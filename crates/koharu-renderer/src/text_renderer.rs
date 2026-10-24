@@ -173,7 +173,7 @@ impl TextRenderer {
                     })
                     .collect(),
             });
-            if behind_fill {
+            if behind_fill && !border.is_empty() {
                 scene.commands.push(command.clone());
             }
             draw_layout(
@@ -188,7 +188,7 @@ impl TextRenderer {
                     dilation_px: 0.0,
                 },
             );
-            if !behind_fill {
+            if !behind_fill && !border.is_empty() {
                 scene.commands.push(command);
             }
             return Ok(bounds);

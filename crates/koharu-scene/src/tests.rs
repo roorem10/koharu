@@ -120,7 +120,6 @@ async fn built_in_component_schema_revisions_are_explicit() {
             schema::<OcrAnalysis>(),
             schema::<Group>(),
             schema::<TextGroup>(),
-            schema::<Typography>(),
             schema::<Region>(),
             schema::<DetectionAnalysis>(),
             schema::<EntityOrigin>(),
@@ -128,8 +127,9 @@ async fn built_in_component_schema_revisions_are_explicit() {
             schema::<crate::components::Assets>(),
             schema::<Relation>(),
         ],
-        [1; 18]
+        [1; 17]
     );
+    assert_eq!(schema::<Typography>(), 2);
     assert_eq!(schema::<TextLayout>(), 2);
 }
 
