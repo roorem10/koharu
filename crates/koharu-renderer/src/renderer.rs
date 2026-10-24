@@ -1459,6 +1459,15 @@ fn resolve_stroke(typography: Option<&Typography>) -> Option<StrokeOptions> {
     Some(StrokeOptions {
         color: typography.stroke_color.unwrap_or([u8::MAX; 4]),
         width_px,
+        method: typography
+            .stroke_method
+            .unwrap_or(koharu_scene::StrokeMethod::Expansion),
+        position: typography
+            .stroke_position
+            .unwrap_or(koharu_scene::StrokePosition::Outside),
+        join: typography
+            .stroke_join
+            .unwrap_or(koharu_scene::StrokeJoin::Round),
     })
 }
 
@@ -1719,6 +1728,9 @@ mod tests {
             color: None,
             stroke_color: None,
             stroke_width: None,
+            stroke_method: None,
+            stroke_position: None,
+            stroke_join: None,
             alignment: None,
             writing_mode: Some(koharu_scene::WritingMode::Vertical),
             extensions: BTreeMap::new(),
@@ -1755,6 +1767,9 @@ mod tests {
             color: None,
             stroke_color: None,
             stroke_width: None,
+            stroke_method: None,
+            stroke_position: None,
+            stroke_join: None,
             alignment: None,
             writing_mode: Some(koharu_scene::WritingMode::Vertical),
             extensions: BTreeMap::new(),

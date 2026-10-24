@@ -121,7 +121,11 @@
       "bundled": "內建",
       "system": "系統"
     },
-    "style": "樣式"
+    "style": "樣式",
+    "favorites": "我的最愛",
+    "allFonts": "所有字型",
+    "addFavorite": "將{{family}}加入我的最愛",
+    "removeFavorite": "將{{family}}從我的最愛移除"
   },
   "inference": {
     "currentPage": "目前頁面",
@@ -199,7 +203,18 @@
     "unplaced": "未放置",
     "vertical": "直排",
     "weight": "字重",
-    "width": "寬度"
+    "width": "寬度",
+    "outlineMethod": "描邊方式",
+    "outlineExpansion": "擴張",
+    "outlineContour": "輪廓描邊",
+    "outlinePosition": "位置",
+    "outlineOutside": "外側",
+    "outlineCenter": "置中",
+    "outlineInside": "內側",
+    "outlineJoin": "轉角",
+    "outlineRound": "圓角",
+    "outlineMiter": "尖角",
+    "outlineBevel": "斜角"
   },
   "languages": {
     "ar": "العربية",

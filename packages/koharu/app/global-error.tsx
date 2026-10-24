@@ -15,7 +15,7 @@ export default function GlobalError({
   const { t, i18n } = useTranslation()
 
   useEffect(() => {
-    Sentry.captureException(error)
+    if (process.env.NEXT_PUBLIC_KOHARU_PREVIEW !== '1') Sentry.captureException(error)
   }, [error])
 
   return (

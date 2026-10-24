@@ -3,12 +3,49 @@ use koharu_renderer::{
     FontStyle as RenderFontStyle,
 };
 use koharu_scene::FontStyle;
-use serde::Serialize;
+use std::collections::BTreeSet;
+
+use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{State, ipc::IpcResponse};
 
 use super::Error;
 use koharu_desktop::Desktop;
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(default)]
+struct FontPreferences {
+    favorites: BTreeSet<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn get_font_favorites() -> std::result::Result<Vec<String>, Error> {
+    let config = koharu_config::load::<FontPreferences>("fonts")?;
+    Ok(config.read()?.favorites.iter().cloned().collect())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn set_font_favorite(
+    family_name: String,
+    favorite: bool,
+) -> std::result::Result<Vec<String>, Error> {
+    let family_name = family_name.trim();
+    if family_name.is_empty() || family_name.len() > 4096 || family_name.contains('\0') {
+        return Err(anyhow::anyhow!("invalid font family name").into());
+    }
+    let config = koharu_config::load::<FontPreferences>("fonts")?;
+    let mut preferences = config.write()?;
+    if favorite {
+        preferences.favorites.insert(family_name.to_owned());
+    } else {
+        preferences.favorites.remove(family_name);
+    }
+    let favorites = preferences.favorites.iter().cloned().collect();
+    preferences.save()?;
+    Ok(favorites)
+}
 
 #[derive(Clone, Debug, Serialize, Type)]
 pub struct FontFamily {

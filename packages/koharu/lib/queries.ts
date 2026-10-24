@@ -18,6 +18,7 @@ export const pagesKey = ['pages'] as const
 export const pageKey = ['page'] as const
 export const preparedPageKey = (page: string) => ['prepared-page', page] as const
 export const fontsKey = ['fonts'] as const
+export const fontFavoritesKey = ['font-favorites'] as const
 
 const projectQuery = queryOptions({
   queryKey: projectKey,
@@ -64,6 +65,27 @@ export function usePage(enabled = true) {
 
 export function useFonts(enabled = true) {
   return useQuery({ ...fontsQuery, enabled })
+}
+
+export function useFontFavorites(enabled = true) {
+  const favorites = useQuery({
+    queryKey: fontFavoritesKey,
+    queryFn: () => call(commands.getFontFavorites),
+    enabled,
+  })
+  const busy = useIsMutating({ mutationKey: fontFavoritesKey }) > 0
+  const mutation = useMutation({
+    mutationKey: fontFavoritesKey,
+    scope: { id: 'font-favorites' },
+    mutationFn: ({ family, favorite }: { family: string; favorite: boolean }) =>
+      call(commands.setFontFavorite, family, favorite),
+    onSuccess: (names) => queryClient.setQueryData(fontFavoritesKey, names),
+  })
+  return {
+    favorites: favorites.data ?? [],
+    busy: busy || favorites.isPending || favorites.isError,
+    setFavorite: (family: string, favorite: boolean) => mutation.mutate({ family, favorite }),
+  }
 }
 
 export function useFontPreview(font: FontFamily | undefined, enabled = true) {

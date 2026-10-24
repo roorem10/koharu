@@ -1,7 +1,13 @@
 import * as Sentry from '@sentry/nextjs'
 
-Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-})
+const enabled = process.env.NEXT_PUBLIC_KOHARU_PREVIEW !== '1'
 
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart
+if (enabled) {
+  Sentry.init({
+    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  })
+}
+
+export const onRouterTransitionStart: typeof Sentry.captureRouterTransitionStart = (...args) => {
+  if (enabled) Sentry.captureRouterTransitionStart(...args)
+}

@@ -121,7 +121,11 @@
       "bundled": "Incluídas",
       "system": "Sistema"
     },
-    "style": "Estilo"
+    "style": "Estilo",
+    "favorites": "Favoritos",
+    "allFonts": "Todas as fontes",
+    "addFavorite": "Adicionar {{family}} aos favoritos",
+    "removeFavorite": "Remover {{family}} dos favoritos"
   },
   "inference": {
     "currentPage": "Página atual",
@@ -199,7 +203,18 @@
     "unplaced": "Não posicionado",
     "vertical": "Vertical",
     "weight": "Peso",
-    "width": "Largura"
+    "width": "Largura",
+    "outlineMethod": "Método do contorno",
+    "outlineExpansion": "Expansão",
+    "outlineContour": "Traçado do contorno",
+    "outlinePosition": "Posição",
+    "outlineOutside": "Externo",
+    "outlineCenter": "Centro",
+    "outlineInside": "Interno",
+    "outlineJoin": "Cantos",
+    "outlineRound": "Redondos",
+    "outlineMiter": "Pontiagudos",
+    "outlineBevel": "Chanfrados"
   },
   "languages": {
     "ar": "العربية",

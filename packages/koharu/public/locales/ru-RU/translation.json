@@ -121,7 +121,11 @@
       "bundled": "Встроенные",
       "system": "Системные"
     },
-    "style": "Стиль"
+    "style": "Стиль",
+    "favorites": "Избранное",
+    "allFonts": "Все шрифты",
+    "addFavorite": "Добавить {{family}} в избранное",
+    "removeFavorite": "Удалить {{family}} из избранного"
   },
   "inference": {
     "currentPage": "Текущая страница",
@@ -199,7 +203,18 @@
     "unplaced": "Не размещено",
     "vertical": "Вертикально",
     "weight": "Насыщенность",
-    "width": "Ширина"
+    "width": "Ширина",
+    "outlineMethod": "Способ обводки",
+    "outlineExpansion": "Расширение",
+    "outlineContour": "Контурная обводка",
+    "outlinePosition": "Положение",
+    "outlineOutside": "Снаружи",
+    "outlineCenter": "По центру",
+    "outlineInside": "Внутри",
+    "outlineJoin": "Углы",
+    "outlineRound": "Скруглённые",
+    "outlineMiter": "Острые",
+    "outlineBevel": "Скошенные"
   },
   "languages": {
     "ar": "العربية",

@@ -4,10 +4,16 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use koharu_rasterizer::{
-    PreparedGlyph, PreparedGlyphRun, PreparedResource, PreparedScene, PreparedSceneCommand,
-    ResourceId,
+    FillRule, PathElement, PreparedGlyph, PreparedGlyphRun, PreparedPath, PreparedResource,
+    PreparedScene, PreparedSceneCommand, PreparedStrokePath, ResourceId,
 };
-use vello::kurbo::Affine;
+use koharu_scene::{StrokeJoin, StrokeMethod, StrokePosition};
+use skrifa::{
+    GlyphId, MetadataProvider,
+    instance::Size,
+    outline::{DrawSettings, OutlinePen},
+};
+use vello::kurbo::{Affine, BezPath, Diagonal2, Join, PathEl, Rect, Shape, expand_path};
 
 use crate::{
     Error, FontStyle, HyphenationPolicy, LayoutRun, RenderBounds, RenderDiagnostic,
@@ -63,6 +69,9 @@ pub(crate) struct RenderedTextMetadata {
 pub(crate) struct StrokeOptions {
     pub color: [u8; 4],
     pub width_px: f32,
+    pub method: StrokeMethod,
+    pub position: StrokePosition,
+    pub join: StrokeJoin,
 }
 
 /// Paint options used when recording one laid-out text run into a Vello scene.
@@ -109,7 +118,75 @@ impl TextRenderer {
         writing_mode: WritingMode,
         options: &TextRenderOptions,
         transform: Affine,
-    ) {
+    ) -> Result<Option<Rect>> {
+        if let Some(stroke) = options.stroke.filter(|stroke| {
+            stroke.method == StrokeMethod::Contour && stroke.width_px > 0.0 && stroke.color[3] > 0
+        }) {
+            let contours = text_contours(layout, options)?;
+            let mut fill_options = options.clone();
+            // The contour and fill must use the same unhinted geometry at every zoom level.
+            fill_options.hint_glyphs = false;
+            draw_layout(
+                scene,
+                resources,
+                layout,
+                writing_mode,
+                &fill_options,
+                transform,
+                GlyphPaint {
+                    color: options.color,
+                    dilation_px: 0.0,
+                },
+            );
+            if contours.is_empty() {
+                return Ok(None);
+            }
+            let padding = match stroke.position {
+                StrokePosition::Inside => 0.0,
+                StrokePosition::Center => f64::from(stroke.width_px) * 0.5,
+                StrokePosition::Outside => f64::from(stroke.width_px),
+            } * if stroke.join == StrokeJoin::Miter {
+                4.0
+            } else {
+                1.0
+            };
+            let bounds =
+                transform.transform_rect_bbox(contours.bounding_box().inflate(padding, padding));
+            scene
+                .commands
+                .push(PreparedSceneCommand::StrokePath(PreparedStrokePath {
+                    path: PreparedPath {
+                        fill: FillRule::NonZero,
+                        transform: transform.as_coeffs(),
+                        color: stroke.color,
+                        elements: contours
+                            .elements()
+                            .iter()
+                            .map(|element| match *element {
+                                PathEl::MoveTo(p) => PathElement::MoveTo([p.x, p.y]),
+                                PathEl::LineTo(p) => PathElement::LineTo([p.x, p.y]),
+                                PathEl::QuadTo(c, p) => PathElement::QuadTo([c.x, c.y, p.x, p.y]),
+                                PathEl::CurveTo(c1, c2, p) => {
+                                    PathElement::CurveTo([c1.x, c1.y, c2.x, c2.y, p.x, p.y])
+                                }
+                                PathEl::ClosePath => PathElement::Close,
+                            })
+                            .collect(),
+                    },
+                    width: f64::from(stroke.width_px),
+                    position: match stroke.position {
+                        StrokePosition::Outside => koharu_rasterizer::StrokePosition::Outside,
+                        StrokePosition::Center => koharu_rasterizer::StrokePosition::Center,
+                        StrokePosition::Inside => koharu_rasterizer::StrokePosition::Inside,
+                    },
+                    join: match stroke.join {
+                        StrokeJoin::Round => koharu_rasterizer::StrokeJoin::Round,
+                        StrokeJoin::Miter => koharu_rasterizer::StrokeJoin::Miter,
+                        StrokeJoin::Bevel => koharu_rasterizer::StrokeJoin::Bevel,
+                    },
+                }));
+            return Ok(Some(bounds));
+        }
         // The border is drawn first as an outward-only dilation of the glyph outline (see
         // `draw_layout`), then the ordinary fill is drawn on top in the foreground color. Unlike a
         // centered stroke, a dilation never grows inward, so it can't punch a hole through small
@@ -143,6 +220,7 @@ impl TextRenderer {
                 dilation_px: 0.0,
             },
         );
+        Ok(None)
     }
 
     pub(crate) fn render_descriptor(
@@ -257,14 +335,19 @@ impl TextRenderer {
         if let Some(stroke) = descriptor.stroke {
             options.stroke = Some(stroke);
         }
-        self.render(
-            &mut scene,
-            &mut resources,
-            &layout,
-            descriptor.writing_mode,
-            &options,
-            transform,
-        );
+        let contour_bounds = self
+            .render(
+                &mut scene,
+                &mut resources,
+                &layout,
+                descriptor.writing_mode,
+                &options,
+                transform,
+            )
+            .map_err(|source| Error::Layout {
+                entity: descriptor.entity,
+                source,
+            })?;
         let mut diagnostics = Vec::new();
         if layout.font_size + f32::EPSILON < descriptor.minimum_font_size {
             diagnostics.push(RenderDiagnostic::TextBelowReadableSize {
@@ -290,15 +373,25 @@ impl TextRenderer {
         };
         let stroke_padding = descriptor
             .stroke
+            .filter(|stroke| stroke.method == StrokeMethod::Expansion)
             .map_or(0.0, |stroke| stroke.width_px.max(0.0));
+        let mut local_bounds = Rect::new(
+            f64::from(rendered_bounds.x - stroke_padding),
+            f64::from(rendered_bounds.y - stroke_padding),
+            f64::from(rendered_bounds.x + rendered_bounds.width + stroke_padding),
+            f64::from(rendered_bounds.y + rendered_bounds.height + stroke_padding),
+        );
+        if let Some(contour_bounds) = contour_bounds {
+            local_bounds = local_bounds.union(contour_bounds);
+        }
         Ok(RenderedTextNode {
             scene: Arc::new(scene),
             resources: resources.into(),
             local_bounds: RenderBounds {
-                x: rendered_bounds.x - stroke_padding,
-                y: rendered_bounds.y - stroke_padding,
-                width: rendered_bounds.width + stroke_padding * 2.0,
-                height: rendered_bounds.height + stroke_padding * 2.0,
+                x: local_bounds.x0 as f32,
+                y: local_bounds.y0 as f32,
+                width: local_bounds.width() as f32,
+                height: local_bounds.height() as f32,
             },
             metadata: RenderedTextMetadata {
                 rendered_bounds,
@@ -316,6 +409,79 @@ impl TextRenderer {
             },
             diagnostics,
         })
+    }
+}
+
+fn text_contours(layout: &LayoutRun<'_>, options: &TextRenderOptions) -> Result<BezPath> {
+    let mut contours = BezPath::new();
+    for line in &layout.lines {
+        let (baseline_x, baseline_y) = line.baseline;
+        let (mut pen_x, mut pen_y) = (0.0, 0.0);
+        for glyph in &line.glyphs {
+            let font = glyph.font.skrifa_ref()?;
+            if let Some(outline) = font.outline_glyphs().get(GlyphId::new(glyph.glyph_id)) {
+                let mut path = BezPath::new();
+                outline.draw(
+                    DrawSettings::unhinted(Size::new(layout.font_size), glyph.font.location()),
+                    &mut ContourPen(&mut path),
+                )?;
+                if glyph.font.synthetic_bold() {
+                    // Match Vello's synthetic weight for fallback faces. The border itself is
+                    // always a conventional stroke, never a large glyph expansion.
+                    path = expand_path(&path, Diagonal2::new(1.0, 1.0), Join::Round, 4.0, 0.1);
+                }
+                let skew = glyph
+                    .font
+                    .synthetic_skew()
+                    .map_or(Affine::IDENTITY, |angle| {
+                        Affine::skew(-(f64::from(angle).to_radians().tan()), 0.0)
+                    });
+                path.apply_affine(
+                    Affine::translate((
+                        f64::from(options.padding + baseline_x + pen_x + glyph.x_offset),
+                        f64::from(
+                            options.padding + baseline_y + pen_y
+                                - glyph.y_offset
+                                - options.baseline_shift,
+                        ),
+                    )) * skew
+                        * Affine::scale_non_uniform(1.0, -1.0),
+                );
+                // Normalize face winding before combining fallback fonts into one clipping path.
+                if path.area() < 0.0 {
+                    path = path.reverse_subpaths();
+                }
+                contours.extend(path.elements().iter().copied());
+            }
+            pen_x += glyph.x_advance;
+            pen_y -= glyph.y_advance;
+        }
+    }
+    Ok(contours)
+}
+
+struct ContourPen<'a>(&'a mut BezPath);
+
+impl OutlinePen for ContourPen<'_> {
+    fn move_to(&mut self, x: f32, y: f32) {
+        self.0.move_to((f64::from(x), f64::from(y)));
+    }
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.0.line_to((f64::from(x), f64::from(y)));
+    }
+    fn quad_to(&mut self, cx: f32, cy: f32, x: f32, y: f32) {
+        self.0
+            .quad_to((f64::from(cx), f64::from(cy)), (f64::from(x), f64::from(y)));
+    }
+    fn curve_to(&mut self, c1x: f32, c1y: f32, c2x: f32, c2y: f32, x: f32, y: f32) {
+        self.0.curve_to(
+            (f64::from(c1x), f64::from(c1y)),
+            (f64::from(c2x), f64::from(c2y)),
+            (f64::from(x), f64::from(y)),
+        );
+    }
+    fn close(&mut self) {
+        self.0.close_path();
     }
 }
 
@@ -490,13 +656,30 @@ mod tests {
             .unwrap();
         let mut scene = PreparedScene::default();
         let mut resources = Vec::new();
-        TextRenderer::new().render(
-            &mut scene,
-            &mut resources,
-            &layout,
-            WritingMode::Horizontal,
-            &TextRenderOptions::default(),
-            Affine::IDENTITY,
+        TextRenderer::new()
+            .render(
+                &mut scene,
+                &mut resources,
+                &layout,
+                WritingMode::Horizontal,
+                &TextRenderOptions {
+                    stroke: Some(StrokeOptions {
+                        color: [255, 255, 255, 255],
+                        width_px: 6.0,
+                        method: StrokeMethod::Contour,
+                        position: StrokePosition::Outside,
+                        join: StrokeJoin::Round,
+                    }),
+                    ..TextRenderOptions::default()
+                },
+                Affine::IDENTITY,
+            )
+            .unwrap();
+        assert!(
+            scene
+                .commands
+                .iter()
+                .any(|command| matches!(command, PreparedSceneCommand::StrokePath(_)))
         );
         assert_eq!(resources.len(), 1);
         assert!(matches!(

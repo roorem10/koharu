@@ -41,6 +41,8 @@ export const commands = {
 	getThumbnail: (page: EntityId) => __TAURI_INVOKE<ThumbnailBytes>("get_thumbnail", { page }),
 	getFonts: () => __TAURI_INVOKE<FontFamily[]>("get_fonts"),
 	getFontPreview: (familyName: string) => __TAURI_INVOKE<FontPreviewBytes>("get_font_preview", { familyName }),
+	getFontFavorites: () => __TAURI_INVOKE<string[]>("get_font_favorites"),
+	setFontFavorite: (familyName: string, favorite: boolean) => __TAURI_INVOKE<string[]>("set_font_favorite", { familyName, favorite }),
 	savePreferences: (pipeline: PipelineConfig, providers: ProviderPreferences, typesetting: TypesettingConfig) => __TAURI_INVOKE<Preferences>("save_preferences", { pipeline, providers, typesetting }),
 	getPreferences: () => __TAURI_INVOKE<Preferences>("get_preferences"),
 	getTranslationModels: () => __TAURI_INVOKE<Model[]>("get_translation_models"),
@@ -453,6 +455,12 @@ export type StartupState = {
 	canvas: CanvasState,
 };
 
+export type StrokeJoin = "round" | "miter" | "bevel";
+
+export type StrokeMethod = "expansion" | "contour";
+
+export type StrokePosition = "outside" | "center" | "inside";
+
 export type TextAlignment = "Start" | "Center" | "End" | "Justify";
 
 export type TextContent = {
@@ -497,6 +505,9 @@ export type Typography = {
 	color: [number, number, number, number] | null,
 	stroke_color: [number, number, number, number] | null,
 	stroke_width: number | null,
+	stroke_method: StrokeMethod | null,
+	stroke_position: StrokePosition | null,
+	stroke_join: StrokeJoin | null,
 	alignment: TextAlignment | null,
 	writing_mode: WritingMode | null,
 };

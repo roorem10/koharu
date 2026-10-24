@@ -1,7 +1,10 @@
 use sentry::{ClientOptions, IntoDsn};
 use tracing_subscriber::registry::LookupSpan;
 
-pub fn initialize() -> sentry::ClientInitGuard {
+pub fn initialize() -> Option<sentry::ClientInitGuard> {
+    if option_env!("KOHARU_PRIVATE_PREVIEW") == Some("1") {
+        return None;
+    }
     let mut options = ClientOptions::new()
         .maybe_release(sentry::release_name!())
         .send_default_pii(true)
@@ -10,7 +13,7 @@ pub fn initialize() -> sentry::ClientInitGuard {
     options.dsn = option_env!("SENTRY_DSN")
         .into_dsn()
         .expect("invalid SENTRY_DSN environment variable");
-    sentry::init(options)
+    Some(sentry::init(options))
 }
 
 pub fn tracing_layer<S>() -> impl tracing_subscriber::Layer<S>

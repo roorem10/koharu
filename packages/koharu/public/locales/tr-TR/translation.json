@@ -121,7 +121,11 @@
       "bundled": "Paketlenmiş",
       "system": "Sistem"
     },
-    "style": "Stil"
+    "style": "Stil",
+    "favorites": "Favoriler",
+    "allFonts": "Tüm yazı tipleri",
+    "addFavorite": "{{family}} yazı tipini favorilere ekle",
+    "removeFavorite": "{{family}} yazı tipini favorilerden kaldır"
   },
   "inference": {
     "currentPage": "Geçerli sayfa",
@@ -199,7 +203,18 @@
     "unplaced": "Yerleştirilmedi",
     "vertical": "Dikey",
     "weight": "Kalınlık",
-    "width": "Genişlik"
+    "width": "Genişlik",
+    "outlineMethod": "Anahat yöntemi",
+    "outlineExpansion": "Genişletme",
+    "outlineContour": "Kontur çizgisi",
+    "outlinePosition": "Konum",
+    "outlineOutside": "Dışta",
+    "outlineCenter": "Ortada",
+    "outlineInside": "İçte",
+    "outlineJoin": "Köşeler",
+    "outlineRound": "Yuvarlak",
+    "outlineMiter": "Keskin",
+    "outlineBevel": "Pah"
   },
   "languages": {
     "ar": "العربية",

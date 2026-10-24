@@ -92,6 +92,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             output::get_thumbnail,
             fonts::get_fonts,
             fonts::get_font_preview,
+            fonts::get_font_favorites,
+            fonts::set_font_favorite,
             preferences::save_preferences,
             preferences::get_preferences,
             preferences::get_translation_models,

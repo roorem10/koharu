@@ -121,7 +121,11 @@
       "bundled": "مضمّن",
       "system": "النظام"
     },
-    "style": "النمط"
+    "style": "النمط",
+    "favorites": "المفضلة",
+    "allFonts": "كل الخطوط",
+    "addFavorite": "إضافة {{family}} إلى المفضلة",
+    "removeFavorite": "إزالة {{family}} من المفضلة"
   },
   "inference": {
     "currentPage": "الصفحة الحالية",
@@ -199,7 +203,18 @@
     "unplaced": "غير موضوع",
     "vertical": "عمودي",
     "weight": "الوزن",
-    "width": "العرض"
+    "width": "العرض",
+    "outlineMethod": "طريقة الحدود",
+    "outlineExpansion": "توسيع",
+    "outlineContour": "حدود المسار",
+    "outlinePosition": "الموضع",
+    "outlineOutside": "الخارج",
+    "outlineCenter": "الوسط",
+    "outlineInside": "الداخل",
+    "outlineJoin": "الزوايا",
+    "outlineRound": "مستديرة",
+    "outlineMiter": "حادة",
+    "outlineBevel": "مشطوفة"
   },
   "languages": {
     "ar": "العربية",

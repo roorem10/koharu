@@ -1,0 +1,12 @@
+{
+  "identifier": "rs.koharu.typesetting-preview",
+  "productName": "Koharu Typesetting Preview",
+  "build": {
+    "windows": {
+      "staticVCRuntime": false
+    }
+  },
+  "bundle": {
+    "createUpdaterArtifacts": false
+  }
+}

@@ -124,7 +124,7 @@ function StartupBoundary({ children }: { children: ReactNode }) {
   return initialized ? (
     <>
       {children}
-      <Updater />
+      {process.env.NEXT_PUBLIC_KOHARU_PREVIEW !== '1' && <Updater />}
     </>
   ) : (
     <StartupView />

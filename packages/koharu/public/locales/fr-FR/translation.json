@@ -121,7 +121,11 @@
       "bundled": "Intégrées",
       "system": "Système"
     },
-    "style": "Style"
+    "style": "Style",
+    "favorites": "Favoris",
+    "allFonts": "Toutes les polices",
+    "addFavorite": "Ajouter {{family}} aux favoris",
+    "removeFavorite": "Retirer {{family}} des favoris"
   },
   "inference": {
     "currentPage": "Page actuelle",
@@ -199,7 +203,18 @@
     "unplaced": "Non placé",
     "vertical": "Vertical",
     "weight": "Graisse",
-    "width": "Largeur"
+    "width": "Largeur",
+    "outlineMethod": "Méthode du contour",
+    "outlineExpansion": "Expansion",
+    "outlineContour": "Tracé du contour",
+    "outlinePosition": "Position",
+    "outlineOutside": "Extérieur",
+    "outlineCenter": "Centre",
+    "outlineInside": "Intérieur",
+    "outlineJoin": "Angles",
+    "outlineRound": "Arrondis",
+    "outlineMiter": "Pointus",
+    "outlineBevel": "Biseautés"
   },
   "languages": {
     "ar": "العربية",

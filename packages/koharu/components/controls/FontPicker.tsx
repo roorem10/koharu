@@ -2,11 +2,11 @@
 
 import { observeElementRect, useVirtualizer } from '@tanstack/react-virtual'
 import type { TFunction } from 'i18next'
-import { ChevronDown, ListFilter, Search, X } from 'lucide-react'
+import { ChevronDown, ListFilter, Search, Star, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { useFontPreview } from '@/lib/queries'
+import { useFontFavorites, useFontPreview } from '@/lib/queries'
 import type { FontFamily, FontSource } from '@koharu/bridge/protocol'
 import { Badge } from '@koharu/ui/components/badge'
 import { Button } from '@koharu/ui/components/button'
@@ -35,6 +35,7 @@ import { Separator } from '@koharu/ui/components/separator'
 import { cn } from '@koharu/ui/lib/utils'
 
 const rowHeight = 38
+const headingHeight = 24
 const listHeight = 248
 const allFonts = '__all_fonts__'
 
@@ -68,6 +69,7 @@ export function FontPicker({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<Filters>(emptyFilters)
+  const { favorites, busy: savingFavorite, setFavorite } = useFontFavorites(open)
   const input = useRef<HTMLInputElement>(null)
   const orderedFamilies = useMemo(
     () =>
@@ -188,6 +190,12 @@ export function FontPicker({
             key={`${query}:${filters.source}:${filters.script}:${filters.category}:${filters.useCase}`}
             families={results}
             value={value}
+            favorites={favorites}
+            savingFavorite={savingFavorite}
+            onFavorite={(family, favorite) => {
+              setFavorite(family, favorite)
+              input.current?.focus({ preventScroll: true })
+            }}
             onSelect={(family) => {
               onChange(family)
               setOpen(false)
@@ -342,33 +350,77 @@ function FontResultSummary({
 function FontList({
   families,
   value,
+  favorites,
+  savingFavorite,
+  onFavorite,
   onSelect,
 }: {
   families: FontFamily[]
   value: string
+  favorites: string[]
+  savingFavorite: boolean
+  onFavorite: (family: string, favorite: boolean) => void
   onSelect: (family: string) => void
 }) {
   const { t } = useTranslation()
   const list = useRef<HTMLDivElement>(null)
-  const selectedIndex = families.findIndex(
-    (family) => normalizeFontName(family.name) === normalizeFontName(value),
+  const favoriteNames = useMemo(() => new Set(favorites.map(normalizeFontName)), [favorites])
+  const rows = useMemo(() => {
+    type Row =
+      | { kind: 'heading'; key: string; label: string }
+      | { kind: 'font'; key: string; family: FontFamily }
+    const starred = families
+      .filter((family) => favoriteNames.has(normalizeFontName(family.name)))
+      .sort((left, right) =>
+        left.name.localeCompare(right.name, undefined, { sensitivity: 'base', numeric: true }),
+      )
+    const result: Row[] = []
+    if (starred.length > 0) {
+      result.push({ kind: 'heading', key: 'favorites', label: t('fontPicker.favorites') })
+      result.push(
+        ...starred.map((family): Row => ({
+          kind: 'font',
+          key: `favorite:${normalizeFontName(family.name)}`,
+          family,
+        })),
+      )
+      result.push({ kind: 'heading', key: 'all-fonts', label: t('fontPicker.allFonts') })
+    }
+    result.push(
+      ...families.map((family): Row => ({
+        kind: 'font',
+        key: `all:${normalizeFontName(family.name)}`,
+        family,
+      })),
+    )
+    return result
+  }, [families, favoriteNames, t])
+  const hasFavorites = rows[0]?.kind === 'heading'
+  const selectedIndex = rows.findIndex(
+    (row) => row.kind === 'font' && normalizeFontName(row.family.name) === normalizeFontName(value),
   )
   const virtualizer = useVirtualizer({
-    count: families.length,
+    count: rows.length,
     getScrollElement: () => list.current,
-    getItemKey: (index) => normalizeFontName(families[index]?.name ?? String(index)),
-    estimateSize: () => rowHeight,
+    getItemKey: (index) => rows[index]?.key ?? index,
+    estimateSize: (index) => (rows[index]?.kind === 'heading' ? headingHeight : rowHeight),
     overscan: 6,
-    initialOffset: Math.max(
-      0,
-      selectedIndex * rowHeight - Math.floor((listHeight / rowHeight - 1) / 2) * rowHeight,
-    ),
+    initialOffset: hasFavorites
+      ? 0
+      : Math.max(
+          0,
+          selectedIndex * rowHeight - Math.floor((listHeight / rowHeight - 1) / 2) * rowHeight,
+        ),
     initialRect: { width: 240, height: listHeight },
     observeElementRect: (instance, callback) =>
       observeElementRect(instance, (rect) =>
         callback({ width: rect.width || 240, height: rect.height || listHeight }),
       ),
   })
+
+  useEffect(() => {
+    if (hasFavorites) virtualizer.scrollToOffset(0)
+  }, [hasFavorites, virtualizer])
 
   return (
     <ScrollArea
@@ -381,13 +433,36 @@ function FontList({
         height:
           families.length === 0
             ? rowHeight * 2
-            : Math.min(listHeight, Math.max(rowHeight, families.length * rowHeight)),
+            : Math.min(
+                listHeight,
+                Math.max(
+                  rowHeight,
+                  rows.reduce(
+                    (height, row) => height + (row.kind === 'heading' ? headingHeight : rowHeight),
+                    0,
+                  ),
+                ),
+              ),
       }}
     >
       <div className='relative' style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {
-          const family = families[virtualRow.index]
-          if (!family) return null
+          const row = rows[virtualRow.index]
+          if (!row) return null
+          if (row.kind === 'heading') {
+            return (
+              <div
+                key={virtualRow.key}
+                role='presentation'
+                className='absolute inset-x-0 top-0 flex h-6 items-center bg-muted/50 px-2 text-[10px] font-medium text-muted-foreground'
+                style={{ transform: `translateY(${virtualRow.start}px)` }}
+              >
+                {row.label}
+              </div>
+            )
+          }
+          const family = row.family
+          const starred = favoriteNames.has(normalizeFontName(family.name))
           const selected = normalizeFontName(family.name) === normalizeFontName(value)
           const source = t(
             family.sources.includes('bundled')
@@ -395,27 +470,43 @@ function FontList({
               : 'fontPicker.sources.system',
           )
           return (
-            <button
+            <div
               key={virtualRow.key}
-              type='button'
-              role='option'
-              aria-label={t('fontPicker.fontLabel', { family: family.name, source })}
-              aria-selected={selected}
               className={cn(
-                'absolute inset-x-0 top-0 flex h-9.5 w-full items-center px-2 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none',
+                'absolute inset-x-0 top-0 flex h-9.5 w-full items-center focus-within:bg-accent hover:bg-accent',
                 selected && 'bg-accent text-accent-foreground',
               )}
               style={{ transform: `translateY(${virtualRow.start}px)` }}
-              onClick={() => onSelect(family.name)}
             >
-              <div className='flex min-w-0 flex-1 flex-col justify-center gap-px'>
+              <button
+                type='button'
+                role='option'
+                aria-label={t('fontPicker.fontLabel', { family: family.name, source })}
+                aria-selected={selected}
+                className='flex h-full min-w-0 flex-1 flex-col justify-center gap-px px-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring'
+                onClick={() => onSelect(family.name)}
+              >
                 <FontPreviewLabel family={family} className='h-4.5 w-full min-w-0' />
                 <div className='flex min-w-0 items-center justify-between gap-2 text-[8px] leading-none text-muted-foreground'>
                   <span className='min-w-0 truncate'>{family.name}</span>
                   <span className='shrink-0'>{source}</span>
                 </div>
-              </div>
-            </button>
+              </button>
+              <Button
+                type='button'
+                variant='ghost'
+                size='icon'
+                className='mr-1 size-7 shrink-0'
+                aria-label={t(starred ? 'fontPicker.removeFavorite' : 'fontPicker.addFavorite', {
+                  family: family.name,
+                })}
+                aria-pressed={starred}
+                disabled={savingFavorite}
+                onClick={() => onFavorite(family.name, !starred)}
+              >
+                <Star className={cn('size-3.5', starred && 'fill-current text-amber-500')} />
+              </Button>
+            </div>
           )
         })}
       </div>

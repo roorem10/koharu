@@ -55,6 +55,7 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 Element.prototype.scrollIntoView = vi.fn()
+Element.prototype.scrollTo = vi.fn()
 Element.prototype.setPointerCapture = vi.fn()
 Element.prototype.hasPointerCapture = vi.fn(() => true)
 Element.prototype.releasePointerCapture = vi.fn()
