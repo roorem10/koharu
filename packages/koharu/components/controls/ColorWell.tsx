@@ -32,11 +32,18 @@ export function ColorWell(props: ColorWellProps) {
   const { value, label, size = 'default', disabled = false, allowTransparent = false } = props
   const [draft, setDraft] = useState(value ?? '#000000')
   const [transparent, setTransparent] = useState(value === null)
+  // A picker drag can update the swatch without its end event firing (for example when the
+  // drag ends in the black corner). Such a dragged-but-uncommitted color is kept here, apart
+  // from the committed `value`, so closing the picker can apply it and Escape can discard it.
+  // Every other way of settling the color (a committed drag, a typed hex code, Transparent, the
+  // eyedropper or a new value from outside) clears it, so it can never override a later choice.
+  const [pending, setPending] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const sampling = useColorSampling()
   const accessibleLabel = label ?? t('colorPicker.brushColor')
 
   useEffect(() => {
+    setPending(null)
     if (value === null) {
       setTransparent(true)
     } else {
@@ -48,6 +55,7 @@ export function ColorWell(props: ColorWellProps) {
   const set = (color: string) => {
     const normalized = normalize(color)
     setDraft(normalized)
+    setPending(null)
     setTransparent(false)
     if (props.allowTransparent) props.onChange(normalized)
     else props.onChange(normalized)
@@ -55,12 +63,27 @@ export function ColorWell(props: ColorWellProps) {
 
   const clear = () => {
     if (!props.allowTransparent) return
+    setPending(null)
     setTransparent(true)
     props.onChange(null)
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next, details) => {
+        if (!next && pending !== null) {
+          if (details.reason === 'escape-key') {
+            // Escape cancels: show the committed color again and apply nothing.
+            setPending(null)
+            if (value !== null) setDraft(value)
+          } else {
+            set(pending)
+          }
+        }
+        setOpen(next)
+      }}
+    >
       <PopoverTrigger
         aria-label={accessibleLabel}
         disabled={disabled}
@@ -88,7 +111,11 @@ export function ColorWell(props: ColorWellProps) {
         <div>
           <HexColorPicker
             color={draft}
-            onChange={(color) => setDraft(normalize(color))}
+            onChange={(color) => {
+              const normalized = normalize(color)
+              setDraft(normalized)
+              setPending(normalized)
+            }}
             onChangeEnd={set}
           />
         </div>
@@ -106,6 +133,10 @@ export function ColorWell(props: ColorWellProps) {
               variant='outline'
               aria-label={t('colorPicker.sampleCanvas')}
               onClick={() => {
+                // Sampling replaces any uncommitted drag: a picked color commits through `set`,
+                // and canceling the eyedropper leaves the committed color unchanged.
+                setPending(null)
+                if (value !== null) setDraft(value)
                 setOpen(false)
                 sampling.request(set)
               }}

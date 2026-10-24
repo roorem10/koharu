@@ -25,7 +25,12 @@ import {
 import { ProviderPreferences } from '@/components/preferences/ProviderPreferences'
 import { TranslationPreferences } from '@/components/preferences/TranslationPreferences'
 import { TypesettingPreferences } from '@/components/preferences/TypesettingPreferences'
-import { refreshPreferences, refreshTranslationModels, savePreferences } from '@/lib/backend'
+import {
+  refreshPreferences,
+  refreshTranslationModels,
+  savePreferences,
+  saveShortcuts,
+} from '@/lib/backend'
 import { supportedLanguages } from '@/lib/i18n'
 import { receivePreferences, useKoharuStore, type ShortcutAction } from '@/lib/store'
 import {
@@ -325,7 +330,11 @@ function ShortcutPreferences() {
               maxLength={1}
               value={shortcuts[action]}
               className='ml-auto h-8 w-14 text-center text-[12px] uppercase'
-              onChange={(event) => setShortcut(action, event.currentTarget.value)}
+              onChange={(event) => {
+                setShortcut(action, event.currentTarget.value)
+                // Persist natively so the change survives a restart (koharu#1136).
+                void saveShortcuts(useKoharuStore.getState().shortcuts).catch(() => undefined)
+              }}
             />
           </PreferenceRow>
         ))}

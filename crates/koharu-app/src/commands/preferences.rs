@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::BTreeMap, fmt};
 
 use anyhow::Result;
 use koharu_pipeline::PipelineConfig;
@@ -199,4 +199,45 @@ pub(crate) async fn get_preferences() -> std::result::Result<Preferences, Error>
 #[specta::specta]
 pub(crate) async fn get_translation_models() -> std::result::Result<Vec<Model>, Error> {
     Ok(koharu_translator::Translator::models().await?)
+}
+
+/// Keyboard shortcuts the user changed, by action name. Actions left out use the editor's
+/// built-in defaults, so new actions added later keep their default keys.
+#[derive(Default, Deserialize, Serialize)]
+#[serde(default)]
+struct ShortcutPreferences {
+    keys: BTreeMap<String, String>,
+}
+
+const MAX_SHORTCUTS: usize = 64;
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn get_shortcuts() -> std::result::Result<BTreeMap<String, String>, Error> {
+    let config = koharu_config::load::<ShortcutPreferences>("shortcuts")?;
+    Ok(config.read()?.keys.clone())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn save_shortcuts(
+    shortcuts: BTreeMap<String, String>,
+) -> std::result::Result<BTreeMap<String, String>, Error> {
+    let valid = shortcuts.len() <= MAX_SHORTCUTS
+        && shortcuts.iter().all(|(action, key)| {
+            (1..=32).contains(&action.len())
+                && action
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric() || character == '_')
+                && key.chars().count() <= 1
+                && !key.chars().any(char::is_control)
+        });
+    if !valid {
+        return Err(anyhow::anyhow!("invalid keyboard shortcuts").into());
+    }
+    let config = koharu_config::load::<ShortcutPreferences>("shortcuts")?;
+    let mut preferences = config.write()?;
+    preferences.keys = shortcuts.clone();
+    preferences.save()?;
+    Ok(shortcuts)
 }

@@ -146,6 +146,16 @@ export function receiveStartupState(state: StartupState): void {
   })
 }
 
+/** Apply saved shortcut keys over the defaults, ignoring actions the editor no longer has. */
+export function receiveShortcuts(saved: Partial<{ [key in string]: string }>): void {
+  const shortcuts = { ...defaultShortcuts }
+  for (const action of Object.keys(defaultShortcuts) as ShortcutAction[]) {
+    const key = saved[action]
+    if (typeof key === 'string') shortcuts[action] = key.toLowerCase().slice(0, 1)
+  }
+  useKoharuStore.setState({ shortcuts })
+}
+
 export function receiveCanvas(canvas: CanvasState): void {
   useKoharuStore.setState(canvasSnapshot(canvas))
 }

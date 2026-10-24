@@ -8,7 +8,13 @@ import type {
   TypesettingConfig,
 } from '@koharu/bridge/protocol'
 
-import { receiveError, receivePreferences, receiveTranslationModels } from './store'
+import {
+  receiveError,
+  receivePreferences,
+  receiveShortcuts,
+  receiveTranslationModels,
+  type Shortcuts,
+} from './store'
 
 type Command<Args extends unknown[], Result> = (...args: Args) => Promise<Result>
 
@@ -16,6 +22,8 @@ let translationModelsRequest: Promise<void> | null = null
 let translationModelsGeneration = 0
 let preferencesWriteGeneration = 0
 let preferencesWriteQueue: Promise<void> = Promise.resolve()
+let shortcutsWriteGeneration = 0
+let shortcutsWriteQueue: Promise<void> = Promise.resolve()
 
 export async function call<Args extends unknown[], Result>(
   command: Command<Args, Result>,
@@ -52,6 +60,36 @@ export function savePreferences(
     .catch(() => undefined)
     .then(() => call(commands.savePreferences, pipeline, providers, typesetting))
   preferencesWriteQueue = pending.then(
+    () => undefined,
+    () => undefined,
+  )
+  return pending
+}
+
+/**
+ * Load saved shortcuts unless the user changed one since loading began; a newer local edit
+ * always wins over the startup response.
+ */
+export async function refreshShortcuts(): Promise<void> {
+  const generation = shortcutsWriteGeneration
+  await shortcutsWriteQueue
+  const saved = await call(commands.getShortcuts)
+  if (generation === shortcutsWriteGeneration) receiveShortcuts(saved)
+}
+
+/**
+ * Save the complete shortcut map. Writes run one at a time in edit order, each with its own
+ * copy of the map, so an older save can never land after a newer one. A failed write is
+ * reported by `call` and does not block later saves.
+ */
+export function saveShortcuts(shortcuts: Shortcuts): Promise<void> {
+  shortcutsWriteGeneration += 1
+  const snapshot = { ...shortcuts }
+  const pending = shortcutsWriteQueue
+    .catch(() => undefined)
+    .then(() => call(commands.saveShortcuts, snapshot))
+    .then(() => undefined)
+  shortcutsWriteQueue = pending.then(
     () => undefined,
     () => undefined,
   )
