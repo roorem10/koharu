@@ -3,10 +3,17 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use i_overlay::{core::fill_rule::FillRule as OverlayFillRule, float::simplify::SimplifyShape};
+use i_overlay::{
+    core::{fill_rule::FillRule as OverlayFillRule, overlay_rule::OverlayRule},
+    float::{simplify::SimplifyShape, single::SingleFloatOverlay},
+    mesh::float::{
+        outline::offset::OutlineOffset,
+        style::{LineJoin, OutlineStyle},
+    },
+};
 use koharu_rasterizer::{
     FillRule, PathElement, PreparedGlyph, PreparedGlyphRun, PreparedPath, PreparedResource,
-    PreparedScene, PreparedSceneCommand, PreparedStrokePath, ResourceId,
+    PreparedScene, PreparedSceneCommand, ResourceId,
 };
 use koharu_scene::{StrokeJoin, StrokeMethod, StrokePosition};
 use skrifa::{
@@ -142,52 +149,29 @@ impl TextRenderer {
                 );
                 return Ok(None);
             }
-            // Opaque letters cover the inward half of a full stroke drawn behind them. Cutting
-            // that half away first would antialias the same edge twice and expose the background.
-            // Translucent letters still need a true outside-only stroke to preserve their alpha.
+            // Opaque letters cover the expanded region's interior. Subtracting the letters first
+            // would antialias their shared edge twice and expose the background. Translucent
+            // letters need an outside-only region to preserve their alpha instead.
             let behind_fill = stroke.position == StrokePosition::Outside && options.color[3] == 255;
-            let padding = match stroke.position {
-                StrokePosition::Inside => 0.0,
-                StrokePosition::Center => f64::from(stroke.width_px) * 0.5,
-                StrokePosition::Outside => f64::from(stroke.width_px),
-            } * if stroke.join == StrokeJoin::Miter {
-                4.0
-            } else {
-                1.0
-            };
+            let border = contour_border(&contours, stroke, behind_fill);
             let bounds =
-                transform.transform_rect_bbox(contours.bounding_box().inflate(padding, padding));
-            let command = PreparedSceneCommand::StrokePath(PreparedStrokePath {
-                path: PreparedPath {
-                    fill: FillRule::NonZero,
-                    transform: transform.as_coeffs(),
-                    color: stroke.color,
-                    elements: contours
-                        .elements()
-                        .iter()
-                        .map(|element| match *element {
-                            PathEl::MoveTo(p) => PathElement::MoveTo([p.x, p.y]),
-                            PathEl::LineTo(p) => PathElement::LineTo([p.x, p.y]),
-                            PathEl::QuadTo(c, p) => PathElement::QuadTo([c.x, c.y, p.x, p.y]),
-                            PathEl::CurveTo(c1, c2, p) => {
-                                PathElement::CurveTo([c1.x, c1.y, c2.x, c2.y, p.x, p.y])
-                            }
-                            PathEl::ClosePath => PathElement::Close,
-                        })
-                        .collect(),
-                },
-                width: f64::from(stroke.width_px) * if behind_fill { 2.0 } else { 1.0 },
-                position: match (stroke.position, behind_fill) {
-                    (_, true) => koharu_rasterizer::StrokePosition::Center,
-                    (StrokePosition::Outside, false) => koharu_rasterizer::StrokePosition::Outside,
-                    (StrokePosition::Center, false) => koharu_rasterizer::StrokePosition::Center,
-                    (StrokePosition::Inside, false) => koharu_rasterizer::StrokePosition::Inside,
-                },
-                join: match stroke.join {
-                    StrokeJoin::Round => koharu_rasterizer::StrokeJoin::Round,
-                    StrokeJoin::Miter => koharu_rasterizer::StrokeJoin::Miter,
-                    StrokeJoin::Bevel => koharu_rasterizer::StrokeJoin::Bevel,
-                },
+                (!border.is_empty()).then(|| transform.transform_rect_bbox(border.bounding_box()));
+            let command = PreparedSceneCommand::FillPath(PreparedPath {
+                fill: FillRule::NonZero,
+                transform: transform.as_coeffs(),
+                color: stroke.color,
+                elements: border
+                    .elements()
+                    .iter()
+                    .map(|element| match *element {
+                        PathEl::MoveTo(p) => PathElement::MoveTo([p.x, p.y]),
+                        PathEl::LineTo(p) => PathElement::LineTo([p.x, p.y]),
+                        PathEl::QuadTo(..) | PathEl::CurveTo(..) => {
+                            unreachable!("polygon offsets contain only straight segments")
+                        }
+                        PathEl::ClosePath => PathElement::Close,
+                    })
+                    .collect(),
             });
             if behind_fill {
                 scene.commands.push(command.clone());
@@ -207,7 +191,7 @@ impl TextRenderer {
             if !behind_fill {
                 scene.commands.push(command);
             }
-            return Ok(Some(bounds));
+            return Ok(bounds);
         }
         // The border is drawn first as an outward-only dilation of the glyph outline (see
         // `draw_layout`), then the ordinary fill is drawn on top in the foreground color. Unlike a
@@ -434,7 +418,9 @@ impl TextRenderer {
     }
 }
 
-fn text_contours(layout: &LayoutRun<'_>, options: &TextRenderOptions) -> Result<BezPath> {
+type ContourRegion = Vec<Vec<Vec<[f64; 2]>>>;
+
+fn text_contours(layout: &LayoutRun<'_>, options: &TextRenderOptions) -> Result<ContourRegion> {
     let mut contours = BezPath::new();
     for line in &layout.lines {
         let (baseline_x, baseline_y) = line.baseline;
@@ -484,7 +470,7 @@ fn text_contours(layout: &LayoutRun<'_>, options: &TextRenderOptions) -> Result<
 
 /// Stroke the visible boundary of the complete text, including touching glyphs and overlaps
 /// within variable/CJK glyphs. Nonzero winding preserves counters and self-intersections.
-fn union_contours(path: &BezPath) -> BezPath {
+fn union_contours(path: &BezPath) -> ContourRegion {
     let mut contours: Vec<Vec<[f64; 2]>> = Vec::new();
     let mut contour = Vec::new();
     // The boolean library consumes polygons. At 0.02 layout pixels, the flattening error stays
@@ -513,8 +499,50 @@ fn union_contours(path: &BezPath) -> BezPath {
     if contour.len() >= 3 {
         contours.push(contour);
     }
+    contours.simplify_shape(OverlayFillRule::NonZero)
+}
+
+fn contour_border(contours: &ContourRegion, stroke: StrokeOptions, behind_fill: bool) -> BezPath {
+    let width = f64::from(stroke.width_px);
+    let offset = |distance: f64| {
+        let join = match stroke.join {
+            // Bound arc chord error to about 0.01 layout pixels. The offset library also
+            // clamps the angular step to its supported range.
+            StrokeJoin::Round => LineJoin::Round((8.0 * 0.01 / distance.abs()).sqrt()),
+            // i_overlay takes a minimum interior angle, rather than a miter-length ratio.
+            StrokeJoin::Miter => LineJoin::Miter(2.0 * (1.0_f64 / 4.0).asin()),
+            StrokeJoin::Bevel => LineJoin::Bevel,
+        };
+        contours.outline(
+            &OutlineStyle::new(distance)
+                .line_join(join)
+                .miter_min_turn(0.0),
+        )
+    };
+    // Resolve offset self-intersections before rasterization. A single-winding filled region
+    // avoids coverage accumulation from overlapping wide strokes on the flattened glyphs.
+    let region = match stroke.position {
+        StrokePosition::Outside if behind_fill => offset(width),
+        StrokePosition::Outside => {
+            offset(width).overlay(contours, OverlayRule::Difference, OverlayFillRule::NonZero)
+        }
+        StrokePosition::Center => offset(width * 0.5).overlay(
+            &offset(-width * 0.5),
+            OverlayRule::Difference,
+            OverlayFillRule::NonZero,
+        ),
+        StrokePosition::Inside => contours.overlay(
+            &offset(-width),
+            OverlayRule::Difference,
+            OverlayFillRule::NonZero,
+        ),
+    };
+    contours_path(&region)
+}
+
+fn contours_path(region: &ContourRegion) -> BezPath {
     let mut result = BezPath::new();
-    for shape in contours.simplify_shape(OverlayFillRule::NonZero) {
+    for shape in region {
         for contour in shape {
             if let Some(first) = contour.first() {
                 result.move_to((first[0], first[1]));
@@ -709,7 +737,7 @@ mod tests {
         // Twice the opposite winding cuts the counter through both overlapping glyph shapes.
         raw.extend(hole.elements().iter().copied());
         raw.extend(hole.elements().iter().copied());
-        let united = union_contours(&raw);
+        let united = contours_path(&union_contours(&raw));
         assert_eq!(
             united.winding(Point::new(15.0, 15.0)),
             0,
@@ -736,8 +764,7 @@ mod tests {
             .with_font_size(40.0)
             .run("Ho")
             .unwrap();
-        let bounds = text_contours(&layout, &TextRenderOptions::default())
-            .unwrap()
+        let bounds = contours_path(&text_contours(&layout, &TextRenderOptions::default()).unwrap())
             .bounding_box();
         let transform = Affine::translate((8.37 - bounds.x0, 5.23 - bounds.y0));
         let rasterizer = Rasterizer::new().unwrap();
@@ -765,7 +792,7 @@ mod tests {
                     transform,
                 )
                 .unwrap();
-            let frame = text_bundle(scene, resources)
+            let frame = text_bundle(scene, resources, 160, 48)
                 .into_frame_with_raster_sources(&Default::default())
                 .unwrap();
             rasterizer
@@ -813,34 +840,193 @@ mod tests {
         );
     }
 
-    fn text_bundle(scene: PreparedScene, resources: Vec<PreparedResource>) -> PreparedFrameBundle {
+    #[test]
+    fn contour_regions_preserve_positions_counters_and_corner_styles() {
+        use vello::kurbo::Point;
+        let mut raw = Rect::new(20.0, 20.0, 80.0, 80.0).to_path(0.01);
+        raw.extend(
+            Rect::new(40.0, 40.0, 60.0, 60.0)
+                .to_path(0.01)
+                .reverse_subpaths()
+                .elements()
+                .iter()
+                .copied(),
+        );
+        let contours = union_contours(&raw);
+        for join in [StrokeJoin::Round, StrokeJoin::Miter, StrokeJoin::Bevel] {
+            let stroke = StrokeOptions {
+                color: [255; 4],
+                width_px: 6.0,
+                method: StrokeMethod::Contour,
+                position: StrokePosition::Outside,
+                join,
+            };
+            for (position, outward, inward) in [
+                (StrokePosition::Outside, true, false),
+                (StrokePosition::Center, true, true),
+                (StrokePosition::Inside, false, true),
+            ] {
+                let border = contour_border(&contours, StrokeOptions { position, ..stroke }, false);
+                assert_eq!(border.winding(Point::new(18.0, 50.0)) != 0, outward);
+                assert_eq!(border.winding(Point::new(22.0, 50.0)) != 0, inward);
+                assert_eq!(border.winding(Point::new(42.0, 50.0)) != 0, outward);
+                assert_eq!(border.winding(Point::new(38.0, 50.0)) != 0, inward);
+                assert_eq!(
+                    border.winding(Point::new(50.0, 50.0)),
+                    0,
+                    "counter stays open"
+                );
+                // Overlapping offset pieces must resolve to one winding before area AA.
+                for y in 10..90 {
+                    for x in 10..90 {
+                        assert!(
+                            border
+                                .winding(Point::new(x as f64 + 0.37, y as f64 + 0.23))
+                                .abs()
+                                <= 1
+                        );
+                    }
+                }
+            }
+            let border = contour_border(&contours, stroke, true);
+            assert_ne!(
+                border.winding(Point::new(30.0, 50.0)),
+                0,
+                "opaque fill has underlap"
+            );
+            assert_eq!(
+                border.winding(Point::new(15.0, 15.0)) != 0,
+                join == StrokeJoin::Miter
+            );
+            assert_eq!(
+                border.winding(Point::new(16.5, 16.5)) != 0,
+                join != StrokeJoin::Bevel
+            );
+            assert!((border.bounding_box().x0 - 14.0).abs() < 0.02);
+        }
+        let collapsed = contour_border(
+            &contours,
+            StrokeOptions {
+                color: [255; 4],
+                width_px: 40.0,
+                method: StrokeMethod::Contour,
+                position: StrokePosition::Inside,
+                join: StrokeJoin::Round,
+            },
+            false,
+        );
+        assert!((collapsed.area().abs() - contours_path(&contours).area().abs()).abs() < 0.01);
+    }
+
+    #[test]
+    fn contour_outside_outer_edge_keeps_antialiasing_at_large_sizes() {
+        use koharu_rasterizer::{RasterOptions, Rasterizer};
+        let font = FontSystem::new().first_font().unwrap();
+        let rasterizer = Rasterizer::new().unwrap();
+        for size in [64.0, 300.0] {
+            let layout = TextLayout::new(&font)
+                .with_font_size(size)
+                .run("O")
+                .unwrap();
+            let stroke_width = size * 24.5 / 300.0;
+            let options = TextRenderOptions {
+                stroke: Some(StrokeOptions {
+                    color: [255; 4],
+                    width_px: stroke_width,
+                    method: StrokeMethod::Contour,
+                    position: StrokePosition::Outside,
+                    join: StrokeJoin::Round,
+                }),
+                ..TextRenderOptions::default()
+            };
+            let bounds = contours_path(&text_contours(&layout, &options).unwrap()).bounding_box();
+            let margin = f64::from(stroke_width) + 4.0;
+            let width = (bounds.width() + 2.0 * margin).ceil() as u32;
+            let height = (bounds.height() + 2.0 * margin).ceil() as u32;
+            let mut scene = PreparedScene::default();
+            let mut resources = Vec::new();
+            TextRenderer::new()
+                .render(
+                    &mut scene,
+                    &mut resources,
+                    &layout,
+                    WritingMode::Horizontal,
+                    &options,
+                    Affine::translate((margin + 0.37 - bounds.x0, margin + 0.23 - bounds.y0)),
+                )
+                .unwrap();
+            let frame = text_bundle(scene, resources, width, height)
+                .into_frame_with_raster_sources(&Default::default())
+                .unwrap();
+            let image = rasterizer
+                .rasterize(&frame, RasterOptions::default())
+                .unwrap()
+                .image;
+            let mut edge_pixels = 0;
+            let mut partial_pixels = 0;
+            for y in 1..height - 1 {
+                for x in 1..width - 1 {
+                    let alpha = image.get_pixel(x, y).0[3];
+                    if alpha > 0
+                        && [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
+                            .iter()
+                            .any(|&(x, y)| image.get_pixel(x, y).0[3] == 0)
+                    {
+                        edge_pixels += 1;
+                        partial_pixels += usize::from(alpha < 255);
+                    }
+                }
+            }
+            assert!(edge_pixels > 30);
+            assert!(
+                partial_pixels * 4 > edge_pixels,
+                "curved outer border must retain partial coverage at size {size}: {partial_pixels}/{edge_pixels}"
+            );
+        }
+    }
+
+    fn text_bundle(
+        scene: PreparedScene,
+        resources: Vec<PreparedResource>,
+        width: u32,
+        height: u32,
+    ) -> PreparedFrameBundle {
         PreparedFrameBundle {
             frame: PreparedFrame {
                 revision: Revision::new(7),
                 page: LayerId::from_bytes([1; 16]),
-                width: 160,
-                height: 48,
+                width,
+                height,
                 origin: (0, 0),
                 normalization: Affine::IDENTITY.as_coeffs(),
                 layers: vec![PreparedLayer {
                     id: LayerId::from_bytes([2; 16]),
                     geometry: vec![
                         Point { x: 0.0, y: 0.0 },
-                        Point { x: 160.0, y: 0.0 },
-                        Point { x: 160.0, y: 48.0 },
-                        Point { x: 0.0, y: 48.0 },
+                        Point {
+                            x: width as f64,
+                            y: 0.0,
+                        },
+                        Point {
+                            x: width as f64,
+                            y: height as f64,
+                        },
+                        Point {
+                            x: 0.0,
+                            y: height as f64,
+                        },
                     ],
                     bounds: Bounds {
                         x: 0.0,
                         y: 0.0,
-                        width: 160.0,
-                        height: 48.0,
+                        width: width as f32,
+                        height: height as f32,
                     },
                     local_bounds: Bounds {
                         x: 0.0,
                         y: 0.0,
-                        width: 160.0,
-                        height: 48.0,
+                        width: width as f32,
+                        height: height as f32,
                     },
                     presentation: Presentation {
                         visible: true,
@@ -978,7 +1164,7 @@ mod tests {
             scene
                 .commands
                 .iter()
-                .any(|command| matches!(command, PreparedSceneCommand::StrokePath(_)))
+                .any(|command| matches!(command, PreparedSceneCommand::FillPath(_)))
         );
         assert_eq!(resources.len(), 1);
         assert!(matches!(
@@ -987,7 +1173,7 @@ mod tests {
         ));
 
         let layer = LayerId::from_bytes([2; 16]);
-        let bundle = text_bundle(scene, resources);
+        let bundle = text_bundle(scene, resources, 160, 48);
 
         let encoded = bundle.manifest().unwrap().encode().unwrap();
         let manifest = PreparedFrameManifest::decode(&encoded).unwrap();
