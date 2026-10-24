@@ -110,7 +110,7 @@ export function CanvasWorkspace() {
   const page = usePage().data
   const pages = usePages().data
   const canvasPage = useKoharuStore((state) => state.canvasPage)
-  const camera = useKoharuStore((state) => state.camera) 
+  const camera = useKoharuStore((state) => state.camera)
   const canvasRevision = useKoharuStore((state) => state.canvasRevision)
   const canvasGeneration = useKoharuStore((state) => state.canvasGeneration)
   const canvasSize = useKoharuStore((state) => state.canvasSize)
@@ -539,9 +539,7 @@ export function CanvasWorkspace() {
         .map((layer) => layer.id)
 
       selectLayers(
-        current.additive
-          ? [...new Set([...selected, ...selectedInRect])]
-          : selectedInRect,
+        current.additive ? [...new Set([...selected, ...selectedInRect])] : selectedInRect,
       )
       setSelectionRect(null)
     } else if (current.kind === 'move') {
@@ -571,30 +569,30 @@ export function CanvasWorkspace() {
       const operation =
         current.kind === 'paint'
           ? enqueue(() =>
-            call(commands.commitPaint, current.revision, current.layer, current.points, {
-              diameter: current.diameter,
-              color: current.color!,
-            }),
-          ).then((result) => {
-            selectLayers([result.layer])
-            return refresh(projectKey, pagesKey, pageKey)
-          })
-          : current.kind === 'erase'
-            ? enqueue(() =>
-              call(
-                commands.commitErase,
-                current.revision,
-                current.layer!,
-                current.points,
-                current.diameter,
-              ),
+              call(commands.commitPaint, current.revision, current.layer, current.points, {
+                diameter: current.diameter,
+                color: current.color!,
+              }),
             ).then((result) => {
               selectLayers([result.layer])
               return refresh(projectKey, pagesKey, pageKey)
             })
+          : current.kind === 'erase'
+            ? enqueue(() =>
+                call(
+                  commands.commitErase,
+                  current.revision,
+                  current.layer!,
+                  current.points,
+                  current.diameter,
+                ),
+              ).then((result) => {
+                selectLayers([result.layer])
+                return refresh(projectKey, pagesKey, pageKey)
+              })
             : enqueue(() =>
-              call(commands.commitInpaint, current.revision, current.points, current.diameter),
-            )
+                call(commands.commitInpaint, current.revision, current.points, current.diameter),
+              )
       commitPending.current = true
       void operation
         .catch(() => canvas?.cancelStroke())
@@ -839,13 +837,11 @@ export function CanvasWorkspace() {
               className='pointer-events-none absolute z-10 border border-[var(--canvas-selection)] bg-[var(--canvas-selection)]/10'
               style={{
                 left:
-                  (selectionRect.x * camera.zoom + camera.translation[0]) /
-                  window.devicePixelRatio,
+                  (selectionRect.x * camera.zoom + camera.translation[0]) / window.devicePixelRatio,
                 top:
-                  (selectionRect.y * camera.zoom + camera.translation[1]) /
-                  window.devicePixelRatio,
-                width: selectionRect.width * camera.zoom / window.devicePixelRatio,
-                height: selectionRect.height * camera.zoom / window.devicePixelRatio,
+                  (selectionRect.y * camera.zoom + camera.translation[1]) / window.devicePixelRatio,
+                width: (selectionRect.width * camera.zoom) / window.devicePixelRatio,
+                height: (selectionRect.height * camera.zoom) / window.devicePixelRatio,
               }}
             />
           )}
@@ -1013,7 +1009,7 @@ class FrameCommand<Value> {
   constructor(
     private readonly execute: (value: Value) => void | Promise<unknown>,
     private readonly merge: (current: Value, next: Value) => Value = (_current, next) => next,
-  ) { }
+  ) {}
 
   schedule(value: Value): void {
     this.pending = this.pending === undefined ? value : this.merge(this.pending, value)

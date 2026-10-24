@@ -169,8 +169,9 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
                 .find(|window| window.label == "main")
                 .context("the main Tauri window configuration is unavailable")?;
             let window = tauri::WebviewWindowBuilder::from_config(application, window_config)?;
+            // Keep the window profile separate from CEF's user-data root.
             let window = match &preview_root {
-                Some(root) => window.data_directory(root.join("browser")),
+                Some(root) => window.data_directory(root.join("browser").join("editor")),
                 None => window,
             };
             let window = window.build().context("failed to create the main window")?;

@@ -3,9 +3,9 @@ import { createElement, StrictMode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Providers from '@/app/providers'
-import { call } from '@/lib/backend'
+import { call, refreshShortcuts, saveShortcuts } from '@/lib/backend'
 import { useProject } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
+import { defaultShortcuts, useKoharuStore } from '@/lib/store'
 import {
   commands,
   type Preferences,
@@ -62,6 +62,7 @@ const project: ProjectInfo = {
 
 beforeEach(() => {
   vi.spyOn(commands, 'getTranslationModels').mockResolvedValue([])
+  vi.spyOn(commands, 'getShortcuts').mockResolvedValue({})
 })
 
 const startupState = (): StartupState => ({
@@ -95,6 +96,49 @@ function ProjectProbe() {
 }
 
 describe('Tauri runtime', () => {
+  it('saves shortcut snapshots in edit order', async () => {
+    const first = deferred<Record<string, string>>()
+    const save = vi
+      .spyOn(commands, 'saveShortcuts')
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValue({})
+    const shortcuts = { ...defaultShortcuts, text: 'q' }
+    const older = saveShortcuts(shortcuts)
+    shortcuts.text = 'w'
+    const newer = saveShortcuts(shortcuts)
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    expect(save.mock.calls[0][0].text).toBe('q')
+    first.resolve({})
+    await Promise.all([older, newer])
+    expect(save.mock.calls.map(([keys]) => keys.text)).toEqual(['q', 'w'])
+  })
+
+  it('keeps a newer shortcut edit when the startup response arrives late', async () => {
+    const startup = deferred<Record<string, string>>()
+    const load = vi.spyOn(commands, 'getShortcuts').mockReturnValue(startup.promise)
+    vi.spyOn(commands, 'saveShortcuts').mockResolvedValue({})
+    const loading = refreshShortcuts()
+    await waitFor(() => expect(load).toHaveBeenCalled())
+
+    useKoharuStore.getState().setShortcut('text', 'q')
+    await saveShortcuts(useKoharuStore.getState().shortcuts)
+    startup.resolve({ text: 'w' })
+    await loading
+
+    expect(useKoharuStore.getState().shortcuts.text).toBe('q')
+  })
+
+  it('allows a newer shortcut save after a failed write', async () => {
+    const save = vi
+      .spyOn(commands, 'saveShortcuts')
+      .mockRejectedValueOnce(new Error('write failed'))
+      .mockResolvedValue({})
+    await expect(saveShortcuts({ ...defaultShortcuts, text: 'q' })).rejects.toThrow('write failed')
+    await expect(saveShortcuts({ ...defaultShortcuts, text: 'w' })).resolves.toBeUndefined()
+    expect(save.mock.calls.map(([keys]) => keys.text)).toEqual(['q', 'w'])
+  })
+
   it('keeps the project unresolved until its backend query returns', async () => {
     const projectPending = deferred<ProjectInfo | null>()
     vi.spyOn(commands, 'getProject').mockReturnValue(projectPending.promise)
