@@ -16,23 +16,24 @@ Unicode true
 !endif
 
 Name "Koharu Typesetting Preview"
-OutFile "${OUTPUT_DIR}/Koharu-Typesetting-Preview-1-Setup.exe"
+OutFile "${OUTPUT_DIR}/Koharu-Typesetting-Preview-2-Setup.exe"
 InstallDir "$LOCALAPPDATA\Programs\KoharuTypesettingPreview"
 InstallDirRegKey HKCU "Software\KoharuTypesettingPreview" "InstallDir"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 Icon "${SOURCE_DIR}/crates/koharu/icons/icon.ico"
 UninstallIcon "${SOURCE_DIR}/crates/koharu/icons/icon.ico"
-VIProductVersion "0.83.5.1"
+VIProductVersion "0.83.5.2"
 VIAddVersionKey "ProductName" "Koharu Typesetting Preview"
 VIAddVersionKey "FileDescription" "Koharu font favorites and contour outline preview"
-VIAddVersionKey "FileVersion" "0.83.5 Preview 1"
-VIAddVersionKey "ProductVersion" "0.83.5 Preview 1"
+VIAddVersionKey "FileVersion" "0.83.5 Preview 2"
+VIAddVersionKey "ProductVersion" "0.83.5 Preview 2"
 VIAddVersionKey "LegalCopyright" "Koharu contributors; see bundled licenses"
 
 !define MUI_ABORTWARNING
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "${SOURCE_DIR}/LICENSE-MIT"
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE VerifyDestination
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN "$INSTDIR\koharu.exe"
@@ -50,16 +51,26 @@ Function .onInit
   SetRegView 64
 FunctionEnd
 
+Function VerifyDestination
+  IfFileExists "$INSTDIR\koharu.exe" 0 allowed
+  ReadRegStr $0 HKCU "Software\KoharuTypesettingPreview" "InstallDir"
+  StrCmp $0 "$INSTDIR" allowed
+  MessageBox MB_ICONSTOP|MB_OK "This folder already contains Koharu. Choose a new folder for the preview so the existing program stays untouched." /SD IDOK
+  Abort
+allowed:
+FunctionEnd
+
 Section "Application"
+  Call VerifyDestination
   SetOutPath "$INSTDIR"
-  File /r "${RUNTIME_DIR}/*"
+  File /r /x ".*" "${RUNTIME_DIR}/*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   CreateDirectory "$SMPROGRAMS\Koharu Typesetting Preview"
   CreateShortcut "$SMPROGRAMS\Koharu Typesetting Preview\Koharu Typesetting Preview.lnk" "$INSTDIR\koharu.exe"
   CreateShortcut "$SMPROGRAMS\Koharu Typesetting Preview\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
   WriteRegStr HKCU "Software\KoharuTypesettingPreview" "InstallDir" "$INSTDIR"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\KoharuTypesettingPreview" "DisplayName" "Koharu Typesetting Preview 1"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\KoharuTypesettingPreview" "DisplayVersion" "0.83.5 Preview 1"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\KoharuTypesettingPreview" "DisplayName" "Koharu Typesetting Preview 2"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\KoharuTypesettingPreview" "DisplayVersion" "0.83.5 Preview 2"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\KoharuTypesettingPreview" "DisplayIcon" "$INSTDIR\koharu.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\KoharuTypesettingPreview" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\KoharuTypesettingPreview" "UninstallString" '"$INSTDIR\Uninstall.exe"'

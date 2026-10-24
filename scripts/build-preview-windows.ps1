@@ -67,7 +67,10 @@ Invoke-Checked 'bun' @('run', '--filter', '@koharu/app', 'build')
 Invoke-Checked 'cargo' @('build', '-p', 'koharu', '--release', '--features', 'tauri/custom-protocol')
 
 $out = Join-Path $root 'dist'
-$stage = Join-Path $out 'Koharu-Typesetting-Preview-1'
+$stage = Join-Path $out 'Koharu-Typesetting-Preview-2'
+if (Test-Path (Join-Path $stage 'PreviewData')) {
+    throw 'The staging folder contains preview user data. Move that complete preview folder to a safe location before rebuilding.'
+}
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 $runtime = Join-Path $root 'target\release'
@@ -92,6 +95,9 @@ Copy-Item (Join-Path $cefRoot 'CREDITS.html') -Destination (Join-Path $stage 'CE
 
 Get-ChildItem $stage -File | Where-Object { $_.Extension -in @('.exe', '.dll') } |
     ForEach-Object { Assert-CompleteWindowsBinary $_.FullName }
+if (Get-ChildItem $stage -Recurse -File -Force | Where-Object { $_.Name.StartsWith('.') }) {
+    throw 'Temporary dot-files are present in runtime staging. Remove them before packaging.'
+}
 
 # Remove only the files we install, even when an existing folder is chosen.
 $uninstallInclude = Join-Path $out 'uninstall-preview-files.nsh'
@@ -107,4 +113,6 @@ Get-ChildItem $stage -Recurse -Directory | Sort-Object { $_.FullName.Length } -D
 Set-Content -Path $uninstallInclude -Value $removals -Encoding utf8
 
 Invoke-Checked $makensis @('/WX', "/DRUNTIME_DIR=$stage", "/DOUTPUT_DIR=$out", "/DSOURCE_DIR=$root", "/DUNINSTALL_INCLUDE=$uninstallInclude", (Join-Path $root 'preview\installer.nsi'))
-Write-Host "Installer created: $(Join-Path $out 'Koharu-Typesetting-Preview-1-Setup.exe')"
+Compress-Archive -LiteralPath $stage -DestinationPath (Join-Path $out 'Koharu-Typesetting-Preview-2-Portable.zip') -Force
+Write-Host "Installer created: $(Join-Path $out 'Koharu-Typesetting-Preview-2-Setup.exe')"
+Write-Host "Portable ZIP created: $(Join-Path $out 'Koharu-Typesetting-Preview-2-Portable.zip')"

@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use i_overlay::{core::fill_rule::FillRule as OverlayFillRule, float::simplify::SimplifyShape};
 use koharu_rasterizer::{
     FillRule, PathElement, PreparedGlyph, PreparedGlyphRun, PreparedPath, PreparedResource,
     PreparedScene, PreparedSceneCommand, PreparedStrokePath, ResourceId,
@@ -13,7 +14,7 @@ use skrifa::{
     instance::Size,
     outline::{DrawSettings, OutlinePen},
 };
-use vello::kurbo::{Affine, BezPath, Diagonal2, Join, PathEl, Rect, Shape, expand_path};
+use vello::kurbo::{Affine, BezPath, Diagonal2, Join, PathEl, Rect, Shape, expand_path, flatten};
 
 use crate::{
     Error, FontStyle, HyphenationPolicy, LayoutRun, RenderBounds, RenderDiagnostic,
@@ -126,6 +127,71 @@ impl TextRenderer {
             let mut fill_options = options.clone();
             // The contour and fill must use the same unhinted geometry at every zoom level.
             fill_options.hint_glyphs = false;
+            if contours.is_empty() {
+                draw_layout(
+                    scene,
+                    resources,
+                    layout,
+                    writing_mode,
+                    &fill_options,
+                    transform,
+                    GlyphPaint {
+                        color: options.color,
+                        dilation_px: 0.0,
+                    },
+                );
+                return Ok(None);
+            }
+            // Opaque letters cover the inward half of a full stroke drawn behind them. Cutting
+            // that half away first would antialias the same edge twice and expose the background.
+            // Translucent letters still need a true outside-only stroke to preserve their alpha.
+            let behind_fill = stroke.position == StrokePosition::Outside && options.color[3] == 255;
+            let padding = match stroke.position {
+                StrokePosition::Inside => 0.0,
+                StrokePosition::Center => f64::from(stroke.width_px) * 0.5,
+                StrokePosition::Outside => f64::from(stroke.width_px),
+            } * if stroke.join == StrokeJoin::Miter {
+                4.0
+            } else {
+                1.0
+            };
+            let bounds =
+                transform.transform_rect_bbox(contours.bounding_box().inflate(padding, padding));
+            let command = PreparedSceneCommand::StrokePath(PreparedStrokePath {
+                path: PreparedPath {
+                    fill: FillRule::NonZero,
+                    transform: transform.as_coeffs(),
+                    color: stroke.color,
+                    elements: contours
+                        .elements()
+                        .iter()
+                        .map(|element| match *element {
+                            PathEl::MoveTo(p) => PathElement::MoveTo([p.x, p.y]),
+                            PathEl::LineTo(p) => PathElement::LineTo([p.x, p.y]),
+                            PathEl::QuadTo(c, p) => PathElement::QuadTo([c.x, c.y, p.x, p.y]),
+                            PathEl::CurveTo(c1, c2, p) => {
+                                PathElement::CurveTo([c1.x, c1.y, c2.x, c2.y, p.x, p.y])
+                            }
+                            PathEl::ClosePath => PathElement::Close,
+                        })
+                        .collect(),
+                },
+                width: f64::from(stroke.width_px) * if behind_fill { 2.0 } else { 1.0 },
+                position: match (stroke.position, behind_fill) {
+                    (_, true) => koharu_rasterizer::StrokePosition::Center,
+                    (StrokePosition::Outside, false) => koharu_rasterizer::StrokePosition::Outside,
+                    (StrokePosition::Center, false) => koharu_rasterizer::StrokePosition::Center,
+                    (StrokePosition::Inside, false) => koharu_rasterizer::StrokePosition::Inside,
+                },
+                join: match stroke.join {
+                    StrokeJoin::Round => koharu_rasterizer::StrokeJoin::Round,
+                    StrokeJoin::Miter => koharu_rasterizer::StrokeJoin::Miter,
+                    StrokeJoin::Bevel => koharu_rasterizer::StrokeJoin::Bevel,
+                },
+            });
+            if behind_fill {
+                scene.commands.push(command.clone());
+            }
             draw_layout(
                 scene,
                 resources,
@@ -138,53 +204,9 @@ impl TextRenderer {
                     dilation_px: 0.0,
                 },
             );
-            if contours.is_empty() {
-                return Ok(None);
+            if !behind_fill {
+                scene.commands.push(command);
             }
-            let padding = match stroke.position {
-                StrokePosition::Inside => 0.0,
-                StrokePosition::Center => f64::from(stroke.width_px) * 0.5,
-                StrokePosition::Outside => f64::from(stroke.width_px),
-            } * if stroke.join == StrokeJoin::Miter {
-                4.0
-            } else {
-                1.0
-            };
-            let bounds =
-                transform.transform_rect_bbox(contours.bounding_box().inflate(padding, padding));
-            scene
-                .commands
-                .push(PreparedSceneCommand::StrokePath(PreparedStrokePath {
-                    path: PreparedPath {
-                        fill: FillRule::NonZero,
-                        transform: transform.as_coeffs(),
-                        color: stroke.color,
-                        elements: contours
-                            .elements()
-                            .iter()
-                            .map(|element| match *element {
-                                PathEl::MoveTo(p) => PathElement::MoveTo([p.x, p.y]),
-                                PathEl::LineTo(p) => PathElement::LineTo([p.x, p.y]),
-                                PathEl::QuadTo(c, p) => PathElement::QuadTo([c.x, c.y, p.x, p.y]),
-                                PathEl::CurveTo(c1, c2, p) => {
-                                    PathElement::CurveTo([c1.x, c1.y, c2.x, c2.y, p.x, p.y])
-                                }
-                                PathEl::ClosePath => PathElement::Close,
-                            })
-                            .collect(),
-                    },
-                    width: f64::from(stroke.width_px),
-                    position: match stroke.position {
-                        StrokePosition::Outside => koharu_rasterizer::StrokePosition::Outside,
-                        StrokePosition::Center => koharu_rasterizer::StrokePosition::Center,
-                        StrokePosition::Inside => koharu_rasterizer::StrokePosition::Inside,
-                    },
-                    join: match stroke.join {
-                        StrokeJoin::Round => koharu_rasterizer::StrokeJoin::Round,
-                        StrokeJoin::Miter => koharu_rasterizer::StrokeJoin::Miter,
-                        StrokeJoin::Bevel => koharu_rasterizer::StrokeJoin::Bevel,
-                    },
-                }));
             return Ok(Some(bounds));
         }
         // The border is drawn first as an outward-only dilation of the glyph outline (see
@@ -457,7 +479,53 @@ fn text_contours(layout: &LayoutRun<'_>, options: &TextRenderOptions) -> Result<
             pen_y -= glyph.y_advance;
         }
     }
-    Ok(contours)
+    Ok(union_contours(&contours))
+}
+
+/// Stroke the visible boundary of the complete text, including touching glyphs and overlaps
+/// within variable/CJK glyphs. Nonzero winding preserves counters and self-intersections.
+fn union_contours(path: &BezPath) -> BezPath {
+    let mut contours: Vec<Vec<[f64; 2]>> = Vec::new();
+    let mut contour = Vec::new();
+    // The boolean library consumes polygons. At 0.02 layout pixels, the flattening error stays
+    // below one tenth of a pixel at 4x scale; the original glyph curves still paint the fill.
+    flatten(
+        path.elements().iter().copied(),
+        0.02,
+        |element| match element {
+            PathEl::MoveTo(point) => {
+                if contour.len() >= 3 {
+                    contours.push(std::mem::take(&mut contour));
+                }
+                contour.clear();
+                contour.push([point.x, point.y]);
+            }
+            PathEl::LineTo(point) => contour.push([point.x, point.y]),
+            PathEl::ClosePath => {
+                if contour.len() >= 3 {
+                    contours.push(std::mem::take(&mut contour));
+                }
+                contour.clear();
+            }
+            _ => unreachable!("flatten emits only straight segments"),
+        },
+    );
+    if contour.len() >= 3 {
+        contours.push(contour);
+    }
+    let mut result = BezPath::new();
+    for shape in contours.simplify_shape(OverlayFillRule::NonZero) {
+        for contour in shape {
+            if let Some(first) = contour.first() {
+                result.move_to((first[0], first[1]));
+                for point in &contour[1..] {
+                    result.line_to((point[0], point[1]));
+                }
+                result.close_path();
+            }
+        }
+    }
+    result
 }
 
 struct ContourPen<'a>(&'a mut BezPath);
@@ -611,6 +679,170 @@ mod tests {
     use crate::fonts::FontSystem;
 
     #[test]
+    fn contour_union_removes_shared_edges_and_preserves_counters() {
+        use vello::kurbo::{ParamCurveNearest, Point, Rect, Shape};
+        let mut raw = Rect::new(0.0, 0.0, 20.0, 30.0).to_path(0.01);
+        raw.extend(
+            Rect::new(10.0, 0.0, 30.0, 30.0)
+                .to_path(0.01)
+                .elements()
+                .iter()
+                .copied(),
+        );
+        let hole = Rect::new(12.0, 10.0, 18.0, 20.0)
+            .to_path(0.01)
+            .reverse_subpaths();
+        // Twice the opposite winding cuts the counter through both overlapping glyph shapes.
+        raw.extend(hole.elements().iter().copied());
+        raw.extend(hole.elements().iter().copied());
+        let united = union_contours(&raw);
+        assert_eq!(
+            united.winding(Point::new(15.0, 15.0)),
+            0,
+            "counter stays open"
+        );
+        assert_ne!(
+            united.winding(Point::new(15.0, 5.0)),
+            0,
+            "glyph overlap stays filled"
+        );
+        assert!((united.area().abs() - 840.0).abs() < 0.001);
+        // The old path had interior vertical edges at x=10 and x=20 even above the counter.
+        for segment in united.segments() {
+            assert!(segment.nearest(Point::new(10.0, 5.0), 0.001).distance_sq > 1.0);
+            assert!(segment.nearest(Point::new(20.0, 5.0), 0.001).distance_sq > 1.0);
+        }
+    }
+
+    #[test]
+    fn contour_outside_covers_antialiased_seams_and_keeps_transparent_fill() {
+        use koharu_rasterizer::{RasterOptions, Rasterizer};
+        let font = FontSystem::new().first_font().unwrap();
+        let layout = TextLayout::new(&font)
+            .with_font_size(40.0)
+            .run("Ho")
+            .unwrap();
+        let bounds = text_contours(&layout, &TextRenderOptions::default())
+            .unwrap()
+            .bounding_box();
+        let transform = Affine::translate((8.37 - bounds.x0, 5.23 - bounds.y0));
+        let rasterizer = Rasterizer::new().unwrap();
+        let render = |alpha: u8, outlined: bool| {
+            let mut scene = PreparedScene::default();
+            let mut resources = Vec::new();
+            TextRenderer::new()
+                .render(
+                    &mut scene,
+                    &mut resources,
+                    &layout,
+                    WritingMode::Horizontal,
+                    &TextRenderOptions {
+                        color: [255, 255, 255, alpha],
+                        hint_glyphs: false,
+                        stroke: outlined.then_some(StrokeOptions {
+                            color: [255, 255, 255, 255],
+                            width_px: 4.0,
+                            method: StrokeMethod::Contour,
+                            position: StrokePosition::Outside,
+                            join: StrokeJoin::Round,
+                        }),
+                        ..TextRenderOptions::default()
+                    },
+                    transform,
+                )
+                .unwrap();
+            let frame = text_bundle(scene, resources)
+                .into_frame_with_raster_sources(&Default::default())
+                .unwrap();
+            rasterizer
+                .rasterize(&frame, RasterOptions::default())
+                .unwrap()
+                .image
+        };
+        let fill = render(255, false);
+        let opaque = render(255, true);
+        let clear = render(0, true);
+        let translucent = render(96, true);
+        let mut edges = 0;
+        let mut interiors = 0;
+        for (x, y, pixel) in fill.enumerate_pixels() {
+            if (32..=223).contains(&pixel.0[3]) {
+                edges += 1;
+                assert!(
+                    opaque.get_pixel(x, y).0[3] >= 254,
+                    "no seam at glyph edge ({x},{y})"
+                );
+            }
+            if pixel.0[3] == 255
+                && x > 0
+                && y > 0
+                && x + 1 < fill.width()
+                && y + 1 < fill.height()
+                && [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
+                    .iter()
+                    .all(|&(x, y)| fill.get_pixel(x, y).0[3] == 255)
+            {
+                interiors += 1;
+                assert!(
+                    clear.get_pixel(x, y).0[3] <= 1,
+                    "outside-only stroke preserves clear interior ({x},{y})"
+                );
+                assert!(
+                    translucent.get_pixel(x, y).0[3].abs_diff(96) <= 1,
+                    "outside-only stroke preserves translucent interior ({x},{y})"
+                );
+            }
+        }
+        assert!(
+            edges > 10 && interiors > 10,
+            "exercise both antialiased edges and solid glyph interiors: edges={edges}, interiors={interiors}"
+        );
+    }
+
+    fn text_bundle(scene: PreparedScene, resources: Vec<PreparedResource>) -> PreparedFrameBundle {
+        PreparedFrameBundle {
+            frame: PreparedFrame {
+                revision: Revision::new(7),
+                page: LayerId::from_bytes([1; 16]),
+                width: 160,
+                height: 48,
+                origin: (0, 0),
+                normalization: Affine::IDENTITY.as_coeffs(),
+                layers: vec![PreparedLayer {
+                    id: LayerId::from_bytes([2; 16]),
+                    geometry: vec![
+                        Point { x: 0.0, y: 0.0 },
+                        Point { x: 160.0, y: 0.0 },
+                        Point { x: 160.0, y: 48.0 },
+                        Point { x: 0.0, y: 48.0 },
+                    ],
+                    bounds: Bounds {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 160.0,
+                        height: 48.0,
+                    },
+                    local_bounds: Bounds {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 160.0,
+                        height: 48.0,
+                    },
+                    presentation: Presentation {
+                        visible: true,
+                        opacity: 1.0,
+                    },
+                    kind: PreparedLayerKind::Text,
+                    placement: Affine::IDENTITY.as_coeffs(),
+                    content: PreparedContent::Vector(scene),
+                    element_frame: None,
+                }],
+            },
+            resources,
+        }
+    }
+
+    #[test]
     fn automatic_size_preserves_free_text_default_and_balloon_extent() {
         let descriptor = TextNodeDescriptor {
             entity: EntityId::new(),
@@ -688,46 +920,7 @@ mod tests {
         ));
 
         let layer = LayerId::from_bytes([2; 16]);
-        let bundle = PreparedFrameBundle {
-            frame: PreparedFrame {
-                revision: Revision::new(7),
-                page: LayerId::from_bytes([1; 16]),
-                width: 160,
-                height: 48,
-                origin: (0, 0),
-                normalization: Affine::IDENTITY.as_coeffs(),
-                layers: vec![PreparedLayer {
-                    id: layer,
-                    geometry: vec![
-                        Point { x: 0.0, y: 0.0 },
-                        Point { x: 160.0, y: 0.0 },
-                        Point { x: 160.0, y: 48.0 },
-                        Point { x: 0.0, y: 48.0 },
-                    ],
-                    bounds: Bounds {
-                        x: 0.0,
-                        y: 0.0,
-                        width: 160.0,
-                        height: 48.0,
-                    },
-                    local_bounds: Bounds {
-                        x: 0.0,
-                        y: 0.0,
-                        width: 160.0,
-                        height: 48.0,
-                    },
-                    presentation: Presentation {
-                        visible: true,
-                        opacity: 1.0,
-                    },
-                    kind: PreparedLayerKind::Text,
-                    placement: Affine::IDENTITY.as_coeffs(),
-                    content: PreparedContent::Vector(scene),
-                    element_frame: None,
-                }],
-            },
-            resources,
-        };
+        let bundle = text_bundle(scene, resources);
 
         let encoded = bundle.manifest().unwrap().encode().unwrap();
         let manifest = PreparedFrameManifest::decode(&encoded).unwrap();

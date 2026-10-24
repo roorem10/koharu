@@ -56,8 +56,6 @@ impl Serialize for SecretValue {
 
 impl SerializableSecret for SecretValue {}
 
-const SERVICE: &str = "koharu";
-
 static CREDENTIAL_STORE: LazyLock<Result<(), String>> = LazyLock::new(|| {
     #[cfg(target_os = "linux")]
     {
@@ -94,13 +92,18 @@ pub fn delete(key: &str) -> anyhow::Result<()> {
 }
 
 fn entry(key: &str) -> anyhow::Result<Entry> {
+    let service = if koharu_config::preview::enabled() {
+        koharu_config::preview::IDENTIFIER
+    } else {
+        "koharu"
+    };
     match &*CREDENTIAL_STORE {
         Ok(()) => {}
         Err(error) => anyhow::bail!("failed to initialize Linux Keyutils: {error}"),
     }
     #[cfg(target_os = "linux")]
-    let entry = Entry::new(SERVICE, key)?;
+    let entry = Entry::new(service, key)?;
     #[cfg(not(target_os = "linux"))]
-    let entry = keyring::Entry::new(SERVICE, key)?.inner;
+    let entry = keyring::Entry::new(service, key)?.inner;
     Ok(entry)
 }

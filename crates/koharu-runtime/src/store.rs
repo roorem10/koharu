@@ -49,6 +49,11 @@ impl Store {
     #[must_use]
     pub fn root() -> &'static Path {
         ROOT.get_or_init(|| {
+            if let Some(root) = koharu_config::preview::root()
+                .expect("could not locate isolated preview runtime storage")
+            {
+                return root.join("packages");
+            }
             dirs::cache_dir()
                 .unwrap_or_else(std::env::temp_dir)
                 .join("koharu")

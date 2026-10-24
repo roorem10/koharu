@@ -57,3 +57,5 @@ test-results/
 # Local documentation output
 /packages/docs/.mintlify/
 /packages/docs/site/
+# Private portable preview data must never enter a source checkpoint.
+PreviewData/

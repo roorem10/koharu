@@ -54,7 +54,42 @@ pub(crate) async fn initialize(handle: AppHandle<CefRuntime>) -> Result<()> {
 }
 
 pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
+    if koharu_config::preview::enabled() {
+        anyhow::ensure!(
+            context.config().identifier == koharu_config::preview::IDENTIFIER,
+            "private previews require their separate application identifier"
+        );
+    }
+    let preview_root = koharu_config::preview::initialize()?;
     let cef = Cef::default();
+    let cef = match &preview_root {
+        Some(root) => cef
+            .root_cache_path(root.join("browser"))
+            .log_file(root.join("logs").join("cef.log")),
+        None => cef,
+    };
+    let log_target = match &preview_root {
+        Some(root) => tauri_plugin_log::TargetKind::Folder {
+            path: root.join("logs"),
+            file_name: Some("koharu-preview".into()),
+        },
+        None => tauri_plugin_log::TargetKind::LogDir { file_name: None },
+    };
+    let window_state = tauri_plugin_window_state::Builder::default().with_state_flags(
+        tauri_plugin_window_state::StateFlags::SIZE
+            | tauri_plugin_window_state::StateFlags::POSITION
+            | tauri_plugin_window_state::StateFlags::MAXIMIZED
+            | tauri_plugin_window_state::StateFlags::FULLSCREEN,
+    );
+    let window_state = match &preview_root {
+        Some(root) => window_state.with_filename(
+            root.join("settings")
+                .join("window-state.json")
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        None => window_state,
+    };
     #[cfg(debug_assertions)]
     let cef = cef.remote_debugging(tauri_runtime_cef::RemoteDebugging::Port {
         port: 4000,
@@ -68,16 +103,14 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
             ("use-angle", Some("vulkan")),
             ("--ozone-platform", Some("x11")),
         ]);
-    tauri::Builder::<CefRuntime>::new()
+    let builder = tauri::Builder::<CefRuntime>::new()
         .runtime(cef)
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(tauri_plugin_log::log::LevelFilter::Info)
                 .max_file_size(1_000_000)
                 .clear_targets()
-                .target(tauri_plugin_log::Target::new(
-                    tauri_plugin_log::TargetKind::LogDir { file_name: None },
-                ))
+                .target(tauri_plugin_log::Target::new(log_target))
                 .build(),
         )
         .plugin(tauri_plugin_single_instance::init(|handle, _, _| {
@@ -87,29 +120,30 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
                 let _ = window.set_focus();
             }
         }))
-        .plugin(
-            tauri_plugin_window_state::Builder::default()
-                .with_state_flags(
-                    tauri_plugin_window_state::StateFlags::SIZE
-                        | tauri_plugin_window_state::StateFlags::POSITION
-                        | tauri_plugin_window_state::StateFlags::MAXIMIZED
-                        | tauri_plugin_window_state::StateFlags::FULLSCREEN,
-                )
-                .build(),
-        )
+        .plugin(window_state.build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(crate::commands::bindings().invoke_handler())
+        .invoke_handler(crate::commands::bindings().invoke_handler());
+    let builder = if preview_root.is_some() {
+        builder
+    } else {
+        builder.plugin(tauri_plugin_updater::Builder::new().build())
+    };
+    builder
         .setup(move |application| {
+            if let Some(root) = &preview_root {
+                koharu_runtime::Store::configure(root.join("packages"))?;
+            }
             #[cfg(all(target_os = "windows", not(debug_assertions)))]
-            koharu_runtime::Store::configure(
-                application
-                    .path()
-                    .resource_dir()
-                    .context("failed to locate Koharu's installation directory")?
-                    .join("store"),
-            )?;
+            if preview_root.is_none() {
+                koharu_runtime::Store::configure(
+                    application
+                        .path()
+                        .resource_dir()
+                        .context("failed to locate Koharu's installation directory")?
+                        .join("store"),
+                )?;
+            }
 
             application.manage(CurrentProject {
                 project: Mutex::new(None),
@@ -134,9 +168,12 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
                 .iter()
                 .find(|window| window.label == "main")
                 .context("the main Tauri window configuration is unavailable")?;
-            let window = tauri::WebviewWindowBuilder::from_config(application, window_config)?
-                .build()
-                .context("failed to create the main window")?;
+            let window = tauri::WebviewWindowBuilder::from_config(application, window_config)?;
+            let window = match &preview_root {
+                Some(root) => window.data_directory(root.join("browser")),
+                None => window,
+            };
+            let window = window.build().context("failed to create the main window")?;
             window.show().context("failed to show the main window")?;
             window
                 .set_focus()

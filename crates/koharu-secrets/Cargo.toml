@@ -13,6 +13,7 @@ publish.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+koharu-config = { workspace = true }
 keyring = { workspace = true }
 keyring-core = { workspace = true }
 secrecy = { workspace = true }

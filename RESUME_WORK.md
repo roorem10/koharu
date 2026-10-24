@@ -1,4 +1,32 @@
-# Koharu handoff — temporary hold
+# Koharu handoff — Preview 2 complete; temporary hold
+
+The first two additions and the requested follow-up corrections are complete. The user postponed the Preview 1 trial and authorized isolated application data plus the outline fixes. The project is back on hold after delivering Preview 2. Do not begin Perspective Transform, rich text or Mesh Warp without a new user instruction.
+
+## Current delivery
+
+Use Koharu-Typesetting-Preview-2-Portable.zip (already saved as libfile_431dea2ed6f08191aba256d2c73e1640) or Koharu-Typesetting-Preview-2-Setup.exe. Preserve all Preview 1 files as historical baselines. Preview 1 shared official data paths and is not the isolated trial build. The Preview 2 full source includes the cumulative patch against the original source and a Preview-1-to-2 patch for Claude or another developer; each patch is checked against its actual baseline.
+
+Read IMPLEMENTATION_HANDOFF.md for the complete implementation, PREVIEW2_IMPLEMENTATION.md for the follow-up, FEATURE_REQUESTS.md for all five original requirements, FEATURE_PROGRESS.md for checks/manual acceptance, and PREVIEW_INSTALL.md for beginner trial instructions. Read AGENTS.md before future changes.
+
+## Implementation summary
+
+koharu-config::preview selects executable-relative PreviewData without automatic legacy reads, migration or path fallback. Projects, settings, model/runtime packages, browser storage, logs and window state use that root. Native secrets use a separate OS credential service. Startup rejects the official identifier; the updater plugin is omitted. HF model downloads use the existing pinned HTTPS resolver and managed downloader to avoid Xet's user-global cache. Sentry remains disabled in the private build. No global Windows environment variables are changed.
+
+Text contours are flattened at 0.02 layout pixels and nonzero-unioned with i_overlay 9.1.0. Opaque Outside strokes paint behind the fill; clear/translucent fills keep isolated outside clipping. Manual and detected new text explicitly starts in Contour. Legacy values retain Expansion. Editable text, glyph resources, shared rendering/export, typography revision 2 and prepared manifest version 5 remain intact.
+
+## Verification
+
+Two profile tests, two contour geometry/pixel regressions and a prepared-packet round trip passed. Rust formatting/diff checks passed. Windows x64 release compiled. Exact installer directory and all 242 runtime hashes, 242 portable entries, all 10 complete x64 PEs, and 237 CEF archive members passed. The CEF archive SHA-1 matches the official index. Two local extraction outputs were incomplete; full archive member streams matched expected sizes/hashes. A temporary staging copy was excluded and the inflated installer candidate discarded. Only the clean verified setup is delivered.
+
+No Windows GUI launch, real favorites restart test, problem-font trial, save/reopen, Undo/Redo or desktop canvas/export comparison has been claimed. These remain user acceptance checks. Preview project edits save automatically; new/updated revision-2 typography cannot be opened by official 0.83.5. Use new or copied projects.
+
+## Persistence and recovery
+
+Ongoing source checkpoint: libfile_d518d0b2b028819196e928266d4513c3. Ongoing checklist: libfile_eb0443fa33e881919dc7b23a6f7c2b71. Implementation handoff: libfile_7c4e7aac02008191bfa3d3fbc7e04e68. Install guide: libfile_182b954fec408191a685498e513ce953. Resolve exact Preview 2 filenames for the installer/frozen source; never overwrite the original upload. Use retained receipts or current metadata for version guards.
+
+Save compiled downloads as well as source, so a future session can recover them without rebuilding SDKs and CEF. Source archives exclude credentials, model weights, PreviewData, build caches and internal review screenshots. Do not run Preview 1 build helpers unchanged: preserve frozen names. The Windows script now targets Preview-2 outputs and refuses to wipe staging that contains PreviewData. A future usage-limit interruption is not authorization to resume the three held additions.
+
+## Historical Preview 1 handoff
 
 The first-two-features delivery is complete: favorite fonts and contour outlines. **The user explicitly requested a temporary hold. Do not begin Perspective Transform, rich text or Mesh Warp unless the user resumes the project.** Those additions remain unimplemented.
 

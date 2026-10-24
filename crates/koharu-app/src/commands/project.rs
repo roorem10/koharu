@@ -185,9 +185,12 @@ pub(crate) struct ProjectLibrary {
 
 impl ProjectLibrary {
     pub(crate) fn new() -> Result<Self> {
-        let root = dirs::document_dir()
-            .context("the Documents directory is unavailable")?
-            .join("Koharu");
+        let root = match koharu_config::preview::root()? {
+            Some(root) => root.join("projects"),
+            None => dirs::document_dir()
+                .context("the Documents directory is unavailable")?
+                .join("Koharu"),
+        };
         std::fs::create_dir_all(&root)
             .with_context(|| format!("failed to create {}", root.display()))?;
         Ok(Self { root })
@@ -459,7 +462,7 @@ impl Project {
                     color: None,
                     stroke_color: None,
                     stroke_width: None,
-                    stroke_method: None,
+                    stroke_method: Some(koharu_scene::StrokeMethod::Contour),
                     stroke_position: None,
                     stroke_join: None,
                     alignment: match kind {

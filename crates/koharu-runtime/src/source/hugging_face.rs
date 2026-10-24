@@ -62,6 +62,22 @@ impl<'a> HuggingFaceFile<'a> {
     #[tracing::instrument(skip_all)]
     pub async fn resolve(self) -> anyhow::Result<PathBuf> {
         Store::file(self.path(), move |stage| async move {
+            if koharu_config::preview::enabled() {
+                // HF's Xet byte stream initializes a separate user-global shard/cache directory,
+                // even with HFClient's file cache disabled. The managed HTTP downloader follows
+                // the same pinned /resolve URL without opening that external cache.
+                let mut url = reqwest::Url::parse("https://huggingface.co")?;
+                {
+                    let mut segments = url.path_segments_mut().expect("HTTPS URL has a path");
+                    if self.kind == RepositoryKind::Dataset {
+                        segments.push("datasets");
+                    }
+                    segments.extend(self.repository.split('/'));
+                    segments.push("resolve").push(self.revision);
+                    segments.extend(self.filename.split('/'));
+                }
+                return download::fetch(url.as_str(), &stage).await;
+            }
             let client = client()?;
             let (owner, name) = split_id(self.repository);
             download::receive(self.filename, &stage, async {

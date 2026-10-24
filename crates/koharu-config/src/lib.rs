@@ -31,6 +31,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::sync::watch;
 
+pub mod preview;
+
 const CONFIG_DIRECTORY: &str = ".koharu";
 const CONFIG_FILE: &str = "config.toml";
 
@@ -370,8 +372,11 @@ impl Manager {
     }
 }
 
-/// Returns the shared Koharu configuration path: `~/.koharu/config.toml`.
+/// Returns the active configuration path, isolated beside the executable in private previews.
 pub fn path() -> Result<PathBuf> {
+    if let Some(root) = preview::root()? {
+        return Ok(root.join("settings").join(CONFIG_FILE));
+    }
     let home = dirs::home_dir().context("could not determine the home directory")?;
     Ok(home.join(CONFIG_DIRECTORY).join(CONFIG_FILE))
 }
