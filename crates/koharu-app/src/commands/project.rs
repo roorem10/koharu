@@ -170,6 +170,8 @@ pub struct Typography {
     pub stroke_method: Option<koharu_scene::StrokeMethod>,
     pub stroke_position: Option<koharu_scene::StrokePosition>,
     pub stroke_join: Option<koharu_scene::StrokeJoin>,
+    pub outer_stroke_color: Option<[u8; 4]>,
+    pub outer_stroke_width: Option<f32>,
     pub alignment: Option<koharu_scene::TextAlignment>,
     pub writing_mode: Option<koharu_scene::WritingMode>,
 }
@@ -465,6 +467,8 @@ impl Project {
                     stroke_method: Some(koharu_scene::StrokeMethod::Contour),
                     stroke_position: None,
                     stroke_join: None,
+                    outer_stroke_color: None,
+                    outer_stroke_width: None,
                     alignment: match kind {
                         TextLayoutKind::Point => Some(koharu_scene::TextAlignment::Start),
                         TextLayoutKind::Paragraph => None,
@@ -563,6 +567,11 @@ impl Project {
                         stroke_method: update.typography.stroke_method,
                         stroke_position: update.typography.stroke_position,
                         stroke_join: update.typography.stroke_join,
+                        outer_stroke_color: update.typography.outer_stroke_color,
+                        outer_stroke_width: update
+                            .typography
+                            .outer_stroke_width
+                            .filter(|width| *width > 0.0),
                         alignment: update.typography.alignment,
                         writing_mode: update.typography.writing_mode,
                         extensions: Default::default(),
@@ -1122,6 +1131,8 @@ impl Project {
             stroke_method: typography.stroke_method,
             stroke_position: typography.stroke_position,
             stroke_join: typography.stroke_join,
+            outer_stroke_color: typography.outer_stroke_color,
+            outer_stroke_width: typography.outer_stroke_width,
             alignment: typography.alignment,
             writing_mode,
         }
@@ -1368,6 +1379,8 @@ mod tests {
             stroke_method: None,
             stroke_position: None,
             stroke_join: None,
+            outer_stroke_color: None,
+            outer_stroke_width: None,
             alignment: None,
             writing_mode: Some(WritingMode::Vertical),
             extensions: Default::default(),
