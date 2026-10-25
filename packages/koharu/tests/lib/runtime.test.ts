@@ -98,6 +98,33 @@ function ProjectProbe() {
 }
 
 describe('Tauri runtime', () => {
+  it('suppresses the page context menu but keeps it for editable text', async () => {
+    const { dispose } = await start()
+    const menu = (target: Element) => {
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+      target.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+    const page = document.createElement('article')
+    const input = document.createElement('input')
+    const textarea = document.createElement('textarea')
+    const editable = document.createElement('div')
+    editable.setAttribute('contenteditable', 'true')
+    const inside = document.createElement('span')
+    editable.append(inside)
+    document.body.append(page, input, textarea, editable)
+    expect(menu(page)).toBe(true)
+    expect(menu(input)).toBe(false)
+    expect(menu(textarea)).toBe(false)
+    expect(menu(inside)).toBe(false)
+    dispose()
+    expect(menu(page)).toBe(false)
+    page.remove()
+    input.remove()
+    textarea.remove()
+    editable.remove()
+  })
+
   it('saves shortcut snapshots in edit order', async () => {
     const first = deferred<Record<string, string>>()
     const save = vi

@@ -107,6 +107,21 @@ export function Providers({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('wheel', preventViewportScaling, { capture: true })
   }, [])
 
+  useEffect(() => {
+    // The runtime only filters Chrome-style context menus. In the Alloy window the
+    // page menu offers Back, Forward, Print and View source, so keep the native
+    // menu for editable text only, where it carries cut, copy and paste.
+    const preventPageMenu = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest('input, textarea, [contenteditable]:not([contenteditable="false"])'))
+        return
+      event.preventDefault()
+    }
+
+    window.addEventListener('contextmenu', preventPageMenu, { capture: true })
+    return () => window.removeEventListener('contextmenu', preventPageMenu, { capture: true })
+  }, [])
+
   return (
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
