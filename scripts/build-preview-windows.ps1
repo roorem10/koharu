@@ -90,7 +90,10 @@ if (-not $cefRoot) {
     if ($cef) { $cefRoot = $cef.DirectoryName }
 }
 if (-not $cefRoot) { throw 'Cannot locate CEF notices. Keep the CEF build directory and retry.' }
-Copy-Item (Join-Path $cefRoot 'LICENSE.txt') -Destination (Join-Path $stage 'CEF-LICENSE.txt') -Force
+# Cargo's CEF download keeps CREDITS.html but drops the archive's LICENSE.txt; fall back to the checked-in copy.
+$cefLicense = Join-Path $cefRoot 'LICENSE.txt'
+if (-not (Test-Path $cefLicense)) { $cefLicense = Join-Path $root 'preview\CEF-LICENSE.txt' }
+Copy-Item $cefLicense -Destination (Join-Path $stage 'CEF-LICENSE.txt') -Force
 Copy-Item (Join-Path $cefRoot 'CREDITS.html') -Destination (Join-Path $stage 'CEF-CREDITS.html') -Force
 
 Get-ChildItem $stage -File | Where-Object { $_.Extension -in @('.exe', '.dll') } |
