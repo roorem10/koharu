@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { FileDropImport } from '@/components/app/FileDropImport'
 import { TitleBar } from '@/components/app/TitleBar'
 import { Editor } from '@/components/editor/Editor'
 import { SettingsPage } from '@/components/preferences/SettingsPage'
@@ -36,6 +37,7 @@ export function KoharuApp() {
       )}
     >
       <TitleBar />
+      <FileDropImport />
       {settingsOpen ? (
         <SettingsPage />
       ) : project === undefined ? (

@@ -1,13 +1,14 @@
+use std::path::PathBuf;
+
 use anyhow::{Context as _, Result};
 use koharu_desktop::{CanvasState, Desktop};
-use koharu_scene::{AssetInput, AssetMetadata, AssetRole, At, PageDraft};
+use koharu_scene::ProjectId;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use strum::{EnumMessage as _, IntoEnumIterator as _};
 use tauri::{AppHandle, Manager as _, State, WebviewWindow, ipc::Channel};
 use tauri_runtime_cef::CefRuntime;
-use walkdir::WalkDir;
 
 use super::{
     ChannelExt as _, Error,
@@ -337,14 +338,13 @@ async fn close_current_project(handle: &AppHandle<CefRuntime>) -> Result<()> {
 pub(crate) async fn import(
     source: PageImportSource,
     window: WebviewWindow<CefRuntime>,
-    desktop: State<'_, Desktop>,
-    project: State<'_, CurrentProject>,
-    processing: State<'_, Processing>,
-    canvas_channel: State<'_, CanvasChannel>,
+    handle: AppHandle<CefRuntime>,
 ) -> std::result::Result<(), Error> {
+    let processing = handle.state::<Processing>();
     if !processing.stops.lock().is_empty() {
         return Err(anyhow::anyhow!("pages cannot be imported while processing is running").into());
     }
+    let expected_project = import_project(&handle).await?;
     let extensions = import::Format::iter()
         .flat_map(|format| format.get_serializations())
         .collect::<Vec<_>>();
@@ -358,74 +358,85 @@ pub(crate) async fn import(
                 .map(|file| file.path().to_owned())
                 .collect::<Vec<_>>()
         }),
-        PageImportSource::Folder => dialog.pick_folder().await.map(|folder| {
-            WalkDir::new(folder.path())
-                .follow_links(false)
-                .into_iter()
-                .filter_map(|entry| match entry {
-                    Ok(entry) if entry.file_type().is_file() => Some(entry.into_path()),
-                    Ok(_) => None,
-                    Err(error) => {
-                        tracing::warn!(%error, "could not inspect an import directory entry");
-                        None
-                    }
-                })
-                .filter(|path| {
-                    path.extension()
-                        .and_then(|extension| extension.to_str())
-                        .is_some_and(|extension| extension.parse::<import::Format>().is_ok())
-                })
-                .collect::<Vec<_>>()
-        }),
+        PageImportSource::Folder => dialog
+            .pick_folder()
+            .await
+            .map(|folder| vec![folder.path().to_owned()]),
     };
     let Some(files) = files else {
         return Ok(());
     };
-    if files.is_empty() {
-        return Err(anyhow::anyhow!("no supported images were found in the selection").into());
-    }
-    let pages = tokio_rayon::spawn(move || import::import(files)).await?;
+    import_paths(files, None, expected_project, &handle).await?;
+    Ok(())
+}
 
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn import_dropped(
+    paths: Vec<String>,
+    handle: AppHandle<CefRuntime>,
+) -> std::result::Result<u32, Error> {
+    let expected_project = import_project(&handle).await?;
+    Ok(import_paths(
+        paths.into_iter().map(PathBuf::from).collect(),
+        Some(2_000),
+        expected_project,
+        &handle,
+    )
+    .await?)
+}
+
+async fn import_project(handle: &AppHandle<CefRuntime>) -> Result<ProjectId> {
+    Ok(handle
+        .state::<CurrentProject>()
+        .project
+        .lock()
+        .await
+        .as_ref()
+        .context("no project is open")?
+        .snapshot()
+        .project_id())
+}
+
+async fn import_paths(
+    paths: Vec<PathBuf>,
+    maximum: Option<usize>,
+    expected_project: ProjectId,
+    handle: &AppHandle<CefRuntime>,
+) -> Result<u32> {
+    let processing = handle.state::<Processing>();
+    anyhow::ensure!(
+        processing.stops.lock().is_empty(),
+        "pages cannot be imported while processing is running"
+    );
+    let (pages, skipped) = tokio_rayon::spawn(move || -> Result<_> {
+        let selection = import::collect_paths(paths, maximum)?;
+        Ok((import::import(selection.paths)?, selection.skipped))
+    })
+    .await?;
     let (commit, page) = {
+        let project = handle.state::<CurrentProject>();
         let mut project = project.project.lock().await;
         let project = project.as_mut().context("no project is open")?;
-        let source = AssetRole::new("source")?;
-        let patch = project.snapshot().patch(|edit| {
-            for imported in pages {
-                let page = edit.add_page(
-                    PageDraft::new(
-                        imported.name,
-                        f64::from(imported.width),
-                        f64::from(imported.height),
-                    ),
-                    At::End,
-                )?;
-                edit.set_asset(
-                    page,
-                    &source,
-                    AssetInput::new(
-                        imported.bytes,
-                        imported.format.to_mime_type(),
-                        AssetMetadata {
-                            width: Some(imported.width),
-                            height: Some(imported.height),
-                            attributes: Default::default(),
-                        },
-                    ),
-                )?;
-            }
-            Ok(())
-        })?;
-        let commit = project.session.commit(patch).await?;
-        project.record(vec![commit.revision]);
+        anyhow::ensure!(
+            project.snapshot().project_id() == expected_project,
+            "the project changed while pages were being imported"
+        );
+        anyhow::ensure!(
+            processing.stops.lock().is_empty(),
+            "pages cannot be imported while processing is running"
+        );
+        let commit = project.import_pages(pages).await?;
+        project.record_commit(&commit);
         project.reconcile_page();
         let page = project.active_page();
         (commit, page)
     };
+    let desktop = handle.state::<Desktop>();
     desktop.synchronize(&commit.snapshot, page, &commit).await?;
     let canvas = desktop.canvas_state();
-    canvas_channel.channel.publish(canvas);
-    Ok(())
+    handle.state::<CanvasChannel>().channel.publish(canvas);
+    Ok(skipped)
 }
 
 #[tauri::command]

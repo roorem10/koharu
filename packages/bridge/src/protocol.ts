@@ -22,6 +22,7 @@ export const commands = {
 	deleteProject: (name: string) => __TAURI_INVOKE<null>("delete_project", { name }),
 	closeProject: () => __TAURI_INVOKE<null>("close_project"),
 	import: (source: PageImportSource) => __TAURI_INVOKE<null>("import", { source }),
+	importDropped: (paths: string[]) => __TAURI_INVOKE<number>("import_dropped", { paths }),
 	selectPage: (page: EntityId) => __TAURI_INVOKE<PageSelection>("select_page", { page }),
 	renamePage: (page: EntityId, label: string) => __TAURI_INVOKE<null>("rename_page", { page, label }),
 	deletePages: (pages: EntityId[]) => __TAURI_INVOKE<null>("delete_pages", { pages }),

@@ -8,8 +8,10 @@ import {
   useMutation,
   useQuery,
 } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 
-import { commands, type FontFamily } from '@koharu/bridge/protocol'
+import { commands, type FontFamily, type PageImportSource } from '@koharu/bridge/protocol'
+import { toast } from '@koharu/ui/components/toast'
 
 import { call } from './backend'
 
@@ -121,10 +123,28 @@ export function useCommand<Args extends unknown[], Result>(
 }
 
 export function useImportPages() {
-  const { run, busy } = useCommand(['import-pages'], commands.import, 'navigator.importing', () =>
-    refresh(projectKey, pagesKey, pageKey),
-  )
-  return { importPages: run, importing: busy }
+  const { t } = useTranslation()
+  const importing = useIsMutating({ mutationKey: ['import-pages'] }) > 0
+  const mutation = useMutation({
+    mutationKey: ['import-pages'],
+    meta: { activity: 'navigator.importing' },
+    mutationFn: async (input: PageImportSource | string[]) => {
+      if (Array.isArray(input)) return call(commands.importDropped, input)
+      await call(commands.import, input)
+      return null
+    },
+    onSuccess: async (result) => {
+      await refresh(projectKey, pagesKey, pageKey)
+      if (result) {
+        toast.add({ type: 'info', title: t('navigator.itemsSkipped', { count: result }) })
+      }
+    },
+  })
+  return {
+    importPages: (source: PageImportSource) => mutation.mutate(source),
+    importDroppedPages: (paths: string[]) => mutation.mutateAsync(paths),
+    importing,
+  }
 }
 
 export async function refresh(...keys: QueryKey[]): Promise<void> {

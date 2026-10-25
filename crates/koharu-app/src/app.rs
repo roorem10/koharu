@@ -176,6 +176,8 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
             };
             // This pinned CEF runtime delivers native file drops only in Alloy style.
             let window = window.browser_runtime_style(RuntimeStyle::Alloy);
+            // A dropped file must never replace the app's frameless editor page.
+            let window = window.on_navigation(|url| url.scheme() != "file");
             let window = window.build().context("failed to create the main window")?;
             window.show().context("failed to show the main window")?;
             window

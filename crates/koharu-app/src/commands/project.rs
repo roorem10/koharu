@@ -18,6 +18,7 @@ use tokio::sync::Mutex;
 use super::{
     canvas::Point,
     editing::{GeometryUpdate, TypographyUpdate},
+    import,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -303,6 +304,37 @@ impl Project {
 
     pub(crate) fn active_page(&self) -> Option<EntityId> {
         self.active_page
+    }
+
+    pub(super) async fn import_pages(&mut self, pages: Vec<import::Page>) -> Result<Commit> {
+        let source = AssetRole::new("source")?;
+        let patch = self.snapshot().patch(|edit| {
+            for imported in pages {
+                let page = edit.add_page(
+                    PageDraft::new(
+                        imported.name,
+                        f64::from(imported.width),
+                        f64::from(imported.height),
+                    ),
+                    At::End,
+                )?;
+                edit.set_asset(
+                    page,
+                    &source,
+                    AssetInput::new(
+                        imported.bytes,
+                        imported.format.to_mime_type(),
+                        AssetMetadata {
+                            width: Some(imported.width),
+                            height: Some(imported.height),
+                            attributes: Default::default(),
+                        },
+                    ),
+                )?;
+            }
+            Ok(())
+        })?;
+        self.commit(patch).await
     }
 
     pub(crate) fn select_page(&mut self, page: EntityId) -> Result<()> {
@@ -1361,6 +1393,56 @@ mod tests {
     use koharu_scene::{Generation, ProducerId, WritingMode};
 
     use super::*;
+
+    #[tokio::test]
+    async fn imported_pages_append_with_source_assets_and_one_undo() {
+        let mut session = Session::memory().await.unwrap();
+        let create = session
+            .snapshot()
+            .patch(|edit| {
+                edit.add_page(PageDraft::new("existing", 20.0, 30.0), At::End)?;
+                Ok(())
+            })
+            .unwrap();
+        session.commit(create).await.unwrap();
+        let mut project = Project::new(session, "import test".to_owned());
+        let mut bytes = Cursor::new(Vec::new());
+        DynamicImage::ImageRgba8(RgbaImage::from_pixel(2, 3, image::Rgba([10, 20, 30, 255])))
+            .write_to(&mut bytes, ImageFormat::Png)
+            .unwrap();
+        let pages = ["01.png", "02.png", "03.png"]
+            .into_iter()
+            .map(|name| import::Page {
+                name: name.to_owned(),
+                bytes: bytes.get_ref().clone().into(),
+                format: ImageFormat::Png,
+                width: 2,
+                height: 3,
+            })
+            .collect();
+        let commit = project.import_pages(pages).await.unwrap();
+        project.record_commit(&commit);
+        project.reconcile_page();
+        let summary = Project::pages(&project.snapshot()).unwrap();
+        assert_eq!(
+            summary
+                .iter()
+                .map(|page| page.label.as_str())
+                .collect::<Vec<_>>(),
+            ["existing", "01.png", "02.png", "03.png"]
+        );
+        for page in &summary[1..] {
+            assert_eq!((page.size.width, page.size.height), (2.0, 3.0));
+            assert!(page.source_asset.is_some());
+        }
+        assert_eq!(project.undo.len(), 1);
+        project.undo().await.unwrap();
+        let summary = Project::pages(&project.snapshot()).unwrap();
+        assert_eq!(summary.len(), 1);
+        assert_eq!(summary[0].label, "existing");
+        project.redo().await.unwrap();
+        assert_eq!(Project::pages(&project.snapshot()).unwrap().len(), 4);
+    }
 
     #[test]
     fn only_user_authored_direction_is_projected_as_an_override() {
