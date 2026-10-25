@@ -1,6 +1,6 @@
 use anyhow::{Context as _, Result};
 use tauri::{AppHandle, Manager as _, WindowEvent};
-use tauri_runtime_cef::{Cef, CefRuntime};
+use tauri_runtime_cef::{Cef, CefRuntime, RuntimeStyle, WebviewWindowBuilderCefExt};
 use tokio::sync::Mutex;
 
 use crate::commands::{
@@ -174,6 +174,8 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
                 Some(root) => window.data_directory(root.join("browser").join("editor")),
                 None => window,
             };
+            // This pinned CEF runtime delivers native file drops only in Alloy style.
+            let window = window.browser_runtime_style(RuntimeStyle::Alloy);
             let window = window.build().context("failed to create the main window")?;
             window.show().context("failed to show the main window")?;
             window
