@@ -1,0 +1,128 @@
+name: Preview Windows build
+
+# Builds the private Typesetting Preview portable package with the same script
+# used for hand-made builds (scripts/build-preview-windows.ps1), so the
+# PreviewData isolation, separate credential service, disabled updater and
+# disabled Sentry all come from one place.
+#
+# Cache scoping: a run can only restore caches saved on its own branch or the
+# default branch, or on the base branch for pull requests. Only pushes to
+# typesetting-preview save the Rust cache; work-order branches should be built
+# through a pull request into typesetting-preview so they start warm.
+
+on:
+  push:
+    branches: ['typesetting-preview']
+    paths-ignore: ['**.md']
+  pull_request:
+    branches: ['typesetting-preview']
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Matches the toolchain used for the accepted hand-made builds.
+  RUST_TOOLCHAIN: '1.99.1'
+
+jobs:
+  portable:
+    name: Windows portable
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust ${{ env.RUST_TOOLCHAIN }}
+        shell: pwsh
+        run: |
+          rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal --target wasm32-unknown-unknown
+          rustup default $env:RUST_TOOLCHAIN
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install Ninja and NSIS if missing
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { choco install ninja -y --no-progress }
+          $nsis = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue) -and -not (Test-Path $nsis)) {
+            choco install nsis -y --no-progress
+          }
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: koharu-preview-windows
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/typesetting-preview' }}
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: windows-bun-${{ hashFiles('**/bun.lock') }}
+
+      - name: Toolchain versions
+        shell: pwsh
+        run: |
+          rustc --version
+          cargo --version
+          bun --version
+          cmake --version | Select-Object -First 1
+          ninja --version
+
+      - name: Build preview package
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview-windows.ps1
+
+      - name: Check package layout
+        shell: pwsh
+        run: |
+          $stage = 'dist\Koharu-Typesetting-Preview-2'
+          $required = @('koharu.exe', 'libcef.dll', 'locales', 'LICENSE-MIT', 'LICENSE-APACHE',
+            'PREVIEW_INSTALL.md', 'CEF-LICENSE.txt', 'CEF-CREDITS.html')
+          $missing = $required | Where-Object { -not (Test-Path (Join-Path $stage $_)) }
+          if ($missing) { throw "Package is missing: $($missing -join ', ')" }
+          if (Test-Path (Join-Path $stage 'PreviewData')) { throw 'Package contains PreviewData.' }
+
+          # A SHA-256 list of every packaged file, for comparing against other builds.
+          $root = (Resolve-Path $stage).Path
+          $files = Get-ChildItem $root -Recurse -File | Sort-Object FullName
+          $files | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Length)  $($_.FullName.Substring($root.Length + 1).Replace('\', '/'))"
+          } | Set-Content dist\MANIFEST-SHA256.txt -Encoding utf8
+
+          $size = [math]::Round(($files | Measure-Object Length -Sum).Sum / 1MB)
+          @(
+            '### Preview package'
+            ''
+            "- Commit: ``$env:GITHUB_SHA``"
+            "- Files: $($files.Count), $size MB unpacked"
+            "- Rust: $(rustc --version)"
+          ) | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: Name artifact
+        id: name
+        shell: pwsh
+        run: |
+          $sha = '${{ github.event.pull_request.head.sha || github.sha }}'.Substring(0, 8)
+          if ($env:GITHUB_EVENT_NAME -eq 'pull_request') { $label = 'pr${{ github.event.pull_request.number }}' }
+          else { $label = $env:GITHUB_REF_NAME -replace '[^A-Za-z0-9._-]', '-' }
+          "artifact=Koharu-Preview-$label-$sha" >> $env:GITHUB_OUTPUT
+
+      # The artifact unpacks to the same Koharu-Typesetting-Preview-2 folder as
+      # the portable ZIP, plus the manifest beside it.
+      - name: Upload portable package
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.name.outputs.artifact }}
+          path: |
+            dist/Koharu-Typesetting-Preview-2/
+            dist/MANIFEST-SHA256.txt
+          if-no-files-found: error
+          retention-days: 90
