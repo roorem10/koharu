@@ -7,6 +7,8 @@ use crate::stages::{Flux2KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, RoremMixed
 
 #[derive(Clone, Debug, PartialEq, Type)]
 pub struct PipelineConfig {
+    pub detect_text_color: bool,
+    pub default_text_color: Option<[u8; 4]>,
     pub detection: DetectionModel,
     pub ocr: OcrModel,
     pub translation: TranslationConfig,
@@ -19,6 +21,8 @@ pub struct PipelineConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 struct PipelineFile {
+    detect_text_color: bool,
+    default_text_color: Option<[u8; 4]>,
     detection: ModelSelection,
     ocr: ModelSelection,
     translation: TranslationConfig,
@@ -30,6 +34,8 @@ struct PipelineFile {
 impl Default for PipelineFile {
     fn default() -> Self {
         Self {
+            detect_text_color: true,
+            default_text_color: None,
             detection: ModelSelection {
                 model: "koharu-layout-rfdetr-seg-2xl".to_owned(),
             },
@@ -86,6 +92,8 @@ impl Serialize for PipelineConfig {
             InpaintingModel::LaMa {} | InpaintingModel::AotInpainting {} => {}
         }
         PipelineFile {
+            detect_text_color: self.detect_text_color,
+            default_text_color: self.default_text_color,
             detection: ModelSelection {
                 model: detection.to_owned(),
             },
@@ -148,6 +156,8 @@ impl<'de> Deserialize<'de> for PipelineConfig {
             }
         };
         Ok(Self {
+            detect_text_color: file.detect_text_color,
+            default_text_color: file.default_text_color,
             detection,
             ocr,
             translation: file.translation,
@@ -160,6 +170,8 @@ impl<'de> Deserialize<'de> for PipelineConfig {
 impl Default for PipelineConfig {
     fn default() -> Self {
         Self {
+            detect_text_color: true,
+            default_text_color: None,
             detection: DetectionModel::KoharuLayoutRFDetrSeg2XL(
                 KoharuLayoutRFDetrSeg2XLConfig::default(),
             ),
@@ -431,6 +443,8 @@ mod tests {
     #[test]
     fn serializes_model_profiles_under_processor() {
         let config = PipelineConfig {
+            detect_text_color: true,
+            default_text_color: None,
             detection: DetectionModel::KoharuLayoutRFDetrSeg2XL(KoharuLayoutRFDetrSeg2XLConfig {
                 text_threshold: Some(0.25),
                 ..Default::default()
@@ -454,5 +468,27 @@ mod tests {
             restored.inpainting().unwrap(),
             InpaintingModel::Flux2Klein(config) if config.prompt == "Keep the line art."
         ));
+    }
+
+    #[test]
+    fn missing_text_color_preferences_keep_existing_detection() {
+        let config: PipelineConfig = toml::from_str("").unwrap();
+        assert!(config.detect_text_color);
+        assert_eq!(config.default_text_color, None);
+    }
+
+    #[test]
+    fn text_color_preferences_round_trip_and_can_be_cleared() {
+        for color in [Some([20, 115, 235, 128]), None] {
+            let config = PipelineConfig {
+                detect_text_color: false,
+                default_text_color: color,
+                ..PipelineConfig::default()
+            };
+            let saved = toml::to_string(&config).unwrap();
+            let restored: PipelineConfig = toml::from_str(&saved).unwrap();
+            assert!(!restored.detect_text_color);
+            assert_eq!(restored.default_text_color, color);
+        }
     }
 }

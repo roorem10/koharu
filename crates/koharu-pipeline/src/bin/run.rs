@@ -128,6 +128,7 @@ impl Arguments {
                 }
             },
             processor: Default::default(),
+            ..PipelineConfig::default()
         }
     }
 }

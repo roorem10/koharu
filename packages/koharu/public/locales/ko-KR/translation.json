@@ -413,6 +413,9 @@
         "textThreshold": "텍스트 임곗값"
       },
       "processing": "처리 중",
+      "detectTextColors": "텍스트 및 테두리 색상 감지",
+      "defaultTextColor": "기본 텍스트 색상",
+      "textColorHelp": "새로 감지된 텍스트에 적용됩니다. 기존 텍스트 상자의 색상은 유지됩니다.",
       "stages": {
         "detection": {
           "description": "텍스트, 말풍선, 패널을 찾습니다.",

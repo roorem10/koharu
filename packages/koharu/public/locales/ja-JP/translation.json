@@ -413,6 +413,9 @@
         "textThreshold": "テキストしきい値"
       },
       "processing": "処理中",
+      "detectTextColors": "文字色と縁取り色を検出",
+      "defaultTextColor": "既定の文字色",
+      "textColorHelp": "新しく検出した文字に適用します。既存のテキストボックスの色は変更しません。",
       "stages": {
         "detection": {
           "description": "テキスト、吹き出し、コマを検出します。",

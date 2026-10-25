@@ -413,6 +413,9 @@
         "textThreshold": "文字閾值"
       },
       "processing": "正在處理",
+      "detectTextColors": "偵測文字與描邊顏色",
+      "defaultTextColor": "預設文字顏色",
+      "textColorHelp": "僅套用至新偵測的文字。現有文字方塊的顏色保持不變。",
       "stages": {
         "detection": {
           "description": "尋找文字、對話框和分鏡。",

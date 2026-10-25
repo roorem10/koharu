@@ -413,6 +413,9 @@
         "textThreshold": "Limite de texto"
       },
       "processing": "Processando",
+      "detectTextColors": "Detectar cores do texto e do contorno",
+      "defaultTextColor": "Cor padrão do texto",
+      "textColorHelp": "Aplica-se ao texto recém-detectado. As caixas de texto existentes mantêm suas cores.",
       "stages": {
         "detection": {
           "description": "Encontra texto, balões e quadros.",

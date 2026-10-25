@@ -26,6 +26,8 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 const preferences: Preferences = {
   pipeline: {
+    detect_text_color: true,
+    default_text_color: null,
     detection: { model: 'koharu-layout-rfdetr-seg-2xl' },
     ocr: { model: 'paddleocr-vl-1.6' },
     translation: {

@@ -3,6 +3,8 @@
 import { Eraser, FileText, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { ColorWell } from '@/components/controls/ColorWell'
+import { hexToRgba, rgbaToHex } from '@/lib/color'
 import {
   defaultModel,
   modelNames,
@@ -28,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@koharu/ui/components/select'
+import { Switch } from '@koharu/ui/components/switch'
 
 const stages = [
   ['detection', Search],
@@ -96,6 +99,29 @@ export function PipelinePreferences({
             </PreferenceRow>
           )
         })}
+        <PreferenceRow
+          title={t('settings.pipeline.detectTextColors')}
+          description={t('settings.pipeline.textColorHelp')}
+        >
+          <Switch
+            aria-label={t('settings.pipeline.detectTextColors')}
+            checked={value.detect_text_color}
+            onCheckedChange={(detect_text_color) => onChange({ ...value, detect_text_color })}
+          />
+        </PreferenceRow>
+        <PreferenceRow title={t('settings.pipeline.defaultTextColor')}>
+          <ColorWell
+            label={t('settings.pipeline.defaultTextColor')}
+            allowTransparent
+            disabled={value.detect_text_color}
+            value={value.default_text_color && value.default_text_color[3] > 0
+              ? rgbaToHex(value.default_text_color) : null}
+            onChange={(color) => onChange({
+              ...value,
+              default_text_color: color === null ? null : hexToRgba(color),
+            })}
+          />
+        </PreferenceRow>
       </PreferenceSection>
     </PreferencePage>
   )

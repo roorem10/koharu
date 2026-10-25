@@ -140,6 +140,8 @@ const artworkLayer: Layer = {
 
 const preferences: Preferences = {
   pipeline: {
+    detect_text_color: true,
+    default_text_color: null,
     detection: { model: 'koharu-layout-rfdetr-seg-2xl' },
     ocr: { model: 'paddleocr-vl-1.6' },
     translation: {
@@ -1624,6 +1626,42 @@ describe('greenfield editor', () => {
       expect(input).toHaveFocus()
       expect(input).toHaveValue('s')
     })
+  })
+
+  it('saves and clears the default color only when detection is disabled', async () => {
+    installProject()
+    const user = userEvent.setup()
+    useKoharuStore.setState({ settingsOpen: true })
+    const existingColor = [...textLayer.typography!.color!]
+    const save = vi.spyOn(commands, 'savePreferences')
+      .mockImplementation(async (pipeline, providers, typesetting) => ({
+        ...preferences, pipeline, providers, typesetting,
+      }))
+    const setTypography = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
+    render(<ThemeProvider attribute='class'><SettingsPage /></ThemeProvider>)
+
+    await user.click(screen.getByRole('button', { name: 'Pipeline' }))
+    const toggle = screen.getByRole('switch', { name: 'Detect text and outline colors' })
+    const color = screen.getByRole('button', { name: 'Default text color' })
+    expect(toggle).toBeChecked()
+    expect(color).toBeDisabled()
+    await user.click(toggle)
+    expect(color).toBeEnabled()
+    await user.click(color)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hex color code' }), {
+      target: { value: '#2357AB' },
+    })
+    await waitFor(() => expect(save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ detect_text_color: false, default_text_color: [35, 87, 171, 255] }),
+      preferences.providers, preferences.typesetting,
+    ))
+    await user.click(screen.getByRole('button', { name: 'Transparent' }))
+    await waitFor(() => expect(save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ detect_text_color: false, default_text_color: null }),
+      preferences.providers, preferences.typesetting,
+    ))
+    expect(setTypography).not.toHaveBeenCalled()
+    expect(textLayer.typography!.color).toEqual(existingColor)
   })
 
   it('clamps a threshold typed past its bounds before saving it', async () => {

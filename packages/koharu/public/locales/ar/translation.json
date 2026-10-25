@@ -413,6 +413,9 @@
         "textThreshold": "عتبة النص"
       },
       "processing": "المعالجة",
+      "detectTextColors": "اكتشاف ألوان النص والحدود",
+      "defaultTextColor": "لون النص الافتراضي",
+      "textColorHelp": "يُطبّق على النص المكتشف حديثًا. تحتفظ مربعات النص الحالية بألوانها.",
       "stages": {
         "detection": {
           "description": "إيجاد النصوص وفقاعات الكلام والألواح.",

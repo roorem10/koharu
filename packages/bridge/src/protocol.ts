@@ -365,6 +365,8 @@ export type PaintBrush = {
 };
 
 export type PipelineConfig = {
+	detect_text_color: boolean,
+	default_text_color: [number, number, number, number] | null,
 	detection: DetectionModel,
 	ocr: OcrModel,
 	translation: TranslationConfig,

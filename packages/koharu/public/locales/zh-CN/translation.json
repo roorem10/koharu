@@ -413,6 +413,9 @@
         "textThreshold": "文本阈值"
       },
       "processing": "正在处理",
+      "detectTextColors": "检测文字和描边颜色",
+      "defaultTextColor": "默认文字颜色",
+      "textColorHelp": "仅应用于新检测的文字。现有文本框的颜色保持不变。",
       "stages": {
         "detection": {
           "description": "查找文本、气泡和分镜。",

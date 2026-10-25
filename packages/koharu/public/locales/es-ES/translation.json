@@ -413,6 +413,9 @@
         "textThreshold": "Umbral de texto"
       },
       "processing": "Procesando",
+      "detectTextColors": "Detectar colores del texto y del contorno",
+      "defaultTextColor": "Color de texto predeterminado",
+      "textColorHelp": "Se aplica al texto recién detectado. Los cuadros de texto existentes conservan sus colores.",
       "stages": {
         "detection": {
           "description": "Encuentra texto, bocadillos y viñetas.",

@@ -57,14 +57,34 @@ pub struct KoharuLayoutRFDetrSeg2XLConfig {
     pub panel_threshold: Option<f32>,
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct TextColorOptions {
+    pub detect_text_color: bool,
+    pub default_text_color: Option<[u8; 4]>,
+}
+
+impl Default for TextColorOptions {
+    fn default() -> Self {
+        Self {
+            detect_text_color: true,
+            default_text_color: None,
+        }
+    }
+}
+
 pub(super) struct Processor {
     config: DetectionModel,
     device: koharu_ml::Device,
     model: ModelCell<Model>,
+    text_colors: TextColorOptions,
 }
 
 impl Processor {
-    pub(super) fn new(mut config: DetectionModel, device: koharu_ml::Device) -> Self {
+    pub(super) fn new(
+        mut config: DetectionModel,
+        device: koharu_ml::Device,
+        text_colors: TextColorOptions,
+    ) -> Self {
         let DetectionModel::KoharuLayoutRFDetrSeg2XL(settings) = &mut config;
         for (name, value) in [
             ("text", &mut settings.text_threshold),
@@ -89,6 +109,7 @@ impl Processor {
             config,
             device,
             model: ModelCell::new(),
+            text_colors,
         }
     }
 }
@@ -129,7 +150,7 @@ impl StageProcessor for Processor {
             .await
             .as_ref()
             .ok_or_else(|| anyhow!("detection model is not loaded"))?
-            .run(input)
+            .run(input, self.text_colors)
             .await
     }
 }
@@ -153,7 +174,11 @@ impl Model {
         })
     }
 
-    async fn run(&self, input: StageInput) -> Result<koharu_scene::Patch> {
+    async fn run(
+        &self,
+        input: StageInput,
+        colors: TextColorOptions,
+    ) -> Result<koharu_scene::Patch> {
         let page = input.page;
         let image = input
             .images
@@ -161,7 +186,14 @@ impl Model {
             .await?
             .ok_or_else(|| anyhow!("page {page} has no source image"))?;
         let output = self.detect(image.clone()).await?;
-        build_patch(&input, &image, output, &generation(PRODUCER, MODEL_ID)?).await
+        build_patch(
+            &input,
+            &image,
+            output,
+            &generation(PRODUCER, MODEL_ID)?,
+            colors,
+        )
+        .await
     }
 
     async fn detect(&self, image: Arc<DynamicImage>) -> Result<KoharuLayoutDetections> {
@@ -214,13 +246,14 @@ async fn build_patch(
     image: &DynamicImage,
     output: KoharuLayoutDetections,
     generation: &Generation,
+    colors: TextColorOptions,
 ) -> Result<koharu_scene::Patch> {
     let page = input.page;
     let mut edit = input.scene.edit_as(generation.clone());
     edit.observe_subtree(page)?;
     remove_previous_regions(input, &mut edit, generation)
         .context("failed to replace the previous detection regions")?;
-    write_page(input, &mut edit, page, image, output, generation)
+    write_page(input, &mut edit, page, image, output, generation, colors)
         .await
         .context("failed to write detection output")?;
     finish(edit)
@@ -262,6 +295,7 @@ async fn write_page(
     image: &DynamicImage,
     output: KoharuLayoutDetections,
     generation: &Generation,
+    colors: TextColorOptions,
 ) -> Result<()> {
     let KoharuLayoutDetections {
         mut detections,
@@ -279,8 +313,16 @@ async fn write_page(
     sort_by_layout(&mut detections);
 
     let image = image.to_rgb8();
-    let regions = write_regions(&input.scene, edit, page, &image, &detections, generation)
-        .context("failed to write detected regions")?;
+    let regions = write_regions(
+        &input.scene,
+        edit,
+        page,
+        &image,
+        &detections,
+        generation,
+        colors,
+    )
+    .context("failed to write detected regions")?;
     link_dialogue_regions(edit, &regions, generation)
         .context("failed to associate detected text with dialogue regions")?;
     write_masks(input, edit, page, &detections, size)
@@ -295,13 +337,14 @@ fn write_regions<'a>(
     image: &RgbImage,
     detections: &'a [KoharuLayoutDetection],
     generation: &Generation,
+    colors: TextColorOptions,
 ) -> Result<PageRegions<'a>> {
     let mut regions = PageRegions::default();
     let inferred = detections
         .par_iter()
         .map(|detection| {
             (detection.label == "text")
-                .then(|| infer_typography(image, detection))
+                .then(|| infer_typography(image, detection, colors.detect_text_color))
                 .flatten()
         })
         .collect::<Vec<_>>();
@@ -315,7 +358,7 @@ fn write_regions<'a>(
         None
     };
     for (index, (detection, inferred)) in detections.iter().zip(inferred).enumerate() {
-        match write_region(edit, page, detection, inferred, generation)
+        match write_region(edit, page, detection, inferred, generation, colors)
             .with_context(|| format!("failed to write {} detection {index}", detection.label))?
         {
             RegionOutput::Bubble(bubble) => regions.bubbles.push(bubble),
@@ -338,6 +381,7 @@ fn write_region<'a>(
     detection: &'a KoharuLayoutDetection,
     inferred: Option<InferredTypography>,
     generation: &Generation,
+    colors: TextColorOptions,
 ) -> Result<RegionOutput<'a>> {
     let entity = edit
         .add_entity(page, At::End)
@@ -400,6 +444,7 @@ fn write_region<'a>(
     )?;
     write_text_role(edit, content, "dev.koharu.text.free-text", generation)
         .context("failed to set the detected text role")?;
+    let paint = inferred.filter(|_| colors.detect_text_color);
     edit.set(
         layer,
         &Typography {
@@ -409,11 +454,17 @@ fn write_region<'a>(
             font_style: None,
             size: None,
             auto_fit: true,
-            color: inferred.map(|value| [value.color[0], value.color[1], value.color[2], u8::MAX]),
-            stroke_color: inferred
+            color: if colors.detect_text_color {
+                paint
+                    .and_then(|value| value.color)
+                    .map(|[r, g, b]| [r, g, b, u8::MAX])
+            } else {
+                colors.default_text_color
+            },
+            stroke_color: paint
                 .and_then(|value| value.stroke_color)
                 .map(|color| [color[0], color[1], color[2], u8::MAX]),
-            stroke_width: inferred.and_then(|value| value.stroke_width),
+            stroke_width: paint.and_then(|value| value.stroke_width),
             stroke_method: Some(koharu_scene::StrokeMethod::Contour),
             stroke_position: None,
             stroke_join: None,
@@ -486,7 +537,7 @@ fn write_text_role(
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct InferredTypography {
-    color: [u8; 3],
+    color: Option<[u8; 3]>,
     stroke_color: Option<[u8; 3]>,
     stroke_width: Option<f32>,
     angle_degrees: f32,
@@ -516,6 +567,7 @@ struct MaskPixel {
 fn infer_typography(
     image: &RgbImage,
     detection: &KoharuLayoutDetection,
+    detect_text_color: bool,
 ) -> Option<InferredTypography> {
     let mask = &detection.mask;
     let width = image.width();
@@ -541,26 +593,28 @@ fn infer_typography(
         for x in left..right {
             let local_x = x - left + 1;
             let local_y = y - top + 1;
-            let color = image.get_pixel(x, y).0;
             let inside_mask = mask.contains(x, y);
-            pixels.push(MaskPixel {
-                x: local_x,
-                y: local_y,
-                color,
-                inside_mask,
-            });
+            if detect_text_color {
+                let color = image.get_pixel(x, y).0;
+                pixels.push(MaskPixel {
+                    x: local_x,
+                    y: local_y,
+                    color,
+                    inside_mask,
+                });
+                if x < left + background_margin
+                    || x + background_margin >= right
+                    || y < top + background_margin
+                    || y + background_margin >= bottom
+                {
+                    background.push(color);
+                }
+            }
             if inside_mask {
                 points.push(MaskPoint {
                     x: f64::from(x) + 0.5,
                     y: f64::from(y) + 0.5,
                 });
-            }
-            if x < left + background_margin
-                || x + background_margin >= right
-                || y < top + background_margin
-                || y + background_margin >= bottom
-            {
-                background.push(color);
             }
         }
     }
@@ -568,18 +622,19 @@ fn infer_typography(
         return None;
     }
 
-    let background = if background.is_empty() {
-        median_pixel_color(&pixels)
-    } else {
-        median_color(&background)
-    };
     let (angle_degrees, vertical) = mask_angle(&points, detection.bbox);
-    let (color, stroke_color, stroke_width) =
-        infer_text_paint(&pixels, background, local_width, local_height);
+    let paint = detect_text_color.then(|| {
+        let background = if background.is_empty() {
+            median_pixel_color(&pixels)
+        } else {
+            median_color(&background)
+        };
+        infer_text_paint(&pixels, background, local_width, local_height)
+    });
     Some(InferredTypography {
-        color,
-        stroke_color,
-        stroke_width,
+        color: paint.map(|value| value.0),
+        stroke_color: paint.and_then(|value| value.1),
+        stroke_width: paint.and_then(|value| value.2),
         angle_degrees,
         writing_mode: if vertical {
             WritingMode::Vertical
@@ -1851,9 +1906,9 @@ mod tests {
     use super::{
         DIALOGUE_MASK_CONTAINMENT_THRESHOLD, DetectedRegion, DetectedText, DetectionModel,
         ImageSize, KoharuLayoutRFDetrSeg2XLConfig, MaskPixel, PageRegions, Processor, RegionOutput,
-        StageInput, StageProcessor, closed_mask_for, color_palette, generation, infer_typography,
-        layout_order, link_dialogue_regions, mask_containment, mask_for, mask_geometry,
-        non_maximum_suppression, normalize_text_color, write_region,
+        StageInput, StageProcessor, TextColorOptions, closed_mask_for, color_palette, generation,
+        infer_typography, layout_order, link_dialogue_regions, mask_containment, mask_for,
+        mask_geometry, non_maximum_suppression, normalize_text_color, write_region,
     };
 
     #[test]
@@ -1865,6 +1920,7 @@ mod tests {
                 panel_threshold: Some(0.55),
             }),
             koharu_ml::Device::cpu(),
+            TextColorOptions::default(),
         );
 
         let DetectionModel::KoharuLayoutRFDetrSeg2XL(settings) = &processor.config;
@@ -1904,6 +1960,7 @@ mod tests {
         let processor = Processor::new(
             DetectionModel::KoharuLayoutRFDetrSeg2XL(KoharuLayoutRFDetrSeg2XLConfig::default()),
             koharu_ml::Device::cpu(),
+            TextColorOptions::default(),
         );
 
         assert!(processor.skip(&input).unwrap());
@@ -2246,12 +2303,20 @@ mod tests {
         let snapshot = session.commit(create).await.unwrap().snapshot;
         let page = page.unwrap();
         let (image, detection) = outlined_text(3, [0, 0, 0], [255, 255, 255]);
-        let inferred = infer_typography(&image, &detection);
+        let inferred = infer_typography(&image, &detection, true);
         let generation = generation(super::PRODUCER, super::MODEL_ID).unwrap();
         let mut layer = None;
         let patch = snapshot
             .patch(|edit| {
-                let output = write_region(edit, page, &detection, inferred, &generation).unwrap();
+                let output = write_region(
+                    edit,
+                    page,
+                    &detection,
+                    inferred,
+                    &generation,
+                    TextColorOptions::default(),
+                )
+                .unwrap();
                 let RegionOutput::Text(text) = output else {
                     panic!("expected a text region");
                 };
@@ -2293,6 +2358,85 @@ mod tests {
                 .iter()
                 .any(|detection| detection.label == "bubble")
         );
+    }
+
+    #[test]
+    fn disabling_text_colors_preserves_the_inferred_orientation() {
+        let (image, detection) = outlined_text(3, [0, 0, 0], [255, 255, 255]);
+        let automatic = infer_typography(&image, &detection, true).unwrap();
+        let disabled = infer_typography(&image, &detection, false).unwrap();
+        assert_eq!(disabled.color, None);
+        assert_eq!(disabled.stroke_color, None);
+        assert_eq!(disabled.stroke_width, None);
+        assert_eq!(disabled.angle_degrees, automatic.angle_degrees);
+        assert_eq!(disabled.writing_mode, automatic.writing_mode);
+    }
+
+    #[tokio::test]
+    async fn disabled_text_colors_apply_only_the_default_to_new_boxes() {
+        let mut session = Session::memory().await.unwrap();
+        let mut page = None;
+        let create = session
+            .snapshot()
+            .patch(|edit| {
+                page = Some(edit.add_page(PageDraft::new("page", 96.0, 96.0), At::End)?);
+                Ok(())
+            })
+            .unwrap();
+        let mut snapshot = session.commit(create).await.unwrap().snapshot;
+        let page = page.unwrap();
+        let (image, detection) = outlined_text(3, [0, 0, 0], [255, 255, 255]);
+        let inferred = infer_typography(&image, &detection, true);
+        let generation = generation(super::PRODUCER, super::MODEL_ID).unwrap();
+        let custom = [20, 115, 235, 180];
+        let mut first = None;
+        for default_text_color in [Some(custom), None] {
+            let mut layer = None;
+            let patch = snapshot
+                .patch(|edit| {
+                    let output = write_region(
+                        edit,
+                        page,
+                        &detection,
+                        inferred,
+                        &generation,
+                        TextColorOptions {
+                            detect_text_color: false,
+                            default_text_color,
+                        },
+                    )
+                    .unwrap();
+                    let RegionOutput::Text(text) = output else {
+                        panic!("expected a text region")
+                    };
+                    layer = Some(text.layer);
+                    Ok(())
+                })
+                .unwrap();
+            snapshot = session.commit(patch).await.unwrap().snapshot;
+            let layer = layer.unwrap();
+            let typography = snapshot.component::<Typography>(layer).unwrap().unwrap();
+            assert_eq!(typography.color, default_text_color);
+            assert_eq!(typography.stroke_color, None);
+            assert_eq!(typography.stroke_width, None);
+            assert_eq!(typography.preferred_font, None);
+            assert_eq!(
+                typography.writing_mode,
+                inferred.map(|value| value.writing_mode)
+            );
+            if let Some(first) = first {
+                assert_eq!(
+                    snapshot
+                        .component::<Typography>(first)
+                        .unwrap()
+                        .unwrap()
+                        .color,
+                    Some(custom)
+                );
+            } else {
+                first = Some(layer);
+            }
+        }
     }
 
     #[test]
@@ -2522,10 +2666,10 @@ mod tests {
     fn typography_comes_from_horizontal_text_mask() {
         let (image, detection) = masked_text(52.0, 12.0, 12.0, [24, 80, 160]);
 
-        let inferred = infer_typography(&image, &detection).unwrap();
+        let inferred = infer_typography(&image, &detection, true).unwrap();
 
         assert!((inferred.angle_degrees - 12.0).abs() < 1.0);
-        assert_eq!(inferred.color, [24, 80, 160]);
+        assert_eq!(inferred.color, Some([24, 80, 160]));
         assert_eq!(inferred.stroke_color, None);
         assert_eq!(inferred.stroke_width, None);
         assert_eq!(inferred.writing_mode, WritingMode::Horizontal);
@@ -2535,7 +2679,7 @@ mod tests {
     fn vertical_text_angle_is_relative_to_upright_vertical() {
         let (image, detection) = masked_text(12.0, 52.0, 9.0, [120, 80, 40]);
 
-        let inferred = infer_typography(&image, &detection).unwrap();
+        let inferred = infer_typography(&image, &detection, true).unwrap();
 
         assert!((inferred.angle_degrees - 9.0).abs() < 1.0);
         assert_eq!(inferred.writing_mode, WritingMode::Vertical);
@@ -2579,7 +2723,7 @@ mod tests {
             },
         };
 
-        let inferred = infer_typography(&image, &detection).unwrap();
+        let inferred = infer_typography(&image, &detection, true).unwrap();
 
         assert_eq!(inferred.writing_mode, WritingMode::Horizontal);
         assert!((inferred.angle_degrees - 8.0).abs() < 1.0);
@@ -2596,9 +2740,9 @@ mod tests {
             }
         }
 
-        let inferred = infer_typography(&image, &detection).unwrap();
+        let inferred = infer_typography(&image, &detection, true).unwrap();
 
-        assert_eq!(inferred.color, [0, 0, 0]);
+        assert_eq!(inferred.color, Some([0, 0, 0]));
     }
 
     #[test]
@@ -2616,9 +2760,9 @@ mod tests {
         for stroke_width in [2, 3, 5] {
             let (image, detection) = outlined_text(stroke_width, [0, 0, 0], [255, 255, 255]);
 
-            let inferred = infer_typography(&image, &detection).unwrap();
+            let inferred = infer_typography(&image, &detection, true).unwrap();
 
-            assert_eq!(inferred.color, [0, 0, 0]);
+            assert_eq!(inferred.color, Some([0, 0, 0]));
             assert_eq!(inferred.stroke_color, Some([255, 255, 255]));
             assert_eq!(inferred.stroke_width, Some(stroke_width as f32));
         }
@@ -2628,9 +2772,9 @@ mod tests {
     fn outlined_text_roles_do_not_flip_with_inverse_luminance() {
         let (image, detection) = outlined_text(3, [255, 255, 255], [0, 0, 0]);
 
-        let inferred = infer_typography(&image, &detection).unwrap();
+        let inferred = infer_typography(&image, &detection, true).unwrap();
 
-        assert_eq!(inferred.color, [255, 255, 255]);
+        assert_eq!(inferred.color, Some([255, 255, 255]));
         assert_eq!(inferred.stroke_color, Some([0, 0, 0]));
         assert_eq!(inferred.stroke_width, Some(3.0));
     }
@@ -2640,9 +2784,9 @@ mod tests {
         let (image, detection) =
             outlined_text_on_background(3, [255, 255, 255], [0, 0, 0], [255, 255, 255]);
 
-        let inferred = infer_typography(&image, &detection).unwrap();
+        let inferred = infer_typography(&image, &detection, true).unwrap();
 
-        assert_eq!(inferred.color, [0, 0, 0]);
+        assert_eq!(inferred.color, Some([0, 0, 0]));
         assert_eq!(inferred.stroke_color, None);
         assert_eq!(inferred.stroke_width, None);
     }
@@ -2651,9 +2795,9 @@ mod tests {
     fn outlined_text_is_separated_from_matching_dark_artwork() {
         let (image, detection) = outlined_text_on_textured_background();
 
-        let inferred = infer_typography(&image, &detection).unwrap();
+        let inferred = infer_typography(&image, &detection, true).unwrap();
 
-        assert_eq!(inferred.color, [0, 0, 0]);
+        assert_eq!(inferred.color, Some([0, 0, 0]));
         assert_eq!(inferred.stroke_color, Some([255, 255, 255]));
         assert_eq!(inferred.stroke_width, Some(3.0));
     }
@@ -2662,9 +2806,9 @@ mod tests {
     fn colors_in_the_same_luminance_class_do_not_create_a_border() {
         let (image, detection) = outlined_text(3, [0, 0, 0], [48, 48, 48]);
 
-        let inferred = infer_typography(&image, &detection).unwrap();
+        let inferred = infer_typography(&image, &detection, true).unwrap();
 
-        assert_eq!(inferred.color, [0, 0, 0]);
+        assert_eq!(inferred.color, Some([0, 0, 0]));
         assert_eq!(inferred.stroke_color, None);
         assert_eq!(inferred.stroke_width, None);
     }
@@ -2677,9 +2821,9 @@ mod tests {
         ] {
             let (image, detection) = outlined_text_on_background(4, fill, antialias, background);
 
-            let inferred = infer_typography(&image, &detection).unwrap();
+            let inferred = infer_typography(&image, &detection, true).unwrap();
 
-            assert_eq!(inferred.color, fill);
+            assert_eq!(inferred.color, Some(fill));
             assert_eq!(inferred.stroke_color, None);
             assert_eq!(inferred.stroke_width, None);
         }
@@ -2694,9 +2838,9 @@ mod tests {
         ] {
             let (image, detection) = region_masked_text(fill, background);
 
-            let inferred = infer_typography(&image, &detection).unwrap();
+            let inferred = infer_typography(&image, &detection, true).unwrap();
 
-            assert_eq!(inferred.color, expected);
+            assert_eq!(inferred.color, Some(expected));
             assert_eq!(inferred.stroke_color, None);
             assert_eq!(inferred.stroke_width, None);
         }

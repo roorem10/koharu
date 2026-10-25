@@ -413,6 +413,9 @@
         "textThreshold": "文本阈值"
       },
       "processing": "来勒处理",
+      "detectTextColors": "检测文字搭描边颜色",
+      "defaultTextColor": "默认文字颜色",
+      "textColorHelp": "只对新检测出个文字生效。已有个文字框颜色保持勿变。",
       "stages": {
         "detection": {
           "description": "寻出文本、对话气泡搭分镜。",

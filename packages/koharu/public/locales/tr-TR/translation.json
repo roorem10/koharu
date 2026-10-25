@@ -413,6 +413,9 @@
         "textThreshold": "Metin eşiği"
       },
       "processing": "İşleniyor",
+      "detectTextColors": "Metin ve kenarlık renklerini algıla",
+      "defaultTextColor": "Varsayılan metin rengi",
+      "textColorHelp": "Yeni algılanan metne uygulanır. Mevcut metin kutuları renklerini korur.",
       "stages": {
         "detection": {
           "description": "Metinleri, konuşma balonlarını ve panelleri bulur.",

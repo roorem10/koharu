@@ -83,7 +83,14 @@ impl Stages {
         device: &koharu_ml::Device,
     ) -> Result<Self> {
         Ok(Self {
-            detection: detection::Processor::new(config.detection()?, device.clone()),
+            detection: detection::Processor::new(
+                config.detection()?,
+                device.clone(),
+                detection::TextColorOptions {
+                    detect_text_color: config.detect_text_color,
+                    default_text_color: config.default_text_color,
+                },
+            ),
             ocr: ocr::Processor::new(config.ocr.clone(), device.clone()),
             translation: translation::Processor::new(config.translation.clone(), translator),
             inpainting: inpainting::Processor::new(config.inpainting()?, device.clone())?,

@@ -413,6 +413,9 @@
         "textThreshold": "Seuil du texte"
       },
       "processing": "Traitement",
+      "detectTextColors": "Détecter les couleurs du texte et du contour",
+      "defaultTextColor": "Couleur du texte par défaut",
+      "textColorHelp": "S’applique au texte nouvellement détecté. Les zones de texte existantes conservent leurs couleurs.",
       "stages": {
         "detection": {
           "description": "Trouver le texte, les bulles et les cases.",

@@ -413,6 +413,9 @@
         "textThreshold": "Text threshold"
       },
       "processing": "Processing",
+      "detectTextColors": "Detect text and outline colors",
+      "defaultTextColor": "Default text color",
+      "textColorHelp": "Applies to newly detected text. Existing text boxes keep their colors.",
       "stages": {
         "detection": {
           "description": "Find text, speech bubbles, and panels.",

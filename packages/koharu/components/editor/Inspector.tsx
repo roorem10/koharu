@@ -36,6 +36,7 @@ import {
   layerChildren,
 } from '@/lib/document'
 import { pageKey, projectKey, queryClient, refresh, useFonts, usePage } from '@/lib/queries'
+import { hexToRgba, rgbaToHex } from '@/lib/color'
 import { useKoharuStore } from '@/lib/store'
 import { previewCanvasOpacity } from '@koharu/bridge/canvas'
 import {
@@ -1169,22 +1170,6 @@ function EmptyInspector({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   )
-}
-
-function rgbaToHex([red, green, blue]: [number, number, number, number]): string {
-  return `#${[red, green, blue]
-    .map((channel) => channel.toString(16).padStart(2, '0'))
-    .join('')}`.toUpperCase()
-}
-
-function hexToRgba(hex: string): [number, number, number, number] {
-  const value = hex.replace('#', '')
-  return [
-    Number.parseInt(value.slice(0, 2), 16),
-    Number.parseInt(value.slice(2, 4), 16),
-    Number.parseInt(value.slice(4, 6), 16),
-    255,
-  ]
 }
 
 function layerIcon(layer: Layer): typeof Type {
