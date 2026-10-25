@@ -788,6 +788,7 @@ impl GpuCompositor {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_uniforms(
     transform: Affine,
     source_size: (u32, u32),
