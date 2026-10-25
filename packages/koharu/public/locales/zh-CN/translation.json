@@ -161,6 +161,8 @@
     "stopProcessing": "停止处理"
   },
   "inspector": {
+    "fixBubbleFrames": "固定气泡内所有文本框",
+    "fixBubbleFramesHelp": "将此气泡中自动适应的文本框固定在当前位置。",
     "alignBottom": "底端对齐",
     "alignCenter": "居中对齐",
     "alignLeft": "左对齐",

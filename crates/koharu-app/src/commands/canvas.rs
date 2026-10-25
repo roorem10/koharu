@@ -290,11 +290,13 @@ async fn commit_raster_stroke(
 pub(crate) async fn commit_transform(
     expected_revision: Revision,
     elements: Vec<TransformFrame>,
+    persist_unchanged: bool,
     desktop: State<'_, Desktop>,
     project: State<'_, CurrentProject>,
     canvas_channel: State<'_, CanvasChannel>,
 ) -> Result<Option<Revision>, Error> {
-    let geometries = desktop.transform_geometries(expected_revision, &elements)?;
+    let geometries =
+        desktop.transform_geometries(expected_revision, &elements, persist_unchanged)?;
     if geometries.is_empty() {
         return Ok(None);
     }

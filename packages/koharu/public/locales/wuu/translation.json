@@ -161,6 +161,8 @@
     "stopProcessing": "停止处理"
   },
   "inspector": {
+    "fixBubbleFrames": "固定气泡里向所有文本框",
+    "fixBubbleFramesHelp": "拿搿只气泡里向自动适应个文本框固定勒现在个位子。",
     "alignBottom": "底端对齐",
     "alignCenter": "水平居中",
     "alignLeft": "左对齐",

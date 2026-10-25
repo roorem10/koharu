@@ -161,6 +161,8 @@
     "stopProcessing": "Detener procesamiento"
   },
   "inspector": {
+    "fixBubbleFrames": "Fijar todos en el bocadillo",
+    "fixBubbleFramesHelp": "Mantener en su posición actual todos los cuadros de texto con ajuste automático de este bocadillo.",
     "alignBottom": "Alinear abajo",
     "alignCenter": "Centrar",
     "alignLeft": "Alinear a la izquierda",

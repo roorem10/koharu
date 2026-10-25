@@ -205,7 +205,7 @@ export function CanvasWorkspace() {
       return
     }
     commitPending.current = true
-    void enqueue(() => call(commands.commitTransform, revision, elements))
+    void enqueue(() => call(commands.commitTransform, revision, elements, false))
       .then((revision) => (revision === null ? undefined : refresh(projectKey, pagesKey, pageKey)))
       .catch(() => canvas?.cancelTransform())
       .finally(() => {

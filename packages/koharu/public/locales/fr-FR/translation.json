@@ -161,6 +161,8 @@
     "stopProcessing": "Arrêter le traitement"
   },
   "inspector": {
+    "fixBubbleFrames": "Fixer tout dans la bulle",
+    "fixBubbleFramesHelp": "Conserver à leur position actuelle tous les cadres de texte automatiques de cette bulle.",
     "alignBottom": "Aligner en bas",
     "alignCenter": "Centrer",
     "alignLeft": "Aligner à gauche",

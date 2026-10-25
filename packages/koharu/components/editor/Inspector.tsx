@@ -921,6 +921,32 @@ function LayerEditor({ layer, onDelete }: { layer: Layer; onDelete?: () => void 
   const { t } = useTranslation()
   const name = localizedLayerName(layer, 0, t)
   const [opacity, setOpacity] = useState(layer.visibility.opacity * 100)
+  const page = usePage().data
+  const frames = useKoharuStore((state) => state.layerFrames)
+  const canvasPage = useKoharuStore((state) => state.canvasPage)
+  const revision = useKoharuStore((state) => state.canvasRevision)
+  const [fixing, setFixing] = useState(false)
+  const parent = page?.layers.find((candidate) => candidate.id === layer.parent)
+  // A page has one text group; the automatic region identifies the actual bubble.
+  const siblings = isTextLayer(layer) && layer.automatic_region && parent?.type === 'group'
+    && parent.role === 'text'
+    ? layerChildren(page?.layers ?? [], parent.id).filter(isTextLayer)
+      .filter((candidate) => candidate.automatic_region === layer.automatic_region)
+    : []
+  const automatic = siblings.length >= 2 && canvasPage === page?.id && revision !== null
+    ? siblings.filter((candidate) => !candidate.geometry && frames[candidate.id])
+      .map((candidate) => ({ element: candidate.id, frame: frames[candidate.id] }))
+    : []
+
+  const fixBubbleFrames = () => {
+    if (fixing || revision === null || automatic.length === 0) return
+    setFixing(true)
+    // Reuse the canvas commit's native contour conversion and single undo entry.
+    void call(commands.commitTransform, revision, automatic, true)
+      .then(() => refresh(projectKey, pageKey))
+      .catch(() => undefined)
+      .finally(() => setFixing(false))
+  }
 
   useEffect(() => {
     setOpacity(layer.visibility.opacity * 100)
@@ -1001,6 +1027,24 @@ function LayerEditor({ layer, onDelete }: { layer: Layer; onDelete?: () => void 
                   ? t('inspector.autoFit')
                   : t('inspector.unplaced')}
             </span>
+            {automatic.length > 0 && (
+              <Tooltip>
+                <TooltipTrigger render={
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon-xs'
+                    className='ml-auto size-5 shrink-0 rounded-md text-muted-foreground hover:text-foreground'
+                    aria-label={t('inspector.fixBubbleFrames')}
+                    disabled={fixing}
+                    onClick={fixBubbleFrames}
+                  />
+                }>
+                  <Lock className='size-3' />
+                </TooltipTrigger>
+                <TooltipContent side='left'>{t('inspector.fixBubbleFramesHelp')}</TooltipContent>
+              </Tooltip>
+            )}
             {layer.geometry && layer.automatic_region && (
               <Tooltip>
                 <TooltipTrigger

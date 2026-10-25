@@ -233,6 +233,7 @@ impl Desktop {
         &self,
         expected_revision: Revision,
         elements: &[TransformFrame],
+        persist_unchanged: bool,
     ) -> Result<Vec<(EntityId, Geometry, f32)>> {
         let presentation = self.presentation.read();
         let rendered = presentation
@@ -280,17 +281,24 @@ impl Desktop {
                 height: original.height,
                 angle_degrees: original.angle_degrees,
             };
-            let coefficients = frame_transform(original, element.frame);
-            let geometry = Geometry {
-                origin: layer.geometry().origin.clone(),
-                points: layer
-                    .geometry()
-                    .points
-                    .iter()
-                    .map(|point| transform_point(coefficients, point))
-                    .collect(),
+            // Fixing auto placement must preserve the layout contour, not replace it
+            // with the smaller glyph-control rectangle or introduce rounding drift.
+            let geometry = if element.frame == original {
+                layer.geometry().clone()
+            } else {
+                let coefficients = frame_transform(original, element.frame);
+                Geometry {
+                    origin: layer.geometry().origin.clone(),
+                    points: layer
+                        .geometry()
+                        .points
+                        .iter()
+                        .map(|point| transform_point(coefficients, point))
+                        .collect(),
+                }
             };
-            if geometry != *layer.geometry()
+            if persist_unchanged
+                || geometry != *layer.geometry()
                 || element.frame.angle_degrees != original.angle_degrees
             {
                 geometries.push((element.element, geometry, element.frame.angle_degrees));

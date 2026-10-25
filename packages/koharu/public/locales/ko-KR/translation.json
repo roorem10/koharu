@@ -161,6 +161,8 @@
     "stopProcessing": "처리 중지"
   },
   "inspector": {
+    "fixBubbleFrames": "말풍선의 모든 상자 고정",
+    "fixBubbleFramesHelp": "이 말풍선의 자동 맞춤 텍스트 상자를 현재 위치에 고정합니다.",
     "alignBottom": "아래 정렬",
     "alignCenter": "가운데 정렬",
     "alignLeft": "왼쪽 정렬",

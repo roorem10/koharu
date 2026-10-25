@@ -161,6 +161,8 @@
     "stopProcessing": "İşlemeyi durdur"
   },
   "inspector": {
+    "fixBubbleFrames": "Balondaki tümünü sabitle",
+    "fixBubbleFramesHelp": "Bu balondaki otomatik sığdırılan tüm metin kutularını mevcut konumlarında tut.",
     "alignBottom": "Alta hizala",
     "alignCenter": "Ortala",
     "alignLeft": "Sola hizala",

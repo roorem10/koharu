@@ -1051,6 +1051,40 @@ describe('greenfield editor', () => {
     expect(useKoharuStore.getState().selectedLayers).toEqual(['element'])
   })
 
+  it('fixes only rendered auto-fit siblings in the same bubble with one canvas commit', async () => {
+    installProject()
+    const auto = { ...textLayer, geometry: null, parent: 'text-group', automatic_region: 'bubble' }
+    const layers: Layer[] = [
+      { type: 'group', id: 'text-group', parent: 'page', name: 'Text', role: 'text',
+        visibility: { visible: true, opacity: 1 } },
+      auto,
+      { ...auto, id: 'rotated' },
+      { ...auto, id: 'no-frame' },
+      { ...auto, id: 'fixed', geometry: textLayer.geometry },
+      { ...auto, id: 'different-bubble', automatic_region: 'other-bubble' },
+    ]
+    queryClient.setQueryData(pageKey, (page: { layers: Layer[] }) => ({ ...page, layers }))
+    const frames = {
+      element: { x: 30, y: 40, width: 50, height: 20, angle_degrees: 0 },
+      rotated: { x: 90, y: 40, width: 40, height: 20, angle_degrees: 27 },
+      fixed: { x: 10, y: 10, width: 20, height: 20, angle_degrees: 0 },
+      'different-bubble': { x: 10, y: 80, width: 20, height: 20, angle_degrees: 0 },
+    }
+    useKoharuStore.setState({ canvasPage: 'page', canvasRevision: 1, layerFrames: frames })
+    const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(2)
+    render(<Inspector />)
+    fireEvent.click(screen.getByRole('button', { name: 'Fix all in bubble' }))
+    await waitFor(() => expect(commit).toHaveBeenCalledExactlyOnceWith(1, [
+      { element: 'element', frame: frames.element },
+      { element: 'rotated', frame: frames.rotated },
+    ], true))
+    act(() => queryClient.setQueryData(pageKey, (page: { layers: Layer[] }) => ({
+      ...page, layers: layers.map((layer) => layer.type === 'text'
+        ? { ...layer, geometry: textLayer.geometry } : layer),
+    })))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Fix all in bubble' })).not.toBeInTheDocument())
+  })
+
   it('resets a custom text frame to its automatic region', async () => {
     installProject()
     queryClient.setQueryData(pageKey, (page: { layers: Layer[] }) => ({

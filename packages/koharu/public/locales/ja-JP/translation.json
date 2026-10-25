@@ -161,6 +161,8 @@
     "stopProcessing": "処理を停止"
   },
   "inspector": {
+    "fixBubbleFrames": "吹き出し内をすべて固定",
+    "fixBubbleFramesHelp": "この吹き出し内の自動配置テキストボックスを現在の位置に固定します。",
     "alignBottom": "下揃え",
     "alignCenter": "中央揃え",
     "alignLeft": "左揃え",

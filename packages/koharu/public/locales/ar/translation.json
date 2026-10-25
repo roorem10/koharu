@@ -161,6 +161,8 @@
     "stopProcessing": "إيقاف المعالجة"
   },
   "inspector": {
+    "fixBubbleFrames": "تثبيت الكل في الفقاعة",
+    "fixBubbleFramesHelp": "إبقاء جميع مربعات النص ذات الملاءمة التلقائية في هذه الفقاعة في مواضعها الحالية.",
     "alignBottom": "محاذاة للأسفل",
     "alignCenter": "توسيط أفقي",
     "alignLeft": "محاذاة لليسار",

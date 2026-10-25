@@ -2031,6 +2031,140 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn fixing_all_balloon_flows_preserves_pixels_and_rotation() {
+        let font = crate::fonts::FontSystem::new().first_font().unwrap();
+        let renderer = Renderer::with_typesetting(TypesettingConfig {
+            font_families: vec![font.family_name().to_owned()],
+        });
+        let rasterizer = koharu_rasterizer::Rasterizer::new().unwrap();
+        for angle in [0.0_f32, 27.0] {
+            let mut session = Session::memory().await.unwrap();
+            let mut ids = None;
+            let create = session
+                .snapshot()
+                .patch(|edit| {
+                    let page = edit.add_page(PageDraft::new("page", 200.0, 160.0), At::End)?;
+                    let mut geometry = Geometry::rectangle(40.0, 50.0, 120.0, 60.0);
+                    let (sin, cos) = f64::from(angle).to_radians().sin_cos();
+                    for point in &mut geometry.points {
+                        let x = point.x - 100.0;
+                        let y = point.y - 80.0;
+                        point.x = 100.0 + x * cos - y * sin;
+                        point.y = 80.0 + x * sin + y * cos;
+                    }
+                    let bubble =
+                        edit.add_analysis_region::<BubbleRegion>(page, At::End, &geometry, None)?;
+                    let mut layers = Vec::new();
+                    for (x, text) in [(55.0, "First flow"), (115.0, "Second flow")] {
+                        let region = edit.add_analysis_region::<koharu_scene::TextRegion>(
+                            page,
+                            At::End,
+                            &Geometry::rectangle(x, 65.0, 20.0, 30.0),
+                            None,
+                        )?;
+                        let content = edit.add_text_content(page, At::End)?;
+                        edit.set(
+                            content,
+                            &SourceText {
+                                text: Authored::user(text.to_owned()),
+                                language: None,
+                            },
+                        )
+                        .unwrap();
+                        edit.set(
+                            content,
+                            &Translation {
+                                text: Authored::user(text.to_owned()),
+                                language: None,
+                            },
+                        )?;
+                        edit.relate::<RecognizedFrom>(content, region)?;
+                        let layer = edit.add_text_layer(
+                            page,
+                            At::End,
+                            content,
+                            &SceneTextLayout {
+                                origin: Origin::User,
+                                kind: TextLayoutKind::Paragraph,
+                                angle_degrees: None,
+                            },
+                        )?;
+                        edit.relate::<FlowsIn>(layer, bubble)?;
+                        layers.push(layer);
+                    }
+                    ids = Some((page, layers));
+                    Ok(())
+                })
+                .unwrap();
+            let base = session.commit(create).await.unwrap().snapshot;
+            let (page, layers) = ids.unwrap();
+            let before = renderer.render(&base, page).await.unwrap();
+            // This is the no-motion branch of the shared native canvas conversion.
+            let freeze = base
+                .patch(|edit| {
+                    for &entity in &layers {
+                        let rendered = before.layer(entity).unwrap();
+                        let LayerKind::Text(text) = rendered.kind() else {
+                            panic!("expected text")
+                        };
+                        let mut layout = base.text_layer(entity)?.layout()?;
+                        layout.angle_degrees = Some(text.angle_degrees);
+                        edit.set(entity, rendered.geometry())?;
+                        edit.set(entity, &layout)?;
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            let fixed = session.commit(freeze).await.unwrap().snapshot;
+            let after = renderer.render(&fixed, page).await.unwrap();
+            let raster = |frame: &crate::Frame| {
+                rasterizer
+                    .rasterize(
+                        &frame.raster_frame().unwrap(),
+                        koharu_rasterizer::RasterOptions::default(),
+                    )
+                    .unwrap()
+                    .image
+            };
+            assert!(
+                raster(&before).as_raw() == raster(&after).as_raw(),
+                "freezing changed pixels at {angle} degrees"
+            );
+            for &entity in &layers {
+                assert_eq!(
+                    before.layer(entity).unwrap().kind(),
+                    after.layer(entity).unwrap().kind()
+                );
+                assert_eq!(
+                    before.layer(entity).unwrap().geometry(),
+                    after.layer(entity).unwrap().geometry()
+                );
+            }
+            let first_content = fixed.text_layer(layers[0]).unwrap().content().unwrap().id();
+            let change = fixed
+                .patch(|edit| {
+                    edit.set(
+                        first_content,
+                        &Translation {
+                            text: Authored::user(
+                                "A much longer first flow that needs a different text layout"
+                                    .to_owned(),
+                            ),
+                            language: None,
+                        },
+                    )
+                })
+                .unwrap();
+            let changed = session.commit(change).await.unwrap().snapshot;
+            let changed = renderer.render(&changed, page).await.unwrap();
+            assert_eq!(
+                after.layer(layers[1]).unwrap().kind(),
+                changed.layer(layers[1]).unwrap().kind()
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn joined_balloon_flows_preserve_layout_when_transformed() {
         let mut session = Session::memory().await.unwrap();
         let mut ids = None;

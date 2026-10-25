@@ -382,6 +382,7 @@ describe('canvas interaction adapter', () => {
           frame: expect.objectContaining({ x: 50, y: 60 }),
         }),
       ]),
+      false,
     )
   })
 
@@ -419,6 +420,7 @@ describe('canvas interaction adapter', () => {
           frame: { x: 10, y: 20, width: 120, height: 50, angle_degrees: 0 },
         },
       ]),
+      false,
     )
   })
 

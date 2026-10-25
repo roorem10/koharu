@@ -1398,6 +1398,131 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn fixing_bubble_geometry_is_one_undo_and_single_reset_still_works() {
+        let mut session = Session::memory().await.unwrap();
+        let mut edit = session.snapshot().edit();
+        let page = edit
+            .add_page(PageDraft::new("page", 200.0, 160.0), At::End)
+            .unwrap();
+        let bubble = edit
+            .add_analysis_region::<koharu_scene::BubbleRegion>(
+                page,
+                At::End,
+                &SceneGeometry::rectangle(40.0, 50.0, 120.0, 60.0),
+                None,
+            )
+            .unwrap();
+        let mut layers = Vec::new();
+        for text in ["First flow", "Second flow"] {
+            let content = edit.add_text_content(page, At::End).unwrap();
+            edit.set(
+                content,
+                &SceneSourceText {
+                    text: Authored::user(text.to_owned()),
+                    language: None,
+                },
+            )
+            .unwrap();
+            edit.set(
+                content,
+                &SceneTranslation {
+                    text: Authored::user(text.to_owned()),
+                    language: None,
+                },
+            )
+            .unwrap();
+            let layer = edit
+                .add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &SceneTextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                    },
+                )
+                .unwrap();
+            edit.relate::<koharu_scene::FlowsIn>(layer, bubble).unwrap();
+            layers.push(layer);
+        }
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let mut project = Project::new(session, "test".to_owned());
+        let updates = layers.iter().map(|&layer| {
+            (
+                layer,
+                SceneGeometry::rectangle(40.0, 50.0, 60.0, 60.0),
+                27.0,
+            )
+        });
+        let commit = project.set_geometries(updates).await.unwrap();
+        project.record_commit(&commit);
+        assert_eq!(project.undo.len(), 1);
+        for &layer in &layers {
+            assert!(
+                project
+                    .snapshot()
+                    .component::<SceneGeometry>(layer)
+                    .unwrap()
+                    .is_some()
+            );
+            assert_eq!(
+                project
+                    .snapshot()
+                    .text_layer(layer)
+                    .unwrap()
+                    .layout()
+                    .unwrap()
+                    .angle_degrees,
+                Some(27.0)
+            );
+        }
+        project.undo().await.unwrap();
+        for &layer in &layers {
+            assert!(
+                project
+                    .snapshot()
+                    .component::<SceneGeometry>(layer)
+                    .unwrap()
+                    .is_none()
+            );
+            assert_eq!(
+                project
+                    .snapshot()
+                    .text_layer(layer)
+                    .unwrap()
+                    .layout()
+                    .unwrap()
+                    .angle_degrees,
+                None
+            );
+        }
+        assert!(project.undo.is_empty());
+        project.redo().await.unwrap();
+        project
+            .set_geometry(vec![GeometryUpdate {
+                layer: layers[0],
+                points: None,
+            }])
+            .await
+            .unwrap();
+        assert!(
+            project
+                .snapshot()
+                .component::<SceneGeometry>(layers[0])
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            project
+                .snapshot()
+                .component::<SceneGeometry>(layers[1])
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
     async fn pipeline_commit_rebases_or_yields_to_the_manual_edit() {
         let mut session = Session::memory().await.unwrap();
         let mut setup = session.snapshot().edit();

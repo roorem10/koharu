@@ -161,6 +161,8 @@
     "stopProcessing": "停止處理"
   },
   "inspector": {
+    "fixBubbleFrames": "固定對話框內所有文字框",
+    "fixBubbleFramesHelp": "將此對話框中自動調整的文字框固定在目前位置。",
     "alignBottom": "底端對齊",
     "alignCenter": "置中對齊",
     "alignLeft": "靠左對齊",

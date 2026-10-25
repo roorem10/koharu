@@ -161,6 +161,8 @@
     "stopProcessing": "Stop processing"
   },
   "inspector": {
+    "fixBubbleFrames": "Fix all in bubble",
+    "fixBubbleFramesHelp": "Keep all auto-fit text boxes in this bubble at their current positions.",
     "alignBottom": "Align bottom",
     "alignCenter": "Align center",
     "alignLeft": "Align left",
