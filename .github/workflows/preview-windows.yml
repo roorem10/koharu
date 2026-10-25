@@ -6,9 +6,9 @@ name: Preview Windows build
 # disabled Sentry all come from one place.
 #
 # Cache scoping: a run can only restore caches saved on its own branch or the
-# default branch, or on the base branch for pull requests. Only pushes to
-# typesetting-preview save the Rust cache; work-order branches should be built
-# through a pull request into typesetting-preview so they start warm.
+# default branch, or on the base branch for pull requests. Work-order branches
+# should be built through a pull request into typesetting-preview, so the first
+# run starts from typesetting-preview's cache and later pushes from the PR's own.
 
 on:
   push:
@@ -59,7 +59,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: koharu-preview-windows
-          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/typesetting-preview' }}
+          # Keep compiled dependencies even when a later packaging step fails.
+          cache-on-failure: true
 
       - uses: actions/cache@v6
         with:
