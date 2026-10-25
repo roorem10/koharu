@@ -357,6 +357,10 @@
     "openrouter": "OpenRouter 経由で提供されるモデル。"
   },
   "resources": {
+    "unloadModels": "モデルを解放",
+    "modelsUnloaded": "解放したモデル数: {{count}}",
+    "noModelsLoaded": "読み込み済みのモデルはありません",
+    "reloadModels": "処理を実行するとモデルが自動的に再読み込みされます。",
     "cpu": "CPU",
     "processUtilization": "プロセス使用率",
     "ram": "RAM",

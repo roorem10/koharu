@@ -357,6 +357,10 @@
     "openrouter": "OpenRouter를 통해 라우팅되는 모델입니다."
   },
   "resources": {
+    "unloadModels": "모델 해제",
+    "modelsUnloaded": "해제된 모델: {{count}}",
+    "noModelsLoaded": "로드된 모델이 없습니다",
+    "reloadModels": "처리를 실행하면 모델이 자동으로 다시 로드됩니다.",
     "cpu": "CPU",
     "processUtilization": "프로세스 사용률",
     "ram": "RAM",

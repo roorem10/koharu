@@ -357,6 +357,10 @@
     "openrouter": "透過 OpenRouter 路由的模型。"
   },
   "resources": {
+    "unloadModels": "卸載模型",
+    "modelsUnloaded": "已卸載模型：{{count}}",
+    "noModelsLoaded": "沒有已載入的模型",
+    "reloadModels": "執行處理時會自動重新載入模型。",
     "cpu": "CPU",
     "processUtilization": "程序使用率",
     "ram": "RAM",

@@ -357,6 +357,10 @@
     "openrouter": "Modèles acheminés via OpenRouter."
   },
   "resources": {
+    "unloadModels": "Décharger les modèles",
+    "modelsUnloaded": "Modèles déchargés : {{count}}",
+    "noModelsLoaded": "Aucun modèle n’était chargé",
+    "reloadModels": "Les modèles se rechargent automatiquement au prochain traitement.",
     "cpu": "CPU",
     "processUtilization": "Utilisation par le processus",
     "ram": "RAM",

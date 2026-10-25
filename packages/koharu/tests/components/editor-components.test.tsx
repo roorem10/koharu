@@ -42,6 +42,7 @@ import {
   type ProjectInfo,
 } from '@koharu/bridge/protocol'
 import { TooltipProvider } from '@koharu/ui/components/tooltip'
+import { toast } from '@koharu/ui/components/toast'
 
 const nativeWindow = vi.hoisted(() => ({
   close: vi.fn(async () => undefined),
@@ -1865,6 +1866,36 @@ describe('greenfield editor', () => {
     render(<ResourceMonitor />)
     expect(screen.getByText('8%')).toBeInTheDocument()
     expect(screen.getByText('3%')).toBeInTheDocument()
+  })
+
+  it('unloads from the resource monitor and blocks duplicate or running-job requests', async () => {
+    const user = userEvent.setup()
+    useKoharuStore.setState({ resources: {
+      process_memory: 1024, system_memory: 4096, process_cpu: 8, devices: [],
+    } })
+    const first = Promise.withResolvers<number>()
+    const unload = vi.spyOn(commands, 'unloadModels')
+      .mockReturnValueOnce(first.promise).mockResolvedValue(0)
+    const notify = vi.spyOn(toast, 'add')
+    render(<ResourceMonitor />)
+    await user.click(screen.getByText('8%').closest('button')!)
+    const button = screen.getByRole('button', { name: 'Unload models' })
+    await user.click(button)
+    expect(button).toBeDisabled()
+    await user.click(button)
+    expect(unload).toHaveBeenCalledTimes(1)
+    await act(async () => first.resolve(3))
+    await waitFor(() => expect(button).toBeEnabled())
+    expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'success' }))
+    await user.click(button)
+    await waitFor(() => expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'info' })))
+    act(() => useKoharuStore.setState({ jobs: {
+      job: { id: 'job', state: 'running', completed: 0, total: 1, page: null,
+        stage: null, model: null, error: null },
+    } }))
+    expect(button).toBeDisabled()
+    await user.click(button)
+    expect(unload).toHaveBeenCalledTimes(2)
   })
 
   it('tracks arbitrary concurrent commands until each one settles', async () => {

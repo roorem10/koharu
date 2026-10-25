@@ -73,6 +73,17 @@ impl Pipeline {
     }
 
     #[tracing::instrument(skip_all)]
+    pub async fn unload_models(&self) -> Result<u32> {
+        let _execution = self
+            .execution
+            .try_lock()
+            .context("models cannot be unloaded while processing is running")?;
+        let count = self.current.load().unload_models();
+        self.resources.refresh().await;
+        Ok(count)
+    }
+
+    #[tracing::instrument(skip_all)]
     pub async fn execute(
         &self,
         snapshot: Snapshot,
@@ -89,5 +100,35 @@ impl Pipeline {
         )?
         .run()
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn unloading_refuses_an_active_execution_and_publishes_a_fresh_sample() {
+        let pipeline = Pipeline::from_config(
+            Config::memory(PipelineConfig::default()),
+            Config::memory(koharu_translator::ProvidersConfig::default()),
+            koharu_ml::Device::cpu(),
+        )
+        .unwrap();
+        let execution = pipeline.execution.lock().await;
+        assert!(
+            pipeline
+                .unload_models()
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("processing is running")
+        );
+        drop(execution);
+        let mut resources = pipeline.subscribe_resources();
+        resources.borrow_and_update();
+        assert_eq!(pipeline.unload_models().await.unwrap(), 0);
+        assert!(resources.has_changed().unwrap());
+        assert_eq!(pipeline.unload_models().await.unwrap(), 0);
     }
 }

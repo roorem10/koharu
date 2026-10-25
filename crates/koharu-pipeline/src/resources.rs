@@ -26,6 +26,7 @@ pub struct ResourceSnapshot {
 }
 
 pub(crate) struct ResourceMonitor {
+    refresh_requested: Arc<tokio::sync::Notify>,
     started: AtomicBool,
     sampled: AtomicBool,
     sampled_notify: tokio::sync::Notify,
@@ -37,6 +38,7 @@ impl ResourceMonitor {
     pub(crate) fn new(device: &koharu_ml::Device) -> Arc<Self> {
         let (changed, _) = tokio::sync::watch::channel(ResourceSnapshot::default());
         Arc::new(Self {
+            refresh_requested: Arc::new(tokio::sync::Notify::new()),
             started: AtomicBool::new(false),
             sampled: AtomicBool::new(false),
             sampled_notify: tokio::sync::Notify::new(),
@@ -53,6 +55,7 @@ impl ResourceMonitor {
             self.started.store(false, Ordering::Release);
             return;
         };
+        let refresh_requested = self.refresh_requested.clone();
         let monitor = Arc::downgrade(self);
         let device = self.device.clone();
         runtime.spawn(async move {
@@ -69,7 +72,10 @@ impl ResourceMonitor {
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             let mut host_refresh_tick = 0_u8;
             loop {
-                interval.tick().await;
+                tokio::select! {
+                    _ = interval.tick() => {},
+                    _ = refresh_requested.notified() => { host_refresh_tick = 0; },
+                }
                 let Some(monitor) = monitor.upgrade() else {
                     return;
                 };
@@ -109,6 +115,14 @@ impl ResourceMonitor {
                 monitor.sampled_notify.notify_waiters();
             }
         });
+    }
+
+    pub(crate) async fn refresh(self: &Arc<Self>) {
+        let mut changed = self.subscribe();
+        self.start();
+        self.refresh_requested.notify_one();
+        // The monitor owns sampling and publication to the existing resources channel.
+        let _ = tokio::time::timeout(Duration::from_secs(2), changed.changed()).await;
     }
 
     pub(crate) async fn wait_for_sample(&self) {

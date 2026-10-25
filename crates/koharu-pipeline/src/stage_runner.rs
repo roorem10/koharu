@@ -32,6 +32,17 @@ impl StageRunner {
         })
     }
 
+    pub(crate) fn unload_models(&self) -> u32 {
+        let mut count = 0;
+        for stage in Stage::ALL {
+            if self.stages.unload(stage) {
+                count += 1;
+                tracing::info!(%stage, model = self.stages.model(stage), "unloaded model");
+            }
+        }
+        count
+    }
+
     #[tracing::instrument(skip_all)]
     pub(crate) async fn run(&self, job: StageJob) -> StageCompletion {
         let started = Instant::now();

@@ -232,6 +232,20 @@ pub(crate) async fn process(
 
 #[tauri::command]
 #[specta::specta]
+pub(crate) async fn unload_models(
+    pipeline: State<'_, koharu_pipeline::Pipeline>,
+    processing: State<'_, Processing>,
+) -> std::result::Result<u32, Error> {
+    if !processing.stops.lock().is_empty() {
+        return Err(
+            anyhow::anyhow!("models cannot be unloaded while processing is running").into(),
+        );
+    }
+    Ok(pipeline.unload_models().await?)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub(crate) async fn stop_job(
     job: JobId,
     processing: State<'_, Processing>,

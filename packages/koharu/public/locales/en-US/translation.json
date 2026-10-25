@@ -357,6 +357,10 @@
     "openrouter": "Models routed through OpenRouter."
   },
   "resources": {
+    "unloadModels": "Unload models",
+    "modelsUnloaded": "Models unloaded: {{count}}",
+    "noModelsLoaded": "No models were loaded",
+    "reloadModels": "Models reload automatically when processing runs.",
     "cpu": "CPU",
     "processUtilization": "Process utilization",
     "ram": "RAM",

@@ -1,8 +1,13 @@
 'use client'
 
 import { Cpu, Gauge, HardDrive, MemoryStick } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { call } from '@/lib/backend'
+import { commands } from '@koharu/bridge/protocol'
+import { Button } from '@koharu/ui/components/button'
+import { toast } from '@koharu/ui/components/toast'
 import { useKoharuStore } from '@/lib/store'
 import {
   Popover,
@@ -17,6 +22,24 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/t
 export function ResourceMonitor() {
   const { t } = useTranslation()
   const resources = useKoharuStore((state) => state.resources)
+  const jobs = useKoharuStore((state) => state.jobs)
+  const running = Object.values(jobs).some((job) => job.state === 'running')
+  const [unloading, setUnloading] = useState(false)
+  const unload = async () => {
+    if (running || unloading) return
+    setUnloading(true)
+    try {
+      const count = await call(commands.unloadModels)
+      toast.add({
+        type: count ? 'success' : 'info',
+        title: count ? t('resources.modelsUnloaded', { count }) : t('resources.noModelsLoaded'),
+      })
+    } catch {
+      // call reports native errors through the existing error toast.
+    } finally {
+      setUnloading(false)
+    }
+  }
   if (!resources) return null
 
   const device =
@@ -95,6 +118,18 @@ export function ResourceMonitor() {
                 }
               />
             )}
+          </div>
+          <div className='grid gap-1.5 border-t border-border/50 px-3 py-2'>
+            <Button
+              type='button'
+              variant='outline'
+              size='sm'
+              disabled={running || unloading}
+              onClick={() => void unload()}
+            >
+              {t('resources.unloadModels')}
+            </Button>
+            <p className='text-[10px] text-muted-foreground'>{t('resources.reloadModels')}</p>
           </div>
         </PopoverContent>
       </Popover>

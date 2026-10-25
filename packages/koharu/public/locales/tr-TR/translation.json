@@ -357,6 +357,10 @@
     "openrouter": "OpenRouter üzerinden yönlendirilen modeller."
   },
   "resources": {
+    "unloadModels": "Modelleri bellekten kaldır",
+    "modelsUnloaded": "Kaldırılan model sayısı: {{count}}",
+    "noModelsLoaded": "Yüklü model yoktu",
+    "reloadModels": "İşleme başladığında modeller otomatik olarak yeniden yüklenir.",
     "cpu": "CPU",
     "processUtilization": "İşlem kullanımı",
     "ram": "RAM",

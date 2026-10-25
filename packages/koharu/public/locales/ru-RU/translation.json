@@ -357,6 +357,10 @@
     "openrouter": "Модели, маршрутизируемые через OpenRouter."
   },
   "resources": {
+    "unloadModels": "Выгрузить модели",
+    "modelsUnloaded": "Выгружено моделей: {{count}}",
+    "noModelsLoaded": "Загруженных моделей нет",
+    "reloadModels": "Модели автоматически загружаются при запуске обработки.",
     "cpu": "CPU",
     "processUtilization": "Использование процессом",
     "ram": "RAM",

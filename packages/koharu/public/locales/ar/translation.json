@@ -357,6 +357,10 @@
     "openrouter": "نماذج تُوجَّه عبر OpenRouter."
   },
   "resources": {
+    "unloadModels": "إلغاء تحميل النماذج",
+    "modelsUnloaded": "النماذج التي أُلغي تحميلها: {{count}}",
+    "noModelsLoaded": "لم تكن هناك نماذج محملة",
+    "reloadModels": "تُحمّل النماذج تلقائيًا عند تشغيل المعالجة.",
     "cpu": "CPU",
     "processUtilization": "استخدام العملية",
     "ram": "RAM",
