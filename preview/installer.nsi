@@ -63,7 +63,8 @@ FunctionEnd
 Section "Application"
   Call VerifyDestination
   SetOutPath "$INSTDIR"
-  File /r /x ".*" "${RUNTIME_DIR}/*"
+  ; The build script already rejects dot-files in staging. With /x ".*" and a "/*" pattern, makensis on Windows found no files.
+  File /r "${RUNTIME_DIR}\*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   CreateDirectory "$SMPROGRAMS\Koharu Typesetting Preview"
   CreateShortcut "$SMPROGRAMS\Koharu Typesetting Preview\Koharu Typesetting Preview.lnk" "$INSTDIR\koharu.exe"
