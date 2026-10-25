@@ -4,7 +4,6 @@ import { Eraser, FileText, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { ColorWell } from '@/components/controls/ColorWell'
-import { hexToRgba, rgbaToHex } from '@/lib/color'
 import {
   defaultModel,
   modelNames,
@@ -22,6 +21,7 @@ import {
   PreferenceSection,
   TextField,
 } from '@/components/preferences/PreferenceFields'
+import { hexToRgba, rgbaToHex } from '@/lib/color'
 import type { PipelineConfig } from '@koharu/bridge/protocol'
 import {
   Select,
@@ -114,12 +114,17 @@ export function PipelinePreferences({
             label={t('settings.pipeline.defaultTextColor')}
             allowTransparent
             disabled={value.detect_text_color}
-            value={value.default_text_color && value.default_text_color[3] > 0
-              ? rgbaToHex(value.default_text_color) : null}
-            onChange={(color) => onChange({
-              ...value,
-              default_text_color: color === null ? null : hexToRgba(color),
-            })}
+            value={
+              value.default_text_color && value.default_text_color[3] > 0
+                ? rgbaToHex(value.default_text_color)
+                : null
+            }
+            onChange={(color) =>
+              onChange({
+                ...value,
+                default_text_color: color === null ? null : hexToRgba(color),
+              })
+            }
           />
         </PreferenceRow>
       </PreferenceSection>

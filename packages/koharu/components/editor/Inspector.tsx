@@ -28,6 +28,7 @@ import { ColorWell } from '@/components/controls/ColorWell'
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { FontPicker } from '@/components/controls/FontPicker'
 import { call } from '@/lib/backend'
+import { hexToRgba, rgbaToHex } from '@/lib/color'
 import {
   expandLayerSelection,
   isGroupLayer,
@@ -36,7 +37,6 @@ import {
   layerChildren,
 } from '@/lib/document'
 import { pageKey, projectKey, queryClient, refresh, useFonts, usePage } from '@/lib/queries'
-import { hexToRgba, rgbaToHex } from '@/lib/color'
 import { useKoharuStore } from '@/lib/store'
 import { previewCanvasOpacity } from '@koharu/bridge/canvas'
 import {
@@ -928,15 +928,21 @@ function LayerEditor({ layer, onDelete }: { layer: Layer; onDelete?: () => void 
   const [fixing, setFixing] = useState(false)
   const parent = page?.layers.find((candidate) => candidate.id === layer.parent)
   // A page has one text group; the automatic region identifies the actual bubble.
-  const siblings = isTextLayer(layer) && layer.automatic_region && parent?.type === 'group'
-    && parent.role === 'text'
-    ? layerChildren(page?.layers ?? [], parent.id).filter(isTextLayer)
-      .filter((candidate) => candidate.automatic_region === layer.automatic_region)
-    : []
-  const automatic = siblings.length >= 2 && canvasPage === page?.id && revision !== null
-    ? siblings.filter((candidate) => !candidate.geometry && frames[candidate.id])
-      .map((candidate) => ({ element: candidate.id, frame: frames[candidate.id] }))
-    : []
+  const siblings =
+    isTextLayer(layer) &&
+    layer.automatic_region &&
+    parent?.type === 'group' &&
+    parent.role === 'text'
+      ? layerChildren(page?.layers ?? [], parent.id)
+          .filter(isTextLayer)
+          .filter((candidate) => candidate.automatic_region === layer.automatic_region)
+      : []
+  const automatic =
+    siblings.length >= 2 && canvasPage === page?.id && revision !== null
+      ? siblings
+          .filter((candidate) => !candidate.geometry && frames[candidate.id])
+          .map((candidate) => ({ element: candidate.id, frame: frames[candidate.id] }))
+      : []
 
   const fixBubbleFrames = () => {
     if (fixing || revision === null || automatic.length === 0) return
@@ -1029,17 +1035,19 @@ function LayerEditor({ layer, onDelete }: { layer: Layer; onDelete?: () => void 
             </span>
             {automatic.length > 0 && (
               <Tooltip>
-                <TooltipTrigger render={
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='icon-xs'
-                    className='ml-auto size-5 shrink-0 rounded-md text-muted-foreground hover:text-foreground'
-                    aria-label={t('inspector.fixBubbleFrames')}
-                    disabled={fixing}
-                    onClick={fixBubbleFrames}
-                  />
-                }>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='icon-xs'
+                      className='ml-auto size-5 shrink-0 rounded-md text-muted-foreground hover:text-foreground'
+                      aria-label={t('inspector.fixBubbleFrames')}
+                      disabled={fixing}
+                      onClick={fixBubbleFrames}
+                    />
+                  }
+                >
                   <Lock className='size-3' />
                 </TooltipTrigger>
                 <TooltipContent side='left'>{t('inspector.fixBubbleFramesHelp')}</TooltipContent>

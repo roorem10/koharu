@@ -5,10 +5,9 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { call } from '@/lib/backend'
+import { useKoharuStore } from '@/lib/store'
 import { commands } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
-import { toast } from '@koharu/ui/components/toast'
-import { useKoharuStore } from '@/lib/store'
 import {
   Popover,
   PopoverContent,
@@ -16,6 +15,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@koharu/ui/components/popover'
+import { toast } from '@koharu/ui/components/toast'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/tooltip'
 
 /** Native telemetry for the Koharu process and the accelerator used by models. */
