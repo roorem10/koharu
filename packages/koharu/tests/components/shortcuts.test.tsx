@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SettingsPage } from '@/components/preferences/SettingsPage'
@@ -13,6 +14,7 @@ vi.mock('@/lib/backend', async (importOriginal) => ({
 
 beforeEach(() => {
   vi.spyOn(commands, 'saveShortcuts').mockResolvedValue({})
+  vi.spyOn(commands, 'saveWheelZoom').mockImplementation(async (value) => value)
 })
 
 function open() {
@@ -32,6 +34,20 @@ function record(action: string, options: KeyboardEventInit, alternate = false) {
 }
 
 describe('shortcut preferences', () => {
+  it('saves the wheel choice and restores it with the complete shortcut defaults', async () => {
+    const user = userEvent.setup()
+    open()
+    await user.click(screen.getByRole('combobox', { name: 'Zoom with' }))
+    await user.click(await screen.findByRole('option', { name: 'Wheel alone' }))
+    await waitFor(() => expect(commands.saveWheelZoom).toHaveBeenCalledWith('wheel'))
+    expect(useKoharuStore.getState().wheelZoom).toBe('wheel')
+    record('Zoom in', { key: 'z', altKey: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }))
+    await waitFor(() => expect(commands.saveWheelZoom).toHaveBeenLastCalledWith('ctrl'))
+    expect(useKoharuStore.getState().wheelZoom).toBe('ctrl')
+    expect(useKoharuStore.getState().shortcuts).toEqual(defaultShortcuts)
+  })
+
   it('records two slots, keeps the old value on Escape, clears slots and resets defaults', async () => {
     open()
     record('Text', { key: 'Alt', altKey: true })

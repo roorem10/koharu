@@ -466,6 +466,7 @@
       "canvas": "Tuval",
       "clear": "{{action}} kısayolunu temizle",
       "conflictBanner": "Birden fazla kısayol aynı tuşları kullanıyor. Ayrılmadan önce birini değiştirin.",
+      "ctrlWheel": "Ctrl + tekerlek",
       "description": "Her işlem için birincil ve alternatif tuş veya tuş birleşimi seçin. Yazı yazarken kısayollar çalışmaz.",
       "fixed": {
         "selectAll": "Sayfadaki tüm metin kutularını seç",
@@ -499,16 +500,20 @@
         "import": "İçe aktarma"
       },
       "inputLabel": "{{action}} kısayolu",
+      "mouseWheel": "Fare tekerleği",
       "pressKeys": "Tuşlara basın…",
       "primary": "Birincil",
       "reset": "Varsayılanlara sıfırla",
+      "scrollVertical": "Yukarı/aşağı kaydır",
       "title": "Kısayollar",
       "tools": "Araçlar",
       "unassigned": "Atanmamış",
       "usedByBuiltIn": "{{action}} kullanıyor (yerleşik)",
+      "wheelAlone": "Yalnızca tekerlek",
       "zoomActual": "%100 yakınlaştırma",
       "zoomIn": "Yakınlaştır",
-      "zoomOut": "Uzaklaştır"
+      "zoomOut": "Uzaklaştır",
+      "zoomWith": "Yakınlaştırma hareketi"
     },
     "tabs": {
       "appearance": "Görünüm",

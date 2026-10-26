@@ -466,6 +466,7 @@
       "canvas": "Canvas",
       "clear": "Clear {{action}} shortcut",
       "conflictBanner": "Two shortcuts use the same keys. Change one before leaving.",
+      "ctrlWheel": "Ctrl + wheel",
       "description": "Choose a primary and alternate key or key combination for each action. Shortcuts do not run while typing.",
       "fixed": {
         "selectAll": "Select all text boxes on the page",
@@ -499,16 +500,20 @@
         "import": "Import"
       },
       "inputLabel": "{{action}} shortcut",
+      "mouseWheel": "Mouse wheel",
       "pressKeys": "Press keys…",
       "primary": "Primary",
       "reset": "Reset to defaults",
+      "scrollVertical": "Scroll up/down",
       "title": "Shortcuts",
       "tools": "Tools",
       "unassigned": "Unassigned",
       "usedByBuiltIn": "Used by {{action}} (built-in)",
+      "wheelAlone": "Wheel alone",
       "zoomActual": "Zoom to 100 %",
       "zoomIn": "Zoom in",
-      "zoomOut": "Zoom out"
+      "zoomOut": "Zoom out",
+      "zoomWith": "Zoom with"
     },
     "tabs": {
       "appearance": "Appearance",

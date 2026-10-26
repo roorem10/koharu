@@ -466,6 +466,7 @@
       "canvas": "캔버스",
       "clear": "{{action}} 단축키 지우기",
       "conflictBanner": "여러 단축키가 같은 키를 사용합니다. 나가기 전에 하나를 변경하세요.",
+      "ctrlWheel": "Ctrl + 휠",
       "description": "각 동작의 기본 및 보조 키나 키 조합을 설정합니다. 텍스트 입력 중에는 실행되지 않습니다.",
       "fixed": {
         "selectAll": "페이지의 모든 텍스트 상자 선택",
@@ -499,16 +500,20 @@
         "import": "가져오기"
       },
       "inputLabel": "{{action}} 단축키",
+      "mouseWheel": "마우스 휠",
       "pressKeys": "키를 누르세요…",
       "primary": "기본",
       "reset": "기본값으로 초기화",
+      "scrollVertical": "위아래 스크롤",
       "title": "단축키",
       "tools": "도구",
       "unassigned": "할당 안 됨",
       "usedByBuiltIn": "{{action}}에서 사용 중 (내장)",
+      "wheelAlone": "휠만 사용",
       "zoomActual": "100 %로 보기",
       "zoomIn": "확대",
-      "zoomOut": "축소"
+      "zoomOut": "축소",
+      "zoomWith": "확대/축소 방법"
     },
     "tabs": {
       "appearance": "모양",

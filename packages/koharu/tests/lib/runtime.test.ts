@@ -3,7 +3,13 @@ import { createElement, StrictMode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Providers from '@/app/providers'
-import { call, refreshShortcuts, saveShortcuts } from '@/lib/backend'
+import {
+  call,
+  refreshShortcuts,
+  saveShortcuts,
+  refreshWheelZoom,
+  saveWheelZoom,
+} from '@/lib/backend'
 import { useProject } from '@/lib/queries'
 import { defaultShortcuts, useKoharuStore } from '@/lib/store'
 import {
@@ -11,6 +17,7 @@ import {
   type Preferences,
   type ProjectInfo,
   type StartupState,
+  type WheelZoom,
 } from '@koharu/bridge/protocol'
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -65,6 +72,7 @@ const project: ProjectInfo = {
 beforeEach(() => {
   vi.spyOn(commands, 'getTranslationModels').mockResolvedValue([])
   vi.spyOn(commands, 'getShortcuts').mockResolvedValue({})
+  vi.spyOn(commands, 'getWheelZoom').mockResolvedValue('ctrl')
 })
 
 const startupState = (): StartupState => ({
@@ -98,6 +106,38 @@ function ProjectProbe() {
 }
 
 describe('Tauri runtime', () => {
+  it('loads the wheel preference at startup', async () => {
+    vi.spyOn(commands, 'getWheelZoom').mockResolvedValue('wheel')
+    const { dispose } = await start()
+    await waitFor(() => expect(useKoharuStore.getState().wheelZoom).toBe('wheel'))
+    dispose()
+  })
+
+  it('keeps wheel writes ordered and ignores a late startup response after a newer edit', async () => {
+    const startup = deferred<WheelZoom>()
+    const first = deferred<WheelZoom>()
+    const load = vi.spyOn(commands, 'getWheelZoom').mockReturnValue(startup.promise)
+    const save = vi
+      .spyOn(commands, 'saveWheelZoom')
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValue('ctrl')
+    const loading = refreshWheelZoom()
+    await waitFor(() => expect(load).toHaveBeenCalled())
+    const older = saveWheelZoom('wheel')
+    const newer = saveWheelZoom('ctrl')
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    first.resolve('wheel')
+    await Promise.all([older, newer])
+    expect(save.mock.calls.map(([value]) => value)).toEqual(['wheel', 'ctrl'])
+    useKoharuStore.getState().setWheelZoom('ctrl')
+    startup.resolve('wheel')
+    await loading
+    expect(useKoharuStore.getState().wheelZoom).toBe('ctrl')
+    save.mockRejectedValueOnce(new Error('write failed')).mockResolvedValue('wheel')
+    await expect(saveWheelZoom('ctrl')).rejects.toThrow('write failed')
+    await expect(saveWheelZoom('wheel')).resolves.toBeUndefined()
+  })
+
   it('blocks host page-zoom keys in capture without stopping propagation', async () => {
     const { dispose } = await start()
     const bubble = vi.fn()

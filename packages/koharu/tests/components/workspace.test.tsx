@@ -406,6 +406,54 @@ describe('canvas interaction adapter', () => {
     expect(useKoharuStore.getState().camera.zoom).toBe(1)
   })
 
+  it.each(['ctrl', 'wheel'] as const)(
+    'keeps wheel gestures and the pointer anchor consistent in %s mode',
+    (wheelZoom) => {
+      installProject()
+      useKoharuStore.getState().setWheelZoom(wheelZoom)
+      const surface = renderWorkspace()
+      const reset = () =>
+        act(() =>
+          useKoharuStore.setState({ camera: { zoom: 1, translation: [0, 0], fitted: false } }),
+        )
+      for (const ctrlKey of [false, true]) {
+        reset()
+        fireEvent.wheel(surface, { clientX: 210, clientY: 220, deltaY: -100, ctrlKey })
+        const camera = useKoharuStore.getState().camera
+        if (ctrlKey === (wheelZoom === 'ctrl')) {
+          expect(camera.zoom).toBeGreaterThan(1)
+          expect((200 - camera.translation[0]) / camera.zoom).toBeCloseTo(200)
+          expect((200 - camera.translation[1]) / camera.zoom).toBeCloseTo(200)
+        } else expect(camera).toEqual({ zoom: 1, translation: [0, 100], fitted: false })
+      }
+      reset()
+      fireEvent.wheel(surface, { deltaY: 20, shiftKey: true })
+      expect(useKoharuStore.getState().camera).toEqual({
+        zoom: 1,
+        translation: [-20, 0],
+        fitted: false,
+      })
+      reset()
+      act(() => useKoharuStore.setState({ tool: 'draw' }))
+      fireEvent.wheel(surface, { deltaY: 20, altKey: true })
+      expect(useKoharuStore.getState().brush.diameter).toBe(44)
+      expect(useKoharuStore.getState().camera).toEqual({
+        zoom: 1,
+        translation: [0, 0],
+        fitted: false,
+      })
+    },
+  )
+
+  it('treats an indistinguishable Ctrl+wheel pinch as scrolling in wheel-alone mode', () => {
+    installProject()
+    useKoharuStore.getState().setWheelZoom('wheel')
+    const surface = renderWorkspace()
+    fireEvent.wheel(surface, { deltaY: 0.5, ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(1)
+    expect(useKoharuStore.getState().camera.translation[1]).toBeCloseTo(-0.5)
+  })
+
   it('suppresses Alt browser handling while an editor input retains focus', () => {
     installProject()
     renderWorkspace()

@@ -207,6 +207,16 @@ pub(crate) async fn get_translation_models() -> std::result::Result<Vec<Model>, 
 #[serde(default)]
 struct ShortcutPreferences {
     keys: BTreeMap<String, String>,
+    #[serde(default)]
+    wheel_zoom: WheelZoom,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WheelZoom {
+    #[default]
+    Ctrl,
+    Wheel,
 }
 
 const MAX_SHORTCUTS: usize = 64;
@@ -216,6 +226,25 @@ const MAX_SHORTCUTS: usize = 64;
 pub(crate) async fn get_shortcuts() -> std::result::Result<BTreeMap<String, String>, Error> {
     let config = koharu_config::load::<ShortcutPreferences>("shortcuts")?;
     Ok(config.read()?.keys.clone())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn get_wheel_zoom() -> std::result::Result<WheelZoom, Error> {
+    let config = koharu_config::load::<ShortcutPreferences>("shortcuts")?;
+    Ok(config.read()?.wheel_zoom)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn save_wheel_zoom(
+    wheel_zoom: WheelZoom,
+) -> std::result::Result<WheelZoom, Error> {
+    let config = koharu_config::load::<ShortcutPreferences>("shortcuts")?;
+    let mut preferences = config.write()?;
+    preferences.wheel_zoom = wheel_zoom;
+    preferences.save()?;
+    Ok(wheel_zoom)
 }
 
 #[tauri::command]
@@ -279,7 +308,20 @@ fn valid_shortcut_binding(binding: &str) -> bool {
 
 #[cfg(test)]
 mod shortcut_tests {
-    use super::valid_shortcut_binding;
+    use super::{ShortcutPreferences, WheelZoom, valid_shortcut_binding};
+
+    #[test]
+    fn wheel_preference_defaults_without_replacing_saved_keys() {
+        let mut preferences: ShortcutPreferences =
+            serde_json::from_str(r#"{"keys":{"text":"alt+z"}}"#).unwrap();
+        assert_eq!(preferences.wheel_zoom, WheelZoom::Ctrl);
+        preferences.wheel_zoom = WheelZoom::Wheel;
+        let saved = serde_json::to_value(&preferences).unwrap();
+        assert_eq!(saved["keys"]["text"], "alt+z");
+        assert_eq!(saved["wheel_zoom"], "wheel");
+        let loaded: ShortcutPreferences = serde_json::from_value(saved).unwrap();
+        assert_eq!(loaded.wheel_zoom, WheelZoom::Wheel);
+    }
 
     #[test]
     fn validates_shortcut_bindings() {

@@ -466,6 +466,7 @@
       "canvas": "キャンバス",
       "clear": "{{action}}のショートカットを解除",
       "conflictBanner": "同じキーが複数の操作に割り当てられています。移動する前に変更してください。",
+      "ctrlWheel": "Ctrl + ホイール",
       "description": "各操作にメインと代替のキーやキーの組み合わせを設定します。文字入力中は実行されません。",
       "fixed": {
         "selectAll": "ページ内のすべてのテキストボックスを選択",
@@ -499,16 +500,20 @@
         "import": "インポート"
       },
       "inputLabel": "{{action}}のショートカット",
+      "mouseWheel": "マウスホイール",
       "pressKeys": "キーを押してください…",
       "primary": "メイン",
       "reset": "既定値に戻す",
+      "scrollVertical": "上下にスクロール",
       "title": "ショートカット",
       "tools": "ツール",
       "unassigned": "未割り当て",
       "usedByBuiltIn": "{{action}}で使用中（固定）",
+      "wheelAlone": "ホイールのみ",
       "zoomActual": "100 %で表示",
       "zoomIn": "拡大",
-      "zoomOut": "縮小"
+      "zoomOut": "縮小",
+      "zoomWith": "拡大・縮小の操作"
     },
     "tabs": {
       "appearance": "外観",

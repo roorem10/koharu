@@ -14,6 +14,7 @@ import type {
   StartupState,
   ModelResources,
   PageSize,
+  WheelZoom,
 } from '@koharu/bridge/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
@@ -66,6 +67,7 @@ interface KoharuStore {
   processingStages: Stage[]
   settingsOpen: boolean
   shortcuts: Shortcuts
+  wheelZoom: WheelZoom
   selectPages: (pages: EntityId[]) => void
   showInspector: (section: InspectorSection) => void
   setFontFavoritesOnly: (favoritesOnly: boolean) => void
@@ -77,6 +79,7 @@ interface KoharuStore {
   setBrush: (brush: CanvasBrush) => void
   setShortcut: (slot: ShortcutSlot, binding: string) => void
   setShortcuts: (shortcuts: Shortcuts) => void
+  setWheelZoom: (wheelZoom: WheelZoom) => void
   requestCanvasFit: () => void
   dismissJob: (id: string) => void
   dismissDownload: (id: number) => void
@@ -131,6 +134,7 @@ export const useKoharuStore = create<KoharuStore>()((set) => ({
   processingStages: [...pipelineStages],
   settingsOpen: false,
   shortcuts: defaultShortcuts,
+  wheelZoom: 'ctrl',
   selectPages: (selectedPages) => set({ selectedPages: [...new Set(selectedPages)] }),
   showInspector: (inspector) => set({ inspector }),
   setFontFavoritesOnly: (fontFavoritesOnly) => set({ fontFavoritesOnly }),
@@ -145,6 +149,7 @@ export const useKoharuStore = create<KoharuStore>()((set) => ({
       shortcuts: { ...state.shortcuts, [slot]: binding },
     })),
   setShortcuts: (shortcuts) => set({ shortcuts: { ...shortcuts } }),
+  setWheelZoom: (wheelZoom) => set({ wheelZoom }),
   requestCanvasFit: () => set((state) => ({ fitCanvasRequest: state.fitCanvasRequest + 1 })),
   dismissJob: (id) =>
     set((state) => {

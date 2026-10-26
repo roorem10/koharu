@@ -4,7 +4,7 @@ import { LockKeyhole, RotateCcw, X } from 'lucide-react'
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { saveShortcuts } from '@/lib/backend'
+import { saveShortcuts, saveWheelZoom } from '@/lib/backend'
 import {
   bindingFromEvent,
   builtInShortcuts,
@@ -23,6 +23,13 @@ import {
   type ShortcutSlot,
 } from '@/lib/store'
 import { Button } from '@koharu/ui/components/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@koharu/ui/components/select'
 
 import { PreferencePage, PreferenceRow, PreferenceSection } from './PreferenceFields'
 
@@ -36,6 +43,7 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
   function ShortcutPreferences(_, ref) {
     const { t } = useTranslation()
     const saved = useKoharuStore((state) => state.shortcuts)
+    const wheelZoom = useKoharuStore((state) => state.wheelZoom)
     const [draft, setDraft] = useState(saved)
     const edited = useRef(false)
     const [recording, setRecording] = useState<ShortcutSlot | null>(null)
@@ -202,6 +210,8 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
             onClick={() => {
               setRecording(null)
               update({ ...defaultShortcuts })
+              useKoharuStore.getState().setWheelZoom('ctrl')
+              void saveWheelZoom('ctrl').catch(() => undefined)
             }}
           >
             <RotateCcw className='size-3.5' />
@@ -214,6 +224,48 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
         <PreferenceSection title={t('settings.shortcuts.canvas')}>
           {rows(canvasActions)}
         </PreferenceSection>
+        <PreferenceSection title={t('settings.shortcuts.mouseWheel')}>
+          <PreferenceRow title={t('settings.shortcuts.zoomWith')}>
+            <Select
+              value={wheelZoom}
+              items={{
+                ctrl: t('settings.shortcuts.ctrlWheel'),
+                wheel: t('settings.shortcuts.wheelAlone'),
+              }}
+              onValueChange={(value) => {
+                if (value !== 'ctrl' && value !== 'wheel') return
+                useKoharuStore.getState().setWheelZoom(value)
+                void saveWheelZoom(value).catch(() => undefined)
+              }}
+            >
+              <SelectTrigger
+                aria-label={t('settings.shortcuts.zoomWith')}
+                className='h-8 w-full text-[11px]'
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='ctrl'>{t('settings.shortcuts.ctrlWheel')}</SelectItem>
+                <SelectItem value='wheel'>{t('settings.shortcuts.wheelAlone')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </PreferenceRow>
+          <PreferenceRow title={t('settings.shortcuts.scrollVertical')}>
+            <p className='text-right text-[11px] text-muted-foreground'>
+              {t(`settings.shortcuts.${wheelZoom === 'ctrl' ? 'wheelAlone' : 'ctrlWheel'}`)}
+            </p>
+          </PreferenceRow>
+          {builtInShortcuts
+            .filter((entry) => entry.id === 'brush' || entry.id === 'horizontal')
+            .map((entry) => (
+              <PreferenceRow key={entry.id} title={t(entry.labelKey)}>
+                <div className='flex items-center justify-end gap-2 text-right text-[11px] text-muted-foreground'>
+                  <LockKeyhole className='size-3 shrink-0' aria-hidden />
+                  <span>{entry.keys.map((key) => t(key)).join(' / ')}</span>
+                </div>
+              </PreferenceRow>
+            ))}
+        </PreferenceSection>
         <PreferenceSection
           title={t('settings.shortcuts.builtIn')}
           description={t('settings.shortcuts.builtInDescription')}
@@ -224,7 +276,10 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
                 {t(`settings.shortcuts.groups.${group}`)}
               </h4>
               {builtInShortcuts
-                .filter((entry) => entry.group === group)
+                .filter(
+                  (entry) =>
+                    entry.group === group && entry.id !== 'brush' && entry.id !== 'horizontal',
+                )
                 .map((entry) => (
                   <PreferenceRow key={entry.id} title={t(entry.labelKey)}>
                     <div className='flex items-center justify-end gap-2 text-right text-[11px] text-muted-foreground'>

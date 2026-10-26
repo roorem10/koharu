@@ -50,6 +50,8 @@ export const commands = {
 	getTranslationModels: () => __TAURI_INVOKE<Model[]>("get_translation_models"),
 	getShortcuts: () => __TAURI_INVOKE<{ [key in string]: string }>("get_shortcuts"),
 	saveShortcuts: (shortcuts: { [key in string]: string }) => __TAURI_INVOKE<{ [key in string]: string }>("save_shortcuts", { shortcuts }),
+	getWheelZoom: () => __TAURI_INVOKE<WheelZoom>("get_wheel_zoom"),
+	saveWheelZoom: (wheelZoom: WheelZoom) => __TAURI_INVOKE<WheelZoom>("save_wheel_zoom", { wheelZoom }),
 	getCanvasManifest: (generation: CanvasGeneration) => __TAURI_INVOKE<CanvasBytes>("get_canvas_manifest", { generation }),
 	getCanvasResource: (generation: CanvasGeneration, resource: string) => __TAURI_INVOKE<CanvasBytes>("get_canvas_resource", { generation, resource }),
 	prepareCanvasPage: (page: EntityId) => __TAURI_INVOKE<CanvasPagePreparation | null>("prepare_canvas_page", { page }),
@@ -524,6 +526,8 @@ export type TypographyUpdate = {
 	layer: EntityId,
 	typography: Typography,
 };
+
+export type WheelZoom = "ctrl" | "wheel";
 
 export type WritingMode = "Horizontal" | "Vertical";
 

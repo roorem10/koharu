@@ -466,6 +466,7 @@
       "canvas": "畫布",
       "clear": "清除{{action}}快捷鍵",
       "conflictBanner": "多個快捷鍵使用相同的按鍵。離開前請修改其中一個。",
+      "ctrlWheel": "Ctrl + 滾輪",
       "description": "為每個操作設定主要和備用按鍵或組合鍵。輸入文字時不會觸發快捷鍵。",
       "fixed": {
         "selectAll": "選取頁面上的所有文字框",
@@ -499,16 +500,20 @@
         "import": "匯入"
       },
       "inputLabel": "{{action}} 快速鍵",
+      "mouseWheel": "滑鼠滾輪",
       "pressKeys": "請按鍵…",
       "primary": "主要",
       "reset": "還原預設值",
+      "scrollVertical": "上下捲動",
       "title": "快捷鍵",
       "tools": "工具",
       "unassigned": "未指派",
       "usedByBuiltIn": "{{action}}已使用（內建）",
+      "wheelAlone": "僅滾輪",
       "zoomActual": "縮放至100 %",
       "zoomIn": "放大",
-      "zoomOut": "縮小"
+      "zoomOut": "縮小",
+      "zoomWith": "縮放方式"
     },
     "tabs": {
       "appearance": "外觀",

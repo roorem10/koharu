@@ -8,7 +8,7 @@ import { I18nextProvider } from 'react-i18next'
 import { StartupView } from '@/components/app/StartupView'
 import { Updater } from '@/components/app/Updater'
 import ClientOnly from '@/components/ClientOnly'
-import { refreshShortcuts, refreshTranslationModels } from '@/lib/backend'
+import { refreshShortcuts, refreshTranslationModels, refreshWheelZoom } from '@/lib/backend'
 import i18n from '@/lib/i18n'
 import { pageKey, pagesKey, projectKey, queryClient, refresh } from '@/lib/queries'
 import {
@@ -81,6 +81,7 @@ export function Providers({ children }: { children: ReactNode }) {
         .catch(() => undefined)
       // Saved shortcuts are applied once loaded; until then the editor uses the defaults.
       void refreshShortcuts().catch(() => undefined)
+      void refreshWheelZoom().catch(() => undefined)
     }
 
     return () => {

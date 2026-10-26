@@ -466,6 +466,7 @@
       "canvas": "Lienzo",
       "clear": "Borrar el atajo de {{action}}",
       "conflictBanner": "Varios atajos usan las mismas teclas. Cambia uno antes de salir.",
+      "ctrlWheel": "Ctrl + rueda",
       "description": "Elige una tecla o combinación principal y alternativa para cada acción. Los atajos no se ejecutan al escribir.",
       "fixed": {
         "selectAll": "Seleccionar todos los cuadros de texto de la página",
@@ -499,16 +500,20 @@
         "import": "Importación"
       },
       "inputLabel": "Atajo de {{action}}",
+      "mouseWheel": "Rueda del ratón",
       "pressKeys": "Pulsa las teclas…",
       "primary": "Principal",
       "reset": "Restablecer valores predeterminados",
+      "scrollVertical": "Desplazar arriba/abajo",
       "title": "Atajos",
       "tools": "Herramientas",
       "unassigned": "Sin asignar",
       "usedByBuiltIn": "Lo usa {{action}} (integrado)",
+      "wheelAlone": "Solo la rueda",
       "zoomActual": "Zoom al 100 %",
       "zoomIn": "Acercar",
-      "zoomOut": "Alejar"
+      "zoomOut": "Alejar",
+      "zoomWith": "Ampliar con"
     },
     "tabs": {
       "appearance": "Apariencia",

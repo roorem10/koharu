@@ -946,7 +946,11 @@ export function CanvasWorkspace() {
             }
             const point = clientPhysicalPoint(event.clientX, event.clientY)
             const current = useKoharuStore.getState().camera
-            if (event.ctrlKey) {
+            const zoomGesture =
+              useKoharuStore.getState().wheelZoom === 'wheel'
+                ? !event.ctrlKey && !event.shiftKey
+                : event.ctrlKey
+            if (zoomGesture) {
               setZoom(current.zoom * Math.exp(-event.deltaY * 0.0015), point)
               return
             }

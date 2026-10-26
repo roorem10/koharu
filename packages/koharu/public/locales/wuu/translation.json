@@ -466,6 +466,7 @@
       "canvas": "画布",
       "clear": "清除{{action}}快捷键",
       "conflictBanner": "有几个快捷键用仔一样个按键。离开前请改脱一个。",
+      "ctrlWheel": "Ctrl + 滚轮",
       "description": "每个操作可以设主要搭备用按键或者组合键。打字辰光勿会触发快捷键。",
       "fixed": {
         "selectAll": "选中页面浪所有文本框",
@@ -499,16 +500,20 @@
         "import": "导入"
       },
       "inputLabel": "{{action}} 快捷键",
+      "mouseWheel": "鼠标滚轮",
       "pressKeys": "请按键…",
       "primary": "主要",
       "reset": "恢复默认设置",
+      "scrollVertical": "上下滚动",
       "title": "快捷键",
       "tools": "工具",
       "unassigned": "呒没分配",
       "usedByBuiltIn": "{{action}}用仔（内置）",
+      "wheelAlone": "光用滚轮",
       "zoomActual": "缩放到100 %",
       "zoomIn": "放大",
-      "zoomOut": "缩小"
+      "zoomOut": "缩小",
+      "zoomWith": "缩放方式"
     },
     "tabs": {
       "appearance": "外观",

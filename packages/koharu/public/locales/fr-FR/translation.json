@@ -466,6 +466,7 @@
       "canvas": "Canevas",
       "clear": "Effacer le raccourci {{action}}",
       "conflictBanner": "Plusieurs raccourcis utilisent les mêmes touches. Modifiez-en un avant de quitter.",
+      "ctrlWheel": "Ctrl + molette",
       "description": "Choisissez une touche ou une combinaison principale et secondaire par action. Les raccourcis sont désactivés pendant la saisie.",
       "fixed": {
         "selectAll": "Sélectionner toutes les zones de texte de la page",
@@ -499,16 +500,20 @@
         "import": "Importation"
       },
       "inputLabel": "Raccourci : {{action}}",
+      "mouseWheel": "Molette de la souris",
       "pressKeys": "Appuyez sur les touches…",
       "primary": "Principal",
       "reset": "Rétablir les valeurs par défaut",
+      "scrollVertical": "Défiler verticalement",
       "title": "Raccourcis",
       "tools": "Outils",
       "unassigned": "Non attribué",
       "usedByBuiltIn": "Utilisé par {{action}} (intégré)",
+      "wheelAlone": "Molette seule",
       "zoomActual": "Zoom à 100 %",
       "zoomIn": "Zoom avant",
-      "zoomOut": "Zoom arrière"
+      "zoomOut": "Zoom arrière",
+      "zoomWith": "Zoomer avec"
     },
     "tabs": {
       "appearance": "Apparence",

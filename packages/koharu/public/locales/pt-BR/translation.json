@@ -466,6 +466,7 @@
       "canvas": "Tela",
       "clear": "Limpar o atalho de {{action}}",
       "conflictBanner": "Vários atalhos usam as mesmas teclas. Altere um antes de sair.",
+      "ctrlWheel": "Ctrl + roda",
       "description": "Escolha uma tecla ou combinação principal e alternativa para cada ação. Os atalhos não são executados durante a digitação.",
       "fixed": {
         "selectAll": "Selecionar todas as caixas de texto da página",
@@ -499,16 +500,20 @@
         "import": "Importação"
       },
       "inputLabel": "Atalho de {{action}}",
+      "mouseWheel": "Roda do mouse",
       "pressKeys": "Pressione as teclas…",
       "primary": "Principal",
       "reset": "Restaurar padrões",
+      "scrollVertical": "Rolar para cima/baixo",
       "title": "Atalhos",
       "tools": "Ferramentas",
       "unassigned": "Não atribuído",
       "usedByBuiltIn": "Usado por {{action}} (integrado)",
+      "wheelAlone": "Somente a roda",
       "zoomActual": "Zoom em 100 %",
       "zoomIn": "Ampliar",
-      "zoomOut": "Reduzir"
+      "zoomOut": "Reduzir",
+      "zoomWith": "Zoom com"
     },
     "tabs": {
       "appearance": "Aparência",

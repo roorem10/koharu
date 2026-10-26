@@ -6,6 +6,7 @@ import type {
   Preferences,
   ProviderPreferences,
   TypesettingConfig,
+  WheelZoom,
 } from '@koharu/bridge/protocol'
 
 import {
@@ -14,6 +15,7 @@ import {
   receiveShortcuts,
   receiveTranslationModels,
   type Shortcuts,
+  useKoharuStore,
 } from './store'
 
 type Command<Args extends unknown[], Result> = (...args: Args) => Promise<Result>
@@ -24,6 +26,8 @@ let preferencesWriteGeneration = 0
 let preferencesWriteQueue: Promise<void> = Promise.resolve()
 let shortcutsWriteGeneration = 0
 let shortcutsWriteQueue: Promise<void> = Promise.resolve()
+let wheelZoomWriteGeneration = 0
+let wheelZoomWriteQueue: Promise<void> = Promise.resolve()
 
 export async function call<Args extends unknown[], Result>(
   command: Command<Args, Result>,
@@ -90,6 +94,26 @@ export function saveShortcuts(shortcuts: Shortcuts): Promise<void> {
     .then(() => call(commands.saveShortcuts, snapshot))
     .then(() => undefined)
   shortcutsWriteQueue = pending.then(
+    () => undefined,
+    () => undefined,
+  )
+  return pending
+}
+
+export async function refreshWheelZoom(): Promise<void> {
+  const generation = wheelZoomWriteGeneration
+  await wheelZoomWriteQueue
+  const saved = await call(commands.getWheelZoom)
+  if (generation === wheelZoomWriteGeneration) useKoharuStore.getState().setWheelZoom(saved)
+}
+
+export function saveWheelZoom(wheelZoom: WheelZoom): Promise<void> {
+  wheelZoomWriteGeneration += 1
+  const pending = wheelZoomWriteQueue
+    .catch(() => undefined)
+    .then(() => call(commands.saveWheelZoom, wheelZoom))
+    .then(() => undefined)
+  wheelZoomWriteQueue = pending.then(
     () => undefined,
     () => undefined,
   )

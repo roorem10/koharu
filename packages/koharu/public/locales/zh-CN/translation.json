@@ -466,6 +466,7 @@
       "canvas": "画布",
       "clear": "清除{{action}}快捷键",
       "conflictBanner": "多个快捷键使用了相同的按键。离开前请修改其中一个。",
+      "ctrlWheel": "Ctrl + 滚轮",
       "description": "为每个操作设置主要和备用按键或组合键。输入文字时不会触发快捷键。",
       "fixed": {
         "selectAll": "选择页面上的所有文本框",
@@ -499,16 +500,20 @@
         "import": "导入"
       },
       "inputLabel": "{{action}} 快捷键",
+      "mouseWheel": "鼠标滚轮",
       "pressKeys": "请按键…",
       "primary": "主要",
       "reset": "恢复默认设置",
+      "scrollVertical": "上下滚动",
       "title": "快捷键",
       "tools": "工具",
       "unassigned": "未分配",
       "usedByBuiltIn": "{{action}}已使用（内置）",
+      "wheelAlone": "仅滚轮",
       "zoomActual": "缩放到100 %",
       "zoomIn": "放大",
-      "zoomOut": "缩小"
+      "zoomOut": "缩小",
+      "zoomWith": "缩放方式"
     },
     "tabs": {
       "appearance": "外观",
