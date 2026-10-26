@@ -1,9 +1,9 @@
 'use client'
 
-import { observeElementRect, useVirtualizer } from '@tanstack/react-virtual'
+import { defaultRangeExtractor, observeElementRect, useVirtualizer } from '@tanstack/react-virtual'
 import type { TFunction } from 'i18next'
 import { ChevronDown, ListFilter, Search, Star, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useFontFavorites, useFontPreview } from '@/lib/queries'
@@ -39,6 +39,10 @@ const headingHeight = 24
 const listHeight = 248
 const allFonts = '__all_fonts__'
 
+type FontRow =
+  | { kind: 'heading'; key: string; label: string }
+  | { kind: 'font'; key: string; family: FontFamily }
+
 type Filters = {
   source: '' | FontSource
   script: string
@@ -68,6 +72,8 @@ export function FontPicker({
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [activeFontKey, setActiveFontKey] = useState<string | null>(null)
+  const listId = useId()
   const [filters, setFilters] = useState<Filters>(emptyFilters)
   const { favorites, busy: savingFavorite, setFavorite } = useFontFavorites(open)
   const input = useRef<HTMLInputElement>(null)
@@ -105,11 +111,58 @@ export function FontPicker({
       return matchesQuery && matchesSource && matchesScript && matchesCategory && matchesUse
     })
   }, [filters, orderedFamilies, query])
+  const favoriteNames = useMemo(() => new Set(favorites.map(normalizeFontName)), [favorites])
+  const rows = useMemo(() => {
+    const starred = results
+      .filter((family) => favoriteNames.has(normalizeFontName(family.name)))
+      .sort((left, right) =>
+        left.name.localeCompare(right.name, undefined, { sensitivity: 'base', numeric: true }),
+      )
+    const result: FontRow[] = []
+    if (starred.length > 0) {
+      result.push({ kind: 'heading', key: 'favorites', label: t('fontPicker.favorites') })
+      result.push(
+        ...starred.map((family): FontRow => ({
+          kind: 'font',
+          key: `favorite:${normalizeFontName(family.name)}`,
+          family,
+        })),
+      )
+      result.push({ kind: 'heading', key: 'all-fonts', label: t('fontPicker.allFonts') })
+    }
+    result.push(
+      ...results.map((family): FontRow => ({
+        kind: 'font',
+        key: `all:${normalizeFontName(family.name)}`,
+        family,
+      })),
+    )
+    return result
+  }, [results, favoriteNames, t])
   const selectedFamily = useMemo(
     () =>
       orderedFamilies.find((family) => normalizeFontName(family.name) === normalizeFontName(value)),
     [orderedFamilies, value],
   )
+  const activeFontIndex = rows.findIndex((row) => row.kind === 'font' && row.key === activeFontKey)
+  const activeIndex =
+    activeFontIndex >= 0 ? activeFontIndex : rows.findIndex((row) => row.kind === 'font')
+  const activeRow = rows[activeIndex]
+  const activeFamily = activeRow?.kind === 'font' ? activeRow.family : undefined
+  const updateQuery = (next: string) => {
+    setQuery(next)
+    setActiveFontKey(null)
+  }
+  const updateFilters = (next: Filters) => {
+    setFilters(next)
+    setActiveFontKey(null)
+  }
+  const chooseFont = (family: string) => {
+    onChange(family)
+    setOpen(false)
+    setQuery('')
+    setActiveFontKey(null)
+  }
   const activeFilterCount = Object.values(filters).filter(Boolean).length
 
   return (
@@ -117,7 +170,18 @@ export function FontPicker({
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
-        if (!next) setQuery('')
+        if (!next) {
+          setQuery('')
+          setActiveFontKey(null)
+          return
+        }
+        setActiveFontKey(
+          rows.find(
+            (row) =>
+              row.kind === 'font' &&
+              normalizeFontName(row.family.name) === normalizeFontName(value),
+          )?.key ?? null,
+        )
       }}
     >
       <PopoverTrigger
@@ -160,35 +224,72 @@ export function FontPicker({
               ref={input}
               value={query}
               aria-label={t('fontPicker.search')}
+              role='combobox'
+              aria-autocomplete='list'
+              aria-expanded={open}
+              aria-controls={listId}
+              aria-activedescendant={activeFamily ? `${listId}-option-${activeIndex}` : undefined}
               placeholder={t('fontPicker.search')}
               className='h-6 px-0 text-[11px]'
-              onChange={(event) => setQuery(event.currentTarget.value)}
+              onChange={(event) => updateQuery(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) return
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                  if (activeIndex < 0) return
+                  event.preventDefault()
+                  const increment = event.key === 'ArrowDown' ? 1 : -1
+                  for (
+                    let index = activeIndex + increment;
+                    index >= 0 && index < rows.length;
+                    index += increment
+                  ) {
+                    const row = rows[index]
+                    if (row.kind === 'font') {
+                      setActiveFontKey(row.key)
+                      break
+                    }
+                  }
+                } else if (event.key === 'Enter' && activeFamily) {
+                  event.preventDefault()
+                  chooseFont(activeFamily.name)
+                }
+              }}
             />
             <InputGroupAddon align='inline-end' className='gap-0.5 pr-0.5'>
               {query && (
-                <InputGroupButton aria-label={t('common.clearSearch')} onClick={() => setQuery('')}>
+                <InputGroupButton
+                  aria-label={t('common.clearSearch')}
+                  onClick={() => updateQuery('')}
+                >
                   <X />
                 </InputGroupButton>
               )}
               <FontFilterMenu
                 filters={filters}
                 facets={facets}
-                onChange={setFilters}
-                onClear={() => setFilters(emptyFilters)}
+                onChange={updateFilters}
+                onClear={() => updateFilters(emptyFilters)}
               />
             </InputGroupAddon>
           </InputGroup>
         </div>
         <FontResultSummary
           count={results.length}
+          previewFamily={activeFamily}
           activeFilterCount={activeFilterCount}
-          onClear={() => setFilters(emptyFilters)}
+          onClear={() => updateFilters(emptyFilters)}
         />
         <Separator />
         {open && (
           <FontList
             key={`${query}:${filters.source}:${filters.script}:${filters.category}:${filters.useCase}`}
-            families={results}
+            rows={rows}
+            activeIndex={activeIndex}
+            listId={listId}
+            onActiveIndexChange={(index) => {
+              const row = rows[index]
+              if (row?.kind === 'font') setActiveFontKey(row.key)
+            }}
             value={value}
             favorites={favorites}
             savingFavorite={savingFavorite}
@@ -196,10 +297,7 @@ export function FontPicker({
               setFavorite(family, favorite)
               input.current?.focus({ preventScroll: true })
             }}
-            onSelect={(family) => {
-              onChange(family)
-              setOpen(false)
-            }}
+            onSelect={chooseFont}
           />
         )}
       </PopoverContent>
@@ -325,18 +423,26 @@ function FilterSubmenu({
 }
 
 function FontResultSummary({
+  previewFamily,
   count,
   activeFilterCount,
   onClear,
 }: {
+  previewFamily?: FontFamily
   count: number
   activeFilterCount: number
   onClear: () => void
 }) {
   const { t } = useTranslation()
   return (
-    <div className='flex h-6 items-center justify-between px-2 text-[9px] text-muted-foreground'>
-      <span>{t('fontPicker.fontCount', { count })}</span>
+    <div className='flex h-7 items-center justify-between gap-2 px-2 text-[9px] text-muted-foreground'>
+      <span className='shrink-0'>{t('fontPicker.fontCount', { count })}</span>
+      {previewFamily && (
+        <div className='flex min-w-0 flex-1 items-center justify-end gap-1' aria-live='polite'>
+          <FontPreviewLabel family={previewFamily} className='h-5 max-w-12 min-w-0' />
+          <span className='min-w-0 truncate'>{previewFamily.name}</span>
+        </div>
+      )}
       {activeFilterCount > 0 ? (
         <Button variant='ghost' size='xs' className='h-5 px-1.5 text-[9px]' onClick={onClear}>
           {t('fontPicker.activeFilterCount', { count: activeFilterCount })}
@@ -348,14 +454,20 @@ function FontResultSummary({
 }
 
 function FontList({
-  families,
+  rows,
+  activeIndex,
+  listId,
+  onActiveIndexChange,
   value,
   favorites,
   savingFavorite,
   onFavorite,
   onSelect,
 }: {
-  families: FontFamily[]
+  rows: FontRow[]
+  activeIndex: number
+  listId: string
+  onActiveIndexChange: (index: number) => void
   value: string
   favorites: string[]
   savingFavorite: boolean
@@ -365,36 +477,6 @@ function FontList({
   const { t } = useTranslation()
   const list = useRef<HTMLDivElement>(null)
   const favoriteNames = useMemo(() => new Set(favorites.map(normalizeFontName)), [favorites])
-  const rows = useMemo(() => {
-    type Row =
-      | { kind: 'heading'; key: string; label: string }
-      | { kind: 'font'; key: string; family: FontFamily }
-    const starred = families
-      .filter((family) => favoriteNames.has(normalizeFontName(family.name)))
-      .sort((left, right) =>
-        left.name.localeCompare(right.name, undefined, { sensitivity: 'base', numeric: true }),
-      )
-    const result: Row[] = []
-    if (starred.length > 0) {
-      result.push({ kind: 'heading', key: 'favorites', label: t('fontPicker.favorites') })
-      result.push(
-        ...starred.map((family): Row => ({
-          kind: 'font',
-          key: `favorite:${normalizeFontName(family.name)}`,
-          family,
-        })),
-      )
-      result.push({ kind: 'heading', key: 'all-fonts', label: t('fontPicker.allFonts') })
-    }
-    result.push(
-      ...families.map((family): Row => ({
-        kind: 'font',
-        key: `all:${normalizeFontName(family.name)}`,
-        family,
-      })),
-    )
-    return result
-  }, [families, favoriteNames, t])
   const hasFavorites = rows[0]?.kind === 'heading'
   const selectedIndex = rows.findIndex(
     (row) => row.kind === 'font' && normalizeFontName(row.family.name) === normalizeFontName(value),
@@ -405,6 +487,12 @@ function FontList({
     getItemKey: (index) => rows[index]?.key ?? index,
     estimateSize: (index) => (rows[index]?.kind === 'heading' ? headingHeight : rowHeight),
     overscan: 6,
+    rangeExtractor: (range) => {
+      const visible = defaultRangeExtractor(range)
+      return activeIndex >= 0 && !visible.includes(activeIndex)
+        ? [...visible, activeIndex].sort((left, right) => left - right)
+        : visible
+    },
     initialOffset: hasFavorites
       ? 0
       : Math.max(
@@ -419,19 +507,21 @@ function FontList({
   })
 
   useEffect(() => {
-    if (hasFavorites) virtualizer.scrollToOffset(0)
-  }, [hasFavorites, virtualizer])
+    if (activeIndex >= 0 && activeIndex < rows.length)
+      virtualizer.scrollToIndex(activeIndex, { align: 'auto' })
+  }, [activeIndex, rows.length, virtualizer])
 
   return (
     <ScrollArea
       viewportRef={list}
       role='listbox'
+      id={listId}
       aria-label={t('fontPicker.fonts')}
       className='relative'
       viewportClassName='overflow-x-hidden'
       style={{
         height:
-          families.length === 0
+          rows.length === 0
             ? rowHeight * 2
             : Math.min(
                 listHeight,
@@ -474,13 +564,17 @@ function FontList({
               key={virtualRow.key}
               className={cn(
                 'absolute inset-x-0 top-0 flex h-9.5 w-full items-center focus-within:bg-accent hover:bg-accent',
-                selected && 'bg-accent text-accent-foreground',
+                (selected || activeIndex === virtualRow.index) &&
+                  'bg-accent text-accent-foreground',
               )}
               style={{ transform: `translateY(${virtualRow.start}px)` }}
+              onPointerMove={() => onActiveIndexChange(virtualRow.index)}
             >
               <button
                 type='button'
                 role='option'
+                id={`${listId}-option-${virtualRow.index}`}
+                data-highlighted={activeIndex === virtualRow.index}
                 aria-label={t('fontPicker.fontLabel', { family: family.name, source })}
                 aria-selected={selected}
                 className='flex h-full min-w-0 flex-1 flex-col justify-center gap-px px-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring'
@@ -510,7 +604,7 @@ function FontList({
           )
         })}
       </div>
-      {families.length === 0 && (
+      {rows.length === 0 && (
         <Empty role='status' className='absolute inset-1 rounded-md p-2'>
           <EmptyTitle className='text-[11px] text-muted-foreground'>
             {t('fontPicker.noResults')}

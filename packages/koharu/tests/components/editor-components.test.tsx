@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { TitleBar } from '@/components/app/TitleBar'
 import { WindowControls } from '@/components/app/WindowChrome'
+import { FontPicker } from '@/components/controls/FontPicker'
 import { ActivityCenter } from '@/components/editor/ActivityCenter'
 import { CanvasCommandBar } from '@/components/editor/CanvasCommandBar'
 import { Inspector } from '@/components/editor/Inspector'
@@ -36,6 +37,7 @@ import { useKoharuStore } from '@/lib/store'
 import * as canvasRuntime from '@koharu/bridge/canvas'
 import {
   commands,
+  type FontFamily,
   type Layer,
   type PageSummary,
   type Preferences,
@@ -2035,5 +2037,157 @@ describe('greenfield editor', () => {
     expect(screen.getAllByRole('progressbar')).toHaveLength(1)
     expect(screen.queryByText('one.ttf')).not.toBeInTheDocument()
     expect(screen.queryByText('two.ttf')).not.toBeInTheDocument()
+  })
+})
+
+describe('font picker keyboard', () => {
+  const familiesFor = (names: string[]): FontFamily[] =>
+    names.map((name) => ({
+      name,
+      metadata: {
+        primary_script: 'latn',
+        scripts: ['latn'],
+        languages: [],
+        category: null,
+        classifications: [],
+        use_cases: [],
+      },
+      sources: ['system'],
+      faces: [
+        {
+          postscript_name: name.replaceAll(' ', ''),
+          weight: 400,
+          weight_range: null,
+          style: 'normal',
+        },
+      ],
+    }))
+
+  it('navigates, previews, and scrolls font choices with the keyboard', async () => {
+    const user = userEvent.setup()
+    const families = familiesFor(
+      Array.from({ length: 32 }, (_, index) => `Font ${String(index + 1).padStart(2, '0')}`),
+    )
+    const getFontPreview = vi.spyOn(commands, 'getFontPreview').mockResolvedValue([1])
+    vi.spyOn(commands, 'getFontFavorites').mockResolvedValue([])
+    const onChange = vi.fn()
+    render(<FontPicker value='Font 01' families={families} onChange={onChange} />)
+
+    await user.click(screen.getByTestId('type-font-picker'))
+    const search = screen.getByRole('combobox', { name: 'Search fonts' })
+    const listbox = screen.getByRole('listbox', { name: 'Fonts' })
+    expect(search).toHaveAttribute('aria-controls', listbox.id)
+    const viewport = listbox.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
+    expect(viewport).not.toBeNull()
+    Object.defineProperties(viewport!, {
+      clientHeight: { configurable: true, value: 248 },
+      scrollHeight: { configurable: true, value: 1400 },
+    })
+    const scrollTo = vi.fn((options: ScrollToOptions) => {
+      viewport!.scrollTop = options.top ?? 0
+      viewport!.dispatchEvent(new Event('scroll'))
+    })
+    Object.defineProperty(viewport!, 'scrollTo', { configurable: true, value: scrollTo })
+
+    for (let index = 0; index < 20; index += 1) fireEvent.keyDown(search, { key: 'ArrowDown' })
+
+    const activeOptionId = search.getAttribute('aria-activedescendant')
+    expect(activeOptionId).toBeTruthy()
+    const activeOption = document.getElementById(activeOptionId!)
+    expect(activeOption).toHaveTextContent('Font 21')
+    expect(activeOption).toHaveAttribute('data-highlighted', 'true')
+    await waitFor(() => expect(viewport!.scrollTop).toBeGreaterThan(0))
+    await waitFor(() => expect(getFontPreview).toHaveBeenCalledWith('Font 21'))
+    expect(onChange).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(search, { key: 'Enter' })
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('Font 21')
+    expect(screen.queryByRole('listbox', { name: 'Fonts' })).not.toBeInTheDocument()
+  })
+
+  it('follows the displayed favorites-first font order and skips headings', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(commands, 'getFontFavorites').mockResolvedValue(['Zulu'])
+    vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
+    const onChange = vi.fn()
+    render(
+      <FontPicker value='' families={familiesFor(['Alpha', 'Beta', 'Zulu'])} onChange={onChange} />,
+    )
+    await user.click(screen.getByTestId('type-font-picker'))
+    await screen.findByText('Favorites')
+    const search = screen.getByRole('combobox', { name: 'Search fonts' })
+    const active = () => document.getElementById(search.getAttribute('aria-activedescendant')!)
+
+    expect(active()).toHaveTextContent('Zulu')
+    fireEvent.keyDown(search, { key: 'ArrowUp' })
+    expect(active()).toHaveTextContent('Zulu')
+    fireEvent.keyDown(search, { key: 'ArrowDown' })
+    expect(active()).toHaveTextContent('Alpha')
+    fireEvent.keyDown(search, { key: 'ArrowDown' })
+    expect(active()).toHaveTextContent('Beta')
+    fireEvent.keyDown(search, { key: 'ArrowUp' })
+    expect(active()).toHaveTextContent('Alpha')
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.keyDown(search, { key: 'Enter' })
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('Alpha')
+  })
+
+  it('resets the active font for search results and ignores an empty result set', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(commands, 'getFontFavorites').mockResolvedValue([])
+    vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
+    const onChange = vi.fn()
+    render(
+      <FontPicker
+        value='Zulu'
+        families={familiesFor(['Alpha', 'Beta', 'Zulu'])}
+        onChange={onChange}
+      />,
+    )
+    await user.click(screen.getByTestId('type-font-picker'))
+    const search = screen.getByRole('combobox', { name: 'Search fonts' })
+    fireEvent.change(search, { target: { value: 'missing' } })
+    fireEvent.keyDown(search, { key: 'ArrowDown' })
+    fireEvent.keyDown(search, { key: 'Enter' })
+    expect(search).not.toHaveAttribute('aria-activedescendant')
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.change(search, { target: { value: 'Bet' } })
+    expect(
+      document.getElementById(search.getAttribute('aria-activedescendant')!),
+    ).toHaveTextContent('Beta')
+    fireEvent.keyDown(search, { key: 'Enter' })
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('Beta')
+  })
+
+  it('keeps font browsing and Esc out of document history and applies Enter once', async () => {
+    const user = userEvent.setup()
+    installProject()
+    useKoharuStore.setState({ inspector: 'type' })
+    queryClient.setQueryData(fontsKey, familiesFor(['Noto Sans', 'Noto Serif']))
+    vi.spyOn(commands, 'getFontFavorites').mockResolvedValue([])
+    vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
+    const setTypography = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
+    render(<Inspector />)
+
+    await user.click(screen.getByTestId('type-font-picker'))
+    let search = screen.getByRole('combobox', { name: 'Search fonts' })
+    fireEvent.keyDown(search, { key: 'ArrowDown' })
+    expect(setTypography).not.toHaveBeenCalled()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('listbox', { name: 'Fonts' })).not.toBeInTheDocument()
+    expect(setTypography).not.toHaveBeenCalled()
+
+    await user.click(screen.getByTestId('type-font-picker'))
+    search = screen.getByRole('combobox', { name: 'Search fonts' })
+    fireEvent.keyDown(search, { key: 'ArrowDown' })
+    fireEvent.keyDown(search, { key: 'Enter' })
+    await waitFor(() =>
+      expect(setTypography).toHaveBeenCalledExactlyOnceWith([
+        expect.objectContaining({
+          layer: 'element',
+          typography: expect.objectContaining({ preferred_font: 'Noto Serif' }),
+        }),
+      ]),
+    )
   })
 })
