@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { CanvasWorkspace } from '@/components/editor/CanvasWorkspace'
+import { CanvasWorkspace, MIN_ZOOM, MAX_ZOOM } from '@/components/editor/CanvasWorkspace'
 import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type Layer } from '@koharu/bridge/protocol'
@@ -231,6 +231,39 @@ describe('canvas interaction adapter', () => {
     })
 
     expect(useKoharuStore.getState().camera).toEqual(camera)
+  })
+
+  it('keeps wheel zoom anchored at the pointer and bounded by the shared limits', () => {
+    installProject()
+    const surface = renderWorkspace()
+    act(() => useKoharuStore.setState({ camera: { zoom: 1, translation: [0, 0], fitted: false } }))
+    fireEvent.wheel(surface, { clientX: 210, clientY: 220, deltaY: -100, ctrlKey: true })
+    const camera = useKoharuStore.getState().camera
+    expect((200 - camera.translation[0]) / camera.zoom).toBeCloseTo(200)
+    expect((200 - camera.translation[1]) / camera.zoom).toBeCloseTo(200)
+    fireEvent.wheel(surface, { clientX: 210, clientY: 220, deltaY: -100000, ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(MAX_ZOOM)
+    expect(screen.getByText('1600%')).toBeInTheDocument()
+    fireEvent.wheel(surface, { clientX: 210, clientY: 220, deltaY: 100000, ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(MIN_ZOOM)
+    expect(screen.getByText('2%')).toBeInTheDocument()
+  })
+
+  it('clamps translation when the status-bar slider changes zoom', async () => {
+    installProject()
+    renderWorkspace()
+    act(() =>
+      useKoharuStore.setState({ camera: { zoom: 1, translation: [1000, 1000], fitted: false } }),
+    )
+    const slider = document.querySelector<HTMLInputElement>('footer input[type="range"]')!
+    expect(slider).not.toBeNull()
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
+    expect(useKoharuStore.getState().camera).toEqual({
+      zoom: 1.05,
+      translation: [700, 500],
+      fitted: false,
+    })
+    expect(screen.getByText('105%')).toBeInTheDocument()
   })
 
   it('suppresses Alt browser handling while an editor input retains focus', () => {

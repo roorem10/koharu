@@ -45,6 +45,8 @@ import { commands, type Frame, type Point, type TransformFrame } from '@koharu/b
 import { Button } from '@koharu/ui/components/button'
 
 const BRUSH_DIAMETER_STEP = 4
+export const MIN_ZOOM = 0.02
+export const MAX_ZOOM = 16
 const arrowKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
 
 const canvasCursors = {
@@ -275,23 +277,36 @@ export function CanvasWorkspace() {
     if (useKoharuStore.getState().camera.fitted) fitCanvas()
   }, [canvas, fitCanvas])
 
-  const setZoom = useCallback((zoom: number) => {
-    const element = surface.current
-    if (!element) return
-    const bounds = element.getBoundingClientRect()
-    const dpr = window.devicePixelRatio
-    const current = useKoharuStore.getState().camera
-    const center = { x: bounds.width * dpr * 0.5, y: bounds.height * dpr * 0.5 }
-    const pageX = (center.x - current.translation[0]) / current.zoom
-    const pageY = (center.y - current.translation[1]) / current.zoom
-    useKoharuStore.setState({
-      camera: {
-        zoom,
-        translation: [center.x - pageX * zoom, center.y - pageY * zoom],
-        fitted: false,
-      },
-    })
-  }, [])
+  const setZoom = useCallback(
+    (requestedZoom: number, anchor?: Point) => {
+      const element = surface.current
+      if (!element || pageWidth === undefined || pageHeight === undefined) return
+      const bounds = element.getBoundingClientRect()
+      const dpr = window.devicePixelRatio
+      const current = useKoharuStore.getState().camera
+      const zoom = clamp(requestedZoom, MIN_ZOOM, MAX_ZOOM)
+      if (!Number.isFinite(zoom)) return
+      const point = anchor ?? { x: bounds.width * dpr * 0.5, y: bounds.height * dpr * 0.5 }
+      const pageX = (point.x - current.translation[0]) / current.zoom
+      const pageY = (point.y - current.translation[1]) / current.zoom
+      useKoharuStore.setState({
+        camera: {
+          zoom,
+          translation: clampCameraTranslation(
+            [point.x - pageX * zoom, point.y - pageY * zoom],
+            zoom,
+            pageWidth,
+            pageHeight,
+            bounds.width * dpr,
+            bounds.height * dpr,
+            dpr,
+          ),
+          fitted: false,
+        },
+      })
+    },
+    [pageHeight, pageWidth],
+  )
 
   useEffect(() => {
     const element = surface.current
@@ -888,38 +903,28 @@ export function CanvasWorkspace() {
             }
             const point = clientPhysicalPoint(event.clientX, event.clientY)
             const current = useKoharuStore.getState().camera
-            let zoom = current.zoom
-            let translation = current.translation
             if (event.ctrlKey) {
-              zoom = clamp(current.zoom * Math.exp(-event.deltaY * 0.0015), 0.02, 16)
-              const pageX = (point.x - current.translation[0]) / current.zoom
-              const pageY = (point.y - current.translation[1]) / current.zoom
-              translation = [point.x - pageX * zoom, point.y - pageY * zoom]
-            } else {
-              const dpr = window.devicePixelRatio
-              let deltaX = event.deltaX
-              let deltaY = event.deltaY
-              if (event.shiftKey && deltaX === 0) {
-                deltaX = deltaY
-                deltaY = 0
-              }
-              translation = [
-                current.translation[0] - deltaX * dpr,
-                current.translation[1] - deltaY * dpr,
-              ]
+              setZoom(current.zoom * Math.exp(-event.deltaY * 0.0015), point)
+              return
             }
             const bounds = event.currentTarget.getBoundingClientRect()
             const dpr = window.devicePixelRatio
-            translation = clampCameraTranslation(
-              translation,
-              zoom,
+            let deltaX = event.deltaX
+            let deltaY = event.deltaY
+            if (event.shiftKey && deltaX === 0) {
+              deltaX = deltaY
+              deltaY = 0
+            }
+            const translation = clampCameraTranslation(
+              [current.translation[0] - deltaX * dpr, current.translation[1] - deltaY * dpr],
+              current.zoom,
               pageWidth ?? page.size.width,
               pageHeight ?? page.size.height,
               bounds.width * dpr,
               bounds.height * dpr,
               dpr,
             )
-            useKoharuStore.setState({ camera: { zoom, translation, fitted: false } })
+            useKoharuStore.setState({ camera: { zoom: current.zoom, translation, fitted: false } })
           }}
         >
           {selectionRect && (
