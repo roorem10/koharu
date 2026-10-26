@@ -2,6 +2,7 @@
   "about": {
     "author": "Autor",
     "description": "Ferramentas de tradução de mangá",
+    "forkVersion": "Versão do fork",
     "unavailable": "Indisponível",
     "version": "Versão"
   },
@@ -93,6 +94,7 @@
     "fontCount_other": "{{count}} fontes",
     "fontLabel": "{{family}}, {{source}}",
     "fonts": "Fontes",
+    "noFavorites": "Marque fontes com uma estrela para adicioná-las aqui",
     "noResults": "Nenhuma fonte corresponde à busca",
     "purpose": "Finalidade",
     "script": "Sistema de escrita",
@@ -123,6 +125,7 @@
     },
     "style": "Estilo",
     "favorites": "Favoritos",
+    "favoritesOnly": "Somente favoritos",
     "allFonts": "Todas as fontes",
     "addFavorite": "Adicionar {{family}} aos favoritos",
     "removeFavorite": "Remover {{family}} dos favoritos"

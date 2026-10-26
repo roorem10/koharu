@@ -2,6 +2,7 @@
   "about": {
     "author": "Автор",
     "description": "Инструменты перевода манги",
+    "forkVersion": "Версия форка",
     "unavailable": "Недоступно",
     "version": "Версия"
   },
@@ -93,6 +94,7 @@
     "fontCount_other": "Шрифтов: {{count}}",
     "fontLabel": "{{family}}, {{source}}",
     "fonts": "Шрифты",
+    "noFavorites": "Добавьте шрифты в избранное, чтобы они появились здесь",
     "noResults": "Нет шрифтов, соответствующих поиску",
     "purpose": "Назначение",
     "script": "Система письма",
@@ -123,6 +125,7 @@
     },
     "style": "Стиль",
     "favorites": "Избранное",
+    "favoritesOnly": "Только избранное",
     "allFonts": "Все шрифты",
     "addFavorite": "Добавить {{family}} в избранное",
     "removeFavorite": "Удалить {{family}} из избранного"

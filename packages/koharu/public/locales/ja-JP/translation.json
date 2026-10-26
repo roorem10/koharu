@@ -2,6 +2,7 @@
   "about": {
     "author": "作者",
     "description": "漫画翻訳ツール",
+    "forkVersion": "フォーク版のバージョン",
     "unavailable": "利用不可",
     "version": "バージョン"
   },
@@ -93,6 +94,7 @@
     "fontCount_other": "{{count}}個のフォント",
     "fontLabel": "{{family}}、{{source}}",
     "fonts": "フォント",
+    "noFavorites": "フォントにスターを付けるとここに表示されます",
     "noResults": "この検索に一致するフォントはありません",
     "purpose": "用途",
     "script": "文字体系",
@@ -123,6 +125,7 @@
     },
     "style": "スタイル",
     "favorites": "お気に入り",
+    "favoritesOnly": "お気に入りのみ",
     "allFonts": "すべてのフォント",
     "addFavorite": "{{family}}をお気に入りに追加",
     "removeFavorite": "{{family}}をお気に入りから削除"

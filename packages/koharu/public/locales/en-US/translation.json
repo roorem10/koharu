@@ -94,6 +94,7 @@
     "fontCount_other": "{{count}} fonts",
     "fontLabel": "{{family}}, {{source}}",
     "fonts": "Fonts",
+    "noFavorites": "Star fonts to add them here",
     "noResults": "No fonts match this search",
     "purpose": "Purpose",
     "script": "Script",
@@ -124,6 +125,7 @@
     },
     "style": "Style",
     "favorites": "Favorites",
+    "favoritesOnly": "Favorites only",
     "allFonts": "All Fonts",
     "addFavorite": "Add {{family}} to favorites",
     "removeFavorite": "Remove {{family}} from favorites"

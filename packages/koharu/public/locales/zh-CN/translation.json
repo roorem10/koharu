@@ -2,6 +2,7 @@
   "about": {
     "author": "作者",
     "description": "漫画翻译工具",
+    "forkVersion": "分支版本",
     "unavailable": "不可用",
     "version": "版本"
   },
@@ -93,6 +94,7 @@
     "fontCount_other": "{{count}} 种字体",
     "fontLabel": "{{family}}，{{source}}",
     "fonts": "字体",
+    "noFavorites": "为字体加星标即可在此显示",
     "noResults": "没有与此搜索匹配的字体",
     "purpose": "用途",
     "script": "文字体系",
@@ -123,6 +125,7 @@
     },
     "style": "样式",
     "favorites": "收藏字体",
+    "favoritesOnly": "仅收藏",
     "allFonts": "全部字体",
     "addFavorite": "收藏{{family}}",
     "removeFavorite": "取消收藏{{family}}"

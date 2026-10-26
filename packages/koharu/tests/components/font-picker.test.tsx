@@ -85,7 +85,7 @@ describe('font favorites', () => {
     picker(onChange)
     await user.click(screen.getByRole('button', { name: 'Font' }))
     await screen.findByText('Favorites')
-    await user.type(screen.getByRole('textbox', { name: 'Search fonts' }), 'Wild')
+    await user.type(screen.getByRole('combobox', { name: 'Search fonts' }), 'Wild')
     expect(screen.getAllByRole('option')).toHaveLength(2)
     expect(screen.queryByRole('option', { name: /Anime Ace/ })).not.toBeInTheDocument()
 
@@ -99,6 +99,6 @@ describe('font favorites', () => {
     )
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.getByRole('listbox')).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Search fonts' })).toHaveFocus()
+    expect(screen.getByRole('combobox', { name: 'Search fonts' })).toHaveFocus()
   })
 })

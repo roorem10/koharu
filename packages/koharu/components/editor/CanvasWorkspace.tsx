@@ -44,6 +44,7 @@ import { commands, type Frame, type Point, type TransformFrame } from '@koharu/b
 import { Button } from '@koharu/ui/components/button'
 
 const BRUSH_DIAMETER_STEP = 4
+const arrowKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
 
 const canvasCursors = {
   select: undefined,
@@ -95,6 +96,9 @@ export function CanvasWorkspace() {
   const gesture = useRef<Gesture | null>(null)
   const previousPageIndex = useRef<number | null>(null)
   const spaceHeld = useRef(false)
+  const heldArrows = useRef(new Set<string>())
+  const nudgeShift = useRef(false)
+  const nudgeTimer = useRef<number | null>(null)
   const transformActive = useRef(false)
   const transformRevision = useRef<number | null>(null)
   const transformFinal = useRef<TransformFrame[]>([])
@@ -185,7 +189,24 @@ export function CanvasWorkspace() {
     [transformUpdates],
   )
 
+  const nudge = useCallback(() => {
+    if (!transformActive.current) return
+
+    const keys = heldArrows.current
+    const step = nudgeShift.current ? 10 : 1
+    const x = (Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft'))) * step
+    const y = (Number(keys.has('ArrowDown')) - Number(keys.has('ArrowUp'))) * step
+
+    if (x || y) {
+      updateTransform(translateFrames(transformFinal.current, { x, y }))
+    }
+  }, [updateTransform])
+
   const finishTransform = useCallback(() => {
+    if (nudgeTimer.current !== null) window.clearTimeout(nudgeTimer.current)
+    nudgeTimer.current = null
+    heldArrows.current.clear()
+    nudgeShift.current = false
     if (!transformActive.current) return
     transformUpdates.commit()
     transformActive.current = false
@@ -215,6 +236,10 @@ export function CanvasWorkspace() {
   }, [canvas, enqueue, transformUpdates])
 
   const cancelGesture = useCallback(() => {
+    if (nudgeTimer.current !== null) window.clearTimeout(nudgeTimer.current)
+    nudgeTimer.current = null
+    heldArrows.current.clear()
+    nudgeShift.current = false
     const current = gesture.current
     gesture.current = null
     setSelectionRect(null)
@@ -361,6 +386,7 @@ export function CanvasWorkspace() {
     }
 
     const down = (event: KeyboardEvent) => {
+      if (event.key === 'Shift' && heldArrows.current.size) nudgeShift.current = true
       if (event.key === 'Alt') {
         event.preventDefault()
         return
@@ -411,11 +437,17 @@ export function CanvasWorkspace() {
     }
 
     const up = (event: KeyboardEvent) => {
+      if (event.key === 'Shift') nudgeShift.current = false
       if (event.key === 'Alt') event.preventDefault()
       if (event.code === 'Space') spaceHeld.current = false
+
+      if (heldArrows.current.delete(event.key) && heldArrows.current.size === 0) {
+        finishTransform()
+      }
     }
     const blur = () => {
       spaceHeld.current = false
+      if (heldArrows.current.size) finishTransform()
       cancelGesture()
     }
 
@@ -427,7 +459,7 @@ export function CanvasWorkspace() {
       window.removeEventListener('keyup', up)
       window.removeEventListener('blur', blur)
     }
-  }, [cancelGesture, colorSampling, page, requestCanvasFit, selectLayers, setTool])
+  }, [cancelGesture, colorSampling, finishTransform, page, requestCanvasFit, selectLayers, setTool])
 
   const clientPagePoint = (clientX: number, clientY: number) =>
     pagePoint(
@@ -614,6 +646,55 @@ export function CanvasWorkspace() {
           style={{
             cursor: page && canvasState.status === 'ready' ? canvasCursors[tool] : undefined,
           }}
+          onKeyDown={(event) => {
+            const keys = heldArrows.current
+            if (
+              !arrowKeys.includes(event.key) ||
+              event.defaultPrevented ||
+              event.target !== event.currentTarget ||
+              event.ctrlKey ||
+              event.metaKey ||
+              event.altKey ||
+              canvasState.status != 'ready' ||
+              canvasPage !== pageId ||
+              gesture.current ||
+              (transformActive.current && keys.size === 0)
+            )
+              return
+
+            nudgeShift.current = event.shiftKey
+            if (event.repeat || keys.has(event.key)) {
+              if (keys.has(event.key)) event.preventDefault()
+              return
+            }
+
+            if (keys.size === 0) {
+              beginTransform(
+                framesFor(
+                  selected.filter((id) =>
+                    page?.layers.some((layer) => layer.id === id && layer.type === 'text'),
+                  ),
+                ),
+              )
+              if (!transformActive.current) return
+            }
+            keys.add(event.key)
+            event.preventDefault()
+            nudge()
+            if (nudgeTimer.current === null) {
+              const repeat = () => {
+                nudgeTimer.current = null
+                if (heldArrows.current.size === 0 || !transformActive.current) return
+                nudge()
+                nudgeTimer.current = window.setTimeout(repeat, 30)
+              }
+              nudgeTimer.current = window.setTimeout(repeat, 300)
+            }
+          }}
+          onBlur={() => {
+            if (heldArrows.current.size) finishTransform()
+          }}
+
           onContextMenu={(event) => event.preventDefault()}
           onPointerDown={(event) => {
             if (
@@ -757,6 +838,12 @@ export function CanvasWorkspace() {
                 .catch((error: unknown) => receiveError(errorMessage(error)))
             }
             event.preventDefault()
+          }}
+          onPointerDownCapture={(event) => {
+            if (heldArrows.current.size) {
+              event.preventDefault()
+              event.stopPropagation()
+            }
           }}
           onPointerMove={(event) => {
             if (!page) return

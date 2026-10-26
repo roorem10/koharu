@@ -2,6 +2,7 @@
   "about": {
     "author": "Auteur",
     "description": "Outils de traduction de mangas",
+    "forkVersion": "Version du fork",
     "unavailable": "Indisponible",
     "version": "Version"
   },
@@ -93,6 +94,7 @@
     "fontCount_other": "{{count}} polices",
     "fontLabel": "{{family}}, {{source}}",
     "fonts": "Polices",
+    "noFavorites": "Ajoutez une étoile aux polices pour les afficher ici",
     "noResults": "Aucune police ne correspond à cette recherche",
     "purpose": "Usage",
     "script": "Écriture",
@@ -123,6 +125,7 @@
     },
     "style": "Style",
     "favorites": "Favoris",
+    "favoritesOnly": "Favoris uniquement",
     "allFonts": "Toutes les polices",
     "addFavorite": "Ajouter {{family}} aux favoris",
     "removeFavorite": "Retirer {{family}} des favoris"

@@ -2,6 +2,7 @@
   "about": {
     "author": "المؤلف",
     "description": "أدوات ترجمة المانغا",
+    "forkVersion": "إصدار النسخة المشتقة",
     "unavailable": "غير متاح",
     "version": "الإصدار"
   },
@@ -93,6 +94,7 @@
     "fontCount_other": "{{count}} خط",
     "fontLabel": "{{family}}، {{source}}",
     "fonts": "الخطوط",
+    "noFavorites": "أضف نجمة إلى الخطوط لإظهارها هنا",
     "noResults": "لا توجد خطوط تطابق هذا البحث",
     "purpose": "الغرض",
     "script": "النظام الكتابي",
@@ -123,6 +125,7 @@
     },
     "style": "النمط",
     "favorites": "المفضلة",
+    "favoritesOnly": "المفضلة فقط",
     "allFonts": "كل الخطوط",
     "addFavorite": "إضافة {{family}} إلى المفضلة",
     "removeFavorite": "إزالة {{family}} من المفضلة"
