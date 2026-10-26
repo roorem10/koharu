@@ -2,6 +2,7 @@
   "about": {
     "author": "작성자",
     "description": "만화 번역 도구",
+    "forkVersion": "포크 버전",
     "unavailable": "사용할 수 없음",
     "version": "버전"
   },

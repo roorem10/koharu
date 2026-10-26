@@ -2,6 +2,7 @@
   "about": {
     "author": "Автор",
     "description": "Инструменты перевода манги",
+    "forkVersion": "Версия форка",
     "unavailable": "Недоступно",
     "version": "Версия"
   },

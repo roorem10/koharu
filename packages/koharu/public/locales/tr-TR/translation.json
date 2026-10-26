@@ -2,6 +2,7 @@
   "about": {
     "author": "Yazar",
     "description": "Manga çeviri araçları",
+    "forkVersion": "Fork sürümü",
     "unavailable": "Kullanılamıyor",
     "version": "Sürüm"
   },

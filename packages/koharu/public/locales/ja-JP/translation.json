@@ -2,6 +2,7 @@
   "about": {
     "author": "作者",
     "description": "漫画翻訳ツール",
+    "forkVersion": "フォーク版のバージョン",
     "unavailable": "利用不可",
     "version": "バージョン"
   },
