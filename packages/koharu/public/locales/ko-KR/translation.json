@@ -93,6 +93,7 @@
     "fontCount_other": "글꼴 {{count}}개",
     "fontLabel": "{{family}}, {{source}}",
     "fonts": "글꼴",
+    "noFavorites": "글꼴에 별표를 추가하면 여기에 표시됩니다",
     "noResults": "검색과 일치하는 글꼴이 없습니다",
     "purpose": "용도",
     "script": "문자 체계",
@@ -123,6 +124,7 @@
     },
     "style": "스타일",
     "favorites": "즐겨찾기",
+    "favoritesOnly": "즐겨찾기만",
     "allFonts": "모든 글꼴",
     "addFavorite": "{{family}} 즐겨찾기에 추가",
     "removeFavorite": "{{family}} 즐겨찾기에서 제거"

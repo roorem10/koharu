@@ -93,6 +93,7 @@
     "fontCount_other": "{{count}} 種字型",
     "fontLabel": "{{family}}，{{source}}",
     "fonts": "字型",
+    "noFavorites": "為字型加上星號即可顯示於此",
     "noResults": "沒有符合此搜尋的字型",
     "purpose": "用途",
     "script": "文字系統",
@@ -123,6 +124,7 @@
     },
     "style": "樣式",
     "favorites": "我的最愛",
+    "favoritesOnly": "僅顯示收藏",
     "allFonts": "所有字型",
     "addFavorite": "將{{family}}加入我的最愛",
     "removeFavorite": "將{{family}}從我的最愛移除"

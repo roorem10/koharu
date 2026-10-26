@@ -93,6 +93,7 @@
     "fontCount_other": "{{count}} 种字体",
     "fontLabel": "{{family}}，{{source}}",
     "fonts": "字体",
+    "noFavorites": "帮字体标星，伊就会显示勒此地",
     "noResults": "寻弗着符合条件个字体",
     "purpose": "用途",
     "script": "文字体系",
@@ -123,6 +124,7 @@
     },
     "style": "样式",
     "favorites": "收藏字體",
+    "favoritesOnly": "单看收藏",
     "allFonts": "全部字體",
     "addFavorite": "收藏{{family}}",
     "removeFavorite": "取消收藏{{family}}"

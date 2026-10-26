@@ -58,12 +58,14 @@ interface KoharuStore {
   tool: CanvasTool
   brush: CanvasBrush
   inspector: InspectorSection
+  fontFavoritesOnly: boolean
   processingScope: PipelineScope
   processingStages: Stage[]
   settingsOpen: boolean
   shortcuts: Shortcuts
   selectPages: (pages: EntityId[]) => void
   showInspector: (section: InspectorSection) => void
+  setFontFavoritesOnly: (favoritesOnly: boolean) => void
   setProcessingScope: (scope: PipelineScope) => void
   setProcessingStages: (stages: Stage[]) => void
   setSettingsOpen: (open: boolean) => void
@@ -106,12 +108,14 @@ export const useKoharuStore = create<KoharuStore>()((set) => ({
   tool: 'select',
   brush: { diameter: 48, color: '#FFFFFF' },
   inspector: 'copy',
+  fontFavoritesOnly: false,
   processingScope: 'selected-pages',
   processingStages: [...pipelineStages],
   settingsOpen: false,
   shortcuts: defaultShortcuts,
   selectPages: (selectedPages) => set({ selectedPages: [...new Set(selectedPages)] }),
   showInspector: (inspector) => set({ inspector }),
+  setFontFavoritesOnly: (fontFavoritesOnly) => set({ fontFavoritesOnly }),
   setProcessingScope: (processingScope) => set({ processingScope }),
   setProcessingStages: (processingStages) => set({ processingStages }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),

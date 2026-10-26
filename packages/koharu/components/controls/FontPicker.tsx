@@ -7,6 +7,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useFontFavorites, useFontPreview } from '@/lib/queries'
+import { useKoharuStore } from '@/lib/store'
 import type { FontFamily, FontSource } from '@koharu/bridge/protocol'
 import { Badge } from '@koharu/ui/components/badge'
 import { Button } from '@koharu/ui/components/button'
@@ -76,6 +77,9 @@ export function FontPicker({
   const listId = useId()
   const [filters, setFilters] = useState<Filters>(emptyFilters)
   const { favorites, busy: savingFavorite, setFavorite } = useFontFavorites(open)
+  const favoritesOnly = useKoharuStore((state) => state.fontFavoritesOnly)
+  const setFavoritesOnly = useKoharuStore((state) => state.setFontFavoritesOnly)
+  const favoriteNames = useMemo(() => new Set(favorites.map(normalizeFontName)), [favorites])
   const input = useRef<HTMLInputElement>(null)
   const orderedFamilies = useMemo(
     () =>
@@ -108,10 +112,17 @@ export function FontPicker({
         !filters.useCase ||
         family.metadata.classifications.includes(filters.useCase) ||
         family.metadata.use_cases.includes(filters.useCase)
-      return matchesQuery && matchesSource && matchesScript && matchesCategory && matchesUse
+      const matchesFavorite = !favoritesOnly || favoriteNames.has(normalizeFontName(family.name))
+      return (
+        matchesQuery &&
+        matchesSource &&
+        matchesScript &&
+        matchesCategory &&
+        matchesUse &&
+        matchesFavorite
+      )
     })
-  }, [filters, orderedFamilies, query])
-  const favoriteNames = useMemo(() => new Set(favorites.map(normalizeFontName)), [favorites])
+  }, [favoriteNames, favoritesOnly, filters, orderedFamilies, query])
   const rows = useMemo(() => {
     const starred = results
       .filter((family) => favoriteNames.has(normalizeFontName(family.name)))
@@ -128,17 +139,19 @@ export function FontPicker({
           family,
         })),
       )
-      result.push({ kind: 'heading', key: 'all-fonts', label: t('fontPicker.allFonts') })
+      if (!favoritesOnly)
+        result.push({ kind: 'heading', key: 'all-fonts', label: t('fontPicker.allFonts') })
     }
-    result.push(
-      ...results.map((family): FontRow => ({
-        kind: 'font',
-        key: `all:${normalizeFontName(family.name)}`,
-        family,
-      })),
-    )
+    if (!favoritesOnly)
+      result.push(
+        ...results.map((family): FontRow => ({
+          kind: 'font',
+          key: `all:${normalizeFontName(family.name)}`,
+          family,
+        })),
+      )
     return result
-  }, [results, favoriteNames, t])
+  }, [results, favoriteNames, favoritesOnly, t])
   const selectedFamily = useMemo(
     () =>
       orderedFamilies.find((family) => normalizeFontName(family.name) === normalizeFontName(value)),
@@ -264,6 +277,18 @@ export function FontPicker({
                   <X />
                 </InputGroupButton>
               )}
+              <InputGroupButton
+                aria-label={t('fontPicker.favoritesOnly')}
+                aria-pressed={favoritesOnly}
+                className={cn(favoritesOnly && 'bg-accent text-foreground')}
+                onClick={() => {
+                  setFavoritesOnly(!favoritesOnly)
+                  setActiveFontKey(null)
+                  input.current?.focus({ preventScroll: true })
+                }}
+              >
+                <Star className={cn(favoritesOnly && 'fill-current text-amber-500')} />
+              </InputGroupButton>
               <FontFilterMenu
                 filters={filters}
                 facets={facets}
@@ -282,7 +307,7 @@ export function FontPicker({
         <Separator />
         {open && (
           <FontList
-            key={`${query}:${filters.source}:${filters.script}:${filters.category}:${filters.useCase}`}
+            key={`${favoritesOnly}:${query}:${filters.source}:${filters.script}:${filters.category}:${filters.useCase}`}
             rows={rows}
             activeIndex={activeIndex}
             listId={listId}
@@ -291,7 +316,10 @@ export function FontPicker({
               if (row?.kind === 'font') setActiveFontKey(row.key)
             }}
             value={value}
-            favorites={favorites}
+            favoriteNames={favoriteNames}
+            emptyHint={
+              favoritesOnly && favoriteNames.size === 0 ? t('fontPicker.noFavorites') : undefined
+            }
             savingFavorite={savingFavorite}
             onFavorite={(family, favorite) => {
               setFavorite(family, favorite)
@@ -459,7 +487,8 @@ function FontList({
   listId,
   onActiveIndexChange,
   value,
-  favorites,
+  favoriteNames,
+  emptyHint,
   savingFavorite,
   onFavorite,
   onSelect,
@@ -469,14 +498,14 @@ function FontList({
   listId: string
   onActiveIndexChange: (index: number) => void
   value: string
-  favorites: string[]
+  favoriteNames: ReadonlySet<string>
+  emptyHint?: string
   savingFavorite: boolean
   onFavorite: (family: string, favorite: boolean) => void
   onSelect: (family: string) => void
 }) {
   const { t } = useTranslation()
   const list = useRef<HTMLDivElement>(null)
-  const favoriteNames = useMemo(() => new Set(favorites.map(normalizeFontName)), [favorites])
   const hasFavorites = rows[0]?.kind === 'heading'
   const selectedIndex = rows.findIndex(
     (row) => row.kind === 'font' && normalizeFontName(row.family.name) === normalizeFontName(value),
@@ -607,7 +636,7 @@ function FontList({
       {rows.length === 0 && (
         <Empty role='status' className='absolute inset-1 rounded-md p-2'>
           <EmptyTitle className='text-[11px] text-muted-foreground'>
-            {t('fontPicker.noResults')}
+            {emptyHint ?? t('fontPicker.noResults')}
           </EmptyTitle>
         </Empty>
       )}

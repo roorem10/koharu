@@ -93,6 +93,7 @@
     "fontCount_other": "{{count}} yazı tipi",
     "fontLabel": "{{family}}, {{source}}",
     "fonts": "Yazı tipleri",
+    "noFavorites": "Yazı tiplerini buraya eklemek için yıldızlayın",
     "noResults": "Bu aramayla eşleşen yazı tipi yok",
     "purpose": "Amaç",
     "script": "Yazı sistemi",
@@ -123,6 +124,7 @@
     },
     "style": "Stil",
     "favorites": "Favoriler",
+    "favoritesOnly": "Yalnızca favoriler",
     "allFonts": "Tüm yazı tipleri",
     "addFavorite": "{{family}} yazı tipini favorilere ekle",
     "removeFavorite": "{{family}} yazı tipini favorilerden kaldır"

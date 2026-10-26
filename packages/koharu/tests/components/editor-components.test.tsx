@@ -2040,7 +2040,7 @@ describe('greenfield editor', () => {
   })
 })
 
-describe('font picker keyboard', () => {
+describe('font picker controls', () => {
   const familiesFor = (names: string[]): FontFamily[] =>
     names.map((name) => ({
       name,
@@ -2189,5 +2189,120 @@ describe('font picker keyboard', () => {
         }),
       ]),
     )
+  })
+  it('remembers favorites-only across closing and remounting without selecting a font', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(commands, 'getFontFavorites').mockResolvedValue(['Beta', 'Zulu'])
+    vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
+    const onChange = vi.fn()
+    const families = familiesFor(['Alpha', 'Beta', 'Zulu'])
+    const view = render(<FontPicker value='Alpha' families={families} onChange={onChange} />)
+    await user.click(screen.getByTestId('type-font-picker'))
+    await screen.findByText('Favorites')
+    await user.click(screen.getByRole('button', { name: 'Favorites only' }))
+
+    expect(screen.getByRole('button', { name: 'Favorites only' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getAllByRole('option')).toHaveLength(2)
+    expect(screen.queryByRole('option', { name: /Alpha/ })).not.toBeInTheDocument()
+    await user.type(screen.getByRole('combobox', { name: 'Search fonts' }), 'Z')
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(screen.getByRole('option', { name: /Zulu/ })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByTestId('type-font-picker'))
+    expect(screen.getByRole('button', { name: 'Favorites only' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getAllByRole('option')).toHaveLength(2)
+
+    view.unmount()
+    render(<FontPicker value='Alpha' families={families} onChange={onChange} />)
+    await user.click(screen.getByTestId('type-font-picker'))
+    expect(screen.getByRole('button', { name: 'Favorites only' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getAllByRole('option')).toHaveLength(2)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('applies search and source filters within favorites-only results', async () => {
+    const user = userEvent.setup()
+    const families = familiesFor(['Alpha', 'Beta', 'Zulu'])
+    families[0].sources = ['bundled']
+    families[2].sources = ['bundled']
+    vi.spyOn(commands, 'getFontFavorites').mockResolvedValue(['Beta', 'Zulu'])
+    vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
+    render(<FontPicker value='Beta' families={families} onChange={vi.fn()} />)
+    await user.click(screen.getByTestId('type-font-picker'))
+    await screen.findByText('Favorites')
+    await user.click(screen.getByRole('button', { name: 'Favorites only' }))
+    await user.click(screen.getByRole('button', { name: 'Filter fonts' }))
+    const source = await screen.findByRole('menuitem', { name: 'Source' })
+    act(() => source.focus())
+    await user.keyboard('{ArrowRight}')
+    const bundled = await screen.findByRole('menuitemradio', { name: 'Bundled' })
+    act(() => bundled.focus())
+    await user.keyboard('{Enter}')
+
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(screen.getByRole('option', { name: /Zulu/ })).toBeInTheDocument()
+    const search = screen.getByRole('combobox', { name: 'Search fonts' })
+    fireEvent.change(search, { target: { value: 'Beta' } })
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('No fonts match this search')
+    fireEvent.change(search, { target: { value: 'Zulu' } })
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+  })
+
+  it('shows the star-fonts hint when favorites-only starts without any favorites', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(commands, 'getFontFavorites').mockResolvedValue([])
+    vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
+    const onChange = vi.fn()
+    render(<FontPicker value='Alpha' families={familiesFor(['Alpha'])} onChange={onChange} />)
+    await user.click(screen.getByTestId('type-font-picker'))
+    await user.click(screen.getByRole('button', { name: 'Favorites only' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Star fonts to add them here')
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
+    const search = screen.getByRole('combobox', { name: 'Search fonts' })
+    fireEvent.keyDown(search, { key: 'Enter' })
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('updates favorites-only results while starring and unstarring without closing the picker', async () => {
+    const user = userEvent.setup()
+    let favorites = ['Beta']
+    vi.spyOn(commands, 'getFontFavorites').mockImplementation(async () => favorites)
+    vi.spyOn(commands, 'setFontFavorite').mockImplementation(async (family, favorite) => {
+      favorites = favorite ? [...favorites, family] : favorites.filter((name) => name !== family)
+      return favorites
+    })
+    vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
+    const onChange = vi.fn()
+    render(
+      <FontPicker value='Alpha' families={familiesFor(['Alpha', 'Beta'])} onChange={onChange} />,
+    )
+    await user.click(screen.getByTestId('type-font-picker'))
+    await screen.findByText('Favorites')
+    await user.click(screen.getByRole('button', { name: 'Favorites only' }))
+    await user.click(screen.getByRole('button', { name: 'Remove Beta from favorites' }))
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Star fonts to add them here'),
+    )
+    expect(screen.getByRole('button', { name: 'Favorites only' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await user.click(screen.getByRole('button', { name: 'Favorites only' }))
+    await user.click(screen.getByRole('button', { name: 'Add Alpha to favorites' }))
+    await screen.findByText('Favorites')
+    await user.click(screen.getByRole('button', { name: 'Favorites only' }))
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(screen.getByRole('option', { name: /Alpha/ })).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
   })
 })
