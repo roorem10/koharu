@@ -7,15 +7,15 @@ name: Preview Windows build
 #
 # Cache scoping: a run can only restore caches saved on its own branch or the
 # default branch, or on the base branch for pull requests. Work-order branches
-# should be built through a pull request into typesetting-preview, so the first
-# run starts from typesetting-preview's cache and later pushes from the PR's own.
+# should be built through a pull request into booharu, so the first
+# run starts from booharu's cache and later pushes from the PR's own.
 
 on:
   push:
-    branches: ['typesetting-preview']
+    branches: ['booharu']
     paths-ignore: ['**.md']
   pull_request:
-    branches: ['typesetting-preview']
+    branches: ['booharu']
     paths-ignore: ['**.md']
   workflow_dispatch:
 
