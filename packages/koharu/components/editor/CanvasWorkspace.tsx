@@ -97,6 +97,7 @@ export function CanvasWorkspace() {
   const previousPageIndex = useRef<number | null>(null)
   const spaceHeld = useRef(false)
   const heldArrows = useRef(new Set<string>())
+  const nudgeShift = useRef(false)
   const nudgeTimer = useRef<number | null>(null)
   const transformActive = useRef(false)
   const transformRevision = useRef<number | null>(null)
@@ -192,8 +193,9 @@ export function CanvasWorkspace() {
     if (!transformActive.current) return
 
     const keys = heldArrows.current
-    const x = Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft'))
-    const y = Number(keys.has('ArrowDown')) - Number(keys.has('ArrowUp'))
+    const step = nudgeShift.current ? 10 : 1
+    const x = (Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft'))) * step
+    const y = (Number(keys.has('ArrowDown')) - Number(keys.has('ArrowUp'))) * step
 
     if (x || y) {
       updateTransform(translateFrames(transformFinal.current, { x, y }))
@@ -204,6 +206,7 @@ export function CanvasWorkspace() {
     if (nudgeTimer.current !== null) window.clearTimeout(nudgeTimer.current)
     nudgeTimer.current = null
     heldArrows.current.clear()
+    nudgeShift.current = false
     if (!transformActive.current) return
     transformUpdates.commit()
     transformActive.current = false
@@ -236,6 +239,7 @@ export function CanvasWorkspace() {
     if (nudgeTimer.current !== null) window.clearTimeout(nudgeTimer.current)
     nudgeTimer.current = null
     heldArrows.current.clear()
+    nudgeShift.current = false
     const current = gesture.current
     gesture.current = null
     setSelectionRect(null)
@@ -382,6 +386,7 @@ export function CanvasWorkspace() {
     }
 
     const down = (event: KeyboardEvent) => {
+      if (event.key === 'Shift' && heldArrows.current.size) nudgeShift.current = true
       if (event.key === 'Alt') {
         event.preventDefault()
         return
@@ -432,6 +437,7 @@ export function CanvasWorkspace() {
     }
 
     const up = (event: KeyboardEvent) => {
+      if (event.key === 'Shift') nudgeShift.current = false
       if (event.key === 'Alt') event.preventDefault()
       if (event.code === 'Space') spaceHeld.current = false
 
@@ -649,7 +655,6 @@ export function CanvasWorkspace() {
               event.ctrlKey ||
               event.metaKey ||
               event.altKey ||
-              event.shiftKey ||
               canvasState.status != 'ready' ||
               canvasPage !== pageId ||
               gesture.current ||
@@ -657,6 +662,7 @@ export function CanvasWorkspace() {
             )
               return
 
+            nudgeShift.current = event.shiftKey
             if (event.repeat || keys.has(event.key)) {
               if (keys.has(event.key)) event.preventDefault()
               return

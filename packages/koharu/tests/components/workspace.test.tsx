@@ -445,6 +445,28 @@ describe('canvas interaction adapter', () => {
     )
   })
 
+  it('nudges ten pixels with Shift and returns to one pixel when Shift is released', async () => {
+    vi.useFakeTimers()
+    installNudgeProject()
+    const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(2)
+    const surface = renderWorkspace()
+
+    fireEvent.keyDown(surface, { key: 'ArrowRight', shiftKey: true })
+    act(() => vi.advanceTimersByTime(300))
+    fireEvent.keyUp(surface, { key: 'Shift' })
+    act(() => vi.advanceTimersByTime(30))
+    fireEvent.keyUp(surface, { key: 'ArrowRight' })
+    vi.useRealTimers()
+
+    await waitFor(() =>
+      expect(commit).toHaveBeenCalledExactlyOnceWith(
+        1,
+        [{ element: 'element', frame: { x: 51, y: 40, width: 50, height: 20, angle_degrees: 0 } }],
+        false,
+      ),
+    )
+  })
+
   it('commits separate arrow taps as separate undo steps', async () => {
     installNudgeProject()
     const commit = vi
