@@ -78,6 +78,8 @@ jobs:
 
       - name: Build preview package
         shell: pwsh
+        env:
+          KOHARU_FORK_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview-windows.ps1
 
       - name: Check package layout

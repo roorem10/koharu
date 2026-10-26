@@ -14,6 +14,8 @@ import {
 } from '@koharu/ui/components/dialog'
 
 const author = 'Mayo Takanashi'
+const forkVersion = process.env.NEXT_PUBLIC_KOHARU_FORK_VERSION
+const forkCommit = process.env.NEXT_PUBLIC_KOHARU_FORK_COMMIT
 
 export function AboutDialog({
   open,
@@ -58,6 +60,14 @@ export function AboutDialog({
           <dd className='text-right font-medium'>{version ?? t('common.loading')}</dd>
           <dt className='text-muted-foreground'>{t('about.author')}</dt>
           <dd className='text-right font-medium'>{author}</dd>
+          {forkVersion && (
+            <>
+              <dt className='text-muted-foreground'>{t('about.forkVersion')}</dt>
+              <dd className='text-right font-medium'>
+                {forkCommit ? `${forkVersion} · ${forkCommit}` : forkVersion}
+              </dd>
+            </>
+          )}
         </dl>
       </DialogContent>
     </Dialog>

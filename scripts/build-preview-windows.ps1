@@ -48,6 +48,19 @@ else { $makensis = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe' }
 if (-not (Test-Path $makensis)) { throw 'NSIS is missing. See BUILD_PREVIEW.md.' }
 
 $env:NEXT_PUBLIC_KOHARU_PREVIEW = '1'
+$env:NEXT_PUBLIC_KOHARU_FORK_VERSION = (Get-Content (Join-Path $root 'FORK_VERSION') -Raw).Trim()
+if (-not $env:NEXT_PUBLIC_KOHARU_FORK_VERSION) { throw 'FORK_VERSION is empty.' }
+
+# CI passes the pull request's head commit; hand builds read it from git when there is a checkout.
+if (-not $env:KOHARU_FORK_COMMIT -and (Test-Path (Join-Path $root '.git'))) {
+    $commit = git -C $root rev-parse --short=8 HEAD 2>$null
+    if ($LASTEXITCODE -eq 0 -and $commit) { $env:KOHARU_FORK_COMMIT = $commit.Trim() }
+}
+Remove-Item Env:NEXT_PUBLIC_KOHARU_FORK_COMMIT -ErrorAction SilentlyContinue
+if ($env:KOHARU_FORK_COMMIT) {
+    $env:NEXT_PUBLIC_KOHARU_FORK_COMMIT = $env:KOHARU_FORK_COMMIT.Substring(0, [Math]::Min(8, $env:KOHARU_FORK_COMMIT.Length))
+}
+
 $env:KOHARU_PRIVATE_PREVIEW = '1'
 $env:NEXT_TELEMETRY_DISABLED = '1'
 Get-ChildItem Env: | Where-Object { $_.Name -like 'SENTRY_*' -or $_.Name -like 'NEXT_PUBLIC_SENTRY_*' } |
