@@ -505,7 +505,10 @@
       "title": "Kısayollar",
       "tools": "Araçlar",
       "unassigned": "Atanmamış",
-      "usedByBuiltIn": "{{action}} kullanıyor (yerleşik)"
+      "usedByBuiltIn": "{{action}} kullanıyor (yerleşik)",
+      "zoomActual": "%100 yakınlaştırma",
+      "zoomIn": "Yakınlaştır",
+      "zoomOut": "Uzaklaştır"
     },
     "tabs": {
       "appearance": "Görünüm",

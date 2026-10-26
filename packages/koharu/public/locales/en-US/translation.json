@@ -505,7 +505,10 @@
       "title": "Shortcuts",
       "tools": "Tools",
       "unassigned": "Unassigned",
-      "usedByBuiltIn": "Used by {{action}} (built-in)"
+      "usedByBuiltIn": "Used by {{action}} (built-in)",
+      "zoomActual": "Zoom to 100 %",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out"
     },
     "tabs": {
       "appearance": "Appearance",

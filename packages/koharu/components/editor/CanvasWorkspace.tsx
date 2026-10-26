@@ -31,7 +31,14 @@ import {
   usePage,
   usePages,
 } from '@/lib/queries'
-import { findShortcut, hasModifier, bindingFromEvent, loadShortcutLayout } from '@/lib/shortcuts'
+import {
+  findShortcut,
+  hasModifier,
+  bindingFromEvent,
+  loadShortcutLayout,
+  builtInShortcuts,
+  matchesBinding,
+} from '@/lib/shortcuts'
 import {
   isBrushTool,
   maxBrushDiameter,
@@ -39,6 +46,7 @@ import {
   receiveError,
   useKoharuStore,
   type CanvasTool,
+  type ShortcutAction,
 } from '@/lib/store'
 import { prefetchCanvasPages, workspaceColor, type CanvasColor } from '@koharu/bridge/canvas'
 import { commands, type Frame, type Point, type TransformFrame } from '@koharu/bridge/protocol'
@@ -99,6 +107,7 @@ export function CanvasWorkspace() {
   const gesture = useRef<Gesture | null>(null)
   const previousPageIndex = useRef<number | null>(null)
   const spaceHeld = useRef(false)
+  const lastZoomStep = useRef(-Infinity)
   const heldArrows = useRef(new Set<string>())
   const nudgeShift = useRef(false)
   const nudgeTimer = useRef<number | null>(null)
@@ -378,8 +387,8 @@ export function CanvasWorkspace() {
   useEffect(() => {
     void loadShortcutLayout()
     // Text entry keeps every key. Other inputs, such as a slider or checkbox that keeps focus
-    // after a click, also keep their own keys (Space, arrows, Enter, Delete and modified
-    // shortcuts), but a bare tool key such as V or T means nothing to them, so it still switches
+    // after a click, also keep their own keys (Space, arrows, Enter and Delete), but a bare
+    // tool key such as V or T means nothing to them, so it still switches
     // tools. Treating every input as text entry left the tool shortcuts silently disabled until
     // the canvas was clicked again (koharu#1181).
     const textEntryTypes = new Set(['text', 'search', 'number', 'email', 'url', 'password', 'tel'])
@@ -389,9 +398,20 @@ export function CanvasWorkspace() {
       target instanceof HTMLSelectElement ||
       (target instanceof HTMLElement && target.isContentEditable)
 
-    const toolShortcut = (event: KeyboardEvent) => {
-      const { shortcuts } = useKoharuStore.getState()
-      const next = findShortcut(event, shortcuts)
+    const runShortcut = (event: KeyboardEvent, next: ShortcutAction | undefined) => {
+      if (!next) return
+      if (next === 'zoom_in' || next === 'zoom_out' || next === 'zoom_actual') {
+        event.preventDefault()
+        if (!page || (next === 'zoom_actual' && event.repeat)) return
+        const now = performance.now()
+        if (event.repeat && now - lastZoomStep.current < 100) return
+        lastZoomStep.current = now
+        const current = useKoharuStore.getState().camera.zoom
+        let zoom = next === 'zoom_actual' ? 1 : next === 'zoom_in' ? current * 1.2 : current / 1.2
+        if ((current < 1 && zoom >= 1) || (current > 1 && zoom <= 1)) zoom = 1
+        setZoom(zoom)
+        return
+      }
       if (next === 'fit') {
         event.preventDefault()
         requestCanvasFit()
@@ -404,6 +424,20 @@ export function CanvasWorkspace() {
     }
 
     const down = (event: KeyboardEvent) => {
+      const action = findShortcut(event, useKoharuStore.getState().shortcuts)
+      const modified = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey
+      // CEF's capture-phase page-zoom blocker has already prevented the default here.
+      // Configured modifier bindings also work immediately after a range input was used.
+      const reserved = builtInShortcuts.some(
+        (entry) =>
+          entry.checked && entry.bindings.some((binding) => matchesBinding(event, binding)),
+      )
+      if (modified && action && !reserved) {
+        event.preventDefault()
+        if (event.isComposing || textEntry(event.target)) return
+        runShortcut(event, action)
+        return
+      }
       if (event.key === 'Shift' && heldArrows.current.size) nudgeShift.current = true
       if (event.key === 'Alt') {
         event.preventDefault()
@@ -414,7 +448,7 @@ export function CanvasWorkspace() {
       if (event.target instanceof HTMLInputElement) {
         const binding = bindingFromEvent(event)
         if (binding && (hasModifier(binding) || (event.key.length === 1 && event.key !== ' ')))
-          toolShortcut(event)
+          runShortcut(event, action)
         return
       }
       const state = useKoharuStore.getState()
@@ -452,7 +486,7 @@ export function CanvasWorkspace() {
         selectLayers([])
         return
       }
-      toolShortcut(event)
+      runShortcut(event, action)
     }
 
     const up = (event: KeyboardEvent) => {
@@ -478,7 +512,16 @@ export function CanvasWorkspace() {
       window.removeEventListener('keyup', up)
       window.removeEventListener('blur', blur)
     }
-  }, [cancelGesture, colorSampling, finishTransform, page, requestCanvasFit, selectLayers, setTool])
+  }, [
+    cancelGesture,
+    colorSampling,
+    finishTransform,
+    page,
+    requestCanvasFit,
+    selectLayers,
+    setTool,
+    setZoom,
+  ])
 
   const clientPagePoint = (clientX: number, clientY: number) =>
     pagePoint(

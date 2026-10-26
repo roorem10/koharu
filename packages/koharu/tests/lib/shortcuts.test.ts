@@ -63,8 +63,8 @@ describe('shortcut bindings', () => {
     expect(matchesBinding(key({ key: 'z', ctrlKey: true, shiftKey: true }), 'ctrl+z')).toBe(false)
     const conflicts = shortcutConflicts({
       ...defaultShortcuts,
-      select: 'ctrl+plus',
-      text_alt: 'ctrl+shift+=',
+      select: 'ctrl+alt+plus',
+      text_alt: 'ctrl+alt+shift+=',
     })
     expect(conflicts.select).toEqual([{ slot: 'text_alt' }])
     expect(conflicts.text_alt).toEqual([{ slot: 'select' }])

@@ -505,7 +505,10 @@
       "title": "ショートカット",
       "tools": "ツール",
       "unassigned": "未割り当て",
-      "usedByBuiltIn": "{{action}}で使用中（固定）"
+      "usedByBuiltIn": "{{action}}で使用中（固定）",
+      "zoomActual": "100 %で表示",
+      "zoomIn": "拡大",
+      "zoomOut": "縮小"
     },
     "tabs": {
       "appearance": "外観",

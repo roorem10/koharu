@@ -30,6 +30,8 @@ export interface ShortcutPreferencesHandle {
   canLeave: () => boolean
 }
 
+const canvasActions: readonly ShortcutAction[] = ['fit', 'zoom_in', 'zoom_out', 'zoom_actual']
+
 export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
   function ShortcutPreferences(_, ref) {
     const { t } = useTranslation()
@@ -207,10 +209,10 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
           </Button>
         </div>
         <PreferenceSection title={t('settings.shortcuts.tools')}>
-          {rows(shortcutActions.filter((action) => action !== 'fit'))}
+          {rows(shortcutActions.filter((action) => !canvasActions.includes(action)))}
         </PreferenceSection>
         <PreferenceSection title={t('settings.shortcuts.canvas')}>
-          {rows(['fit'])}
+          {rows(canvasActions)}
         </PreferenceSection>
         <PreferenceSection
           title={t('settings.shortcuts.builtIn')}

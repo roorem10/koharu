@@ -103,8 +103,21 @@ export function Providers({ children }: { children: ReactNode }) {
       if (event.ctrlKey) event.preventDefault()
     }
 
+    const preventViewportKeys = (event: KeyboardEvent) => {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        (['=', '+', '-', '_', '0'].includes(event.key) ||
+          ['NumpadAdd', 'NumpadSubtract', 'Numpad0'].includes(event.code))
+      )
+        event.preventDefault()
+    }
+
     window.addEventListener('wheel', preventViewportScaling, { capture: true, passive: false })
-    return () => window.removeEventListener('wheel', preventViewportScaling, { capture: true })
+    window.addEventListener('keydown', preventViewportKeys, { capture: true })
+    return () => {
+      window.removeEventListener('wheel', preventViewportScaling, { capture: true })
+      window.removeEventListener('keydown', preventViewportKeys, { capture: true })
+    }
   }, [])
 
   useEffect(() => {

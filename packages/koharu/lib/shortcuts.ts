@@ -9,6 +9,9 @@ export const shortcutActions: readonly ShortcutAction[] = [
   'remove',
   'pan',
   'fit',
+  'zoom_in',
+  'zoom_out',
+  'zoom_actual',
 ]
 
 export const shortcutLabels: Record<ShortcutAction, string> = {
@@ -20,6 +23,9 @@ export const shortcutLabels: Record<ShortcutAction, string> = {
   remove: 'tools.remove',
   pan: 'tools.pan',
   fit: 'canvas.fit',
+  zoom_in: 'settings.shortcuts.zoomIn',
+  zoom_out: 'settings.shortcuts.zoomOut',
+  zoom_actual: 'settings.shortcuts.zoomActual',
 }
 
 const modifiers = ['ctrl', 'alt', 'shift'] as const
@@ -165,7 +171,16 @@ export function bindingFromEvent(event: KeyEvent): string | null {
 }
 
 export function matchesBinding(event: KeyEvent, binding: string): boolean {
-  const recorded = bindingFromEvent(event)
+  // Matching identifies the action; each caller decides whether composition may run it.
+  const recorded = bindingFromEvent({
+    key: event.key,
+    code: event.code,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    altKey: event.altKey,
+    shiftKey: event.shiftKey,
+    isComposing: false,
+  })
   const expected = identity(binding)
   return expected !== null && recorded !== null && identity(recorded) === expected
 }

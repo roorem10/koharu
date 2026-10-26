@@ -505,7 +505,10 @@
       "title": "단축키",
       "tools": "도구",
       "unassigned": "할당 안 됨",
-      "usedByBuiltIn": "{{action}}에서 사용 중 (내장)"
+      "usedByBuiltIn": "{{action}}에서 사용 중 (내장)",
+      "zoomActual": "100 %로 보기",
+      "zoomIn": "확대",
+      "zoomOut": "축소"
     },
     "tabs": {
       "appearance": "모양",

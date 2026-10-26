@@ -505,7 +505,10 @@
       "title": "Atalhos",
       "tools": "Ferramentas",
       "unassigned": "Não atribuído",
-      "usedByBuiltIn": "Usado por {{action}} (integrado)"
+      "usedByBuiltIn": "Usado por {{action}} (integrado)",
+      "zoomActual": "Zoom em 100 %",
+      "zoomIn": "Ampliar",
+      "zoomOut": "Reduzir"
     },
     "tabs": {
       "appearance": "Aparência",

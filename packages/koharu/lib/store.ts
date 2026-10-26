@@ -36,7 +36,7 @@ export interface CanvasBrush {
   color: string
 }
 export type InspectorSection = 'copy' | 'type' | 'layers'
-export type ShortcutAction = CanvasTool | 'fit'
+export type ShortcutAction = CanvasTool | 'fit' | 'zoom_in' | 'zoom_out' | 'zoom_actual'
 export type ShortcutSlot = ShortcutAction | `${ShortcutAction}_alt`
 export type Shortcuts = Record<ShortcutSlot, string>
 export type PipelineScope = 'page' | 'selected-pages' | 'project'
@@ -91,6 +91,9 @@ export const defaultShortcuts: Shortcuts = {
   remove: 'j',
   pan: 'h',
   fit: '0',
+  zoom_in: 'ctrl+plus',
+  zoom_out: 'ctrl+-',
+  zoom_actual: 'ctrl+0',
   select_alt: '',
   text_alt: '',
   draw_alt: '',
@@ -99,6 +102,9 @@ export const defaultShortcuts: Shortcuts = {
   remove_alt: '',
   pan_alt: '',
   fit_alt: '',
+  zoom_in_alt: 'ctrl+numpadadd',
+  zoom_out_alt: 'ctrl+numpadsubtract',
+  zoom_actual_alt: '',
 }
 
 export const useKoharuStore = create<KoharuStore>()((set) => ({

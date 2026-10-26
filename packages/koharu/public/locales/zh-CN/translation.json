@@ -505,7 +505,10 @@
       "title": "快捷键",
       "tools": "工具",
       "unassigned": "未分配",
-      "usedByBuiltIn": "{{action}}已使用（内置）"
+      "usedByBuiltIn": "{{action}}已使用（内置）",
+      "zoomActual": "缩放到100 %",
+      "zoomIn": "放大",
+      "zoomOut": "缩小"
     },
     "tabs": {
       "appearance": "外观",

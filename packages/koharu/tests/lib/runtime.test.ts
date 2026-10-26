@@ -98,6 +98,48 @@ function ProjectProbe() {
 }
 
 describe('Tauri runtime', () => {
+  it('blocks host page-zoom keys in capture without stopping propagation', async () => {
+    const { dispose } = await start()
+    const bubble = vi.fn()
+    window.addEventListener('keydown', bubble)
+    const target = document.createElement('input')
+    document.body.append(target)
+    for (const options of [
+      { key: '=', ctrlKey: true },
+      { key: '+', ctrlKey: true, shiftKey: true },
+      { key: '-', metaKey: true },
+      { key: '_', ctrlKey: true, shiftKey: true },
+      { key: '0', ctrlKey: true },
+      { key: '+', code: 'NumpadAdd', ctrlKey: true },
+      { key: '-', code: 'NumpadSubtract', ctrlKey: true },
+      { key: 'Insert', code: 'Numpad0', ctrlKey: true },
+    ]) {
+      const event = new KeyboardEvent('keydown', { ...options, bubbles: true, cancelable: true })
+      target.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(true)
+    }
+    expect(bubble).toHaveBeenCalledTimes(8)
+    const unrelated = new KeyboardEvent('keydown', {
+      key: 'q',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    target.dispatchEvent(unrelated)
+    expect(unrelated.defaultPrevented).toBe(false)
+    dispose()
+    const removed = new KeyboardEvent('keydown', {
+      key: '-',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    target.dispatchEvent(removed)
+    expect(removed.defaultPrevented).toBe(false)
+    window.removeEventListener('keydown', bubble)
+    target.remove()
+  })
+
   it('suppresses the page context menu but keeps it for editable text', async () => {
     const { dispose } = await start()
     const menu = (target: Element) => {

@@ -505,7 +505,10 @@
       "title": "Raccourcis",
       "tools": "Outils",
       "unassigned": "Non attribué",
-      "usedByBuiltIn": "Utilisé par {{action}} (intégré)"
+      "usedByBuiltIn": "Utilisé par {{action}} (intégré)",
+      "zoomActual": "Zoom à 100 %",
+      "zoomIn": "Zoom avant",
+      "zoomOut": "Zoom arrière"
     },
     "tabs": {
       "appearance": "Apparence",

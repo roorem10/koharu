@@ -505,7 +505,10 @@
       "title": "Atajos",
       "tools": "Herramientas",
       "unassigned": "Sin asignar",
-      "usedByBuiltIn": "Lo usa {{action}} (integrado)"
+      "usedByBuiltIn": "Lo usa {{action}} (integrado)",
+      "zoomActual": "Zoom al 100 %",
+      "zoomIn": "Acercar",
+      "zoomOut": "Alejar"
     },
     "tabs": {
       "appearance": "Apariencia",

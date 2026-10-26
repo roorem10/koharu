@@ -505,7 +505,10 @@
       "title": "Сочетания клавиш",
       "tools": "Инструменты",
       "unassigned": "Не назначено",
-      "usedByBuiltIn": "Используется: {{action}} (встроенное)"
+      "usedByBuiltIn": "Используется: {{action}} (встроенное)",
+      "zoomActual": "Масштаб 100 %",
+      "zoomIn": "Увеличить",
+      "zoomOut": "Уменьшить"
     },
     "tabs": {
       "appearance": "Оформление",

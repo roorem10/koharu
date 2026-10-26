@@ -505,7 +505,10 @@
       "title": "الاختصارات",
       "tools": "الأدوات",
       "unassigned": "غير معيّن",
-      "usedByBuiltIn": "يستخدمه {{action}} (مدمج)"
+      "usedByBuiltIn": "يستخدمه {{action}} (مدمج)",
+      "zoomActual": "تكبير إلى 100 %",
+      "zoomIn": "تكبير",
+      "zoomOut": "تصغير"
     },
     "tabs": {
       "appearance": "المظهر",
