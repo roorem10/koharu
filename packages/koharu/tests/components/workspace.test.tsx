@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { CanvasWorkspace } from '@/components/editor/CanvasWorkspace'
+import { CanvasWorkspace, MIN_ZOOM, MAX_ZOOM } from '@/components/editor/CanvasWorkspace'
 import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type Layer } from '@koharu/bridge/protocol'
@@ -233,6 +233,227 @@ describe('canvas interaction adapter', () => {
     expect(useKoharuStore.getState().camera).toEqual(camera)
   })
 
+  it('keeps wheel zoom anchored at the pointer and bounded by the shared limits', () => {
+    installProject()
+    const surface = renderWorkspace()
+    act(() => useKoharuStore.setState({ camera: { zoom: 1, translation: [0, 0], fitted: false } }))
+    fireEvent.wheel(surface, { clientX: 210, clientY: 220, deltaY: -100, ctrlKey: true })
+    const camera = useKoharuStore.getState().camera
+    expect((200 - camera.translation[0]) / camera.zoom).toBeCloseTo(200)
+    expect((200 - camera.translation[1]) / camera.zoom).toBeCloseTo(200)
+    fireEvent.wheel(surface, { clientX: 210, clientY: 220, deltaY: -100000, ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(MAX_ZOOM)
+    expect(screen.getByText('1600%')).toBeInTheDocument()
+    fireEvent.wheel(surface, { clientX: 210, clientY: 220, deltaY: 100000, ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(MIN_ZOOM)
+    expect(screen.getByText('2%')).toBeInTheDocument()
+  })
+
+  it('clamps translation when the status-bar slider changes zoom', async () => {
+    installProject()
+    renderWorkspace()
+    act(() =>
+      useKoharuStore.setState({ camera: { zoom: 1, translation: [1000, 1000], fitted: false } }),
+    )
+    const slider = document.querySelector<HTMLInputElement>('footer input[type="range"]')!
+    expect(slider).not.toBeNull()
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
+    expect(useKoharuStore.getState().camera).toEqual({
+      zoom: 1.05,
+      translation: [700, 500],
+      fitted: false,
+    })
+    expect(screen.getByText('105%')).toBeInTheDocument()
+  })
+
+  it.each([
+    [{ key: '-', code: 'Minus', ctrlKey: true }, 1 / 1.2, '83%'],
+    [{ key: '=', code: 'Equal', ctrlKey: true }, 1.2, '120%'],
+    [{ key: '+', code: 'Equal', ctrlKey: true, shiftKey: true }, 1.2, '120%'],
+    [{ key: '+', code: 'NumpadAdd', ctrlKey: true }, 1.2, '120%'],
+    [{ key: '-', code: 'NumpadSubtract', ctrlKey: true }, 1 / 1.2, '83%'],
+    [{ key: '=', code: 'Equal', metaKey: true }, 1.2, '120%'],
+  ] as const)('zooms the camera and status label with %j', (options, expected, label) => {
+    installProject()
+    renderWorkspace()
+    const undo = vi.spyOn(commands, 'undo').mockResolvedValue(null)
+    const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(null)
+    const typography = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
+    act(() => useKoharuStore.setState({ camera: { zoom: 1, translation: [0, 0], fitted: false } }))
+    const event = new KeyboardEvent('keydown', { ...options, bubbles: true, cancelable: true })
+    fireEvent(window, event)
+    const camera = useKoharuStore.getState().camera
+    expect(camera.zoom).toBeCloseTo(expected)
+    expect((400 - camera.translation[0]) / camera.zoom).toBeCloseTo(400)
+    expect((300 - camera.translation[1]) / camera.zoom).toBeCloseTo(300)
+    expect(screen.getByText(label)).toBeInTheDocument()
+    expect(event.defaultPrevented).toBe(true)
+    expect(undo).not.toHaveBeenCalled()
+    expect(commit).not.toHaveBeenCalled()
+    expect(typography).not.toHaveBeenCalled()
+  })
+
+  it('snaps through 100 percent, resets to actual size, keeps Fit and enforces zoom limits', () => {
+    installProject()
+    const surface = renderWorkspace()
+    act(() =>
+      useKoharuStore.setState({ camera: { zoom: 0.9, translation: [0, 0], fitted: false } }),
+    )
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(1)
+    act(() =>
+      useKoharuStore.setState({ camera: { zoom: 1.1, translation: [0, 0], fitted: false } }),
+    )
+    fireEvent.keyDown(window, { key: '-', ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(1)
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true })
+    fireEvent.keyDown(window, { key: '0', ctrlKey: true })
+    expect(screen.getByText('100%')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: '0' })
+    expect(useKoharuStore.getState().camera.fitted).toBe(true)
+    act(() =>
+      useKoharuStore.setState({ camera: { zoom: MAX_ZOOM, translation: [0, 0], fitted: false } }),
+    )
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(MAX_ZOOM)
+    act(() =>
+      useKoharuStore.setState({ camera: { zoom: MIN_ZOOM, translation: [0, 0], fitted: false } }),
+    )
+    fireEvent.keyDown(window, { key: '-', ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(MIN_ZOOM)
+    expect(surface).toBeInTheDocument()
+  })
+
+  it('throttles held zoom keys and ignores repeats for actual size', () => {
+    vi.useFakeTimers()
+    installProject()
+    renderWorkspace()
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true })
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true, repeat: true })
+    act(() => vi.advanceTimersByTime(99))
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true, repeat: true })
+    expect(useKoharuStore.getState().camera.zoom).toBeCloseTo(1.2)
+    act(() => vi.advanceTimersByTime(1))
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true, repeat: true })
+    expect(useKoharuStore.getState().camera.zoom).toBeCloseTo(1.44)
+    fireEvent.keyDown(window, { key: '0', ctrlKey: true, repeat: true })
+    expect(useKoharuStore.getState().camera.zoom).toBeCloseTo(1.44)
+  })
+
+  it('handles modified zoom after slider input and host prevention, but protects text entry and composition', () => {
+    installProject()
+    renderWorkspace()
+    const slider = document.querySelector<HTMLInputElement>('footer input[type="range"]')!
+    slider.focus()
+    const event = new KeyboardEvent('keydown', {
+      key: '-',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    event.preventDefault()
+    fireEvent(slider, event)
+    const zoom = useKoharuStore.getState().camera.zoom
+    expect(zoom).toBeCloseTo(1 / 1.2)
+    for (const control of [document.createElement('input'), document.createElement('textarea')]) {
+      document.body.append(control)
+      const typed = new KeyboardEvent('keydown', {
+        key: '-',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      fireEvent(control, typed)
+      expect(typed.defaultPrevented).toBe(true)
+      expect(useKoharuStore.getState().camera.zoom).toBe(zoom)
+      control.remove()
+    }
+    const composing = new KeyboardEvent('keydown', {
+      key: '-',
+      ctrlKey: true,
+      isComposing: true,
+      cancelable: true,
+    })
+    fireEvent(window, composing)
+    expect(composing.defaultPrevented).toBe(true)
+    expect(useKoharuStore.getState().camera.zoom).toBe(zoom)
+  })
+
+  it('uses changed zoom modifiers and keys, and keeps bare bindings behind the handled-key guard', () => {
+    installProject()
+    renderWorkspace()
+    useKoharuStore.getState().setShortcut('zoom_in', 'alt+z')
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(1)
+    fireEvent.keyDown(window, { key: 'z', altKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(1.2)
+    useKoharuStore.getState().setShortcut('zoom_in', 'shift+]')
+    fireEvent.keyDown(window, { key: '}', code: 'BracketRight', shiftKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBeCloseTo(1.44)
+    useKoharuStore.getState().setShortcut('zoom_in', '=')
+    const handled = new KeyboardEvent('keydown', { key: '=', cancelable: true })
+    handled.preventDefault()
+    fireEvent(window, handled)
+    expect(useKoharuStore.getState().camera.zoom).toBeCloseTo(1.44)
+    fireEvent.keyDown(window, { key: '=' })
+    expect(useKoharuStore.getState().camera.zoom).toBeCloseTo(1.728)
+  })
+
+  it('does not zoom without an open page', () => {
+    queryClient.setQueryData(pageKey, null)
+    renderWorkspace()
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(1)
+  })
+
+  it.each(['ctrl', 'wheel'] as const)(
+    'keeps wheel gestures and the pointer anchor consistent in %s mode',
+    (wheelZoom) => {
+      installProject()
+      useKoharuStore.getState().setWheelZoom(wheelZoom)
+      const surface = renderWorkspace()
+      const reset = () =>
+        act(() =>
+          useKoharuStore.setState({ camera: { zoom: 1, translation: [0, 0], fitted: false } }),
+        )
+      for (const ctrlKey of [false, true]) {
+        reset()
+        fireEvent.wheel(surface, { clientX: 210, clientY: 220, deltaY: -100, ctrlKey })
+        const camera = useKoharuStore.getState().camera
+        if (ctrlKey === (wheelZoom === 'ctrl')) {
+          expect(camera.zoom).toBeGreaterThan(1)
+          expect((200 - camera.translation[0]) / camera.zoom).toBeCloseTo(200)
+          expect((200 - camera.translation[1]) / camera.zoom).toBeCloseTo(200)
+        } else expect(camera).toEqual({ zoom: 1, translation: [0, 100], fitted: false })
+      }
+      reset()
+      fireEvent.wheel(surface, { deltaY: 20, shiftKey: true })
+      expect(useKoharuStore.getState().camera).toEqual({
+        zoom: 1,
+        translation: [-20, 0],
+        fitted: false,
+      })
+      reset()
+      act(() => useKoharuStore.setState({ tool: 'draw' }))
+      fireEvent.wheel(surface, { deltaY: 20, altKey: true })
+      expect(useKoharuStore.getState().brush.diameter).toBe(44)
+      expect(useKoharuStore.getState().camera).toEqual({
+        zoom: 1,
+        translation: [0, 0],
+        fitted: false,
+      })
+    },
+  )
+
+  it('treats an indistinguishable Ctrl+wheel pinch as scrolling in wheel-alone mode', () => {
+    installProject()
+    useKoharuStore.getState().setWheelZoom('wheel')
+    const surface = renderWorkspace()
+    fireEvent.wheel(surface, { deltaY: 0.5, ctrlKey: true })
+    expect(useKoharuStore.getState().camera.zoom).toBe(1)
+    expect(useKoharuStore.getState().camera.translation[1]).toBeCloseTo(-0.5)
+  })
+
   it('suppresses Alt browser handling while an editor input retains focus', () => {
     installProject()
     renderWorkspace()
@@ -293,6 +514,22 @@ describe('canvas interaction adapter', () => {
     handled.preventDefault()
     fireEvent(window, handled)
     expect(useKoharuStore.getState().tool).toBe('select')
+  })
+
+  it('matches modified and alternate tool bindings from a focused slider', () => {
+    installProject()
+    renderWorkspace()
+    const slider = document.createElement('input')
+    slider.type = 'range'
+    document.body.append(slider)
+    useKoharuStore.getState().setShortcut('text', 'alt+z')
+    useKoharuStore.getState().setShortcut('text_alt', 'f2')
+    fireEvent.keyDown(slider, { key: 'z', altKey: true })
+    expect(useKoharuStore.getState().tool).toBe('text')
+    act(() => useKoharuStore.getState().setTool('select'))
+    fireEvent.keyDown(window, { key: 'F2' })
+    expect(useKoharuStore.getState().tool).toBe('text')
+    slider.remove()
   })
 
   it('announces WebGPU startup failures and offers recovery', () => {

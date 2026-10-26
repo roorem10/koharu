@@ -459,10 +459,61 @@
       "title": "提供商"
     },
     "shortcuts": {
-      "description": "文本框呒没焦点个辰光，就好用单键快捷键。",
+      "alsoUsedBy": "{{action}}也勒用",
+      "alternate": "备用",
+      "builtIn": "内置（勿能改）",
+      "builtInDescription": "搿眼快捷键是固定个。鼠标操作搭控件专用按键也列勒搿搭供参考。",
+      "canvas": "画布",
+      "clear": "清除{{action}}快捷键",
+      "conflictBanner": "有几个快捷键用仔一样个按键。离开前请改脱一个。",
+      "ctrlWheel": "Ctrl + 滚轮",
+      "description": "每个操作可以设主要搭备用按键或者组合键。打字辰光勿会触发快捷键。",
+      "fixed": {
+        "selectAll": "选中页面浪所有文本框",
+        "delete": "删除选中个图层",
+        "cancel": "取消操作或者取色并清除选择",
+        "pan": "按牢辰光平移",
+        "nudge": "移动选中个文字1像素（画布有焦点辰光）",
+        "nudgeFast": "移动选中个文字10像素（画布有焦点辰光）",
+        "addSelection": "加到选择里向或者移出选择",
+        "rangeSelection": "选择页面或者图层范围",
+        "middlePan": "用鼠标中键平移",
+        "brush": "调整笔刷大小（笔刷工具）",
+        "horizontal": "左右滚动",
+        "font": "浏览字体／应用高亮字体",
+        "send": "发送／换行",
+        "drop": "取消拖放提示"
+      },
+      "gestures": {
+        "select": "Ctrl／Shift + 单击",
+        "range": "Shift + 单击",
+        "middle": "鼠标中键拖动",
+        "brush": "Alt + 滚轮",
+        "horizontal": "Shift + 滚轮"
+      },
+      "groups": {
+        "edit": "编辑",
+        "canvas": "画布",
+        "mouse": "鼠标",
+        "fonts": "字体选择器",
+        "agent": "智能体面板",
+        "import": "导入"
+      },
       "inputLabel": "{{action}} 快捷键",
+      "mouseWheel": "鼠标滚轮",
+      "pressKeys": "请按键…",
+      "primary": "主要",
+      "reset": "恢复默认设置",
+      "scrollVertical": "上下滚动",
       "title": "快捷键",
-      "tools": "工具"
+      "tools": "工具",
+      "unassigned": "呒没分配",
+      "usedByBuiltIn": "{{action}}用仔（内置）",
+      "wheelAlone": "光用滚轮",
+      "zoomActual": "缩放到100 %",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "zoomWith": "缩放方式"
     },
     "tabs": {
       "appearance": "外观",

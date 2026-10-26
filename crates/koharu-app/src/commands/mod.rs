@@ -101,6 +101,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             preferences::get_translation_models,
             preferences::get_shortcuts,
             preferences::save_shortcuts,
+            preferences::get_wheel_zoom,
+            preferences::save_wheel_zoom,
             canvas::get_canvas_manifest,
             canvas::get_canvas_resource,
             canvas::prepare_canvas_page,

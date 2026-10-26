@@ -32,18 +32,29 @@ import {
   usePages,
 } from '@/lib/queries'
 import {
+  findShortcut,
+  hasModifier,
+  bindingFromEvent,
+  loadShortcutLayout,
+  builtInShortcuts,
+  matchesBinding,
+} from '@/lib/shortcuts'
+import {
   isBrushTool,
   maxBrushDiameter,
   MIN_BRUSH_DIAMETER,
   receiveError,
   useKoharuStore,
   type CanvasTool,
+  type ShortcutAction,
 } from '@/lib/store'
 import { prefetchCanvasPages, workspaceColor, type CanvasColor } from '@koharu/bridge/canvas'
 import { commands, type Frame, type Point, type TransformFrame } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 
 const BRUSH_DIAMETER_STEP = 4
+export const MIN_ZOOM = 0.02
+export const MAX_ZOOM = 16
 const arrowKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
 
 const canvasCursors = {
@@ -96,6 +107,7 @@ export function CanvasWorkspace() {
   const gesture = useRef<Gesture | null>(null)
   const previousPageIndex = useRef<number | null>(null)
   const spaceHeld = useRef(false)
+  const lastZoomStep = useRef(-Infinity)
   const heldArrows = useRef(new Set<string>())
   const nudgeShift = useRef(false)
   const nudgeTimer = useRef<number | null>(null)
@@ -274,23 +286,36 @@ export function CanvasWorkspace() {
     if (useKoharuStore.getState().camera.fitted) fitCanvas()
   }, [canvas, fitCanvas])
 
-  const setZoom = useCallback((zoom: number) => {
-    const element = surface.current
-    if (!element) return
-    const bounds = element.getBoundingClientRect()
-    const dpr = window.devicePixelRatio
-    const current = useKoharuStore.getState().camera
-    const center = { x: bounds.width * dpr * 0.5, y: bounds.height * dpr * 0.5 }
-    const pageX = (center.x - current.translation[0]) / current.zoom
-    const pageY = (center.y - current.translation[1]) / current.zoom
-    useKoharuStore.setState({
-      camera: {
-        zoom,
-        translation: [center.x - pageX * zoom, center.y - pageY * zoom],
-        fitted: false,
-      },
-    })
-  }, [])
+  const setZoom = useCallback(
+    (requestedZoom: number, anchor?: Point) => {
+      const element = surface.current
+      if (!element || pageWidth === undefined || pageHeight === undefined) return
+      const bounds = element.getBoundingClientRect()
+      const dpr = window.devicePixelRatio
+      const current = useKoharuStore.getState().camera
+      const zoom = clamp(requestedZoom, MIN_ZOOM, MAX_ZOOM)
+      if (!Number.isFinite(zoom)) return
+      const point = anchor ?? { x: bounds.width * dpr * 0.5, y: bounds.height * dpr * 0.5 }
+      const pageX = (point.x - current.translation[0]) / current.zoom
+      const pageY = (point.y - current.translation[1]) / current.zoom
+      useKoharuStore.setState({
+        camera: {
+          zoom,
+          translation: clampCameraTranslation(
+            [point.x - pageX * zoom, point.y - pageY * zoom],
+            zoom,
+            pageWidth,
+            pageHeight,
+            bounds.width * dpr,
+            bounds.height * dpr,
+            dpr,
+          ),
+          fitted: false,
+        },
+      })
+    },
+    [pageHeight, pageWidth],
+  )
 
   useEffect(() => {
     const element = surface.current
@@ -360,9 +385,10 @@ export function CanvasWorkspace() {
   useEffect(() => cancelGesture, [cancelGesture, canvasGeneration, canvasRevision, page?.id, tool])
 
   useEffect(() => {
+    void loadShortcutLayout()
     // Text entry keeps every key. Other inputs, such as a slider or checkbox that keeps focus
-    // after a click, also keep their own keys (Space, arrows, Enter, Delete and modified
-    // shortcuts), but a bare tool key such as V or T means nothing to them, so it still switches
+    // after a click, also keep their own keys (Space, arrows, Enter and Delete), but a bare
+    // tool key such as V or T means nothing to them, so it still switches
     // tools. Treating every input as text entry left the tool shortcuts silently disabled until
     // the canvas was clicked again (koharu#1181).
     const textEntryTypes = new Set(['text', 'search', 'number', 'email', 'url', 'password', 'tel'])
@@ -372,20 +398,46 @@ export function CanvasWorkspace() {
       target instanceof HTMLSelectElement ||
       (target instanceof HTMLElement && target.isContentEditable)
 
-    const toolShortcut = (key: string) => {
-      const { shortcuts } = useKoharuStore.getState()
-      const lower = key.toLowerCase()
-      if (lower === shortcuts.fit) {
+    const runShortcut = (event: KeyboardEvent, next: ShortcutAction | undefined) => {
+      if (!next) return
+      if (next === 'zoom_in' || next === 'zoom_out' || next === 'zoom_actual') {
+        event.preventDefault()
+        if (!page || (next === 'zoom_actual' && event.repeat)) return
+        const now = performance.now()
+        if (event.repeat && now - lastZoomStep.current < 100) return
+        lastZoomStep.current = now
+        const current = useKoharuStore.getState().camera.zoom
+        let zoom = next === 'zoom_actual' ? 1 : next === 'zoom_in' ? current * 1.2 : current / 1.2
+        if ((current < 1 && zoom >= 1) || (current > 1 && zoom <= 1)) zoom = 1
+        setZoom(zoom)
+        return
+      }
+      if (next === 'fit') {
+        event.preventDefault()
         requestCanvasFit()
         return
       }
-      const next = (
-        ['select', 'text', 'draw', 'eraser', 'color_picker', 'remove', 'pan'] as const
-      ).find((action) => shortcuts[action] === lower)
-      if (next) setTool(next)
+      if (next) {
+        event.preventDefault()
+        setTool(next)
+      }
     }
 
     const down = (event: KeyboardEvent) => {
+      const action = findShortcut(event, useKoharuStore.getState().shortcuts)
+      const modified = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey
+      // CEF's capture-phase page-zoom blocker has already prevented the default here.
+      // Configured modifier bindings also work immediately after a range input was used.
+      const reserved = builtInShortcuts.some(
+        (entry) =>
+          entry.checked && entry.bindings.some((binding) => matchesBinding(event, binding)),
+      )
+      if (modified && action && !reserved) {
+        event.preventDefault()
+        if (event.isComposing || textEntry(event.target)) return
+        runShortcut(event, action)
+        return
+      }
       if (event.key === 'Shift' && heldArrows.current.size) nudgeShift.current = true
       if (event.key === 'Alt') {
         event.preventDefault()
@@ -394,8 +446,9 @@ export function CanvasWorkspace() {
       // A focused control or an IME composition that already handled the key keeps it.
       if (event.defaultPrevented || event.isComposing || textEntry(event.target)) return
       if (event.target instanceof HTMLInputElement) {
-        const modified = event.ctrlKey || event.metaKey || event.altKey
-        if (!modified && event.key.length === 1 && event.key !== ' ') toolShortcut(event.key)
+        const binding = bindingFromEvent(event)
+        if (binding && (hasModifier(binding) || (event.key.length === 1 && event.key !== ' ')))
+          runShortcut(event, action)
         return
       }
       const state = useKoharuStore.getState()
@@ -433,7 +486,7 @@ export function CanvasWorkspace() {
         selectLayers([])
         return
       }
-      toolShortcut(event.key)
+      runShortcut(event, action)
     }
 
     const up = (event: KeyboardEvent) => {
@@ -459,7 +512,16 @@ export function CanvasWorkspace() {
       window.removeEventListener('keyup', up)
       window.removeEventListener('blur', blur)
     }
-  }, [cancelGesture, colorSampling, finishTransform, page, requestCanvasFit, selectLayers, setTool])
+  }, [
+    cancelGesture,
+    colorSampling,
+    finishTransform,
+    page,
+    requestCanvasFit,
+    selectLayers,
+    setTool,
+    setZoom,
+  ])
 
   const clientPagePoint = (clientX: number, clientY: number) =>
     pagePoint(
@@ -884,38 +946,32 @@ export function CanvasWorkspace() {
             }
             const point = clientPhysicalPoint(event.clientX, event.clientY)
             const current = useKoharuStore.getState().camera
-            let zoom = current.zoom
-            let translation = current.translation
-            if (event.ctrlKey) {
-              zoom = clamp(current.zoom * Math.exp(-event.deltaY * 0.0015), 0.02, 16)
-              const pageX = (point.x - current.translation[0]) / current.zoom
-              const pageY = (point.y - current.translation[1]) / current.zoom
-              translation = [point.x - pageX * zoom, point.y - pageY * zoom]
-            } else {
-              const dpr = window.devicePixelRatio
-              let deltaX = event.deltaX
-              let deltaY = event.deltaY
-              if (event.shiftKey && deltaX === 0) {
-                deltaX = deltaY
-                deltaY = 0
-              }
-              translation = [
-                current.translation[0] - deltaX * dpr,
-                current.translation[1] - deltaY * dpr,
-              ]
+            const zoomGesture =
+              useKoharuStore.getState().wheelZoom === 'wheel'
+                ? !event.ctrlKey && !event.shiftKey
+                : event.ctrlKey
+            if (zoomGesture) {
+              setZoom(current.zoom * Math.exp(-event.deltaY * 0.0015), point)
+              return
             }
             const bounds = event.currentTarget.getBoundingClientRect()
             const dpr = window.devicePixelRatio
-            translation = clampCameraTranslation(
-              translation,
-              zoom,
+            let deltaX = event.deltaX
+            let deltaY = event.deltaY
+            if (event.shiftKey && deltaX === 0) {
+              deltaX = deltaY
+              deltaY = 0
+            }
+            const translation = clampCameraTranslation(
+              [current.translation[0] - deltaX * dpr, current.translation[1] - deltaY * dpr],
+              current.zoom,
               pageWidth ?? page.size.width,
               pageHeight ?? page.size.height,
               bounds.width * dpr,
               bounds.height * dpr,
               dpr,
             )
-            useKoharuStore.setState({ camera: { zoom, translation, fitted: false } })
+            useKoharuStore.setState({ camera: { zoom: current.zoom, translation, fitted: false } })
           }}
         >
           {selectionRect && (

@@ -459,10 +459,61 @@
       "title": "プロバイダー"
     },
     "shortcuts": {
-      "description": "テキスト入力欄にフォーカスがないとき、単一キーのショートカットを使用できます。",
+      "alsoUsedBy": "{{action}}でも使用中",
+      "alternate": "代替",
+      "builtIn": "固定（変更不可）",
+      "builtInDescription": "これらのショートカットは変更できません。マウス操作や各コントロール専用のキーも確認できます。",
+      "canvas": "キャンバス",
+      "clear": "{{action}}のショートカットを解除",
+      "conflictBanner": "同じキーが複数の操作に割り当てられています。移動する前に変更してください。",
+      "ctrlWheel": "Ctrl + ホイール",
+      "description": "各操作にメインと代替のキーやキーの組み合わせを設定します。文字入力中は実行されません。",
+      "fixed": {
+        "selectAll": "ページ内のすべてのテキストボックスを選択",
+        "delete": "選択したレイヤーを削除",
+        "cancel": "操作や色の取得を中止して選択を解除",
+        "pan": "押している間パン",
+        "nudge": "選択したテキストを1 px移動（キャンバスにフォーカス時）",
+        "nudgeFast": "選択したテキストを10 px移動（キャンバスにフォーカス時）",
+        "addSelection": "選択に追加／選択から除外",
+        "rangeSelection": "ページやレイヤーの範囲を選択",
+        "middlePan": "マウスの中ボタンでパン",
+        "brush": "ブラシのサイズを変更（ブラシツール）",
+        "horizontal": "左右にスクロール",
+        "font": "フォントを移動／選択中のフォントを適用",
+        "send": "送信／改行",
+        "drop": "ドロップの表示を閉じる"
+      },
+      "gestures": {
+        "select": "Ctrl／Shift + クリック",
+        "range": "Shift + クリック",
+        "middle": "中ボタンでドラッグ",
+        "brush": "Alt + ホイール",
+        "horizontal": "Shift + ホイール"
+      },
+      "groups": {
+        "edit": "編集",
+        "canvas": "キャンバス",
+        "mouse": "マウス",
+        "fonts": "フォント選択",
+        "agent": "エージェントパネル",
+        "import": "インポート"
+      },
       "inputLabel": "{{action}}のショートカット",
+      "mouseWheel": "マウスホイール",
+      "pressKeys": "キーを押してください…",
+      "primary": "メイン",
+      "reset": "既定値に戻す",
+      "scrollVertical": "上下にスクロール",
       "title": "ショートカット",
-      "tools": "ツール"
+      "tools": "ツール",
+      "unassigned": "未割り当て",
+      "usedByBuiltIn": "{{action}}で使用中（固定）",
+      "wheelAlone": "ホイールのみ",
+      "zoomActual": "100 %で表示",
+      "zoomIn": "拡大",
+      "zoomOut": "縮小",
+      "zoomWith": "拡大・縮小の操作"
     },
     "tabs": {
       "appearance": "外観",

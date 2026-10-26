@@ -459,10 +459,61 @@
       "title": "Sağlayıcılar"
     },
     "shortcuts": {
-      "description": "Tek tuşlu kısayollar, bir metin alanına odaklanılmadığında kullanılabilir.",
+      "alsoUsedBy": "{{action}} da kullanıyor",
+      "alternate": "Alternatif",
+      "builtIn": "Yerleşik (değiştirilemez)",
+      "builtInDescription": "Bu kısayollar sabittir. Fare hareketleri ve denetimlere özel tuşlar da başvuru için gösterilir.",
+      "canvas": "Tuval",
+      "clear": "{{action}} kısayolunu temizle",
+      "conflictBanner": "Birden fazla kısayol aynı tuşları kullanıyor. Ayrılmadan önce birini değiştirin.",
+      "ctrlWheel": "Ctrl + tekerlek",
+      "description": "Her işlem için birincil ve alternatif tuş veya tuş birleşimi seçin. Yazı yazarken kısayollar çalışmaz.",
+      "fixed": {
+        "selectAll": "Sayfadaki tüm metin kutularını seç",
+        "delete": "Seçili katmanları sil",
+        "cancel": "Hareketi veya renk seçimini iptal et ve seçimi temizle",
+        "pan": "Basılı tutarken kaydır",
+        "nudge": "Seçili metni 1 px taşı (tuval odaktayken)",
+        "nudgeFast": "Seçili metni 10 px taşı (tuval odaktayken)",
+        "addSelection": "Seçime ekle veya seçimden çıkar",
+        "rangeSelection": "Sayfa veya katman aralığı seç",
+        "middlePan": "Orta fare düğmesiyle kaydır",
+        "brush": "Fırça boyutunu değiştir (fırça araçları)",
+        "horizontal": "Sola/sağa kaydır",
+        "font": "Yazı tiplerine göz at / vurgulananı uygula",
+        "send": "Gönder / yeni satır",
+        "drop": "Bırakma göstergesini iptal et"
+      },
+      "gestures": {
+        "select": "Ctrl / Shift + tıklama",
+        "range": "Shift + tıklama",
+        "middle": "Orta düğmeyle sürükleme",
+        "brush": "Alt + tekerlek",
+        "horizontal": "Shift + tekerlek"
+      },
+      "groups": {
+        "edit": "Düzenle",
+        "canvas": "Tuval",
+        "mouse": "Fare",
+        "fonts": "Yazı tipi seçici",
+        "agent": "Ajan paneli",
+        "import": "İçe aktarma"
+      },
       "inputLabel": "{{action}} kısayolu",
+      "mouseWheel": "Fare tekerleği",
+      "pressKeys": "Tuşlara basın…",
+      "primary": "Birincil",
+      "reset": "Varsayılanlara sıfırla",
+      "scrollVertical": "Yukarı/aşağı kaydır",
       "title": "Kısayollar",
-      "tools": "Araçlar"
+      "tools": "Araçlar",
+      "unassigned": "Atanmamış",
+      "usedByBuiltIn": "{{action}} kullanıyor (yerleşik)",
+      "wheelAlone": "Yalnızca tekerlek",
+      "zoomActual": "%100 yakınlaştırma",
+      "zoomIn": "Yakınlaştır",
+      "zoomOut": "Uzaklaştır",
+      "zoomWith": "Yakınlaştırma hareketi"
     },
     "tabs": {
       "appearance": "Görünüm",

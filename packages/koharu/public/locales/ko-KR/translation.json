@@ -459,10 +459,61 @@
       "title": "제공자"
     },
     "shortcuts": {
-      "description": "텍스트 필드에 포커스가 없을 때 단일 키 단축키를 사용할 수 있습니다.",
+      "alsoUsedBy": "{{action}}에서도 사용 중",
+      "alternate": "보조",
+      "builtIn": "내장 (변경 불가)",
+      "builtInDescription": "이 단축키는 변경할 수 없습니다. 마우스 동작과 각 컨트롤 전용 키도 참고용으로 표시됩니다.",
+      "canvas": "캔버스",
+      "clear": "{{action}} 단축키 지우기",
+      "conflictBanner": "여러 단축키가 같은 키를 사용합니다. 나가기 전에 하나를 변경하세요.",
+      "ctrlWheel": "Ctrl + 휠",
+      "description": "각 동작의 기본 및 보조 키나 키 조합을 설정합니다. 텍스트 입력 중에는 실행되지 않습니다.",
+      "fixed": {
+        "selectAll": "페이지의 모든 텍스트 상자 선택",
+        "delete": "선택한 레이어 삭제",
+        "cancel": "동작이나 색상 추출을 취소하고 선택 해제",
+        "pan": "누르고 있는 동안 이동",
+        "nudge": "선택한 텍스트 1 px 이동 (캔버스에 초점이 있을 때)",
+        "nudgeFast": "선택한 텍스트 10 px 이동 (캔버스에 초점이 있을 때)",
+        "addSelection": "선택에 추가하거나 선택에서 제거",
+        "rangeSelection": "페이지 또는 레이어 범위 선택",
+        "middlePan": "마우스 가운데 버튼으로 이동",
+        "brush": "브러시 크기 변경 (브러시 도구)",
+        "horizontal": "좌우 스크롤",
+        "font": "글꼴 탐색 / 강조된 글꼴 적용",
+        "send": "전송 / 줄바꿈",
+        "drop": "드롭 안내 취소"
+      },
+      "gestures": {
+        "select": "Ctrl / Shift + 클릭",
+        "range": "Shift + 클릭",
+        "middle": "마우스 가운데 버튼 드래그",
+        "brush": "Alt + 휠",
+        "horizontal": "Shift + 휠"
+      },
+      "groups": {
+        "edit": "편집",
+        "canvas": "캔버스",
+        "mouse": "마우스",
+        "fonts": "글꼴 선택기",
+        "agent": "에이전트 패널",
+        "import": "가져오기"
+      },
       "inputLabel": "{{action}} 단축키",
+      "mouseWheel": "마우스 휠",
+      "pressKeys": "키를 누르세요…",
+      "primary": "기본",
+      "reset": "기본값으로 초기화",
+      "scrollVertical": "위아래 스크롤",
       "title": "단축키",
-      "tools": "도구"
+      "tools": "도구",
+      "unassigned": "할당 안 됨",
+      "usedByBuiltIn": "{{action}}에서 사용 중 (내장)",
+      "wheelAlone": "휠만 사용",
+      "zoomActual": "100 %로 보기",
+      "zoomIn": "확대",
+      "zoomOut": "축소",
+      "zoomWith": "확대/축소 방법"
     },
     "tabs": {
       "appearance": "모양",
