@@ -2,6 +2,7 @@
   "about": {
     "author": "المؤلف",
     "description": "أدوات ترجمة المانغا",
+    "forkVersion": "إصدار النسخة المشتقة",
     "unavailable": "غير متاح",
     "version": "الإصدار"
   },

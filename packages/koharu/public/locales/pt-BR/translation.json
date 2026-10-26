@@ -2,6 +2,7 @@
   "about": {
     "author": "Autor",
     "description": "Ferramentas de tradução de mangá",
+    "forkVersion": "Versão do fork",
     "unavailable": "Indisponível",
     "version": "Versão"
   },

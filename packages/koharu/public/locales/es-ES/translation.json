@@ -2,6 +2,7 @@
   "about": {
     "author": "Autor",
     "description": "Herramientas de traducción de manga",
+    "forkVersion": "Versión del fork",
     "unavailable": "No disponible",
     "version": "Versión"
   },
