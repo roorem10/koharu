@@ -6,6 +6,7 @@ import { CanvasWorkspace } from '@/components/editor/CanvasWorkspace'
 import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type Layer } from '@koharu/bridge/protocol'
+import { Slider } from '@koharu/ui/components/slider'
 import { TooltipProvider } from '@koharu/ui/components/tooltip'
 
 const canvas = vi.hoisted(() => ({
@@ -47,7 +48,7 @@ vi.mock('@koharu/bridge/canvas', () => ({
   workspaceColor: () => [245, 245, 245],
 }))
 
-const layer: Layer = {
+const layer: Extract<Layer, { type: 'image' }> = {
   type: 'image',
   id: 'element',
   parent: 'page',
@@ -92,7 +93,10 @@ beforeEach(() => {
   prefetchCanvasPages.mockClear()
 })
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 
 function installProject() {
   const page = {
@@ -117,6 +121,41 @@ function installProject() {
     canvasRevision: 1,
     canvasGeneration: 1,
     canvasSize: [1000, 1000],
+  })
+}
+
+function installNudgeProject() {
+  installProject()
+
+  queryClient.setQueryData(pageKey, (page: { layers: Layer[] }) => ({
+    ...page,
+    layers: [
+      {
+        type: 'text',
+        id: 'element',
+        parent: 'page',
+        geometry: layer.geometry,
+        angle_degrees: 0,
+        visibility: { visible: true, opacity: 1 },
+        content: {
+          id: 'content',
+          source: { text: 'Source', language: 'en' },
+          translation: { text: 'Rendered', language: null },
+          role: null,
+          source_region: null,
+        },
+        typography: null,
+        layout: 'paragraph',
+        automatic_region: null,
+      },
+    ],
+  }))
+
+  useKoharuStore.setState({
+    selectedLayers: ['element'],
+    layerFrames: {
+      element: { x: 30, y: 40, width: 50, height: 20, angle_degrees: 0 },
+    },
   })
 }
 
@@ -294,6 +333,187 @@ describe('canvas interaction adapter', () => {
       diameter: 48,
       color: [255, 255, 255, 255],
     })
+  })
+  it.each([
+    {
+      keys: ['ArrowRight'],
+      repeat: 'ArrowRight',
+      release: 'ArrowRight',
+      expected: { x: 32, y: 40 },
+    },
+    {
+      keys: ['ArrowUp', 'ArrowRight'],
+      repeat: 'ArrowRight',
+      release: 'ArrowRight',
+      expected: { x: 32, y: 36 },
+    },
+    {
+      keys: ['ArrowRight', 'ArrowUp'],
+      repeat: 'ArrowUp',
+      release: 'ArrowRight',
+      expected: { x: 33, y: 37 },
+    },
+    {
+      keys: ['ArrowLeft', 'ArrowRight'],
+      repeat: 'ArrowRight',
+      release: 'ArrowRight',
+      expected: { x: 28, y: 40 },
+    },
+    {
+      keys: ['ArrowUp', 'ArrowDown'],
+      repeat: 'ArrowDown',
+      release: 'ArrowDown',
+      expected: { x: 30, y: 38 },
+    },
+  ])('text box nudge with arrow key: $keys', async ({ keys, repeat, release, expected }) => {
+    vi.useFakeTimers()
+    installNudgeProject()
+
+    const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(2)
+    const surface = renderWorkspace()
+
+    act(() =>
+      useKoharuStore.setState({
+        camera: { zoom: 4, translation: [0, 0], fitted: false },
+      }),
+    )
+
+    for (const key of keys) fireEvent.keyDown(surface, { key })
+
+    act(() => {
+      vi.advanceTimersByTime(300)
+    })
+
+    fireEvent.keyDown(surface, { key: repeat, repeat: true })
+
+    fireEvent.keyUp(surface, { key: release })
+    const remaining = keys.filter((key) => key !== release)
+
+    if (remaining.length) {
+      expect(commit).not.toHaveBeenCalled()
+    }
+
+    act(() => {
+      vi.advanceTimersByTime(30)
+    })
+
+    for (const key of remaining) {
+      fireEvent.keyUp(surface, { key })
+    }
+
+    vi.useRealTimers()
+
+    await waitFor(() =>
+      expect(commit).toHaveBeenCalledWith(
+        1,
+        [
+          {
+            element: 'element',
+            frame: {
+              ...expected,
+              width: 50,
+              height: 20,
+              angle_degrees: 0,
+            },
+          },
+        ],
+        false,
+      ),
+    )
+  })
+  it('commits one continuous arrow hold once and blocks pointer gestures during it', async () => {
+    vi.useFakeTimers()
+    installNudgeProject()
+    const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(2)
+    const surface = renderWorkspace()
+
+    fireEvent.keyDown(surface, { key: 'ArrowRight' })
+    act(() => vi.advanceTimersByTime(1000))
+    fireEvent.pointerDown(surface, { button: 0, pointerId: 7, clientX: 200, clientY: 200 })
+    expect(useKoharuStore.getState().selectedLayers).toEqual(['element'])
+    expect(canvas.beginTransform).toHaveBeenCalledOnce()
+    expect(commit).not.toHaveBeenCalled()
+
+    fireEvent.keyUp(surface, { key: 'ArrowRight' })
+    vi.useRealTimers()
+    await waitFor(() =>
+      expect(commit).toHaveBeenCalledExactlyOnceWith(
+        1,
+        [{ element: 'element', frame: { x: 55, y: 40, width: 50, height: 20, angle_degrees: 0 } }],
+        false,
+      ),
+    )
+  })
+
+  it('commits separate arrow taps as separate undo steps', async () => {
+    installNudgeProject()
+    const commit = vi
+      .spyOn(commands, 'commitTransform')
+      .mockImplementation(async (revision, frames) => {
+        useKoharuStore.setState({
+          canvasRevision: revision + 1,
+          layerFrames: Object.fromEntries(frames.map(({ element, frame }) => [element, frame])),
+        })
+        return revision + 1
+      })
+    const surface = renderWorkspace()
+
+    for (let index = 0; index < 4; index++) {
+      await act(async () => {
+        fireEvent.keyDown(surface, { key: 'ArrowRight' })
+        fireEvent.keyUp(surface, { key: 'ArrowRight' })
+      })
+      expect(commit).toHaveBeenNthCalledWith(
+        index + 1,
+        index + 1,
+        [
+          {
+            element: 'element',
+            frame: { x: 31 + index, y: 40, width: 50, height: 20, angle_degrees: 0 },
+          },
+        ],
+        false,
+      )
+    }
+    expect(commit).toHaveBeenCalledTimes(4)
+  })
+
+  it('leaves arrow keys to a focused slider without nudging selected text', async () => {
+    installNudgeProject()
+    const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(2)
+    renderWorkspace()
+    render(<Slider defaultValue={50} />)
+    const sliders = await screen.findAllByRole('slider', { hidden: true })
+    const slider = sliders.at(-1)!
+    act(() => slider.focus())
+
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
+    fireEvent.keyUp(slider, { key: 'ArrowRight' })
+
+    expect(slider).toHaveAttribute('aria-valuenow', '51')
+    expect(canvas.beginTransform).not.toHaveBeenCalled()
+    expect(commit).not.toHaveBeenCalled()
+  })
+
+  it.each(['Escape', 'blur', 'pointercancel'])('stops a held nudge on %s', async (reason) => {
+    vi.useFakeTimers()
+    installNudgeProject()
+    const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(2)
+    const surface = renderWorkspace()
+    fireEvent.keyDown(surface, { key: 'ArrowRight' })
+    if (reason === 'Escape') fireEvent.keyDown(surface, { key: 'Escape' })
+    else if (reason === 'blur') fireEvent(window, new Event('blur'))
+    else fireEvent.pointerCancel(surface)
+    act(() => vi.advanceTimersByTime(1000))
+    fireEvent.keyUp(surface, { key: 'ArrowRight' })
+    vi.useRealTimers()
+
+    if (reason === 'blur') await waitFor(() => expect(commit).toHaveBeenCalledOnce())
+    else {
+      expect(canvas.cancelTransform).toHaveBeenCalledOnce()
+      expect(commit).not.toHaveBeenCalled()
+    }
+    expect(canvas.updateTransform).toHaveBeenCalledTimes(reason === 'blur' ? 1 : 0)
   })
 
   it.each([
