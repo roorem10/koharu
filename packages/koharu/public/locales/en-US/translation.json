@@ -459,10 +459,53 @@
       "title": "Providers"
     },
     "shortcuts": {
-      "description": "Single-key shortcuts are available whenever a text field is not focused.",
+      "alsoUsedBy": "Also used by {{action}}",
+      "alternate": "Alternate",
+      "builtIn": "Built-in (can’t be changed)",
+      "builtInDescription": "These shortcuts are fixed. Mouse and control-specific keys are listed for reference.",
+      "canvas": "Canvas",
+      "clear": "Clear {{action}} shortcut",
+      "conflictBanner": "Two shortcuts use the same keys. Change one before leaving.",
+      "description": "Choose a primary and alternate key or key combination for each action. Shortcuts do not run while typing.",
+      "fixed": {
+        "selectAll": "Select all text boxes on the page",
+        "delete": "Delete selected layers",
+        "cancel": "Cancel gesture or color pick and clear selection",
+        "pan": "Pan while held",
+        "nudge": "Move selected text 1 px (canvas focused)",
+        "nudgeFast": "Move selected text 10 px (canvas focused)",
+        "addSelection": "Add to or remove from selection",
+        "rangeSelection": "Select a range in pages or layers",
+        "middlePan": "Pan with the middle mouse button",
+        "brush": "Change brush size (brush tools)",
+        "horizontal": "Scroll left/right",
+        "font": "Browse fonts / apply highlighted font",
+        "send": "Send / new line",
+        "drop": "Cancel the drop overlay"
+      },
+      "gestures": {
+        "select": "Ctrl / Shift + click",
+        "range": "Shift + click",
+        "middle": "Middle mouse drag",
+        "brush": "Alt + wheel",
+        "horizontal": "Shift + wheel"
+      },
+      "groups": {
+        "edit": "Edit",
+        "canvas": "Canvas",
+        "mouse": "Mouse",
+        "fonts": "Font picker",
+        "agent": "Agent panel",
+        "import": "Import"
+      },
       "inputLabel": "{{action}} shortcut",
+      "pressKeys": "Press keys…",
+      "primary": "Primary",
+      "reset": "Reset to defaults",
       "title": "Shortcuts",
-      "tools": "Tools"
+      "tools": "Tools",
+      "unassigned": "Unassigned",
+      "usedByBuiltIn": "Used by {{action}} (built-in)"
     },
     "tabs": {
       "appearance": "Appearance",

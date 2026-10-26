@@ -17,6 +17,8 @@ import type {
 } from '@koharu/bridge/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
+import { isBinding } from './shortcuts'
+
 export type CanvasTool = 'select' | 'text' | 'draw' | 'eraser' | 'color_picker' | 'remove' | 'pan'
 export const MIN_BRUSH_DIAMETER = 1
 export function maxBrushDiameter(size: PageSize): number {
@@ -35,7 +37,8 @@ export interface CanvasBrush {
 }
 export type InspectorSection = 'copy' | 'type' | 'layers'
 export type ShortcutAction = CanvasTool | 'fit'
-export type Shortcuts = Record<ShortcutAction, string>
+export type ShortcutSlot = ShortcutAction | `${ShortcutAction}_alt`
+export type Shortcuts = Record<ShortcutSlot, string>
 export type PipelineScope = 'page' | 'selected-pages' | 'project'
 export const pipelineStages: readonly Stage[] = ['detection', 'ocr', 'translation', 'inpainting']
 
@@ -72,7 +75,8 @@ interface KoharuStore {
   selectLayers: (layers: EntityId[]) => void
   setTool: (tool: CanvasTool) => void
   setBrush: (brush: CanvasBrush) => void
-  setShortcut: (action: ShortcutAction, key: string) => void
+  setShortcut: (slot: ShortcutSlot, binding: string) => void
+  setShortcuts: (shortcuts: Shortcuts) => void
   requestCanvasFit: () => void
   dismissJob: (id: string) => void
   dismissDownload: (id: number) => void
@@ -87,6 +91,14 @@ export const defaultShortcuts: Shortcuts = {
   remove: 'j',
   pan: 'h',
   fit: '0',
+  select_alt: '',
+  text_alt: '',
+  draw_alt: '',
+  eraser_alt: '',
+  color_picker_alt: '',
+  remove_alt: '',
+  pan_alt: '',
+  fit_alt: '',
 }
 
 export const useKoharuStore = create<KoharuStore>()((set) => ({
@@ -122,10 +134,11 @@ export const useKoharuStore = create<KoharuStore>()((set) => ({
   selectLayers: (selectedLayers) => set({ selectedLayers: [...new Set(selectedLayers)] }),
   setTool: (tool) => set({ tool }),
   setBrush: (brush) => set({ brush }),
-  setShortcut: (action, key) =>
+  setShortcut: (slot, binding) =>
     set((state) => ({
-      shortcuts: { ...state.shortcuts, [action]: key.toLowerCase().slice(0, 1) },
+      shortcuts: { ...state.shortcuts, [slot]: binding },
     })),
+  setShortcuts: (shortcuts) => set({ shortcuts: { ...shortcuts } }),
   requestCanvasFit: () => set((state) => ({ fitCanvasRequest: state.fitCanvasRequest + 1 })),
   dismissJob: (id) =>
     set((state) => {
@@ -153,9 +166,9 @@ export function receiveStartupState(state: StartupState): void {
 /** Apply saved shortcut keys over the defaults, ignoring actions the editor no longer has. */
 export function receiveShortcuts(saved: Partial<{ [key in string]: string }>): void {
   const shortcuts = { ...defaultShortcuts }
-  for (const action of Object.keys(defaultShortcuts) as ShortcutAction[]) {
-    const key = saved[action]
-    if (typeof key === 'string') shortcuts[action] = key.toLowerCase().slice(0, 1)
+  for (const slot of Object.keys(defaultShortcuts) as ShortcutSlot[]) {
+    const binding = saved[slot]
+    if (typeof binding === 'string' && isBinding(binding)) shortcuts[slot] = binding
   }
   useKoharuStore.setState({ shortcuts })
 }

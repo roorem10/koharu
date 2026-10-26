@@ -459,10 +459,53 @@
       "title": "提供者"
     },
     "shortcuts": {
-      "description": "當文字欄位未取得焦點時，可以使用單鍵快捷鍵。",
+      "alsoUsedBy": "{{action}}也在使用",
+      "alternate": "備用",
+      "builtIn": "內建（無法變更）",
+      "builtInDescription": "這些快捷鍵無法變更。滑鼠操作和控制項專用按鍵也列在此處供參考。",
+      "canvas": "畫布",
+      "clear": "清除{{action}}快捷鍵",
+      "conflictBanner": "多個快捷鍵使用相同的按鍵。離開前請修改其中一個。",
+      "description": "為每個操作設定主要和備用按鍵或組合鍵。輸入文字時不會觸發快捷鍵。",
+      "fixed": {
+        "selectAll": "選取頁面上的所有文字框",
+        "delete": "刪除所選圖層",
+        "cancel": "取消操作或取色並清除選取",
+        "pan": "按住時平移",
+        "nudge": "移動所選文字1像素（畫布取得焦點時）",
+        "nudgeFast": "移動所選文字10像素（畫布取得焦點時）",
+        "addSelection": "加入選取或從選取中移除",
+        "rangeSelection": "選取頁面或圖層範圍",
+        "middlePan": "使用滑鼠中鍵平移",
+        "brush": "調整筆刷大小（筆刷工具）",
+        "horizontal": "左右捲動",
+        "font": "瀏覽字型／套用反白字型",
+        "send": "傳送／換行",
+        "drop": "取消拖放提示"
+      },
+      "gestures": {
+        "select": "Ctrl／Shift + 按一下",
+        "range": "Shift + 按一下",
+        "middle": "滑鼠中鍵拖曳",
+        "brush": "Alt + 滾輪",
+        "horizontal": "Shift + 滾輪"
+      },
+      "groups": {
+        "edit": "編輯",
+        "canvas": "畫布",
+        "mouse": "滑鼠",
+        "fonts": "字型選擇器",
+        "agent": "代理面板",
+        "import": "匯入"
+      },
       "inputLabel": "{{action}} 快速鍵",
+      "pressKeys": "請按鍵…",
+      "primary": "主要",
+      "reset": "還原預設值",
       "title": "快捷鍵",
-      "tools": "工具"
+      "tools": "工具",
+      "unassigned": "未指派",
+      "usedByBuiltIn": "{{action}}已使用（內建）"
     },
     "tabs": {
       "appearance": "外觀",

@@ -459,10 +459,53 @@
       "title": "Proveedores"
     },
     "shortcuts": {
-      "description": "Los atajos de una tecla están disponibles cuando ningún campo de texto tiene el foco.",
+      "alsoUsedBy": "También lo usa {{action}}",
+      "alternate": "Alternativa",
+      "builtIn": "Integrados (no editables)",
+      "builtInDescription": "Estos atajos son fijos. Los gestos del ratón y las teclas de cada control se muestran como referencia.",
+      "canvas": "Lienzo",
+      "clear": "Borrar el atajo de {{action}}",
+      "conflictBanner": "Varios atajos usan las mismas teclas. Cambia uno antes de salir.",
+      "description": "Elige una tecla o combinación principal y alternativa para cada acción. Los atajos no se ejecutan al escribir.",
+      "fixed": {
+        "selectAll": "Seleccionar todos los cuadros de texto de la página",
+        "delete": "Eliminar las capas seleccionadas",
+        "cancel": "Cancelar el gesto o el cuentagotas y quitar la selección",
+        "pan": "Desplazar mientras se mantiene pulsado",
+        "nudge": "Mover el texto seleccionado 1 px (con foco en el lienzo)",
+        "nudgeFast": "Mover el texto seleccionado 10 px (con foco en el lienzo)",
+        "addSelection": "Añadir o quitar de la selección",
+        "rangeSelection": "Seleccionar un intervalo de páginas o capas",
+        "middlePan": "Desplazar con el botón central del ratón",
+        "brush": "Cambiar el tamaño del pincel (herramientas de pincel)",
+        "horizontal": "Desplazar a izquierda/derecha",
+        "font": "Explorar fuentes / aplicar la resaltada",
+        "send": "Enviar / nueva línea",
+        "drop": "Cancelar el indicador de arrastre"
+      },
+      "gestures": {
+        "select": "Ctrl / Mayús + clic",
+        "range": "Mayús + clic",
+        "middle": "Arrastrar con el botón central",
+        "brush": "Alt + rueda",
+        "horizontal": "Mayús + rueda"
+      },
+      "groups": {
+        "edit": "Edición",
+        "canvas": "Lienzo",
+        "mouse": "Ratón",
+        "fonts": "Selector de fuentes",
+        "agent": "Panel del agente",
+        "import": "Importación"
+      },
       "inputLabel": "Atajo de {{action}}",
+      "pressKeys": "Pulsa las teclas…",
+      "primary": "Principal",
+      "reset": "Restablecer valores predeterminados",
       "title": "Atajos",
-      "tools": "Herramientas"
+      "tools": "Herramientas",
+      "unassigned": "Sin asignar",
+      "usedByBuiltIn": "Lo usa {{action}} (integrado)"
     },
     "tabs": {
       "appearance": "Apariencia",

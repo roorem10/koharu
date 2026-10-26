@@ -23,16 +23,15 @@ import {
   PreferenceSection,
 } from '@/components/preferences/PreferenceFields'
 import { ProviderPreferences } from '@/components/preferences/ProviderPreferences'
+import {
+  ShortcutPreferences,
+  type ShortcutPreferencesHandle,
+} from '@/components/preferences/ShortcutPreferences'
 import { TranslationPreferences } from '@/components/preferences/TranslationPreferences'
 import { TypesettingPreferences } from '@/components/preferences/TypesettingPreferences'
-import {
-  refreshPreferences,
-  refreshTranslationModels,
-  savePreferences,
-  saveShortcuts,
-} from '@/lib/backend'
+import { refreshPreferences, refreshTranslationModels, savePreferences } from '@/lib/backend'
 import { supportedLanguages } from '@/lib/i18n'
-import { receivePreferences, useKoharuStore, type ShortcutAction } from '@/lib/store'
+import { receivePreferences, useKoharuStore } from '@/lib/store'
 import {
   type PipelineConfig,
   type Preferences,
@@ -40,7 +39,6 @@ import {
   type TypesettingConfig,
 } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
-import { Input } from '@koharu/ui/components/input'
 import { ScrollArea } from '@koharu/ui/components/scroll-area'
 import {
   Select,
@@ -67,6 +65,7 @@ export function SettingsPage() {
   const preferences = useKoharuStore((state) => state.preferences)
   const translationModels = useKoharuStore((state) => state.translationModels)
   const [tab, setTab] = useState<Tab>('appearance')
+  const shortcutPreferences = useRef<ShortcutPreferencesHandle>(null)
   const [pipeline, setPipeline] = useState<PipelineConfig | null>(preferences?.pipeline ?? null)
   const [providers, setProviders] = useState<ProviderSettings | null>(
     preferences?.providers ?? null,
@@ -166,6 +165,7 @@ export function SettingsPage() {
           variant='ghost'
           className='mb-5 h-9 justify-start gap-2 rounded-lg px-2 text-[12px] text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground'
           onClick={() => {
+            if (shortcutPreferences.current?.canLeave() === false) return
             if (!pipeline || !providers || !typesetting) {
               setOpen(false)
               return
@@ -189,7 +189,10 @@ export function SettingsPage() {
               size='sm'
               data-active={tab === id}
               className='h-10 w-full justify-start gap-3 rounded-lg px-3 text-left text-[12px] text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground'
-              onClick={() => setTab(id)}
+              onClick={() => {
+                if (id !== tab && shortcutPreferences.current?.canLeave() === false) return
+                setTab(id)
+              }}
             >
               <Icon className='size-4' /> {t(`settings.tabs.${id}`)}
             </Button>
@@ -235,7 +238,7 @@ export function SettingsPage() {
               ) : (
                 <LoadingPreferences />
               ))}
-            {tab === 'shortcuts' && <ShortcutPreferences />}
+            {tab === 'shortcuts' && <ShortcutPreferences ref={shortcutPreferences} />}
           </div>
         </ScrollArea>
       </main>
@@ -303,58 +306,7 @@ function AppearancePreferences() {
   )
 }
 
-function ShortcutPreferences() {
-  const { t } = useTranslation()
-  const shortcuts = useKoharuStore((state) => state.shortcuts)
-  const setShortcut = useKoharuStore((state) => state.setShortcut)
-  const actions: ShortcutAction[] = [
-    'select',
-    'text',
-    'draw',
-    'eraser',
-    'color_picker',
-    'remove',
-    'pan',
-    'fit',
-  ]
-  return (
-    <PreferencePage
-      title={t('settings.shortcuts.title')}
-      description={t('settings.shortcuts.description')}
-    >
-      <PreferenceSection title={t('settings.shortcuts.tools')}>
-        {actions.map((action) => (
-          <PreferenceRow key={action} title={t(shortcutKeys[action])}>
-            <Input
-              aria-label={t('settings.shortcuts.inputLabel', { action: t(shortcutKeys[action]) })}
-              maxLength={1}
-              value={shortcuts[action]}
-              className='ml-auto h-8 w-14 text-center text-[12px] uppercase'
-              onChange={(event) => {
-                setShortcut(action, event.currentTarget.value)
-                // Persist natively so the change survives a restart (koharu#1136).
-                void saveShortcuts(useKoharuStore.getState().shortcuts).catch(() => undefined)
-              }}
-            />
-          </PreferenceRow>
-        ))}
-      </PreferenceSection>
-    </PreferencePage>
-  )
-}
-
 function LoadingPreferences() {
   const { t } = useTranslation()
   return <p className='py-10 text-[12px] text-muted-foreground'>{t('settings.loading')}</p>
-}
-
-const shortcutKeys: Record<ShortcutAction, string> = {
-  select: 'tools.select',
-  text: 'tools.text',
-  draw: 'tools.draw',
-  eraser: 'tools.eraser',
-  color_picker: 'tools.color_picker',
-  remove: 'tools.remove',
-  pan: 'tools.pan',
-  fit: 'canvas.fit',
 }

@@ -295,6 +295,22 @@ describe('canvas interaction adapter', () => {
     expect(useKoharuStore.getState().tool).toBe('select')
   })
 
+  it('matches modified and alternate tool bindings from a focused slider', () => {
+    installProject()
+    renderWorkspace()
+    const slider = document.createElement('input')
+    slider.type = 'range'
+    document.body.append(slider)
+    useKoharuStore.getState().setShortcut('text', 'alt+z')
+    useKoharuStore.getState().setShortcut('text_alt', 'f2')
+    fireEvent.keyDown(slider, { key: 'z', altKey: true })
+    expect(useKoharuStore.getState().tool).toBe('text')
+    act(() => useKoharuStore.getState().setTool('select'))
+    fireEvent.keyDown(window, { key: 'F2' })
+    expect(useKoharuStore.getState().tool).toBe('text')
+    slider.remove()
+  })
+
   it('announces WebGPU startup failures and offers recovery', () => {
     installProject()
     canvasState.status = 'error'

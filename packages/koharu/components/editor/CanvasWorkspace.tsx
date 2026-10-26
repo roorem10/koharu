@@ -31,6 +31,7 @@ import {
   usePage,
   usePages,
 } from '@/lib/queries'
+import { findShortcut, hasModifier, bindingFromEvent, loadShortcutLayout } from '@/lib/shortcuts'
 import {
   isBrushTool,
   maxBrushDiameter,
@@ -360,6 +361,7 @@ export function CanvasWorkspace() {
   useEffect(() => cancelGesture, [cancelGesture, canvasGeneration, canvasRevision, page?.id, tool])
 
   useEffect(() => {
+    void loadShortcutLayout()
     // Text entry keeps every key. Other inputs, such as a slider or checkbox that keeps focus
     // after a click, also keep their own keys (Space, arrows, Enter, Delete and modified
     // shortcuts), but a bare tool key such as V or T means nothing to them, so it still switches
@@ -372,17 +374,18 @@ export function CanvasWorkspace() {
       target instanceof HTMLSelectElement ||
       (target instanceof HTMLElement && target.isContentEditable)
 
-    const toolShortcut = (key: string) => {
+    const toolShortcut = (event: KeyboardEvent) => {
       const { shortcuts } = useKoharuStore.getState()
-      const lower = key.toLowerCase()
-      if (lower === shortcuts.fit) {
+      const next = findShortcut(event, shortcuts)
+      if (next === 'fit') {
+        event.preventDefault()
         requestCanvasFit()
         return
       }
-      const next = (
-        ['select', 'text', 'draw', 'eraser', 'color_picker', 'remove', 'pan'] as const
-      ).find((action) => shortcuts[action] === lower)
-      if (next) setTool(next)
+      if (next) {
+        event.preventDefault()
+        setTool(next)
+      }
     }
 
     const down = (event: KeyboardEvent) => {
@@ -394,8 +397,9 @@ export function CanvasWorkspace() {
       // A focused control or an IME composition that already handled the key keeps it.
       if (event.defaultPrevented || event.isComposing || textEntry(event.target)) return
       if (event.target instanceof HTMLInputElement) {
-        const modified = event.ctrlKey || event.metaKey || event.altKey
-        if (!modified && event.key.length === 1 && event.key !== ' ') toolShortcut(event.key)
+        const binding = bindingFromEvent(event)
+        if (binding && (hasModifier(binding) || (event.key.length === 1 && event.key !== ' ')))
+          toolShortcut(event)
         return
       }
       const state = useKoharuStore.getState()
@@ -433,7 +437,7 @@ export function CanvasWorkspace() {
         selectLayers([])
         return
       }
-      toolShortcut(event.key)
+      toolShortcut(event)
     }
 
     const up = (event: KeyboardEvent) => {

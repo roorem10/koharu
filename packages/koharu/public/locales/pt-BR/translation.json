@@ -459,10 +459,53 @@
       "title": "Provedores"
     },
     "shortcuts": {
-      "description": "Atalhos de uma tecla ficam disponíveis quando nenhum campo de texto está em foco.",
+      "alsoUsedBy": "Também usado por {{action}}",
+      "alternate": "Alternativo",
+      "builtIn": "Integrados (não editáveis)",
+      "builtInDescription": "Estes atalhos são fixos. Gestos do mouse e teclas específicas dos controles são exibidos como referência.",
+      "canvas": "Tela",
+      "clear": "Limpar o atalho de {{action}}",
+      "conflictBanner": "Vários atalhos usam as mesmas teclas. Altere um antes de sair.",
+      "description": "Escolha uma tecla ou combinação principal e alternativa para cada ação. Os atalhos não são executados durante a digitação.",
+      "fixed": {
+        "selectAll": "Selecionar todas as caixas de texto da página",
+        "delete": "Excluir camadas selecionadas",
+        "cancel": "Cancelar gesto ou conta-gotas e limpar seleção",
+        "pan": "Mover a visualização enquanto mantém pressionado",
+        "nudge": "Mover texto selecionado 1 px (com foco na tela)",
+        "nudgeFast": "Mover texto selecionado 10 px (com foco na tela)",
+        "addSelection": "Adicionar ou remover da seleção",
+        "rangeSelection": "Selecionar intervalo de páginas ou camadas",
+        "middlePan": "Mover a visualização com o botão do meio",
+        "brush": "Alterar tamanho do pincel (ferramentas de pincel)",
+        "horizontal": "Rolar para esquerda/direita",
+        "font": "Navegar pelas fontes / aplicar a destacada",
+        "send": "Enviar / nova linha",
+        "drop": "Cancelar o indicador de arrastar"
+      },
+      "gestures": {
+        "select": "Ctrl / Shift + clique",
+        "range": "Shift + clique",
+        "middle": "Arrastar com o botão do meio",
+        "brush": "Alt + roda",
+        "horizontal": "Shift + roda"
+      },
+      "groups": {
+        "edit": "Edição",
+        "canvas": "Tela",
+        "mouse": "Mouse",
+        "fonts": "Seletor de fontes",
+        "agent": "Painel do agente",
+        "import": "Importação"
+      },
       "inputLabel": "Atalho de {{action}}",
+      "pressKeys": "Pressione as teclas…",
+      "primary": "Principal",
+      "reset": "Restaurar padrões",
       "title": "Atalhos",
-      "tools": "Ferramentas"
+      "tools": "Ferramentas",
+      "unassigned": "Não atribuído",
+      "usedByBuiltIn": "Usado por {{action}} (integrado)"
     },
     "tabs": {
       "appearance": "Aparência",

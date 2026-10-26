@@ -229,8 +229,7 @@ pub(crate) async fn save_shortcuts(
                 && action
                     .chars()
                     .all(|character| character.is_ascii_alphanumeric() || character == '_')
-                && key.chars().count() <= 1
-                && !key.chars().any(char::is_control)
+                && valid_shortcut_binding(key)
         });
     if !valid {
         return Err(anyhow::anyhow!("invalid keyboard shortcuts").into());
@@ -240,4 +239,86 @@ pub(crate) async fn save_shortcuts(
     preferences.keys = shortcuts.clone();
     preferences.save()?;
     Ok(shortcuts)
+}
+
+fn valid_shortcut_binding(binding: &str) -> bool {
+    if binding.is_empty() {
+        return true;
+    }
+    if binding.chars().count() > 32 || binding != binding.to_lowercase() {
+        return false;
+    }
+    let mut parts = binding.split('+');
+    let key = parts.next_back().unwrap_or_default();
+    let mut previous = None;
+    for modifier in parts {
+        let Some(index) = ["ctrl", "alt", "shift"]
+            .iter()
+            .position(|value| *value == modifier)
+        else {
+            return false;
+        };
+        if previous.is_some_and(|previous| index <= previous) {
+            return false;
+        }
+        previous = Some(index);
+    }
+    let printable = key.chars().count() == 1
+        && !key
+            .chars()
+            .any(|character| character.is_control() || character.is_whitespace());
+    let named = key == "plus"
+        || key == "numpadadd"
+        || key == "numpadsubtract"
+        || (key
+            .strip_prefix("numpad")
+            .is_some_and(|number| number.len() == 1 && number.as_bytes()[0].is_ascii_digit()))
+        || (1..=12).any(|number| key == format!("f{number}"));
+    printable || named
+}
+
+#[cfg(test)]
+mod shortcut_tests {
+    use super::valid_shortcut_binding;
+
+    #[test]
+    fn validates_shortcut_bindings() {
+        for binding in [
+            "",
+            "v",
+            "-",
+            "=",
+            ",",
+            "é",
+            "ctrl+plus",
+            "ctrl+shift+=",
+            "alt+z",
+            "ctrl+alt+shift+numpad9",
+            "numpadadd",
+            "ctrl+numpadsubtract",
+            "f1",
+            "f12",
+        ] {
+            assert!(valid_shortcut_binding(binding), "{binding:?}");
+        }
+        for binding in [
+            "Ctrl+z",
+            "ctrl+ctrl+z",
+            "shift+ctrl+z",
+            "meta+z",
+            "ctrl+",
+            "ctrl++",
+            "abc",
+            "f0",
+            "f13",
+            "numpad10",
+            "numpadmultiply",
+            "\n",
+            " ",
+            "delete",
+            "ctrl+alt+shift+numpadsubtractextra",
+        ] {
+            assert!(!valid_shortcut_binding(binding), "{binding:?}");
+        }
+    }
 }

@@ -459,10 +459,53 @@
       "title": "提供商"
     },
     "shortcuts": {
-      "description": "当文本字段未获得焦点时，可以使用单键快捷键。",
+      "alsoUsedBy": "{{action}}也在使用",
+      "alternate": "备用",
+      "builtIn": "内置（不可更改）",
+      "builtInDescription": "这些快捷键不可更改。鼠标操作和控件专用按键也列在此处供参考。",
+      "canvas": "画布",
+      "clear": "清除{{action}}快捷键",
+      "conflictBanner": "多个快捷键使用了相同的按键。离开前请修改其中一个。",
+      "description": "为每个操作设置主要和备用按键或组合键。输入文字时不会触发快捷键。",
+      "fixed": {
+        "selectAll": "选择页面上的所有文本框",
+        "delete": "删除所选图层",
+        "cancel": "取消操作或取色并清除选择",
+        "pan": "按住时平移",
+        "nudge": "移动所选文本1像素（画布获得焦点时）",
+        "nudgeFast": "移动所选文本10像素（画布获得焦点时）",
+        "addSelection": "添加到选择或从选择中移除",
+        "rangeSelection": "选择页面或图层范围",
+        "middlePan": "使用鼠标中键平移",
+        "brush": "调整笔刷大小（笔刷工具）",
+        "horizontal": "左右滚动",
+        "font": "浏览字体／应用高亮字体",
+        "send": "发送／换行",
+        "drop": "取消拖放提示"
+      },
+      "gestures": {
+        "select": "Ctrl／Shift + 单击",
+        "range": "Shift + 单击",
+        "middle": "鼠标中键拖动",
+        "brush": "Alt + 滚轮",
+        "horizontal": "Shift + 滚轮"
+      },
+      "groups": {
+        "edit": "编辑",
+        "canvas": "画布",
+        "mouse": "鼠标",
+        "fonts": "字体选择器",
+        "agent": "智能体面板",
+        "import": "导入"
+      },
       "inputLabel": "{{action}} 快捷键",
+      "pressKeys": "请按键…",
+      "primary": "主要",
+      "reset": "恢复默认设置",
       "title": "快捷键",
-      "tools": "工具"
+      "tools": "工具",
+      "unassigned": "未分配",
+      "usedByBuiltIn": "{{action}}已使用（内置）"
     },
     "tabs": {
       "appearance": "外观",

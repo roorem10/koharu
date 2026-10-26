@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next'
 
 import { ColorWell } from '@/components/controls/ColorWell'
 import { usePage } from '@/lib/queries'
+import { formatBinding, shortcutSlots } from '@/lib/shortcuts'
 import {
   isBrushTool,
   maxBrushDiameter,
@@ -84,7 +85,12 @@ export function ToolBar() {
               </TooltipTrigger>
               <TooltipContent side='right'>
                 {t(`tools.${tool}`)}
-                <span className='ml-2 opacity-60'>{shortcuts[tool].toUpperCase()}</span>
+                <span className='ml-2 opacity-60'>
+                  {shortcutSlots(tool)
+                    .map((slot) => formatBinding(shortcuts[slot]))
+                    .filter(Boolean)
+                    .join(' / ')}
+                </span>
               </TooltipContent>
             </Tooltip>
           </div>
