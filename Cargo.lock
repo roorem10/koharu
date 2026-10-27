@@ -4879,6 +4879,7 @@ dependencies = [
  "koharu-renderer",
  "koharu-scene",
  "thiserror 2.0.21",
+ "tokio",
  "tokio-rayon",
  "tracing",
 ]

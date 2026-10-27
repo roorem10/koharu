@@ -144,9 +144,7 @@ pub(crate) async fn build(
         .filter(|(_, text)| !text.text.trim().is_empty())
         .collect::<Vec<_>>();
     let font_set = collect_fonts(text_entities.iter().map(|(_, text)| *text));
-    // GIMP writes the application layer list in reverse so PSD records remain bottom-to-top.
-    // Reversing the complete visual list preserves interleaving between text and raster layers.
-    for visual in frame.layers().iter().rev() {
+    for visual in record_order(frame) {
         let image = match visual.kind() {
             LayerKind::Image(image) => Some(image),
             LayerKind::Text(_) => None,
@@ -219,6 +217,14 @@ pub(crate) async fn build(
         merged: merged.image,
         layers,
     })
+}
+
+/// The frame's layers in PSD record order, which runs bottom to top. GIMP reverses
+/// its layer list here because GIMP keeps it top-first; a frame lists its layers in
+/// the order they are drawn, already bottom-first, so it is kept as is. Text and
+/// raster layers stay interleaved as they are on the page.
+fn record_order(frame: &Frame) -> impl Iterator<Item = &koharu_renderer::Layer> {
+    frame.layers().iter()
 }
 
 async fn rasterize(
@@ -426,6 +432,75 @@ mod tests {
         assert_eq!(metadata.font_size, 24.0);
         assert!((metadata.transform[0]).abs() < 1e-12);
         assert!((metadata.transform[1] - 1.0).abs() < 1e-12);
+    }
+
+    fn png(color: [u8; 4]) -> koharu_scene::AssetInput {
+        let image = RgbaImage::from_pixel(4, 4, Rgba(color));
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        DynamicImage::ImageRgba8(image)
+            .write_to(&mut bytes, image::ImageFormat::Png)
+            .unwrap();
+        koharu_scene::AssetInput::new(
+            Arc::<[u8]>::from(bytes.into_inner()),
+            "image/png",
+            koharu_scene::AssetMetadata {
+                width: Some(4),
+                height: Some(4),
+                attributes: Default::default(),
+            },
+        )
+    }
+
+    #[tokio::test]
+    async fn layers_are_stacked_in_the_order_the_page_is_drawn() {
+        use koharu_scene::{At, Origin, PageDraft, RasterLayer, RasterLayerKind, Session};
+
+        let source = AssetRole::new(SOURCE_ROLE).unwrap();
+        let mut session = Session::memory().await.unwrap();
+        let mut page = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let created = edit.add_page(PageDraft::new("page", 4.0, 4.0), At::End)?;
+                edit.set_asset(created, &source, png([10, 10, 10, 255]))?;
+                for (name, kind, color) in [
+                    ("Cleanup", RasterLayerKind::Cleanup, [200, 0, 0, 255]),
+                    ("Paint", RasterLayerKind::Paint, [0, 0, 200, 255]),
+                ] {
+                    let layer = edit.add_entity(created, At::End)?;
+                    edit.set(
+                        layer,
+                        &RasterLayer {
+                            origin: Origin::User,
+                            name: name.to_owned(),
+                            kind,
+                        },
+                    )?;
+                    edit.set_asset(layer, &source, png(color))?;
+                }
+                page = Some(created);
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let frame = koharu_renderer::Renderer::new()
+            .unwrap()
+            .render(&snapshot, page.unwrap())
+            .await
+            .unwrap();
+
+        let images = record_order(&frame)
+            .filter_map(|layer| match layer.kind() {
+                LayerKind::Image(image) => Some(image.kind),
+                LayerKind::Text(_) => None,
+            })
+            .collect::<Vec<_>>();
+
+        // Records run bottom to top: the page, then Cleanup, then Paint drawn over it.
+        assert_eq!(
+            images,
+            [ImageKind::Source, ImageKind::Cleanup, ImageKind::Paint]
+        );
     }
 
     #[test]
