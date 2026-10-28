@@ -50,6 +50,11 @@ if (-not (Test-Path $makensis)) { throw 'NSIS is missing. See BUILD_PREVIEW.md.'
 $env:NEXT_PUBLIC_KOHARU_PREVIEW = '1'
 $env:NEXT_PUBLIC_KOHARU_FORK_VERSION = (Get-Content (Join-Path $root 'FORK_VERSION') -Raw).Trim()
 if (-not $env:NEXT_PUBLIC_KOHARU_FORK_VERSION) { throw 'FORK_VERSION is empty.' }
+# "Booharu 0.0.1" packages as Booharu-0.0.1; a work-order build such as "WO-03" as Booharu-WO-03.
+$releaseVersion = $env:NEXT_PUBLIC_KOHARU_FORK_VERSION -replace '^Booharu\s+', ''
+$packageName = 'Booharu-' + ($releaseVersion -replace '[^A-Za-z0-9._-]', '-')
+# Windows file versions take four numbers; work-order builds have none.
+$fileVersion = if ($releaseVersion -match '^\d+\.\d+\.\d+$') { "$releaseVersion.0" } else { '0.0.0.0' }
 
 # CI passes the pull request's head commit; hand builds read it from git when there is a checkout.
 if (-not $env:KOHARU_FORK_COMMIT -and (Test-Path (Join-Path $root '.git'))) {
@@ -80,7 +85,7 @@ Invoke-Checked 'bun' @('run', '--filter', '@koharu/app', 'build')
 Invoke-Checked 'cargo' @('build', '-p', 'koharu', '--release', '--features', 'tauri/custom-protocol')
 
 $out = Join-Path $root 'dist'
-$stage = Join-Path $out 'Koharu-Typesetting-Preview-2'
+$stage = Join-Path $out 'Booharu'
 if (Test-Path (Join-Path $stage 'PreviewData')) {
     throw 'The staging folder contains preview user data. Move that complete preview folder to a safe location before rebuilding.'
 }
@@ -128,7 +133,15 @@ Get-ChildItem $stage -Recurse -Directory | Sort-Object { $_.FullName.Length } -D
 }
 Set-Content -Path $uninstallInclude -Value $removals -Encoding utf8
 
-Invoke-Checked $makensis @('/WX', "/DRUNTIME_DIR=$stage", "/DOUTPUT_DIR=$out", "/DSOURCE_DIR=$root", "/DUNINSTALL_INCLUDE=$uninstallInclude", (Join-Path $root 'preview\installer.nsi'))
-Compress-Archive -LiteralPath $stage -DestinationPath (Join-Path $out 'Koharu-Typesetting-Preview-2-Portable.zip') -Force
-Write-Host "Installer created: $(Join-Path $out 'Koharu-Typesetting-Preview-2-Setup.exe')"
-Write-Host "Portable ZIP created: $(Join-Path $out 'Koharu-Typesetting-Preview-2-Portable.zip')"
+Invoke-Checked $makensis @('/WX', "/DRUNTIME_DIR=$stage", "/DOUTPUT_DIR=$out", "/DSOURCE_DIR=$root", "/DUNINSTALL_INCLUDE=$uninstallInclude",
+    "/DPACKAGE_NAME=$packageName", "/DPRODUCT_VERSION=$releaseVersion", "/DFILE_VERSION=$fileVersion", (Join-Path $root 'preview\installer.nsi'))
+$installer = Join-Path $out "$packageName-Setup.exe"
+$portable = Join-Path $out "$packageName-Portable.zip"
+Compress-Archive -LiteralPath $stage -DestinationPath $portable -Force
+
+# The two release downloads and their checksums, in sha256sum format.
+$installer, $portable | ForEach-Object {
+    "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $(Split-Path $_ -Leaf)"
+} | Set-Content (Join-Path $out 'SHA256SUMS.txt') -Encoding ascii
+Write-Host "Installer created: $installer"
+Write-Host "Portable ZIP created: $portable"

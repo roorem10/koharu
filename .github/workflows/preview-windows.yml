@@ -1,6 +1,6 @@
 name: Preview Windows build
 
-# Builds the private Typesetting Preview portable package with the same script
+# Builds the Booharu Windows installer and portable package with the same script
 # used for hand-made builds (scripts/build-preview-windows.ps1), so the
 # PreviewData isolation, separate credential service, disabled updater and
 # disabled Sentry all come from one place.
@@ -85,7 +85,7 @@ jobs:
       - name: Check package layout
         shell: pwsh
         run: |
-          $stage = 'dist\Koharu-Typesetting-Preview-2'
+          $stage = 'dist\Booharu'
           $required = @('koharu.exe', 'libcef.dll', 'locales', 'LICENSE-MIT', 'LICENSE-APACHE',
             'PREVIEW_INSTALL.md', 'CEF-LICENSE.txt', 'CEF-CREDITS.html')
           $missing = $required | Where-Object { -not (Test-Path (Join-Path $stage $_)) }
@@ -118,14 +118,26 @@ jobs:
           else { $label = $env:GITHUB_REF_NAME -replace '[^A-Za-z0-9._-]', '-' }
           "artifact=Koharu-Preview-$label-$sha" >> $env:GITHUB_OUTPUT
 
-      # The artifact unpacks to the same Koharu-Typesetting-Preview-2 folder as
-      # the portable ZIP, plus the manifest beside it.
+      # The artifact unpacks to the same Booharu folder as the portable ZIP,
+      # plus the manifest beside it.
       - name: Upload portable package
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.name.outputs.artifact }}
           path: |
-            dist/Koharu-Typesetting-Preview-2/
+            dist/Booharu/
             dist/MANIFEST-SHA256.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      # The files to attach to a GitHub release: installer, portable ZIP and checksums.
+      - name: Upload release files
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.name.outputs.artifact }}-release
+          path: |
+            dist/Booharu-*-Setup.exe
+            dist/Booharu-*-Portable.zip
+            dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 90
