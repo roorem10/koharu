@@ -1,22 +1,19 @@
-<h1 align="center">Koharu</h1>
+<h1 align="center">Booharu</h1>
 
-<p align="center">ML-powered manga translator, written in <b>Rust</b>.</p>
+<p align="center">A personal Windows fork of <a href="https://github.com/koharu-rs/koharu">Koharu</a>, the ML-powered manga translator written in <b>Rust</b>.</p>
 
 <p align="center">
-<a href="https://github.com/koharu-rs/koharu/releases/latest" target="_blank"><img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/github/downloads/koharu-rs/koharu/total?style=for-the-badge&link=https%3A%2F%2Fgithub.com%2Fkoharu-rs%2Fkoharu%2Freleases%2Flatest"></a>
+<a href="https://github.com/roorem10/koharu/releases/latest" target="_blank"><img alt="Latest Booharu release" src="https://img.shields.io/github/v/release/roorem10/koharu?style=for-the-badge&label=Booharu"></a>
 </p>
 
 <p align="center">
-<a href="https://trendshift.io/repositories/20649" target="_blank"><img src="https://trendshift.io/api/badge/repositories/20649" alt="koharu-rs%2Fkoharu | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+<a href="https://github.com/roorem10/koharu/releases/latest" target="_blank">Download</a> · <a href="https://koharu.rs/" target="_blank">Koharu docs</a> · <a href="https://github.com/roorem10/koharu/issues" target="_blank">Booharu issues</a> · <a href="https://github.com/koharu-rs/koharu" target="_blank">Upstream Koharu</a>
 </p>
 
-<p align="center">
-<a href="https://koharu.rs/installation" target="_blank">Getting Started</a> · <a href="https://koharu.rs/" target="_blank">Docs</a> · <a href="https://github.com/koharu-rs/koharu/issues" target="_blank">Bug reports</a> · <a href="https://discord.gg/mHvHkxGnUY" target="_blank">Discord</a>
-</p>
+> [!IMPORTANT]
+> Booharu is maintained by roorem10 and is **not an official Koharu release**. Please report problems you see in Booharu on [this fork's issues](https://github.com/roorem10/koharu/issues), not to the Koharu project, unless you can reproduce them in official Koharu too.
 
-<p align="center">
-<a href="https://koharu.rs/ja" target="_blank">日本語</a> | <a href="https://koharu.rs/zh" target="_blank">简体中文</a>
-</p>
+Booharu 0.0.1 is based on Koharu 0.83.5. It keeps everything Koharu does and adds the typesetting and editing changes listed below. The app's About page shows both the Koharu version and the Booharu version.
 
 Koharu introduces a local-first workflow for manga translation, utilizing the power of ML to automate the process. It combines the capabilities of object detection, OCR, inpainting, and LLMs to create a seamless translation experience.
 
@@ -27,10 +24,40 @@ Koharu introduces a local-first workflow for manga translation, utilizing the po
 
 ![screenshot](packages/docs/screenshot.png)
 
-> [!NOTE]
-> Join our [Discord server](https://discord.gg/mHvHkxGnUY) for support and discussion.
+## What Booharu changes
 
-## Features
+**Text and outlines**
+
+- Contour outline method that follows the glyph shapes, with Outside, Center and Inside placement and Round, Sharp and Bevel corners
+- Double outline: a second outline around the first
+- Typed font size applies when you press Enter
+
+**Editing**
+
+- Arrow keys nudge the selected text box by one pixel, Shift+arrow by ten
+- Font picker keyboard navigation, favorite fonts and a Favorites filter
+- Zoom with editable keyboard shortcuts, shortcut recording for key combinations, and a choice of mouse wheel or Ctrl+wheel to zoom
+- Fix all text boxes in a bubble in place
+
+**Pipeline and models**
+
+- Option to turn off automatic text color detection
+- Unload all models at once to free GPU memory
+- Inpainting on large pages no longer leaves smears or crosses into nearby line art ([koharu#731](https://github.com/koharu-rs/koharu/issues/731))
+
+**Windows**
+
+- Drag and drop files and folders from Explorer to import them
+- Loading spinner fix (from NeKoharu)
+- Windows startup fixes
+- Settings, projects and downloaded models live in a `PreviewData` folder next to the app, separate from an official Koharu install
+- About page shows the Booharu version and build commit
+
+Booharu also turns off Koharu's updater and Sentry crash reporting.
+
+## Koharu features
+
+Booharu includes all of Koharu's features:
 
 - [Multi-format project management](https://koharu.rs/guides/projects) for raster images, archives, and PDFs with page sequencing
 - [Selective pipeline](https://koharu.rs/guides/processing) for detection, OCR, translation, and inpainting at page or project scope
@@ -46,7 +73,7 @@ Koharu introduces a local-first workflow for manga translation, utilizing the po
 
 ## Hardware Acceleration
 
-Koharu supports CUDA and ROCm / HIP on Windows and Linux, Metal on Apple silicon, and Vulkan on Windows and Linux. Keep your graphics driver current; a full CUDA or ROCm SDK installation is not required. See [Runtime and hardware requirements](https://koharu.rs/hardware) for model-specific guidance.
+Booharu is built for Windows only, so the Metal section below does not apply to it. Koharu supports CUDA and ROCm / HIP on Windows and Linux, Metal on Apple silicon, and Vulkan on Windows and Linux. Keep your graphics driver current; a full CUDA or ROCm SDK installation is not required. See [Runtime and hardware requirements](https://koharu.rs/hardware) for model-specific guidance.
 
 ### CUDA
 
@@ -138,36 +165,24 @@ OpenAI-compatible endpoints are also supported.
 
 ## Installation
 
-Download release builds from the [releases page](https://github.com/koharu-rs/koharu/releases/latest). [Installation requirements and first launch](https://koharu.rs/installation) vary by operating system.
+Download Booharu from the [releases page](https://github.com/roorem10/koharu/releases/latest). Each release has two files:
 
-Builds are available for Windows, macOS, and Linux.
+- `Booharu-<version>-Setup.exe`: installer. Installs to your user's Programs folder and adds a Start menu entry.
+- `Booharu-<version>-Portable.zip`: extract anywhere and run `koharu.exe` from the extracted `Booharu` folder.
 
-### WinGet
+Booharu runs on 64-bit Windows and has been tested with an NVIDIA GPU. The builds are unsigned, so Windows may show an "unknown publisher" warning; choose **More info**, then **Run anyway**. `SHA256SUMS.txt` in each release lists checksums for both files.
 
-Install on Windows with [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
-
-```bash
-winget install koharu
-```
-
-### Homebrew
-
-Install on macOS with [Homebrew](https://brew.sh/):
-
-```bash
-brew install --cask koharu
-```
+Booharu keeps its own data, so it can sit next to an official Koharu install. For official Koharu builds for Windows, macOS and Linux, see the [Koharu releases page](https://github.com/koharu-rs/koharu/releases/latest).
 
 ## Troubleshooting
 
-Startup, runtime, model, and provider errors are covered in [Troubleshooting](https://koharu.rs/reference/troubleshooting). Set `RUST_LOG` to `debug` or `trace` for verbose logs:
+Koharu's guide to startup, runtime, model, and provider errors also applies to Booharu: [Troubleshooting](https://koharu.rs/reference/troubleshooting). Set `RUST_LOG` to `debug` or `trace` for verbose logs:
 
-```bash
-# macOS / Linux
-RUST_LOG=debug koharu
-# Windows (PowerShell)
-$env:RUST_LOG="debug"; koharu.exe
+```powershell
+$env:RUST_LOG="debug"; .\koharu.exe
 ```
+
+Booharu writes its logs to `PreviewData\logs` next to the app.
 
 ## Development
 
@@ -199,9 +214,13 @@ bun run build
 
 The executable is written to `target/release`.
 
-## Sponsorship
+### Build the Booharu Windows packages
 
-If Koharu is useful in your workflow, consider sponsoring the project.
+On Windows, `scripts/build-preview-windows.ps1` builds the installer and portable ZIP named after the version in `FORK_VERSION`. See [BUILD_PREVIEW.md](BUILD_PREVIEW.md).
+
+## Support Koharu
+
+Booharu exists because of Koharu. If it is useful in your workflow, consider sponsoring the Koharu project.
 
 - [GitHub Sponsors](https://github.com/sponsors/mayocream)
 - [Patreon](https://www.patreon.com/mayocream)
@@ -210,7 +229,7 @@ If Koharu is useful in your workflow, consider sponsoring the project.
 
 ## Contributors ❤️
 
-Thanks to all the contributors who have helped make Koharu better!
+Thanks to all the contributors who have helped make Koharu better! Booharu also includes a fix from NeKoharu.
 
 <a href="https://github.com/koharu-rs/koharu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=koharu-rs/koharu" />
@@ -220,5 +239,5 @@ Thanks to all the contributors who have helped make Koharu better!
 
 Copyright 2025-2026 Mayo Takanashi and Koharu contributors.
 
-Koharu is dual-licensed under the [MIT License](LICENSE-MIT) or the
+Booharu changes by roorem10. Koharu and Booharu are dual-licensed under the [MIT License](LICENSE-MIT) or the
 [Apache License, Version 2.0](LICENSE-APACHE), at your option.
