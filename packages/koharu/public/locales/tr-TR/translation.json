@@ -224,7 +224,8 @@
     "outlineJoin": "Köşeler",
     "outlineRound": "Yuvarlak",
     "outlineMiter": "Keskin",
-    "outlineBevel": "Pah"
+    "outlineBevel": "Pah",
+    "swapFillOutline": "Dolgu ve dış çizgi renklerini değiştir"
   },
   "languages": {
     "ar": "العربية",

@@ -224,7 +224,8 @@
     "outlineJoin": "轉角",
     "outlineRound": "圓角",
     "outlineMiter": "尖角",
-    "outlineBevel": "斜角"
+    "outlineBevel": "斜角",
+    "swapFillOutline": "交换填充搭描边颜色"
   },
   "languages": {
     "ar": "العربية",

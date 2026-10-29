@@ -224,7 +224,8 @@
     "outlineJoin": "Углы",
     "outlineRound": "Скруглённые",
     "outlineMiter": "Острые",
-    "outlineBevel": "Скошенные"
+    "outlineBevel": "Скошенные",
+    "swapFillOutline": "Поменять цвета заливки и обводки"
   },
   "languages": {
     "ar": "العربية",

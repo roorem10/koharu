@@ -224,7 +224,8 @@
     "outlineJoin": "Corners",
     "outlineRound": "Round",
     "outlineMiter": "Sharp",
-    "outlineBevel": "Bevel"
+    "outlineBevel": "Bevel",
+    "swapFillOutline": "Swap fill and outline colors"
   },
   "languages": {
     "ar": "العربية",

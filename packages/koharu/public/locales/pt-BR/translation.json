@@ -224,7 +224,8 @@
     "outlineJoin": "Cantos",
     "outlineRound": "Redondos",
     "outlineMiter": "Pontiagudos",
-    "outlineBevel": "Chanfrados"
+    "outlineBevel": "Chanfrados",
+    "swapFillOutline": "Trocar cores do preenchimento e do contorno"
   },
   "languages": {
     "ar": "العربية",

@@ -6,6 +6,7 @@ import {
   AlignLeft,
   AlignRight,
   ArrowDown,
+  ArrowRightLeft,
   ArrowUp,
   Brush,
   ChevronDown,
@@ -394,7 +395,7 @@ function TypeInspector() {
           </InspectorField>
         </div>
 
-        <div className='grid min-w-0 grid-cols-[2.75rem_minmax(5.5rem,1fr)] items-end gap-1.5'>
+        <div className='grid min-w-0 grid-cols-[2.75rem_minmax(5.5rem,1fr)_1.5rem] items-end gap-1.5'>
           <InspectorField label={t('inspector.border')}>
             <ColorWell
               label={t('inspector.borderColor')}
@@ -449,6 +450,23 @@ function TypeInspector() {
               </NumberFieldGroup>
             </NumberField>
           </InspectorField>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon-xs'
+                  aria-label={t('inspector.swapFillOutline')}
+                  disabled={disabled}
+                  onClick={() => apply((value) => invertBorder(value, displayedStrokeWidth))}
+                />
+              }
+            >
+              <ArrowRightLeft className='size-3' />
+            </TooltipTrigger>
+            <TooltipContent side='left'>{t('inspector.swapFillOutline')}</TooltipContent>
+          </Tooltip>
         </div>
         <div className='grid min-w-0 grid-cols-[2.75rem_minmax(5.5rem,1fr)] items-end gap-1.5'>
           <InspectorField label={t('inspector.secondBorder')}>
@@ -585,6 +603,23 @@ function TypeInspector() {
       </div>
     </div>
   )
+}
+
+// Without a visible border, use a contrasting fill instead of transparent text.
+function invertBorder(value: Typography, displayedWidth: number): Typography {
+  const color = value.color ?? defaultTypography.color!
+  const stroke = value.stroke_color
+  if ((value.stroke_width ?? 0) > 0 && stroke && stroke[3] > 0) {
+    return { ...value, color: stroke, stroke_color: color }
+  }
+  const [red, green, blue] = color
+  const light = 0.2126 * red + 0.7152 * green + 0.0722 * blue > 127.5
+  return {
+    ...value,
+    color: light ? [0, 0, 0, 255] : [255, 255, 255, 255],
+    stroke_color: [red, green, blue, 255],
+    stroke_width: displayedWidth,
+  }
 }
 
 function findFontFamily(families: FontFamily[], name: string): FontFamily | undefined {

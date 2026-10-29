@@ -224,7 +224,8 @@
     "outlineJoin": "모서리",
     "outlineRound": "둥글게",
     "outlineMiter": "뾰족하게",
-    "outlineBevel": "베벨"
+    "outlineBevel": "베벨",
+    "swapFillOutline": "채우기와 윤곽선 색상 바꾸기"
   },
   "languages": {
     "ar": "العربية",

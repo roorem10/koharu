@@ -503,6 +503,58 @@ describe('greenfield editor', () => {
     expect(tooltip).toHaveTextContent('6')
   })
 
+  it('swaps fill and outline for the whole selection and enables a hidden outline at the displayed width', async () => {
+    installProject()
+    const first = {
+      ...textLayer,
+      typography: {
+        ...textLayer.typography!,
+        color: [0, 0, 0, 255] as [number, number, number, number],
+        stroke_color: [255, 255, 255, 255] as [number, number, number, number],
+        stroke_width: 4,
+        size: 45,
+        auto_fit: false,
+      },
+    }
+    const second = {
+      ...secondLayer,
+      typography: {
+        ...secondLayer.typography!,
+        color: [255, 255, 255, 255] as [number, number, number, number],
+        stroke_color: [10, 20, 30, 0] as [number, number, number, number],
+        stroke_width: 7,
+      },
+    }
+    queryClient.setQueryData(pageKey, {
+      ...queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey),
+      layers: [first, second],
+    })
+    useKoharuStore.setState({ selectedLayers: ['element', 'second'] })
+    const update = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
+    render(<Inspector />)
+    fireEvent.click(screen.getByRole('button', { name: 'Swap fill and outline colors' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(update.mock.calls[0]![0]).toEqual([
+      {
+        layer: 'element',
+        typography: {
+          ...first.typography,
+          color: [255, 255, 255, 255],
+          stroke_color: [0, 0, 0, 255],
+        },
+      },
+      {
+        layer: 'second',
+        typography: {
+          ...second.typography,
+          color: [0, 0, 0, 255],
+          stroke_color: [255, 255, 255, 255],
+          stroke_width: 4,
+        },
+      },
+    ])
+  })
+
   it('registers one native resize listener in React strict mode', async () => {
     const unlisten = vi.fn()
     nativeWindow.onResized.mockClear()

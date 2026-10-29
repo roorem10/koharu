@@ -224,7 +224,8 @@
     "outlineJoin": "Angles",
     "outlineRound": "Arrondis",
     "outlineMiter": "Pointus",
-    "outlineBevel": "Biseautés"
+    "outlineBevel": "Biseautés",
+    "swapFillOutline": "Permuter les couleurs du texte et du contour"
   },
   "languages": {
     "ar": "العربية",
