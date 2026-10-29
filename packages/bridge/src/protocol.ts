@@ -57,6 +57,8 @@ export const commands = {
 	captureTextStyle: (layer: EntityId, groups: StyleGroup[]) => __TAURI_INVOKE<TextStyle>("capture_text_style", { layer, groups }),
 	applyTextStyle: (scope: StyleScope, style: TextStyle) => __TAURI_INVOKE<StyleApplyResult>("apply_text_style", { scope, style }),
 	countTextStyleTargets: (scope: StyleScope) => __TAURI_INVOKE<number>("count_text_style_targets", { scope }),
+	applyShapeRules: (scope: StyleScope) => __TAURI_INVOKE<StyleApplyResult>("apply_shape_rules", { scope }),
+	getTextBubbleShape: (layer: EntityId) => __TAURI_INVOKE<BubbleShapeInfo>("get_text_bubble_shape", { layer }),
 	getCanvasManifest: (generation: CanvasGeneration) => __TAURI_INVOKE<CanvasBytes>("get_canvas_manifest", { generation }),
 	getCanvasResource: (generation: CanvasGeneration, resource: string) => __TAURI_INVOKE<CanvasBytes>("get_canvas_resource", { generation, resource }),
 	prepareCanvasPage: (page: EntityId) => __TAURI_INVOKE<CanvasPagePreparation | null>("prepare_canvas_page", { page }),
@@ -101,6 +103,15 @@ export type Bounds = {
 	y: number,
 	width: number,
 	height: number,
+};
+
+export type BubbleShape = "rectangle" | "round" | "spiky";
+
+export type BubbleShapeInfo = {
+	bubble: EntityId | null,
+	/**  None without a bubble, or when its polygon is degenerate. */
+	shape: BubbleShape | null,
+	measures: ShapeMeasures | null,
 };
 
 export type CaiyunConfig = Record<string, never>;
@@ -478,6 +489,20 @@ export type Scope = { scope: "project" } | { scope: "pages"; value: EntityId[] }
 	bounds: Bounds,
 } } | { scope: "entities"; value: EntityId[] };
 
+export type ShapeMeasures = {
+	rectangularity: number,
+	solidity: number,
+	spikes: number,
+};
+
+export type ShapeRules = {
+	enabled?: boolean,
+	rectangle?: string | null,
+	round?: string | null,
+	spiky?: string | null,
+	free?: string | null,
+};
+
 export type SizePart = {
 	auto_fit: boolean,
 	size: number | null,
@@ -544,6 +569,7 @@ export type TextStyle = {
 export type TextStyles = {
 	default_style?: TextStyle,
 	presets?: TextPreset[],
+	shape_rules?: ShapeRules,
 	/**  Distinguish a deliberate Clear from a pre-migration missing fill. */
 	legacy_color_migrated?: boolean,
 };

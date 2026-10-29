@@ -635,7 +635,7 @@
     "clearGroup": "Borrar {{group}}",
     "clear": "Borrar",
     "notSet": "Sin definir",
-    "pipelineNote": "El texto nuevo usa el estilo predeterminado (Ajustes > Tipografía).",
+    "pipelineNote": "El texto nuevo usa el estilo predeterminado.",
     "cancel": "Cancelar",
     "save": "Guardar",
     "groups": {
@@ -679,6 +679,31 @@
     "shortcutHelp": "Prueba los números del 1 al 9. Activa la grabación y pulsa una tecla o combinación. Escape cancela.",
     "recordShortcut": "Grabar atajo del preajuste",
     "invalidShortcut": "Elige un atajo válido.",
-    "usedByPreset": "Usado por el preajuste «{{name}}»"
+    "usedByPreset": "Usado por el preajuste «{{name}}»",
+    "shapeTitle": "Estilo según la forma del bocadillo",
+    "shapeEnabled": "Aplicar durante la detección",
+    "shapeHelp": "Usa Aplicar reglas de forma en Estilos para texto existente. Los colores detectados tienen prioridad si la detección de color está activada.",
+    "defaultOnly": "Solo el estilo predeterminado",
+    "presetMissing": "Falta el preajuste",
+    "bubbleShape": "Forma del bocadillo: {{shape}}",
+    "shapeMeasures": "Rectangularidad: {{rectangularity}} % · Solidez: {{solidity}} % · Entrantes profundos: {{spikes}}",
+    "measuresUnavailable": "No hay medidas de forma disponibles.",
+    "applyShapeRules": "Aplicar reglas de forma",
+    "scopeSelection": "Selección",
+    "scopePage": "Esta página",
+    "scopeProject": "Todas las páginas",
+    "shapes": {
+      "rectangle": "Rectangular",
+      "round": "Redondo",
+      "spiky": "Dentado",
+      "free": "Sin bocadillo",
+      "unknown": "No disponible"
+    },
+    "shapeHints": {
+      "rectangle": "Narración y títulos",
+      "round": "Diálogo",
+      "spiky": "Gritos",
+      "free": "Texto libre"
+    }
   }
 }

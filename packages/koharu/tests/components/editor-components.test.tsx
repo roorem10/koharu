@@ -23,6 +23,7 @@ import { ResourceMonitor } from '@/components/editor/ResourceMonitor'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { ProviderPreferences } from '@/components/preferences/ProviderPreferences'
+import { ShapeStylePreferences } from '@/components/preferences/ShapeStylePreferences'
 import { SettingsPage } from '@/components/preferences/SettingsPage'
 import {
   fontsKey,
@@ -290,13 +291,24 @@ describe('greenfield editor', () => {
 
   it('confirms project-wide text styles with the native box count before applying', async () => {
     installProject()
-    const style = { ...emptyTextStyle, fill: [255, 255, 255, 255] as [number, number, number, number] }
-    useKoharuStore.setState({ textStyles: { default_style: style, presets: [], legacy_color_migrated: true } })
+    const style = {
+      ...emptyTextStyle,
+      fill: [255, 255, 255, 255] as [number, number, number, number],
+    }
+    useKoharuStore.setState({
+      textStyles: { default_style: style, presets: [], legacy_color_migrated: true },
+    })
     vi.spyOn(commands, 'countTextStyleTargets').mockResolvedValue(3)
     const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 3, skipped: 0 })
-    vi.spyOn(commands, 'getProject').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!)
-    vi.spyOn(commands, 'getPage').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey)!)
-    vi.spyOn(commands, 'getPages').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPages>>>(pagesKey)!)
+    vi.spyOn(commands, 'getProject').mockResolvedValue(
+      queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!,
+    )
+    vi.spyOn(commands, 'getPage').mockResolvedValue(
+      queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey)!,
+    )
+    vi.spyOn(commands, 'getPages').mockResolvedValue(
+      queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPages>>>(pagesKey)!,
+    )
     render(<Inspector />)
     const user = userEvent.setup()
     fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
@@ -309,24 +321,58 @@ describe('greenfield editor', () => {
 
   it('applies a partial preset to the selected layers in one native call', async () => {
     installProject()
-    queryClient.setQueryData(pageKey, { ...queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey), layers: [textLayer, secondLayer] })
-    const style = { ...emptyTextStyle, outline: { stroke_color: [255, 255, 255, 255] as [number, number, number, number], stroke_width: 3, stroke_method: null, stroke_position: null, stroke_join: null } }
-    useKoharuStore.setState({ selectedLayers: ['element', 'second'], textStyles: { default_style: { ...emptyTextStyle }, presets: [{ id: 'white', name: 'White outline', style, key: null }], legacy_color_migrated: true } })
+    queryClient.setQueryData(pageKey, {
+      ...queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey),
+      layers: [textLayer, secondLayer],
+    })
+    const style = {
+      ...emptyTextStyle,
+      outline: {
+        stroke_color: [255, 255, 255, 255] as [number, number, number, number],
+        stroke_width: 3,
+        stroke_method: null,
+        stroke_position: null,
+        stroke_join: null,
+      },
+    }
+    useKoharuStore.setState({
+      selectedLayers: ['element', 'second'],
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [{ id: 'white', name: 'White outline', style, key: null }],
+        legacy_color_migrated: true,
+      },
+    })
     const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 2, skipped: 0 })
-    vi.spyOn(commands, 'getProject').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!)
-    vi.spyOn(commands, 'getPage').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey)!)
-    vi.spyOn(commands, 'getPages').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPages>>>(pagesKey)!)
+    vi.spyOn(commands, 'getProject').mockResolvedValue(
+      queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!,
+    )
+    vi.spyOn(commands, 'getPage').mockResolvedValue(
+      queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey)!,
+    )
+    vi.spyOn(commands, 'getPages').mockResolvedValue(
+      queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPages>>>(pagesKey)!,
+    )
     render(<Inspector />)
     fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
     fireEvent.click(await screen.findByRole('menuitem', { name: /^White outline/ }))
-    await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith({ layers: ['element', 'second'] }, style))
+    await waitFor(() =>
+      expect(apply).toHaveBeenCalledExactlyOnceWith({ layers: ['element', 'second'] }, style),
+    )
     expect(style.font).toBeNull()
     expect(style.size).toBeNull()
   })
 
   it('disables preset application without a text selection', async () => {
     installProject()
-    useKoharuStore.setState({ selectedLayers: [], textStyles: { default_style: { ...emptyTextStyle }, presets: [{ id: 'white', name: 'White outline', style: { ...emptyTextStyle }, key: null }], legacy_color_migrated: true } })
+    useKoharuStore.setState({
+      selectedLayers: [],
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [{ id: 'white', name: 'White outline', style: { ...emptyTextStyle }, key: null }],
+        legacy_color_migrated: true,
+      },
+    })
     const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 0, skipped: 0 })
     render(<Inspector />)
     fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
@@ -346,10 +392,115 @@ describe('greenfield editor', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Save selected box as preset…' }))
     await user.type(screen.getByRole('textbox', { name: 'Preset name' }), 'Dark fill')
-    for (const group of ['Font', 'Outline', 'Outer outline', 'Alignment']) await user.click(screen.getByRole('checkbox', { name: group }))
+    for (const group of ['Font', 'Outline', 'Outer outline', 'Alignment'])
+      await user.click(screen.getByRole('checkbox', { name: group }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(capture).toHaveBeenCalledWith('element', ['fill']))
-    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ presets: [expect.objectContaining({ name: 'Dark fill', style })] })))
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          presets: [expect.objectContaining({ name: 'Dark fill', style })],
+        }),
+      ),
+    )
+  })
+
+  it('saves shape mappings and keeps missing preset references visible', async () => {
+    installProject()
+    useKoharuStore.setState({
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [
+          {
+            id: 'shout',
+            name: 'Shout',
+            key: null,
+            style: { ...emptyTextStyle, fill: [255, 255, 255, 255] },
+          },
+        ],
+        shape_rules: { enabled: false, rectangle: null, round: null, spiky: 'deleted', free: null },
+      },
+    })
+    const save = vi.spyOn(commands, 'saveTextStyles').mockImplementation(async (styles) => styles)
+    render(<ShapeStylePreferences />)
+    const user = userEvent.setup()
+    expect(screen.getByRole('switch', { name: 'Style by bubble shape' })).not.toBeChecked()
+    expect(screen.getByRole('combobox', { name: 'Spiky' })).toHaveTextContent('Preset missing')
+    await user.click(screen.getByRole('switch', { name: 'Style by bubble shape' }))
+    await user.click(screen.getByRole('combobox', { name: 'Round' }))
+    await user.click(await screen.findByRole('option', { name: /Shout/ }))
+    await waitFor(() =>
+      expect(save).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          shape_rules: expect.objectContaining({ enabled: true, round: 'shout', spiky: 'deleted' }),
+        }),
+      ),
+    )
+  })
+
+  it('confirms project-wide shape rules before one native edit', async () => {
+    installProject()
+    useKoharuStore.setState({
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [],
+        shape_rules: { enabled: true },
+      },
+    })
+    vi.spyOn(commands, 'countTextStyleTargets').mockResolvedValue(3)
+    const apply = vi
+      .spyOn(commands, 'applyShapeRules')
+      .mockResolvedValue({ changed: 3, skipped: 0 })
+    vi.spyOn(commands, 'getProject').mockResolvedValue(
+      queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!,
+    )
+    vi.spyOn(commands, 'getPage').mockResolvedValue(
+      queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey)!,
+    )
+    vi.spyOn(commands, 'getPages').mockResolvedValue(
+      queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPages>>>(pagesKey)!,
+    )
+    render(<Inspector />)
+    const user = userEvent.setup()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
+    await user.hover(await screen.findByRole('menuitem', { name: 'Apply shape rules' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'All pages' }))
+    expect(await screen.findByRole('dialog')).toHaveTextContent('3')
+    expect(apply).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Apply' }))
+    await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith('project'))
+  })
+
+  it('shows the selected bubble shape with polygon measurements', async () => {
+    installProject()
+    vi.mocked(commands.getTextBubbleShape).mockResolvedValue({
+      bubble: 'bubble',
+      shape: 'spiky',
+      measures: { rectangularity: 0.7, solidity: 0.8, spikes: 6 },
+    })
+    render(
+      <TooltipProvider>
+        <Inspector />
+      </TooltipProvider>,
+    )
+    const line = await screen.findByText('Bubble shape: Spiky')
+    Object.defineProperty(line, 'getBoundingClientRect', {
+      value: () => ({
+        x: 10,
+        y: 10,
+        top: 10,
+        left: 10,
+        right: 210,
+        bottom: 30,
+        width: 200,
+        height: 20,
+      }),
+    })
+    act(() => line.focus())
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip).toHaveTextContent('70.0%')
+    expect(tooltip).toHaveTextContent('80.0%')
+    expect(tooltip).toHaveTextContent('6')
   })
 
   it('registers one native resize listener in React strict mode', async () => {

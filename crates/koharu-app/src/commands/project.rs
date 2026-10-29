@@ -651,6 +651,34 @@ impl Project {
         .await
     }
 
+    pub(crate) async fn apply_shape_rules(
+        &mut self,
+        scope: super::styles::StyleScope,
+        styles: &koharu_renderer::TextStyles,
+        detect_colors: bool,
+    ) -> Result<(Option<Commit>, super::styles::StyleApplyResult)> {
+        use koharu_pipeline::bubble_shape::{style_for_shape, text_bubble_shape};
+        styles.validate()?;
+        if !styles.shape_rules.enabled {
+            return Ok((None, Default::default()));
+        }
+        self.apply_style(scope, |snapshot, layer, typography| {
+            let info = text_bubble_shape(snapshot, layer)?;
+            anyhow::ensure!(
+                info.bubble.is_none() || info.measures.is_some(),
+                "bubble polygon cannot be measured"
+            );
+            styles
+                .default_style
+                .apply_to_detected(typography, detect_colors);
+            if let Some(style) = style_for_shape(styles, info.shape) {
+                style.apply_to_detected(typography, detect_colors);
+            }
+            Ok(())
+        })
+        .await
+    }
+
     async fn apply_style(
         &mut self,
         scope: super::styles::StyleScope,
@@ -1631,6 +1659,138 @@ mod tests {
         assert!(commit.is_some());
         assert_eq!(result.changed, 1);
         assert_eq!(result.skipped, 1);
+    }
+
+    #[tokio::test]
+    async fn shape_styles_apply_across_pages_with_flows_in_and_inside_in_one_undo() {
+        use koharu_renderer::{FontPart, ShapeRules, TextPreset, TextStyle, TextStyles};
+        use koharu_scene::{BubbleRegion, FlowsIn, Inside, RecognizedFrom, TextRegion};
+        let mut session = Session::memory().await.unwrap();
+        let mut layers = Vec::new();
+        let original = style_test_typography();
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                for page_index in 0..2 {
+                    let page = edit.add_page(PageDraft::new("page", 300.0, 300.0), At::End)?;
+                    let bubble = edit.add_analysis_region::<BubbleRegion>(
+                        page,
+                        At::End,
+                        &SceneGeometry::rectangle(10.0, 10.0, 200.0, 100.0),
+                        None,
+                    )?;
+                    let content = edit.add_text_content(page, At::End)?;
+                    let layer = edit.add_text_layer(
+                        page,
+                        At::End,
+                        content,
+                        &SceneTextLayout {
+                            origin: Origin::User,
+                            kind: TextLayoutKind::Paragraph,
+                            angle_degrees: None,
+                        },
+                    )?;
+                    edit.set(layer, &original)?;
+                    if page_index == 0 {
+                        edit.relate::<FlowsIn>(layer, bubble)?;
+                    } else {
+                        let region = edit.add_analysis_region::<TextRegion>(
+                            page,
+                            At::End,
+                            &SceneGeometry::rectangle(20.0, 20.0, 50.0, 50.0),
+                            None,
+                        )?;
+                        edit.relate::<RecognizedFrom>(content, region)?;
+                        edit.relate::<Inside>(region, bubble)?;
+                    }
+                    layers.push(layer);
+                    if page_index == 1 {
+                        let content = edit.add_text_content(page, At::End)?;
+                        let layer = edit.add_text_layer(
+                            page,
+                            At::End,
+                            content,
+                            &SceneTextLayout {
+                                origin: Origin::User,
+                                kind: TextLayoutKind::Paragraph,
+                                angle_degrees: None,
+                            },
+                        )?;
+                        edit.set(layer, &original)?;
+                        layers.push(layer);
+                    }
+                }
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let make_preset = |id: &str| TextPreset {
+            id: id.into(),
+            name: id.into(),
+            key: None,
+            style: TextStyle {
+                font: Some(FontPart {
+                    preferred_font: Some(id.into()),
+                    font_weight: None,
+                    font_style: None,
+                }),
+                ..Default::default()
+            },
+        };
+        let mut styles = TextStyles {
+            default_style: TextStyle {
+                fill: Some([12, 34, 56, 255]),
+                ..Default::default()
+            },
+            presets: vec![make_preset("narration"), make_preset("free")],
+            shape_rules: ShapeRules {
+                enabled: true,
+                rectangle: Some("narration".into()),
+                free: Some("free".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut project = Project::new(session, "shapes".into());
+        let (commit, result) = project
+            .apply_shape_rules(super::super::styles::StyleScope::Project, &styles, false)
+            .await
+            .unwrap();
+        assert_eq!(result.changed, 3);
+        assert_eq!(result.skipped, 0);
+        project.record_commit(&commit.unwrap());
+        assert_eq!(project.undo.len(), 1);
+        for (index, &layer) in layers.iter().enumerate() {
+            let typography = project
+                .snapshot()
+                .component::<SceneTypography>(layer)
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                typography.preferred_font.as_deref(),
+                Some(if index == 2 { "free" } else { "narration" })
+            );
+            assert_eq!(typography.extensions, original.extensions);
+            assert_eq!(typography.color, styles.default_style.fill);
+        }
+        project.undo().await.unwrap();
+        for &layer in &layers {
+            assert_eq!(
+                project
+                    .snapshot()
+                    .component::<SceneTypography>(layer)
+                    .unwrap()
+                    .unwrap(),
+                original
+            );
+        }
+        styles.shape_rules.enabled = false;
+        let (commit, result) = project
+            .apply_shape_rules(super::super::styles::StyleScope::Project, &styles, false)
+            .await
+            .unwrap();
+        assert!(commit.is_none());
+        assert_eq!(result.changed, 0);
     }
 
     #[tokio::test]

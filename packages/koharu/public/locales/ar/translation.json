@@ -635,7 +635,7 @@
     "clearGroup": "مسح {{group}}",
     "clear": "مسح",
     "notSet": "غير محدد",
-    "pipelineNote": "يستخدم النص الجديد النمط الافتراضي (الإعدادات > تنضيد النص).",
+    "pipelineNote": "يستخدم النص الجديد النمط الافتراضي.",
     "cancel": "إلغاء",
     "save": "حفظ",
     "groups": {
@@ -679,6 +679,31 @@
     "shortcutHelp": "جرّب الأرقام 1–9. انقر زر التسجيل ثم اضغط مفتاحًا أو مجموعة مفاتيح. يلغي Escape التسجيل.",
     "recordShortcut": "تسجيل اختصار الإعداد المسبق",
     "invalidShortcut": "اختر اختصارًا صالحًا.",
-    "usedByPreset": "يستخدمه الإعداد المسبق «{{name}}»"
+    "usedByPreset": "يستخدمه الإعداد المسبق «{{name}}»",
+    "shapeTitle": "النمط حسب شكل الفقاعة",
+    "shapeEnabled": "تطبيق أثناء الكشف",
+    "shapeHelp": "استخدم تطبيق قواعد الشكل من قائمة الأنماط لإعادة تنسيق النص الموجود. للألوان المكتشفة الأولوية عند تفعيل كشف الألوان.",
+    "defaultOnly": "النمط الافتراضي فقط",
+    "presetMissing": "الإعداد المسبق مفقود",
+    "bubbleShape": "شكل الفقاعة: {{shape}}",
+    "shapeMeasures": "المستطيلية: {{rectangularity}}% · الامتلاء: {{solidity}}% · التقعرات العميقة: {{spikes}}",
+    "measuresUnavailable": "قياسات الشكل غير متاحة.",
+    "applyShapeRules": "تطبيق قواعد الشكل",
+    "scopeSelection": "التحديد",
+    "scopePage": "هذه الصفحة",
+    "scopeProject": "كل الصفحات",
+    "shapes": {
+      "rectangle": "مستطيل",
+      "round": "دائري",
+      "spiky": "مسنن",
+      "free": "دون فقاعة",
+      "unknown": "غير متاح"
+    },
+    "shapeHints": {
+      "rectangle": "السرد والعناوين",
+      "round": "الحوار",
+      "spiky": "الصراخ",
+      "free": "نص حر"
+    }
   }
 }

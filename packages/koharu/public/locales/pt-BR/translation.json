@@ -635,7 +635,7 @@
     "clearGroup": "Limpar {{group}}",
     "clear": "Limpar",
     "notSet": "Não definido",
-    "pipelineNote": "Novos textos usam o estilo padrão (Configurações > Tipografia).",
+    "pipelineNote": "Novos textos usam o estilo padrão.",
     "cancel": "Cancelar",
     "save": "Salvar",
     "groups": {
@@ -679,6 +679,31 @@
     "shortcutHelp": "Experimente os números de 1 a 9. Ative a gravação e pressione uma tecla ou combinação. Escape cancela.",
     "recordShortcut": "Gravar atalho da predefinição",
     "invalidShortcut": "Escolha um atalho válido.",
-    "usedByPreset": "Usado pela predefinição “{{name}}”"
+    "usedByPreset": "Usado pela predefinição “{{name}}”",
+    "shapeTitle": "Estilo pela forma do balão",
+    "shapeEnabled": "Aplicar durante a detecção",
+    "shapeHelp": "Use Aplicar regras de forma em Estilos para textos existentes. As cores detectadas têm prioridade quando a detecção de cores está ativa.",
+    "defaultOnly": "Somente o estilo padrão",
+    "presetMissing": "Predefinição ausente",
+    "bubbleShape": "Forma do balão: {{shape}}",
+    "shapeMeasures": "Retangularidade: {{rectangularity}}% · Solidez: {{solidity}}% · Reentrâncias profundas: {{spikes}}",
+    "measuresUnavailable": "Nenhuma medida de forma disponível.",
+    "applyShapeRules": "Aplicar regras de forma",
+    "scopeSelection": "Seleção",
+    "scopePage": "Esta página",
+    "scopeProject": "Todas as páginas",
+    "shapes": {
+      "rectangle": "Retangular",
+      "round": "Redondo",
+      "spiky": "Pontudo",
+      "free": "Sem balão",
+      "unknown": "Indisponível"
+    },
+    "shapeHints": {
+      "rectangle": "Narração e títulos",
+      "round": "Diálogo",
+      "spiky": "Gritos",
+      "free": "Texto livre"
+    }
   }
 }

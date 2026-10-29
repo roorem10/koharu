@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { TextStylePresets } from '@/components/editor/PresetControls'
+import { ShapeStylePreferences } from '@/components/preferences/ShapeStylePreferences'
 import { refreshTextStyles, saveTextStyles } from '@/lib/backend'
 import { useKoharuStore } from '@/lib/store'
 import { emptyTextStyle, styleGroups, styleSummary } from '@/lib/text-styles'
@@ -68,6 +69,7 @@ export function TextStylePreferences() {
         </ul>
       </section>
       <TextStylePresets />
+      <ShapeStylePreferences />
     </>
   )
 }

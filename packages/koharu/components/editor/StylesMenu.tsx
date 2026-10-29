@@ -25,6 +25,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@koharu/ui/components/dropdown-menu'
 import { toast } from '@koharu/ui/components/toast'
 
@@ -34,18 +37,22 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
   const presetsUI = usePresetDialogs(selected)
   const styles = useKoharuStore((state) => state.textStyles)
   const [capture, setCapture] = useState<EntityId | null>(null)
-  const [confirmation, setConfirmation] = useState<{ scope: StyleScope; count: number } | null>(
-    null,
-  )
+  const [confirmation, setConfirmation] = useState<{
+    scope: StyleScope
+    count: number
+    shape: boolean
+  } | null>(null)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     if (!styles) void refreshTextStyles().catch(() => undefined)
   }, [styles])
 
-  const apply = async (scope: StyleScope, style: TextStyle) => {
+  const apply = async (scope: StyleScope, style?: TextStyle) => {
     setBusy(true)
     try {
-      const result = await call(commands.applyTextStyle, scope, style)
+      const result = style
+        ? await call(commands.applyTextStyle, scope, style)
+        : await call(commands.applyShapeRules, scope)
       await refresh(projectKey, pagesKey, pageKey)
       toast.add({
         type: 'success',
@@ -59,9 +66,9 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
       setBusy(false)
     }
   }
-  const confirm = async (scope: StyleScope) => {
+  const confirm = async (scope: StyleScope, shape = false) => {
     const count = await call(commands.countTextStyleTargets, scope)
-    setConfirmation({ scope, count })
+    setConfirmation({ scope, count, shape })
   }
   const presets = styles?.presets ?? []
   const defaultStyle = styles?.default_style ?? emptyTextStyle
@@ -110,6 +117,33 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
             {t('textStyles.savePreset')}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger disabled={!styles?.shape_rules?.enabled}>
+              {t('textStyles.applyShapeRules')}
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className='w-56'>
+              <DropdownMenuItem
+                disabled={!selected.length}
+                onClick={() => void apply({ layers: selected }).catch(() => undefined)}
+              >
+                {t('textStyles.scopeSelection')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!page}
+                onClick={() => {
+                  if (page) void confirm({ page: page.id }, true).catch(() => undefined)
+                }}
+              >
+                {t('textStyles.scopePage')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!page}
+                onClick={() => void confirm('project', true).catch(() => undefined)}
+              >
+                {t('textStyles.scopeProject')}
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           <DropdownMenuItem
             disabled={!selected.length}
             onClick={() => void apply({ layers: selected }, defaultStyle).catch(() => undefined)}
@@ -154,7 +188,9 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
         }}
       >
         <DialogContent showCloseButton={false}>
-          <DialogTitle>{t('textStyles.applyDefault')}</DialogTitle>
+          <DialogTitle>
+            {t(confirmation?.shape ? 'textStyles.applyShapeRules' : 'textStyles.applyDefault')}
+          </DialogTitle>
           <DialogDescription>
             {t('textStyles.confirmApply', { count: confirmation?.count ?? 0 })}
           </DialogDescription>
@@ -166,7 +202,10 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
               disabled={busy || !confirmation?.count}
               onClick={() => {
                 if (confirmation)
-                  void apply(confirmation.scope, defaultStyle).catch(() => undefined)
+                  void apply(
+                    confirmation.scope,
+                    confirmation.shape ? undefined : defaultStyle,
+                  ).catch(() => undefined)
               }}
             >
               {t('textStyles.apply')}

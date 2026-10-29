@@ -1,3 +1,4 @@
+pub mod bubble_shape;
 mod detection;
 mod inpainting;
 mod ocr;
@@ -89,7 +90,7 @@ impl Stages {
                 detection::TextColorOptions {
                     detect_text_color: config.detect_text_color,
                 },
-                koharu_renderer::TextStyles::load(config.default_text_color)?,
+                koharu_renderer::TextStyles::load(|| Ok(config.default_text_color))?,
             ),
             ocr: ocr::Processor::new(config.ocr.clone(), device.clone()),
             translation: translation::Processor::new(config.translation.clone(), translator),

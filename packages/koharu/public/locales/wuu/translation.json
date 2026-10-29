@@ -635,7 +635,7 @@
     "clearGroup": "清除{{group}}",
     "clear": "清除",
     "notSet": "朆设置",
-    "pipelineNote": "新文字使用默认文字样式（设置 > 排版）。",
+    "pipelineNote": "新文字使用默认文字样式。",
     "cancel": "取消",
     "save": "保存",
     "groups": {
@@ -679,6 +679,31 @@
     "shortcutHelp": "建议用数字1–9。点记录按钮，再按单键或者组合键。按Escape取消记录。",
     "recordShortcut": "记录预设快捷键",
     "invalidShortcut": "请选择有效个快捷键。",
-    "usedByPreset": "已拨预设“{{name}}”使用"
+    "usedByPreset": "已拨预设“{{name}}”使用",
+    "shapeTitle": "照气泡形状设样式",
+    "shapeEnabled": "检测个辰光应用",
+    "shapeHelp": "用样式菜单里个“应用形状规则”重新设置已有个文字。开仔颜色检测个辰光，检测到个颜色优先。",
+    "defaultOnly": "只用默认样式",
+    "presetMissing": "预设缺失",
+    "bubbleShape": "气泡形状：{{shape}}",
+    "shapeMeasures": "矩形度：{{rectangularity}}% · 实心度：{{solidity}}% · 深凹陷数：{{spikes}}",
+    "measuresUnavailable": "暂时呒没形状测量数据。",
+    "applyShapeRules": "应用形状规则",
+    "scopeSelection": "选中项",
+    "scopePage": "本页",
+    "scopeProject": "全部页面",
+    "shapes": {
+      "rectangle": "矩形",
+      "round": "圆形",
+      "spiky": "锯齿形",
+      "free": "呒没气泡",
+      "unknown": "无数据"
+    },
+    "shapeHints": {
+      "rectangle": "旁白搭标题",
+      "round": "对白",
+      "spiky": "喊叫",
+      "free": "自由文字"
+    }
   }
 }

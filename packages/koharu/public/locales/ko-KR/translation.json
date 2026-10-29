@@ -635,7 +635,7 @@
     "clearGroup": "{{group}} 지우기",
     "clear": "지우기",
     "notSet": "설정 안 됨",
-    "pipelineNote": "새 텍스트는 기본 스타일을 사용합니다(설정 > 조판).",
+    "pipelineNote": "새 텍스트는 기본 스타일을 사용합니다.",
     "cancel": "취소",
     "save": "저장",
     "groups": {
@@ -679,6 +679,31 @@
     "shortcutHelp": "숫자 1~9를 사용해 보세요. 기록 버튼을 누른 뒤 키 또는 조합을 입력하세요. Escape로 기록을 취소합니다.",
     "recordShortcut": "프리셋 단축키 기록",
     "invalidShortcut": "유효한 단축키를 선택하세요.",
-    "usedByPreset": "“{{name}}” 프리셋에서 사용 중"
+    "usedByPreset": "“{{name}}” 프리셋에서 사용 중",
+    "shapeTitle": "말풍선 모양에 따라 스타일 적용",
+    "shapeEnabled": "감지할 때 적용",
+    "shapeHelp": "기존 텍스트는 스타일 메뉴의 모양 규칙 적용을 사용하세요. 색상 감지가 켜져 있으면 감지된 색상을 우선합니다.",
+    "defaultOnly": "기본 스타일만",
+    "presetMissing": "프리셋 없음",
+    "bubbleShape": "말풍선 모양: {{shape}}",
+    "shapeMeasures": "사각형 비율: {{rectangularity}}% · 볼록도: {{solidity}}% · 깊은 홈: {{spikes}}",
+    "measuresUnavailable": "모양 측정값이 없습니다.",
+    "applyShapeRules": "모양 규칙 적용",
+    "scopeSelection": "선택 영역",
+    "scopePage": "이 페이지",
+    "scopeProject": "모든 페이지",
+    "shapes": {
+      "rectangle": "사각형",
+      "round": "둥근 모양",
+      "spiky": "뾰족한 모양",
+      "free": "말풍선 없음",
+      "unknown": "사용 불가"
+    },
+    "shapeHints": {
+      "rectangle": "내레이션 및 제목",
+      "round": "대화",
+      "spiky": "외침",
+      "free": "자유 텍스트"
+    }
   }
 }

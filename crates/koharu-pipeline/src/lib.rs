@@ -28,6 +28,7 @@ pub use request::{InpaintingMask, Operation, Request, StopToken};
 pub use resources::{DeviceResources, ResourceSnapshot};
 pub use scope::{Bounds, Scope};
 pub use stage::Stage;
+pub use stages::bubble_shape;
 pub use stages::{Flux2KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, RoremMixedConfig};
 
 use images::ImageCache;

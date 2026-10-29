@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { FontPicker } from '@/components/controls/FontPicker'
+import { BubbleShapeLine } from '@/components/editor/BubbleShapeLine'
 import { StylesMenu } from '@/components/editor/StylesMenu'
 import { call } from '@/lib/backend'
 import { hexToRgba, rgbaToHex } from '@/lib/color'
@@ -215,6 +216,7 @@ function TypeInspector() {
     <div className='min-w-0 p-2' data-testid='type-inspector' aria-disabled={disabled}>
       <div className='grid min-w-0 gap-1.5'>
         <StylesMenu selected={selected.map((layer) => layer.id)} />
+        {current && <BubbleShapeLine layer={current.id} />}
         <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_2.5rem] gap-1.5'>
           <InspectorField label={t('inspector.font')}>
             <FontPicker

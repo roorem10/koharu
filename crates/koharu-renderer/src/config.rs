@@ -210,17 +210,33 @@ pub struct TextPreset {
 pub struct TextStyles {
     pub default_style: TextStyle,
     pub presets: Vec<TextPreset>,
+    pub shape_rules: ShapeRules,
     /// Distinguish a deliberate Clear from a pre-migration missing fill.
     pub legacy_color_migrated: bool,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize, Type)]
+#[serde(default)]
+pub struct ShapeRules {
+    pub enabled: bool,
+    pub rectangle: Option<String>,
+    pub round: Option<String>,
+    pub spiky: Option<String>,
+    pub free: Option<String>,
+}
+
 impl TextStyles {
-    pub fn load(legacy_color: Option<[u8; 4]>) -> anyhow::Result<koharu_config::Config<Self>> {
+    pub fn load(
+        legacy_color: impl FnOnce() -> anyhow::Result<Option<[u8; 4]>>,
+    ) -> anyhow::Result<koharu_config::Config<Self>> {
         let config = koharu_config::load::<Self>("text-styles")?;
         if !config.read()?.legacy_color_migrated {
+            // Read the retired setting before locking this section, and only
+            // for an unmigrated profile. Other sections can have live readers.
+            let color = legacy_color()?;
             let mut current = config.write()?;
             if !current.legacy_color_migrated {
-                current.migrate_color(legacy_color);
+                current.migrate_color(color);
                 current.save()?;
             }
         }
@@ -320,7 +336,10 @@ mod text_style_tests {
 
     #[test]
     fn partial_style_preserves_other_groups_origin_and_extensions() {
-        let original = typography();
+        let mut original = typography();
+        original.origin = koharu_scene::Origin::Generated(koharu_scene::Generation::new(
+            koharu_scene::ProducerId::new("dev.booharu.test").unwrap(),
+        ));
         let mut actual = original.clone();
         let style = TextStyle {
             fill: Some([255, 255, 255, 255]),
@@ -454,6 +473,113 @@ mod text_style_tests {
         existing.default_style.fill = Some([0, 0, 0, 255]);
         existing.migrate_color(legacy);
         assert_eq!(existing.default_style.fill, Some([0, 0, 0, 255]));
+    }
+
+    #[test]
+    fn missing_settings_file_and_persisted_styles_roundtrip() {
+        // Executable-relative preview settings let subprocesses test real files
+        // without ever opening a developer's normal profile.
+        if !koharu_config::preview::enabled() {
+            return;
+        }
+        const CHILD: &str = "BOOHARU_TEXT_STYLES_FILE_TEST";
+        let executable = std::env::current_exe().unwrap();
+        if let Ok(phase) = std::env::var(CHILD) {
+            let path = koharu_config::path().unwrap();
+            assert_eq!(
+                path,
+                executable
+                    .parent()
+                    .unwrap()
+                    .join("PreviewData/settings/config.toml")
+            );
+            let expected = TextStyles {
+                default_style: TextStyle {
+                    alignment: Some(AlignmentPart { value: None }),
+                    fill: Some([9, 8, 7, 255]),
+                    ..TextStyle::capture(&typography(), &[StyleGroup::Font, StyleGroup::Outline])
+                },
+                presets: vec![TextPreset {
+                    id: "round-trip".into(),
+                    name: "Round trip".into(),
+                    style: TextStyle::capture(&typography(), &[StyleGroup::Outline]),
+                    key: Some("ctrl+shift+1".into()),
+                }],
+                shape_rules: ShapeRules {
+                    spiky: Some("missing".into()),
+                    ..Default::default()
+                },
+                legacy_color_migrated: true,
+            };
+            let legacy = [20, 115, 235, 180];
+            match phase.as_str() {
+                "empty" => {
+                    assert!(!path.exists());
+                    let config = TextStyles::load(|| Ok(None)).unwrap();
+                    assert_eq!(config.read().unwrap().default_style, TextStyle::default());
+                    assert!(config.read().unwrap().presets.is_empty());
+                    *config.write().unwrap() = expected;
+                    config.save().unwrap();
+                }
+                "reload" => {
+                    let config =
+                        TextStyles::load(|| panic!("legacy color read after migration")).unwrap();
+                    assert_eq!(*config.read().unwrap(), expected);
+                }
+                "legacy" => {
+                    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                    std::fs::write(&path, "[pipeline]\ndetect_text_color = false\ndefault_text_color = [20, 115, 235, 180]\n").unwrap();
+                    let document: toml::Table =
+                        toml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+                    let color = document["pipeline"]["default_text_color"]
+                        .clone()
+                        .try_into::<[u8; 4]>()
+                        .unwrap();
+                    let config = TextStyles::load(|| Ok(Some(color))).unwrap();
+                    assert_eq!(config.read().unwrap().default_style.fill, Some(legacy));
+                    let document: toml::Table =
+                        toml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+                    assert_eq!(
+                        document["pipeline"]["default_text_color"]
+                            .clone()
+                            .try_into::<[u8; 4]>()
+                            .unwrap(),
+                        legacy
+                    );
+                    config.write().unwrap().default_style.fill = None;
+                    config.save().unwrap();
+                }
+                "legacy-reload" => {
+                    let config =
+                        TextStyles::load(|| panic!("legacy color read after clearing")).unwrap();
+                    assert_eq!(config.read().unwrap().default_style.fill, None);
+                    assert!(config.read().unwrap().legacy_color_migrated);
+                }
+                _ => panic!("unknown test phase"),
+            }
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        for (name, phases) in [
+            ("empty", ["empty", "reload"]),
+            ("legacy", ["legacy", "legacy-reload"]),
+        ] {
+            let folder = directory.path().join(name);
+            std::fs::create_dir_all(&folder).unwrap();
+            let copy = folder.join(executable.file_name().unwrap());
+            std::fs::copy(&executable, &copy).unwrap();
+            for phase in phases {
+                let output = std::process::Command::new(&copy)
+                    .args(["--exact", "config::text_style_tests::missing_settings_file_and_persisted_styles_roundtrip"])
+                    .env(CHILD, phase).output().unwrap();
+                assert!(
+                    output.status.success(),
+                    "{phase}: {}\n{}",
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+        }
     }
 
     #[test]

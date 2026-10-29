@@ -635,7 +635,7 @@
     "clearGroup": "{{group}}をクリア",
     "clear": "クリア",
     "notSet": "未設定",
-    "pipelineNote": "新しいテキストには既定のスタイルを使用します（設定 > 組版）。",
+    "pipelineNote": "新しいテキストには既定のスタイルを使用します。",
     "cancel": "キャンセル",
     "save": "保存",
     "groups": {
@@ -679,6 +679,31 @@
     "shortcutHelp": "数字の1～9がおすすめです。記録ボタンを押してからキーを入力します。Escapeで記録を取り消せます。",
     "recordShortcut": "プリセットのショートカットを記録",
     "invalidShortcut": "有効なショートカットを選んでください。",
-    "usedByPreset": "プリセット「{{name}}」が使用中"
+    "usedByPreset": "プリセット「{{name}}」が使用中",
+    "shapeTitle": "吹き出しの形でスタイルを適用",
+    "shapeEnabled": "検出時に適用",
+    "shapeHelp": "既存のテキストにはスタイルメニューの「形のルールを適用」を使用します。色検出が有効な場合は検出した色を優先します。",
+    "defaultOnly": "既定のスタイルのみ",
+    "presetMissing": "プリセットが見つかりません",
+    "bubbleShape": "吹き出しの形：{{shape}}",
+    "shapeMeasures": "矩形度：{{rectangularity}}% · 凸包充填率：{{solidity}}% · 深いくぼみ：{{spikes}}",
+    "measuresUnavailable": "形の測定値はありません。",
+    "applyShapeRules": "形のルールを適用",
+    "scopeSelection": "選択範囲",
+    "scopePage": "このページ",
+    "scopeProject": "全ページ",
+    "shapes": {
+      "rectangle": "長方形",
+      "round": "丸形",
+      "spiky": "ギザギザ",
+      "free": "吹き出しなし",
+      "unknown": "取得不可"
+    },
+    "shapeHints": {
+      "rectangle": "ナレーション・タイトル",
+      "round": "会話",
+      "spiky": "叫び",
+      "free": "自由なテキスト"
+    }
   }
 }

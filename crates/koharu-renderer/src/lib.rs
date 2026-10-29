@@ -15,8 +15,8 @@ mod text_renderer;
 mod types;
 
 pub use config::{
-    AlignmentPart, FontPart, OuterPart, OutlinePart, SizePart, StyleGroup, TextPreset, TextStyle,
-    TextStyles, TypesettingConfig, WritingModePart,
+    AlignmentPart, FontPart, OuterPart, OutlinePart, ShapeRules, SizePart, StyleGroup, TextPreset,
+    TextStyle, TextStyles, TypesettingConfig, WritingModePart,
 };
 pub use error::{Error, Result};
 pub use frame::{

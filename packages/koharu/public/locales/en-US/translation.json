@@ -635,7 +635,7 @@
     "clearGroup": "Clear {{group}}",
     "clear": "Clear",
     "notSet": "Not set",
-    "pipelineNote": "New text uses the default text style (Settings > Typesetting).",
+    "pipelineNote": "New text uses the default text style.",
     "cancel": "Cancel",
     "save": "Save",
     "groups": {
@@ -679,6 +679,31 @@
     "shortcutHelp": "Try digits 1–9. Click the recorder, then press a key or combination. Escape cancels recording.",
     "recordShortcut": "Record preset shortcut",
     "invalidShortcut": "Choose a valid shortcut.",
-    "usedByPreset": "Used by preset “{{name}}”"
+    "usedByPreset": "Used by preset “{{name}}”",
+    "shapeTitle": "Style by bubble shape",
+    "shapeEnabled": "Apply during detection",
+    "shapeHelp": "Use Apply shape rules in the Styles menu to restyle existing text. Detected colors keep priority when color detection is on.",
+    "defaultOnly": "Default style only",
+    "presetMissing": "Preset missing",
+    "bubbleShape": "Bubble shape: {{shape}}",
+    "shapeMeasures": "Rectangularity: {{rectangularity}}% · Solidity: {{solidity}}% · Deep dips: {{spikes}}",
+    "measuresUnavailable": "No shape measurements available.",
+    "applyShapeRules": "Apply shape rules",
+    "scopeSelection": "Selection",
+    "scopePage": "This page",
+    "scopeProject": "All pages",
+    "shapes": {
+      "rectangle": "Rectangle",
+      "round": "Round",
+      "spiky": "Spiky",
+      "free": "No bubble",
+      "unknown": "Unavailable"
+    },
+    "shapeHints": {
+      "rectangle": "Narration and titles",
+      "round": "Dialogue",
+      "spiky": "Shouting",
+      "free": "Free text"
+    }
   }
 }

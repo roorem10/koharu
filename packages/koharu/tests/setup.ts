@@ -4,6 +4,7 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import { queryClient } from '@/lib/queries'
 import { defaultShortcuts, useKoharuStore } from '@/lib/store'
 import { emptyTextStyle } from '@/lib/text-styles'
+import { commands } from '@koharu/bridge/protocol'
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
@@ -69,6 +70,11 @@ Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), writable: true }
 
 const initial = useKoharuStore.getState()
 beforeEach(() => {
+  vi.spyOn(commands, 'getTextBubbleShape').mockResolvedValue({
+    bubble: null,
+    shape: null,
+    measures: null,
+  })
   queryClient.clear()
   useKoharuStore.setState({
     ...initial,

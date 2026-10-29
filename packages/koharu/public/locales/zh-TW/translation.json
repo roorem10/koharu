@@ -635,7 +635,7 @@
     "clearGroup": "清除{{group}}",
     "clear": "清除",
     "notSet": "未設定",
-    "pipelineNote": "新文字使用預設文字樣式（設定 > 排版）。",
+    "pipelineNote": "新文字使用預設文字樣式。",
     "cancel": "取消",
     "save": "儲存",
     "groups": {
@@ -679,6 +679,31 @@
     "shortcutHelp": "建議使用數字1–9。點選記錄按鈕，再按下單鍵或組合鍵。按Escape取消記錄。",
     "recordShortcut": "記錄預設集快捷鍵",
     "invalidShortcut": "請選擇有效的快捷鍵。",
-    "usedByPreset": "已被預設集「{{name}}」使用"
+    "usedByPreset": "已被預設集「{{name}}」使用",
+    "shapeTitle": "依對話框形狀設定樣式",
+    "shapeEnabled": "偵測時套用",
+    "shapeHelp": "使用樣式選單中的「套用形狀規則」重新設定現有文字。啟用色彩偵測時，偵測到的色彩優先。",
+    "defaultOnly": "僅使用預設樣式",
+    "presetMissing": "預設集遺失",
+    "bubbleShape": "對話框形狀：{{shape}}",
+    "shapeMeasures": "矩形度：{{rectangularity}}% · 實心度：{{solidity}}% · 深凹陷數：{{spikes}}",
+    "measuresUnavailable": "尚無形狀測量資料。",
+    "applyShapeRules": "套用形狀規則",
+    "scopeSelection": "選取項目",
+    "scopePage": "本頁",
+    "scopeProject": "所有頁面",
+    "shapes": {
+      "rectangle": "矩形",
+      "round": "圓形",
+      "spiky": "鋸齒形",
+      "free": "無對話框",
+      "unknown": "無法取得"
+    },
+    "shapeHints": {
+      "rectangle": "旁白與標題",
+      "round": "對白",
+      "spiky": "喊叫",
+      "free": "自由文字"
+    }
   }
 }

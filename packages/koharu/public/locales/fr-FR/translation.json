@@ -635,7 +635,7 @@
     "clearGroup": "Effacer {{group}}",
     "clear": "Effacer",
     "notSet": "Non défini",
-    "pipelineNote": "Le nouveau texte utilise le style par défaut (Paramètres > Composition).",
+    "pipelineNote": "Le nouveau texte utilise le style par défaut.",
     "cancel": "Annuler",
     "save": "Enregistrer",
     "groups": {
@@ -679,6 +679,31 @@
     "shortcutHelp": "Essayez les chiffres 1 à 9. Activez l’enregistrement puis appuyez sur une touche ou une combinaison. Échap annule.",
     "recordShortcut": "Enregistrer le raccourci du préréglage",
     "invalidShortcut": "Choisissez un raccourci valide.",
-    "usedByPreset": "Utilisé par le préréglage « {{name}} »"
+    "usedByPreset": "Utilisé par le préréglage « {{name}} »",
+    "shapeTitle": "Style selon la forme des bulles",
+    "shapeEnabled": "Appliquer pendant la détection",
+    "shapeHelp": "Utilisez Appliquer les règles de forme dans Styles pour les textes existants. Les couleurs détectées restent prioritaires si leur détection est activée.",
+    "defaultOnly": "Style par défaut uniquement",
+    "presetMissing": "Préréglage manquant",
+    "bubbleShape": "Forme de bulle : {{shape}}",
+    "shapeMeasures": "Rectangularité : {{rectangularity}} % · Solidité : {{solidity}} % · Creux profonds : {{spikes}}",
+    "measuresUnavailable": "Aucune mesure de forme disponible.",
+    "applyShapeRules": "Appliquer les règles de forme",
+    "scopeSelection": "Sélection",
+    "scopePage": "Cette page",
+    "scopeProject": "Toutes les pages",
+    "shapes": {
+      "rectangle": "Rectangle",
+      "round": "Ronde",
+      "spiky": "Dentelée",
+      "free": "Sans bulle",
+      "unknown": "Indisponible"
+    },
+    "shapeHints": {
+      "rectangle": "Narration et titres",
+      "round": "Dialogue",
+      "spiky": "Cris",
+      "free": "Texte libre"
+    }
   }
 }

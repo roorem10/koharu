@@ -635,7 +635,7 @@
     "clearGroup": "{{group}} grubunu temizle",
     "clear": "Temizle",
     "notSet": "Ayarlanmadı",
-    "pipelineNote": "Yeni metin varsayılan metin stilini kullanır (Ayarlar > Dizgi).",
+    "pipelineNote": "Yeni metin varsayılan metin stilini kullanır.",
     "cancel": "İptal",
     "save": "Kaydet",
     "groups": {
@@ -679,6 +679,31 @@
     "shortcutHelp": "1–9 rakamlarını deneyin. Kaydı başlatıp bir tuşa veya birleşime basın. Escape kaydı iptal eder.",
     "recordShortcut": "Hazır ayar kısayolunu kaydet",
     "invalidShortcut": "Geçerli bir kısayol seçin.",
-    "usedByPreset": "“{{name}}” hazır ayarı kullanıyor"
+    "usedByPreset": "“{{name}}” hazır ayarı kullanıyor",
+    "shapeTitle": "Balon şekline göre stil",
+    "shapeEnabled": "Algılama sırasında uygula",
+    "shapeHelp": "Mevcut metni biçimlendirmek için Stiller menüsündeki Şekil kurallarını uygula seçeneğini kullanın. Renk algılama açıksa algılanan renkler önceliklidir.",
+    "defaultOnly": "Yalnızca varsayılan stil",
+    "presetMissing": "Hazır ayar eksik",
+    "bubbleShape": "Balon şekli: {{shape}}",
+    "shapeMeasures": "Dikdörtgenlik: %{{rectangularity}} · Doluluk: %{{solidity}} · Derin girintiler: {{spikes}}",
+    "measuresUnavailable": "Şekil ölçümü yok.",
+    "applyShapeRules": "Şekil kurallarını uygula",
+    "scopeSelection": "Seçim",
+    "scopePage": "Bu sayfa",
+    "scopeProject": "Tüm sayfalar",
+    "shapes": {
+      "rectangle": "Dikdörtgen",
+      "round": "Yuvarlak",
+      "spiky": "Sivri",
+      "free": "Balon yok",
+      "unknown": "Kullanılamıyor"
+    },
+    "shapeHints": {
+      "rectangle": "Anlatım ve başlıklar",
+      "round": "Diyalog",
+      "spiky": "Bağırma",
+      "free": "Serbest metin"
+    }
   }
 }

@@ -43,6 +43,7 @@ vello = { workspace = true }
 webp = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 toml = { workspace = true }
 criterion = { workspace = true }
 
