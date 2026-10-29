@@ -224,7 +224,8 @@
     "outlineJoin": "Esquinas",
     "outlineRound": "Redondas",
     "outlineMiter": "Puntiagudas",
-    "outlineBevel": "Biseladas"
+    "outlineBevel": "Biseladas",
+    "swapFillOutline": "Intercambiar colores de relleno y contorno"
   },
   "languages": {
     "ar": "العربية",

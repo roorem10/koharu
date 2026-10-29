@@ -224,7 +224,8 @@
     "outlineJoin": "الزوايا",
     "outlineRound": "مستديرة",
     "outlineMiter": "حادة",
-    "outlineBevel": "مشطوفة"
+    "outlineBevel": "مشطوفة",
+    "swapFillOutline": "تبديل لوني التعبئة والحد"
   },
   "languages": {
     "ar": "العربية",

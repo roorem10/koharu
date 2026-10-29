@@ -224,7 +224,8 @@
     "outlineJoin": "角の形状",
     "outlineRound": "丸形",
     "outlineMiter": "鋭角",
-    "outlineBevel": "面取り"
+    "outlineBevel": "面取り",
+    "swapFillOutline": "塗りと縁取りの色を入れ替える"
   },
   "languages": {
     "ar": "العربية",
