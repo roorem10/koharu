@@ -305,6 +305,37 @@ impl Edit {
         Ok(())
     }
 
+    /// Automatic restyling changes presentation without claiming a manual edit.
+    /// Preserve the existing component owner; pipeline edits must use `set`.
+    pub fn set_typography_preserving_origin(
+        &mut self,
+        entity: EntityId,
+        typography: &crate::Typography,
+    ) -> Result<()> {
+        if self.generation.is_some() {
+            return Err(Error::Authorship(
+                "automatic restyling is not a pipeline edit".into(),
+            ));
+        }
+        let owner = ComponentOwner::Entity(entity);
+        let component_key = key::<crate::Typography>()?;
+        let record = self
+            .component(owner, &component_key)?
+            .ok_or_else(|| Error::invalid("text layer has no typography"))?;
+        let record_exists = |id| self.state.contains_entity(id);
+        let blob_exists = |_id| true;
+        let original = decode::<crate::Typography>(
+            record,
+            &ValidationContext::new(&record_exists, &blob_exists),
+        )?;
+        self.observe_component(owner, component_key.clone())?;
+        let mut value = typography.clone();
+        value.origin = original.origin;
+        self.replace_component(owner, component_key, Some(self.encode_value(&value)?))?;
+        self.validate_entities.insert(entity);
+        Ok(())
+    }
+
     pub fn set_project<T: Component>(&mut self, value: &T) -> Result<()> {
         if matches!(
             T::KIND,

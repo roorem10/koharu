@@ -616,6 +616,103 @@ impl Project {
         self.commit(patch).await
     }
 
+    pub(crate) fn style_targets(
+        snapshot: &Snapshot,
+        scope: super::styles::StyleScope,
+    ) -> Result<Vec<EntityId>> {
+        use super::styles::StyleScope;
+        let mut targets = Vec::new();
+        match scope {
+            StyleScope::Layers(layers) => targets = layers,
+            StyleScope::Page(page) => {
+                targets.extend(snapshot.page(page)?.text_layers()?.map(|layer| layer.id()))
+            }
+            StyleScope::Project => {
+                for page in snapshot.pages() {
+                    targets.extend(page.text_layers()?.map(|layer| layer.id()));
+                }
+            }
+        }
+        let mut seen = HashSet::new();
+        targets.retain(|layer| seen.insert(*layer));
+        Ok(targets)
+    }
+
+    pub(crate) async fn apply_style(
+        &mut self,
+        scope: super::styles::StyleScope,
+        promote_user: bool,
+        include_user: bool,
+        mut update: impl FnMut(&Snapshot, EntityId, &mut SceneTypography) -> Result<()>,
+    ) -> Result<(Option<Commit>, super::styles::StyleApplyResult)> {
+        use koharu_renderer::{StyleGroup, TextStyle};
+        let snapshot = self.snapshot();
+        let mut result = super::styles::StyleApplyResult::default();
+        let mut updates = Vec::new();
+        let keep_manual = !include_user && !matches!(scope, super::styles::StyleScope::Layers(_));
+        for layer in Self::style_targets(&snapshot, scope)? {
+            if keep_manual
+                && snapshot
+                    .component::<SceneTypography>(layer)?
+                    .is_some_and(|t| t.origin == Origin::User)
+            {
+                result.kept_manual += 1;
+                continue;
+            }
+            let prepared = (|| -> Result<_> {
+                let content = Self::text_content(&snapshot, layer)?;
+                snapshot.text_content(content)?;
+                let original = snapshot
+                    .component::<SceneTypography>(layer)?
+                    .context("text layer has no typography")?;
+                let mut typography = original.clone();
+                update(&snapshot, layer, &mut typography)?;
+                TextStyle::capture(
+                    &typography,
+                    &[
+                        StyleGroup::Font,
+                        StyleGroup::Size,
+                        StyleGroup::Fill,
+                        StyleGroup::Outline,
+                        StyleGroup::OuterOutline,
+                        StyleGroup::Alignment,
+                        StyleGroup::WritingMode,
+                    ],
+                )
+                .validate()?;
+                Ok((content, original, typography))
+            })();
+            let Ok((content, original, mut typography)) = prepared else {
+                result.skipped += 1;
+                continue;
+            };
+            if original == typography {
+                continue;
+            }
+            if promote_user {
+                typography.origin = Origin::User;
+            }
+            updates.push((layer, content, typography));
+        }
+        if updates.is_empty() {
+            return Ok((None, result));
+        }
+        result.changed = u32::try_from(updates.len())?;
+        let patch = snapshot.patch(|edit| {
+            for (layer, content, typography) in updates {
+                if promote_user {
+                    edit.promote_entity_to_user(layer)?;
+                    edit.promote_entity_to_user(content)?;
+                    edit.set(layer, &typography)?;
+                } else {
+                    edit.set_typography_preserving_origin(layer, &typography)?;
+                }
+            }
+            Ok(())
+        })?;
+        Ok((Some(self.commit(patch).await?), result))
+    }
+
     pub(crate) async fn set_geometry(&mut self, updates: Vec<GeometryUpdate>) -> Result<Commit> {
         let snapshot = self.snapshot();
         let updates = updates
@@ -1394,6 +1491,175 @@ mod tests {
     use koharu_scene::{Generation, ProducerId, WritingMode};
 
     use super::*;
+
+    fn style_test_typography() -> SceneTypography {
+        SceneTypography {
+            origin: Origin::User,
+            preferred_font: Some("Original".into()),
+            font_weight: Some(400),
+            font_style: None,
+            size: Some(24.0),
+            auto_fit: false,
+            color: Some([0, 0, 0, 255]),
+            stroke_color: Some([255, 255, 255, 255]),
+            stroke_width: Some(0.0),
+            stroke_method: Some(koharu_scene::StrokeMethod::Contour),
+            stroke_position: None,
+            stroke_join: None,
+            outer_stroke_color: None,
+            outer_stroke_width: None,
+            alignment: Some(koharu_scene::TextAlignment::Center),
+            writing_mode: Some(WritingMode::Horizontal),
+            extensions: [("dev.booharu.test".into(), "kept".into())].into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn batch_text_styles_change_three_boxes_in_one_undo_and_ignore_noops() {
+        let mut session = Session::memory().await.unwrap();
+        let original = style_test_typography();
+        let mut layers = Vec::new();
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                for count in [2, 1] {
+                    let page = edit.add_page(PageDraft::new("page", 100.0, 100.0), At::End)?;
+                    for _ in 0..count {
+                        let content = edit.add_text_content(page, At::End)?;
+                        let layer = edit.add_text_layer(
+                            page,
+                            At::End,
+                            content,
+                            &SceneTextLayout {
+                                origin: Origin::User,
+                                kind: TextLayoutKind::Paragraph,
+                                angle_degrees: None,
+                            },
+                        )?;
+                        edit.set(layer, &original)?;
+                        layers.push(layer);
+                    }
+                }
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let mut project = Project::new(session, "styles".into());
+        let style = koharu_renderer::TextStyle {
+            fill: Some([255, 255, 255, 255]),
+            ..Default::default()
+        };
+        let (commit, result) = project
+            .apply_style(
+                super::super::styles::StyleScope::Project,
+                true,
+                true,
+                |_, _, typography| {
+                    style.apply_to(typography);
+                    Ok(())
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(result.changed, 3);
+        assert_eq!(result.skipped, 0);
+        project.record_commit(&commit.unwrap());
+        assert_eq!(project.undo.len(), 1);
+        for &layer in &layers {
+            let typography = project
+                .snapshot()
+                .component::<SceneTypography>(layer)
+                .unwrap()
+                .unwrap();
+            assert_eq!(typography.color, style.fill);
+            assert_eq!(typography.size, original.size);
+            assert_eq!(typography.extensions, original.extensions);
+        }
+        let (commit, result) = project
+            .apply_style(
+                super::super::styles::StyleScope::Project,
+                true,
+                true,
+                |_, _, typography| {
+                    style.apply_to(typography);
+                    Ok(())
+                },
+            )
+            .await
+            .unwrap();
+        assert!(commit.is_none());
+        assert_eq!(result.changed, 0);
+        assert_eq!(project.undo.len(), 1);
+        project.undo().await.unwrap();
+        for layer in layers {
+            assert_eq!(
+                project
+                    .snapshot()
+                    .component::<SceneTypography>(layer)
+                    .unwrap()
+                    .unwrap(),
+                original
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn batch_text_styles_skip_a_missing_content_relation() {
+        let mut session = Session::memory().await.unwrap();
+        let mut layers = Vec::new();
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 100.0, 100.0), At::End)?;
+                for _ in 0..2 {
+                    let content = edit.add_text_content(page, At::End)?;
+                    let layer = edit.add_text_layer(
+                        page,
+                        At::End,
+                        content,
+                        &SceneTextLayout {
+                            origin: Origin::User,
+                            kind: TextLayoutKind::Paragraph,
+                            angle_degrees: None,
+                        },
+                    )?;
+                    edit.set(layer, &style_test_typography())?;
+                    layers.push(layer);
+                }
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let relation = snapshot
+            .relation_from::<Presents>(layers[0])
+            .unwrap()
+            .unwrap()
+            .id();
+        let patch = snapshot
+            .patch(|edit| edit.remove_relation(relation))
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let mut project = Project::new(session, "styles".into());
+        let style = koharu_renderer::TextStyle {
+            fill: Some([255, 255, 255, 255]),
+            ..Default::default()
+        };
+        let (commit, result) = project
+            .apply_style(
+                super::super::styles::StyleScope::Layers(layers),
+                true,
+                true,
+                |_, _, typography| {
+                    style.apply_to(typography);
+                    Ok(())
+                },
+            )
+            .await
+            .unwrap();
+        assert!(commit.is_some());
+        assert_eq!(result.changed, 1);
+        assert_eq!(result.skipped, 1);
+    }
 
     #[tokio::test]
     async fn imported_pages_append_with_source_assets_and_one_undo() {

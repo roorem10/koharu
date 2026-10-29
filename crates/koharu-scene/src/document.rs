@@ -209,6 +209,14 @@ impl Snapshot {
 }
 
 impl<'a> PageRef<'a> {
+    pub fn text_layers(self) -> Result<impl ExactSizeIterator<Item = TextLayerRef<'a>>> {
+        let mut layers = Vec::new();
+        if let Some(group) = self.text_group()? {
+            layers.extend(group.text_layers()?);
+        }
+        Ok(layers.into_iter())
+    }
+
     pub fn text_group(self) -> Result<Option<GroupRef<'a>>> {
         let mut groups = Vec::new();
         for id in self.snapshot.children(self.id)? {
