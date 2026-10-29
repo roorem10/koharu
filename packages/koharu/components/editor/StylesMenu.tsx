@@ -12,6 +12,7 @@ import { useKoharuStore } from '@/lib/store'
 import { emptyTextStyle } from '@/lib/text-styles'
 import { commands, type EntityId, type StyleScope, type TextStyle } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
+import { Checkbox } from '@koharu/ui/components/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -39,27 +40,33 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
   const [capture, setCapture] = useState<EntityId | null>(null)
   const [confirmation, setConfirmation] = useState<{
     scope: StyleScope
-    count: number
+    restylable: number
+    manual: number
     shape: boolean
   } | null>(null)
+  const [includeUser, setIncludeUser] = useState(false)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     if (!styles) void refreshTextStyles().catch(() => undefined)
   }, [styles])
 
-  const apply = async (scope: StyleScope, style?: TextStyle) => {
+  const apply = async (scope: StyleScope, style?: TextStyle, includeUser = false) => {
     setBusy(true)
     try {
       const result = style
         ? await call(commands.applyTextStyle, scope, style)
-        : await call(commands.applyShapeRules, scope)
+        : await call(commands.applyShapeRules, scope, includeUser)
       await refresh(projectKey, pagesKey, pageKey)
       toast.add({
         type: 'success',
         title: t('textStyles.applied', { count: result.changed }),
-        description: result.skipped
-          ? t('textStyles.skipped', { count: result.skipped })
-          : undefined,
+        description:
+          [
+            result.skipped ? t('textStyles.skipped', { count: result.skipped }) : '',
+            result.kept_manual ? t('textStyles.keptManual', { count: result.kept_manual }) : '',
+          ]
+            .filter(Boolean)
+            .join(' ') || undefined,
       })
       setConfirmation(null)
     } finally {
@@ -67,8 +74,9 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
     }
   }
   const confirm = async (scope: StyleScope, shape = false) => {
-    const count = await call(commands.countTextStyleTargets, scope)
-    setConfirmation({ scope, count, shape })
+    const counts = await call(commands.countTextStyleTargets, scope)
+    setIncludeUser(false)
+    setConfirmation({ scope, ...counts, shape })
   }
   const presets = styles?.presets ?? []
   const defaultStyle = styles?.default_style ?? emptyTextStyle
@@ -192,19 +200,46 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
             {t(confirmation?.shape ? 'textStyles.applyShapeRules' : 'textStyles.applyDefault')}
           </DialogTitle>
           <DialogDescription>
-            {t('textStyles.confirmApply', { count: confirmation?.count ?? 0 })}
+            {t('textStyles.confirmApply', {
+              count: confirmation
+                ? confirmation.restylable +
+                  (confirmation.shape && !includeUser ? 0 : confirmation.manual)
+                : 0,
+            })}
           </DialogDescription>
+          {confirmation?.shape && (
+            <>
+              <p className='text-sm text-muted-foreground'>
+                {t('textStyles.manualCount', { count: confirmation.manual })}
+              </p>
+              <label className='flex items-center gap-2 text-sm'>
+                <Checkbox
+                  checked={includeUser}
+                  onCheckedChange={(checked) => setIncludeUser(checked === true)}
+                />
+                {t('textStyles.includeManual')}
+              </label>
+            </>
+          )}
           <DialogFooter>
             <Button variant='outline' disabled={busy} onClick={() => setConfirmation(null)}>
               {t('textStyles.cancel')}
             </Button>
             <Button
-              disabled={busy || !confirmation?.count}
+              disabled={
+                busy ||
+                !confirmation ||
+                !(
+                  confirmation.restylable +
+                  (confirmation.shape && !includeUser ? 0 : confirmation.manual)
+                )
+              }
               onClick={() => {
                 if (confirmation)
                   void apply(
                     confirmation.scope,
                     confirmation.shape ? undefined : defaultStyle,
+                    includeUser,
                   ).catch(() => undefined)
               }}
             >

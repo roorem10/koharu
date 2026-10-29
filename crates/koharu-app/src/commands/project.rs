@@ -644,7 +644,7 @@ impl Project {
         style: &koharu_renderer::TextStyle,
     ) -> Result<(Option<Commit>, super::styles::StyleApplyResult)> {
         style.validate()?;
-        self.apply_style(scope, |_, _, typography| {
+        self.apply_style(scope, true, true, |_, _, typography| {
             style.apply_to(typography);
             Ok(())
         })
@@ -656,13 +656,14 @@ impl Project {
         scope: super::styles::StyleScope,
         styles: &koharu_renderer::TextStyles,
         detect_colors: bool,
+        include_user: bool,
     ) -> Result<(Option<Commit>, super::styles::StyleApplyResult)> {
         use koharu_pipeline::bubble_shape::{style_for_shape, text_bubble_shape};
         styles.validate()?;
         if !styles.shape_rules.enabled {
             return Ok((None, Default::default()));
         }
-        self.apply_style(scope, |snapshot, layer, typography| {
+        self.apply_style(scope, false, include_user, |snapshot, layer, typography| {
             let info = text_bubble_shape(snapshot, layer)?;
             anyhow::ensure!(
                 info.bubble.is_none() || info.measures.is_some(),
@@ -679,16 +680,27 @@ impl Project {
         .await
     }
 
-    async fn apply_style(
+    pub(crate) async fn apply_style(
         &mut self,
         scope: super::styles::StyleScope,
+        promote_user: bool,
+        include_user: bool,
         mut update: impl FnMut(&Snapshot, EntityId, &mut SceneTypography) -> Result<()>,
     ) -> Result<(Option<Commit>, super::styles::StyleApplyResult)> {
         use koharu_renderer::{StyleGroup, TextStyle};
         let snapshot = self.snapshot();
         let mut result = super::styles::StyleApplyResult::default();
         let mut updates = Vec::new();
+        let keep_manual = !include_user && !matches!(scope, super::styles::StyleScope::Layers(_));
         for layer in Self::style_targets(&snapshot, scope)? {
+            if keep_manual
+                && snapshot
+                    .component::<SceneTypography>(layer)?
+                    .is_some_and(|t| t.origin == Origin::User)
+            {
+                result.kept_manual += 1;
+                continue;
+            }
             let prepared = (|| -> Result<_> {
                 let content = Self::text_content(&snapshot, layer)?;
                 snapshot.text_content(content)?;
@@ -719,7 +731,9 @@ impl Project {
             if original == typography {
                 continue;
             }
-            typography.origin = Origin::User;
+            if promote_user {
+                typography.origin = Origin::User;
+            }
             updates.push((layer, content, typography));
         }
         if updates.is_empty() {
@@ -728,9 +742,13 @@ impl Project {
         result.changed = u32::try_from(updates.len())?;
         let patch = snapshot.patch(|edit| {
             for (layer, content, typography) in updates {
-                edit.promote_entity_to_user(layer)?;
-                edit.promote_entity_to_user(content)?;
-                edit.set(layer, &typography)?;
+                if promote_user {
+                    edit.promote_entity_to_user(layer)?;
+                    edit.promote_entity_to_user(content)?;
+                    edit.set(layer, &typography)?;
+                } else {
+                    edit.set_typography_preserving_origin(layer, &typography)?;
+                }
             }
             Ok(())
         })?;
@@ -1753,7 +1771,12 @@ mod tests {
         };
         let mut project = Project::new(session, "shapes".into());
         let (commit, result) = project
-            .apply_shape_rules(super::super::styles::StyleScope::Project, &styles, false)
+            .apply_shape_rules(
+                super::super::styles::StyleScope::Project,
+                &styles,
+                false,
+                true,
+            )
             .await
             .unwrap();
         assert_eq!(result.changed, 3);
@@ -1786,11 +1809,124 @@ mod tests {
         }
         styles.shape_rules.enabled = false;
         let (commit, result) = project
-            .apply_shape_rules(super::super::styles::StyleScope::Project, &styles, false)
+            .apply_shape_rules(
+                super::super::styles::StyleScope::Project,
+                &styles,
+                false,
+                true,
+            )
             .await
             .unwrap();
         assert!(commit.is_none());
         assert_eq!(result.changed, 0);
+    }
+
+    #[tokio::test]
+    async fn shape_rules_keep_manual_boxes_and_generated_ownership() {
+        use super::super::styles::StyleScope;
+        use koharu_renderer::{ShapeRules, TextStyle, TextStyles};
+        let mut session = Session::memory().await.unwrap();
+        let generation = Generation::new(ProducerId::new("dev.koharu.pipeline.detection").unwrap());
+        let mut edit = session.snapshot().edit_as(generation.clone());
+        let mut layers = Vec::new();
+        for _ in 0..2 {
+            let page = edit
+                .add_page(PageDraft::new("page", 300.0, 300.0), At::End)
+                .unwrap();
+            let content = edit.add_text_content(page, At::End).unwrap();
+            let layer = edit
+                .add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &SceneTextLayout {
+                        origin: Origin::Generated(generation.clone()),
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                    },
+                )
+                .unwrap();
+            edit.set(layer, &style_test_typography()).unwrap();
+            layers.push((layer, content));
+        }
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let mut project = Project::new(session, "manual rules".into());
+        let manual_style = TextStyle {
+            fill: Some([1, 2, 3, 255]),
+            ..Default::default()
+        };
+        project
+            .apply_text_style(StyleScope::Layers(vec![layers[0].0]), &manual_style)
+            .await
+            .unwrap();
+        let styles = TextStyles {
+            default_style: TextStyle {
+                fill: Some([4, 5, 6, 255]),
+                ..Default::default()
+            },
+            shape_rules: ShapeRules {
+                enabled: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let (commit, result) = project
+            .apply_shape_rules(StyleScope::Project, &styles, false, false)
+            .await
+            .unwrap();
+        assert_eq!(
+            (result.changed, result.skipped, result.kept_manual),
+            (1, 0, 1)
+        );
+        project.record_commit(&commit.unwrap());
+        let snapshot = project.snapshot();
+        assert_eq!(
+            snapshot
+                .component::<SceneTypography>(layers[0].0)
+                .unwrap()
+                .unwrap()
+                .color,
+            manual_style.fill
+        );
+        assert!(matches!(
+            snapshot
+                .component::<SceneTypography>(layers[1].0)
+                .unwrap()
+                .unwrap()
+                .origin,
+            Origin::Generated(_)
+        ));
+        for id in [layers[1].0, layers[1].1] {
+            assert!(matches!(
+                snapshot
+                    .component::<koharu_scene::EntityOrigin>(id)
+                    .unwrap()
+                    .unwrap()
+                    .origin,
+                Origin::Generated(_)
+            ));
+        }
+        project.undo().await.unwrap();
+        let (commit, result) = project
+            .apply_shape_rules(StyleScope::Project, &styles, false, true)
+            .await
+            .unwrap();
+        assert_eq!((result.changed, result.kept_manual), (2, 0));
+        project.record_commit(&commit.unwrap());
+        project.undo().await.unwrap();
+        let (_, result) = project
+            .apply_shape_rules(StyleScope::Layers(vec![layers[0].0]), &styles, false, false)
+            .await
+            .unwrap();
+        assert_eq!((result.changed, result.kept_manual), (1, 0));
+        // A second automatic run still targets generated boxes.
+        let mut changed_styles = styles.clone();
+        changed_styles.default_style.fill = Some([7, 8, 9, 255]);
+        let (_, result) = project
+            .apply_shape_rules(StyleScope::Project, &changed_styles, false, false)
+            .await
+            .unwrap();
+        assert_eq!((result.changed, result.kept_manual), (1, 1));
     }
 
     #[tokio::test]

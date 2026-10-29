@@ -298,8 +298,8 @@ describe('greenfield editor', () => {
     useKoharuStore.setState({
       textStyles: { default_style: style, presets: [], legacy_color_migrated: true },
     })
-    vi.spyOn(commands, 'countTextStyleTargets').mockResolvedValue(3)
-    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 3, skipped: 0 })
+    vi.spyOn(commands, 'countTextStyleTargets').mockResolvedValue({ restylable: 2, manual: 1 })
+    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 3, skipped: 0, kept_manual: 0 })
     vi.spyOn(commands, 'getProject').mockResolvedValue(
       queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!,
     )
@@ -343,7 +343,7 @@ describe('greenfield editor', () => {
         legacy_color_migrated: true,
       },
     })
-    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 2, skipped: 0 })
+    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 2, skipped: 0, kept_manual: 0 })
     vi.spyOn(commands, 'getProject').mockResolvedValue(
       queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!,
     )
@@ -373,7 +373,7 @@ describe('greenfield editor', () => {
         legacy_color_migrated: true,
       },
     })
-    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 0, skipped: 0 })
+    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 0, skipped: 0, kept_manual: 0 })
     render(<Inspector />)
     fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
     const row = await screen.findByRole('menuitem', { name: /^White outline/ })
@@ -438,7 +438,7 @@ describe('greenfield editor', () => {
     )
   })
 
-  it('confirms project-wide shape rules before one native edit', async () => {
+  it.each([false, true])('confirms project-wide shape rules with include manual = %s', async (includeUser) => {
     installProject()
     useKoharuStore.setState({
       textStyles: {
@@ -447,10 +447,10 @@ describe('greenfield editor', () => {
         shape_rules: { enabled: true },
       },
     })
-    vi.spyOn(commands, 'countTextStyleTargets').mockResolvedValue(3)
+    vi.spyOn(commands, 'countTextStyleTargets').mockResolvedValue({ restylable: 2, manual: 1 })
     const apply = vi
       .spyOn(commands, 'applyShapeRules')
-      .mockResolvedValue({ changed: 3, skipped: 0 })
+      .mockResolvedValue({ changed: 3, skipped: 0, kept_manual: 0 })
     vi.spyOn(commands, 'getProject').mockResolvedValue(
       queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!,
     )
@@ -465,10 +465,17 @@ describe('greenfield editor', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
     await user.hover(await screen.findByRole('menuitem', { name: 'Apply shape rules' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'All pages' }))
-    expect(await screen.findByRole('dialog')).toHaveTextContent('3')
+    expect(await screen.findByRole('dialog')).toHaveTextContent('2')
+    expect(screen.getByRole('dialog')).toHaveTextContent('1 box changed by hand')
+    const checkbox = screen.getByRole('checkbox', { name: 'Also restyle boxes I changed by hand' })
+    expect(checkbox).not.toBeChecked()
     expect(apply).not.toHaveBeenCalled()
+    if (includeUser) {
+      await user.click(checkbox)
+      expect(screen.getByRole('dialog')).toHaveTextContent('3')
+    }
     await user.click(screen.getByRole('button', { name: 'Apply' }))
-    await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith('project'))
+    await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith('project', includeUser))
   })
 
   it('shows the selected bubble shape with polygon measurements', async () => {

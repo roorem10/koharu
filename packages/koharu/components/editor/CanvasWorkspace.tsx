@@ -443,7 +443,8 @@ export function CanvasWorkspace() {
           .map((layer) => layer.id)
         if (!selected.length) return
         event.preventDefault()
-        void call(commands.applyTextStyle, { layers: selected }, preset.style)
+        void commands
+          .applyTextStyle({ layers: selected }, preset.style)
           .then((result) => {
             toast.add({
               type: 'success',
@@ -454,7 +455,7 @@ export function CanvasWorkspace() {
             })
             return refresh(projectKey, pagesKey, pageKey)
           })
-          .catch(() => undefined)
+          .catch((error: unknown) => receiveError(errorMessage(error)))
       }
       const modified = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey
       // CEF's capture-phase page-zoom blocker has already prevented the default here.

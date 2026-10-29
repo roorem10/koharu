@@ -21,6 +21,13 @@ pub enum StyleScope {
 pub struct StyleApplyResult {
     pub changed: u32,
     pub skipped: u32,
+    pub kept_manual: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Type)]
+pub struct StyleTargetCounts {
+    pub restylable: u32,
+    pub manual: u32,
 }
 
 #[tauri::command]
@@ -28,12 +35,22 @@ pub struct StyleApplyResult {
 pub(crate) async fn count_text_style_targets(
     scope: StyleScope,
     project: State<'_, CurrentProject>,
-) -> Result<u32, Error> {
+) -> Result<StyleTargetCounts, Error> {
     let project = project.project.lock().await;
     let project = project.as_ref().context("no project is open")?;
-    Ok(u32::try_from(
-        Project::style_targets(&project.snapshot(), scope)?.len(),
-    )?)
+    let snapshot = project.snapshot();
+    let mut counts = StyleTargetCounts::default();
+    for layer in Project::style_targets(&snapshot, scope)? {
+        if snapshot
+            .component::<Typography>(layer)?
+            .is_some_and(|t| t.origin == koharu_scene::Origin::User)
+        {
+            counts.manual += 1;
+        } else {
+            counts.restylable += 1;
+        }
+    }
+    Ok(counts)
 }
 
 #[tauri::command]
@@ -79,6 +96,7 @@ pub(crate) async fn get_text_bubble_shape(
 #[specta::specta]
 pub(crate) async fn apply_shape_rules(
     scope: StyleScope,
+    include_user: bool,
     desktop: State<'_, Desktop>,
     project: State<'_, CurrentProject>,
     canvas_channel: State<'_, CanvasChannel>,
@@ -91,7 +109,7 @@ pub(crate) async fn apply_shape_rules(
         let mut project = project.project.lock().await;
         let project = project.as_mut().context("no project is open")?;
         let (commit, result) = project
-            .apply_shape_rules(scope, &styles, detect_colors)
+            .apply_shape_rules(scope, &styles, detect_colors, include_user)
             .await?;
         if let Some(commit) = &commit {
             project.record_commit(commit);

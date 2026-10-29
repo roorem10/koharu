@@ -8,6 +8,7 @@ import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { emptyTextStyle } from '@/lib/text-styles'
 import { commands, type Layer } from '@koharu/bridge/protocol'
+import { toast } from '@koharu/ui/components/toast'
 import { Slider } from '@koharu/ui/components/slider'
 import { TooltipProvider } from '@koharu/ui/components/tooltip'
 
@@ -204,7 +205,7 @@ describe('canvas interaction adapter', () => {
         presets: [{ id: 'one', name: 'White', key: binding, style }],
       },
     })
-    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 2, skipped: 0 })
+    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 2, skipped: 0, kept_manual: 0 })
     vi.spyOn(commands, 'getPage').mockResolvedValue(nextPage)
     vi.spyOn(commands, 'getPages').mockResolvedValue([])
     vi.spyOn(commands, 'getProject').mockResolvedValue(
@@ -218,6 +219,24 @@ describe('canvas interaction adapter', () => {
     )
   })
 
+  it('shows the usual error toast when a preset key fails', async () => {
+    installNudgeProject()
+    useKoharuStore.setState({
+      selectedLayers: ['element'],
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [{ id: 'one', name: 'White', key: '1', style: { ...emptyTextStyle } }],
+      },
+    })
+    vi.spyOn(commands, 'applyTextStyle').mockRejectedValue(new Error('Style could not be applied'))
+    const notify = vi.spyOn(toast, 'add')
+    renderWorkspace()
+    fireEvent.keyDown(window, { key: '1', code: 'Digit1' })
+    await waitFor(() => expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'error', description: 'Style could not be applied',
+    })))
+  })
+
   it('keeps preset digits in text entry and ignores composition, handled events and empty selections', async () => {
     installNudgeProject()
     useKoharuStore.setState({
@@ -226,7 +245,7 @@ describe('canvas interaction adapter', () => {
         presets: [{ id: 'one', name: 'White', key: '1', style: { ...emptyTextStyle } }],
       },
     })
-    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 1, skipped: 0 })
+    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 1, skipped: 0, kept_manual: 0 })
     renderWorkspace()
     const textarea = document.createElement('textarea')
     textarea.setAttribute('aria-label', 'Translation')

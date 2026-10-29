@@ -56,8 +56,8 @@ export const commands = {
 	saveTextStyles: (styles: TextStyles) => __TAURI_INVOKE<TextStyles>("save_text_styles", { styles }),
 	captureTextStyle: (layer: EntityId, groups: StyleGroup[]) => __TAURI_INVOKE<TextStyle>("capture_text_style", { layer, groups }),
 	applyTextStyle: (scope: StyleScope, style: TextStyle) => __TAURI_INVOKE<StyleApplyResult>("apply_text_style", { scope, style }),
-	countTextStyleTargets: (scope: StyleScope) => __TAURI_INVOKE<number>("count_text_style_targets", { scope }),
-	applyShapeRules: (scope: StyleScope) => __TAURI_INVOKE<StyleApplyResult>("apply_shape_rules", { scope }),
+	countTextStyleTargets: (scope: StyleScope) => __TAURI_INVOKE<StyleTargetCounts>("count_text_style_targets", { scope }),
+	applyShapeRules: (scope: StyleScope, includeUser: boolean) => __TAURI_INVOKE<StyleApplyResult>("apply_shape_rules", { scope, includeUser }),
 	getTextBubbleShape: (layer: EntityId) => __TAURI_INVOKE<BubbleShapeInfo>("get_text_bubble_shape", { layer }),
 	getCanvasManifest: (generation: CanvasGeneration) => __TAURI_INVOKE<CanvasBytes>("get_canvas_manifest", { generation }),
 	getCanvasResource: (generation: CanvasGeneration, resource: string) => __TAURI_INVOKE<CanvasBytes>("get_canvas_resource", { generation, resource }),
@@ -530,11 +530,17 @@ export type StrokePosition = "outside" | "center" | "inside";
 export type StyleApplyResult = {
 	changed: number,
 	skipped: number,
+	kept_manual: number,
 };
 
 export type StyleGroup = "font" | "size" | "fill" | "outline" | "outer_outline" | "alignment" | "writing_mode";
 
 export type StyleScope = ({ layers: EntityId[] }) & { page?: never } | ({ page: EntityId }) & { layers?: never } | "project";
+
+export type StyleTargetCounts = {
+	restylable: number,
+	manual: number,
+};
 
 export type TextAlignment = "Start" | "Center" | "End" | "Justify";
 
