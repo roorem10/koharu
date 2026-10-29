@@ -650,7 +650,15 @@
     "alignments": {
       "Start": "Başlangıç",
       "Center": "Orta",
-      "End": "Son"
-    }
+      "End": "Son",
+      "Justify": "İki yana yasla"
+    },
+    "applyDefault": "Varsayılan stili uygula",
+    "applyPage": "Bu sayfaya uygula",
+    "applyProject": "Tüm sayfalara uygula",
+    "applied": "{{count}} metin kutusuna uygulandı",
+    "skipped": "{{count}} geçersiz metin kutusu atlandı",
+    "confirmApply": "{{count}} metin kutusuna uygulansın mı? Ctrl+Z tek adımda geri alır.",
+    "apply": "Uygula"
   }
 }

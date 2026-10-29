@@ -650,7 +650,15 @@
     "alignments": {
       "Start": "起始",
       "Center": "居中",
-      "End": "末尾"
-    }
+      "End": "末尾",
+      "Justify": "两端对齐"
+    },
+    "applyDefault": "应用默认样式",
+    "applyPage": "将默认样式应用于本页",
+    "applyProject": "将默认样式应用于所有页面",
+    "applied": "已应用于{{count}}个文字框",
+    "skipped": "已跳过{{count}}个无效文字框",
+    "confirmApply": "应用于{{count}}个文字框？按Ctrl+Z可一次性撤销。",
+    "apply": "应用"
   }
 }

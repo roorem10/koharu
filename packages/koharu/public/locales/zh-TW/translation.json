@@ -650,7 +650,15 @@
     "alignments": {
       "Start": "起始",
       "Center": "置中",
-      "End": "末尾"
-    }
+      "End": "末尾",
+      "Justify": "左右對齊"
+    },
+    "applyDefault": "套用預設樣式",
+    "applyPage": "將預設樣式套用至本頁",
+    "applyProject": "將預設樣式套用至所有頁面",
+    "applied": "已套用至{{count}}個文字框",
+    "skipped": "已略過{{count}}個無效文字框",
+    "confirmApply": "套用至{{count}}個文字框？按Ctrl+Z可一次復原。",
+    "apply": "套用"
   }
 }

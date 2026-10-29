@@ -650,7 +650,15 @@
     "alignments": {
       "Start": "Início",
       "Center": "Centro",
-      "End": "Fim"
-    }
+      "End": "Fim",
+      "Justify": "Justificar"
+    },
+    "applyDefault": "Aplicar estilo padrão",
+    "applyPage": "Aplicar nesta página",
+    "applyProject": "Aplicar em todas as páginas",
+    "applied": "Aplicado a {{count}} caixas de texto",
+    "skipped": "{{count}} caixas inválidas ignoradas",
+    "confirmApply": "Aplicar a {{count}} caixas de texto? Ctrl+Z desfaz tudo em uma etapa.",
+    "apply": "Aplicar"
   }
 }

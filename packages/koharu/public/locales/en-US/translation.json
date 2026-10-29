@@ -650,7 +650,15 @@
     "alignments": {
       "Start": "Start",
       "Center": "Center",
-      "End": "End"
-    }
+      "End": "End",
+      "Justify": "Justify"
+    },
+    "applyDefault": "Apply default style",
+    "applyPage": "Apply default to this page",
+    "applyProject": "Apply default to all pages",
+    "applied": "Applied to {{count}} text boxes",
+    "skipped": "Skipped {{count}} invalid text boxes",
+    "confirmApply": "Apply to {{count}} text boxes? Ctrl+Z undoes this in one step.",
+    "apply": "Apply"
   }
 }

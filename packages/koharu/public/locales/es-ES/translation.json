@@ -650,7 +650,15 @@
     "alignments": {
       "Start": "Inicio",
       "Center": "Centro",
-      "End": "Fin"
-    }
+      "End": "Fin",
+      "Justify": "Justificar"
+    },
+    "applyDefault": "Aplicar estilo predeterminado",
+    "applyPage": "Aplicar a esta página",
+    "applyProject": "Aplicar a todas las páginas",
+    "applied": "Aplicado a {{count}} cuadros de texto",
+    "skipped": "Se omitieron {{count}} cuadros no válidos",
+    "confirmApply": "¿Aplicar a {{count}} cuadros de texto? Ctrl+Z lo deshace en un paso.",
+    "apply": "Aplicar"
   }
 }

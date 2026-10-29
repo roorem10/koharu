@@ -288,6 +288,25 @@ describe('greenfield editor', () => {
     )
   })
 
+  it('confirms project-wide text styles with the native box count before applying', async () => {
+    installProject()
+    const style = { ...emptyTextStyle, fill: [255, 255, 255, 255] as [number, number, number, number] }
+    useKoharuStore.setState({ textStyles: { default_style: style, presets: [], legacy_color_migrated: true } })
+    vi.spyOn(commands, 'countTextStyleTargets').mockResolvedValue(3)
+    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 3, skipped: 0 })
+    vi.spyOn(commands, 'getProject').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!)
+    vi.spyOn(commands, 'getPage').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey)!)
+    vi.spyOn(commands, 'getPages').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPages>>>(pagesKey)!)
+    render(<Inspector />)
+    const user = userEvent.setup()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
+    await user.click(await screen.findByRole('menuitem', { name: 'Apply default to all pages' }))
+    expect(await screen.findByRole('dialog')).toHaveTextContent('3')
+    expect(apply).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Apply' }))
+    await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith('project', style))
+  })
+
   it('registers one native resize listener in React strict mode', async () => {
     const unlisten = vi.fn()
     nativeWindow.onResized.mockClear()

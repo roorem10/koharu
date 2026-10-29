@@ -650,7 +650,15 @@
     "alignments": {
       "Start": "Début",
       "Center": "Centre",
-      "End": "Fin"
-    }
+      "End": "Fin",
+      "Justify": "Justifié"
+    },
+    "applyDefault": "Appliquer le style par défaut",
+    "applyPage": "Appliquer à cette page",
+    "applyProject": "Appliquer à toutes les pages",
+    "applied": "Appliqué à {{count}} zones de texte",
+    "skipped": "{{count}} zones de texte invalides ignorées",
+    "confirmApply": "Appliquer à {{count}} zones de texte ? Ctrl+Z annule tout en une étape.",
+    "apply": "Appliquer"
   }
 }

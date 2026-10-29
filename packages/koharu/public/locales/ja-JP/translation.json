@@ -650,7 +650,15 @@
     "alignments": {
       "Start": "行頭",
       "Center": "中央",
-      "End": "行末"
-    }
+      "End": "行末",
+      "Justify": "両端揃え"
+    },
+    "applyDefault": "既定のスタイルを適用",
+    "applyPage": "このページに既定のスタイルを適用",
+    "applyProject": "全ページに既定のスタイルを適用",
+    "applied": "{{count}}個のテキストボックスに適用しました",
+    "skipped": "無効なテキストボックス{{count}}個をスキップしました",
+    "confirmApply": "{{count}}個のテキストボックスに適用しますか？ Ctrl+Zでまとめて元に戻せます。",
+    "apply": "適用"
   }
 }

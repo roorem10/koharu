@@ -55,6 +55,8 @@ export const commands = {
 	getTextStyles: () => __TAURI_INVOKE<TextStyles>("get_text_styles"),
 	saveTextStyles: (styles: TextStyles) => __TAURI_INVOKE<TextStyles>("save_text_styles", { styles }),
 	captureTextStyle: (layer: EntityId, groups: StyleGroup[]) => __TAURI_INVOKE<TextStyle>("capture_text_style", { layer, groups }),
+	applyTextStyle: (scope: StyleScope, style: TextStyle) => __TAURI_INVOKE<StyleApplyResult>("apply_text_style", { scope, style }),
+	countTextStyleTargets: (scope: StyleScope) => __TAURI_INVOKE<number>("count_text_style_targets", { scope }),
 	getCanvasManifest: (generation: CanvasGeneration) => __TAURI_INVOKE<CanvasBytes>("get_canvas_manifest", { generation }),
 	getCanvasResource: (generation: CanvasGeneration, resource: string) => __TAURI_INVOKE<CanvasBytes>("get_canvas_resource", { generation, resource }),
 	prepareCanvasPage: (page: EntityId) => __TAURI_INVOKE<CanvasPagePreparation | null>("prepare_canvas_page", { page }),
@@ -500,7 +502,14 @@ export type StrokeMethod = "expansion" | "contour";
 
 export type StrokePosition = "outside" | "center" | "inside";
 
+export type StyleApplyResult = {
+	changed: number,
+	skipped: number,
+};
+
 export type StyleGroup = "font" | "size" | "fill" | "outline" | "outer_outline" | "alignment" | "writing_mode";
+
+export type StyleScope = ({ layers: EntityId[] }) & { page?: never } | ({ page: EntityId }) & { layers?: never } | "project";
 
 export type TextAlignment = "Start" | "Center" | "End" | "Justify";
 
