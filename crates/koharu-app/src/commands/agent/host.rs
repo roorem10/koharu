@@ -39,10 +39,7 @@ impl KoharuHost {
             let current = current.project.lock().await;
             let project = current.as_ref().context("no project is open")?;
             let snapshot = project.snapshot();
-            let pages = Project::pages(&snapshot)?
-                .into_iter()
-                .map(|page| Project::page(&snapshot, page.id))
-                .collect::<Result<Vec<_>>>()?;
+            let pages = agent_pages(&snapshot)?;
             (project.info(), pages)
         };
         let preferences = Preferences::load()?;
@@ -67,6 +64,7 @@ impl KoharuHost {
                 })
             })
             .collect::<Vec<_>>();
+        let styles = crate::commands::styles::load_text_styles()?.read()?.clone();
         Ok(json!({
             "project": project,
             "pages": pages,
@@ -74,6 +72,7 @@ impl KoharuHost {
                 "pipeline": preferences.pipeline,
                 "providers": providers,
                 "typesetting": preferences.typesetting,
+                "text_styles": text_styles_context(&styles),
                 "available_fonts": fonts.into_iter().map(|font| font.name).collect::<Vec<_>>(),
             },
         }))
@@ -85,16 +84,40 @@ impl KoharuHost {
             &'project mut Project,
         ) -> Pin<
             Box<dyn Future<Output = Result<(Commit, T)>> + Send + 'project>,
-        >,
+        > + Send,
     ) -> Result<Invocation>
     where
-        T: serde::Serialize + Send,
+        T: serde::Serialize + Send + 'static,
+    {
+        self.mutate_optional(|project| {
+            let pending = mutation(project);
+            Box::pin(async move {
+                let (commit, value) = pending.await?;
+                Ok((Some(commit), value))
+            })
+        })
+        .await
+    }
+
+    async fn mutate_optional<T>(
+        &self,
+        mutation: impl for<'project> FnOnce(
+            &'project mut Project,
+        ) -> Pin<
+            Box<dyn Future<Output = Result<(Option<Commit>, T)>> + Send + 'project>,
+        > + Send,
+    ) -> Result<Invocation>
+    where
+        T: serde::Serialize + Send + 'static,
     {
         let (commit, value, page, project) = {
             let current = self.handle.state::<CurrentProject>();
             let mut current = current.project.lock().await;
             let project = current.as_mut().context("no project is open")?;
             let (commit, value) = mutation(project).await?;
+            let Some(commit) = commit else {
+                return Invocation::read(value);
+            };
             project.record_commit(&commit);
             project.reconcile_page();
             (commit, value, project.active_page(), project.info())
@@ -208,6 +231,7 @@ impl Host for KoharuHost {
                         "set_typography",
                         "Replace an element's typography settings. Font is a family name from available_fonts.",
                     ),
+                    text_style_definition(),
                     definition::<SetGeometry>(
                         "set_geometry",
                         "Replace an element's page-space polygon geometry.",
@@ -388,6 +412,19 @@ impl Host for KoharuHost {
                 })
                 .await
             }
+            "apply_text_style" => {
+                let arguments: ApplyTextStyle = arguments(&call)?;
+                let styles = crate::commands::styles::load_text_styles()?.read()?.clone();
+                let detect_colors = koharu_pipeline::PipelineConfig::load()?
+                    .read()?
+                    .detect_text_color;
+                self.mutate_optional(|project| {
+                    Box::pin(async move {
+                        apply_agent_text_style(project, arguments, &styles, detect_colors).await
+                    })
+                })
+                .await
+            }
             "set_geometry" => {
                 let arguments: SetGeometry = arguments(&call)?;
                 let element = entity(&arguments.element)?;
@@ -463,6 +500,132 @@ impl Host for KoharuHost {
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
             name => bail!("unknown Koharu tool {name}"),
         }
+    }
+}
+
+fn agent_pages(snapshot: &Snapshot) -> Result<Vec<Value>> {
+    Project::pages(snapshot)?
+        .into_iter()
+        .map(|page| {
+            let mut page = serde_json::to_value(Project::page(snapshot, page.id)?)?;
+            for layer in page["layers"]
+                .as_array_mut()
+                .context("page layers must be an array")?
+            {
+                if layer["type"] != "text" {
+                    continue;
+                }
+                let id = serde_json::from_value(layer["id"].clone())?;
+                let info = koharu_pipeline::bubble_shape::text_bubble_shape(snapshot, id)?;
+                layer["bubble_shape"] = match (info.bubble, info.shape) {
+                    (None, _) => json!("none"),
+                    (Some(_), None) => json!("unknown"),
+                    (_, Some(shape)) => serde_json::to_value(shape)?,
+                };
+                layer["shape_measures"] = serde_json::to_value(info.measures)?;
+                layer["style_origin"] = json!(if snapshot
+                    .component::<koharu_scene::Typography>(id)?
+                    .is_some_and(|typography| typography.origin == koharu_scene::Origin::User)
+                {
+                    "user"
+                } else {
+                    "generated"
+                });
+            }
+            Ok(page)
+        })
+        .collect()
+}
+
+fn text_styles_context(styles: &koharu_renderer::TextStyles) -> Value {
+    json!({
+        "default_style": styles.default_style,
+        "presets": styles.presets.iter().map(|preset| {
+            let groups = serde_json::to_value(&preset.style).expect("text style must serialize");
+            let groups = groups.as_object().expect("text style is an object").iter()
+                .filter(|(_, value)| !value.is_null()).map(|(key, _)| key).collect::<Vec<_>>();
+            json!({"id": preset.id, "name": preset.name, "style": preset.style, "groups": groups, "key": preset.key})
+        }).collect::<Vec<_>>(),
+        "shape_rules": styles.shape_rules,
+    })
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ApplyTextStyle {
+    elements: Vec<String>,
+    preset: Option<String>,
+    /// One of rectangle, round, spiky, none. Applies the default and the linked shape preset.
+    shape: Option<String>,
+}
+
+fn text_style_definition() -> Tool {
+    let mut tool = definition::<ApplyTextStyle>(
+        "apply_text_style",
+        "Restyle text elements with a saved preset, or as if their bubble had another shape. Use after view_page shows that a bubble was sorted wrongly, for example a shout in a bubble detected as round.",
+    );
+    tool.parameters["oneOf"] = json!([
+        {"required": ["preset"], "not": {"required": ["shape"]}},
+        {"required": ["shape"], "not": {"required": ["preset"]}}
+    ]);
+    tool.parameters["properties"]["preset"] = json!({"type": "string"});
+    tool.parameters["properties"]["shape"] =
+        json!({"type": "string", "enum": ["rectangle", "round", "spiky", "none"]});
+    tool
+}
+
+async fn apply_agent_text_style(
+    project: &mut Project,
+    arguments: ApplyTextStyle,
+    styles: &koharu_renderer::TextStyles,
+    detect_colors: bool,
+) -> Result<(Option<Commit>, crate::commands::styles::StyleApplyResult)> {
+    use crate::commands::styles::StyleScope;
+    let scope = StyleScope::Layers(entities(&arguments.elements)?);
+    match (arguments.preset, arguments.shape) {
+        (Some(id), None) => {
+            let preset = styles
+                .presets
+                .iter()
+                .find(|preset| preset.id == id)
+                .with_context(|| {
+                    format!(
+                        "unknown preset {id}; valid preset ids: {}",
+                        styles
+                            .presets
+                            .iter()
+                            .map(|preset| preset.id.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                })?;
+            project.apply_text_style(scope, &preset.style).await
+        }
+        (None, Some(shape)) => {
+            let preset_id = match shape.as_str() {
+                "rectangle" => &styles.shape_rules.rectangle,
+                "round" => &styles.shape_rules.round,
+                "spiky" => &styles.shape_rules.spiky,
+                "none" => &styles.shape_rules.free,
+                _ => bail!("unknown shape {shape}; valid shapes: rectangle, round, spiky, none"),
+            };
+            styles.validate()?;
+            let preset = preset_id
+                .as_ref()
+                .and_then(|id| styles.presets.iter().find(|preset| &preset.id == id));
+            project
+                .apply_style(scope, true, true, |_, _, typography| {
+                    styles
+                        .default_style
+                        .apply_to_detected(typography, detect_colors);
+                    if let Some(preset) = preset {
+                        preset.style.apply_to_detected(typography, detect_colors);
+                    }
+                    Ok(())
+                })
+                .await
+        }
+        _ => bail!("provide exactly one of preset or shape"),
     }
 }
 
@@ -733,6 +896,200 @@ impl RunPipeline {
             (false, true) => Ok(Scope::Pages(entities(&self.pages)?)),
             (true, false) => Ok(Scope::Entities(entities(&self.elements)?)),
             (false, false) => bail!("pipeline scope cannot contain both pages and elements"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod text_style_tests {
+    use super::*;
+    use koharu_renderer::{FontPart, ShapeRules, TextPreset, TextStyle, TextStyles};
+    use koharu_scene::{
+        At, BubbleRegion, FlowsIn, Generation, Geometry, Origin, PageDraft, Point, ProducerId,
+        TextLayout, TextLayoutKind,
+    };
+
+    #[tokio::test]
+    async fn context_and_forced_shape_style_share_the_real_batch_and_undo() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut project =
+            Project::create("agent styles".into(), directory.path().join("project.khr"))
+                .await
+                .unwrap();
+        let generation = Generation::new(ProducerId::new("dev.koharu.pipeline.detection").unwrap());
+        let mut edit = project.snapshot().edit_as(generation.clone());
+        let page = edit
+            .add_page(PageDraft::new("Page 3", 300.0, 300.0), At::End)
+            .unwrap();
+        let points = (0..24)
+            .map(|index| {
+                let radius = if index % 2 == 0 { 100.0 } else { 60.0 };
+                let angle = index as f64 * std::f64::consts::TAU / 24.0;
+                Point {
+                    x: 150.0 + radius * angle.cos(),
+                    y: 150.0 + radius * angle.sin(),
+                }
+            })
+            .collect();
+        let bubble = edit
+            .add_analysis_region::<BubbleRegion>(
+                page,
+                At::End,
+                &Geometry {
+                    origin: Origin::Generated(generation.clone()),
+                    points,
+                },
+                None,
+            )
+            .unwrap();
+        let mut layers = Vec::new();
+        for _ in 0..2 {
+            let content = edit.add_text_content(page, At::End).unwrap();
+            let layer = edit
+                .add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &TextLayout {
+                        origin: Origin::Generated(generation.clone()),
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                    },
+                )
+                .unwrap();
+            edit.set(
+                layer,
+                &koharu_scene::Typography {
+                    origin: Origin::Generated(generation.clone()),
+                    preferred_font: Some("Original".into()),
+                    font_weight: None,
+                    font_style: None,
+                    size: None,
+                    auto_fit: true,
+                    color: Some([1, 2, 3, 255]),
+                    stroke_color: None,
+                    stroke_width: None,
+                    stroke_method: None,
+                    stroke_position: None,
+                    stroke_join: None,
+                    outer_stroke_color: None,
+                    outer_stroke_width: None,
+                    alignment: None,
+                    writing_mode: Some(koharu_scene::WritingMode::Vertical),
+                    extensions: Default::default(),
+                },
+            )
+            .unwrap();
+            edit.relate::<FlowsIn>(layer, bubble).unwrap();
+            layers.push(layer);
+        }
+        project
+            .commit_rebased(edit.finish().unwrap())
+            .await
+            .unwrap()
+            .unwrap();
+        let original = project
+            .snapshot()
+            .component::<koharu_scene::Typography>(layers[0])
+            .unwrap()
+            .unwrap();
+        let first_text = |pages: &[Value]| {
+            pages[0]["layers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|layer| layer["type"] == "text")
+                .unwrap()
+                .clone()
+        };
+        let pages = agent_pages(&project.snapshot()).unwrap();
+        assert_eq!(first_text(&pages)["bubble_shape"], "spiky");
+        assert_eq!(first_text(&pages)["style_origin"], "generated");
+        assert!(
+            first_text(&pages)["shape_measures"]["spikes"]
+                .as_u64()
+                .unwrap()
+                >= 5
+        );
+        let styles = TextStyles {
+            presets: vec![TextPreset {
+                id: "shout".into(),
+                name: "Shout".into(),
+                key: Some("1".into()),
+                style: TextStyle {
+                    font: Some(FontPart {
+                        preferred_font: Some("Spiky Font".into()),
+                        font_weight: None,
+                        font_style: None,
+                    }),
+                    ..Default::default()
+                },
+            }],
+            shape_rules: ShapeRules {
+                spiky: Some("shout".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let configuration = text_styles_context(&styles);
+        assert_eq!(configuration["presets"][0]["groups"], json!(["font"]));
+        assert_eq!(configuration["presets"][0]["key"], "1");
+        let args = || ApplyTextStyle {
+            elements: layers.iter().map(ToString::to_string).collect(),
+            preset: None,
+            shape: Some("spiky".into()),
+        };
+        let (commit, result) = apply_agent_text_style(&mut project, args(), &styles, true)
+            .await
+            .unwrap();
+        assert_eq!((result.changed, result.skipped), (2, 0));
+        project.record_commit(&commit.unwrap());
+        assert_eq!(project.undo.len(), 1);
+        for layer in &layers {
+            let typography = project
+                .snapshot()
+                .component::<koharu_scene::Typography>(*layer)
+                .unwrap()
+                .unwrap();
+            assert_eq!(typography.preferred_font.as_deref(), Some("Spiky Font"));
+            assert_eq!(typography.origin, Origin::User);
+            assert_eq!(typography.color, original.color);
+            assert_eq!(typography.writing_mode, original.writing_mode);
+        }
+        assert_eq!(
+            first_text(&agent_pages(&project.snapshot()).unwrap())["style_origin"],
+            "user"
+        );
+        let (commit, result) = apply_agent_text_style(&mut project, args(), &styles, true)
+            .await
+            .unwrap();
+        assert!(commit.is_none());
+        assert_eq!((result.changed, result.skipped), (0, 0));
+        assert!(!Invocation::read(result).unwrap().changed);
+        project.undo().await.unwrap();
+        for layer in &layers {
+            assert_eq!(
+                project
+                    .snapshot()
+                    .component::<koharu_scene::Typography>(*layer)
+                    .unwrap()
+                    .unwrap(),
+                original
+            );
+        }
+        for (preset, shape, expected) in [
+            (Some("missing"), None, "shout"),
+            (None, Some("triangle"), "rectangle, round, spiky, none"),
+            (Some("shout"), Some("spiky"), "exactly one"),
+            (None, None, "exactly one"),
+        ] {
+            let mut arguments = args();
+            arguments.preset = preset.map(str::to_owned);
+            arguments.shape = shape.map(str::to_owned);
+            let error = apply_agent_text_style(&mut project, arguments, &styles, true)
+                .await
+                .unwrap_err();
+            assert!(error.to_string().contains(expected), "{error}");
         }
     }
 }
