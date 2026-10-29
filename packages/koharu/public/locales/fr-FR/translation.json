@@ -632,14 +632,45 @@
     "clearGroup": "Effacer {{group}}",
     "notSet": "Non défini",
     "pipelineNote": "Le nouveau texte utilise le style par défaut.",
+    "cancel": "Annuler",
+    "applied": "Appliqué à {{count}} zones de texte",
+    "skipped": "{{count}} zones de texte invalides ignorées",
+    "includeManual": "Restyler aussi les cadres que j’ai modifiés à la main",
+    "manualCount_one": "{{count}} cadre modifié à la main",
+    "manualCount_other": "{{count}} cadres modifiés à la main",
+    "keptManual": "{{count}} cadres modifiés à la main conservés",
+    "manualCount": "{{count}} cadres modifiés à la main",
+    "confirmApply": "Appliquer à {{count}} zones de texte ? Ctrl+Z annule tout en une étape.",
+    "apply": "Appliquer",
+    "bubbleShape": "Forme de bulle : {{shape}}",
+    "shapeMeasures": "Rectangularité : {{rectangularity}} % · Solidité : {{solidity}} % · Creux profonds : {{spikes}}",
+    "measuresUnavailable": "Aucune mesure de forme disponible.",
+    "shapes": {
+      "rectangle": "Rectangle",
+      "round": "Ronde",
+      "spiky": "Dentelée",
+      "free": "Sans bulle",
+      "unknown": "Indisponible"
+    },
     "groups": {
       "font": "Police",
       "fill": "Couleur du texte",
       "outline": "Contour"
     },
+    "shapeTitle": "Polices selon la forme de la bulle",
     "defaultHelp": "Choisissez les valeurs par défaut des nouveaux textes et des textes détectés. Chaque cadre reste modifiable dans l’inspecteur.",
+    "shapeEnabled": "Choisir la police selon la forme de la bulle",
+    "shapeHelp": "Chaque forme remplace la police par défaut. Les couleurs détectées restent prioritaires si leur détection est activée. La taille reste automatique.",
+    "sameAsDefault": "Identique à la valeur par défaut",
+    "applyOpenProject": "Appliquer au projet ouvert",
     "defaultFont": "Police par défaut",
     "outlineColor": "Couleur du contour",
-    "outlineWidth": "Épaisseur du contour (px)"
+    "outlineWidth": "Épaisseur du contour (px)",
+    "shapeFonts": {
+      "round": "Ronde (dialogue)",
+      "rectangle": "Rectangle (narration et titres)",
+      "spiky": "Pointue (cris)",
+      "free": "Sans bulle (texte libre)"
+    }
   }
 }

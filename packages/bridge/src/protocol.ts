@@ -55,6 +55,8 @@ export const commands = {
 	getTextStyles: () => __TAURI_INVOKE<TextStyles>("get_text_styles"),
 	saveTextStyles: (styles: TextStyles) => __TAURI_INVOKE<TextStyles>("save_text_styles", { styles }),
 	countTextStyleTargets: (scope: StyleScope) => __TAURI_INVOKE<StyleTargetCounts>("count_text_style_targets", { scope }),
+	applyShapeRules: (scope: StyleScope, includeUser: boolean) => __TAURI_INVOKE<StyleApplyResult>("apply_shape_rules", { scope, includeUser }),
+	getTextBubbleShape: (layer: EntityId) => __TAURI_INVOKE<BubbleShapeInfo>("get_text_bubble_shape", { layer }),
 	getCanvasManifest: (generation: CanvasGeneration) => __TAURI_INVOKE<CanvasBytes>("get_canvas_manifest", { generation }),
 	getCanvasResource: (generation: CanvasGeneration, resource: string) => __TAURI_INVOKE<CanvasBytes>("get_canvas_resource", { generation, resource }),
 	prepareCanvasPage: (page: EntityId) => __TAURI_INVOKE<CanvasPagePreparation | null>("prepare_canvas_page", { page }),
@@ -99,6 +101,15 @@ export type Bounds = {
 	y: number,
 	width: number,
 	height: number,
+};
+
+export type BubbleShape = "rectangle" | "round" | "spiky";
+
+export type BubbleShapeInfo = {
+	bubble: EntityId | null,
+	/**  None without a bubble, or when its polygon is degenerate. */
+	shape: BubbleShape | null,
+	measures: ShapeMeasures | null,
 };
 
 export type CaiyunConfig = Record<string, never>;
@@ -476,6 +487,12 @@ export type Scope = { scope: "project" } | { scope: "pages"; value: EntityId[] }
 	bounds: Bounds,
 } } | { scope: "entities"; value: EntityId[] };
 
+export type ShapeMeasures = {
+	rectangularity: number,
+	solidity: number,
+	spikes: number,
+};
+
 export type ShapeStyles = {
 	enabled?: boolean,
 	rectangle?: TextStyle,
@@ -507,6 +524,12 @@ export type StrokeJoin = "round" | "miter" | "bevel";
 export type StrokeMethod = "expansion" | "contour";
 
 export type StrokePosition = "outside" | "center" | "inside";
+
+export type StyleApplyResult = {
+	changed: number,
+	skipped: number,
+	kept_manual: number,
+};
 
 export type StyleScope = ({ layers: EntityId[] }) & { page?: never } | ({ page: EntityId }) & { layers?: never } | "project";
 

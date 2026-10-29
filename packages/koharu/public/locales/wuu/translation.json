@@ -632,14 +632,45 @@
     "clearGroup": "清除{{group}}",
     "notSet": "朆设置",
     "pipelineNote": "新文字使用默认文字样式。",
+    "cancel": "取消",
+    "applied": "已应用到{{count}}只文字框",
+    "skipped": "已跳过{{count}}只无效文字框",
+    "includeManual": "手动改过个文字框也重新套用样式",
+    "manualCount_one": "{{count}} 只手动改过个文字框",
+    "manualCount_other": "{{count}} 只手动改过个文字框",
+    "keptManual": "保留仔 {{count}} 只手动改过个文字框",
+    "manualCount": "{{count}} 只手动改过个文字框",
+    "confirmApply": "应用到{{count}}只文字框？按Ctrl+Z可以一趟撤销。",
+    "apply": "应用",
+    "bubbleShape": "气泡形状：{{shape}}",
+    "shapeMeasures": "矩形度：{{rectangularity}}% · 实心度：{{solidity}}% · 深凹陷数：{{spikes}}",
+    "measuresUnavailable": "暂时呒没形状测量数据。",
+    "shapes": {
+      "rectangle": "矩形",
+      "round": "圆形",
+      "spiky": "锯齿形",
+      "free": "呒没气泡",
+      "unknown": "无数据"
+    },
     "groups": {
       "font": "字体",
       "fill": "文字颜色",
       "outline": "描边"
     },
+    "shapeTitle": "照气泡形状选字体",
     "defaultHelp": "选择新建搭检测文字个默认值。每只文字框仍好勒属性面板里单独修改。",
+    "shapeEnabled": "照气泡形状选择字体",
+    "shapeHelp": "各形状个字体覆盖默认字体。颜色检测开牢个辰光优先保留检测出来个颜色。字号保持自动适应。",
+    "sameAsDefault": "搭默认一样",
+    "applyOpenProject": "应用到打开个项目",
     "defaultFont": "默认字体",
     "outlineColor": "描边颜色",
-    "outlineWidth": "描边宽度（像素）"
+    "outlineWidth": "描边宽度（像素）",
+    "shapeFonts": {
+      "round": "圆形（对话）",
+      "rectangle": "矩形（旁白搭标题）",
+      "spiky": "尖刺形（喊叫）",
+      "free": "无气泡（自由文字）"
+    }
   }
 }

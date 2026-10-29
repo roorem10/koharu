@@ -107,6 +107,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             styles::get_text_styles,
             styles::save_text_styles,
             styles::count_text_style_targets,
+            styles::apply_shape_rules,
+            styles::get_text_bubble_shape,
             canvas::get_canvas_manifest,
             canvas::get_canvas_resource,
             canvas::prepare_canvas_page,

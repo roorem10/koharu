@@ -632,14 +632,45 @@
     "clearGroup": "清除{{group}}",
     "notSet": "未设置",
     "pipelineNote": "新文字使用默认文字样式。",
+    "cancel": "取消",
+    "applied": "已应用于{{count}}个文字框",
+    "skipped": "已跳过{{count}}个无效文字框",
+    "includeManual": "也重新设置我手动修改过的文本框样式",
+    "manualCount_one": "{{count}} 个手动修改的文本框",
+    "manualCount_other": "{{count}} 个手动修改的文本框",
+    "keptManual": "已保留 {{count}} 个手动修改的文本框",
+    "manualCount": "{{count}} 个手动修改的文本框",
+    "confirmApply": "应用于{{count}}个文字框？按Ctrl+Z可一次性撤销。",
+    "apply": "应用",
+    "bubbleShape": "气泡形状：{{shape}}",
+    "shapeMeasures": "矩形度：{{rectangularity}}% · 实心度：{{solidity}}% · 深凹陷数：{{spikes}}",
+    "measuresUnavailable": "暂无形状测量数据。",
+    "shapes": {
+      "rectangle": "矩形",
+      "round": "圆形",
+      "spiky": "锯齿形",
+      "free": "无气泡",
+      "unknown": "不可用"
+    },
     "groups": {
       "font": "字体",
       "fill": "文字颜色",
       "outline": "描边"
     },
+    "shapeTitle": "按气泡形状选择字体",
     "defaultHelp": "选择新建和检测文本的默认值。每个文本框仍可在属性面板中单独修改。",
+    "shapeEnabled": "按气泡形状选择字体",
+    "shapeHelp": "各形状的字体覆盖默认字体。启用颜色检测时优先保留检测到的颜色。字号保持自动适应。",
+    "sameAsDefault": "与默认相同",
+    "applyOpenProject": "应用到打开的项目",
     "defaultFont": "默认字体",
     "outlineColor": "描边颜色",
-    "outlineWidth": "描边宽度（像素）"
+    "outlineWidth": "描边宽度（像素）",
+    "shapeFonts": {
+      "round": "圆形（对话）",
+      "rectangle": "矩形（旁白和标题）",
+      "spiky": "尖刺形（喊叫）",
+      "free": "无气泡（自由文本）"
+    }
   }
 }

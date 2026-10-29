@@ -632,14 +632,45 @@
     "clearGroup": "{{group}}をクリア",
     "notSet": "未設定",
     "pipelineNote": "新しいテキストには既定のスタイルを使用します。",
+    "cancel": "キャンセル",
+    "applied": "{{count}}個のテキストボックスに適用しました",
+    "skipped": "無効なテキストボックス{{count}}個をスキップしました",
+    "includeManual": "手動で変更したボックスにもスタイルを適用する",
+    "manualCount_one": "手動で変更したボックス：{{count}}個",
+    "manualCount_other": "手動で変更したボックス：{{count}}個",
+    "keptManual": "手動で変更した{{count}}個のボックスを保持しました",
+    "manualCount": "手動で変更したボックス：{{count}}個",
+    "confirmApply": "{{count}}個のテキストボックスに適用しますか？ Ctrl+Zでまとめて元に戻せます。",
+    "apply": "適用",
+    "bubbleShape": "吹き出しの形：{{shape}}",
+    "shapeMeasures": "矩形度：{{rectangularity}}% · 凸包充填率：{{solidity}}% · 深いくぼみ：{{spikes}}",
+    "measuresUnavailable": "形の測定値はありません。",
+    "shapes": {
+      "rectangle": "長方形",
+      "round": "丸形",
+      "spiky": "ギザギザ",
+      "free": "吹き出しなし",
+      "unknown": "取得不可"
+    },
     "groups": {
       "font": "フォント",
       "fill": "文字色",
       "outline": "縁取り"
     },
+    "shapeTitle": "吹き出しの形ごとのフォント",
     "defaultHelp": "新規・検出テキストの既定値を選択します。各ボックスはインスペクターで個別に変更できます。",
+    "shapeEnabled": "吹き出しの形でフォントを選ぶ",
+    "shapeHelp": "形ごとのフォントが既定のフォントより優先されます。色の検出が有効な場合は検出色を維持します。サイズは自動調整のままです。",
+    "sameAsDefault": "既定と同じ",
+    "applyOpenProject": "開いているプロジェクトに適用",
     "defaultFont": "既定のフォント",
     "outlineColor": "縁取りの色",
-    "outlineWidth": "縁取りの幅（px）"
+    "outlineWidth": "縁取りの幅（px）",
+    "shapeFonts": {
+      "round": "丸形（会話）",
+      "rectangle": "四角形（ナレーション・見出し）",
+      "spiky": "トゲ形（叫び）",
+      "free": "吹き出しなし（自由テキスト）"
+    }
   }
 }

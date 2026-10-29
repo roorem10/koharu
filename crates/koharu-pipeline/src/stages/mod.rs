@@ -1,3 +1,4 @@
+pub mod bubble_shape;
 mod detection;
 mod inpainting;
 mod ocr;

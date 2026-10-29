@@ -1,11 +1,12 @@
 use anyhow::Context as _;
+use koharu_desktop::Desktop;
 use koharu_renderer::TextStyles;
 use koharu_scene::{EntityId, Typography};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
 
-use super::project::Project;
+use super::{ChannelExt as _, canvas::CanvasChannel, project::Project};
 use super::{Error, project::CurrentProject};
 
 #[derive(Clone, Debug, Deserialize, Type)]
@@ -50,6 +51,51 @@ pub(crate) async fn count_text_style_targets(
         }
     }
     Ok(counts)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn get_text_bubble_shape(
+    layer: EntityId,
+    project: State<'_, CurrentProject>,
+) -> Result<koharu_pipeline::bubble_shape::BubbleShapeInfo, Error> {
+    let project = project.project.lock().await;
+    let project = project.as_ref().context("no project is open")?;
+    Ok(koharu_pipeline::bubble_shape::text_bubble_shape(
+        &project.snapshot(),
+        layer,
+    )?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn apply_shape_rules(
+    scope: StyleScope,
+    include_user: bool,
+    desktop: State<'_, Desktop>,
+    project: State<'_, CurrentProject>,
+    canvas_channel: State<'_, CanvasChannel>,
+) -> Result<StyleApplyResult, Error> {
+    let styles = load_text_styles()?.read()?.clone();
+    let detect_colors = koharu_pipeline::PipelineConfig::load()?
+        .read()?
+        .detect_text_color;
+    let (commit, page, result) = {
+        let mut project = project.project.lock().await;
+        let project = project.as_mut().context("no project is open")?;
+        let (commit, result) = project
+            .apply_shape_rules(scope, &styles, detect_colors, include_user)
+            .await?;
+        if let Some(commit) = &commit {
+            project.record_commit(commit);
+        }
+        (commit, project.active_page(), result)
+    };
+    if let Some(commit) = commit {
+        desktop.synchronize(&commit.snapshot, page, &commit).await?;
+        canvas_channel.channel.publish(desktop.canvas_state());
+    }
+    Ok(result)
 }
 
 pub(crate) fn load_text_styles() -> anyhow::Result<koharu_config::Config<TextStyles>> {

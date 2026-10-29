@@ -632,14 +632,45 @@
     "clearGroup": "Clear {{group}}",
     "notSet": "Not set",
     "pipelineNote": "New text uses the default text style.",
+    "cancel": "Cancel",
+    "applied": "Applied to {{count}} text boxes",
+    "skipped": "Skipped {{count}} invalid text boxes",
+    "includeManual": "Also restyle boxes I changed by hand",
+    "manualCount_one": "{{count}} box changed by hand",
+    "manualCount_other": "{{count}} boxes changed by hand",
+    "keptManual": "Kept {{count}} hand-edited boxes",
+    "manualCount": "{{count}} boxes changed by hand",
+    "confirmApply": "Apply to {{count}} text boxes? Ctrl+Z undoes this in one step.",
+    "apply": "Apply",
+    "bubbleShape": "Bubble shape: {{shape}}",
+    "shapeMeasures": "Rectangularity: {{rectangularity}}% · Solidity: {{solidity}}% · Deep dips: {{spikes}}",
+    "measuresUnavailable": "No shape measurements available.",
+    "shapes": {
+      "rectangle": "Rectangle",
+      "round": "Round",
+      "spiky": "Spiky",
+      "free": "No bubble",
+      "unknown": "Unavailable"
+    },
     "groups": {
       "font": "Font",
       "fill": "Text color",
       "outline": "Outline"
     },
+    "shapeTitle": "Fonts by bubble shape",
     "defaultHelp": "Choose defaults for new and detected text. Change any individual box in the Inspector.",
+    "shapeEnabled": "Choose font by bubble shape",
+    "shapeHelp": "Each shape overrides the default font. Detected colors keep priority when color detection is on. Font choices leave text on auto fit.",
+    "sameAsDefault": "Same as default",
+    "applyOpenProject": "Apply to the open project",
     "defaultFont": "Default font",
     "outlineColor": "Outline color",
-    "outlineWidth": "Outline width (px)"
+    "outlineWidth": "Outline width (px)",
+    "shapeFonts": {
+      "round": "Round (dialogue)",
+      "rectangle": "Rectangle (narration and titles)",
+      "spiky": "Spiky (shouting)",
+      "free": "No bubble (free text)"
+    }
   }
 }

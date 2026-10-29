@@ -24,6 +24,7 @@ import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { ProviderPreferences } from '@/components/preferences/ProviderPreferences'
 import { TextStylePreferences } from '@/components/preferences/TextStylePreferences'
+import { ShapeStylePreferences } from '@/components/preferences/ShapeStylePreferences'
 import { SettingsPage } from '@/components/preferences/SettingsPage'
 import {
   fontsKey,
@@ -321,6 +322,147 @@ describe('greenfield editor', () => {
     await waitFor(() =>
       expect(useKoharuStore.getState().textStyles?.default_style).toEqual(emptyTextStyle),
     )
+  })
+
+  it('saves only a shape font and clears it with Same as default', async () => {
+    installProject()
+    const original = {
+      default_style: { ...emptyTextStyle },
+      shape_styles: structuredClone(emptyShapeStyles),
+      legacy_color_migrated: true,
+    }
+    original.shape_styles.round.fill = [1, 2, 3, 255]
+    useKoharuStore.setState({ textStyles: original })
+    queryClient.setQueryData(fontsKey, [
+      {
+        name: 'Font A',
+        sources: ['system'],
+        metadata: {
+          primary_script: 'latn',
+          scripts: [],
+          languages: [],
+          category: null,
+          classifications: [],
+          use_cases: [],
+        },
+        faces: [],
+      },
+    ])
+    vi.spyOn(commands, 'getFontFavorites').mockResolvedValue([])
+    vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
+    const save = vi.spyOn(commands, 'saveTextStyles').mockImplementation(async (styles) => styles)
+    render(<ShapeStylePreferences />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('switch', { name: 'Choose font by bubble shape' }))
+    await user.click(screen.getByRole('button', { name: 'Round (dialogue)' }))
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Same as default')
+    await user.click(await screen.findByRole('option', { name: /Font A/ }))
+    await waitFor(() =>
+      expect(save).toHaveBeenLastCalledWith({
+        ...original,
+        shape_styles: {
+          ...original.shape_styles,
+          enabled: true,
+          round: {
+            ...original.shape_styles.round,
+            font: { preferred_font: 'Font A', font_weight: null, font_style: null },
+          },
+        },
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Round (dialogue)' }))
+    await user.click(screen.getByRole('option', { name: 'Same as default' }))
+    await waitFor(() =>
+      expect(save).toHaveBeenLastCalledWith({
+        ...original,
+        shape_styles: { ...original.shape_styles, enabled: true },
+      }),
+    )
+  })
+
+  it.each([false, true])(
+    'confirms Settings project application with include manual = %s',
+    async (includeUser) => {
+      installProject()
+      useKoharuStore.setState({
+        textStyles: {
+          default_style: { ...emptyTextStyle },
+          shape_styles: { ...structuredClone(emptyShapeStyles), enabled: true },
+          legacy_color_migrated: true,
+        },
+      })
+      vi.spyOn(commands, 'countTextStyleTargets').mockResolvedValue({ restylable: 2, manual: 1 })
+      const apply = vi
+        .spyOn(commands, 'applyShapeRules')
+        .mockResolvedValue({ changed: 2, skipped: 0, kept_manual: includeUser ? 0 : 1 })
+      vi.spyOn(commands, 'getProject').mockResolvedValue(queryClient.getQueryData(projectKey)!)
+      vi.spyOn(commands, 'getPage').mockResolvedValue(queryClient.getQueryData(pageKey)!)
+      vi.spyOn(commands, 'getPages').mockResolvedValue(queryClient.getQueryData(pagesKey)!)
+      render(<ShapeStylePreferences />)
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Apply to the open project' }))
+      expect(await screen.findByRole('dialog')).toHaveTextContent('2')
+      expect(screen.getByRole('dialog')).toHaveTextContent('1 box changed by hand')
+      const checkbox = screen.getByRole('checkbox', {
+        name: 'Also restyle boxes I changed by hand',
+      })
+      expect(checkbox).not.toBeChecked()
+      expect(apply).not.toHaveBeenCalled()
+      if (includeUser) {
+        await user.click(checkbox)
+        expect(screen.getByRole('dialog')).toHaveTextContent('3')
+      }
+      await user.click(screen.getByRole('button', { name: 'Apply' }))
+      await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith('project', includeUser))
+    },
+  )
+
+  it('disables project application with no open project and removes editor Styles controls', () => {
+    installProject()
+    const view = render(<Inspector />)
+    expect(screen.queryByRole('button', { name: 'Styles' })).not.toBeInTheDocument()
+    view.unmount()
+    queryClient.setQueryData(projectKey, null)
+    useKoharuStore.setState({
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        shape_styles: { ...structuredClone(emptyShapeStyles), enabled: true },
+        legacy_color_migrated: true,
+      },
+    })
+    render(<ShapeStylePreferences />)
+    expect(screen.getByRole('button', { name: 'Apply to the open project' })).toBeDisabled()
+  })
+  it('shows the selected bubble shape with polygon measurements', async () => {
+    installProject()
+    vi.mocked(commands.getTextBubbleShape).mockResolvedValue({
+      bubble: 'bubble',
+      shape: 'spiky',
+      measures: { rectangularity: 0.7, solidity: 0.8, spikes: 6 },
+    })
+    render(
+      <TooltipProvider>
+        <Inspector />
+      </TooltipProvider>,
+    )
+    const line = await screen.findByText('Bubble shape: Spiky')
+    Object.defineProperty(line, 'getBoundingClientRect', {
+      value: () => ({
+        x: 10,
+        y: 10,
+        top: 10,
+        left: 10,
+        right: 210,
+        bottom: 30,
+        width: 200,
+        height: 20,
+      }),
+    })
+    act(() => line.focus())
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip).toHaveTextContent('70.0%')
+    expect(tooltip).toHaveTextContent('80.0%')
+    expect(tooltip).toHaveTextContent('6')
   })
 
   it('registers one native resize listener in React strict mode', async () => {

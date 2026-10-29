@@ -32,6 +32,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use super::bubble_shape::{ShapeThresholds, classify, measure, style_for_shape};
 use super::{StageInput, StageProcessor, finish, generation};
 use crate::{DetectionModel, ModelCell};
 
@@ -215,12 +216,14 @@ impl Model {
 }
 
 struct DetectedRegion<'a> {
+    geometry: Geometry,
     entity: EntityId,
     mask: &'a KoharuLayoutMask,
     area: u32,
 }
 
 struct DetectedText<'a> {
+    typography: Typography,
     entity: EntityId,
     mask: &'a KoharuLayoutMask,
     bounds: [f32; 4],
@@ -334,13 +337,14 @@ async fn write_page(
         styles,
     )
     .context("failed to write detected regions")?;
-    link_dialogue_regions(edit, &regions, generation)
+    link_dialogue_regions(edit, &regions, generation, styles, colors.detect_text_color)
         .context("failed to associate detected text with dialogue regions")?;
     write_masks(input, edit, page, &detections, size)
         .await
         .context("failed to write detection masks")
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_regions<'a>(
     snapshot: &koharu_scene::Snapshot,
     edit: &mut koharu_scene::Edit,
@@ -443,6 +447,7 @@ fn write_region<'a>(
     if detection.label != "text" {
         return Ok(if detection.label == "bubble" {
             RegionOutput::Bubble(DetectedRegion {
+                geometry,
                 entity,
                 mask: &detection.mask,
                 area: detection.area,
@@ -500,6 +505,7 @@ fn write_region<'a>(
         .context("failed to associate detected text content with its region")?;
 
     Ok(RegionOutput::Text(DetectedText {
+        typography,
         entity,
         mask: &detection.mask,
         bounds: detection.bbox,
@@ -512,6 +518,8 @@ fn link_dialogue_regions(
     edit: &mut koharu_scene::Edit,
     regions: &PageRegions<'_>,
     generation: &Generation,
+    styles: &TextStyles,
+    detect_colors: bool,
 ) -> Result<()> {
     for text in &regions.texts {
         let bubble = containing_bubble(&regions.bubbles, text);
@@ -521,6 +529,21 @@ fn link_dialogue_regions(
             write_text_role(edit, text.content, "dev.koharu.text.dialogue", generation)?;
         } else {
             edit.relate::<FitsTo>(text.layer, text.entity)?;
+        }
+        if styles.shape_styles.enabled {
+            let shape = bubble.map(|bubble| {
+                measure(&bubble.geometry.points).map(|m| classify(&m, &ShapeThresholds::default()))
+            });
+            // A present but degenerate polygon is not free text.
+            if !matches!(shape, Some(None))
+                && let Some(style) = style_for_shape(styles, shape.flatten())
+            {
+                let mut typography = text.typography.clone();
+                style.apply_to_detected(&mut typography, detect_colors);
+                if typography != text.typography {
+                    edit.set(text.layer, &typography)?;
+                }
+            }
         }
     }
     Ok(())
@@ -2033,11 +2056,31 @@ mod tests {
                     edit,
                     &PageRegions {
                         bubbles: vec![DetectedRegion {
+                            geometry: Geometry::rectangle(10.0, 10.0, 80.0, 80.0),
                             entity: bubble,
                             mask: &bubble_mask,
                             area: 1,
                         }],
                         texts: vec![DetectedText {
+                            typography: Typography {
+                                origin: Origin::Generated(generation.clone()),
+                                preferred_font: None,
+                                font_weight: None,
+                                font_style: None,
+                                size: None,
+                                auto_fit: true,
+                                color: None,
+                                stroke_color: None,
+                                stroke_width: None,
+                                stroke_method: None,
+                                stroke_position: None,
+                                stroke_join: None,
+                                outer_stroke_color: None,
+                                outer_stroke_width: None,
+                                alignment: None,
+                                writing_mode: None,
+                                extensions: Default::default(),
+                            },
                             entity: region,
                             mask: &text_mask,
                             bounds: [0.0, 0.0, 1.0, 1.0],
@@ -2046,6 +2089,8 @@ mod tests {
                         }],
                     },
                     &generation,
+                    &TextStyles::default(),
+                    true,
                 )
                 .unwrap();
                 ids = Some((bubble, region, layer));
@@ -2438,6 +2483,216 @@ mod tests {
                     Some(6.0)
                 }
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn shape_styles_use_saved_polygons_and_free_text_without_changing_inferred_paint() {
+        use crate::bubble_shape::{BubbleShape, text_bubble_shape};
+        use koharu_renderer::{FontPart, OutlinePart, ShapeStyles, WritingModePart};
+        let font = |name: &str| TextStyle {
+            font: Some(FontPart {
+                preferred_font: Some(name.into()),
+                font_weight: None,
+                font_style: None,
+            }),
+            ..Default::default()
+        };
+        let mut style = font("Shout");
+        style.fill = Some([240, 20, 20, 255]);
+        style.outline = Some(OutlinePart {
+            stroke_color: Some([20, 240, 20, 255]),
+            stroke_width: Some(6.0),
+            stroke_method: None,
+            stroke_position: None,
+            stroke_join: None,
+        });
+        style.writing_mode = Some(WritingModePart {
+            value: Some(WritingMode::Vertical),
+        });
+        let styles = TextStyles {
+            default_style: TextStyle {
+                fill: Some([10, 20, 240, 255]),
+                ..font("Default")
+            },
+            shape_styles: ShapeStyles {
+                enabled: true,
+                spiky: style,
+                round: font("Round"),
+                free: font("Free"),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        for expected_shape in [
+            BubbleShape::Spiky,
+            BubbleShape::Round,
+            BubbleShape::Rectangle,
+        ] {
+            let points = match expected_shape {
+                BubbleShape::Rectangle => vec![(10, 20), (190, 20), (190, 180), (10, 180)]
+                    .into_iter()
+                    .map(|(x, y)| imageproc::point::Point::new(x, y))
+                    .collect(),
+                _ => {
+                    let count = if expected_shape == BubbleShape::Round {
+                        64
+                    } else {
+                        24
+                    };
+                    (0..count)
+                        .map(|i| {
+                            let angle = i as f64 * std::f64::consts::TAU / f64::from(count);
+                            let radius = if expected_shape == BubbleShape::Spiky && i % 2 != 0 {
+                                54.0
+                            } else {
+                                90.0
+                            };
+                            imageproc::point::Point::new(
+                                (100.0 + radius * angle.cos()).round() as i32,
+                                (100.0 + radius * angle.sin()).round() as i32,
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                }
+            };
+            let mut mask = image::GrayImage::new(201, 201);
+            imageproc::drawing::draw_polygon_mut(&mut mask, &points, image::Luma([255]));
+            let mut bubble = detection("bubble", 1.0, [10.0, 10.0, 190.0, 190.0]);
+            bubble.area = mask.pixels().filter(|pixel| pixel[0] > 0).count() as u32;
+            bubble.mask = KoharuLayoutMask {
+                x: 0,
+                y: 0,
+                width: 201,
+                height: 201,
+                pixels: mask.into_raw(),
+            };
+            let make_text = |x| {
+                let mut text = detection("text", 1.0, [x as f32, 90.0, (x + 10) as f32, 100.0]);
+                text.mask = KoharuLayoutMask {
+                    x,
+                    y: 90,
+                    width: 10,
+                    height: 10,
+                    pixels: vec![255; 100],
+                };
+                text
+            };
+            let inside = make_text(95);
+            let outside = make_text(240);
+            let inferred = Some(super::InferredTypography {
+                color: Some([0, 0, 0]),
+                stroke_color: Some([255, 255, 255]),
+                stroke_width: Some(3.0),
+                angle_degrees: 0.0,
+                writing_mode: WritingMode::Horizontal,
+            });
+            let generation = generation(super::PRODUCER, super::MODEL_ID).unwrap();
+            for enabled in [false, true] {
+                for detect_colors in [false, true] {
+                    let mut styles = styles.clone();
+                    styles.shape_styles.enabled = enabled;
+                    let mut session = Session::memory().await.unwrap();
+                    let mut ids = Vec::new();
+                    let mut before = Vec::new();
+                    let mut page = None;
+                    let create = session
+                        .snapshot()
+                        .patch(|edit| {
+                            page =
+                                Some(edit.add_page(PageDraft::new("page", 300.0, 250.0), At::End)?);
+                            Ok(())
+                        })
+                        .unwrap();
+                    let snapshot = session.commit(create).await.unwrap().snapshot;
+                    let page = page.unwrap();
+                    let mut edit = snapshot.edit_as(generation.clone());
+                    let RegionOutput::Bubble(bubble) = write_region(
+                        &mut edit,
+                        page,
+                        &bubble,
+                        None,
+                        &generation,
+                        TextColorOptions {
+                            detect_text_color: detect_colors,
+                        },
+                        &styles.default_style,
+                    )
+                    .unwrap() else {
+                        panic!("bubble")
+                    };
+                    let mut regions = PageRegions {
+                        bubbles: vec![bubble],
+                        texts: Vec::new(),
+                    };
+                    for detection in [&inside, &outside] {
+                        let RegionOutput::Text(text) = write_region(
+                            &mut edit,
+                            page,
+                            detection,
+                            inferred,
+                            &generation,
+                            TextColorOptions {
+                                detect_text_color: detect_colors,
+                            },
+                            &styles.default_style,
+                        )
+                        .unwrap() else {
+                            panic!("text")
+                        };
+                        ids.push(text.layer);
+                        before.push(text.typography.clone());
+                        regions.texts.push(text);
+                    }
+                    link_dialogue_regions(&mut edit, &regions, &generation, &styles, detect_colors)
+                        .unwrap();
+                    let patch = super::finish(edit).unwrap();
+                    let snapshot = session.commit(patch).await.unwrap().snapshot;
+                    assert_eq!(
+                        text_bubble_shape(&snapshot, ids[0]).unwrap().shape,
+                        Some(expected_shape)
+                    );
+                    assert_eq!(text_bubble_shape(&snapshot, ids[1]).unwrap().bubble, None);
+                    for (index, layer) in ids.into_iter().enumerate() {
+                        let typography = snapshot.component::<Typography>(layer).unwrap().unwrap();
+                        if !enabled {
+                            assert_eq!(typography, before[index]);
+                            continue;
+                        }
+                        assert_eq!(
+                            typography.preferred_font.as_deref(),
+                            Some(if index == 1 {
+                                "Free"
+                            } else {
+                                match expected_shape {
+                                    BubbleShape::Spiky => "Shout",
+                                    BubbleShape::Round => "Round",
+                                    BubbleShape::Rectangle => "Default",
+                                }
+                            })
+                        );
+                        assert!(typography.auto_fit);
+                        if index == 0 && expected_shape == BubbleShape::Rectangle {
+                            assert_eq!(typography, before[index]);
+                        }
+                        assert_eq!(typography.writing_mode, Some(WritingMode::Horizontal));
+                        assert_eq!(
+                            typography.color,
+                            if detect_colors {
+                                Some([0, 0, 0, 255])
+                            } else if index == 0 && expected_shape == BubbleShape::Spiky {
+                                styles.shape_styles.spiky.fill
+                            } else {
+                                styles.default_style.fill
+                            }
+                        );
+                        if detect_colors {
+                            assert_eq!(typography.stroke_width, Some(3.0));
+                            assert_eq!(typography.stroke_color, Some([255, 255, 255, 255]));
+                        }
+                    }
+                }
+            }
         }
     }
 

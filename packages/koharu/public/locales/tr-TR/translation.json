@@ -632,14 +632,45 @@
     "clearGroup": "{{group}} grubunu temizle",
     "notSet": "Ayarlanmadı",
     "pipelineNote": "Yeni metin varsayılan metin stilini kullanır.",
+    "cancel": "İptal",
+    "applied": "{{count}} metin kutusuna uygulandı",
+    "skipped": "{{count}} geçersiz metin kutusu atlandı",
+    "includeManual": "Elle değiştirdiğim kutuları da yeniden biçimlendir",
+    "manualCount_one": "Elle değiştirilmiş {{count}} kutu",
+    "manualCount_other": "Elle değiştirilmiş {{count}} kutu",
+    "keptManual": "Elle değiştirilmiş {{count}} kutu korundu",
+    "manualCount": "Elle değiştirilmiş {{count}} kutu",
+    "confirmApply": "{{count}} metin kutusuna uygulansın mı? Ctrl+Z tek adımda geri alır.",
+    "apply": "Uygula",
+    "bubbleShape": "Balon şekli: {{shape}}",
+    "shapeMeasures": "Dikdörtgenlik: %{{rectangularity}} · Doluluk: %{{solidity}} · Derin girintiler: {{spikes}}",
+    "measuresUnavailable": "Şekil ölçümü yok.",
+    "shapes": {
+      "rectangle": "Dikdörtgen",
+      "round": "Yuvarlak",
+      "spiky": "Sivri",
+      "free": "Balon yok",
+      "unknown": "Kullanılamıyor"
+    },
     "groups": {
       "font": "Yazı tipi",
       "fill": "Metin rengi",
       "outline": "Dış çizgi"
     },
+    "shapeTitle": "Balon şekline göre yazı tipleri",
     "defaultHelp": "Yeni ve algılanan metin için varsayılanları seçin. Her kutu Denetçi üzerinden ayrı ayrı değiştirilebilir.",
+    "shapeEnabled": "Balon şekline göre yazı tipi seç",
+    "shapeHelp": "Her şekil varsayılan yazı tipini geçersiz kılar. Renk algılama açıksa algılanan renkler korunur. Boyut otomatik kalır.",
+    "sameAsDefault": "Varsayılanla aynı",
+    "applyOpenProject": "Açık projeye uygula",
     "defaultFont": "Varsayılan yazı tipi",
     "outlineColor": "Dış çizgi rengi",
-    "outlineWidth": "Dış çizgi genişliği (px)"
+    "outlineWidth": "Dış çizgi genişliği (px)",
+    "shapeFonts": {
+      "round": "Yuvarlak (diyalog)",
+      "rectangle": "Dikdörtgen (anlatım ve başlıklar)",
+      "spiky": "Sivri (bağırma)",
+      "free": "Balon yok (serbest metin)"
+    }
   }
 }

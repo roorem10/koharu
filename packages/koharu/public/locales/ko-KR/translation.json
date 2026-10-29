@@ -632,14 +632,45 @@
     "clearGroup": "{{group}} 지우기",
     "notSet": "설정 안 됨",
     "pipelineNote": "새 텍스트는 기본 스타일을 사용합니다.",
+    "cancel": "취소",
+    "applied": "텍스트 상자 {{count}}개에 적용됨",
+    "skipped": "유효하지 않은 상자 {{count}}개를 건너뜀",
+    "includeManual": "직접 수정한 상자에도 스타일 적용",
+    "manualCount_one": "직접 수정한 상자 {{count}}개",
+    "manualCount_other": "직접 수정한 상자 {{count}}개",
+    "keptManual": "직접 수정한 상자 {{count}}개를 유지했습니다",
+    "manualCount": "직접 수정한 상자 {{count}}개",
+    "confirmApply": "텍스트 상자 {{count}}개에 적용할까요? Ctrl+Z로 한 번에 되돌릴 수 있습니다.",
+    "apply": "적용",
+    "bubbleShape": "말풍선 모양: {{shape}}",
+    "shapeMeasures": "사각형 비율: {{rectangularity}}% · 볼록도: {{solidity}}% · 깊은 홈: {{spikes}}",
+    "measuresUnavailable": "모양 측정값이 없습니다.",
+    "shapes": {
+      "rectangle": "사각형",
+      "round": "둥근 모양",
+      "spiky": "뾰족한 모양",
+      "free": "말풍선 없음",
+      "unknown": "사용 불가"
+    },
     "groups": {
       "font": "글꼴",
       "fill": "텍스트 색상",
       "outline": "윤곽선"
     },
+    "shapeTitle": "말풍선 모양별 글꼴",
     "defaultHelp": "새 텍스트와 감지된 텍스트의 기본값을 선택합니다. 각 상자는 속성 패널에서 개별 수정할 수 있습니다.",
+    "shapeEnabled": "말풍선 모양에 따라 글꼴 선택",
+    "shapeHelp": "각 모양은 기본 글꼴을 덮어씁니다. 색 감지가 켜져 있으면 감지된 색을 유지합니다. 크기는 자동 맞춤으로 유지됩니다.",
+    "sameAsDefault": "기본값과 같음",
+    "applyOpenProject": "열린 프로젝트에 적용",
     "defaultFont": "기본 글꼴",
     "outlineColor": "외곽선 색상",
-    "outlineWidth": "외곽선 너비 (px)"
+    "outlineWidth": "외곽선 너비 (px)",
+    "shapeFonts": {
+      "round": "둥근 모양 (대화)",
+      "rectangle": "직사각형 (내레이션 및 제목)",
+      "spiky": "뾰족한 모양 (외침)",
+      "free": "말풍선 없음 (자유 텍스트)"
+    }
   }
 }

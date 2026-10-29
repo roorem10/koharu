@@ -632,14 +632,45 @@
     "clearGroup": "Limpar {{group}}",
     "notSet": "Não definido",
     "pipelineNote": "Novos textos usam o estilo padrão.",
+    "cancel": "Cancelar",
+    "applied": "Aplicado a {{count}} caixas de texto",
+    "skipped": "{{count}} caixas inválidas ignoradas",
+    "includeManual": "Reaplicar estilo também às caixas que editei à mão",
+    "manualCount_one": "{{count}} caixa editada à mão",
+    "manualCount_other": "{{count}} caixas editadas à mão",
+    "keptManual": "{{count}} caixas editadas à mão mantidas",
+    "manualCount": "{{count}} caixas editadas à mão",
+    "confirmApply": "Aplicar a {{count}} caixas de texto? Ctrl+Z desfaz tudo em uma etapa.",
+    "apply": "Aplicar",
+    "bubbleShape": "Forma do balão: {{shape}}",
+    "shapeMeasures": "Retangularidade: {{rectangularity}}% · Solidez: {{solidity}}% · Reentrâncias profundas: {{spikes}}",
+    "measuresUnavailable": "Nenhuma medida de forma disponível.",
+    "shapes": {
+      "rectangle": "Retangular",
+      "round": "Redondo",
+      "spiky": "Pontudo",
+      "free": "Sem balão",
+      "unknown": "Indisponível"
+    },
     "groups": {
       "font": "Fonte",
       "fill": "Cor do texto",
       "outline": "Contorno"
     },
+    "shapeTitle": "Fontes por formato do balão",
     "defaultHelp": "Escolha padrões para textos novos e detectados. Cada caixa pode ser alterada no Inspetor.",
+    "shapeEnabled": "Escolher fonte pelo formato do balão",
+    "shapeHelp": "Cada formato substitui a fonte padrão. Cores detectadas têm prioridade quando a detecção está ligada. O tamanho continua automático.",
+    "sameAsDefault": "Igual ao padrão",
+    "applyOpenProject": "Aplicar ao projeto aberto",
     "defaultFont": "Fonte padrão",
     "outlineColor": "Cor do contorno",
-    "outlineWidth": "Largura do contorno (px)"
+    "outlineWidth": "Largura do contorno (px)",
+    "shapeFonts": {
+      "round": "Redondo (diálogo)",
+      "rectangle": "Retângulo (narração e títulos)",
+      "spiky": "Pontudo (gritos)",
+      "free": "Sem balão (texto livre)"
+    }
   }
 }

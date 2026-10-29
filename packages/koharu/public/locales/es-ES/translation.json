@@ -632,14 +632,45 @@
     "clearGroup": "Borrar {{group}}",
     "notSet": "Sin definir",
     "pipelineNote": "El texto nuevo usa el estilo predeterminado.",
+    "cancel": "Cancelar",
+    "applied": "Aplicado a {{count}} cuadros de texto",
+    "skipped": "Se omitieron {{count}} cuadros no válidos",
+    "includeManual": "Cambiar también el estilo de los cuadros que edité a mano",
+    "manualCount_one": "{{count}} cuadro editado a mano",
+    "manualCount_other": "{{count}} cuadros editados a mano",
+    "keptManual": "Se conservaron {{count}} cuadros editados a mano",
+    "manualCount": "{{count}} cuadros editados a mano",
+    "confirmApply": "¿Aplicar a {{count}} cuadros de texto? Ctrl+Z lo deshace en un paso.",
+    "apply": "Aplicar",
+    "bubbleShape": "Forma del bocadillo: {{shape}}",
+    "shapeMeasures": "Rectangularidad: {{rectangularity}} % · Solidez: {{solidity}} % · Entrantes profundos: {{spikes}}",
+    "measuresUnavailable": "No hay medidas de forma disponibles.",
+    "shapes": {
+      "rectangle": "Rectangular",
+      "round": "Redondo",
+      "spiky": "Dentado",
+      "free": "Sin bocadillo",
+      "unknown": "No disponible"
+    },
     "groups": {
       "font": "Fuente",
       "fill": "Color del texto",
       "outline": "Contorno"
     },
+    "shapeTitle": "Fuentes según la forma del bocadillo",
     "defaultHelp": "Elige valores predeterminados para texto nuevo y detectado. Cada cuadro se puede cambiar en el Inspector.",
+    "shapeEnabled": "Elegir fuente según la forma del bocadillo",
+    "shapeHelp": "Cada forma reemplaza la fuente predeterminada. Los colores detectados tienen prioridad si su detección está activada. El tamaño sigue siendo automático.",
+    "sameAsDefault": "Igual que la predeterminada",
+    "applyOpenProject": "Aplicar al proyecto abierto",
     "defaultFont": "Fuente predeterminada",
     "outlineColor": "Color del contorno",
-    "outlineWidth": "Grosor del contorno (px)"
+    "outlineWidth": "Grosor del contorno (px)",
+    "shapeFonts": {
+      "round": "Redondo (diálogo)",
+      "rectangle": "Rectángulo (narración y títulos)",
+      "spiky": "Puntiagudo (gritos)",
+      "free": "Sin bocadillo (texto libre)"
+    }
   }
 }

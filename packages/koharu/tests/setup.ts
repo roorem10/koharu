@@ -70,6 +70,11 @@ Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), writable: true }
 
 const initial = useKoharuStore.getState()
 beforeEach(() => {
+  vi.spyOn(commands, 'getTextBubbleShape').mockResolvedValue({
+    bubble: null,
+    shape: null,
+    measures: null,
+  })
   queryClient.clear()
   useKoharuStore.setState({
     ...initial,
