@@ -270,7 +270,7 @@ pub(crate) async fn save_shortcuts(
     Ok(shortcuts)
 }
 
-fn valid_shortcut_binding(binding: &str) -> bool {
+pub(crate) fn valid_shortcut_binding(binding: &str) -> bool {
     if binding.is_empty() {
         return true;
     }

@@ -673,6 +673,12 @@
     "nameHelp": "Kontrol karakteri içermeyen 1–64 karakter kullanın.",
     "duplicateName": "Başka bir hazır ayar bu adı kullanıyor.",
     "deleteQuestion": "“{{name}}” hazır ayarı silinsin mi?",
-    "presetLimit": "En fazla 32 hazır ayar kaydedebilirsiniz."
+    "presetLimit": "En fazla 32 hazır ayar kaydedebilirsiniz.",
+    "setShortcut": "Kısayol ayarla…",
+    "shortcutFor": "{{name}} kısayolu",
+    "shortcutHelp": "1–9 rakamlarını deneyin. Kaydı başlatıp bir tuşa veya birleşime basın. Escape kaydı iptal eder.",
+    "recordShortcut": "Hazır ayar kısayolunu kaydet",
+    "invalidShortcut": "Geçerli bir kısayol seçin.",
+    "usedByPreset": "“{{name}}” hazır ayarı kullanıyor"
   }
 }

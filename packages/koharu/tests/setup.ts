@@ -3,6 +3,7 @@ import { afterEach, beforeEach, vi } from 'vitest'
 
 import { queryClient } from '@/lib/queries'
 import { defaultShortcuts, useKoharuStore } from '@/lib/store'
+import { emptyTextStyle } from '@/lib/text-styles'
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
@@ -72,6 +73,7 @@ beforeEach(() => {
   useKoharuStore.setState({
     ...initial,
     initialized: false,
+    textStyles: { default_style: { ...emptyTextStyle }, presets: [], legacy_color_migrated: true },
     preferences: null,
     translationModels: [],
     resources: null,

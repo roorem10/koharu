@@ -673,6 +673,12 @@
     "nameHelp": "请输入1到64只字符，覅用控制字符。",
     "duplicateName": "已经有同名预设。",
     "deleteQuestion": "删除预设“{{name}}”？",
-    "presetLimit": "最多可以保存32只预设。"
+    "presetLimit": "最多可以保存32只预设。",
+    "setShortcut": "设置快捷键…",
+    "shortcutFor": "{{name}}个快捷键",
+    "shortcutHelp": "建议用数字1–9。点记录按钮，再按单键或者组合键。按Escape取消记录。",
+    "recordShortcut": "记录预设快捷键",
+    "invalidShortcut": "请选择有效个快捷键。",
+    "usedByPreset": "已拨预设“{{name}}”使用"
   }
 }

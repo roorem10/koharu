@@ -673,6 +673,12 @@
     "nameHelp": "Utilisez 1 à 64 caractères sans caractères de contrôle.",
     "duplicateName": "Un autre préréglage porte déjà ce nom.",
     "deleteQuestion": "Supprimer le préréglage « {{name}} » ?",
-    "presetLimit": "Vous pouvez enregistrer 32 préréglages au maximum."
+    "presetLimit": "Vous pouvez enregistrer 32 préréglages au maximum.",
+    "setShortcut": "Définir un raccourci…",
+    "shortcutFor": "Raccourci pour {{name}}",
+    "shortcutHelp": "Essayez les chiffres 1 à 9. Activez l’enregistrement puis appuyez sur une touche ou une combinaison. Échap annule.",
+    "recordShortcut": "Enregistrer le raccourci du préréglage",
+    "invalidShortcut": "Choisissez un raccourci valide.",
+    "usedByPreset": "Utilisé par le préréglage « {{name}} »"
   }
 }

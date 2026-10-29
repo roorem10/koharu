@@ -673,6 +673,12 @@
     "nameHelp": "Usa de 1 a 64 caracteres sin caracteres de control.",
     "duplicateName": "Otro preajuste ya tiene este nombre.",
     "deleteQuestion": "¿Eliminar el preajuste «{{name}}»?",
-    "presetLimit": "Puedes guardar hasta 32 preajustes."
+    "presetLimit": "Puedes guardar hasta 32 preajustes.",
+    "setShortcut": "Asignar atajo…",
+    "shortcutFor": "Atajo para {{name}}",
+    "shortcutHelp": "Prueba los números del 1 al 9. Activa la grabación y pulsa una tecla o combinación. Escape cancela.",
+    "recordShortcut": "Grabar atajo del preajuste",
+    "invalidShortcut": "Elige un atajo válido.",
+    "usedByPreset": "Usado por el preajuste «{{name}}»"
   }
 }

@@ -76,7 +76,7 @@ pub(crate) async fn get_text_styles() -> Result<TextStyles, Error> {
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn save_text_styles(mut styles: TextStyles) -> Result<TextStyles, Error> {
-    styles.validate()?;
+    validate_styles(&styles)?;
     styles.legacy_color_migrated = true;
     let config = load_text_styles()?;
     let mut current = config.write()?;
@@ -100,4 +100,47 @@ pub(crate) async fn capture_text_style(
         .component::<Typography>(layer)?
         .context("text layer has no typography")?;
     Ok(TextStyle::capture(&typography, &groups))
+}
+
+fn validate_styles(styles: &TextStyles) -> anyhow::Result<()> {
+    styles.validate()?;
+    for preset in &styles.presets {
+        anyhow::ensure!(
+            preset
+                .key
+                .as_ref()
+                .is_none_or(|key| super::preferences::valid_shortcut_binding(key)),
+            "invalid text preset shortcut"
+        );
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn preset_shortcuts_use_the_tool_binding_grammar() {
+        for (key, valid) in [
+            ("1", true),
+            ("ctrl+shift+1", true),
+            ("alt+f2", true),
+            ("ctrl+numpadadd", true),
+            ("Ctrl+1", false),
+            ("shift+ctrl+1", false),
+            ("ctrl++", false),
+            ("two", false),
+        ] {
+            let styles = TextStyles {
+                presets: vec![koharu_renderer::TextPreset {
+                    id: "test".into(),
+                    name: "Test".into(),
+                    style: TextStyle::default(),
+                    key: Some(key.into()),
+                }],
+                ..Default::default()
+            };
+            assert_eq!(validate_styles(&styles).is_ok(), valid, "{key}");
+        }
+    }
 }

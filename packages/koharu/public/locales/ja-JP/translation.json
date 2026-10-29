@@ -673,6 +673,12 @@
     "nameHelp": "制御文字を含まない1～64文字を入力してください。",
     "duplicateName": "同じ名前のプリセットがあります。",
     "deleteQuestion": "プリセット「{{name}}」を削除しますか？",
-    "presetLimit": "プリセットは最大32個まで保存できます。"
+    "presetLimit": "プリセットは最大32個まで保存できます。",
+    "setShortcut": "ショートカットを設定…",
+    "shortcutFor": "{{name}}のショートカット",
+    "shortcutHelp": "数字の1～9がおすすめです。記録ボタンを押してからキーを入力します。Escapeで記録を取り消せます。",
+    "recordShortcut": "プリセットのショートカットを記録",
+    "invalidShortcut": "有効なショートカットを選んでください。",
+    "usedByPreset": "プリセット「{{name}}」が使用中"
   }
 }

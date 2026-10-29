@@ -1,3 +1,7 @@
+import type { TFunction } from 'i18next'
+
+import type { TextPreset } from '@koharu/bridge/protocol'
+
 import type { ShortcutAction, Shortcuts, ShortcutSlot } from './store'
 
 export const shortcutActions: readonly ShortcutAction[] = [
@@ -366,24 +370,62 @@ export const builtInShortcuts: readonly BuiltInShortcut[] = [
   },
 ]
 
-export type ShortcutConflict = { slot: ShortcutSlot } | { builtIn: BuiltInShortcut }
+type PresetBinding = Pick<TextPreset, 'id' | 'name' | 'key'>
+export type ShortcutConflict =
+  | { slot: ShortcutSlot }
+  | { builtIn: BuiltInShortcut }
+  | { preset: PresetBinding }
+
+function bindingConflicts(
+  binding: string,
+  shortcuts: Shortcuts,
+  presets: readonly PresetBinding[],
+  exceptSlot?: ShortcutSlot,
+  exceptPreset?: string,
+): ShortcutConflict[] {
+  const key = identity(binding)
+  if (key === null) return []
+  const found: ShortcutConflict[] = shortcutActions
+    .flatMap(shortcutSlots)
+    .filter((slot) => slot !== exceptSlot && identity(shortcuts[slot]) === key)
+    .map((slot) => ({ slot }))
+  for (const entry of builtInShortcuts) {
+    if (entry.checked && entry.bindings.some((binding) => identity(binding) === key))
+      found.push({ builtIn: entry })
+  }
+  for (const preset of presets) {
+    if (preset.id !== exceptPreset && preset.key && identity(preset.key) === key)
+      found.push({ preset })
+  }
+  return found
+}
 
 export function shortcutConflicts(
   shortcuts: Shortcuts,
+  presets: readonly PresetBinding[] = [],
 ): Partial<Record<ShortcutSlot, ShortcutConflict[]>> {
   const conflicts: Partial<Record<ShortcutSlot, ShortcutConflict[]>> = {}
-  const slots = shortcutActions.flatMap(shortcutSlots)
-  for (const slot of slots) {
-    const key = identity(shortcuts[slot])
-    if (key === null) continue
-    const found: ShortcutConflict[] = slots
-      .filter((other) => other !== slot && identity(shortcuts[other]) === key)
-      .map((slot) => ({ slot }))
-    for (const entry of builtInShortcuts) {
-      if (entry.checked && entry.bindings.some((binding) => identity(binding) === key))
-        found.push({ builtIn: entry })
-    }
+  for (const slot of shortcutActions.flatMap(shortcutSlots)) {
+    const found = bindingConflicts(shortcuts[slot], shortcuts, presets, slot)
     if (found.length) conflicts[slot] = found
   }
   return conflicts
+}
+
+export function presetShortcutConflicts(
+  binding: string,
+  shortcuts: Shortcuts,
+  presets: readonly PresetBinding[],
+  presetId: string,
+): ShortcutConflict[] {
+  return bindingConflicts(binding, shortcuts, presets, undefined, presetId)
+}
+
+export function formatShortcutConflict(conflict: ShortcutConflict, t: TFunction): string {
+  if ('preset' in conflict) return t('textStyles.usedByPreset', { name: conflict.preset.name })
+  if ('builtIn' in conflict)
+    return t('settings.shortcuts.usedByBuiltIn', { action: t(conflict.builtIn.labelKey) })
+  return t('settings.shortcuts.alsoUsedBy', {
+    action: t(shortcutLabels[conflict.slot.replace(/_alt$/, '') as ShortcutAction]),
+  })
 }

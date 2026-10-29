@@ -7,6 +7,7 @@ import { PresetActions, PresetSummary, usePresetDialogs } from '@/components/edi
 import { TextStyleDialog } from '@/components/editor/TextStyleDialog'
 import { call, refreshTextStyles, saveTextStyles } from '@/lib/backend'
 import { usePage, pageKey, pagesKey, projectKey, refresh } from '@/lib/queries'
+import { formatBinding } from '@/lib/shortcuts'
 import { useKoharuStore } from '@/lib/store'
 import { emptyTextStyle } from '@/lib/text-styles'
 import { commands, type EntityId, type StyleScope, type TextStyle } from '@koharu/bridge/protocol'
@@ -86,6 +87,11 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
                 <span className='min-w-0'>
                   <span className='block break-words'>{preset.name}</span>
                   <PresetSummary preset={preset} />
+                  {preset.key && (
+                    <kbd className='text-[10px] text-muted-foreground'>
+                      {formatBinding(preset.key)}
+                    </kbd>
+                  )}
                 </span>
               </DropdownMenuItem>
               <PresetActions

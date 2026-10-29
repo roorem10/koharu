@@ -4,11 +4,12 @@ import { LockKeyhole, RotateCcw, X } from 'lucide-react'
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { saveShortcuts, saveWheelZoom } from '@/lib/backend'
+import { refreshTextStyles, saveShortcuts, saveWheelZoom } from '@/lib/backend'
 import {
   bindingFromEvent,
   builtInShortcuts,
   formatBinding,
+  formatShortcutConflict,
   loadShortcutLayout,
   shortcutActions,
   shortcutConflicts,
@@ -43,14 +44,22 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
   function ShortcutPreferences(_, ref) {
     const { t } = useTranslation()
     const saved = useKoharuStore((state) => state.shortcuts)
+    const textStyles = useKoharuStore((state) => state.textStyles)
     const wheelZoom = useKoharuStore((state) => state.wheelZoom)
     const [draft, setDraft] = useState(saved)
     const edited = useRef(false)
     const [recording, setRecording] = useState<ShortcutSlot | null>(null)
-    const conflicts = useMemo(() => shortcutConflicts(draft), [draft])
+    const conflicts = useMemo(
+      () => shortcutConflicts(draft, textStyles?.presets ?? []),
+      [draft, textStyles],
+    )
     const hasConflicts = Object.keys(conflicts).length > 0
     const banner = useRef<HTMLDivElement>(null)
     const [flash, setFlash] = useState(0)
+
+    useEffect(() => {
+      if (!textStyles) void refreshTextStyles().catch(() => undefined)
+    }, [textStyles])
 
     useEffect(() => {
       void loadShortcutLayout()
@@ -81,9 +90,10 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
     )
 
     const update = (next: Shortcuts) => {
+      if (!textStyles) return
       edited.current = true
       setDraft(next)
-      if (Object.keys(shortcutConflicts(next)).length) return
+      if (Object.keys(shortcutConflicts(next, textStyles.presets ?? [])).length) return
       useKoharuStore.getState().setShortcuts(next)
       void saveShortcuts(next).catch(() => undefined)
     }
@@ -92,17 +102,7 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
       actions.map((action) => {
         const slots = shortcutSlots(action)
         const errors = slots.flatMap((slot) => conflicts[slot] ?? [])
-        const messages = [
-          ...new Set(
-            errors.map((conflict) =>
-              'builtIn' in conflict
-                ? t('settings.shortcuts.usedByBuiltIn', { action: t(conflict.builtIn.labelKey) })
-                : t('settings.shortcuts.alsoUsedBy', {
-                    action: t(shortcutLabels[conflict.slot.replace(/_alt$/, '') as ShortcutAction]),
-                  }),
-            ),
-          ),
-        ]
+        const messages = [...new Set(errors.map((conflict) => formatShortcutConflict(conflict, t)))]
         return (
           <div
             key={action}
@@ -122,6 +122,7 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
                       <div className='flex min-w-0 gap-1'>
                         <Button
                           type='button'
+                          disabled={!textStyles}
                           variant='outline'
                           aria-label={label}
                           aria-pressed={recording === slot}
@@ -163,7 +164,7 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
                           aria-label={t('settings.shortcuts.clear', {
                             action: `${t(shortcutLabels[action])} · ${slotName}`,
                           })}
-                          disabled={!draft[slot]}
+                          disabled={!textStyles || !draft[slot]}
                           onClick={() => {
                             setRecording(null)
                             update({ ...draft, [slot]: '' })
@@ -207,6 +208,7 @@ export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
             type='button'
             variant='outline'
             size='sm'
+            disabled={!textStyles}
             onClick={() => {
               setRecording(null)
               update({ ...defaultShortcuts })

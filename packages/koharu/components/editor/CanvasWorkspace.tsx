@@ -10,7 +10,7 @@ import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { useCanvas } from '@/components/editor/useCanvas'
 import { call } from '@/lib/backend'
-import { expandLayerSelection } from '@/lib/document'
+import { expandLayerSelection, isTextLayer } from '@/lib/document'
 import {
   controlFrame,
   draftFrame,
@@ -51,6 +51,7 @@ import {
 import { prefetchCanvasPages, workspaceColor, type CanvasColor } from '@koharu/bridge/canvas'
 import { commands, type Frame, type Point, type TransformFrame } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
+import { toast } from '@koharu/ui/components/toast'
 
 const BRUSH_DIAMETER_STEP = 4
 export const MIN_ZOOM = 0.02
@@ -424,7 +425,37 @@ export function CanvasWorkspace() {
     }
 
     const down = (event: KeyboardEvent) => {
-      const action = findShortcut(event, useKoharuStore.getState().shortcuts)
+      const state = useKoharuStore.getState()
+      const action = findShortcut(event, state.shortcuts)
+      const preset =
+        !action &&
+        state.textStyles?.presets?.find((preset) => preset.key && matchesBinding(event, preset.key))
+      const runConfigured = () => {
+        if (action) {
+          runShortcut(event, action)
+          return
+        }
+        if (!preset || !page || event.repeat) return
+        const expanded = expandLayerSelection(page.layers, state.selectedLayers)
+        const selected = page.layers
+          .filter(isTextLayer)
+          .filter((layer) => expanded.includes(layer.id))
+          .map((layer) => layer.id)
+        if (!selected.length) return
+        event.preventDefault()
+        void call(commands.applyTextStyle, { layers: selected }, preset.style)
+          .then((result) => {
+            toast.add({
+              type: 'success',
+              title: t('textStyles.applied', { count: result.changed }),
+              description: result.skipped
+                ? t('textStyles.skipped', { count: result.skipped })
+                : undefined,
+            })
+            return refresh(projectKey, pagesKey, pageKey)
+          })
+          .catch(() => undefined)
+      }
       const modified = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey
       // CEF's capture-phase page-zoom blocker has already prevented the default here.
       // Configured modifier bindings also work immediately after a range input was used.
@@ -432,10 +463,10 @@ export function CanvasWorkspace() {
         (entry) =>
           entry.checked && entry.bindings.some((binding) => matchesBinding(event, binding)),
       )
-      if (modified && action && !reserved) {
+      if (modified && (action || preset) && !reserved) {
         event.preventDefault()
         if (event.isComposing || textEntry(event.target)) return
-        runShortcut(event, action)
+        runConfigured()
         return
       }
       if (event.key === 'Shift' && heldArrows.current.size) nudgeShift.current = true
@@ -448,10 +479,9 @@ export function CanvasWorkspace() {
       if (event.target instanceof HTMLInputElement) {
         const binding = bindingFromEvent(event)
         if (binding && (hasModifier(binding) || (event.key.length === 1 && event.key !== ' ')))
-          runShortcut(event, action)
+          runConfigured()
         return
       }
-      const state = useKoharuStore.getState()
       if (event.code === 'Space') {
         spaceHeld.current = true
         event.preventDefault()
@@ -486,7 +516,7 @@ export function CanvasWorkspace() {
         selectLayers([])
         return
       }
-      runShortcut(event, action)
+      runConfigured()
     }
 
     const up = (event: KeyboardEvent) => {
@@ -521,6 +551,7 @@ export function CanvasWorkspace() {
     selectLayers,
     setTool,
     setZoom,
+    t,
   ])
 
   const clientPagePoint = (clientX: number, clientY: number) =>

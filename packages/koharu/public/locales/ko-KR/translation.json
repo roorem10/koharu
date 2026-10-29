@@ -673,6 +673,12 @@
     "nameHelp": "제어 문자를 제외한 1~64자를 입력하세요.",
     "duplicateName": "다른 프리셋이 이미 이 이름을 사용합니다.",
     "deleteQuestion": "“{{name}}” 프리셋을 삭제할까요?",
-    "presetLimit": "최대 32개의 프리셋을 저장할 수 있습니다."
+    "presetLimit": "최대 32개의 프리셋을 저장할 수 있습니다.",
+    "setShortcut": "단축키 설정…",
+    "shortcutFor": "{{name}} 단축키",
+    "shortcutHelp": "숫자 1~9를 사용해 보세요. 기록 버튼을 누른 뒤 키 또는 조합을 입력하세요. Escape로 기록을 취소합니다.",
+    "recordShortcut": "프리셋 단축키 기록",
+    "invalidShortcut": "유효한 단축키를 선택하세요.",
+    "usedByPreset": "“{{name}}” 프리셋에서 사용 중"
   }
 }

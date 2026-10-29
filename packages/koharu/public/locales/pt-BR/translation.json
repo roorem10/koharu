@@ -673,6 +673,12 @@
     "nameHelp": "Use de 1 a 64 caracteres sem caracteres de controle.",
     "duplicateName": "Outra predefinição já tem este nome.",
     "deleteQuestion": "Excluir a predefinição “{{name}}”?",
-    "presetLimit": "Você pode salvar até 32 predefinições."
+    "presetLimit": "Você pode salvar até 32 predefinições.",
+    "setShortcut": "Definir atalho…",
+    "shortcutFor": "Atalho de {{name}}",
+    "shortcutHelp": "Experimente os números de 1 a 9. Ative a gravação e pressione uma tecla ou combinação. Escape cancela.",
+    "recordShortcut": "Gravar atalho da predefinição",
+    "invalidShortcut": "Escolha um atalho válido.",
+    "usedByPreset": "Usado pela predefinição “{{name}}”"
   }
 }

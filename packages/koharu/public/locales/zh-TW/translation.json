@@ -673,6 +673,12 @@
     "nameHelp": "請輸入1至64個字元，不含控制字元。",
     "duplicateName": "已有同名預設集。",
     "deleteQuestion": "刪除預設集「{{name}}」？",
-    "presetLimit": "最多可儲存32個預設集。"
+    "presetLimit": "最多可儲存32個預設集。",
+    "setShortcut": "設定快捷鍵…",
+    "shortcutFor": "{{name}}的快捷鍵",
+    "shortcutHelp": "建議使用數字1–9。點選記錄按鈕，再按下單鍵或組合鍵。按Escape取消記錄。",
+    "recordShortcut": "記錄預設集快捷鍵",
+    "invalidShortcut": "請選擇有效的快捷鍵。",
+    "usedByPreset": "已被預設集「{{name}}」使用"
   }
 }

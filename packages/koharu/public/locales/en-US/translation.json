@@ -673,6 +673,12 @@
     "nameHelp": "Use 1–64 characters without control characters.",
     "duplicateName": "Another preset already has this name.",
     "deleteQuestion": "Delete the preset “{{name}}”?",
-    "presetLimit": "You can save up to 32 presets."
+    "presetLimit": "You can save up to 32 presets.",
+    "setShortcut": "Set shortcut…",
+    "shortcutFor": "Shortcut for {{name}}",
+    "shortcutHelp": "Try digits 1–9. Click the recorder, then press a key or combination. Escape cancels recording.",
+    "recordShortcut": "Record preset shortcut",
+    "invalidShortcut": "Choose a valid shortcut.",
+    "usedByPreset": "Used by preset “{{name}}”"
   }
 }

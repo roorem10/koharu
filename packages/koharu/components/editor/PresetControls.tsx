@@ -4,9 +4,11 @@ import { Ellipsis } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { PresetShortcutDialog } from '@/components/editor/PresetShortcutDialog'
 import { TextStyleDialog } from '@/components/editor/TextStyleDialog'
 import { saveTextStyles } from '@/lib/backend'
 import { useFonts } from '@/lib/queries'
+import { formatBinding } from '@/lib/shortcuts'
 import { useKoharuStore } from '@/lib/store'
 import { styleGroups } from '@/lib/text-styles'
 import type { EntityId, TextPreset } from '@koharu/bridge/protocol'
@@ -29,7 +31,7 @@ import {
 } from '@koharu/ui/components/dropdown-menu'
 import { Input } from '@koharu/ui/components/input'
 
-type PresetAction = 'rename' | 'update' | 'delete'
+type PresetAction = 'rename' | 'update' | 'delete' | 'shortcut'
 type PresetEdit = ({ preset: TextPreset; action: PresetAction } | { action: 'create' }) & {
   layer?: EntityId
 }
@@ -75,6 +77,9 @@ export function PresetActions({
           {t('textStyles.updatePreset')}
         </DropdownMenuItem>
       )}
+      <DropdownMenuItem onClick={() => onAction(preset, 'shortcut')}>
+        {t('textStyles.setShortcut')}
+      </DropdownMenuItem>
       <DropdownMenuItem variant='destructive' onClick={() => onAction(preset, 'delete')}>
         {t('textStyles.delete')}
       </DropdownMenuItem>
@@ -135,6 +140,9 @@ function PresetDialog({
       other.name.normalize('NFKC').trim().toLowerCase() ===
         name.normalize('NFKC').trim().toLowerCase(),
   )
+
+  if (editing.action === 'shortcut' && preset)
+    return <PresetShortcutDialog id={preset.id} onClose={onClose} />
 
   if ((editing.action === 'create' || editing.action === 'update') && layer) {
     return (
@@ -247,6 +255,11 @@ export function TextStylePresets() {
                 <p className='text-[12px] font-medium break-words'>{preset.name}</p>
                 <PresetSummary preset={preset} />
               </div>
+              {preset.key && (
+                <kbd className='shrink-0 text-[11px] text-muted-foreground'>
+                  {formatBinding(preset.key)}
+                </kbd>
+              )}
               <PresetActions preset={preset} onAction={actions.manage} />
             </li>
           ))}

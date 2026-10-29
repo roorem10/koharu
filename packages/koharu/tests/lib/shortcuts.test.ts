@@ -8,6 +8,7 @@ import {
   loadShortcutLayout,
   matchesBinding,
   shortcutConflicts,
+  presetShortcutConflicts,
 } from '@/lib/shortcuts'
 import { defaultShortcuts, receiveShortcuts, useKoharuStore } from '@/lib/store'
 
@@ -92,6 +93,29 @@ describe('shortcut bindings', () => {
       text: [{ slot: 'text_alt' }],
       text_alt: [{ slot: 'text' }],
     })
+  })
+
+  it('checks preset bindings in both directions with the same symbol identity', () => {
+    const presets = [
+      { id: 'one', name: 'Outline', key: '1' },
+      { id: 'two', name: 'Shout', key: 'ctrl+alt+shift+=' },
+    ]
+    expect(presetShortcutConflicts('t', defaultShortcuts, presets, 'new')).toContainEqual({
+      slot: 'text',
+    })
+    expect(presetShortcutConflicts('ctrl+z', defaultShortcuts, presets, 'new')[0]).toHaveProperty(
+      'builtIn',
+    )
+    expect(presetShortcutConflicts('1', defaultShortcuts, presets, 'new')).toEqual([
+      { preset: presets[0] },
+    ])
+    expect(presetShortcutConflicts('ctrl+alt+plus', defaultShortcuts, presets, 'new')).toEqual([
+      { preset: presets[1] },
+    ])
+    expect(presetShortcutConflicts('1', defaultShortcuts, presets, 'one')).toEqual([])
+    expect(shortcutConflicts({ ...defaultShortcuts, text_alt: '1' }, presets).text_alt).toEqual([
+      { preset: presets[0] },
+    ])
   })
 
   it('loads complete bindings, preserves cleared slots and resolves a hand-edited collision in page order', () => {

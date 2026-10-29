@@ -2,8 +2,10 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { PresetShortcutDialog } from '@/components/editor/PresetShortcutDialog'
 import { SettingsPage } from '@/components/preferences/SettingsPage'
 import { defaultShortcuts, useKoharuStore } from '@/lib/store'
+import { emptyTextStyle } from '@/lib/text-styles'
 import { commands } from '@koharu/bridge/protocol'
 
 vi.mock('@/lib/backend', async (importOriginal) => ({
@@ -34,6 +36,71 @@ function record(action: string, options: KeyboardEventInit, alternate = false) {
 }
 
 describe('shortcut preferences', () => {
+  it.each([
+    [{ key: 't' }, 'Text'],
+    [{ key: 'z', ctrlKey: true }, 'Undo'],
+    [{ key: '1' }, 'Other preset'],
+  ] as const)('refuses preset shortcut conflicts for %j', (event, owner) => {
+    const save = vi.spyOn(commands, 'saveTextStyles').mockImplementation(async (styles) => styles)
+    useKoharuStore.setState({
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [
+          { id: 'target', name: 'Target', key: null, style: { ...emptyTextStyle } },
+          { id: 'other', name: 'Other preset', key: '1', style: { ...emptyTextStyle } },
+        ],
+      },
+    })
+    render(<PresetShortcutDialog id='target' onClose={vi.fn()} />)
+    const recorder = screen.getByRole('button', { name: 'Record preset shortcut' })
+    fireEvent.click(recorder)
+    fireEvent.keyDown(recorder, event)
+    expect(screen.getByRole('alert')).toHaveTextContent(owner)
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('records a preset combination and keeps the binding on that preset', async () => {
+    const save = vi.spyOn(commands, 'saveTextStyles').mockImplementation(async (styles) => styles)
+    useKoharuStore.setState({
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [{ id: 'target', name: 'Target', key: null, style: { ...emptyTextStyle } }],
+      },
+    })
+    render(<PresetShortcutDialog id='target' onClose={vi.fn()} />)
+    const recorder = screen.getByRole('button', { name: 'Record preset shortcut' })
+    fireEvent.click(recorder)
+    fireEvent.keyDown(recorder, { key: '!', code: 'Digit1', ctrlKey: true, shiftKey: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          presets: [expect.objectContaining({ id: 'target', key: 'ctrl+shift+1' })],
+        }),
+      ),
+    )
+    expect(commands.saveShortcuts).not.toHaveBeenCalled()
+  })
+
+  it('refuses a tool binding owned by a preset and shows its name', () => {
+    useKoharuStore.setState({
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [{ id: 'one', name: 'White outline', key: '1', style: { ...emptyTextStyle } }],
+      },
+    })
+    open()
+    record('Text', { key: '1' })
+    expect(screen.getByText('Used by preset “White outline”')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Text · Primary shortcut' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    expect(commands.saveShortcuts).not.toHaveBeenCalled()
+    expect(useKoharuStore.getState().shortcuts.text).toBe('t')
+  })
+
   it('saves the wheel choice and restores it with the complete shortcut defaults', async () => {
     const user = userEvent.setup()
     open()

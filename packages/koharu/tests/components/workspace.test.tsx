@@ -1,10 +1,12 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CanvasWorkspace, MIN_ZOOM, MAX_ZOOM } from '@/components/editor/CanvasWorkspace'
 import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
+import { emptyTextStyle } from '@/lib/text-styles'
 import { commands, type Layer } from '@koharu/bridge/protocol'
 import { Slider } from '@koharu/ui/components/slider'
 import { TooltipProvider } from '@koharu/ui/components/tooltip'
@@ -175,6 +177,72 @@ function renderWorkspace() {
 }
 
 describe('canvas interaction adapter', () => {
+  it.each([
+    ['1', { key: '1', code: 'Digit1' }],
+    ['ctrl+shift+1', { key: '!', code: 'Digit1', ctrlKey: true, shiftKey: true }],
+  ] as const)('applies preset %s once to both selected text boxes', async (binding, event) => {
+    installNudgeProject()
+    const page =
+      queryClient.getQueryData<NonNullable<Awaited<ReturnType<typeof commands.getPage>>>>(pageKey)!
+    const first = page.layers[0] as Extract<Layer, { type: 'text' }>
+    const nextPage = {
+      ...page,
+      layers: [
+        first,
+        { ...first, id: 'second', content: { ...first.content, id: 'other-content' } },
+      ],
+    }
+    queryClient.setQueryData(pageKey, nextPage)
+    const style = {
+      ...emptyTextStyle,
+      fill: [255, 255, 255, 255] as [number, number, number, number],
+    }
+    useKoharuStore.setState({
+      selectedLayers: ['element', 'second'],
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [{ id: 'one', name: 'White', key: binding, style }],
+      },
+    })
+    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 2, skipped: 0 })
+    vi.spyOn(commands, 'getPage').mockResolvedValue(nextPage)
+    vi.spyOn(commands, 'getPages').mockResolvedValue([])
+    vi.spyOn(commands, 'getProject').mockResolvedValue(
+      queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!,
+    )
+    renderWorkspace()
+    fireEvent.keyDown(window, event)
+    fireEvent.keyDown(window, { ...event, repeat: true })
+    await waitFor(() =>
+      expect(apply).toHaveBeenCalledExactlyOnceWith({ layers: ['element', 'second'] }, style),
+    )
+  })
+
+  it('keeps preset digits in text entry and ignores composition, handled events and empty selections', async () => {
+    installNudgeProject()
+    useKoharuStore.setState({
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [{ id: 'one', name: 'White', key: '1', style: { ...emptyTextStyle } }],
+      },
+    })
+    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 1, skipped: 0 })
+    renderWorkspace()
+    const textarea = document.createElement('textarea')
+    textarea.setAttribute('aria-label', 'Translation')
+    document.body.append(textarea)
+    await userEvent.setup().type(textarea, '1')
+    expect(textarea).toHaveValue('1')
+    fireEvent.keyDown(window, { key: '1', code: 'Digit1', isComposing: true })
+    const handled = new KeyboardEvent('keydown', { key: '1', cancelable: true })
+    handled.preventDefault()
+    window.dispatchEvent(handled)
+    useKoharuStore.setState({ selectedLayers: [] })
+    fireEvent.keyDown(window, { key: '1', code: 'Digit1' })
+    expect(apply).not.toHaveBeenCalled()
+    textarea.remove()
+  })
+
   it('prefetches only after the authoritative canvas page and generation are active', async () => {
     installProject()
     queryClient.setQueryData(pagesKey, [
