@@ -544,7 +544,7 @@
     "typesetting": {
       "addFamily": "Yazı tipi ailesi ekle",
       "defaultFamilies": "Varsayılan yazı tipi aileleri",
-      "description": "Bir metin katmanına aile atanmadığında kullanılacak sıralı yazı tipi yığınını ayarlayın.",
+      "description": "Varsayılan metin stilini ve yedek yazı tipi sırasını seçin.",
       "empty": "Varsayılan aile yok. Koharu sistem yedeğini kullanacak.",
       "familyLabel": "Varsayılan yazı tipi ailesi {{index}}",
       "fontFallback": "Yedek yazı tipleri",
@@ -624,5 +624,22 @@
     "maximize": "Ekranı kapla",
     "minimize": "Simge durumuna küçült",
     "restore": "Geri yükle"
+  },
+  "textStyles": {
+    "defaultTitle": "Varsayılan metin stili",
+    "clear": "Temizle",
+    "clearAll": "Tümünü temizle",
+    "clearGroup": "{{group}} grubunu temizle",
+    "notSet": "Ayarlanmadı",
+    "pipelineNote": "Yeni metin varsayılan metin stilini kullanır.",
+    "groups": {
+      "font": "Yazı tipi",
+      "fill": "Metin rengi",
+      "outline": "Dış çizgi"
+    },
+    "defaultHelp": "Yeni ve algılanan metin için varsayılanları seçin. Her kutu Denetçi üzerinden ayrı ayrı değiştirilebilir.",
+    "defaultFont": "Varsayılan yazı tipi",
+    "outlineColor": "Dış çizgi rengi",
+    "outlineWidth": "Dış çizgi genişliği (px)"
   }
 }

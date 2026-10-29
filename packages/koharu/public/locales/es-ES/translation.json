@@ -544,7 +544,7 @@
     "typesetting": {
       "addFamily": "Añadir familia tipográfica",
       "defaultFamilies": "Familias tipográficas predeterminadas",
-      "description": "Define la pila ordenada de fuentes usada cuando una capa de texto no tiene una familia asignada.",
+      "description": "Elige el estilo de texto predeterminado y el orden de las fuentes de respaldo.",
       "empty": "No hay familias predeterminadas. Koharu usará la alternativa del sistema.",
       "familyLabel": "Familia tipográfica predeterminada {{index}}",
       "fontFallback": "Fuentes de respaldo",
@@ -624,5 +624,22 @@
     "maximize": "Maximizar",
     "minimize": "Minimizar",
     "restore": "Restaurar"
+  },
+  "textStyles": {
+    "defaultTitle": "Estilo de texto predeterminado",
+    "clear": "Borrar",
+    "clearAll": "Borrar todo",
+    "clearGroup": "Borrar {{group}}",
+    "notSet": "Sin definir",
+    "pipelineNote": "El texto nuevo usa el estilo predeterminado.",
+    "groups": {
+      "font": "Fuente",
+      "fill": "Color del texto",
+      "outline": "Contorno"
+    },
+    "defaultHelp": "Elige valores predeterminados para texto nuevo y detectado. Cada cuadro se puede cambiar en el Inspector.",
+    "defaultFont": "Fuente predeterminada",
+    "outlineColor": "Color del contorno",
+    "outlineWidth": "Grosor del contorno (px)"
   }
 }

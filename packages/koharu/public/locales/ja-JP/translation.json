@@ -544,7 +544,7 @@
     "typesetting": {
       "addFamily": "フォントファミリーを追加",
       "defaultFamilies": "既定のフォントファミリー",
-      "description": "テキストレイヤーにファミリーが指定されていない場合に使う、順序付きフォントスタックを設定します。",
+      "description": "テキストの既定スタイルと代替フォントの順序を設定します。",
       "empty": "既定のファミリーがありません。Koharuはシステムの代替フォントを使用します。",
       "familyLabel": "既定のフォントファミリー {{index}}",
       "fontFallback": "代替フォント",
@@ -624,5 +624,22 @@
     "maximize": "最大化",
     "minimize": "最小化",
     "restore": "元のサイズに戻す"
+  },
+  "textStyles": {
+    "defaultTitle": "既定のテキストスタイル",
+    "clear": "クリア",
+    "clearAll": "すべてクリア",
+    "clearGroup": "{{group}}をクリア",
+    "notSet": "未設定",
+    "pipelineNote": "新しいテキストには既定のスタイルを使用します。",
+    "groups": {
+      "font": "フォント",
+      "fill": "文字色",
+      "outline": "縁取り"
+    },
+    "defaultHelp": "新規・検出テキストの既定値を選択します。各ボックスはインスペクターで個別に変更できます。",
+    "defaultFont": "既定のフォント",
+    "outlineColor": "縁取りの色",
+    "outlineWidth": "縁取りの幅（px）"
   }
 }

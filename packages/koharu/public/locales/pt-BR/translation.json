@@ -544,7 +544,7 @@
     "typesetting": {
       "addFamily": "Adicionar família de fontes",
       "defaultFamilies": "Famílias de fontes padrão",
-      "description": "Defina a pilha ordenada de fontes usada quando uma camada de texto não tem família atribuída.",
+      "description": "Escolha o estilo de texto padrão e a ordem das fontes alternativas.",
       "empty": "Nenhuma família padrão. O Koharu usará a alternativa do sistema.",
       "familyLabel": "Família de fontes padrão {{index}}",
       "fontFallback": "Fontes alternativas",
@@ -624,5 +624,22 @@
     "maximize": "Maximizar",
     "minimize": "Minimizar",
     "restore": "Restaurar"
+  },
+  "textStyles": {
+    "defaultTitle": "Estilo de texto padrão",
+    "clear": "Limpar",
+    "clearAll": "Limpar tudo",
+    "clearGroup": "Limpar {{group}}",
+    "notSet": "Não definido",
+    "pipelineNote": "Novos textos usam o estilo padrão.",
+    "groups": {
+      "font": "Fonte",
+      "fill": "Cor do texto",
+      "outline": "Contorno"
+    },
+    "defaultHelp": "Escolha padrões para textos novos e detectados. Cada caixa pode ser alterada no Inspetor.",
+    "defaultFont": "Fonte padrão",
+    "outlineColor": "Cor do contorno",
+    "outlineWidth": "Largura do contorno (px)"
   }
 }

@@ -544,7 +544,7 @@
     "typesetting": {
       "addFamily": "Ajouter une famille de polices",
       "defaultFamilies": "Familles de polices par défaut",
-      "description": "Définissez la liste ordonnée de polices utilisée lorsqu’aucune famille n’est attribuée à un calque de texte.",
+      "description": "Choisissez les réglages de texte par défaut et l’ordre des polices de secours.",
       "empty": "Aucune famille par défaut. Koharu utilisera la police de secours du système.",
       "familyLabel": "Famille de polices par défaut {{index}}",
       "fontFallback": "Police de secours",
@@ -624,5 +624,22 @@
     "maximize": "Agrandir",
     "minimize": "Réduire",
     "restore": "Restaurer"
+  },
+  "textStyles": {
+    "defaultTitle": "Style de texte par défaut",
+    "clear": "Effacer",
+    "clearAll": "Tout effacer",
+    "clearGroup": "Effacer {{group}}",
+    "notSet": "Non défini",
+    "pipelineNote": "Le nouveau texte utilise le style par défaut.",
+    "groups": {
+      "font": "Police",
+      "fill": "Couleur du texte",
+      "outline": "Contour"
+    },
+    "defaultHelp": "Choisissez les valeurs par défaut des nouveaux textes et des textes détectés. Chaque cadre reste modifiable dans l’inspecteur.",
+    "defaultFont": "Police par défaut",
+    "outlineColor": "Couleur du contour",
+    "outlineWidth": "Épaisseur du contour (px)"
   }
 }

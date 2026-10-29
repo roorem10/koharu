@@ -23,6 +23,7 @@ import { ResourceMonitor } from '@/components/editor/ResourceMonitor'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { ProviderPreferences } from '@/components/preferences/ProviderPreferences'
+import { TextStylePreferences } from '@/components/preferences/TextStylePreferences'
 import { SettingsPage } from '@/components/preferences/SettingsPage'
 import {
   fontsKey,
@@ -34,6 +35,7 @@ import {
   useCommand,
 } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
+import { emptyTextStyle, emptyShapeStyles } from '@/lib/text-styles'
 import * as canvasRuntime from '@koharu/bridge/canvas'
 import {
   commands,
@@ -225,6 +227,7 @@ function installProject() {
   queryClient.setQueryData(pageKey, page)
   useKoharuStore.setState({
     preferences,
+    textStyles: { default_style: { ...emptyTextStyle }, shape_styles: structuredClone(emptyShapeStyles), legacy_color_migrated: true },
     translationModels: [
       {
         provider: 'local',
@@ -259,6 +262,67 @@ function SettingsNavigationHarness() {
 }
 
 describe('greenfield editor', () => {
+  it('edits default font, color and outline directly without changing sizing', async () => {
+    installProject()
+    queryClient.setQueryData(fontsKey, [
+      {
+        name: 'Font A',
+        sources: ['system'],
+        metadata: {
+          primary_script: 'latn',
+          scripts: [],
+          languages: [],
+          category: null,
+          classifications: [],
+          use_cases: [],
+        },
+        faces: [],
+      },
+    ])
+    vi.spyOn(commands, 'getFontFavorites').mockResolvedValue([])
+    vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
+    const save = vi.spyOn(commands, 'saveTextStyles').mockImplementation(async (styles) => styles)
+    render(<TextStylePreferences />)
+    const user = userEvent.setup()
+    expect(screen.queryByRole('spinbutton', { name: 'Size' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Default font' }))
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Not set')
+    await user.click(await screen.findByRole('option', { name: /Font A/ }))
+    await waitFor(() =>
+      expect(save).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          default_style: {
+            ...emptyTextStyle,
+            font: { preferred_font: 'Font A', font_weight: null, font_style: null },
+          },
+        }),
+      ),
+    )
+    await user.click(screen.getByRole('button', { name: 'Text color' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hex color code' }), {
+      target: { value: '#123456' },
+    })
+    await waitFor(() =>
+      expect(useKoharuStore.getState().textStyles?.default_style?.fill).toEqual([18, 52, 86, 255]),
+    )
+    await user.keyboard('{Escape}')
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Outline width (px)' }), {
+      target: { value: '2.5' },
+    })
+    await waitFor(() =>
+      expect(useKoharuStore.getState().textStyles?.default_style?.outline?.stroke_width).toBe(2.5),
+    )
+    expect(useKoharuStore.getState().textStyles?.default_style?.size).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Clear Outline' }))
+    await waitFor(() =>
+      expect(useKoharuStore.getState().textStyles?.default_style?.outline).toBeNull(),
+    )
+    await user.click(screen.getByRole('button', { name: 'Clear all' }))
+    await waitFor(() =>
+      expect(useKoharuStore.getState().textStyles?.default_style).toEqual(emptyTextStyle),
+    )
+  })
+
   it('registers one native resize listener in React strict mode', async () => {
     const unlisten = vi.fn()
     nativeWindow.onResized.mockClear()
@@ -1691,7 +1755,7 @@ describe('greenfield editor', () => {
     })
   })
 
-  it('saves and clears the default color only when detection is disabled', async () => {
+  it('saves the detection switch and links the default color to the default text style', async () => {
     installProject()
     const user = userEvent.setup()
     useKoharuStore.setState({ settingsOpen: true })
@@ -1705,24 +1769,16 @@ describe('greenfield editor', () => {
 
     await user.click(screen.getByRole('button', { name: 'Pipeline' }))
     const toggle = screen.getByRole('switch', { name: 'Detect text and outline colors' })
-    const color = screen.getByRole('button', { name: 'Default text color' })
     expect(toggle).toBeChecked()
-    expect(color).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Default text color' })).not.toBeInTheDocument()
     await user.click(toggle)
-    expect(color).toBeEnabled()
-    await user.click(color)
-    fireEvent.change(screen.getByRole('textbox', { name: 'Hex color code' }), {
-      target: { value: '#2357AB' },
-    })
     await waitFor(() => expect(save).toHaveBeenLastCalledWith(
-      expect.objectContaining({ detect_text_color: false, default_text_color: [35, 87, 171, 255] }),
+      expect.objectContaining({ detect_text_color: false }),
       preferences.providers, preferences.typesetting,
     ))
-    await user.click(screen.getByRole('button', { name: 'Transparent' }))
-    await waitFor(() => expect(save).toHaveBeenLastCalledWith(
-      expect.objectContaining({ detect_text_color: false, default_text_color: null }),
-      preferences.providers, preferences.typesetting,
-    ))
+    const links = screen.getAllByRole('button', { name: 'Typesetting' })
+    await user.click(links[links.length - 1])
+    expect(screen.getByRole('heading', { level: 2, name: 'Typesetting' })).toBeInTheDocument()
     expect(setTypography).not.toHaveBeenCalled()
     expect(textLayer.typography!.color).toEqual(existingColor)
   })

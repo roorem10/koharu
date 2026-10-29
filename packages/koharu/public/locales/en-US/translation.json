@@ -544,7 +544,7 @@
     "typesetting": {
       "addFamily": "Add font family",
       "defaultFamilies": "Default font families",
-      "description": "Set the ordered font stack used when a text layer has no assigned family.",
+      "description": "Choose default text styling and the fallback font order.",
       "empty": "No default families. Koharu will use the system fallback.",
       "familyLabel": "Default font family {{index}}",
       "fontFallback": "Font fallback",
@@ -624,5 +624,22 @@
     "maximize": "Maximize",
     "minimize": "Minimize",
     "restore": "Restore"
+  },
+  "textStyles": {
+    "defaultTitle": "Default text style",
+    "clear": "Clear",
+    "clearAll": "Clear all",
+    "clearGroup": "Clear {{group}}",
+    "notSet": "Not set",
+    "pipelineNote": "New text uses the default text style.",
+    "groups": {
+      "font": "Font",
+      "fill": "Text color",
+      "outline": "Outline"
+    },
+    "defaultHelp": "Choose defaults for new and detected text. Change any individual box in the Inspector.",
+    "defaultFont": "Default font",
+    "outlineColor": "Outline color",
+    "outlineWidth": "Outline width (px)"
   }
 }

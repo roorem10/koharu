@@ -208,7 +208,11 @@ export function SettingsPage() {
             {tab === 'appearance' && <AppearancePreferences />}
             {tab === 'pipeline' &&
               (pipeline ? (
-                <PipelinePreferences value={pipeline} onChange={setPipeline} />
+                <PipelinePreferences
+                  value={pipeline}
+                  onChange={setPipeline}
+                  onTypesetting={() => setTab('typesetting')}
+                />
               ) : (
                 <LoadingPreferences />
               ))}

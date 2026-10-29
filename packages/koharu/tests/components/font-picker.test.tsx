@@ -51,6 +51,28 @@ describe('font favorites', () => {
     vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
   })
 
+  it('keeps the empty choice first and keyboard accessible while filtering', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FontPicker
+          value='Komika Text'
+          families={families}
+          onChange={onChange}
+          ariaLabel='Font'
+          emptyLabel='Same as default'
+        />
+      </QueryClientProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Font' }))
+    expect(screen.getAllByRole('option')[0]).toHaveAccessibleName('Same as default')
+    await user.type(screen.getByRole('combobox', { name: 'Search fonts' }), 'missing family')
+    await user.keyboard('{Enter}')
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
+
   it('stars without selecting or closing, and restores favorites when the selector is reopened', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()

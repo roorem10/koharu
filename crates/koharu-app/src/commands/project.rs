@@ -460,6 +460,8 @@ impl Project {
         frame: Frame,
         kind: TextLayoutKind,
     ) -> Result<(Commit, EntityId)> {
+        let styles = super::styles::load_text_styles()?;
+        let default_style = styles.read()?.default_style.clone();
         let snapshot = self.snapshot();
         let geometry = Self::geometry_from_frame(frame)?;
         let mut layer = None;
@@ -484,31 +486,30 @@ impl Project {
             )?;
             layer = Some(added_layer);
             edit.set(added_layer, &geometry)?;
-            edit.set(
-                added_layer,
-                &SceneTypography {
-                    origin: Origin::User,
-                    preferred_font: None,
-                    font_weight: None,
-                    font_style: None,
-                    size: None,
-                    auto_fit: true,
-                    color: None,
-                    stroke_color: None,
-                    stroke_width: None,
-                    stroke_method: Some(koharu_scene::StrokeMethod::Contour),
-                    stroke_position: None,
-                    stroke_join: None,
-                    outer_stroke_color: None,
-                    outer_stroke_width: None,
-                    alignment: match kind {
-                        TextLayoutKind::Point => Some(koharu_scene::TextAlignment::Start),
-                        TextLayoutKind::Paragraph => None,
-                    },
-                    writing_mode: None,
-                    extensions: Default::default(),
+            let mut typography = SceneTypography {
+                origin: Origin::User,
+                preferred_font: None,
+                font_weight: None,
+                font_style: None,
+                size: None,
+                auto_fit: true,
+                color: None,
+                stroke_color: None,
+                stroke_width: None,
+                stroke_method: Some(koharu_scene::StrokeMethod::Contour),
+                stroke_position: None,
+                stroke_join: None,
+                outer_stroke_color: None,
+                outer_stroke_width: None,
+                alignment: match kind {
+                    TextLayoutKind::Point => Some(koharu_scene::TextAlignment::Start),
+                    TextLayoutKind::Paragraph => None,
                 },
-            )?;
+                writing_mode: None,
+                extensions: Default::default(),
+            };
+            default_style.apply_to(&mut typography);
+            edit.set(added_layer, &typography)?;
             Ok(())
         })?;
         Ok((

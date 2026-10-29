@@ -3,7 +3,6 @@
 import { Eraser, FileText, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { ColorWell } from '@/components/controls/ColorWell'
 import {
   defaultModel,
   modelNames,
@@ -21,7 +20,6 @@ import {
   PreferenceSection,
   TextField,
 } from '@/components/preferences/PreferenceFields'
-import { hexToRgba, rgbaToHex } from '@/lib/color'
 import type { PipelineConfig } from '@koharu/bridge/protocol'
 import {
   Select,
@@ -41,9 +39,11 @@ const stages = [
 export function PipelinePreferences({
   value,
   onChange,
+  onTypesetting,
 }: {
   value: PipelineConfig
   onChange: (value: PipelineConfig) => void
+  onTypesetting: () => void
 }) {
   const { t } = useTranslation()
   return (
@@ -109,24 +109,16 @@ export function PipelinePreferences({
             onCheckedChange={(detect_text_color) => onChange({ ...value, detect_text_color })}
           />
         </PreferenceRow>
-        <PreferenceRow title={t('settings.pipeline.defaultTextColor')}>
-          <ColorWell
-            label={t('settings.pipeline.defaultTextColor')}
-            allowTransparent
-            disabled={value.detect_text_color}
-            value={
-              value.default_text_color && value.default_text_color[3] > 0
-                ? rgbaToHex(value.default_text_color)
-                : null
-            }
-            onChange={(color) =>
-              onChange({
-                ...value,
-                default_text_color: color === null ? null : hexToRgba(color),
-              })
-            }
-          />
-        </PreferenceRow>
+        <p className='px-4 py-3 text-[11px] text-muted-foreground'>
+          {t('textStyles.pipelineNote')}{' '}
+          <button
+            type='button'
+            className='text-primary underline underline-offset-2'
+            onClick={onTypesetting}
+          >
+            {t('settings.tabs.typesetting')}
+          </button>
+        </p>
       </PreferenceSection>
     </PreferencePage>
   )

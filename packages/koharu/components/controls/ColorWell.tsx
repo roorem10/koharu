@@ -13,6 +13,7 @@ import { cn } from '@koharu/ui/lib/utils'
 type ColorWellProps = {
   label?: string
   size?: 'default' | 'sm'
+  emptyLabel?: string
   disabled?: boolean
 } & (
   | {
@@ -154,7 +155,7 @@ export function ColorWell(props: ColorWellProps) {
             onClick={clear}
           >
             <SquareSlash aria-hidden='true' className='size-3.5 text-muted-foreground' />
-            {t('colorPicker.transparent')}
+            {props.emptyLabel ?? t('colorPicker.transparent')}
           </Button>
         )}
       </PopoverContent>

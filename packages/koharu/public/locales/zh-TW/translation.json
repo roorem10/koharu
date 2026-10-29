@@ -544,7 +544,7 @@
     "typesetting": {
       "addFamily": "新增字型家族",
       "defaultFamilies": "預設字型家族",
-      "description": "設定文字圖層未指定字型家族時使用的有序字型堆疊。",
+      "description": "設定文字預設樣式與後備字型順序。",
       "empty": "沒有預設字型家族。Koharu 將使用系統後備字型。",
       "familyLabel": "預設字型家族 {{index}}",
       "fontFallback": "後備字型",
@@ -624,5 +624,22 @@
     "maximize": "最大化",
     "minimize": "最小化",
     "restore": "還原"
+  },
+  "textStyles": {
+    "defaultTitle": "預設文字樣式",
+    "clear": "清除",
+    "clearAll": "全部清除",
+    "clearGroup": "清除{{group}}",
+    "notSet": "未設定",
+    "pipelineNote": "新文字使用預設文字樣式。",
+    "groups": {
+      "font": "字型",
+      "fill": "文字顏色",
+      "outline": "描邊"
+    },
+    "defaultHelp": "選擇新增和偵測文字的預設值。每個文字框仍可在屬性面板中個別修改。",
+    "defaultFont": "預設字型",
+    "outlineColor": "描邊顏色",
+    "outlineWidth": "描邊寬度（像素）"
   }
 }
