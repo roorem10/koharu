@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import { FontPicker } from '@/components/controls/FontPicker'
 import { PreferencePage } from '@/components/preferences/PreferenceFields'
+import { TextStylePreferences } from '@/components/preferences/TextStylePreferences'
 import { useFonts } from '@/lib/queries'
 import type { TypesettingConfig } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
@@ -44,6 +45,7 @@ export function TypesettingPreferences({
       title={t('settings.typesetting.title')}
       description={t('settings.typesetting.description')}
     >
+      <TextStylePreferences />
       <section aria-labelledby='typesetting-font-stack'>
         <header className='mb-3'>
           <h3 id='typesetting-font-stack' className='text-[12px] font-semibold'>

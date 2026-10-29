@@ -624,5 +624,33 @@
     "maximize": "Maximizar",
     "minimize": "Minimizar",
     "restore": "Restaurar"
+  },
+  "textStyles": {
+    "styles": "Estilos",
+    "defaultTitle": "Estilo de texto predeterminado",
+    "defaultHelp": "Se usa para el texto nuevo en todos los proyectos. Guarda las propiedades de un cuadro seleccionado desde Estilos.",
+    "setDefault": "Usar este cuadro como predeterminado…",
+    "chooseGroups": "Solo se guardarán los grupos marcados.",
+    "clearAll": "Borrar todo",
+    "clearGroup": "Borrar {{group}}",
+    "clear": "Borrar",
+    "notSet": "Sin definir",
+    "pipelineNote": "El texto nuevo usa el estilo predeterminado (Ajustes > Tipografía).",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "groups": {
+      "font": "Fuente",
+      "size": "Tamaño",
+      "fill": "Relleno",
+      "outline": "Contorno",
+      "outer_outline": "Contorno exterior",
+      "alignment": "Alineación",
+      "writing_mode": "Dirección de escritura"
+    },
+    "alignments": {
+      "Start": "Inicio",
+      "Center": "Centro",
+      "End": "Fin"
+    }
   }
 }

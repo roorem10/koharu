@@ -14,7 +14,10 @@ mod shape;
 mod text_renderer;
 mod types;
 
-pub use config::TypesettingConfig;
+pub use config::{
+    AlignmentPart, FontPart, OuterPart, OutlinePart, SizePart, StyleGroup, TextPreset, TextStyle,
+    TextStyles, TypesettingConfig, WritingModePart,
+};
 pub use error::{Error, Result};
 pub use frame::{
     Frame, ImageKind, ImageMetadata, Layer, LayerKind, Presentation, RasterImage, RenderBounds,

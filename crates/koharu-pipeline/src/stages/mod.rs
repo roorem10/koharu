@@ -88,8 +88,8 @@ impl Stages {
                 device.clone(),
                 detection::TextColorOptions {
                     detect_text_color: config.detect_text_color,
-                    default_text_color: config.default_text_color,
                 },
+                koharu_renderer::TextStyles::load(config.default_text_color)?,
             ),
             ocr: ocr::Processor::new(config.ocr.clone(), device.clone()),
             translation: translation::Processor::new(config.translation.clone(), translator),

@@ -4972,6 +4972,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-rayon",
+ "toml",
  "tracing",
  "unicode-bidi",
  "vello",

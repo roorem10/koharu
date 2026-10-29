@@ -624,5 +624,33 @@
     "maximize": "Maximize",
     "minimize": "Minimize",
     "restore": "Restore"
+  },
+  "textStyles": {
+    "styles": "Styles",
+    "defaultTitle": "Default text style",
+    "defaultHelp": "Used for new text in every project. Save groups from a selected box in the Styles menu.",
+    "setDefault": "Set as default from this box…",
+    "chooseGroups": "Only the checked groups will be saved.",
+    "clearAll": "Clear all",
+    "clearGroup": "Clear {{group}}",
+    "clear": "Clear",
+    "notSet": "Not set",
+    "pipelineNote": "New text uses the default text style (Settings > Typesetting).",
+    "cancel": "Cancel",
+    "save": "Save",
+    "groups": {
+      "font": "Font",
+      "size": "Size",
+      "fill": "Fill",
+      "outline": "Outline",
+      "outer_outline": "Outer outline",
+      "alignment": "Alignment",
+      "writing_mode": "Writing direction"
+    },
+    "alignments": {
+      "Start": "Start",
+      "Center": "Center",
+      "End": "End"
+    }
   }
 }

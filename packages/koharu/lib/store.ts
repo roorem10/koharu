@@ -15,6 +15,7 @@ import type {
   ModelResources,
   PageSize,
   WheelZoom,
+  TextStyles,
 } from '@koharu/bridge/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
@@ -45,6 +46,7 @@ export const pipelineStages: readonly Stage[] = ['detection', 'ocr', 'translatio
 
 interface KoharuStore {
   initialized: boolean
+  textStyles: TextStyles | null
   preferences: Preferences | null
   translationModels: Model[]
   resources: ModelResources | null
@@ -112,6 +114,7 @@ export const defaultShortcuts: Shortcuts = {
 
 export const useKoharuStore = create<KoharuStore>()((set) => ({
   initialized: false,
+  textStyles: null,
   preferences: null,
   translationModels: [],
   resources: null,

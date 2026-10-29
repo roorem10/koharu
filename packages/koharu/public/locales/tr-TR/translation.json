@@ -624,5 +624,33 @@
     "maximize": "Ekranı kapla",
     "minimize": "Simge durumuna küçült",
     "restore": "Geri yükle"
+  },
+  "textStyles": {
+    "styles": "Stiller",
+    "defaultTitle": "Varsayılan metin stili",
+    "defaultHelp": "Her projede yeni metin için kullanılır. Seçili kutunun özelliklerini Stiller menüsünden kaydedin.",
+    "setDefault": "Bu kutuyu varsayılan olarak ayarla…",
+    "chooseGroups": "Yalnızca işaretli gruplar kaydedilir.",
+    "clearAll": "Tümünü temizle",
+    "clearGroup": "{{group}} grubunu temizle",
+    "clear": "Temizle",
+    "notSet": "Ayarlanmadı",
+    "pipelineNote": "Yeni metin varsayılan metin stilini kullanır (Ayarlar > Dizgi).",
+    "cancel": "İptal",
+    "save": "Kaydet",
+    "groups": {
+      "font": "Yazı tipi",
+      "size": "Boyut",
+      "fill": "Dolgu",
+      "outline": "Dış çizgi",
+      "outer_outline": "İkinci dış çizgi",
+      "alignment": "Hizalama",
+      "writing_mode": "Yazı yönü"
+    },
+    "alignments": {
+      "Start": "Başlangıç",
+      "Center": "Orta",
+      "End": "Son"
+    }
   }
 }

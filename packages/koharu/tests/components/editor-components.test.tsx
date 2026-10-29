@@ -34,6 +34,7 @@ import {
   useCommand,
 } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
+import { emptyTextStyle } from '@/lib/text-styles'
 import * as canvasRuntime from '@koharu/bridge/canvas'
 import {
   commands,
@@ -225,6 +226,7 @@ function installProject() {
   queryClient.setQueryData(pageKey, page)
   useKoharuStore.setState({
     preferences,
+    textStyles: { default_style: { ...emptyTextStyle }, presets: [], legacy_color_migrated: true },
     translationModels: [
       {
         provider: 'local',
@@ -259,6 +261,33 @@ function SettingsNavigationHarness() {
 }
 
 describe('greenfield editor', () => {
+  it('captures only checked groups when setting the app default', async () => {
+    installProject()
+    useKoharuStore.setState({
+      textStyles: {
+        default_style: { ...emptyTextStyle },
+        presets: [],
+        legacy_color_migrated: true,
+      },
+    })
+    const style = { ...emptyTextStyle, fill: [0, 0, 0, 255] as [number, number, number, number] }
+    const capture = vi.spyOn(commands, 'captureTextStyle').mockResolvedValue(style)
+    const save = vi.spyOn(commands, 'saveTextStyles').mockImplementation(async (styles) => styles)
+    render(<Inspector />)
+    const user = userEvent.setup()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
+    await user.click(await screen.findByRole('menuitem', { name: 'Set as default from this box…' }))
+    for (const group of ['Font', 'Outline', 'Outer outline', 'Alignment'])
+      await user.click(screen.getByRole('checkbox', { name: group }))
+    expect(screen.getByRole('checkbox', { name: 'Size' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Writing direction' })).not.toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(capture).toHaveBeenCalledWith('element', ['fill']))
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(expect.objectContaining({ default_style: style })),
+    )
+  })
+
   it('registers one native resize listener in React strict mode', async () => {
     const unlisten = vi.fn()
     nativeWindow.onResized.mockClear()
@@ -1691,7 +1720,7 @@ describe('greenfield editor', () => {
     })
   })
 
-  it('saves and clears the default color only when detection is disabled', async () => {
+  it('saves the detection switch and links the default color to the default text style', async () => {
     installProject()
     const user = userEvent.setup()
     useKoharuStore.setState({ settingsOpen: true })
@@ -1705,24 +1734,16 @@ describe('greenfield editor', () => {
 
     await user.click(screen.getByRole('button', { name: 'Pipeline' }))
     const toggle = screen.getByRole('switch', { name: 'Detect text and outline colors' })
-    const color = screen.getByRole('button', { name: 'Default text color' })
     expect(toggle).toBeChecked()
-    expect(color).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Default text color' })).not.toBeInTheDocument()
     await user.click(toggle)
-    expect(color).toBeEnabled()
-    await user.click(color)
-    fireEvent.change(screen.getByRole('textbox', { name: 'Hex color code' }), {
-      target: { value: '#2357AB' },
-    })
     await waitFor(() => expect(save).toHaveBeenLastCalledWith(
-      expect.objectContaining({ detect_text_color: false, default_text_color: [35, 87, 171, 255] }),
+      expect.objectContaining({ detect_text_color: false }),
       preferences.providers, preferences.typesetting,
     ))
-    await user.click(screen.getByRole('button', { name: 'Transparent' }))
-    await waitFor(() => expect(save).toHaveBeenLastCalledWith(
-      expect.objectContaining({ detect_text_color: false, default_text_color: null }),
-      preferences.providers, preferences.typesetting,
-    ))
+    const links = screen.getAllByRole('button', { name: 'Typesetting' })
+    await user.click(links[links.length - 1])
+    expect(screen.getByRole('heading', { level: 2, name: 'Typesetting' })).toBeInTheDocument()
     expect(setTypography).not.toHaveBeenCalled()
     expect(textLayer.typography!.color).toEqual(existingColor)
   })

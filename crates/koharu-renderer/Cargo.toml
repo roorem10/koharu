@@ -43,6 +43,7 @@ vello = { workspace = true }
 webp = { workspace = true }
 
 [dev-dependencies]
+toml = { workspace = true }
 criterion = { workspace = true }
 
 [[bench]]

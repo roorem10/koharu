@@ -624,5 +624,33 @@
     "maximize": "최대화",
     "minimize": "최소화",
     "restore": "복원"
+  },
+  "textStyles": {
+    "styles": "스타일",
+    "defaultTitle": "기본 텍스트 스타일",
+    "defaultHelp": "모든 프로젝트의 새 텍스트에 사용합니다. 스타일 메뉴에서 선택한 상자의 속성을 저장하세요.",
+    "setDefault": "이 상자를 기본 스타일로 설정…",
+    "chooseGroups": "선택한 그룹만 저장됩니다.",
+    "clearAll": "모두 지우기",
+    "clearGroup": "{{group}} 지우기",
+    "clear": "지우기",
+    "notSet": "설정 안 됨",
+    "pipelineNote": "새 텍스트는 기본 스타일을 사용합니다(설정 > 조판).",
+    "cancel": "취소",
+    "save": "저장",
+    "groups": {
+      "font": "글꼴",
+      "size": "크기",
+      "fill": "채우기",
+      "outline": "윤곽선",
+      "outer_outline": "바깥 윤곽선",
+      "alignment": "정렬",
+      "writing_mode": "쓰기 방향"
+    },
+    "alignments": {
+      "Start": "시작",
+      "Center": "가운데",
+      "End": "끝"
+    }
   }
 }

@@ -624,5 +624,33 @@
     "maximize": "Agrandir",
     "minimize": "Réduire",
     "restore": "Restaurer"
+  },
+  "textStyles": {
+    "styles": "Styles",
+    "defaultTitle": "Style de texte par défaut",
+    "defaultHelp": "Utilisé pour les nouveaux textes de tous les projets. Enregistrez les propriétés d’une zone sélectionnée via le menu Styles.",
+    "setDefault": "Définir cette zone comme style par défaut…",
+    "chooseGroups": "Seuls les groupes cochés seront enregistrés.",
+    "clearAll": "Tout effacer",
+    "clearGroup": "Effacer {{group}}",
+    "clear": "Effacer",
+    "notSet": "Non défini",
+    "pipelineNote": "Le nouveau texte utilise le style par défaut (Paramètres > Composition).",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "groups": {
+      "font": "Police",
+      "size": "Taille",
+      "fill": "Remplissage",
+      "outline": "Contour",
+      "outer_outline": "Contour extérieur",
+      "alignment": "Alignement",
+      "writing_mode": "Sens d’écriture"
+    },
+    "alignments": {
+      "Start": "Début",
+      "Center": "Centre",
+      "End": "Fin"
+    }
   }
 }

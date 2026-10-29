@@ -624,5 +624,33 @@
     "maximize": "最大化",
     "minimize": "最小化",
     "restore": "元のサイズに戻す"
+  },
+  "textStyles": {
+    "styles": "スタイル",
+    "defaultTitle": "既定のテキストスタイル",
+    "defaultHelp": "すべてのプロジェクトの新しいテキストに使用します。選択したボックスの設定をスタイルメニューから保存できます。",
+    "setDefault": "このボックスから既定のスタイルを設定…",
+    "chooseGroups": "チェックしたグループだけを保存します。",
+    "clearAll": "すべてクリア",
+    "clearGroup": "{{group}}をクリア",
+    "clear": "クリア",
+    "notSet": "未設定",
+    "pipelineNote": "新しいテキストには既定のスタイルを使用します（設定 > 組版）。",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "groups": {
+      "font": "フォント",
+      "size": "サイズ",
+      "fill": "塗り",
+      "outline": "縁取り",
+      "outer_outline": "外側の縁取り",
+      "alignment": "配置",
+      "writing_mode": "文字方向"
+    },
+    "alignments": {
+      "Start": "行頭",
+      "Center": "中央",
+      "End": "行末"
+    }
   }
 }

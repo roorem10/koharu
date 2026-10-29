@@ -624,5 +624,33 @@
     "maximize": "最大化",
     "minimize": "最小化",
     "restore": "還原"
+  },
+  "textStyles": {
+    "styles": "樣式",
+    "defaultTitle": "預設文字樣式",
+    "defaultHelp": "用於所有專案的新文字。在樣式選單中儲存所選文字框的屬性。",
+    "setDefault": "將此文字框設為預設樣式…",
+    "chooseGroups": "僅儲存勾選的屬性群組。",
+    "clearAll": "全部清除",
+    "clearGroup": "清除{{group}}",
+    "clear": "清除",
+    "notSet": "未設定",
+    "pipelineNote": "新文字使用預設文字樣式（設定 > 排版）。",
+    "cancel": "取消",
+    "save": "儲存",
+    "groups": {
+      "font": "字型",
+      "size": "字級",
+      "fill": "填色",
+      "outline": "描邊",
+      "outer_outline": "外層描邊",
+      "alignment": "對齊",
+      "writing_mode": "書寫方向"
+    },
+    "alignments": {
+      "Start": "起始",
+      "Center": "置中",
+      "End": "末尾"
+    }
   }
 }

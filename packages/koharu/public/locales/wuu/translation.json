@@ -624,5 +624,33 @@
     "maximize": "最大化",
     "minimize": "最小化",
     "restore": "还原"
+  },
+  "textStyles": {
+    "styles": "样式",
+    "defaultTitle": "默认文字样式",
+    "defaultHelp": "用勒所有项目个新文字。勒样式菜单里保存选中个文字框属性。",
+    "setDefault": "拿搿只文字框设为默认样式…",
+    "chooseGroups": "只保存勾选个属性组。",
+    "clearAll": "全部清除",
+    "clearGroup": "清除{{group}}",
+    "clear": "清除",
+    "notSet": "朆设置",
+    "pipelineNote": "新文字使用默认文字样式（设置 > 排版）。",
+    "cancel": "取消",
+    "save": "保存",
+    "groups": {
+      "font": "字体",
+      "size": "字号",
+      "fill": "填充",
+      "outline": "描边",
+      "outer_outline": "外层描边",
+      "alignment": "对齐",
+      "writing_mode": "书写方向"
+    },
+    "alignments": {
+      "Start": "起始",
+      "Center": "居中",
+      "End": "末尾"
+    }
   }
 }

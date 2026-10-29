@@ -21,6 +21,7 @@ use koharu_ml::koharu_layout_rfdetr_seg_2xl::{
     KoharuLayoutDetection, KoharuLayoutDetections, KoharuLayoutMask, KoharuLayoutRFDetrSeg2XL,
     KoharuLayoutThresholds,
 };
+use koharu_renderer::{TextStyle, TextStyles};
 use koharu_scene::{
     AssetInput, AssetMetadata, AssetRole, At, BubbleRegion, DetectionAnalysis, DetectionLabel,
     EntityId, EntityOrigin, FitsTo, FlowsIn, Generation, Geometry, Inside, Origin, PanelRegion,
@@ -60,14 +61,12 @@ pub struct KoharuLayoutRFDetrSeg2XLConfig {
 #[derive(Clone, Copy)]
 pub(super) struct TextColorOptions {
     pub detect_text_color: bool,
-    pub default_text_color: Option<[u8; 4]>,
 }
 
 impl Default for TextColorOptions {
     fn default() -> Self {
         Self {
             detect_text_color: true,
-            default_text_color: None,
         }
     }
 }
@@ -77,6 +76,7 @@ pub(super) struct Processor {
     device: koharu_ml::Device,
     model: ModelCell<Model>,
     text_colors: TextColorOptions,
+    text_styles: koharu_config::Config<TextStyles>,
 }
 
 impl Processor {
@@ -84,6 +84,7 @@ impl Processor {
         mut config: DetectionModel,
         device: koharu_ml::Device,
         text_colors: TextColorOptions,
+        text_styles: koharu_config::Config<TextStyles>,
     ) -> Self {
         let DetectionModel::KoharuLayoutRFDetrSeg2XL(settings) = &mut config;
         for (name, value) in [
@@ -110,6 +111,7 @@ impl Processor {
             device,
             model: ModelCell::new(),
             text_colors,
+            text_styles,
         }
     }
 }
@@ -145,12 +147,13 @@ impl StageProcessor for Processor {
     }
 
     async fn process(&self, input: StageInput) -> Result<koharu_scene::Patch> {
+        let styles = self.text_styles.read()?.clone();
         self.model
             .lock()
             .await
             .as_ref()
             .ok_or_else(|| anyhow!("detection model is not loaded"))?
-            .run(input, self.text_colors)
+            .run(input, self.text_colors, &styles)
             .await
     }
 }
@@ -178,6 +181,7 @@ impl Model {
         &self,
         input: StageInput,
         colors: TextColorOptions,
+        styles: &TextStyles,
     ) -> Result<koharu_scene::Patch> {
         let page = input.page;
         let image = input
@@ -192,6 +196,7 @@ impl Model {
             output,
             &generation(PRODUCER, MODEL_ID)?,
             colors,
+            styles,
         )
         .await
     }
@@ -247,15 +252,18 @@ async fn build_patch(
     output: KoharuLayoutDetections,
     generation: &Generation,
     colors: TextColorOptions,
+    styles: &TextStyles,
 ) -> Result<koharu_scene::Patch> {
     let page = input.page;
     let mut edit = input.scene.edit_as(generation.clone());
     edit.observe_subtree(page)?;
     remove_previous_regions(input, &mut edit, generation)
         .context("failed to replace the previous detection regions")?;
-    write_page(input, &mut edit, page, image, output, generation, colors)
-        .await
-        .context("failed to write detection output")?;
+    write_page(
+        input, &mut edit, page, image, output, generation, colors, styles,
+    )
+    .await
+    .context("failed to write detection output")?;
     finish(edit)
 }
 
@@ -296,6 +304,7 @@ async fn write_page(
     output: KoharuLayoutDetections,
     generation: &Generation,
     colors: TextColorOptions,
+    styles: &TextStyles,
 ) -> Result<()> {
     let KoharuLayoutDetections {
         mut detections,
@@ -321,6 +330,7 @@ async fn write_page(
         &detections,
         generation,
         colors,
+        styles,
     )
     .context("failed to write detected regions")?;
     link_dialogue_regions(edit, &regions, generation)
@@ -338,6 +348,7 @@ fn write_regions<'a>(
     detections: &'a [KoharuLayoutDetection],
     generation: &Generation,
     colors: TextColorOptions,
+    styles: &TextStyles,
 ) -> Result<PageRegions<'a>> {
     let mut regions = PageRegions::default();
     let inferred = detections
@@ -358,8 +369,16 @@ fn write_regions<'a>(
         None
     };
     for (index, (detection, inferred)) in detections.iter().zip(inferred).enumerate() {
-        match write_region(edit, page, detection, inferred, generation, colors)
-            .with_context(|| format!("failed to write {} detection {index}", detection.label))?
+        match write_region(
+            edit,
+            page,
+            detection,
+            inferred,
+            generation,
+            colors,
+            &styles.default_style,
+        )
+        .with_context(|| format!("failed to write {} detection {index}", detection.label))?
         {
             RegionOutput::Bubble(bubble) => regions.bubbles.push(bubble),
             RegionOutput::Text(text) => {
@@ -382,6 +401,7 @@ fn write_region<'a>(
     inferred: Option<InferredTypography>,
     generation: &Generation,
     colors: TextColorOptions,
+    style: &TextStyle,
 ) -> Result<RegionOutput<'a>> {
     let entity = edit
         .add_entity(page, At::End)
@@ -445,37 +465,36 @@ fn write_region<'a>(
     write_text_role(edit, content, "dev.koharu.text.free-text", generation)
         .context("failed to set the detected text role")?;
     let paint = inferred.filter(|_| colors.detect_text_color);
-    edit.set(
-        layer,
-        &Typography {
-            origin: Origin::Generated(generation.clone()),
-            preferred_font: None,
-            font_weight: None,
-            font_style: None,
-            size: None,
-            auto_fit: true,
-            color: if colors.detect_text_color {
-                paint
-                    .and_then(|value| value.color)
-                    .map(|[r, g, b]| [r, g, b, u8::MAX])
-            } else {
-                colors.default_text_color
-            },
-            stroke_color: paint
-                .and_then(|value| value.stroke_color)
-                .map(|color| [color[0], color[1], color[2], u8::MAX]),
-            stroke_width: paint.and_then(|value| value.stroke_width),
-            stroke_method: Some(koharu_scene::StrokeMethod::Contour),
-            stroke_position: None,
-            stroke_join: None,
-            outer_stroke_color: None,
-            outer_stroke_width: None,
-            alignment: None,
-            writing_mode: inferred.map(|value| value.writing_mode),
-            extensions: Default::default(),
+    let mut typography = Typography {
+        origin: Origin::Generated(generation.clone()),
+        preferred_font: None,
+        font_weight: None,
+        font_style: None,
+        size: None,
+        auto_fit: true,
+        color: if colors.detect_text_color {
+            paint
+                .and_then(|value| value.color)
+                .map(|[r, g, b]| [r, g, b, u8::MAX])
+        } else {
+            None
         },
-    )
-    .context("failed to set detected typography")?;
+        stroke_color: paint
+            .and_then(|value| value.stroke_color)
+            .map(|color| [color[0], color[1], color[2], u8::MAX]),
+        stroke_width: paint.and_then(|value| value.stroke_width),
+        stroke_method: Some(koharu_scene::StrokeMethod::Contour),
+        stroke_position: None,
+        stroke_join: None,
+        outer_stroke_color: None,
+        outer_stroke_width: None,
+        alignment: None,
+        writing_mode: inferred.map(|value| value.writing_mode),
+        extensions: Default::default(),
+    };
+    style.apply_to_detected(&mut typography, colors.detect_text_color);
+    edit.set(layer, &typography)
+        .context("failed to set detected typography")?;
     edit.relate::<RecognizedFrom>(content, entity)
         .context("failed to associate detected text content with its region")?;
 
@@ -1910,6 +1929,7 @@ mod tests {
         infer_typography, layout_order, link_dialogue_regions, mask_containment, mask_for,
         mask_geometry, non_maximum_suppression, normalize_text_color, write_region,
     };
+    use koharu_renderer::{TextStyle, TextStyles};
 
     #[test]
     fn out_of_range_thresholds_fall_back_to_the_model_defaults() {
@@ -1921,6 +1941,7 @@ mod tests {
             }),
             koharu_ml::Device::cpu(),
             TextColorOptions::default(),
+            koharu_config::Config::memory(TextStyles::default()),
         );
 
         let DetectionModel::KoharuLayoutRFDetrSeg2XL(settings) = &processor.config;
@@ -1961,6 +1982,7 @@ mod tests {
             DetectionModel::KoharuLayoutRFDetrSeg2XL(KoharuLayoutRFDetrSeg2XLConfig::default()),
             koharu_ml::Device::cpu(),
             TextColorOptions::default(),
+            koharu_config::Config::memory(TextStyles::default()),
         );
 
         assert!(processor.skip(&input).unwrap());
@@ -2315,6 +2337,7 @@ mod tests {
                     inferred,
                     &generation,
                     TextColorOptions::default(),
+                    &TextStyle::default(),
                 )
                 .unwrap();
                 let RegionOutput::Text(text) = output else {
@@ -2333,6 +2356,88 @@ mod tests {
         assert_eq!(typography.color, Some([0, 0, 0, 255]));
         assert_eq!(typography.stroke_color, Some([255, 255, 255, 255]));
         assert_eq!(typography.stroke_width, Some(3.0));
+    }
+
+    #[tokio::test]
+    async fn default_style_respects_detected_paint_and_direction() {
+        use koharu_renderer::{FontPart, OutlinePart, WritingModePart};
+        let mut session = Session::memory().await.unwrap();
+        let mut page = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                page = Some(edit.add_page(PageDraft::new("page", 96.0, 96.0), At::End)?);
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let (image, detection) = outlined_text(3, [0, 0, 0], [255, 255, 255]);
+        let inferred = infer_typography(&image, &detection, true);
+        let style = TextStyle {
+            font: Some(FontPart {
+                preferred_font: Some("Default font".into()),
+                font_weight: Some(600),
+                font_style: None,
+            }),
+            fill: Some([240, 10, 20, 255]),
+            outline: Some(OutlinePart {
+                stroke_width: Some(6.0),
+                stroke_color: Some([10, 20, 240, 255]),
+                stroke_method: None,
+                stroke_position: None,
+                stroke_join: None,
+            }),
+            writing_mode: Some(WritingModePart { value: None }),
+            ..TextStyle::default()
+        };
+        for detect_text_color in [false, true] {
+            let mut layer = None;
+            let patch = session
+                .snapshot()
+                .patch(|edit| {
+                    let RegionOutput::Text(text) = write_region(
+                        edit,
+                        page.unwrap(),
+                        &detection,
+                        inferred,
+                        &generation(super::PRODUCER, super::MODEL_ID).unwrap(),
+                        TextColorOptions { detect_text_color },
+                        &style,
+                    )
+                    .unwrap() else {
+                        panic!("expected text")
+                    };
+                    layer = Some(text.layer);
+                    Ok(())
+                })
+                .unwrap();
+            let snapshot = session.commit(patch).await.unwrap().snapshot;
+            let typography = snapshot
+                .component::<Typography>(layer.unwrap())
+                .unwrap()
+                .unwrap();
+            assert_eq!(typography.preferred_font.as_deref(), Some("Default font"));
+            assert_eq!(
+                typography.writing_mode,
+                inferred.map(|value| value.writing_mode)
+            );
+            assert_eq!(
+                typography.color,
+                if detect_text_color {
+                    Some([0, 0, 0, 255])
+                } else {
+                    style.fill
+                }
+            );
+            assert_eq!(
+                typography.stroke_width,
+                if detect_text_color {
+                    Some(3.0)
+                } else {
+                    Some(6.0)
+                }
+            );
+        }
     }
 
     #[test]
@@ -2402,7 +2507,10 @@ mod tests {
                         &generation,
                         TextColorOptions {
                             detect_text_color: false,
-                            default_text_color,
+                        },
+                        &TextStyle {
+                            fill: default_text_color,
+                            ..TextStyle::default()
                         },
                     )
                     .unwrap();

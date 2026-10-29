@@ -8,6 +8,7 @@ pub(crate) mod output;
 pub(crate) mod preferences;
 pub(crate) mod processing;
 pub(crate) mod project;
+pub(crate) mod styles;
 
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -103,6 +104,9 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             preferences::save_shortcuts,
             preferences::get_wheel_zoom,
             preferences::save_wheel_zoom,
+            styles::get_text_styles,
+            styles::save_text_styles,
+            styles::capture_text_style,
             canvas::get_canvas_manifest,
             canvas::get_canvas_resource,
             canvas::prepare_canvas_page,

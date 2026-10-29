@@ -7,6 +7,7 @@ import type {
   ProviderPreferences,
   TypesettingConfig,
   WheelZoom,
+  TextStyles,
 } from '@koharu/bridge/protocol'
 
 import {
@@ -26,6 +27,9 @@ let preferencesWriteGeneration = 0
 let preferencesWriteQueue: Promise<void> = Promise.resolve()
 let shortcutsWriteGeneration = 0
 let shortcutsWriteQueue: Promise<void> = Promise.resolve()
+let textStylesGeneration = 0
+let textStylesQueue: Promise<void> = Promise.resolve()
+let textStylesRequest: Promise<void> | null = null
 let wheelZoomWriteGeneration = 0
 let wheelZoomWriteQueue: Promise<void> = Promise.resolve()
 
@@ -144,4 +148,43 @@ function report(error: unknown): Error {
         : 'The native application returned an unknown error.'
   receiveError(message)
   return error instanceof Error ? error : new Error(message)
+}
+
+export function refreshTextStyles(): Promise<void> {
+  if (textStylesRequest) return textStylesRequest
+  const generation = textStylesGeneration
+  const request = textStylesQueue
+    .then(() => call(commands.getTextStyles))
+    .then((textStyles) => {
+      if (generation === textStylesGeneration) useKoharuStore.setState({ textStyles })
+    })
+    .finally(() => {
+      if (textStylesRequest === request) textStylesRequest = null
+    })
+  textStylesRequest = request
+  return request
+}
+
+export function saveTextStyles(styles: TextStyles): Promise<void> {
+  const generation = ++textStylesGeneration
+  const snapshot = structuredClone(styles)
+  useKoharuStore.setState({ textStyles: snapshot })
+  const pending = textStylesQueue
+    .catch(() => undefined)
+    .then(() => call(commands.saveTextStyles, snapshot))
+    .then((textStyles) => {
+      if (generation === textStylesGeneration) useKoharuStore.setState({ textStyles })
+    })
+  textStylesQueue = pending.catch(() => undefined)
+  return pending.catch(async (error) => {
+    if (generation === textStylesGeneration) {
+      await textStylesQueue
+      await call(commands.getTextStyles)
+        .then((textStyles) => {
+          if (generation === textStylesGeneration) useKoharuStore.setState({ textStyles })
+        })
+        .catch(() => undefined)
+    }
+    throw error
+  })
 }

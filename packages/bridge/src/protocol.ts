@@ -52,6 +52,9 @@ export const commands = {
 	saveShortcuts: (shortcuts: { [key in string]: string }) => __TAURI_INVOKE<{ [key in string]: string }>("save_shortcuts", { shortcuts }),
 	getWheelZoom: () => __TAURI_INVOKE<WheelZoom>("get_wheel_zoom"),
 	saveWheelZoom: (wheelZoom: WheelZoom) => __TAURI_INVOKE<WheelZoom>("save_wheel_zoom", { wheelZoom }),
+	getTextStyles: () => __TAURI_INVOKE<TextStyles>("get_text_styles"),
+	saveTextStyles: (styles: TextStyles) => __TAURI_INVOKE<TextStyles>("save_text_styles", { styles }),
+	captureTextStyle: (layer: EntityId, groups: StyleGroup[]) => __TAURI_INVOKE<TextStyle>("capture_text_style", { layer, groups }),
 	getCanvasManifest: (generation: CanvasGeneration) => __TAURI_INVOKE<CanvasBytes>("get_canvas_manifest", { generation }),
 	getCanvasResource: (generation: CanvasGeneration, resource: string) => __TAURI_INVOKE<CanvasBytes>("get_canvas_resource", { generation, resource }),
 	prepareCanvasPage: (page: EntityId) => __TAURI_INVOKE<CanvasPagePreparation | null>("prepare_canvas_page", { page }),
@@ -77,6 +80,10 @@ export type AgentStatus = {
 	models: CodexModel[],
 	config: Config,
 	running: RunId | null,
+};
+
+export type AlignmentPart = {
+	value: TextAlignment | null,
 };
 
 export type AnalysisRegion = {
@@ -194,6 +201,12 @@ export type FontMetadata = {
 	category: string | null,
 	classifications: string[],
 	use_cases: string[],
+};
+
+export type FontPart = {
+	preferred_font: string | null,
+	font_weight: number | null,
+	font_style: FontStyle | null,
 };
 
 export type FontPreviewBytes = number[];
@@ -335,6 +348,19 @@ export type OpenRouterConfig = Record<string, never>;
 
 export type Operation = { operation: "full" } | { operation: "through"; stage: Stage } | { operation: "only"; stage: Stage } | { operation: "stages"; stages: Stage[] };
 
+export type OuterPart = {
+	outer_stroke_width: number | null,
+	outer_stroke_color: [number, number, number, number] | null,
+};
+
+export type OutlinePart = {
+	stroke_width: number | null,
+	stroke_color: [number, number, number, number] | null,
+	stroke_method: StrokeMethod | null,
+	stroke_position: StrokePosition | null,
+	stroke_join: StrokeJoin | null,
+};
+
 export type Page = {
 	id: EntityId,
 	label: string,
@@ -450,6 +476,11 @@ export type Scope = { scope: "project" } | { scope: "pages"; value: EntityId[] }
 	bounds: Bounds,
 } } | { scope: "entities"; value: EntityId[] };
 
+export type SizePart = {
+	auto_fit: boolean,
+	size: number | null,
+};
+
 export type SourceText = {
 	text: string,
 	language: string | null,
@@ -469,6 +500,8 @@ export type StrokeMethod = "expansion" | "contour";
 
 export type StrokePosition = "outside" | "center" | "inside";
 
+export type StyleGroup = "font" | "size" | "fill" | "outline" | "outer_outline" | "alignment" | "writing_mode";
+
 export type TextAlignment = "Start" | "Center" | "End" | "Justify";
 
 export type TextContent = {
@@ -480,6 +513,31 @@ export type TextContent = {
 };
 
 export type TextLayoutKind = "point" | "paragraph";
+
+export type TextPreset = {
+	id: string,
+	name: string,
+	style: TextStyle,
+	key: string | null,
+};
+
+/**  App settings only. An absent group leaves the corresponding scene fields alone. */
+export type TextStyle = {
+	font?: FontPart | null,
+	size?: SizePart | null,
+	fill?: [number, number, number, number] | null,
+	outline?: OutlinePart | null,
+	outer_outline?: OuterPart | null,
+	alignment?: AlignmentPart | null,
+	writing_mode?: WritingModePart | null,
+};
+
+export type TextStyles = {
+	default_style?: TextStyle,
+	presets?: TextPreset[],
+	/**  Distinguish a deliberate Clear from a pre-migration missing fill. */
+	legacy_color_migrated?: boolean,
+};
 
 export type ThumbnailBytes = number[];
 
@@ -530,4 +588,8 @@ export type TypographyUpdate = {
 export type WheelZoom = "ctrl" | "wheel";
 
 export type WritingMode = "Horizontal" | "Vertical";
+
+export type WritingModePart = {
+	value: WritingMode | null,
+};
 
