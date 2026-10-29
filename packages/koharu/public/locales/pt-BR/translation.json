@@ -659,6 +659,20 @@
     "applied": "Aplicado a {{count}} caixas de texto",
     "skipped": "{{count}} caixas inválidas ignoradas",
     "confirmApply": "Aplicar a {{count}} caixas de texto? Ctrl+Z desfaz tudo em uma etapa.",
-    "apply": "Aplicar"
+    "apply": "Aplicar",
+    "presets": "Predefinições de texto",
+    "presetsHelp": "As predefinições alteram apenas os grupos definidos. Salve uma caixa pelo menu Estilos.",
+    "noPresets": "Nenhuma predefinição.",
+    "savePreset": "Salvar caixa como predefinição…",
+    "updatePreset": "Atualizar a partir da caixa selecionada…",
+    "presetName": "Nome da predefinição",
+    "rename": "Renomear",
+    "delete": "Excluir",
+    "managePreset": "Gerenciar {{name}}",
+    "fontMissing": "Fonte ausente",
+    "nameHelp": "Use de 1 a 64 caracteres sem caracteres de controle.",
+    "duplicateName": "Outra predefinição já tem este nome.",
+    "deleteQuestion": "Excluir a predefinição “{{name}}”?",
+    "presetLimit": "Você pode salvar até 32 predefinições."
   }
 }

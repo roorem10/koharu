@@ -659,6 +659,20 @@
     "applied": "Appliqué à {{count}} zones de texte",
     "skipped": "{{count}} zones de texte invalides ignorées",
     "confirmApply": "Appliquer à {{count}} zones de texte ? Ctrl+Z annule tout en une étape.",
-    "apply": "Appliquer"
+    "apply": "Appliquer",
+    "presets": "Préréglages de texte",
+    "presetsHelp": "Un préréglage ne modifie que ses groupes définis. Enregistrez une zone via Styles.",
+    "noPresets": "Aucun préréglage.",
+    "savePreset": "Enregistrer la zone comme préréglage…",
+    "updatePreset": "Actualiser depuis la zone sélectionnée…",
+    "presetName": "Nom du préréglage",
+    "rename": "Renommer",
+    "delete": "Supprimer",
+    "managePreset": "Gérer {{name}}",
+    "fontMissing": "Police manquante",
+    "nameHelp": "Utilisez 1 à 64 caractères sans caractères de contrôle.",
+    "duplicateName": "Un autre préréglage porte déjà ce nom.",
+    "deleteQuestion": "Supprimer le préréglage « {{name}} » ?",
+    "presetLimit": "Vous pouvez enregistrer 32 préréglages au maximum."
   }
 }

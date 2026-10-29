@@ -659,6 +659,20 @@
     "applied": "Aplicado a {{count}} cuadros de texto",
     "skipped": "Se omitieron {{count}} cuadros no válidos",
     "confirmApply": "¿Aplicar a {{count}} cuadros de texto? Ctrl+Z lo deshace en un paso.",
-    "apply": "Aplicar"
+    "apply": "Aplicar",
+    "presets": "Preajustes de texto",
+    "presetsHelp": "Los preajustes solo cambian los grupos que definen. Guarda un cuadro desde Estilos.",
+    "noPresets": "Aún no hay preajustes.",
+    "savePreset": "Guardar cuadro como preajuste…",
+    "updatePreset": "Actualizar desde el cuadro seleccionado…",
+    "presetName": "Nombre del preajuste",
+    "rename": "Renombrar",
+    "delete": "Eliminar",
+    "managePreset": "Gestionar {{name}}",
+    "fontMissing": "Falta la fuente",
+    "nameHelp": "Usa de 1 a 64 caracteres sin caracteres de control.",
+    "duplicateName": "Otro preajuste ya tiene este nombre.",
+    "deleteQuestion": "¿Eliminar el preajuste «{{name}}»?",
+    "presetLimit": "Puedes guardar hasta 32 preajustes."
   }
 }

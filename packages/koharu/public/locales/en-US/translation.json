@@ -659,6 +659,20 @@
     "applied": "Applied to {{count}} text boxes",
     "skipped": "Skipped {{count}} invalid text boxes",
     "confirmApply": "Apply to {{count}} text boxes? Ctrl+Z undoes this in one step.",
-    "apply": "Apply"
+    "apply": "Apply",
+    "presets": "Text style presets",
+    "presetsHelp": "Presets change only the groups they define. Save a selected box from the Styles menu.",
+    "noPresets": "No presets yet.",
+    "savePreset": "Save selected box as preset…",
+    "updatePreset": "Update from selected box…",
+    "presetName": "Preset name",
+    "rename": "Rename",
+    "delete": "Delete",
+    "managePreset": "Manage {{name}}",
+    "fontMissing": "Font missing",
+    "nameHelp": "Use 1–64 characters without control characters.",
+    "duplicateName": "Another preset already has this name.",
+    "deleteQuestion": "Delete the preset “{{name}}”?",
+    "presetLimit": "You can save up to 32 presets."
   }
 }

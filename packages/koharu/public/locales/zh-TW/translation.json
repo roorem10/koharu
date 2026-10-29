@@ -659,6 +659,20 @@
     "applied": "已套用至{{count}}個文字框",
     "skipped": "已略過{{count}}個無效文字框",
     "confirmApply": "套用至{{count}}個文字框？按Ctrl+Z可一次復原。",
-    "apply": "套用"
+    "apply": "套用",
+    "presets": "文字樣式預設集",
+    "presetsHelp": "預設集僅變更已定義的屬性群組。在樣式選單中儲存文字框。",
+    "noPresets": "尚無預設集。",
+    "savePreset": "將所選文字框儲存為預設集…",
+    "updatePreset": "從所選文字框更新…",
+    "presetName": "預設集名稱",
+    "rename": "重新命名",
+    "delete": "刪除",
+    "managePreset": "管理{{name}}",
+    "fontMissing": "字型遺失",
+    "nameHelp": "請輸入1至64個字元，不含控制字元。",
+    "duplicateName": "已有同名預設集。",
+    "deleteQuestion": "刪除預設集「{{name}}」？",
+    "presetLimit": "最多可儲存32個預設集。"
   }
 }

@@ -307,6 +307,51 @@ describe('greenfield editor', () => {
     await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith('project', style))
   })
 
+  it('applies a partial preset to the selected layers in one native call', async () => {
+    installProject()
+    queryClient.setQueryData(pageKey, { ...queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey), layers: [textLayer, secondLayer] })
+    const style = { ...emptyTextStyle, outline: { stroke_color: [255, 255, 255, 255] as [number, number, number, number], stroke_width: 3, stroke_method: null, stroke_position: null, stroke_join: null } }
+    useKoharuStore.setState({ selectedLayers: ['element', 'second'], textStyles: { default_style: { ...emptyTextStyle }, presets: [{ id: 'white', name: 'White outline', style, key: null }], legacy_color_migrated: true } })
+    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 2, skipped: 0 })
+    vi.spyOn(commands, 'getProject').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getProject>>>(projectKey)!)
+    vi.spyOn(commands, 'getPage').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey)!)
+    vi.spyOn(commands, 'getPages').mockResolvedValue(queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPages>>>(pagesKey)!)
+    render(<Inspector />)
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
+    fireEvent.click(await screen.findByRole('menuitem', { name: /^White outline/ }))
+    await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith({ layers: ['element', 'second'] }, style))
+    expect(style.font).toBeNull()
+    expect(style.size).toBeNull()
+  })
+
+  it('disables preset application without a text selection', async () => {
+    installProject()
+    useKoharuStore.setState({ selectedLayers: [], textStyles: { default_style: { ...emptyTextStyle }, presets: [{ id: 'white', name: 'White outline', style: { ...emptyTextStyle }, key: null }], legacy_color_migrated: true } })
+    const apply = vi.spyOn(commands, 'applyTextStyle').mockResolvedValue({ changed: 0, skipped: 0 })
+    render(<Inspector />)
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
+    const row = await screen.findByRole('menuitem', { name: /^White outline/ })
+    expect(row).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(row)
+    expect(apply).not.toHaveBeenCalled()
+  })
+
+  it('saves a named preset with only the ticked groups', async () => {
+    installProject()
+    const style = { ...emptyTextStyle, fill: [0, 0, 0, 255] as [number, number, number, number] }
+    const capture = vi.spyOn(commands, 'captureTextStyle').mockResolvedValue(style)
+    const save = vi.spyOn(commands, 'saveTextStyles').mockImplementation(async (styles) => styles)
+    render(<Inspector />)
+    const user = userEvent.setup()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Styles' }), { key: 'ArrowDown' })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Save selected box as preset…' }))
+    await user.type(screen.getByRole('textbox', { name: 'Preset name' }), 'Dark fill')
+    for (const group of ['Font', 'Outline', 'Outer outline', 'Alignment']) await user.click(screen.getByRole('checkbox', { name: group }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(capture).toHaveBeenCalledWith('element', ['fill']))
+    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ presets: [expect.objectContaining({ name: 'Dark fill', style })] })))
+  })
+
   it('registers one native resize listener in React strict mode', async () => {
     const unlisten = vi.fn()
     nativeWindow.onResized.mockClear()

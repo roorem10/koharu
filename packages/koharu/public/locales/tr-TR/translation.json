@@ -659,6 +659,20 @@
     "applied": "{{count}} metin kutusuna uygulandı",
     "skipped": "{{count}} geçersiz metin kutusu atlandı",
     "confirmApply": "{{count}} metin kutusuna uygulansın mı? Ctrl+Z tek adımda geri alır.",
-    "apply": "Uygula"
+    "apply": "Uygula",
+    "presets": "Metin stili hazır ayarları",
+    "presetsHelp": "Hazır ayarlar yalnızca tanımlı grupları değiştirir. Stiller menüsünden bir kutu kaydedin.",
+    "noPresets": "Henüz hazır ayar yok.",
+    "savePreset": "Seçili kutuyu hazır ayar olarak kaydet…",
+    "updatePreset": "Seçili kutudan güncelle…",
+    "presetName": "Hazır ayar adı",
+    "rename": "Yeniden adlandır",
+    "delete": "Sil",
+    "managePreset": "{{name}} yönetimi",
+    "fontMissing": "Yazı tipi eksik",
+    "nameHelp": "Kontrol karakteri içermeyen 1–64 karakter kullanın.",
+    "duplicateName": "Başka bir hazır ayar bu adı kullanıyor.",
+    "deleteQuestion": "“{{name}}” hazır ayarı silinsin mi?",
+    "presetLimit": "En fazla 32 hazır ayar kaydedebilirsiniz."
   }
 }

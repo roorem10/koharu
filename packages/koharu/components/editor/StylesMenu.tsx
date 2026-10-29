@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { PresetActions, PresetSummary, usePresetDialogs } from '@/components/editor/PresetControls'
 import { TextStyleDialog } from '@/components/editor/TextStyleDialog'
 import { call, refreshTextStyles, saveTextStyles } from '@/lib/backend'
 import { usePage, pageKey, pagesKey, projectKey, refresh } from '@/lib/queries'
@@ -22,12 +23,14 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@koharu/ui/components/dropdown-menu'
 import { toast } from '@koharu/ui/components/toast'
 
 export function StylesMenu({ selected }: { selected: EntityId[] }) {
   const { t } = useTranslation()
   const page = usePage().data
+  const presetsUI = usePresetDialogs(selected)
   const styles = useKoharuStore((state) => state.textStyles)
   const [capture, setCapture] = useState<EntityId | null>(null)
   const [confirmation, setConfirmation] = useState<{ scope: StyleScope; count: number } | null>(
@@ -59,6 +62,7 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
     const count = await call(commands.countTextStyleTargets, scope)
     setConfirmation({ scope, count })
   }
+  const presets = styles?.presets ?? []
   const defaultStyle = styles?.default_style ?? emptyTextStyle
   return (
     <>
@@ -70,6 +74,36 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
           {t('textStyles.styles')}
         </DropdownMenuTrigger>
         <DropdownMenuContent className='w-72'>
+          {presets.map((preset) => (
+            <div key={preset.id} className='flex min-w-0 items-stretch'>
+              <DropdownMenuItem
+                className='min-w-0 flex-1'
+                disabled={!selected.length}
+                onClick={() =>
+                  void apply({ layers: selected }, preset.style).catch(() => undefined)
+                }
+              >
+                <span className='min-w-0'>
+                  <span className='block break-words'>{preset.name}</span>
+                  <PresetSummary preset={preset} />
+                </span>
+              </DropdownMenuItem>
+              <PresetActions
+                preset={preset}
+                nested
+                canUpdate={selected.length > 0}
+                onAction={presetsUI.manage}
+              />
+            </div>
+          ))}
+          <DropdownMenuItem
+            disabled={!selected.length || presets.length >= 32}
+            title={presets.length >= 32 ? t('textStyles.presetLimit') : undefined}
+            onClick={presetsUI.create}
+          >
+            {t('textStyles.savePreset')}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             disabled={!selected.length}
             onClick={() => void apply({ layers: selected }, defaultStyle).catch(() => undefined)}
@@ -95,6 +129,7 @@ export function StylesMenu({ selected }: { selected: EntityId[] }) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {presetsUI.dialogs}
       {capture && (
         <TextStyleDialog
           layer={capture}

@@ -659,6 +659,20 @@
     "applied": "{{count}}個のテキストボックスに適用しました",
     "skipped": "無効なテキストボックス{{count}}個をスキップしました",
     "confirmApply": "{{count}}個のテキストボックスに適用しますか？ Ctrl+Zでまとめて元に戻せます。",
-    "apply": "適用"
+    "apply": "適用",
+    "presets": "テキストスタイルのプリセット",
+    "presetsHelp": "プリセットは定義したグループだけを変更します。スタイルメニューからボックスを保存できます。",
+    "noPresets": "プリセットはありません。",
+    "savePreset": "選択したボックスをプリセットとして保存…",
+    "updatePreset": "選択したボックスから更新…",
+    "presetName": "プリセット名",
+    "rename": "名前を変更",
+    "delete": "削除",
+    "managePreset": "{{name}}を管理",
+    "fontMissing": "フォントが見つかりません",
+    "nameHelp": "制御文字を含まない1～64文字を入力してください。",
+    "duplicateName": "同じ名前のプリセットがあります。",
+    "deleteQuestion": "プリセット「{{name}}」を削除しますか？",
+    "presetLimit": "プリセットは最大32個まで保存できます。"
   }
 }

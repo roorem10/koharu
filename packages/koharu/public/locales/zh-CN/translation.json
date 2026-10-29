@@ -659,6 +659,20 @@
     "applied": "已应用于{{count}}个文字框",
     "skipped": "已跳过{{count}}个无效文字框",
     "confirmApply": "应用于{{count}}个文字框？按Ctrl+Z可一次性撤销。",
-    "apply": "应用"
+    "apply": "应用",
+    "presets": "文字样式预设",
+    "presetsHelp": "预设仅更改已定义的属性组。在样式菜单中保存文字框。",
+    "noPresets": "暂无预设。",
+    "savePreset": "将所选文字框保存为预设…",
+    "updatePreset": "从所选文字框更新…",
+    "presetName": "预设名称",
+    "rename": "重命名",
+    "delete": "删除",
+    "managePreset": "管理{{name}}",
+    "fontMissing": "字体缺失",
+    "nameHelp": "请输入1至64个字符，不含控制字符。",
+    "duplicateName": "已有同名预设。",
+    "deleteQuestion": "删除预设“{{name}}”？",
+    "presetLimit": "最多可保存32个预设。"
   }
 }

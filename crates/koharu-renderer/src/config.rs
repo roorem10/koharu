@@ -455,4 +455,65 @@ mod text_style_tests {
         existing.migrate_color(legacy);
         assert_eq!(existing.default_style.fill, Some([0, 0, 0, 255]));
     }
+
+    #[test]
+    fn preset_limits_and_partial_groups_survive_settings_roundtrip() {
+        let preset = TextPreset {
+            id: "outline-1".into(),
+            name: "White outline".into(),
+            key: Some("1".into()),
+            style: TextStyle::capture(&typography(), &[StyleGroup::Outline]),
+        };
+        let styles = TextStyles {
+            presets: vec![preset.clone()],
+            ..Default::default()
+        };
+        styles.validate().unwrap();
+        let restored: TextStyles = toml::from_str(&toml::to_string(&styles).unwrap()).unwrap();
+        assert_eq!(restored, styles);
+        assert!(restored.presets[0].style.font.is_none());
+        assert!(
+            TextStyles {
+                presets: vec![preset.clone(); 2],
+                ..Default::default()
+            }
+            .validate()
+            .is_err()
+        );
+        for name in [String::new(), "x".repeat(65), "bad\nname".into()] {
+            assert!(
+                TextStyles {
+                    presets: vec![TextPreset {
+                        name,
+                        ..preset.clone()
+                    }],
+                    ..Default::default()
+                }
+                .validate()
+                .is_err()
+            );
+        }
+        let presets = (0..33)
+            .map(|i| TextPreset {
+                id: format!("preset-{i}"),
+                ..preset.clone()
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            TextStyles {
+                presets: presets[..32].to_vec(),
+                ..Default::default()
+            }
+            .validate()
+            .is_ok()
+        );
+        assert!(
+            TextStyles {
+                presets,
+                ..Default::default()
+            }
+            .validate()
+            .is_err()
+        );
+    }
 }
