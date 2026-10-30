@@ -152,6 +152,9 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             canvas::commit_transform,
             canvas::commit_inpaint,
             // WO-19 (lettering categories) commands go here.
+            lettering::get_effective_category,
+            lettering::get_lettering_settings,
+            lettering::save_lettering_settings,
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)

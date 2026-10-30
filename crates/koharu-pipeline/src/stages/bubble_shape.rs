@@ -64,12 +64,225 @@ pub fn style_for_shape(styles: &TextStyles, shape: Option<BubbleShape>) -> Optio
     if !styles.shape_styles.enabled {
         return None;
     }
-    Some(match shape {
-        Some(BubbleShape::Rectangle) => &styles.shape_styles.rectangle,
-        Some(BubbleShape::Round) => &styles.shape_styles.round,
-        Some(BubbleShape::Spiky) => &styles.shape_styles.spiky,
-        None => &styles.shape_styles.free,
-    })
+    Some(styles.category_style(match shape {
+        Some(BubbleShape::Rectangle) => "narration_box",
+        Some(BubbleShape::Round) => "normal_dialogue",
+        Some(BubbleShape::Spiky) => "shout",
+        None => "floating",
+    }))
+}
+
+/// Estimate source glyph height from the OCR region, never the translated font size.
+/// A bubble's padded frame is deliberately not a source-size measurement.
+pub fn original_glyph_fraction(
+    snapshot: &Snapshot,
+    layer: EntityId,
+) -> anyhow::Result<Option<f64>> {
+    let text = snapshot.text_layer(layer)?;
+    let content = text.content()?;
+    let Some(source) = content.source()? else {
+        return Ok(None);
+    };
+    let geometry = if let Some(region) = content.source_region()? {
+        Some(region.geometry()?)
+    } else if let Some(geometry) = snapshot.component::<Geometry>(layer)? {
+        Some(geometry)
+    } else {
+        text.fit_target()?
+            .map(|region| region.geometry())
+            .transpose()?
+    };
+    let Some(geometry) = geometry else {
+        return Ok(None);
+    };
+    let mut ancestor = layer;
+    while let Some(parent) = snapshot.parent(ancestor)? {
+        ancestor = parent;
+    }
+    let height = snapshot.page(ancestor)?.page()?.height;
+    let direction = text.typography()?.and_then(|t| t.writing_mode);
+    Ok(glyph_fraction(
+        &geometry.points,
+        &source.text.value,
+        direction,
+        height,
+    ))
+}
+
+fn glyph_fraction(
+    points: &[Point],
+    source: &str,
+    direction: Option<koharu_scene::WritingMode>,
+    page_height: f64,
+) -> Option<f64> {
+    let count = source.chars().filter(|c| c.is_alphanumeric()).count();
+    if count == 0 || points.len() < 3 || !page_height.is_finite() || page_height <= 0.0 {
+        return None;
+    }
+    let area = signed_area(points).abs();
+    let mut min = Point {
+        x: f64::INFINITY,
+        y: f64::INFINITY,
+    };
+    let mut max = Point {
+        x: f64::NEG_INFINITY,
+        y: f64::NEG_INFINITY,
+    };
+    for point in points {
+        min.x = min.x.min(point.x);
+        min.y = min.y.min(point.y);
+        max.x = max.x.max(point.x);
+        max.y = max.y.max(point.y);
+    }
+    let vertical = direction.map_or(max.y - min.y > max.x - min.x, |mode| {
+        mode == koharu_scene::WritingMode::Vertical
+    });
+    let cross_axis = if vertical {
+        max.x - min.x
+    } else {
+        max.y - min.y
+    };
+    let glyph = (area / count as f64).sqrt().min(cross_axis);
+    (glyph.is_finite() && glyph > 0.0).then_some(glyph / page_height)
+}
+
+#[cfg(test)]
+mod glyph_tests {
+    use super::*;
+    use koharu_scene::WritingMode;
+
+    #[tokio::test]
+    async fn source_region_wins_over_the_edited_typesetting_frame() {
+        use koharu_scene::{
+            At, Authored, Origin, PageDraft, RecognizedFrom, Session, SourceText, TextLayout,
+            TextLayoutKind, TextRegion,
+        };
+        let mut session = Session::memory().await.unwrap();
+        let mut layer = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 1400.0, 2000.0), At::End)?;
+                let region = edit.add_analysis_region::<TextRegion>(
+                    page,
+                    At::End,
+                    &Geometry::rectangle(0.0, 0.0, 160.0, 14.0),
+                    None,
+                )?;
+                let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &SourceText {
+                        text: Authored::user("tiny aside".into()),
+                        language: None,
+                    },
+                )?;
+                edit.relate::<RecognizedFrom>(content, region)?;
+                let id = edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &TextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                    },
+                )?;
+                edit.set(id, &Geometry::rectangle(0.0, 0.0, 1000.0, 2000.0))?;
+                layer = Some(id);
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        assert_eq!(
+            original_glyph_fraction(&session.snapshot(), layer.unwrap()).unwrap(),
+            Some(14.0 / 2000.0)
+        );
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let content = session
+                    .snapshot()
+                    .text_layer(layer.unwrap())?
+                    .content()?
+                    .id();
+                edit.set(
+                    content,
+                    &SourceText {
+                        text: Authored::user("?! ...".into()),
+                        language: None,
+                    },
+                )
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        assert_eq!(
+            original_glyph_fraction(&session.snapshot(), layer.unwrap()).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn distinguishes_dialogue_and_asides_without_counting_punctuation() {
+        let normal = Geometry::rectangle(0.0, 0.0, 100.0, 240.0);
+        let aside = Geometry::rectangle(0.0, 0.0, 160.0, 14.0);
+        let vertical = Geometry::rectangle(0.0, 0.0, 14.0, 160.0);
+        let normal_size = glyph_fraction(
+            &normal.points,
+            "これは普通のセリフです",
+            Some(WritingMode::Vertical),
+            2000.0,
+        )
+        .unwrap();
+        let aside_size = glyph_fraction(
+            &aside.points,
+            "tiny aside!",
+            Some(WritingMode::Horizontal),
+            2000.0,
+        )
+        .unwrap();
+        assert!(normal_size > 0.012);
+        assert!(aside_size < 0.012);
+        assert_eq!(
+            Some(aside_size),
+            glyph_fraction(
+                &vertical.points,
+                "tiny aside!",
+                Some(WritingMode::Vertical),
+                2000.0
+            )
+        );
+        assert_eq!(
+            Some(aside_size),
+            glyph_fraction(
+                &aside.points,
+                "tiny ... aside?!",
+                Some(WritingMode::Horizontal),
+                2000.0
+            )
+        );
+        assert_eq!(None, glyph_fraction(&aside.points, "… ?! ", None, 2000.0));
+        assert_eq!(None, glyph_fraction(&aside.points, "", None, 2000.0));
+        assert_eq!(
+            None,
+            glyph_fraction(
+                &Geometry::rectangle(0.0, 0.0, 0.0, 10.0).points,
+                "text",
+                None,
+                2000.0
+            )
+        );
+        let doubled = Geometry::rectangle(0.0, 0.0, 320.0, 28.0);
+        assert_eq!(
+            Some(aside_size),
+            glyph_fraction(
+                &doubled.points,
+                "tiny aside!",
+                Some(WritingMode::Horizontal),
+                4000.0
+            )
+        );
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
