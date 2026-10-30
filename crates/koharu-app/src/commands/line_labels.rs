@@ -35,15 +35,13 @@ pub(crate) async fn set_line_category(
         let mut project = project.project.lock().await;
         let project = project.as_mut().context("no project is open")?;
         project.snapshot().text_layer(layer)?;
-        let (changed, label) = project.update_context(|context| {
-            let changed = context.set_user_category(layer, category);
-            (changed, context.category(layer))
+        let label = project.update_context(|context| {
+            context.set_user_category(layer, category);
+            context.category(layer)
         })?;
-        let commit = if changed {
-            super::lettering::labels_changed(project, &[layer]).await?
-        } else {
-            None
-        };
+        // Restyle even when the label is unchanged: picking the same category
+        // again is how the user reapplies fonts changed in Settings since.
+        let commit = super::lettering::labels_changed(project, &[layer]).await?;
         if let Some(commit) = &commit {
             project.record_commit(commit);
         }
