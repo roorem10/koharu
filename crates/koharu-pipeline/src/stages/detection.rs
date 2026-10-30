@@ -2666,15 +2666,12 @@ mod tests {
                             } else {
                                 match expected_shape {
                                     BubbleShape::Spiky => "Shout",
-                                    BubbleShape::Round => "Round",
-                                    BubbleShape::Rectangle => "Default",
+                                    // An empty Narration Box style uses Normal Dialogue's.
+                                    BubbleShape::Round | BubbleShape::Rectangle => "Round",
                                 }
                             })
                         );
                         assert!(typography.auto_fit);
-                        if index == 0 && expected_shape == BubbleShape::Rectangle {
-                            assert_eq!(typography, before[index]);
-                        }
                         assert_eq!(typography.writing_mode, Some(WritingMode::Horizontal));
                         assert_eq!(
                             typography.color,
