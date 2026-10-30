@@ -17,6 +17,8 @@ pub struct TranslationRequest {
     pub target_language: Language,
     pub instructions: Option<String>,
     pub context: Vec<TranslationContext>,
+    pub glossary: Vec<GlossaryHint>,
+    pub brief: Option<String>,
     pub image: Option<Arc<DynamicImage>>,
 }
 
@@ -32,6 +34,8 @@ impl TranslationRequest {
             target_language,
             instructions: None,
             context: Vec::new(),
+            glossary: Vec::new(),
+            brief: None,
             image: None,
         }
     }
@@ -55,7 +59,6 @@ impl TranslationRequest {
         self
     }
 
-    #[cfg(test)]
     #[must_use]
     pub fn with_context(mut self, context: impl IntoIterator<Item = TranslationContext>) -> Self {
         self.context = context.into_iter().collect();
@@ -63,30 +66,9 @@ impl TranslationRequest {
     }
 
     pub(crate) fn prepare_image(&mut self) -> anyhow::Result<()> {
-        let Some(image) = self.image.as_ref() else {
-            return Ok(());
-        };
-        let (width, height) = (image.width(), image.height());
-        let longest = width.max(height);
-        if longest <= MAX_IMAGE_DIMENSION {
-            return Ok(());
+        if let Some(image) = self.image.take() {
+            self.image = Some(resize_image(image, MAX_IMAGE_DIMENSION)?);
         }
-        let resized_width =
-            (u64::from(width) * u64::from(MAX_IMAGE_DIMENSION) / u64::from(longest)).max(1) as u32;
-        let resized_height =
-            (u64::from(height) * u64::from(MAX_IMAGE_DIMENSION) / u64::from(longest)).max(1) as u32;
-        let source = image.to_rgb8();
-        let mut resized = RgbImage::new(resized_width, resized_height);
-        Resizer::new()
-            .resize(
-                &source,
-                &mut resized,
-                &ResizeOptions::new()
-                    .resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3))
-                    .use_alpha(false),
-            )
-            .context("failed to resize translation image")?;
-        self.image = Some(Arc::new(DynamicImage::ImageRgb8(resized)));
         Ok(())
     }
 
@@ -128,7 +110,6 @@ pub struct TranslationContext {
 }
 
 impl TranslationContext {
-    #[cfg(test)]
     #[must_use]
     pub fn new(source: impl Into<String>, translation: impl Into<String>) -> Self {
         Self {
@@ -136,4 +117,64 @@ impl TranslationContext {
             translation: translation.into(),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GlossaryHint {
+    pub source: String,
+    pub target: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskRequest {
+    pub system: String,
+    pub user: String,
+    pub images: Vec<Arc<DynamicImage>>,
+    pub schema: serde_json::Value,
+}
+
+impl TaskRequest {
+    pub(crate) fn translation(request: &TranslationRequest) -> anyhow::Result<Self> {
+        let (system, user) = crate::prompt::prompts(request)?;
+        Ok(Self {
+            system,
+            user,
+            images: request.image.iter().cloned().collect(),
+            schema: crate::prompt::output_schema(request.segments.len()),
+        })
+    }
+
+    pub fn prepare_images(&mut self, longest: u32) -> anyhow::Result<()> {
+        anyhow::ensure!(longest > 0, "image dimension must be positive");
+        self.images = self
+            .images
+            .drain(..)
+            .map(|image| resize_image(image, longest))
+            .collect::<anyhow::Result<_>>()?;
+        Ok(())
+    }
+}
+
+fn resize_image(image: Arc<DynamicImage>, limit: u32) -> anyhow::Result<Arc<DynamicImage>> {
+    let (width, height) = (image.width(), image.height());
+    let longest = width.max(height);
+    if longest <= limit {
+        return Ok(image);
+    }
+    let resized_width = (u64::from(width) * u64::from(limit) / u64::from(longest)).max(1) as u32;
+    let resized_height = (u64::from(height) * u64::from(limit) / u64::from(longest)).max(1) as u32;
+    let source = image.to_rgb8();
+    let mut resized = RgbImage::new(resized_width, resized_height);
+    Resizer::new()
+        .resize(
+            &source,
+            &mut resized,
+            &ResizeOptions::new()
+                .resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3))
+                .use_alpha(false),
+        )
+        .context("failed to resize translation image")?;
+    Ok(Arc::new(DynamicImage::ImageRgb8(resized)))
 }

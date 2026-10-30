@@ -16,7 +16,7 @@ use koharu_ml::Device;
 use error::{Error, Result};
 use local::LocalTranslator;
 
-pub use backend::{TranslationContext, TranslationRequest};
+pub use backend::{GlossaryHint, TaskRequest, TranslationContext, TranslationRequest};
 pub use language::Language;
 pub use model::{GenerationConfig, Model, ModelSelection, Quantization};
 pub(crate) use model::{ModelGeneration, QuantizationDefinition, display_name};
@@ -135,6 +135,49 @@ impl Translator {
             .into());
         }
         Ok((provider_id, translated))
+    }
+
+    #[must_use]
+    pub fn supports_tasks(selection: &ModelSelection) -> bool {
+        !matches!(
+            selection.provider,
+            Provider::DeepL | Provider::GoogleCloudTranslation | Provider::Caiyun
+        )
+    }
+
+    pub async fn run_task(
+        &self,
+        selection: &ModelSelection,
+        generation: GenerationConfig,
+        mut request: TaskRequest,
+    ) -> anyhow::Result<serde_json::Value> {
+        anyhow::ensure!(
+            Self::supports_tasks(selection),
+            "Read chapter needs a language-model translation provider"
+        );
+        let generation = generation.for_model(selection);
+        if Self::supports_vision(selection, &generation) {
+            request.prepare_images(2048)?;
+        } else {
+            request.images.clear();
+        }
+        // JSON-only backends need the schema in the prompt as well as the output contract.
+        if matches!(selection.provider, Provider::DeepSeek | Provider::MiniMax) {
+            request.system.push_str(&format!(
+                "\nReturn only JSON matching this schema: {}",
+                request.schema
+            ));
+        }
+        let text = if selection.provider == Provider::Local {
+            self.local(selection)
+                .await?
+                .run_task(request, generation)
+                .await?
+        } else {
+            let providers = self.providers.read()?.clone();
+            remote::run_task(&self.client, &providers, selection, &generation, &request).await?
+        };
+        serde_json::from_str(&text).map_err(Into::into)
     }
 
     #[tracing::instrument(skip_all)]

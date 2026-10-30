@@ -10,8 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::send_json;
 use crate::{
-    GenerationConfig, Model, Provider, Result, TranslationRequest, backend::encode_image,
-    display_name, prompt,
+    GenerationConfig, Model, Provider, Result, TaskRequest, backend::encode_image, display_name,
 };
 
 const URL: &str = "https://api.deepseek.com/chat/completions";
@@ -44,25 +43,27 @@ pub(super) async fn models(client: &Client) -> Result<Vec<Model>> {
         .collect())
 }
 
-pub(super) async fn translate(
+pub(super) async fn run_task(
     client: &Client,
     _config: &DeepSeekConfig,
     model: &str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    request: &TaskRequest,
+) -> Result<String> {
     let api_key = koharu_secrets::get("deepseek")?.context("deepseek API key is not configured")?;
-    let (system, user) = prompt::prompts(request)?;
-    let user_content = match request.image.as_deref() {
-        Some(image) => MessageContent::Parts(vec![
-            ContentPart::Text { text: user },
-            ContentPart::ImageUrl {
+    let (system, user) = (request.system.clone(), request.user.clone());
+    let user_content = if request.images.is_empty() {
+        MessageContent::Text(user)
+    } else {
+        let mut parts = vec![ContentPart::Text { text: user }];
+        for image in &request.images {
+            parts.push(ContentPart::ImageUrl {
                 image_url: ImageUrl {
                     url: encode_image(image)?.data_url(),
                 },
-            },
-        ]),
-        None => MessageContent::Text(user),
+            });
+        }
+        MessageContent::Parts(parts)
     };
     let body = ChatRequest {
         model,
@@ -102,7 +103,7 @@ pub(super) async fn translate(
         .message
         .content
         .context("DeepSeek returned no message content")?;
-    Ok(prompt::translations("deepseek", &text, &request.segments)?)
+    Ok(text)
 }
 
 #[derive(Serialize)]

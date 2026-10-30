@@ -30,7 +30,7 @@ pub use openai_compatible::OpenAiCompatibleConfig;
 pub use openrouter::OpenRouterConfig;
 
 use crate::{
-    Error, GenerationConfig, Model, ModelSelection, Provider, ProvidersConfig, Result,
+    Error, GenerationConfig, Model, ModelSelection, Provider, ProvidersConfig, Result, TaskRequest,
     TranslationRequest,
 };
 
@@ -41,6 +41,31 @@ pub(crate) async fn translate(
     generation: &GenerationConfig,
     request: &TranslationRequest,
 ) -> Result<Vec<String>> {
+    match selection.provider {
+        Provider::DeepL => deepl::translate(client, &providers.deepl, request).await,
+        Provider::GoogleCloudTranslation => {
+            google_cloud::translate(client, &providers.google_cloud_translation, request).await
+        }
+        Provider::Caiyun => caiyun::translate(client, &providers.caiyun, request).await,
+        _ => {
+            let task = TaskRequest::translation(request)?;
+            let text = run_task(client, providers, selection, generation, &task).await?;
+            Ok(crate::prompt::translations(
+                selection.provider.into(),
+                &text,
+                &request.segments,
+            )?)
+        }
+    }
+}
+
+pub(crate) async fn run_task(
+    client: &Client,
+    providers: &ProvidersConfig,
+    selection: &ModelSelection,
+    generation: &GenerationConfig,
+    request: &TaskRequest,
+) -> Result<String> {
     let model = || {
         selection
             .model
@@ -49,25 +74,25 @@ pub(crate) async fn translate(
     };
     match selection.provider {
         Provider::OpenAi => {
-            openai::translate(client, &providers.openai, model()?, generation, request).await
+            openai::run_task(client, &providers.openai, model()?, generation, request).await
         }
         Provider::Gemini => {
-            gemini::translate(client, &providers.gemini, model()?, generation, request).await
+            gemini::run_task(client, &providers.gemini, model()?, generation, request).await
         }
         Provider::Claude => {
-            claude::translate(client, &providers.claude, model()?, generation, request).await
+            claude::run_task(client, &providers.claude, model()?, generation, request).await
         }
         Provider::Grok => {
-            grok::translate(client, &providers.grok, model()?, generation, request).await
+            grok::run_task(client, &providers.grok, model()?, generation, request).await
         }
         Provider::MiniMax => {
-            minimax::translate(client, &providers.minimax, model()?, generation, request).await
+            minimax::run_task(client, &providers.minimax, model()?, generation, request).await
         }
         Provider::DeepSeek => {
-            deepseek::translate(client, &providers.deepseek, model()?, generation, request).await
+            deepseek::run_task(client, &providers.deepseek, model()?, generation, request).await
         }
         Provider::OpenAiCompatible => {
-            openai_compatible::translate(
+            openai_compatible::run_task(
                 client,
                 &providers.openai_compatible,
                 model()?,
@@ -77,17 +102,14 @@ pub(crate) async fn translate(
             .await
         }
         Provider::OpenRouter => {
-            openrouter::translate(client, &providers.openrouter, model()?, generation, request)
-                .await
+            openrouter::run_task(client, &providers.openrouter, model()?, generation, request).await
         }
         Provider::LmStudio => {
-            lm_studio::translate(client, &providers.lm_studio, model()?, generation, request).await
+            lm_studio::run_task(client, &providers.lm_studio, model()?, generation, request).await
         }
-        Provider::DeepL => deepl::translate(client, &providers.deepl, request).await,
-        Provider::GoogleCloudTranslation => {
-            google_cloud::translate(client, &providers.google_cloud_translation, request).await
+        Provider::DeepL | Provider::GoogleCloudTranslation | Provider::Caiyun => {
+            Err(anyhow::anyhow!("Read chapter needs a language-model translation provider").into())
         }
-        Provider::Caiyun => caiyun::translate(client, &providers.caiyun, request).await,
         Provider::Local => unreachable!("local translation has its own backend"),
     }
 }

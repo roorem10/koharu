@@ -9,9 +9,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use super::send_json;
-use crate::{
-    GenerationConfig, Model, Provider, Result, TranslationRequest, backend::encode_image, prompt,
-};
+use crate::{GenerationConfig, Model, Provider, Result, TaskRequest, backend::encode_image};
 
 const URL: &str = "https://api.anthropic.com/v1/messages";
 const MODELS_URL: &str = "https://api.anthropic.com/v1/models?limit=1000";
@@ -49,20 +47,20 @@ pub(super) async fn models(client: &Client) -> Result<Vec<Model>> {
         .collect())
 }
 
-pub(super) async fn translate(
+pub(super) async fn run_task(
     client: &Client,
     _config: &ClaudeConfig,
     model: &str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    request: &TaskRequest,
+) -> Result<String> {
     let api_key = koharu_secrets::get("claude")?.context("claude API key is not configured")?;
-    let (system, user) = prompt::prompts(request)?;
+    let (system, user) = (request.system.clone(), request.user.clone());
     let body = Request {
         model,
         max_tokens: generation.max_tokens.unwrap_or(8192),
         system: &system,
-        messages: [Message::user(&user, request.image.as_deref())?],
+        messages: [Message::user(&user, &request.images)?],
         temperature: generation.temperature,
         thinking: generation.reasoning.map(|enabled| ThinkingConfig {
             kind: if enabled { "adaptive" } else { "disabled" },
@@ -70,7 +68,7 @@ pub(super) async fn translate(
         output_config: OutputConfig {
             format: JsonOutputFormat {
                 kind: "json_schema",
-                schema: prompt::output_schema(request.segments.len()),
+                schema: request.schema.clone(),
             },
         },
     };
@@ -88,7 +86,7 @@ pub(super) async fn translate(
         .into_iter()
         .find_map(|block| (block.kind == "text").then_some(block.text).flatten())
         .context("Claude returned no text content")?;
-    Ok(prompt::translations("claude", &text, &request.segments)?)
+    Ok(text)
 }
 
 #[derive(Serialize)]
@@ -129,9 +127,9 @@ struct Message<'a> {
 }
 
 impl<'a> Message<'a> {
-    fn user(text: &'a str, image: Option<&image::DynamicImage>) -> anyhow::Result<Self> {
+    fn user(text: &'a str, images: &[std::sync::Arc<image::DynamicImage>]) -> anyhow::Result<Self> {
         let mut content = vec![ContentBlock::Text { text }];
-        if let Some(image) = image {
+        for image in images {
             content.push(ContentBlock::Image {
                 source: ImageSource {
                     kind: "base64",
@@ -210,11 +208,15 @@ struct CapabilitySupport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prompt;
 
     #[test]
     fn serializes_text_and_base64_image_blocks() {
-        let message =
-            Message::user("translate", Some(&image::DynamicImage::new_rgb8(1, 1))).unwrap();
+        let message = Message::user(
+            "translate",
+            &[std::sync::Arc::new(image::DynamicImage::new_rgb8(1, 1))],
+        )
+        .unwrap();
         let value = serde_json::to_value(message).unwrap();
         assert_eq!(value["content"][0]["type"], "text");
         assert_eq!(value["content"][1]["type"], "image");
@@ -228,7 +230,7 @@ mod tests {
             model: "claude-opus-4-8",
             max_tokens: 1024,
             system: "system",
-            messages: [Message::user("translate", None).unwrap()],
+            messages: [Message::user("translate", &[]).unwrap()],
             temperature: None,
             thinking: Some(ThinkingConfig { kind: "adaptive" }),
             output_config: OutputConfig {

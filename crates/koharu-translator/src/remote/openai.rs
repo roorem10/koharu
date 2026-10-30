@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::send_json;
 use crate::{
-    GenerationConfig, Model, Provider, Result, TranslationRequest, backend::encode_image,
-    display_name, prompt,
+    GenerationConfig, Model, Provider, Result, TaskRequest, backend::encode_image, display_name,
 };
 
 const URL: &str = "https://api.openai.com/v1/chat/completions";
@@ -70,25 +69,27 @@ fn supports_translation(id: &str) -> bool {
     supported_family && !incompatible
 }
 
-pub(super) async fn translate(
+pub(super) async fn run_task(
     client: &Client,
     _config: &OpenAiConfig,
     model: &str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    request: &TaskRequest,
+) -> Result<String> {
     let api_key = koharu_secrets::get("openai")?.context("openai API key is not configured")?;
-    let (system, user) = prompt::prompts(request)?;
-    let user_content = match request.image.as_deref() {
-        Some(image) => MessageContent::Parts(vec![
-            ContentPart::Text { text: user },
-            ContentPart::ImageUrl {
+    let (system, user) = (request.system.clone(), request.user.clone());
+    let user_content = if request.images.is_empty() {
+        MessageContent::Text(user)
+    } else {
+        let mut parts = vec![ContentPart::Text { text: user }];
+        for image in &request.images {
+            parts.push(ContentPart::ImageUrl {
                 image_url: ImageUrl {
                     url: encode_image(image)?.data_url(),
                 },
-            },
-        ]),
-        None => MessageContent::Text(user),
+            });
+        }
+        MessageContent::Parts(parts)
     };
     let body = ChatRequest {
         model,
@@ -115,7 +116,7 @@ pub(super) async fn translate(
             json_schema: JsonSchema {
                 name: "manga_translation",
                 strict: true,
-                schema: prompt::output_schema(request.segments.len()),
+                schema: request.schema.clone(),
             },
         },
     };
@@ -135,7 +136,7 @@ pub(super) async fn translate(
         .message
         .content
         .context("OpenAI returned no message content")?;
-    Ok(prompt::translations("openai", &text, &request.segments)?)
+    Ok(text)
 }
 
 #[derive(Serialize)]
@@ -224,6 +225,7 @@ struct ListedModel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prompt;
 
     #[test]
     fn filters_models_to_the_chat_translation_contract() {

@@ -10,9 +10,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use super::send_json;
-use crate::{
-    GenerationConfig, Model, Provider, Result, TranslationRequest, backend::encode_image, prompt,
-};
+use crate::{GenerationConfig, Model, Provider, Result, TaskRequest, backend::encode_image};
 
 const CHAT_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
 const MODELS_URL: &str = "https://openrouter.ai/api/v1/models";
@@ -21,26 +19,28 @@ const MODELS_URL: &str = "https://openrouter.ai/api/v1/models";
 #[serde(default)]
 pub struct OpenRouterConfig {}
 
-pub(super) async fn translate(
+pub(super) async fn run_task(
     client: &Client,
     _config: &OpenRouterConfig,
     model: &str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    request: &TaskRequest,
+) -> Result<String> {
     let api_key =
         koharu_secrets::get("openrouter")?.context("openrouter API key is not configured")?;
-    let (system, user) = prompt::prompts(request)?;
-    let user_content = match request.image.as_deref() {
-        Some(image) => MessageContent::Parts(vec![
-            ContentPart::Text { text: user },
-            ContentPart::ImageUrl {
+    let (system, user) = (request.system.clone(), request.user.clone());
+    let user_content = if request.images.is_empty() {
+        MessageContent::Text(user)
+    } else {
+        let mut parts = vec![ContentPart::Text { text: user }];
+        for image in &request.images {
+            parts.push(ContentPart::ImageUrl {
                 image_url: ImageUrl {
                     url: encode_image(image)?.data_url(),
                 },
-            },
-        ]),
-        None => MessageContent::Text(user),
+            });
+        }
+        MessageContent::Parts(parts)
     };
     let body = ChatRequest {
         model,
@@ -67,7 +67,7 @@ pub(super) async fn translate(
             json_schema: JsonSchema {
                 name: "manga_translation",
                 strict: true,
-                schema: prompt::output_schema(request.segments.len()),
+                schema: request.schema.clone(),
             },
         },
         provider: ProviderPreferences {
@@ -90,11 +90,7 @@ pub(super) async fn translate(
         .message
         .content
         .context("OpenRouter returned no message content")?;
-    Ok(prompt::translations(
-        "openrouter",
-        &text,
-        &request.segments,
-    )?)
+    Ok(text)
 }
 
 pub(super) async fn models(client: &Client) -> Result<Vec<Model>> {
@@ -243,6 +239,7 @@ struct ResponseMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prompt;
 
     #[test]
     fn reads_reasoning_capability_from_model_list() {

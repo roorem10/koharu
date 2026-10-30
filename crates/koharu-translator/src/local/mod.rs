@@ -13,7 +13,7 @@ pub(crate) use catalog::{DEFAULT_MODEL, DEFAULT_QUANTIZATION};
 
 use crate::{
     Device, Error, GenerationConfig, Model, ModelSelection, Provider, Quantization, Result,
-    TranslationRequest, prompt,
+    TaskRequest, TranslationRequest, prompt,
 };
 
 #[derive(Debug)]
@@ -73,43 +73,52 @@ impl LocalTranslator {
             });
         }
 
-        let image = request.image.clone();
-        let prompt = self.render_prompt(
-            &request,
-            generation.reasoning.unwrap_or(false) && self.descriptor.reasoning,
-        )?;
-        let schema = prompt::output_schema(expected);
+        let task = TaskRequest::translation(&request)?;
+        let output = self.run_task(task, generation).await?;
+        Ok(prompt::translations("local", &output, &request.segments)?)
+    }
+
+    pub(crate) async fn run_task(
+        &self,
+        request: TaskRequest,
+        generation: GenerationConfig,
+    ) -> Result<String> {
+        let payload = if request.images.is_empty() {
+            request.user
+        } else {
+            format!(
+                "{}\n{}",
+                std::iter::repeat_n(media_marker(), request.images.len())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                request.user
+            )
+        };
+        let prompt = self
+            .llm
+            .render_chat_prompt_with_options(
+                &[
+                    ChatMessage::system(request.system),
+                    ChatMessage::user(payload),
+                ],
+                ChatTemplateOptions {
+                    add_generation_prompt: true,
+                    enable_thinking: generation.reasoning.unwrap_or(false)
+                        && self.descriptor.reasoning,
+                },
+            )
+            .context("failed to render local translation prompt")?;
         let llm = Arc::clone(&self.llm);
         let generation = self.descriptor.generation.options(generation);
         let output = tokio_rayon::spawn(move || {
-            let input = image.as_deref().map_or_else(
-                || Input::new(&prompt),
-                |image| Input::new(&prompt).with_image(image),
-            );
-            llm.inference_with_json_schema(&input, &generation, &schema)
+            let mut input = Input::new(&prompt);
+            for image in &request.images {
+                input = input.with_image(image);
+            }
+            llm.inference_with_json_schema(&input, &generation, &request.schema)
         })
         .await?;
-        let segments = prompt::translations("local", &output.text, &request.segments)?;
-        Ok(segments)
-    }
-
-    fn render_prompt(&self, request: &TranslationRequest, reasoning: bool) -> Result<String> {
-        let (system, payload) = prompt::prompts(request)?;
-        let payload = if request.image.is_some() {
-            format!("{}\n{payload}", media_marker())
-        } else {
-            payload
-        };
-        Ok(self
-            .llm
-            .render_chat_prompt_with_options(
-                &[ChatMessage::system(system), ChatMessage::user(payload)],
-                ChatTemplateOptions {
-                    add_generation_prompt: true,
-                    enable_thinking: reasoning,
-                },
-            )
-            .context("failed to render local translation prompt")?)
+        Ok(output.text)
     }
 }
 

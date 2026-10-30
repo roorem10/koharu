@@ -5,13 +5,19 @@ use indoc::indoc;
 use serde::{Deserialize, Deserializer, Serialize, de};
 use serde_json::{Value, json};
 
-use crate::{Language, TranslationContext, TranslationRequest};
+use crate::{GlossaryHint, Language, TranslationContext, TranslationRequest};
 
 pub(crate) fn prompts(request: &TranslationRequest) -> anyhow::Result<(String, String)> {
     let input = TranslationInput {
         source_language: request.source_language,
         target_language: request.target_language,
         context: &request.context,
+        glossary: &request.glossary,
+        brief: request
+            .brief
+            .as_deref()
+            .map(str::trim)
+            .filter(|text| !text.is_empty()),
         segments: request
             .segments
             .iter()
@@ -141,6 +147,17 @@ fn translation_system_prompt(request: &TranslationRequest) -> String {
     .trim_end()
     .to_owned();
 
+    if !request.glossary.is_empty() {
+        prompt.push_str("\n\nGlossary requirements:\nUse these translations for these terms. These mappings are mandatory; preserve their target spelling.");
+    }
+    if request
+        .brief
+        .as_deref()
+        .is_some_and(|text| !text.trim().is_empty())
+    {
+        prompt.push_str("\n\nBackground requirements:\nThe brief is reference-only background. Do not translate or return it.");
+    }
+
     if !request.context.is_empty() {
         prompt.push_str("\n\n");
         prompt.push_str(indoc! {"
@@ -176,6 +193,10 @@ struct TranslationInput<'a> {
     source_language: Option<Language>,
     target_language: Language,
     context: &'a [TranslationContext],
+    #[serde(skip_serializing_if = "<[GlossaryHint]>::is_empty")]
+    glossary: &'a [GlossaryHint],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    brief: Option<&'a str>,
     segments: Vec<TranslationInputSegment<'a>>,
 }
 
@@ -217,6 +238,36 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn glossary_and_brief_are_scoped_reference_input() {
+        let mut request = TranslationRequest::new(["ヒナ"], Language::English);
+        request.glossary.push(GlossaryHint {
+            source: "ヒナ".into(),
+            target: "Hina".into(),
+            note: None,
+        });
+        request.brief = Some("A quiet conversation".into());
+        let (system, user) = prompts(&request).unwrap();
+        let value: Value = serde_json::from_str(&user).unwrap();
+        assert_eq!(value["glossary"][0]["target"], "Hina");
+        assert_eq!(value["brief"], "A quiet conversation");
+        assert!(system.contains("mandatory"));
+        assert!(system.contains("Do not translate or return it"));
+        assert_eq!(value["segments"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn empty_hints_preserve_the_original_payload_bytes() {
+        let request = TranslationRequest::new(["hello"], Language::English);
+        let (_, user) = prompts(&request).unwrap();
+        assert_eq!(
+            user,
+            r#"{"source_language":null,"target_language":"en-US","context":[],"segments":[{"id":0,"text":"hello"}]}"#
+        );
+        assert!(!translation_system_prompt(&request).contains("Background requirements"));
+        assert!(!translation_system_prompt(&request).contains("Glossary requirements"));
+    }
 
     #[test]
     fn snippet_keeps_a_response_on_one_line() {
