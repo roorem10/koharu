@@ -115,6 +115,10 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             line_labels::get_line_category,
             line_labels::set_line_category,
             // WO-18 (chapter context) commands go here.
+            context::lines::check_glossary,
+            context::lines::dismiss_line_flag,
+            context::lines::glossary_usage,
+            context::lines::explain_line,
             context::reading::read_chapter,
             context::series::list_series,
             context::series::create_series,

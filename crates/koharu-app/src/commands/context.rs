@@ -2,10 +2,12 @@
 //!
 //! Owned by WO-18. The shared foundation only adds the translation hints hook.
 
+pub(crate) mod lines;
 pub(crate) mod reading;
 pub(crate) mod series;
 pub(crate) mod settings;
 
+pub(crate) use lines::refresh_flags;
 pub(crate) use reading::auto_read;
 pub(crate) use settings::get_context_settings;
 
@@ -99,6 +101,7 @@ pub(crate) async fn get_chapter_context(
 ) -> std::result::Result<ChapterState, Error> {
     let projects = project.project.lock().await;
     let project = projects.as_ref().context("no project is open")?;
+    refresh_flags(project)?;
     let context = project.load_context()?;
     let series = linked_series(&context)?;
     let config = koharu_pipeline::PipelineConfig::load()?;

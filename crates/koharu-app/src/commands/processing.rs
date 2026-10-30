@@ -184,6 +184,9 @@ pub(crate) async fn process(
                         return Ok(project.snapshot());
                     };
                     project.record_commit(&commit);
+                    if output.stage == koharu_pipeline::Stage::Translation {
+                        super::context::refresh_flags(project)?;
+                    }
                     let page = project.active_page();
                     (commit, page)
                 };
