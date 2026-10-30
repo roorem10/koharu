@@ -202,13 +202,15 @@ pub(crate) async fn process(
         let mut committer = PipelineCommitter {
             handle: task_handle.clone(),
         };
-        let context_result = if super::context::operation_translates(&request.operation) {
-            super::context::auto_read(&task_handle, &request.scope, &stop, id).await
-        } else {
-            Ok(())
-        };
+        // A failed chapter read must not block translation; the page requests
+        // simply go out without the new brief.
+        if super::context::operation_translates(&request.operation)
+            && let Err(error) =
+                super::context::auto_read(&task_handle, &request.scope, &stop, id).await
+        {
+            tracing::warn!(%error, "automatic Read chapter failed");
+        }
         let result = async {
-            context_result?;
             let snapshot = {
                 let projects = task_handle.state::<CurrentProject>();
                 let projects = projects.project.lock().await;
