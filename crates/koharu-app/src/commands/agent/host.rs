@@ -34,14 +34,44 @@ impl KoharuHost {
     }
 
     async fn project_context(&self) -> Result<Value> {
-        let (project, pages) = {
+        let (project, mut pages, context, glossary) = {
             let current = self.handle.state::<CurrentProject>();
             let current = current.project.lock().await;
             let project = current.as_ref().context("no project is open")?;
             let snapshot = project.snapshot();
             let pages = agent_pages(&snapshot)?;
-            (project.info(), pages)
+            let context = project.load_context()?;
+            let glossary = super::super::context::translation_hints(&context, &snapshot)?.glossary;
+            let mut sources = Vec::new();
+            for page in snapshot.pages() {
+                if let Some(group) = page.text_group()? {
+                    for layer in group.text_layers()? {
+                        if let Some(source) = layer.content()?.source()? {
+                            sources.push(source.text.value);
+                        }
+                    }
+                }
+            }
+            let glossary = koharu_pipeline::page_glossary(&glossary, &sources);
+            (project.info(), pages, context, glossary)
         };
+        for page in &mut pages {
+            if let Some(layers) = page["layers"].as_array_mut() {
+                for layer in layers {
+                    if let Ok(id) = serde_json::from_value::<EntityId>(layer["id"].clone()) {
+                        layer["lettering_category"] = serde_json::to_value(context.category(id))?;
+                        layer["flags"] = serde_json::to_value(
+                            context
+                                .lines
+                                .get(&id)
+                                .map(|line| &line.flags)
+                                .cloned()
+                                .unwrap_or_default(),
+                        )?;
+                    }
+                }
+            }
+        }
         let preferences = Preferences::load()?;
         let fonts = self
             .handle
@@ -68,6 +98,8 @@ impl KoharuHost {
         Ok(json!({
             "project": project,
             "pages": pages,
+            "brief": context.brief,
+            "series_glossary": glossary,
             "configuration": {
                 "pipeline": preferences.pipeline,
                 "providers": providers,
@@ -139,17 +171,114 @@ impl KoharuHost {
         Ok(())
     }
 
+    async fn context_tool(&self, call: &ToolCall) -> Result<Invocation> {
+        let (commit, page, value) = {
+            let projects = self.handle.state::<CurrentProject>();
+            let mut projects = projects.project.lock().await;
+            let project = projects.as_mut().context("no project is open")?;
+            let mut changed_layers = Vec::new();
+            let value = match call.name.as_str() {
+                "add_glossary_entry" => {
+                    let args: AddGlossaryEntry = arguments(call)?;
+                    anyhow::ensure!(
+                        !args.source.trim().is_empty() && !args.target.trim().is_empty(),
+                        "term needs source and target"
+                    );
+                    let context = project.load_context()?;
+                    let series = super::super::context::linked_series(&context)?;
+                    let kind: booharu_context::TermKind = serde_json::from_value(json!(args.kind))?;
+                    let added = project.update_context(|context| {
+                        if series
+                            .iter()
+                            .flat_map(|series| &series.glossary)
+                            .chain(&context.suggestions)
+                            .any(|entry| entry.source.trim() == args.source.trim())
+                        {
+                            return false;
+                        }
+                        context.suggestions.push(booharu_context::GlossaryEntry {
+                            id: EntityId::new().to_string(),
+                            source: args.source.trim().into(),
+                            target: args.target.trim().into(),
+                            kind,
+                            note: args.note,
+                            locked: false,
+                        });
+                        true
+                    })?;
+                    json!({"suggested":added})
+                }
+                "set_line_category" => {
+                    let args: SetLineCategory = arguments(call)?;
+                    let layer = entity(&args.element)?;
+                    project.snapshot().text_layer(layer)?;
+                    let category = booharu_context::LetteringCategory::parse(&args.category)
+                        .context("invalid lettering category")?;
+                    anyhow::ensure!(
+                        args.confidence
+                            .is_none_or(|value| value.is_finite() && (0.0..=1.0).contains(&value)),
+                        "invalid label confidence"
+                    );
+                    let changed = project.update_context(|context| {
+                        context.set_model_category(layer, category, args.confidence)
+                    })?;
+                    if changed {
+                        changed_layers.push(layer);
+                    }
+                    json!({"changed":changed})
+                }
+                "flag_line" => {
+                    let args: FlagLine = arguments(call)?;
+                    let layer = entity(&args.element)?;
+                    let snapshot = project.snapshot();
+                    snapshot.text_layer(layer)?;
+                    let mut page_number = None;
+                    for (index, page) in snapshot.pages().enumerate() {
+                        if let Some(group) = page.text_group()?
+                            && group.text_layers()?.any(|item| item.id() == layer)
+                        {
+                            page_number = Some(index as u32 + 1);
+                            break;
+                        }
+                    }
+                    let page = page_number.context("text layer has no page")?;
+                    project.update_context(|context| {
+                        let flag = booharu_context::Flag::Review {
+                            message: args.message,
+                            page,
+                        };
+                        let line = context.lines.entry(layer).or_default();
+                        if !line.flags.contains(&flag) {
+                            line.flags.push(flag);
+                        }
+                    })?;
+                    json!({"flagged":layer,"page":page})
+                }
+                _ => unreachable!(),
+            };
+            let commit = super::super::lettering::labels_changed(project, &changed_layers).await?;
+            if let Some(commit) = &commit {
+                project.record_commit(commit);
+            }
+            (commit, project.active_page(), value)
+        };
+        if let Some(commit) = commit {
+            self.synchronize(commit, page).await?;
+        }
+        Invocation::changed(value)
+    }
+
     async fn run_pipeline(&self, arguments: RunPipeline, control: &Control) -> Result<Invocation> {
         let scope = arguments.scope()?;
         let operation = arguments.operation.into();
-        let (snapshot, translation_hints) = {
+        let translation_hints = {
             let projects = self.handle.state::<CurrentProject>();
             let project = projects.project.lock().await;
             let project = project.as_ref().context("no project is open")?;
             let snapshot = project.snapshot();
             let hints =
                 super::super::context::translation_hints(&project.load_context()?, &snapshot)?;
-            (snapshot, std::sync::Arc::new(hints))
+            std::sync::Arc::new(hints)
         };
         let job = JobId::new();
         let stop = StopToken::default();
@@ -179,11 +308,29 @@ impl KoharuHost {
             inpainting_mask: None,
             translation_hints,
         };
-        let result = self
-            .handle
-            .state::<koharu_pipeline::Pipeline>()
-            .execute(snapshot, request, &mut committer)
-            .await;
+        let mut request = request;
+        let result = async {
+            if super::super::context::operation_translates(&request.operation) {
+                super::super::context::auto_read(&self.handle, &request.scope, &request.stop, job)
+                    .await?;
+            }
+            let snapshot = {
+                let projects = self.handle.state::<CurrentProject>();
+                let projects = projects.project.lock().await;
+                let project = projects.as_ref().context("no project is open")?;
+                let snapshot = project.snapshot();
+                request.translation_hints = std::sync::Arc::new(
+                    super::super::context::translation_hints(&project.load_context()?, &snapshot)?,
+                );
+                snapshot
+            };
+            self.handle
+                .state::<koharu_pipeline::Pipeline>()
+                .execute(snapshot, request, &mut committer)
+                .await
+                .map_err(anyhow::Error::from)
+        }
+        .await;
         watcher.abort();
         self.handle.state::<Processing>().stops.lock().remove(&job);
         let report = result.map_err(|error| anyhow!(error))?;
@@ -233,6 +380,9 @@ impl Host for KoharuHost {
                         "Replace an element's typography settings. Font is a family name from available_fonts.",
                     ),
                     text_style_definition(),
+                    definition::<AddGlossaryEntry>("add_glossary_entry", "Suggest a glossary term for this chapter without replacing an existing series term."),
+                    definition::<SetLineCategory>("set_line_category", "Set a model lettering category for a text layer. A user label always wins."),
+                    definition::<FlagLine>("flag_line", "Mark a text layer for human review with a short message."),
                     definition::<SetGeometry>(
                         "set_geometry",
                         "Replace an element's page-space polygon geometry.",
@@ -498,6 +648,9 @@ impl Host for KoharuHost {
                 })
                 .await
             }
+            "add_glossary_entry" | "set_line_category" | "flag_line" => {
+                self.context_tool(&call).await
+            }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
             name => bail!("unknown Koharu tool {name}"),
         }
@@ -602,6 +755,9 @@ impl Committer for AgentCommitter {
                 return Ok(project.snapshot());
             };
             project.record_commit(&commit);
+            if output.stage == Stage::Translation {
+                super::super::context::refresh_flags(project)?;
+            }
             (commit, project.active_page())
         };
         let snapshot = commit.snapshot.clone();
@@ -1038,4 +1194,23 @@ mod text_style_tests {
             .unwrap_err();
         assert!(error.to_string().contains("rectangle, round, spiky, none"));
     }
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct AddGlossaryEntry {
+    source: String,
+    target: String,
+    kind: String,
+    note: String,
+}
+#[derive(Deserialize, JsonSchema)]
+struct SetLineCategory {
+    element: String,
+    category: String,
+    confidence: Option<f32>,
+}
+#[derive(Deserialize, JsonSchema)]
+struct FlagLine {
+    element: String,
+    message: String,
 }

@@ -142,6 +142,21 @@ where
         Ok(saved)
     }
 
+    pub async fn restore_messages(&self, messages: &[Message]) {
+        *self.history.lock().await = messages
+            .iter()
+            .map(|entry| {
+                message(
+                    match entry.role {
+                        Role::User => "user",
+                        Role::Assistant => "assistant",
+                    },
+                    &entry.content,
+                )
+            })
+            .collect();
+    }
+
     pub async fn clear(&self) {
         self.history.lock().await.clear();
     }

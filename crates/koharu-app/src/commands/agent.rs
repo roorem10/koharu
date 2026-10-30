@@ -81,6 +81,20 @@ impl AgentState {
         self.agent.clear().await;
     }
 
+    pub(crate) fn active_run(&self) -> Option<RunId> {
+        self.runs.lock().keys().next().copied()
+    }
+
+    pub(crate) async fn start_conversation(&self) -> Result<()> {
+        if !self.runs.lock().is_empty() {
+            return Err(anyhow!(
+                "wait for the agent before starting a new conversation"
+            ));
+        }
+        self.agent.clear().await;
+        Ok(())
+    }
+
     pub(crate) fn cancel_all(&self) {
         if let Some(login) = self.login.lock().take() {
             login.cancel();
@@ -167,6 +181,20 @@ pub(crate) async fn run_agent(
     if state.agent.codex().account()?.is_none() {
         return Err(anyhow!("Codex is not signed in").into());
     }
+    let directory = {
+        let projects = handle.state::<super::project::CurrentProject>();
+        let projects = projects.project.lock().await;
+        projects
+            .as_ref()
+            .context("no project is open")?
+            .directory()
+            .context("project has no directory")?
+            .to_path_buf()
+    };
+    let history = super::context::history::load(&directory)?;
+    let settings = super::context::get_context_settings()?;
+    let recent = super::context::history::recent(&history, usize::from(settings.agent_messages));
+    let assistant = koharu_scene::EntityId::new().to_string();
     let run = RunId::new();
     let control = Control::default();
     {
@@ -176,14 +204,35 @@ pub(crate) async fn run_agent(
         }
         runs.insert(run, control.clone());
     }
+    super::context::history::update(&directory, |history| {
+        use super::context::history::{HistoryMessage, HistoryRole};
+        history.messages.push(HistoryMessage {
+            id: koharu_scene::EntityId::new().to_string(),
+            role: HistoryRole::User,
+            text: prompt.clone(),
+            error: false,
+        });
+        history.messages.push(HistoryMessage {
+            id: assistant.clone(),
+            role: HistoryRole::Assistant,
+            text: String::new(),
+            error: false,
+        });
+    })
+    .inspect_err(|_| {
+        state.runs.lock().remove(&run);
+    })?;
     let agent = state.agent.clone();
     drop(tauri::async_runtime::spawn(async move {
-        let publish_control = control.clone();
+        agent.restore_messages(&recent).await;
         let result = agent
             .run(run, prompt, control, |event| {
-                if on_event.send(event).is_err() {
-                    publish_control.cancel();
+                if let Err(error) =
+                    super::context::history::record_event(&directory, &assistant, &event)
+                {
+                    tracing::error!(%error,"failed to save agent history");
                 }
+                let _ = on_event.send(event);
             })
             .await;
         if let Err(error) = result {

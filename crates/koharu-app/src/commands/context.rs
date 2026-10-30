@@ -2,6 +2,7 @@
 //!
 //! Owned by WO-18. The shared foundation only adds the translation hints hook.
 
+pub(crate) mod history;
 pub(crate) mod lines;
 pub(crate) mod reading;
 pub(crate) mod series;

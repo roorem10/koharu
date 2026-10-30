@@ -211,6 +211,22 @@ pub(crate) async fn explain_line(
     {
         return Err(anyhow::anyhow!("line changed while explaining; try again").into());
     }
+    if let Some(directory) = directory {
+        super::history::update(&directory, |history| {
+            history.messages.push(super::history::HistoryMessage {
+                id: EntityId::new().to_string(),
+                role: super::history::HistoryRole::Note,
+                text: format!(
+                    "{}\n{}\n{}\n{}",
+                    row.source,
+                    row.translation,
+                    explanation.explanation,
+                    explanation.alternatives.join("\n")
+                ),
+                error: false,
+            })
+        })?;
+    }
     Ok(explanation)
 }
 
