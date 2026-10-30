@@ -25,6 +25,7 @@ import {
 import { type MouseEvent, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { GlossaryTextMenu } from '@/components/context/GlossaryTextMenu'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { FontPicker } from '@/components/controls/FontPicker'
@@ -1116,32 +1117,44 @@ function LayerEditor({ layer, onDelete }: { layer: Layer; onDelete?: () => void 
             )}
           </div>
           <InspectorField label={t('inspector.source')}>
-            <CommitTextarea
-              data-testid={`edit-source-${layer.id}`}
-              aria-label={t('layers.sourceLabel', { name })}
-              wrap='soft'
-              className='max-h-14 min-h-8 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
-              value={layer.content.source?.text ?? ''}
-              onCommit={(text) =>
-                void call(commands.setSourceText, layer.id, text)
-                  .then(() => refresh(projectKey, pageKey))
-                  .catch(() => undefined)
-              }
-            />
+            <GlossaryTextMenu
+              field='source'
+              source={layer.content.source?.text ?? ''}
+              translation={layer.content.translation?.text ?? ''}
+            >
+              <CommitTextarea
+                data-testid={`edit-source-${layer.id}`}
+                aria-label={t('layers.sourceLabel', { name })}
+                wrap='soft'
+                className='max-h-14 min-h-8 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
+                value={layer.content.source?.text ?? ''}
+                onCommit={(text) =>
+                  void call(commands.setSourceText, layer.id, text)
+                    .then(() => refresh(projectKey, pageKey))
+                    .catch(() => undefined)
+                }
+              />
+            </GlossaryTextMenu>
           </InspectorField>
           <InspectorField label={t('inspector.translation')}>
-            <CommitTextarea
-              data-testid={`edit-translation-${layer.id}`}
-              aria-label={t('layers.translationLabel', { name })}
-              wrap='soft'
-              className='max-h-16 min-h-9 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md border-primary/25 bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
-              value={layer.content.translation?.text ?? ''}
-              onCommit={(text) =>
-                void call(commands.setTranslation, layer.id, text.trim() ? text : null)
-                  .then(() => refresh(projectKey, pageKey))
-                  .catch(() => undefined)
-              }
-            />
+            <GlossaryTextMenu
+              field='translation'
+              source={layer.content.source?.text ?? ''}
+              translation={layer.content.translation?.text ?? ''}
+            >
+              <CommitTextarea
+                data-testid={`edit-translation-${layer.id}`}
+                aria-label={t('layers.translationLabel', { name })}
+                wrap='soft'
+                className='max-h-16 min-h-9 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md border-primary/25 bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
+                value={layer.content.translation?.text ?? ''}
+                onCommit={(text) =>
+                  void call(commands.setTranslation, layer.id, text.trim() ? text : null)
+                    .then(() => refresh(projectKey, pageKey))
+                    .catch(() => undefined)
+                }
+              />
+            </GlossaryTextMenu>
           </InspectorField>
         </>
       )}

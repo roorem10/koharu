@@ -153,7 +153,7 @@ function JobItem({ job }: { job: Job }) {
         ) : null}
         {job.model ? (
           <p className='col-start-2 col-end-4 truncate text-[10px] text-muted-foreground'>
-            {job.model}
+            {job.model === 'chapter_context_reading' ? t('chapterContext.reading') : job.model}
           </p>
         ) : null}
         <div className='col-start-2 col-end-4'>

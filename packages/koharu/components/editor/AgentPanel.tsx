@@ -2,11 +2,13 @@
 
 import { Channel } from '@tauri-apps/api/core'
 import { Bot, CircleStop, LogOut, Send, Sparkles } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { refreshContext } from '@/components/context/data'
+import { discussLineEvent, historyChangedEvent } from '@/components/context/events'
 import { call } from '@/lib/backend'
-import { pageKey, pagesKey, projectKey, refresh } from '@/lib/queries'
+import { pageKey, pagesKey, projectKey, refresh, useProject } from '@/lib/queries'
 import {
   commands,
   type AgentStatus,
@@ -30,13 +32,15 @@ import { Textarea } from '@koharu/ui/components/textarea'
 
 interface ConversationMessage {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'divider' | 'note'
   text: string
   error?: boolean
 }
 
 export function AgentPanel() {
   const { t } = useTranslation()
+  const projectName = useProject().data?.name
+  const streaming = useRef(false)
   const [status, setStatus] = useState<AgentStatus | null>(null)
   const [loginEvent, setLoginEvent] = useState<LoginEvent | null>(null)
   const [loggingIn, setLoggingIn] = useState(false)
@@ -50,6 +54,39 @@ export function AgentPanel() {
       .then(setStatus)
       .catch(() => undefined)
   }, [])
+
+  useEffect(() => {
+    const prefill = (event: globalThis.Event) =>
+      setPrompt((event as unknown as CustomEvent<string>).detail)
+    window.addEventListener(discussLineEvent, prefill as EventListener)
+    return () => window.removeEventListener(discussLineEvent, prefill as EventListener)
+  }, [])
+
+  useEffect(() => {
+    if (!projectName) return
+    let active = true
+    let timer: number | undefined
+    const load = () => {
+      window.clearTimeout(timer)
+      if (streaming.current) return
+      void call(commands.getAgentHistory)
+        .then((history) => {
+          if (!active || streaming.current) return
+          setMessages(history.messages)
+          setRunning(history.running)
+          if (history.running) timer = window.setTimeout(load, 1200)
+        })
+        .catch(() => undefined)
+    }
+    setMessages([])
+    load()
+    window.addEventListener(historyChangedEvent, load)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+      window.removeEventListener(historyChangedEvent, load)
+    }
+  }, [projectName])
 
   const selectedModel = useMemo(
     () =>
@@ -164,24 +201,45 @@ export function AgentPanel() {
         </div>
       </div>
 
+      <Button
+        size='sm'
+        variant='ghost'
+        disabled={running !== null}
+        onClick={() =>
+          void call(commands.newAgentConversation)
+            .then((history) => setMessages(history.messages))
+            .catch(() => undefined)
+        }
+      >
+        {t('chapterContext.newConversation')}
+      </Button>
       <ScrollArea className='min-h-0 flex-1'>
         {messages.length ? (
           <div className='grid gap-3 p-3'>
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                data-role={message.role}
-                className='flex data-[role=user]:justify-end'
-              >
-                <div
-                  data-role={message.role}
-                  data-error={message.error || undefined}
-                  className='max-w-[90%] rounded-xl bg-muted px-3 py-2 text-[11px] leading-5 whitespace-pre-wrap select-text data-[error=true]:bg-destructive/10 data-[error=true]:text-destructive data-[role=user]:bg-primary data-[role=user]:text-primary-foreground'
+            {messages.map((message) =>
+              message.role === 'divider' ? (
+                <p
+                  key={message.id}
+                  className='border-t pt-2 text-center text-[10px] text-muted-foreground'
                 >
-                  {message.text || (message.role === 'assistant' ? t('agent.working') : '')}
+                  {t('chapterContext.conversationDivider')}
+                </p>
+              ) : (
+                <div
+                  key={message.id}
+                  data-role={message.role}
+                  className='flex data-[role=user]:justify-end'
+                >
+                  <div
+                    data-role={message.role}
+                    data-error={message.error || undefined}
+                    className='max-w-[90%] rounded-xl bg-muted px-3 py-2 text-[11px] leading-5 whitespace-pre-wrap select-text data-[error=true]:bg-destructive/10 data-[error=true]:text-destructive data-[role=user]:bg-primary data-[role=user]:text-primary-foreground'
+                  >
+                    {message.text || (message.role === 'assistant' ? t('agent.working') : '')}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ),
+            )}
             {activity ? (
               <div className='flex items-center gap-1.5 text-[10px] text-muted-foreground'>
                 <span className='size-1.5 rounded-full bg-primary' />
@@ -281,6 +339,7 @@ export function AgentPanel() {
     const id = crypto.randomUUID()
     const assistant = crypto.randomUUID()
     let settled = false
+    streaming.current = true
     setPrompt('')
     setMessages((current) => [
       ...current,
@@ -305,10 +364,15 @@ export function AgentPanel() {
           setActivity(t('agent.applying'))
           break
         case 'tool_finished':
-          if (event.changed) void refresh(projectKey, pagesKey, pageKey)
+          if (event.changed) {
+            void refresh(projectKey, pagesKey, pageKey)
+            void refreshContext()
+          }
           setActivity(t('agent.working'))
           break
         case 'completed':
+          streaming.current = false
+          window.dispatchEvent(new globalThis.Event(historyChangedEvent))
           settled = true
           updateAssistant(() => event.message)
           setRunning(null)
@@ -316,12 +380,16 @@ export function AgentPanel() {
           void refresh(projectKey, pagesKey, pageKey)
           break
         case 'failed':
+          streaming.current = false
+          window.dispatchEvent(new globalThis.Event(historyChangedEvent))
           settled = true
           updateAssistant(() => event.message, true)
           setRunning(null)
           setActivity(null)
           break
         case 'cancelled':
+          streaming.current = false
+          window.dispatchEvent(new globalThis.Event(historyChangedEvent))
           settled = true
           updateAssistant((text) => text || t('agent.cancelled'))
           setRunning(null)
@@ -333,6 +401,7 @@ export function AgentPanel() {
       const run = await call(commands.runAgent, message, channel)
       if (!settled) setRunning(run)
     } catch (error) {
+      streaming.current = false
       settled = true
       updateAssistant(() => (error instanceof Error ? error.message : t('agent.failed')), true)
       setRunning(null)

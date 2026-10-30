@@ -63,6 +63,31 @@ export const commands = {
 	 *  rules decide again, then restyles the line.
 	 */
 	setLineCategory: (layer: EntityId, category: LetteringCategory | null) => __TAURI_INVOKE<LineCategory | null>("set_line_category", { layer, category }),
+	getAgentHistory: () => __TAURI_INVOKE<AgentHistoryView>("get_agent_history"),
+	newAgentConversation: () => __TAURI_INVOKE<AgentHistory>("new_agent_conversation"),
+	checkGlossary: () => __TAURI_INVOKE<ProjectContext>("check_glossary"),
+	dismissLineFlag: (layer: EntityId, index: number) => __TAURI_INVOKE<null>("dismiss_line_flag", { layer, index }),
+	glossaryUsage: (source: string) => __TAURI_INVOKE<TermUsage>("glossary_usage", { source }),
+	explainLine: (layer: EntityId) => __TAURI_INVOKE<LineExplanation>("explain_line", { layer }),
+	readChapter: (scope: Scope, textOnly: boolean) => __TAURI_INVOKE<JobId>("read_chapter", { scope, textOnly }),
+	listSeries: () => __TAURI_INVOKE<Series[]>("list_series"),
+	createSeries: (name: string) => __TAURI_INVOKE<Series>("create_series", { name }),
+	getSeries: (id: string) => __TAURI_INVOKE<Series>("get_series", { id }),
+	saveSeries: (series: Series) => __TAURI_INVOKE<Series>("save_series", { series }),
+	renameSeries: (id: string, name: string) => __TAURI_INVOKE<Series>("rename_series", { id, name }),
+	deleteSeries: (id: string) => __TAURI_INVOKE<null>("delete_series", { id }),
+	setProjectSeries: (id: string | null) => __TAURI_INVOKE<null>("set_project_series", { id }),
+	exportSeries: (id: string, title: string) => __TAURI_INVOKE<boolean>("export_series", { id, title }),
+	previewSeriesImport: (title: string) => __TAURI_INVOKE<Series | null>("preview_series_import", { title }),
+	importSeries: (series: Series, replace: boolean) => __TAURI_INVOKE<Series>("import_series", { series, replace }),
+	previewInstructionGlossary: () => __TAURI_INVOKE<InstructionPreview>("preview_instruction_glossary"),
+	importInstructionGlossary: (id: string, instructions: string, lines: number[], remove: boolean) => __TAURI_INVOKE<Series>("import_instruction_glossary", { id, instructions, lines, remove }),
+	getChapterContext: () => __TAURI_INVOKE<ChapterState>("get_chapter_context"),
+	saveChapterSummary: (summary: string) => __TAURI_INVOKE<null>("save_chapter_summary", { summary }),
+	dismissSuggestion: (id: string) => __TAURI_INVOKE<null>("dismiss_suggestion", { id }),
+	acceptSuggestion: (entry: GlossaryEntry) => __TAURI_INVOKE<null>("accept_suggestion", { entry }),
+	getContextSettings: () => __TAURI_INVOKE<ContextSettings>("get_context_settings"),
+	saveContextSettings: (settings: ContextSettings) => __TAURI_INVOKE<ContextSettings>("save_context_settings", { settings }),
 	getCanvasManifest: (generation: CanvasGeneration) => __TAURI_INVOKE<CanvasBytes>("get_canvas_manifest", { generation }),
 	getCanvasResource: (generation: CanvasGeneration, resource: string) => __TAURI_INVOKE<CanvasBytes>("get_canvas_resource", { generation, resource }),
 	prepareCanvasPage: (page: EntityId) => __TAURI_INVOKE<CanvasPagePreparation | null>("prepare_canvas_page", { page }),
@@ -81,6 +106,15 @@ export type Account = {
 	id: string,
 	email: string | null,
 	plan: string | null,
+};
+
+export type AgentHistory = {
+	messages: HistoryMessage[],
+};
+
+export type AgentHistoryView = {
+	messages: HistoryMessage[],
+	running: RunId | null,
 };
 
 export type AgentStatus = {
@@ -137,6 +171,32 @@ export type CanvasState = {
 	element_frames: TransformFrame[],
 };
 
+export type ChapterBrief = {
+	summary?: string,
+	characters?: ChapterCharacter[],
+	edited?: boolean,
+	read_at?: string | null,
+};
+
+export type ChapterCharacter = {
+	name?: string,
+	original?: string,
+	pages?: number[],
+};
+
+export type ChapterState = {
+	context: ProjectContext,
+	series: Series | null,
+	supports_tasks: boolean,
+};
+
+export type Character = {
+	id?: string,
+	name?: string,
+	original?: string,
+	notes?: string,
+};
+
 export type ClaudeConfig = Record<string, never>;
 
 export type CodexModel = {
@@ -148,6 +208,14 @@ export type CodexModel = {
 export type Config = {
 	model: string | null,
 	reasoning: Reasoning,
+};
+
+export type ContextSettings = {
+	read_when?: ReadWhen,
+	send_images?: boolean,
+	pages_per_request?: number,
+	previous_pages?: number,
+	agent_messages?: number,
 };
 
 export type CredentialInput = {
@@ -192,6 +260,8 @@ export type Error = string;
 export type Event = { type: "started"; run: RunId } | { type: "text_delta"; run: RunId; delta: string } | { type: "reasoning_delta"; run: RunId; delta: string } | { type: "tool_started"; run: RunId; call_id: string; name: string } | { type: "tool_finished"; run: RunId; call_id: string; name: string; changed: boolean; output: string } | { type: "completed"; run: RunId; message: string } | { type: "failed"; run: RunId; message: string } | { type: "cancelled"; run: RunId };
 
 export type ExportFormat = "png" | "psd" | "cbz";
+
+export type Flag = { kind: "glossary"; term: string; page: number } | { kind: "review"; message: string; page: number };
 
 export type Flux2KleinConfig = {
 	prompt?: string,
@@ -269,17 +339,46 @@ export type GeometryUpdate = {
 	points: Point[] | null,
 };
 
+export type GlossaryEntry = {
+	id?: string,
+	source?: string,
+	target?: string,
+	note?: string,
+	kind?: TermKind,
+	locked?: boolean,
+};
+
 export type GoogleCloudConfig = Record<string, never>;
 
 export type GrokConfig = Record<string, never>;
 
 export type GroupRole = "text";
 
+export type HistoryMessage = {
+	id: string,
+	role: HistoryRole,
+	text: string,
+	error: boolean,
+};
+
+export type HistoryRole = "user" | "assistant" | "divider" | "note";
+
 export type InpaintingModel = { model: "lama" } | { model: "aot-inpainting" } | {
 	model: "flux2-klein",
 } & Flux2KleinConfig | {
 	model: "rorem-mixed",
 } & RoremMixedConfig;
+
+export type InstructionPreview = {
+	instructions: string,
+	terms: InstructionTerm[],
+};
+
+export type InstructionTerm = {
+	line: number,
+	source: string,
+	target: string,
+};
 
 export type Job = {
 	id: JobId,
@@ -333,6 +432,18 @@ export type LineCategory = {
 	source: LabelSource,
 	/**  0 to 1 when the model reported it; `None` for hand-set labels. */
 	confidence: number | null,
+};
+
+export type LineContext = {
+	category?: LineCategory | null,
+	note?: string | null,
+	flags?: Flag[],
+	dismissed?: string[],
+};
+
+export type LineExplanation = {
+	explanation: string,
+	alternatives: string[],
 };
 
 export type LmStudioConfig = {
@@ -459,6 +570,16 @@ export type ProcessorConfig = {
 	"rorem-mixed"?: RoremMixedConfig | null,
 };
 
+/**  Everything Booharu keeps about one project outside its save file. */
+export type ProjectContext = {
+	version?: number,
+	series?: string | null,
+	brief?: ChapterBrief | null,
+	suggestions?: GlossaryEntry[],
+	/**  Keyed by text layer id, the id the Inspector selects. */
+	lines?: { [key in EntityId]: LineContext },
+};
+
 export type ProjectInfo = {
 	name: string,
 	revision: Revision,
@@ -493,6 +614,8 @@ export type Quantization = {
 
 export type RasterLayerKind = "cleanup" | "paint";
 
+export type ReadWhen = "missing" | "always" | "never";
+
 export type Reasoning = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 
 export type Revision = number;
@@ -508,6 +631,14 @@ export type Scope = { scope: "project" } | { scope: "pages"; value: EntityId[] }
 	page: EntityId,
 	bounds: Bounds,
 } } | { scope: "entities"; value: EntityId[] };
+
+export type Series = {
+	id?: string,
+	name?: string,
+	notes?: string,
+	glossary?: GlossaryEntry[],
+	characters?: Character[],
+};
 
 export type ShapeMeasures = {
 	rectangularity: number,
@@ -558,6 +689,13 @@ export type StyleScope = ({ layers: EntityId[] }) & { page?: never } | ({ page: 
 export type StyleTargetCounts = {
 	restylable: number,
 	manual: number,
+};
+
+export type TermKind = "name" | "place" | "term" | "honorific" | "other";
+
+export type TermUsage = {
+	layers: EntityId[],
+	skipped: number,
 };
 
 export type TextAlignment = "Start" | "Center" | "End" | "Justify";

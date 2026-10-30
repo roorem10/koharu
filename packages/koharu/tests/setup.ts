@@ -75,6 +75,20 @@ beforeEach(() => {
     shape: null,
     measures: null,
   })
+  vi.spyOn(commands, 'getChapterContext').mockResolvedValue({
+    context: { version: 1, series: null, brief: null, suggestions: [], lines: {} },
+    series: null,
+    supports_tasks: false,
+  })
+  vi.spyOn(commands, 'getContextSettings').mockResolvedValue({
+    read_when: 'missing',
+    send_images: true,
+    pages_per_request: 20,
+    previous_pages: 1,
+    agent_messages: 20,
+  })
+  vi.spyOn(commands, 'listSeries').mockResolvedValue([])
+  vi.spyOn(commands, 'getAgentHistory').mockResolvedValue({ messages: [], running: null })
   vi.spyOn(commands, 'getLineCategory').mockResolvedValue(null)
   queryClient.clear()
   useKoharuStore.setState({

@@ -11,23 +11,28 @@ import {
   Sparkles,
   Square,
 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useChapterContext } from '@/components/context/data'
+import { ReadChapterStep } from '@/components/context/ReadChapterStep'
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { OutputPicker, type OutputDraft } from '@/components/controls/OutputPicker'
 import { call, refreshTranslationModels, savePreferences } from '@/lib/backend'
+import { pagesKey, queryClient } from '@/lib/queries'
 import { pipelineStages, receivePreferences, useKoharuStore, type PipelineScope } from '@/lib/store'
 import { modelKey, providerName } from '@/lib/translation'
 import {
   commands,
   type Model,
   type ModelSelection,
+  type PageSummary,
   type ProviderPreference,
   type Stage,
 } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@koharu/ui/components/popover'
+import { toast } from '@koharu/ui/components/toast'
 import { cn } from '@koharu/ui/lib/utils'
 
 type SelectorView = 'root' | 'model' | 'scope' | 'stages' | 'output'
@@ -48,6 +53,37 @@ export function InferenceControl({
   const selectedPages = useKoharuStore((state) => state.selectedPages)
   const running = Object.values(jobs).find((job) => job.state === 'running') ?? null
   const unavailable = scope === 'selected-pages' && selectedPages.length === 0
+  const provider = useKoharuStore((state) => state.preferences?.pipeline.translation.model.provider)
+  const chapter = useChapterContext().data
+  const noticeShown = useRef(false)
+  const run = () => {
+    if (
+      stages.includes('translation') &&
+      ['deepl', 'google-cloud-translation', 'caiyun'].includes(provider ?? '') &&
+      !noticeShown.current
+    ) {
+      const count =
+        scope === 'project'
+          ? (queryClient.getQueryData<PageSummary[]>(pagesKey)?.length ?? 0)
+          : scope === 'selected-pages'
+            ? selectedPages.length
+            : 1
+      if (chapter?.series && count > 1) {
+        void call(commands.getContextSettings)
+          .then((settings) => {
+            if (
+              settings.read_when === 'always' ||
+              (settings.read_when === 'missing' && !chapter.context.brief?.summary.trim())
+            ) {
+              noticeShown.current = true
+              toast.add({ type: 'info', title: t('chapterContext.autoReadUnavailable') })
+            }
+          })
+          .catch(() => undefined)
+      }
+    }
+    onRun(scope, stages)
+  }
 
   const stop = () => {
     if (!running) return
@@ -74,7 +110,7 @@ export function InferenceControl({
         )}
         disabled={(disabled || unavailable) && !running}
         aria-label={running ? t('inference.stopProcessing') : t('inference.runProcessing')}
-        onClick={running ? stop : () => onRun(scope, stages)}
+        onClick={running ? stop : run}
       >
         {running ? <Square className='size-3 fill-current' /> : <Play className='size-3' />}
         <span>{running ? t('inference.stop') : t('inference.run')}</span>
@@ -314,6 +350,7 @@ function RuntimeSelector({
               selected={stages.includes('ocr')}
               onSelect={toggleStage}
             />
+            <ReadChapterStep />
             <SelectorOption
               value='translation'
               label={t('phase.translation')}

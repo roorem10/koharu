@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ContextPreferences } from '@/components/context/ContextPreferences'
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { GenerationPreferences } from '@/components/preferences/GenerationPreferences'
 import {
@@ -161,6 +162,7 @@ export function TranslationPreferences({
           />
         </PreferenceRow>
       </PreferenceSection>
+      <ContextPreferences />
       <SfxPreferences />
     </PreferencePage>
   )
