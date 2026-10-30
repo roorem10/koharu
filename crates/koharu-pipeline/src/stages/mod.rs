@@ -13,7 +13,7 @@ use koharu_scene::{Edit, EntityId, Generation, Patch, ProducerId, Snapshot};
 pub use detection::KoharuLayoutRFDetrSeg2XLConfig;
 pub use inpainting::{Flux2KleinConfig, RoremMixedConfig};
 
-use crate::{Bounds, ImageCache, InpaintingMask, PipelineConfig, Stage};
+use crate::{Bounds, ImageCache, InpaintingMask, PipelineConfig, Stage, TranslationHints};
 
 #[derive(Clone)]
 pub(crate) struct StageInput {
@@ -23,6 +23,7 @@ pub(crate) struct StageInput {
     region: Option<Bounds>,
     images: Arc<ImageCache>,
     inpainting_mask: Option<InpaintingMask>,
+    translation_hints: Arc<TranslationHints>,
 }
 
 impl StageInput {
@@ -41,7 +42,14 @@ impl StageInput {
             region,
             images,
             inpainting_mask,
+            translation_hints: Arc::default(),
         }
+    }
+
+    #[must_use]
+    pub(crate) fn with_translation_hints(mut self, hints: Arc<TranslationHints>) -> Self {
+        self.translation_hints = hints;
+        self
     }
 
     pub(crate) fn page(&self) -> EntityId {

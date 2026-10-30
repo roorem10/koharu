@@ -60,6 +60,7 @@
     "surface": "Koharu canvas",
     "unavailable": "WebGPU canvas unavailable"
   },
+  "chapterContext": {},
   "colorPicker": {
     "brushColor": "Brush color",
     "hexCode": "Hex color code",
@@ -268,6 +269,27 @@
     "textName": "Text {{index}}",
     "title": "Layers",
     "translationLabel": "{{name}} translation"
+  },
+  "lettering": {
+    "categoryLine": "Category: {{category}}",
+    "automatic": "automatic",
+    "categories": {
+      "normal_dialogue": "Normal Dialogue",
+      "thoughts": "Thoughts",
+      "floating": "Floating",
+      "small_text": "Small Text",
+      "narration_box": "Narration Box",
+      "shout": "Shout",
+      "weak_shout": "Weak/Panic Shout",
+      "sfx": "SFX",
+      "moan": "Moan",
+      "title": "Title",
+      "phone_text": "Phone Text",
+      "whisper": "Whisper",
+      "shy": "Shy / Hesitant",
+      "crying": "Crying / Trembling",
+      "menacing": "Menacing / Sinister"
+    }
   },
   "menu": {
     "about": "About",

@@ -60,6 +60,7 @@
     "surface": "Koharu 画布",
     "unavailable": "WebGPU 画布不可用"
   },
+  "chapterContext": {},
   "colorPicker": {
     "brushColor": "笔刷颜色",
     "hexCode": "十六进制颜色代码",
@@ -268,6 +269,27 @@
     "textName": "文本 {{index}}",
     "title": "图层",
     "translationLabel": "{{name}} 的译文"
+  },
+  "lettering": {
+    "categoryLine": "Category: {{category}}",
+    "automatic": "automatic",
+    "categories": {
+      "normal_dialogue": "Normal Dialogue",
+      "thoughts": "Thoughts",
+      "floating": "Floating",
+      "small_text": "Small Text",
+      "narration_box": "Narration Box",
+      "shout": "Shout",
+      "weak_shout": "Weak/Panic Shout",
+      "sfx": "SFX",
+      "moan": "Moan",
+      "title": "Title",
+      "phone_text": "Phone Text",
+      "whisper": "Whisper",
+      "shy": "Shy / Hesitant",
+      "crying": "Crying / Trembling",
+      "menacing": "Menacing / Sinister"
+    }
   },
   "menu": {
     "about": "关于",

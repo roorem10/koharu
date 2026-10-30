@@ -38,7 +38,9 @@ impl StageProcessor for Processor {
         let mut targets = Vec::new();
         if let Some(group) = input.scene.page(input.page)?.text_group()? {
             for layer in group.text_layers()? {
-                if !input.contains_entity(layer.id())? {
+                if !input.contains_entity(layer.id())?
+                    || input.translation_hints.skip.contains(&layer.id())
+                {
                     continue;
                 }
                 let content = layer.content()?;

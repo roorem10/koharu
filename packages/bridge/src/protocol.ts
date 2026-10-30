@@ -57,6 +57,12 @@ export const commands = {
 	countTextStyleTargets: (scope: StyleScope) => __TAURI_INVOKE<StyleTargetCounts>("count_text_style_targets", { scope }),
 	applyShapeRules: (scope: StyleScope, includeUser: boolean) => __TAURI_INVOKE<StyleApplyResult>("apply_shape_rules", { scope, includeUser }),
 	getTextBubbleShape: (layer: EntityId) => __TAURI_INVOKE<BubbleShapeInfo>("get_text_bubble_shape", { layer }),
+	getLineCategory: (layer: EntityId) => __TAURI_INVOKE<LineCategory | null>("get_line_category", { layer }),
+	/**
+	 *  Sets a hand-picked category, or clears it with `None` so the automatic
+	 *  rules decide again, then restyles the line.
+	 */
+	setLineCategory: (layer: EntityId, category: LetteringCategory | null) => __TAURI_INVOKE<LineCategory | null>("set_line_category", { layer, category }),
 	getCanvasManifest: (generation: CanvasGeneration) => __TAURI_INVOKE<CanvasBytes>("get_canvas_manifest", { generation }),
 	getCanvasResource: (generation: CanvasGeneration, resource: string) => __TAURI_INVOKE<CanvasBytes>("get_canvas_resource", { generation, resource }),
 	prepareCanvasPage: (page: EntityId) => __TAURI_INVOKE<CanvasPagePreparation | null>("prepare_canvas_page", { page }),
@@ -296,6 +302,9 @@ export type KoharuLayoutRFDetrSeg2XLConfig = {
 	panel_threshold?: number | null,
 };
 
+/**  Who set a label. A `User` label is never replaced by a model label. */
+export type LabelSource = "model" | "user";
+
 export type LanguageChoice = {
 	tag: string,
 	name: string,
@@ -311,6 +320,19 @@ export type LayerCommit = {
 export type LayerVisibility = {
 	visible: boolean,
 	opacity: number,
+};
+
+/**
+ *  How a line is presented or delivered on the page. Each category has its own
+ *  font settings; the order here is the order shown in Settings.
+ */
+export type LetteringCategory = "normal_dialogue" | "thoughts" | "floating" | "small_text" | "narration_box" | "shout" | "weak_shout" | "sfx" | "moan" | "title" | "phone_text" | "whisper" | "shy" | "crying" | "menacing";
+
+export type LineCategory = {
+	value: LetteringCategory,
+	source: LabelSource,
+	/**  0 to 1 when the model reported it; `None` for hand-set labels. */
+	confidence: number | null,
 };
 
 export type LmStudioConfig = {

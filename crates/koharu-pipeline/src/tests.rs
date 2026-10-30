@@ -85,6 +85,92 @@ async fn stop_after_a_page_keeps_completed_progress() {
     assert_eq!(report.total, 2);
 }
 
+#[tokio::test]
+async fn translation_leaves_hinted_layers_alone() {
+    // A hosted provider without a key fails on any real request, so reaching
+    // the commit proves the skipped line was never sent.
+    let pipeline = pipeline(TranslationConfig {
+        model: koharu_translator::ModelSelection {
+            provider: koharu_translator::Provider::OpenAi,
+            model: Some("gpt-5.6-luna".to_owned()),
+            quantization: None,
+            vision: false,
+            reasoning: false,
+        },
+        ..Default::default()
+    });
+    let mut session = koharu_scene::Session::memory().await.unwrap();
+    let mut layer = None;
+    let patch = session
+        .snapshot()
+        .patch(|edit| {
+            let page = edit.add_page(
+                koharu_scene::PageDraft::new("one", 1.0, 1.0),
+                koharu_scene::At::End,
+            )?;
+            let content = edit.add_text_content(page, koharu_scene::At::End)?;
+            edit.set(
+                content,
+                &koharu_scene::SourceText {
+                    text: koharu_scene::Authored::user("ドン".to_owned()),
+                    language: None,
+                },
+            )?;
+            layer = Some(edit.add_text_layer(
+                page,
+                koharu_scene::At::End,
+                content,
+                &koharu_scene::TextLayout {
+                    origin: koharu_scene::Origin::User,
+                    kind: koharu_scene::TextLayoutKind::Paragraph,
+                    angle_degrees: None,
+                },
+            )?);
+            Ok(())
+        })
+        .unwrap();
+    session.commit(patch).await.unwrap();
+    let request = Request {
+        operation: Operation::Only {
+            stage: Stage::Translation,
+        },
+        translation_hints: std::sync::Arc::new(crate::TranslationHints {
+            skip: [layer.unwrap()].into(),
+        }),
+        ..Request::default()
+    };
+    let snapshot = session.snapshot();
+    let mut committer = SessionCommitter(&mut session);
+
+    let report = pipeline
+        .execute(snapshot, request, &mut committer)
+        .await
+        .unwrap();
+
+    assert_eq!(report.status, RunStatus::Completed);
+    let snapshot = session.snapshot();
+    let content = snapshot
+        .text_layer(layer.unwrap())
+        .unwrap()
+        .content()
+        .unwrap();
+    assert!(
+        snapshot
+            .component::<koharu_scene::Translation>(content.id())
+            .unwrap()
+            .is_none()
+    );
+}
+
+struct SessionCommitter<'a>(&'a mut koharu_scene::Session);
+
+#[async_trait::async_trait]
+impl Committer for SessionCommitter<'_> {
+    async fn commit(&mut self, output: StageOutput) -> anyhow::Result<koharu_scene::Snapshot> {
+        Ok(self.0.commit(output.patch).await?.snapshot)
+    }
+}
+
 struct RejectCommitter;
 
 fn pipeline(translation: TranslationConfig) -> Pipeline {

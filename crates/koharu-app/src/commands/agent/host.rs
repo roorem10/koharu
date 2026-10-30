@@ -142,15 +142,15 @@ impl KoharuHost {
     async fn run_pipeline(&self, arguments: RunPipeline, control: &Control) -> Result<Invocation> {
         let scope = arguments.scope()?;
         let operation = arguments.operation.into();
-        let snapshot = self
-            .handle
-            .state::<CurrentProject>()
-            .project
-            .lock()
-            .await
-            .as_ref()
-            .context("no project is open")?
-            .snapshot();
+        let (snapshot, translation_hints) = {
+            let projects = self.handle.state::<CurrentProject>();
+            let project = projects.project.lock().await;
+            let project = project.as_ref().context("no project is open")?;
+            let snapshot = project.snapshot();
+            let hints =
+                super::super::context::translation_hints(&project.load_context()?, &snapshot)?;
+            (snapshot, std::sync::Arc::new(hints))
+        };
         let job = JobId::new();
         let stop = StopToken::default();
         {
@@ -177,6 +177,7 @@ impl KoharuHost {
             stop,
             progress: None,
             inpainting_mask: None,
+            translation_hints,
         };
         let result = self
             .handle

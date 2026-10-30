@@ -7,7 +7,7 @@ use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::{ProgressSink, Scope, Stage};
+use crate::{ProgressSink, Scope, Stage, TranslationHints};
 use koharu_scene::EntityId;
 
 #[derive(Clone, Debug)]
@@ -68,6 +68,7 @@ pub struct Request {
     pub stop: StopToken,
     pub progress: Option<ProgressSink>,
     pub inpainting_mask: Option<InpaintingMask>,
+    pub translation_hints: Arc<TranslationHints>,
 }
 
 impl Default for Request {
@@ -78,6 +79,7 @@ impl Default for Request {
             stop: StopToken::default(),
             progress: None,
             inpainting_mask: None,
+            translation_hints: Arc::default(),
         }
     }
 }

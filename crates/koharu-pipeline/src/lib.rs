@@ -4,6 +4,7 @@ mod accelerator;
 mod config;
 mod error;
 mod execution;
+mod hints;
 mod images;
 mod model_cell;
 mod pipeline;
@@ -21,6 +22,7 @@ pub use config::{
     DetectionModel, InpaintingModel, OcrModel, PipelineConfig, ProcessorConfig, TranslationConfig,
 };
 pub use error::{ErrorKind, PipelineError};
+pub use hints::TranslationHints;
 pub use pipeline::Pipeline;
 pub use progress::{Progress, ProgressSink};
 pub use report::{Committer, Report, RunStatus, StageOutput};

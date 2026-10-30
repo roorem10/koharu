@@ -1,4 +1,8 @@
-use std::{collections::HashSet, io::Cursor, path::PathBuf};
+use std::{
+    collections::HashSet,
+    io::Cursor,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context as _, Result, anyhow, bail};
 use image::{DynamicImage, ImageFormat, RgbaImage};
@@ -266,6 +270,8 @@ pub(crate) struct Project {
     pub(crate) active_page: Option<EntityId>,
     pub(crate) undo: Vec<Vec<Revision>>,
     pub(crate) redo: Vec<Vec<Revision>>,
+    /// The project folder on disk; `None` for in-memory test projects.
+    pub(crate) directory: Option<PathBuf>,
 }
 
 impl Project {
@@ -273,17 +279,17 @@ impl Project {
         let session = Session::create(&path)
             .await
             .with_context(|| format!("failed to create {}", path.display()))?;
-        Ok(Self::new(session, name))
+        Ok(Self::new(session, name).with_directory(path))
     }
 
     pub(crate) async fn open(name: String, path: PathBuf) -> Result<Self> {
         let session = Session::open(&path)
             .await
             .with_context(|| format!("failed to open {}", path.display()))?;
-        Ok(Self::new(session, name))
+        Ok(Self::new(session, name).with_directory(path))
     }
 
-    fn new(session: Session, name: String) -> Self {
+    pub(crate) fn new(session: Session, name: String) -> Self {
         let active_page = session.snapshot().pages().next().map(|page| page.id());
         Self {
             session,
@@ -291,7 +297,36 @@ impl Project {
             active_page,
             undo: Vec::new(),
             redo: Vec::new(),
+            directory: None,
         }
+    }
+
+    fn with_directory(mut self, directory: PathBuf) -> Self {
+        self.directory = Some(directory);
+        self
+    }
+
+    pub(crate) fn directory(&self) -> Option<&Path> {
+        self.directory.as_deref()
+    }
+
+    /// The Booharu sidecar for this project. In-memory projects have an empty one.
+    pub(crate) fn load_context(&self) -> Result<booharu_context::ProjectContext> {
+        match self.directory() {
+            Some(directory) => booharu_context::ProjectContext::load(directory),
+            None => Ok(Default::default()),
+        }
+    }
+
+    /// Changes the sidecar in one locked load-change-save step.
+    pub(crate) fn update_context<R>(
+        &self,
+        change: impl FnOnce(&mut booharu_context::ProjectContext) -> R,
+    ) -> Result<R> {
+        let directory = self
+            .directory()
+            .context("this project has no folder for its context file")?;
+        booharu_context::ProjectContext::update(directory, change)
     }
 
     pub(crate) fn snapshot(&self) -> Snapshot {
@@ -645,11 +680,12 @@ impl Project {
         detect_colors: bool,
         include_user: bool,
     ) -> Result<(Option<Commit>, super::styles::StyleApplyResult)> {
-        use koharu_pipeline::bubble_shape::{style_for_shape, text_bubble_shape};
+        use koharu_pipeline::bubble_shape::text_bubble_shape;
         styles.validate()?;
         if !styles.shape_styles.enabled {
             return Ok((None, Default::default()));
         }
+        let context = self.load_context()?;
         self.apply_style(scope, false, include_user, |snapshot, layer, typography| {
             let info = text_bubble_shape(snapshot, layer)?;
             anyhow::ensure!(
@@ -659,7 +695,9 @@ impl Project {
             styles
                 .default_style
                 .apply_to_detected(typography, detect_colors);
-            if let Some(style) = style_for_shape(styles, info.shape) {
+            if let Some(style) =
+                super::lettering::pick_style(styles, &context, snapshot, layer, &info)?
+            {
                 style.apply_to_detected(typography, detect_colors);
             }
             Ok(())

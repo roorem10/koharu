@@ -60,6 +60,7 @@
     "surface": "Canevas Koharu",
     "unavailable": "Canevas WebGPU indisponible"
   },
+  "chapterContext": {},
   "colorPicker": {
     "brushColor": "Couleur du pinceau",
     "hexCode": "Code couleur hexadécimal",
@@ -268,6 +269,27 @@
     "textName": "Texte {{index}}",
     "title": "Calques",
     "translationLabel": "Traduction de {{name}}"
+  },
+  "lettering": {
+    "categoryLine": "Category: {{category}}",
+    "automatic": "automatic",
+    "categories": {
+      "normal_dialogue": "Normal Dialogue",
+      "thoughts": "Thoughts",
+      "floating": "Floating",
+      "small_text": "Small Text",
+      "narration_box": "Narration Box",
+      "shout": "Shout",
+      "weak_shout": "Weak/Panic Shout",
+      "sfx": "SFX",
+      "moan": "Moan",
+      "title": "Title",
+      "phone_text": "Phone Text",
+      "whisper": "Whisper",
+      "shy": "Shy / Hesitant",
+      "crying": "Crying / Trembling",
+      "menacing": "Menacing / Sinister"
+    }
   },
   "menu": {
     "about": "À propos",

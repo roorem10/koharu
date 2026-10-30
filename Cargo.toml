@@ -40,6 +40,7 @@ koharu-renderer = { path = "crates/koharu-renderer" }
 koharu-rasterizer = { path = "crates/koharu-rasterizer", default-features = false }
 koharu-desktop = { path = "crates/koharu-desktop" }
 koharu-secrets = { path = "crates/koharu-secrets" }
+booharu-context = { path = "crates/booharu-context" }
 
 # external dependencies
 alphanumeric-sort = "1.5.8"

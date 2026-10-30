@@ -1,9 +1,12 @@
 pub(crate) mod agent;
 pub(crate) mod canvas;
+pub(crate) mod context;
 pub(crate) mod editing;
 pub(crate) mod fonts;
 pub(crate) mod import;
+pub(crate) mod lettering;
 pub(crate) mod lifecycle;
+pub(crate) mod line_labels;
 pub(crate) mod output;
 pub(crate) mod preferences;
 pub(crate) mod processing;
@@ -109,6 +112,9 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             styles::count_text_style_targets,
             styles::apply_shape_rules,
             styles::get_text_bubble_shape,
+            line_labels::get_line_category,
+            line_labels::set_line_category,
+            // WO-18 (chapter context) commands go here.
             canvas::get_canvas_manifest,
             canvas::get_canvas_resource,
             canvas::prepare_canvas_page,
@@ -120,6 +126,7 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             canvas::commit_erase,
             canvas::commit_transform,
             canvas::commit_inpaint,
+            // WO-19 (lettering categories) commands go here.
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)

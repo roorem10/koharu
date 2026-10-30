@@ -11,6 +11,7 @@ import {
   PreferenceRow,
   PreferenceSection,
 } from '@/components/preferences/PreferenceFields'
+import { SfxPreferences } from '@/components/preferences/SfxPreferences'
 import { modelKey, orderedLanguageChoices, providerName } from '@/lib/translation'
 import type {
   LanguageChoice,
@@ -160,6 +161,7 @@ export function TranslationPreferences({
           />
         </PreferenceRow>
       </PreferenceSection>
+      <SfxPreferences />
     </PreferencePage>
   )
 }

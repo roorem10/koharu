@@ -60,6 +60,7 @@
     "surface": "Lienzo de Koharu",
     "unavailable": "El lienzo WebGPU no está disponible"
   },
+  "chapterContext": {},
   "colorPicker": {
     "brushColor": "Color del pincel",
     "hexCode": "Código de color hexadecimal",
@@ -268,6 +269,27 @@
     "textName": "Texto {{index}}",
     "title": "Capas",
     "translationLabel": "Traducción de {{name}}"
+  },
+  "lettering": {
+    "categoryLine": "Category: {{category}}",
+    "automatic": "automatic",
+    "categories": {
+      "normal_dialogue": "Normal Dialogue",
+      "thoughts": "Thoughts",
+      "floating": "Floating",
+      "small_text": "Small Text",
+      "narration_box": "Narration Box",
+      "shout": "Shout",
+      "weak_shout": "Weak/Panic Shout",
+      "sfx": "SFX",
+      "moan": "Moan",
+      "title": "Title",
+      "phone_text": "Phone Text",
+      "whisper": "Whisper",
+      "shy": "Shy / Hesitant",
+      "crying": "Crying / Trembling",
+      "menacing": "Menacing / Sinister"
+    }
   },
   "menu": {
     "about": "Acerca de",

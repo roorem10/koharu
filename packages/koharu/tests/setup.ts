@@ -75,6 +75,7 @@ beforeEach(() => {
     shape: null,
     measures: null,
   })
+  vi.spyOn(commands, 'getLineCategory').mockResolvedValue(null)
   queryClient.clear()
   useKoharuStore.setState({
     ...initial,

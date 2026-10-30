@@ -82,13 +82,13 @@ pub(crate) async fn process(
     processing: State<'_, Processing>,
     job_channel: State<'_, JobChannel>,
 ) -> std::result::Result<JobId, Error> {
-    let snapshot = project
-        .project
-        .lock()
-        .await
-        .as_ref()
-        .context("no project is open")?
-        .snapshot();
+    let (snapshot, translation_hints) = {
+        let project = project.project.lock().await;
+        let project = project.as_ref().context("no project is open")?;
+        let snapshot = project.snapshot();
+        let hints = super::context::translation_hints(&project.load_context()?, &snapshot)?;
+        (snapshot, Arc::new(hints))
+    };
     let id = JobId::new();
     let stop = StopToken::default();
     {
@@ -123,6 +123,7 @@ pub(crate) async fn process(
             stop: stop.clone(),
             progress: None,
             inpainting_mask,
+            translation_hints,
         };
         request.progress = Some(Arc::new(move |event| {
             let update = match event {

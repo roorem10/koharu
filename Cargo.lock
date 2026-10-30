@@ -942,6 +942,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "booharu-context"
+version = "0.83.5"
+dependencies = [
+ "anyhow",
+ "koharu-scene",
+ "serde",
+ "serde_json",
+ "specta",
+ "tempfile",
+]
+
+[[package]]
 name = "borrow-or-share"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4702,6 +4714,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.23.1",
+ "booharu-context",
  "dirs 7.0.0",
  "futures",
  "hayro",
