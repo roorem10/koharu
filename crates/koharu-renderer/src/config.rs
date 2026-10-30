@@ -68,6 +68,10 @@ pub enum StyleGroup {
 }
 
 impl TextStyle {
+    pub fn is_empty(&self) -> bool {
+        self == &Self::default()
+    }
+
     pub fn apply_to(&self, typography: &mut Typography) {
         if let Some(part) = &self.font {
             typography.preferred_font = part.preferred_font.clone();
@@ -202,6 +206,7 @@ impl TextStyle {
 pub struct TextStyles {
     pub default_style: TextStyle,
     pub shape_styles: ShapeStyles,
+    pub category_styles: CategoryStyles,
     /// Distinguish a deliberate Clear from a pre-migration missing fill.
     pub legacy_color_migrated: bool,
 }
@@ -216,7 +221,50 @@ pub struct ShapeStyles {
     pub free: TextStyle,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize, Type)]
+#[serde(default)]
+pub struct CategoryStyles {
+    pub thoughts: TextStyle,
+    pub small_text: TextStyle,
+    pub weak_shout: TextStyle,
+    pub sfx: TextStyle,
+    pub moan: TextStyle,
+    pub title: TextStyle,
+    pub phone_text: TextStyle,
+    pub whisper: TextStyle,
+    pub shy: TextStyle,
+    pub crying: TextStyle,
+    pub menacing: TextStyle,
+}
+
 impl TextStyles {
+    /// The shared category ids avoid coupling rendering to chapter context.
+    /// Empty category styles inherit the round-bubble dialogue style.
+    pub fn category_style(&self, category: &str) -> &TextStyle {
+        let style = match category {
+            "thoughts" => &self.category_styles.thoughts,
+            "floating" => &self.shape_styles.free,
+            "small_text" => &self.category_styles.small_text,
+            "narration_box" => &self.shape_styles.rectangle,
+            "shout" => &self.shape_styles.spiky,
+            "weak_shout" => &self.category_styles.weak_shout,
+            "sfx" => &self.category_styles.sfx,
+            "moan" => &self.category_styles.moan,
+            "title" => &self.category_styles.title,
+            "phone_text" => &self.category_styles.phone_text,
+            "whisper" => &self.category_styles.whisper,
+            "shy" => &self.category_styles.shy,
+            "crying" => &self.category_styles.crying,
+            "menacing" => &self.category_styles.menacing,
+            _ => &self.shape_styles.round,
+        };
+        if style.is_empty() {
+            &self.shape_styles.round
+        } else {
+            style
+        }
+    }
+
     pub fn load(
         legacy_color: impl FnOnce() -> anyhow::Result<Option<[u8; 4]>>,
     ) -> anyhow::Result<koharu_config::Config<Self>> {
@@ -252,6 +300,17 @@ impl TextStyles {
             &self.shape_styles.round,
             &self.shape_styles.spiky,
             &self.shape_styles.free,
+            &self.category_styles.thoughts,
+            &self.category_styles.small_text,
+            &self.category_styles.weak_shout,
+            &self.category_styles.sfx,
+            &self.category_styles.moan,
+            &self.category_styles.title,
+            &self.category_styles.phone_text,
+            &self.category_styles.whisper,
+            &self.category_styles.shy,
+            &self.category_styles.crying,
+            &self.category_styles.menacing,
         ] {
             style.validate()?;
         }
@@ -282,6 +341,105 @@ impl TypesettingConfig {
 #[cfg(test)]
 mod text_style_tests {
     use super::*;
+
+    #[test]
+    fn category_styles_roundtrip_map_and_inherit_dialogue() {
+        let font = |name: &str| TextStyle {
+            font: Some(FontPart {
+                preferred_font: Some(name.into()),
+                font_weight: None,
+                font_style: None,
+            }),
+            ..Default::default()
+        };
+        let mut styles = TextStyles {
+            shape_styles: ShapeStyles {
+                round: font("normal_dialogue"),
+                rectangle: font("narration_box"),
+                spiky: font("shout"),
+                free: font("floating"),
+                ..Default::default()
+            },
+            category_styles: CategoryStyles {
+                thoughts: font("thoughts"),
+                small_text: font("small_text"),
+                weak_shout: font("weak_shout"),
+                sfx: font("sfx"),
+                moan: font("moan"),
+                title: font("title"),
+                phone_text: font("phone_text"),
+                whisper: font("whisper"),
+                shy: font("shy"),
+                crying: font("crying"),
+                menacing: font("menacing"),
+            },
+            ..Default::default()
+        };
+        styles.validate().unwrap();
+        let restored: TextStyles = toml::from_str(&toml::to_string(&styles).unwrap()).unwrap();
+        assert_eq!(restored, styles);
+        for id in [
+            "normal_dialogue",
+            "thoughts",
+            "floating",
+            "small_text",
+            "narration_box",
+            "shout",
+            "weak_shout",
+            "sfx",
+            "moan",
+            "title",
+            "phone_text",
+            "whisper",
+            "shy",
+            "crying",
+            "menacing",
+        ] {
+            assert_eq!(styles.category_style(id), &font(id));
+        }
+        styles.category_styles = CategoryStyles::default();
+        assert_eq!(styles.category_style("whisper"), &styles.shape_styles.round);
+        styles.shape_styles.round = TextStyle::default();
+        assert!(styles.category_style("whisper").is_empty());
+        for style in [
+            &mut styles.category_styles.thoughts,
+            &mut styles.category_styles.small_text,
+            &mut styles.category_styles.weak_shout,
+            &mut styles.category_styles.sfx,
+            &mut styles.category_styles.moan,
+            &mut styles.category_styles.title,
+            &mut styles.category_styles.phone_text,
+            &mut styles.category_styles.whisper,
+            &mut styles.category_styles.shy,
+            &mut styles.category_styles.crying,
+            &mut styles.category_styles.menacing,
+        ] {
+            style.font = Some(FontPart {
+                preferred_font: None,
+                font_weight: Some(0),
+                font_style: None,
+            });
+        }
+        assert!(styles.validate().is_err());
+    }
+
+    #[test]
+    fn settings_without_categories_keep_shape_fonts() {
+        let styles: TextStyles = toml::from_str(
+            "[shape_styles]\nenabled = true\n[shape_styles.round.font]\npreferred_font = 'Dialogue'\n"
+        ).unwrap();
+        assert_eq!(styles.category_styles, CategoryStyles::default());
+        assert_eq!(
+            styles
+                .category_style("thoughts")
+                .font
+                .as_ref()
+                .unwrap()
+                .preferred_font
+                .as_deref(),
+            Some("Dialogue")
+        );
+    }
 
     fn typography() -> Typography {
         Typography {
@@ -485,6 +643,7 @@ mod text_style_tests {
                     ..Default::default()
                 },
                 legacy_color_migrated: true,
+                category_styles: CategoryStyles::default(),
             };
             let legacy = [20, 115, 235, 180];
             match phase.as_str() {
