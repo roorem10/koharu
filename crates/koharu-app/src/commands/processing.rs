@@ -82,12 +82,12 @@ pub(crate) async fn process(
     processing: State<'_, Processing>,
     job_channel: State<'_, JobChannel>,
 ) -> std::result::Result<JobId, Error> {
-    let (snapshot, translation_hints) = {
+    let translation_hints = {
         let project = project.project.lock().await;
         let project = project.as_ref().context("no project is open")?;
         let snapshot = project.snapshot();
         let hints = super::context::translation_hints(&project.load_context()?, &snapshot)?;
-        (snapshot, Arc::new(hints))
+        Arc::new(hints)
     };
     let id = JobId::new();
     let stop = StopToken::default();
@@ -199,11 +199,34 @@ pub(crate) async fn process(
         let mut committer = PipelineCommitter {
             handle: task_handle.clone(),
         };
-        let result = pipeline.execute(snapshot, request, &mut committer).await;
+        let context_result = if super::context::operation_translates(&request.operation) {
+            super::context::auto_read(&task_handle, &request.scope, &stop, id).await
+        } else {
+            Ok(())
+        };
+        let result = async {
+            context_result?;
+            let snapshot = {
+                let projects = task_handle.state::<CurrentProject>();
+                let projects = projects.project.lock().await;
+                let project = projects.as_ref().context("no project is open")?;
+                let snapshot = project.snapshot();
+                request.translation_hints = Arc::new(super::context::translation_hints(
+                    &project.load_context()?,
+                    &snapshot,
+                )?);
+                snapshot
+            };
+            pipeline
+                .execute(snapshot, request, &mut committer)
+                .await
+                .map_err(anyhow::Error::from)
+        }
+        .await;
         let (stopped, error) = match result {
             Ok(report) => (report.status == RunStatus::Stopped, None),
             Err(error) => {
-                tracing::error!(stage = ?error.stage, %error, "processing failed");
+                tracing::error!(%error, "processing failed");
                 (false, Some(format!("{error:#}")))
             }
         };

@@ -83,6 +83,19 @@ impl Pipeline {
         Ok(count)
     }
 
+    pub async fn run_task(
+        &self,
+        selection: &koharu_translator::ModelSelection,
+        generation: koharu_translator::GenerationConfig,
+        request: koharu_translator::TaskRequest,
+    ) -> Result<serde_json::Value> {
+        let _execution = self.execution.lock().await;
+        self.current
+            .load_full()
+            .run_task(selection, generation, request)
+            .await
+    }
+
     #[tracing::instrument(skip_all)]
     pub async fn execute(
         &self,

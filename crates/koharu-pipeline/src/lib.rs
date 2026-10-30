@@ -22,7 +22,7 @@ pub use config::{
     DetectionModel, InpaintingModel, OcrModel, PipelineConfig, ProcessorConfig, TranslationConfig,
 };
 pub use error::{ErrorKind, PipelineError};
-pub use hints::TranslationHints;
+pub use hints::{GlossaryTerm, TranslationHints, page_glossary, previous_context, term_occurs};
 pub use pipeline::Pipeline;
 pub use progress::{Progress, ProgressSink};
 pub use report::{Committer, Report, RunStatus, StageOutput};

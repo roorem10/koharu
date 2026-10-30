@@ -56,6 +56,9 @@ impl StageProcessor for Processor {
             targets.iter().map(|(_, source)| source.clone()),
             self.config.target_language,
         );
+        input
+            .translation_hints
+            .apply(&mut request, &input.scene, input.page)?;
         if let Some(instructions) = self.config.instructions.as_deref() {
             request = request.with_instructions(instructions);
         }

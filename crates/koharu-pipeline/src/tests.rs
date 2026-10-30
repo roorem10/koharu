@@ -136,6 +136,7 @@ async fn translation_leaves_hinted_layers_alone() {
         },
         translation_hints: std::sync::Arc::new(crate::TranslationHints {
             skip: [layer.unwrap()].into(),
+            ..Default::default()
         }),
         ..Request::default()
     };

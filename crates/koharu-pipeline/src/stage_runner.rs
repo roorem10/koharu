@@ -16,6 +16,7 @@ use crate::{
 
 pub(crate) struct StageRunner {
     stages: Stages,
+    translator: koharu_translator::Translator,
     accelerator: AcceleratorGate,
 }
 
@@ -27,9 +28,45 @@ impl StageRunner {
         resources: Arc<ResourceMonitor>,
     ) -> Result<Self> {
         Ok(Self {
-            stages: Stages::new(config, translator, device)?,
+            stages: Stages::new(config, translator.clone(), device)?,
+            translator,
             accelerator: AcceleratorGate::new(device, resources),
         })
+    }
+
+    pub(crate) async fn run_task(
+        &self,
+        selection: &koharu_translator::ModelSelection,
+        generation: koharu_translator::GenerationConfig,
+        request: koharu_translator::TaskRequest,
+    ) -> Result<serde_json::Value> {
+        let permit = self.accelerator.acquire().await;
+        match self
+            .translator
+            .run_task(selection, generation, request.clone())
+            .await
+        {
+            Ok(value) => Ok(value),
+            Err(error) if is_out_of_memory(&error) => {
+                drop(permit);
+                let _permit = self
+                    .accelerator
+                    .recover(Stage::Translation, &self.stages)
+                    .await;
+                let result = self
+                    .translator
+                    .run_task(selection, generation, request)
+                    .await;
+                if result.is_err() {
+                    self.translator.unload();
+                }
+                result
+            }
+            Err(error) => {
+                self.translator.unload();
+                Err(error)
+            }
+        }
     }
 
     pub(crate) fn unload_models(&self) -> u32 {
