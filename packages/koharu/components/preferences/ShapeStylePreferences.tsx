@@ -6,10 +6,18 @@ import { useTranslation } from 'react-i18next'
 import { FontPicker } from '@/components/controls/FontPicker'
 import { PreferenceRow, PreferenceSection } from '@/components/preferences/PreferenceFields'
 import { call, saveTextStyles } from '@/lib/backend'
+import { LETTERING_CATEGORIES } from '@/lib/line-labels'
 import { pageKey, pagesKey, projectKey, refresh, useFonts, useProject } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { emptyShapeStyles, emptyTextStyle } from '@/lib/text-styles'
-import { commands, type StyleTargetCounts } from '@koharu/bridge/protocol'
+import {
+  emptyShapeStyles,
+  categoryShapes,
+  categoryStyle,
+  withCategoryStyle,
+  isEmptyStyle,
+  suggestCategoryFonts,
+} from '@/lib/text-styles'
+import { commands, type StyleTargetCounts, type FontPart } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 import { Checkbox } from '@koharu/ui/components/checkbox'
 import {
@@ -21,8 +29,6 @@ import {
 } from '@koharu/ui/components/dialog'
 import { Switch } from '@koharu/ui/components/switch'
 import { toast } from '@koharu/ui/components/toast'
-
-const shapes = ['round', 'rectangle', 'spiky', 'free'] as const
 
 export function ShapeStylePreferences() {
   const { t } = useTranslation()
@@ -67,11 +73,11 @@ export function ShapeStylePreferences() {
   }
   return (
     <>
-      <PreferenceSection title={t('textStyles.shapeTitle')} description={t('textStyles.shapeHelp')}>
-        <PreferenceRow title={t('textStyles.shapeEnabled')}>
+      <PreferenceSection title={t('lettering.title')} description={t('lettering.description')}>
+        <PreferenceRow title={t('lettering.enabled')}>
           <Switch
-            checked={shapesStyle.enabled}
-            aria-label={t('textStyles.shapeEnabled')}
+            checked={shapesStyle.enabled ?? false}
+            aria-label={t('lettering.enabled')}
             onCheckedChange={(enabled) =>
               void saveTextStyles({ ...styles, shape_styles: { ...shapesStyle, enabled } }).catch(
                 () => undefined,
@@ -79,33 +85,110 @@ export function ShapeStylePreferences() {
             }
           />
         </PreferenceRow>
-        {shapes.map((shape) => {
-          const style = shapesStyle[shape] ?? emptyTextStyle
+        {LETTERING_CATEGORIES.map((category) => {
+          const style = categoryStyle(styles, category)
+          const name = t(`lettering.categories.${category}`)
+          const shape = categoryShapes[category]
+          const empty = isEmptyStyle(style)
+          const font = style.font ?? shapesStyle.round?.font ?? styles.default_style?.font
+          const updateFont = (part: Partial<FontPart>) => {
+            void saveTextStyles(
+              withCategoryStyle(styles, category, {
+                ...style,
+                font: {
+                  preferred_font: null,
+                  font_weight: null,
+                  font_style: null,
+                  ...font,
+                  ...part,
+                },
+              }),
+            ).catch(() => undefined)
+          }
           return (
-            <PreferenceRow key={shape} title={t(`textStyles.shapeFonts.${shape}`)}>
-              <FontPicker
-                value={style.font?.preferred_font ?? ''}
-                families={fonts.data ?? []}
-                ariaLabel={t(`textStyles.shapeFonts.${shape}`)}
-                emptyLabel={t('textStyles.sameAsDefault')}
-                onChange={(family) =>
-                  void saveTextStyles({
-                    ...styles,
-                    shape_styles: {
-                      ...shapesStyle,
-                      [shape]: {
-                        ...style,
-                        font: family
-                          ? { preferred_font: family, font_weight: null, font_style: null }
-                          : null,
-                      },
-                    },
-                  }).catch(() => undefined)
-                }
-              />
+            <PreferenceRow
+              key={category}
+              title={name}
+              description={[
+                shape ? t(`lettering.shapeHelp.${shape}`) : '',
+                empty
+                  ? t(
+                      category === 'normal_dialogue'
+                        ? 'lettering.sameAsDefault'
+                        : 'lettering.sameAsDialogue',
+                    )
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <div
+                className='flex min-w-0 flex-wrap items-center gap-2'
+                data-testid={`lettering-row-${category}`}
+              >
+                <div className='min-w-[120px] flex-1'>
+                  <FontPicker
+                    value={style.font?.preferred_font ?? ''}
+                    families={fonts.data ?? []}
+                    ariaLabel={name}
+                    emptyLabel={t(
+                      category === 'normal_dialogue'
+                        ? 'lettering.sameAsDefault'
+                        : 'lettering.sameAsDialogue',
+                    )}
+                    onChange={(family) =>
+                      void saveTextStyles(
+                        withCategoryStyle(styles, category, {
+                          ...style,
+                          font: family
+                            ? {
+                                preferred_font: family,
+                                font_weight: style.font?.font_weight ?? null,
+                                font_style: style.font?.font_style ?? null,
+                              }
+                            : null,
+                        }),
+                      ).catch(() => undefined)
+                    }
+                  />
+                </div>
+                <label className='flex items-center gap-1 text-[10px]'>
+                  <Checkbox
+                    aria-label={t('lettering.italicFor', { category: name })}
+                    checked={font?.font_style === 'italic'}
+                    onCheckedChange={(checked) =>
+                      updateFont({ font_style: checked === true ? 'italic' : 'normal' })
+                    }
+                  />
+                  {t('lettering.italic')}
+                </label>
+                <label className='flex items-center gap-1 text-[10px]'>
+                  <Checkbox
+                    aria-label={t('lettering.boldFor', { category: name })}
+                    checked={(font?.font_weight ?? 400) >= 700}
+                    onCheckedChange={(checked) =>
+                      updateFont({ font_weight: checked === true ? 700 : 400 })
+                    }
+                  />
+                  {t('lettering.bold')}
+                </label>
+              </div>
             </PreferenceRow>
           )
         })}
+        <PreferenceRow title={t('lettering.suggestFonts')} description={t('lettering.suggestHelp')}>
+          <Button
+            size='sm'
+            variant='outline'
+            disabled={!fonts.data?.length}
+            onClick={() => {
+              const next = suggestCategoryFonts(styles, fonts.data ?? [])
+              if (next !== styles) void saveTextStyles(next).catch(() => undefined)
+            }}
+          >
+            {t('lettering.suggestFonts')}
+          </Button>
+        </PreferenceRow>
         <div className='py-3.5'>
           <Button
             size='sm'

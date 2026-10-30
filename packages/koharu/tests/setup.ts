@@ -3,7 +3,7 @@ import { afterEach, beforeEach, vi } from 'vitest'
 
 import { queryClient } from '@/lib/queries'
 import { defaultShortcuts, useKoharuStore } from '@/lib/store'
-import { emptyTextStyle, emptyShapeStyles } from '@/lib/text-styles'
+import { emptyTextStyle, emptyShapeStyles, emptyCategoryStyles } from '@/lib/text-styles'
 import { commands } from '@koharu/bridge/protocol'
 
 vi.mock('react-i18next', async (importOriginal) => {
@@ -90,6 +90,15 @@ beforeEach(() => {
   vi.spyOn(commands, 'listSeries').mockResolvedValue([])
   vi.spyOn(commands, 'getAgentHistory').mockResolvedValue({ messages: [], running: null })
   vi.spyOn(commands, 'getLineCategory').mockResolvedValue(null)
+  vi.spyOn(commands, 'getEffectiveCategory').mockResolvedValue({
+    category: 'floating',
+    reason: 'bubble_shape',
+  })
+  vi.spyOn(commands, 'getLetteringSettings').mockResolvedValue({
+    sfx: 'skip',
+    model_confidence: 0.6,
+    small_text_threshold: 0.012,
+  })
   queryClient.clear()
   useKoharuStore.setState({
     ...initial,
@@ -97,6 +106,7 @@ beforeEach(() => {
     textStyles: {
       default_style: { ...emptyTextStyle },
       shape_styles: structuredClone(emptyShapeStyles),
+      category_styles: structuredClone(emptyCategoryStyles),
       legacy_color_migrated: true,
     },
     preferences: null,

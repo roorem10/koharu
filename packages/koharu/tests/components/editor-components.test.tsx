@@ -36,7 +36,11 @@ import {
   useCommand,
 } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { emptyTextStyle, emptyShapeStyles } from '@/lib/text-styles'
+import {
+  emptyTextStyle,
+  emptyShapeStyles,
+  emptyCategoryStyles,
+} from '@/lib/text-styles'
 import * as canvasRuntime from '@koharu/bridge/canvas'
 import {
   commands,
@@ -228,7 +232,12 @@ function installProject() {
   queryClient.setQueryData(pageKey, page)
   useKoharuStore.setState({
     preferences,
-    textStyles: { default_style: { ...emptyTextStyle }, shape_styles: structuredClone(emptyShapeStyles), legacy_color_migrated: true },
+    textStyles: {
+      default_style: { ...emptyTextStyle },
+      shape_styles: structuredClone(emptyShapeStyles),
+      category_styles: structuredClone(emptyCategoryStyles),
+      legacy_color_migrated: true,
+    },
     translationModels: [
       {
         provider: 'local',
@@ -324,11 +333,12 @@ describe('greenfield editor', () => {
     )
   })
 
-  it('saves only a shape font and clears it with Same as default', async () => {
+  it('saves only a shape font and clears it with Same as default style', async () => {
     installProject()
     const original = {
       default_style: { ...emptyTextStyle },
       shape_styles: structuredClone(emptyShapeStyles),
+      category_styles: structuredClone(emptyCategoryStyles),
       legacy_color_migrated: true,
     }
     original.shape_styles.round.fill = [1, 2, 3, 255]
@@ -353,9 +363,9 @@ describe('greenfield editor', () => {
     const save = vi.spyOn(commands, 'saveTextStyles').mockImplementation(async (styles) => styles)
     render(<ShapeStylePreferences />)
     const user = userEvent.setup()
-    await user.click(screen.getByRole('switch', { name: 'Choose font by bubble shape' }))
-    await user.click(screen.getByRole('button', { name: 'Round (dialogue)' }))
-    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Same as default')
+    await user.click(screen.getByRole('switch', { name: 'Pick fonts automatically' }))
+    await user.click(screen.getByRole('button', { name: 'Normal Dialogue' }))
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Same as default style')
     await user.click(await screen.findByRole('option', { name: /Font A/ }))
     await waitFor(() =>
       expect(save).toHaveBeenLastCalledWith({
@@ -370,8 +380,8 @@ describe('greenfield editor', () => {
         },
       }),
     )
-    await user.click(screen.getByRole('button', { name: 'Round (dialogue)' }))
-    await user.click(screen.getByRole('option', { name: 'Same as default' }))
+    await user.click(screen.getByRole('button', { name: 'Normal Dialogue' }))
+    await user.click(screen.getByRole('option', { name: 'Same as default style' }))
     await waitFor(() =>
       expect(save).toHaveBeenLastCalledWith({
         ...original,
@@ -388,6 +398,7 @@ describe('greenfield editor', () => {
         textStyles: {
           default_style: { ...emptyTextStyle },
           shape_styles: { ...structuredClone(emptyShapeStyles), enabled: true },
+          category_styles: structuredClone(emptyCategoryStyles),
           legacy_color_migrated: true,
         },
       })
@@ -427,6 +438,7 @@ describe('greenfield editor', () => {
       textStyles: {
         default_style: { ...emptyTextStyle },
         shape_styles: { ...structuredClone(emptyShapeStyles), enabled: true },
+        category_styles: structuredClone(emptyCategoryStyles),
         legacy_color_migrated: true,
       },
     })

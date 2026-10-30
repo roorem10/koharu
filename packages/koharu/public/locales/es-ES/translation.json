@@ -369,7 +369,7 @@
   },
   "lettering": {
     "categoryLine": "Category: {{category}}",
-    "automatic": "automatic",
+    "automatic": "Automatic",
     "categories": {
       "normal_dialogue": "Normal Dialogue",
       "thoughts": "Thoughts",
@@ -386,6 +386,51 @@
       "shy": "Shy / Hesitant",
       "crying": "Crying / Trembling",
       "menacing": "Menacing / Sinister"
+    },
+    "title": "Lettering categories",
+    "description": "Choose fonts by how a line is presented or delivered. Chapter labels and original lettering size refine the bubble-shape rules.",
+    "enabled": "Pick fonts automatically",
+    "categoryPicker": "Lettering category",
+    "sameAsDialogue": "Same as Normal Dialogue",
+    "sameAsDefault": "Same as default style",
+    "italic": "Italic",
+    "bold": "Bold",
+    "italicFor": "{{category}}: Italic",
+    "boldFor": "{{category}}: Bold",
+    "suggestFonts": "Suggest fonts",
+    "suggestHelp": "Fill empty rows from your starting font list, using only available fonts. Existing choices stay as you set them.",
+    "loading": "Loading…",
+    "loadError": "Could not load lettering settings or category.",
+    "reasons": {
+      "user": "set by hand",
+      "model": "from chapter read",
+      "small_text": "small original lettering"
+    },
+    "shapeReasons": {
+      "round": "round bubble",
+      "rectangle": "rectangle bubble",
+      "spiky": "spiky bubble",
+      "unknown": "bubble shape unavailable",
+      "free": "no bubble"
+    },
+    "shapeHelp": {
+      "round": "Also used for round bubbles.",
+      "rectangle": "Also used for rectangle bubbles.",
+      "spiky": "Also used for spiky bubbles.",
+      "free": "Also used for text without a bubble."
+    },
+    "sfxTitle": "Sound effects",
+    "sfxDescription": "Control which sound-effect boxes translation processes.",
+    "sfxMode": "SFX translation",
+    "sfxModes": {
+      "skip": "Skip",
+      "inside_bubbles": "Inside bubbles only",
+      "translate_all": "Translate all"
+    },
+    "sfxHelp": {
+      "skip": "Leave all SFX boxes untranslated and untypeset.",
+      "inside_bubbles": "Translate SFX inside a bubble; leave other SFX untouched.",
+      "translate_all": "Translate SFX both inside and outside bubbles."
     }
   },
   "menu": {
