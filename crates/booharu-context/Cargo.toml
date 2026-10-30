@@ -17,6 +17,4 @@ koharu-scene = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 specta = { workspace = true }
-
-[dev-dependencies]
 tempfile = { workspace = true }

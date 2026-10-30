@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use specta::Type;
 
-use crate::LetteringCategory;
+use crate::{ChapterBrief, Flag, GlossaryEntry, LetteringCategory};
 
 /// File name of the sidecar inside a project directory.
 pub const CONTEXT_FILE: &str = "booharu-context.json";
@@ -25,6 +25,9 @@ static UPDATE: Mutex<()> = Mutex::new(());
 #[serde(default)]
 pub struct ProjectContext {
     pub version: u32,
+    pub series: Option<String>,
+    pub brief: Option<ChapterBrief>,
+    pub suggestions: Vec<GlossaryEntry>,
     /// Keyed by text layer id, the id the Inspector selects.
     pub lines: BTreeMap<EntityId, LineContext>,
     /// Fields this build doesn't know, kept so saving never erases them.
@@ -37,6 +40,9 @@ impl Default for ProjectContext {
     fn default() -> Self {
         Self {
             version: CONTEXT_VERSION,
+            series: None,
+            brief: None,
+            suggestions: Vec::new(),
             lines: BTreeMap::new(),
             other: Map::new(),
         }
@@ -47,6 +53,9 @@ impl Default for ProjectContext {
 #[serde(default)]
 pub struct LineContext {
     pub category: Option<LineCategory>,
+    pub note: Option<String>,
+    pub flags: Vec<Flag>,
+    pub dismissed: Vec<String>,
     #[serde(flatten)]
     #[specta(skip)]
     pub other: Map<String, Value>,
@@ -54,7 +63,11 @@ pub struct LineContext {
 
 impl LineContext {
     fn is_empty(&self) -> bool {
-        self.category.is_none() && self.other.is_empty()
+        self.category.is_none()
+            && self.note.is_none()
+            && self.flags.is_empty()
+            && self.dismissed.is_empty()
+            && self.other.is_empty()
     }
 }
 
