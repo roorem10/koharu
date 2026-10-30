@@ -99,6 +99,9 @@ export const commands = {
 	commitErase: (expectedRevision: Revision, layer: EntityId, points: Point[], diameter: number) => __TAURI_INVOKE<LayerCommit>("commit_erase", { expectedRevision, layer, points, diameter }),
 	commitTransform: (expectedRevision: Revision, elements: TransformFrame[], persistUnchanged: boolean) => __TAURI_INVOKE<Revision | null>("commit_transform", { expectedRevision, elements, persistUnchanged }),
 	commitInpaint: (expectedRevision: Revision, points: Point[], diameter: number) => __TAURI_INVOKE<JobId | null>("commit_inpaint", { expectedRevision, points, diameter }),
+	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
+	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
+	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
 };
 
 /* Types */
@@ -169,6 +172,22 @@ export type CanvasState = {
 	generation: number,
 	size: [number, number],
 	element_frames: TransformFrame[],
+};
+
+export type CategoryReason = "user" | "model" | "small_text" | "bubble_shape";
+
+export type CategoryStyles = {
+	thoughts?: TextStyle,
+	small_text?: TextStyle,
+	weak_shout?: TextStyle,
+	sfx?: TextStyle,
+	moan?: TextStyle,
+	title?: TextStyle,
+	phone_text?: TextStyle,
+	whisper?: TextStyle,
+	shy?: TextStyle,
+	crying?: TextStyle,
+	menacing?: TextStyle,
 };
 
 export type ChapterBrief = {
@@ -252,6 +271,11 @@ export type Download = {
 };
 
 export type DownloadState = "running" | "finished" | "failed";
+
+export type EffectiveCategory = {
+	category: LetteringCategory,
+	reason: CategoryReason,
+};
 
 export type EntityId = string;
 
@@ -426,6 +450,13 @@ export type LayerVisibility = {
  *  font settings; the order here is the order shown in Settings.
  */
 export type LetteringCategory = "normal_dialogue" | "thoughts" | "floating" | "small_text" | "narration_box" | "shout" | "weak_shout" | "sfx" | "moan" | "title" | "phone_text" | "whisper" | "shy" | "crying" | "menacing";
+
+export type LetteringSettings = {
+	sfx?: SfxMode,
+	model_confidence?: number,
+	/**  Estimated source glyph size as a fraction of page height. */
+	small_text_threshold?: number,
+};
 
 export type LineCategory = {
 	value: LetteringCategory,
@@ -640,6 +671,8 @@ export type Series = {
 	characters?: Character[],
 };
 
+export type SfxMode = "skip" | "inside_bubbles" | "translate_all";
+
 export type ShapeMeasures = {
 	rectangularity: number,
 	solidity: number,
@@ -724,6 +757,7 @@ export type TextStyle = {
 export type TextStyles = {
 	default_style?: TextStyle,
 	shape_styles?: ShapeStyles,
+	category_styles?: CategoryStyles,
 	/**  Distinguish a deliberate Clear from a pre-migration missing fill. */
 	legacy_color_migrated?: boolean,
 };
