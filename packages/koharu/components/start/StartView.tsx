@@ -1,6 +1,6 @@
 'use client'
 
-import { Folder, FolderPlus, Plus, Settings, Trash2 } from 'lucide-react'
+import { Copy, Folder, FolderPlus, Pencil, Plus, Settings, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -20,6 +20,13 @@ import {
   AlertDialogTitle,
 } from '@koharu/ui/components/alert-dialog'
 import { Button } from '@koharu/ui/components/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@koharu/ui/components/dialog'
 import { Input } from '@koharu/ui/components/input'
 import { ScrollArea } from '@koharu/ui/components/scroll-area'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/tooltip'
@@ -31,6 +38,7 @@ export function StartView() {
   const [name, setName] = useState('')
   const [busy, setBusy] = useState<string | null>('list')
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null)
+  const [renaming, setRenaming] = useState<{ name: string; value: string } | null>(null)
 
   const reload = useCallback(async () => {
     setBusy('list')
@@ -78,6 +86,30 @@ export function StartView() {
       await call(commands.deleteProject, projectName)
       await reload()
       setProjectToDelete(null)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const renameProject = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!renaming || busy) return
+    setBusy(renaming.name)
+    try {
+      await call(commands.renameProject, renaming.name, renaming.value)
+      await reload()
+      setRenaming(null)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const duplicateProject = async (projectName: string) => {
+    if (busy) return
+    setBusy(projectName)
+    try {
+      await call(commands.duplicateProject, projectName)
+      await reload()
     } finally {
       setBusy(null)
     }
@@ -232,6 +264,30 @@ export function StartView() {
                             type='button'
                             size='icon-sm'
                             variant='ghost'
+                            disabled={busy !== null}
+                            className='size-7 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                            aria-label={t('files.renameProject', { name: project.name })}
+                            onClick={() => setRenaming({ name: project.name, value: project.name })}
+                          >
+                            <Pencil className='size-3.5' />
+                          </Button>
+                          <Button
+                            type='button'
+                            size='icon-sm'
+                            variant='ghost'
+                            disabled={busy !== null}
+                            className='size-7 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                            aria-label={t('files.duplicateProject', { name: project.name })}
+                            onClick={() =>
+                              void duplicateProject(project.name).catch(() => undefined)
+                            }
+                          >
+                            <Copy className='size-3.5' />
+                          </Button>
+                          <Button
+                            type='button'
+                            size='icon-sm'
+                            variant='ghost'
                             className='mr-2 size-7 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100'
                             aria-label={t('start.deleteLabel', { name: project.name })}
                             onClick={() => setProjectToDelete(project.name)}
@@ -272,6 +328,48 @@ export function StartView() {
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
+      <Dialog
+        open={renaming !== null}
+        onOpenChange={(open) => {
+          if (!open && busy === null) setRenaming(null)
+        }}
+      >
+        <DialogContent showCloseButton={busy === null}>
+          <DialogHeader>
+            <DialogTitle>{t('files.renameTitle')}</DialogTitle>
+          </DialogHeader>
+          <form
+            className='grid gap-4'
+            onSubmit={(event) => void renameProject(event).catch(() => undefined)}
+          >
+            <Input
+              aria-label={t('files.newProjectName')}
+              value={renaming?.value ?? ''}
+              disabled={busy !== null}
+              onChange={(event) => {
+                const value = event.currentTarget.value
+                setRenaming((current) => current && { ...current, value })
+              }}
+            />
+            <DialogFooter>
+              <Button
+                type='button'
+                variant='outline'
+                disabled={busy !== null}
+                onClick={() => setRenaming(null)}
+              >
+                {t('files.cancel')}
+              </Button>
+              <Button
+                type='submit'
+                disabled={busy !== null || !renaming?.value || renaming.value === renaming.name}
+              >
+                {t('files.rename')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </AlertDialog>
   )
 }

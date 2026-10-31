@@ -8,7 +8,7 @@ use anyhow::{Context as _, Result, ensure};
 use booharu_context::{ChapterReading, LetteringCategory};
 use koharu_pipeline::{Pipeline, Scope, StopToken};
 use koharu_scene::{AssetRole, EntityId, Snapshot};
-use koharu_translator::{TaskRequest, Translator};
+use koharu_translator::{GenerationConfig, ModelSelection, Provider, TaskRequest, Translator};
 use serde_json::json;
 use tauri::{AppHandle, Manager as _};
 use tauri_runtime_cef::CefRuntime;
@@ -20,6 +20,99 @@ use super::super::{
     project::CurrentProject,
 };
 use super::{series, settings};
+
+pub(crate) fn can_read_images(selection: &ModelSelection) -> bool {
+    Translator::supports_tasks(selection)
+        && match selection.provider {
+            Provider::OpenAi | Provider::Claude | Provider::Gemini => true,
+            Provider::Local => Translator::supports_vision(
+                selection,
+                &GenerationConfig {
+                    vision: Some(true),
+                    ..Default::default()
+                },
+            ),
+            _ => false,
+        }
+}
+
+fn reading_model(
+    model: Option<ModelSelection>,
+    translation: ModelSelection,
+) -> Result<ModelSelection> {
+    let mut selection = model.unwrap_or(translation);
+    ensure!(
+        can_read_images(&selection),
+        "Read chapter needs a vision-capable language model"
+    );
+    selection.vision = true;
+    Ok(selection)
+}
+
+#[derive(serde::Serialize, specta::Type)]
+pub(crate) struct ReadModelInfo {
+    pub selection: ModelSelection,
+    pub vision: bool,
+    pub local: bool,
+    pub label: String,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn get_reading_model() -> std::result::Result<ReadModelInfo, super::super::Error> {
+    let settings = settings::load()?;
+    let selection = settings.read_model.unwrap_or(
+        koharu_pipeline::PipelineConfig::load()?
+            .read()?
+            .translation
+            .model
+            .clone(),
+    );
+    Ok(ReadModelInfo {
+        vision: can_read_images(&selection),
+        local: selection.provider == Provider::Local,
+        label: format!(
+            "{} · {}",
+            selection.provider.name(),
+            selection.model.as_deref().unwrap_or_default()
+        ),
+        selection,
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn get_reading_models()
+-> std::result::Result<Vec<koharu_translator::Model>, super::super::Error> {
+    Ok(Translator::models()
+        .await?
+        .into_iter()
+        .filter(|model| {
+            can_read_images(&ModelSelection {
+                provider: model.provider,
+                model: model.model.clone(),
+                quantization: None,
+                vision: model.vision,
+                reasoning: model.reasoning,
+            })
+        })
+        .collect())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn get_last_read_model(
+    project: tauri::State<'_, CurrentProject>,
+) -> std::result::Result<Option<String>, super::super::Error> {
+    let projects = project.project.lock().await;
+    let project = projects.as_ref().context("no project is open")?;
+    Ok(project
+        .load_context()?
+        .other
+        .get("chapter_read_model")
+        .and_then(|value| value.as_str())
+        .map(str::to_owned))
+}
 
 pub(super) fn scoped_pages(snapshot: &Snapshot, scope: &Scope) -> Result<Vec<(EntityId, u32)>> {
     let mut pages = Vec::new();
@@ -86,20 +179,20 @@ pub(crate) async fn auto_read(
             context.series.is_some(),
         )
     };
-    if !linked
-        || scoped_pages(&snapshot, scope)?.len() <= 1
-        || (has_brief && settings.read_when == settings::ReadWhen::Missing)
-    {
+    if !linked || scoped_pages(&snapshot, scope)?.len() <= 1 || has_brief {
         return Ok(());
     }
     let config = koharu_pipeline::PipelineConfig::load()?;
-    let selection = config.read()?.translation.model.clone();
-    if !Translator::supports_tasks(&selection) {
-        tracing::info!("Read chapter skipped: provider needs a language model");
-        return Ok(());
-    }
+    let translation_model = config.read()?.translation.model.clone();
+    let selection = match reading_model(settings.read_model, translation_model) {
+        Ok(selection) => selection,
+        Err(error) => {
+            tracing::info!(%error, "Read chapter skipped: selected model cannot see page images");
+            return Ok(());
+        }
+    };
     publish_reading(handle, job);
-    read(handle, scope, !settings.send_images, stop).await
+    read(handle, scope, selection, snapshot.project_id(), stop).await
 }
 
 pub(super) fn publish_reading(handle: &AppHandle<CefRuntime>, id: JobId) {
@@ -116,7 +209,8 @@ pub(super) fn publish_reading(handle: &AppHandle<CefRuntime>, id: JobId) {
 pub(crate) async fn read(
     handle: &AppHandle<CefRuntime>,
     scope: &Scope,
-    text_only: bool,
+    selection: ModelSelection,
+    requested_project: koharu_scene::ProjectId,
     stop: &StopToken,
 ) -> Result<()> {
     let (snapshot, directory, context) = {
@@ -132,20 +226,22 @@ pub(crate) async fn read(
             project.load_context()?,
         )
     };
+    ensure!(
+        snapshot.project_id() == requested_project,
+        "project changed before Read chapter started"
+    );
     let series_id = context
         .series
         .as_deref()
         .context("pick a series before reading the chapter")?;
     let series = series::store()?.get(series_id)?;
     let settings = settings::load()?;
-    let translation = koharu_pipeline::PipelineConfig::load()?
+    let mut translation = koharu_pipeline::PipelineConfig::load()?
         .read()?
         .translation
         .clone();
-    ensure!(
-        Translator::supports_tasks(&translation.model),
-        "Read chapter needs a language-model translation provider"
-    );
+    let selection = reading_model(Some(selection), translation.model.clone())?;
+    translation.generation.vision = Some(true);
     let pages = scoped_pages(&snapshot, scope)?;
     ensure!(!pages.is_empty(), "there are no pages to read");
     let mut merged: Option<ChapterReading> = None;
@@ -168,7 +264,7 @@ pub(crate) async fn read(
                 }
             }
             let mut image_index = None;
-            if !text_only && let Some(asset) = snapshot.asset(page, &AssetRole::new("source")?)? {
+            if let Some(asset) = snapshot.asset(page, &AssetRole::new("source")?)? {
                 let bytes = snapshot.read_blob(asset.blob).await?;
                 let image = tokio_rayon::spawn(move || image::load_from_memory(&bytes)).await?;
                 image_index = Some(images.len());
@@ -188,7 +284,7 @@ pub(crate) async fn read(
         request.prepare_images(1024)?;
         let output = handle
             .state::<Pipeline>()
-            .run_task(&translation.model, translation.generation, request)
+            .run_task(&selection, translation.generation, request)
             .await?;
         let reading: ChapterReading =
             serde_json::from_value(output).context("invalid Read chapter output")?;
@@ -242,6 +338,16 @@ pub(crate) async fn read(
                 read_at,
             )
         })?;
+        project.update_context(|context| {
+            context.other.insert(
+                "chapter_read_model".into(),
+                json!(format!(
+                    "{} · {}",
+                    selection.provider.name(),
+                    selection.model.as_deref().unwrap_or_default()
+                )),
+            );
+        })?;
         let commit = super::super::lettering::labels_changed(project, &changed).await?;
         if let Some(commit) = &commit {
             project.record_commit(commit);
@@ -274,22 +380,23 @@ fn reading_schema() -> serde_json::Value {
 pub(crate) async fn read_chapter(
     handle: AppHandle<CefRuntime>,
     scope: Scope,
-    text_only: bool,
+    model: Option<ModelSelection>,
 ) -> std::result::Result<JobId, super::super::Error> {
     let config = koharu_pipeline::PipelineConfig::load()?;
-    if !Translator::supports_tasks(&config.read()?.translation.model) {
-        return Err(
-            anyhow::anyhow!("Read chapter needs a language-model translation provider").into(),
-        );
-    }
-    {
+    let settings = settings::load()?;
+    let selection = reading_model(
+        model.or(settings.read_model),
+        config.read()?.translation.model.clone(),
+    )?;
+    let requested_project = {
         let projects = handle.state::<CurrentProject>();
         let projects = projects.project.lock().await;
         let project = projects.as_ref().context("no project is open")?;
         if project.load_context()?.series.is_none() {
             return Err(anyhow::anyhow!("pick a series before reading the chapter").into());
         }
-    }
+        project.snapshot().project_id()
+    };
     let id = JobId::new();
     let stop = StopToken::default();
     {
@@ -310,12 +417,17 @@ pub(crate) async fn read_chapter(
                 stage: None,
                 model: Some("chapter_context_reading".into()),
                 error: None,
+                retry: None,
+                failures: Vec::new(),
+                project: None,
+                operation: None,
+                finish_sound: false,
             },
         );
     }
     publish_reading(&handle, id);
     drop(tokio::spawn(async move {
-        let result = read(&handle, &scope, text_only, &stop).await;
+        let result = read(&handle, &scope, selection, requested_project, &stop).await;
         let processing = handle.state::<Processing>();
         processing.stops.lock().remove(&id);
         let job = processing.jobs.lock().remove(&id).map(|mut job| {
@@ -340,6 +452,48 @@ pub(crate) async fn read_chapter(
 mod tests {
     use super::super::super::project::Project;
     use super::*;
+    #[test]
+    fn reading_vision_rule_uses_provider_allowlist_and_local_projector() {
+        for (provider, model, expected) in [
+            (Provider::OpenAi, "gpt", true),
+            (Provider::Claude, "claude", true),
+            (Provider::Gemini, "gemini", true),
+            (Provider::OpenRouter, "gpt", false),
+            (Provider::Grok, "grok", false),
+            (Provider::OpenAiCompatible, "vision", false),
+            (Provider::DeepL, "deepl", false),
+            (Provider::Local, "gemma4-12b-it", true),
+            (Provider::Local, "lfm2.5-1.2b-instruct", false),
+        ] {
+            let selection = ModelSelection {
+                provider,
+                model: Some(model.into()),
+                vision: true,
+                ..Default::default()
+            };
+            assert_eq!(can_read_images(&selection), expected, "{provider}");
+        }
+    }
+
+    #[test]
+    fn explicit_reading_model_wins_and_nonvision_automatic_choice_is_rejected() {
+        let translation = ModelSelection {
+            provider: Provider::DeepSeek,
+            ..Default::default()
+        };
+        assert!(reading_model(None, translation.clone()).is_err());
+        let requested = ModelSelection {
+            provider: Provider::Claude,
+            model: Some("reader".into()),
+            vision: false,
+            ..Default::default()
+        };
+        let selected = reading_model(Some(requested.clone()), translation).unwrap();
+        assert_eq!(selected.model, requested.model);
+        assert_eq!(selected.provider, Provider::Claude);
+        assert!(selected.vision);
+    }
+
     #[tokio::test]
     async fn read_results_persist_in_the_project_without_replacing_a_user_label() {
         let directory = tempfile::tempdir().unwrap();

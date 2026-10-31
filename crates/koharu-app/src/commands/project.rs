@@ -10,10 +10,10 @@ use koharu_desktop::Frame;
 use koharu_scene::{
     AssetInput, AssetMetadata, AssetRole, At, Authored, Commit, EntityId, EntityOrigin,
     Geometry as SceneGeometry, Group as SceneGroup, Origin, PageDraft, Point as ScenePoint,
-    Presents, RasterLayer as SceneRasterLayer, RasterLayerKind, Region as SceneRegion,
-    RemovePolicy, Revision, Session, Snapshot, SourceText as SceneSourceText,
-    TextGroup as SceneTextGroup, TextLayout as SceneTextLayout, TextLayoutKind,
-    Translation as SceneTranslation, Typography as SceneTypography, Visibility as SceneVisibility,
+    RasterLayer as SceneRasterLayer, RasterLayerKind, Region as SceneRegion, RemovePolicy,
+    Revision, Session, Snapshot, SourceText as SceneSourceText, TextGroup as SceneTextGroup,
+    TextLayout as SceneTextLayout, TextLayoutKind, Translation as SceneTranslation,
+    Typography as SceneTypography, Visibility as SceneVisibility,
 };
 use serde::Serialize;
 use specta::Type;
@@ -177,6 +177,9 @@ pub struct Typography {
     pub stroke_join: Option<koharu_scene::StrokeJoin>,
     pub outer_stroke_color: Option<[u8; 4]>,
     pub outer_stroke_width: Option<f32>,
+    pub line_spacing: Option<f32>,
+    pub letter_spacing: Option<f32>,
+    pub fill_gradient: Option<koharu_scene::FillGradient>,
     pub alignment: Option<koharu_scene::TextAlignment>,
     pub writing_mode: Option<koharu_scene::WritingMode>,
 }
@@ -192,15 +195,119 @@ pub(crate) struct ProjectLibrary {
 
 impl ProjectLibrary {
     pub(crate) fn new() -> Result<Self> {
-        let root = match koharu_config::preview::root()? {
+        let configured = match super::files::load_settings() {
+            Ok(settings) => settings.projects_folder,
+            Err(error) => {
+                tracing::warn!(%error, "could not read library settings; using default projects folder");
+                None
+            }
+        };
+        if let Some(root) = configured {
+            match Self::from_root(root) {
+                Ok(library) => return Ok(library),
+                Err(error) => {
+                    tracing::warn!(%error, "could not use configured projects folder; using default")
+                }
+            }
+        }
+        Self::from_root(Self::default_root()?)
+    }
+
+    pub(crate) fn default_root() -> Result<PathBuf> {
+        Ok(match koharu_config::preview::root()? {
             Some(root) => root.join("projects"),
             None => dirs::document_dir()
                 .context("the Documents directory is unavailable")?
                 .join("Koharu"),
-        };
-        std::fs::create_dir_all(&root)
+        })
+    }
+
+    pub(crate) fn from_root(root: PathBuf) -> Result<Self> {
+        super::files::prepare_folder(&root)
             .with_context(|| format!("failed to create {}", root.display()))?;
         Ok(Self { root })
+    }
+
+    pub(crate) fn root(&self) -> &Path {
+        &self.root
+    }
+
+    pub(crate) fn rename(
+        &self,
+        name: &str,
+        new_name: &str,
+        open_project: Option<&str>,
+    ) -> Result<()> {
+        let (name, source) = self.resolve(name)?;
+        anyhow::ensure!(
+            !open_project.is_some_and(|open| open.to_lowercase() == name.to_lowercase()),
+            "close the project before renaming it"
+        );
+        anyhow::ensure!(
+            new_name == new_name.trim(),
+            "project names cannot start or end with whitespace"
+        );
+        let (new_name, destination) = self.resolve(new_name)?;
+        anyhow::ensure!(
+            new_name.encode_utf16().count() <= 247,
+            "project name is too long"
+        );
+        anyhow::ensure!(
+            source.symlink_metadata()?.file_type().is_dir(),
+            "project does not exist or is not a directory"
+        );
+        anyhow::ensure!(
+            !self.name_exists(&new_name)?,
+            "a project with that name already exists"
+        );
+        std::fs::rename(&source, &destination).context("failed to rename project")
+    }
+
+    pub(crate) fn duplicate(&self, name: &str) -> Result<String> {
+        let (name, source) = self.resolve(name)?;
+        anyhow::ensure!(
+            source.symlink_metadata()?.file_type().is_dir(),
+            "project does not exist or is not a directory"
+        );
+        let mut number = 1;
+        let new_name = loop {
+            let candidate = if number == 1 {
+                format!("{name} copy")
+            } else {
+                format!("{name} copy {number}")
+            };
+            validate_project_name(&candidate)?;
+            anyhow::ensure!(
+                candidate.encode_utf16().count() <= 247,
+                "duplicate project name is too long"
+            );
+            if !self.name_exists(&candidate)? {
+                break candidate;
+            }
+            number += 1;
+        };
+        let stage = tempfile::Builder::new()
+            .prefix(".duplicate-")
+            .tempdir_in(&self.root)?;
+        super::files::library::copy_directory(&source, stage.path())?;
+        let destination = self.root.join(format!("{new_name}.khrproj"));
+        anyhow::ensure!(
+            !destination.try_exists()?,
+            "a project with that name already exists"
+        );
+        std::fs::rename(stage.path(), destination)
+            .context("failed to publish duplicate project")?;
+        Ok(new_name)
+    }
+
+    fn name_exists(&self, name: &str) -> Result<bool> {
+        let filename = format!("{name}.khrproj").to_lowercase();
+        for entry in std::fs::read_dir(&self.root)? {
+            if entry?.file_name().to_string_lossy().to_lowercase() == filename {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub(crate) fn list(&self) -> Result<Vec<ProjectSummary>> {
@@ -502,12 +609,10 @@ impl Project {
         let mut layer = None;
         let patch = snapshot.patch(|edit| {
             let content = edit.add_text_content(page, At::End)?;
-            edit.set(
+            // A translation needs a source record, but this unread placeholder is not a hand edit.
+            edit.reset_source_text(
                 content,
-                &SceneSourceText {
-                    text: Authored::user(String::new()),
-                    language: None,
-                },
+                koharu_scene::ProducerId::new("dev.koharu.pipeline.ocr")?,
             )?;
             let added_layer = edit.add_text_layer(
                 page,
@@ -517,6 +622,7 @@ impl Project {
                     origin: Origin::User,
                     kind,
                     angle_degrees: Some(frame.angle_degrees),
+                    warp: None,
                 },
             )?;
             layer = Some(added_layer);
@@ -536,6 +642,9 @@ impl Project {
                 stroke_join: None,
                 outer_stroke_color: None,
                 outer_stroke_width: None,
+                line_spacing: None,
+                letter_spacing: None,
+                fill_gradient: None,
                 alignment: match kind {
                     TextLayoutKind::Point => Some(koharu_scene::TextAlignment::Start),
                     TextLayoutKind::Paragraph => None,
@@ -640,6 +749,9 @@ impl Project {
                             .typography
                             .outer_stroke_width
                             .filter(|width| *width > 0.0),
+                        line_spacing: update.typography.line_spacing,
+                        letter_spacing: update.typography.letter_spacing,
+                        fill_gradient: update.typography.fill_gradient,
                         alignment: update.typography.alignment,
                         writing_mode: update.typography.writing_mode,
                         extensions: Default::default(),
@@ -871,32 +983,8 @@ impl Project {
             }
         }
         let layers = Self::unique_roots(&snapshot, expanded)?;
-        let mut orphaned_contents = Vec::new();
-        for layer in &layers {
-            let Some(relation) = snapshot.relation_from::<Presents>(*layer)? else {
-                continue;
-            };
-            let content = relation.value().target;
-            if snapshot.relations_to_as::<Presents>(content).count() == 1 {
-                orphaned_contents.push(content);
-            }
-        }
-        let patch = snapshot.patch(|edit| {
-            for layer in layers {
-                if snapshot.page(layer).is_ok() {
-                    return Err(koharu_scene::Error::Invalid(
-                        "delete pages with delete_pages".to_owned(),
-                    ));
-                }
-                edit.remove_entity(layer, RemovePolicy::Cascade)?;
-            }
-            for content in orphaned_contents {
-                if snapshot.entity(content).is_ok() {
-                    edit.remove_entity(content, RemovePolicy::Cascade)?;
-                }
-            }
-            Ok(())
-        })?;
+        let patch = snapshot
+            .patch(|edit| super::boxes::deletion::remove_layers(&snapshot, edit, &layers, false))?;
         self.commit(patch).await
     }
 
@@ -956,6 +1044,7 @@ impl Project {
         self.commit(patch).await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn apply_raster_stroke(
         &mut self,
         page: EntityId,
@@ -963,17 +1052,11 @@ impl Project {
         mode: RasterStrokeMode,
         color: [u8; 4],
         diameter: f32,
+        hardness: f32,
         points: Vec<ScenePoint>,
     ) -> Result<(Commit, EntityId)> {
-        if !diameter.is_finite() || diameter <= 0.0 || points.is_empty() {
-            bail!("a raster stroke requires a positive diameter and at least one point");
-        }
-        if points
-            .iter()
-            .any(|point| !point.x.is_finite() || !point.y.is_finite())
-        {
-            bail!("raster stroke points must be finite");
-        }
+        let points_for_mask: Vec<Point> = points.iter().map(|p| Point { x: p.x, y: p.y }).collect();
+        super::cleanup::stroke::validate(&points_for_mask, diameter, hardness)?;
         let snapshot = self.snapshot();
         let page_value = snapshot.page(page)?.page()?;
         let width = page_value.width.round() as u32;
@@ -981,6 +1064,21 @@ impl Project {
         if width == 0 || height == 0 {
             bail!("page dimensions must be positive");
         }
+        let target = koharu_config::load::<koharu_pipeline::CleanupSettings>("cleanup")?
+            .read()?
+            .paint_target;
+        let create_cleanup = layer.is_none() && target == koharu_pipeline::PaintTarget::Cleanup;
+        let layer = if create_cleanup {
+            snapshot.children(page)?.find(|entity| {
+                snapshot
+                    .component::<SceneRasterLayer>(*entity)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|layer| layer.kind == RasterLayerKind::Cleanup)
+            })
+        } else {
+            layer
+        };
         let mut raster_layer = None;
         let mut promote_layer = false;
         let mut image = if let Some(layer) = layer {
@@ -1002,6 +1100,12 @@ impl Project {
                 }
                 None => RgbaImage::new(width, height),
             }
+        } else if create_cleanup {
+            let asset = snapshot
+                .asset(page, &AssetRole::new("source")?)?
+                .context("the page has no source image for manual cleanup")?;
+            let bytes = snapshot.read_blob(asset.blob).await?;
+            image::load_from_memory(&bytes)?.to_rgba8()
         } else {
             if mode == RasterStrokeMode::Erase {
                 bail!("eraser requires a raster layer target");
@@ -1011,24 +1115,28 @@ impl Project {
         if image.dimensions() != (width, height) {
             bail!("raster layer dimensions must match the page");
         }
-        rasterize_stroke(&mut image, mode, color, diameter, &points);
+        rasterize_stroke(&mut image, mode, color, diameter, hardness, &points);
         let mut bytes = Cursor::new(Vec::new());
         DynamicImage::ImageRgba8(image).write_to(&mut bytes, ImageFormat::Png)?;
         let source = AssetRole::new("source")?;
-        let name = format!(
-            "Paint {}",
-            snapshot
-                .children(page)?
-                .filter(|entity| {
-                    snapshot
-                        .component::<SceneRasterLayer>(*entity)
-                        .ok()
-                        .flatten()
-                        .is_some_and(|layer| layer.kind == RasterLayerKind::Paint)
-                })
-                .count()
-                + 1
-        );
+        let name = if create_cleanup {
+            "Cleanup".to_owned()
+        } else {
+            format!(
+                "Paint {}",
+                snapshot
+                    .children(page)?
+                    .filter(|entity| {
+                        snapshot
+                            .component::<SceneRasterLayer>(*entity)
+                            .ok()
+                            .flatten()
+                            .is_some_and(|layer| layer.kind == RasterLayerKind::Paint)
+                    })
+                    .count()
+                    + 1
+            )
+        };
         let mut committed_layer = layer;
         let patch = snapshot.patch(|edit| {
             let layer = if let Some(layer) = committed_layer {
@@ -1042,17 +1150,25 @@ impl Project {
                 }
                 layer
             } else {
-                let at = snapshot
-                    .page(page)?
-                    .text_group()?
-                    .map_or(At::End, |group| At::Before(group.id()));
+                let at = if create_cleanup {
+                    At::Start
+                } else {
+                    snapshot
+                        .page(page)?
+                        .text_group()?
+                        .map_or(At::End, |group| At::Before(group.id()))
+                };
                 let layer = edit.add_entity(page, at)?;
                 edit.set(
                     layer,
                     &SceneRasterLayer {
                         origin: Origin::User,
                         name,
-                        kind: RasterLayerKind::Paint,
+                        kind: if create_cleanup {
+                            RasterLayerKind::Cleanup
+                        } else {
+                            RasterLayerKind::Paint
+                        },
                     },
                 )?;
                 committed_layer = Some(layer);
@@ -1140,7 +1256,7 @@ impl Project {
         Ok(Some(self.commit(patch).await?))
     }
 
-    async fn commit(&mut self, patch: koharu_scene::Patch) -> Result<Commit> {
+    pub(crate) async fn commit(&mut self, patch: koharu_scene::Patch) -> Result<Commit> {
         Ok(self.session.commit(patch).await?)
     }
 
@@ -1330,6 +1446,9 @@ impl Project {
             stroke_join: typography.stroke_join,
             outer_stroke_color: typography.outer_stroke_color,
             outer_stroke_width: typography.outer_stroke_width,
+            line_spacing: typography.line_spacing,
+            letter_spacing: typography.letter_spacing,
+            fill_gradient: typography.fill_gradient,
             alignment: typography.alignment,
             writing_mode,
         }
@@ -1491,63 +1610,36 @@ fn rasterize_stroke(
     mode: RasterStrokeMode,
     color: [u8; 4],
     diameter: f32,
+    _hardness: f32,
     points: &[ScenePoint],
 ) {
-    let radius = f64::from(diameter) * 0.5;
-    for (start, end) in points
-        .iter()
-        .zip(points.iter().skip(1))
-        .chain(points.last().map(|point| (point, point)))
-    {
-        let left = (start.x.min(end.x) - radius - 0.5).floor().max(0.0) as u32;
-        let top = (start.y.min(end.y) - radius - 0.5).floor().max(0.0) as u32;
-        let right = (start.x.max(end.x) + radius + 0.5)
-            .ceil()
-            .min(f64::from(image.width())) as u32;
-        let bottom = (start.y.max(end.y) + radius + 0.5)
-            .ceil()
-            .min(f64::from(image.height())) as u32;
-        let dx = end.x - start.x;
-        let dy = end.y - start.y;
-        let length_squared = dx * dx + dy * dy;
-        for y in top..bottom {
-            for x in left..right {
-                let px = f64::from(x) + 0.5;
-                let py = f64::from(y) + 0.5;
-                let t = if length_squared == 0.0 {
-                    0.0
-                } else {
-                    (((px - start.x) * dx + (py - start.y) * dy) / length_squared).clamp(0.0, 1.0)
-                };
-                let distance =
-                    ((px - (start.x + t * dx)).powi(2) + (py - (start.y + t * dy)).powi(2)).sqrt();
-                let coverage = (radius + 0.5 - distance).clamp(0.0, 1.0) as f32;
-                if coverage == 0.0 {
-                    continue;
-                }
-                let pixel = image.get_pixel_mut(x, y);
-                match mode {
-                    RasterStrokeMode::Paint => {
-                        let source_alpha = f32::from(color[3]) / 255.0 * coverage;
-                        let destination_alpha = f32::from(pixel[3]) / 255.0;
-                        let output_alpha = source_alpha + destination_alpha * (1.0 - source_alpha);
-                        if output_alpha > 0.0 {
-                            for channel in 0..3 {
-                                let source = f32::from(color[channel]) / 255.0;
-                                let destination = f32::from(pixel[channel]) / 255.0;
-                                pixel[channel] = (((source * source_alpha
-                                    + destination * destination_alpha * (1.0 - source_alpha))
-                                    / output_alpha)
-                                    * 255.0)
-                                    .round() as u8;
-                            }
-                        }
-                        pixel[3] = (output_alpha * 255.0).round() as u8;
-                    }
-                    RasterStrokeMode::Erase => {
-                        pixel[3] = (f32::from(pixel[3]) * (1.0 - coverage)).round() as u8;
+    let points: Vec<Point> = points.iter().map(|p| Point { x: p.x, y: p.y }).collect();
+    let mut mask = image::GrayImage::new(image.width(), image.height());
+    super::cleanup::stroke::add_stroke(&mut mask, &points, diameter, _hardness);
+    // Union the stroke first: opacity must not increase at segment joins or pointer samples.
+    for (x, y, pixel) in image.enumerate_pixels_mut() {
+        let coverage = f32::from(mask.get_pixel(x, y)[0]) / 255.0;
+        if coverage == 0.0 {
+            continue;
+        }
+        match mode {
+            RasterStrokeMode::Paint => {
+                let source_alpha = f32::from(color[3]) / 255.0 * coverage;
+                let destination_alpha = f32::from(pixel[3]) / 255.0;
+                let output_alpha = source_alpha + destination_alpha * (1.0 - source_alpha);
+                if output_alpha > 0.0 {
+                    for channel in 0..3 {
+                        pixel[channel] = ((f32::from(color[channel]) * source_alpha
+                            + f32::from(pixel[channel]) * destination_alpha * (1.0 - source_alpha))
+                            / output_alpha)
+                            .round() as u8;
                     }
                 }
+                pixel[3] = (output_alpha * 255.0).round() as u8;
+            }
+            // Source artwork is a separate layer below Cleanup, so this reveals the original.
+            RasterStrokeMode::Erase => {
+                pixel[3] = (f32::from(pixel[3]) * (1.0 - coverage)).round() as u8
             }
         }
     }
@@ -1555,7 +1647,7 @@ fn rasterize_stroke(
 
 #[cfg(test)]
 mod tests {
-    use koharu_scene::{Generation, ProducerId, WritingMode};
+    use koharu_scene::{Generation, Presents, ProducerId, WritingMode};
 
     use super::*;
 
@@ -1575,6 +1667,9 @@ mod tests {
             stroke_join: None,
             outer_stroke_color: None,
             outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
             alignment: Some(koharu_scene::TextAlignment::Center),
             writing_mode: Some(WritingMode::Horizontal),
             extensions: [("dev.booharu.test".into(), "kept".into())].into(),
@@ -1601,6 +1696,7 @@ mod tests {
                                 origin: Origin::User,
                                 kind: TextLayoutKind::Paragraph,
                                 angle_degrees: None,
+                                warp: None,
                             },
                         )?;
                         edit.set(layer, &original)?;
@@ -1688,6 +1784,7 @@ mod tests {
                             origin: Origin::User,
                             kind: TextLayoutKind::Paragraph,
                             angle_degrees: None,
+                            warp: None,
                         },
                     )?;
                     edit.set(layer, &style_test_typography())?;
@@ -1755,6 +1852,7 @@ mod tests {
                             origin: Origin::User,
                             kind: TextLayoutKind::Paragraph,
                             angle_degrees: None,
+                            warp: None,
                         },
                     )?;
                     edit.set(layer, &original)?;
@@ -1781,6 +1879,7 @@ mod tests {
                                 origin: Origin::User,
                                 kind: TextLayoutKind::Paragraph,
                                 angle_degrees: None,
+                                warp: None,
                             },
                         )?;
                         edit.set(layer, &original)?;
@@ -1886,6 +1985,7 @@ mod tests {
                         origin: Origin::Generated(generation.clone()),
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: None,
+                        warp: None,
                     },
                 )
                 .unwrap();
@@ -2049,6 +2149,9 @@ mod tests {
             stroke_join: None,
             outer_stroke_color: None,
             outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
             alignment: None,
             writing_mode: Some(WritingMode::Vertical),
             extensions: Default::default(),
@@ -2108,6 +2211,7 @@ mod tests {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: None,
+                        warp: None,
                     },
                 )
                 .unwrap();
@@ -2280,6 +2384,7 @@ mod tests {
             RasterStrokeMode::Paint,
             [210, 40, 20, 255],
             5.0,
+            100.0,
             &points,
         );
         for x in 4..28 {
@@ -2291,6 +2396,7 @@ mod tests {
             RasterStrokeMode::Erase,
             [0, 0, 0, 0],
             5.0,
+            100.0,
             &[ScenePoint { x: 16.0, y: 8.0 }],
         );
         assert_eq!(image.get_pixel(16, 8)[3], 0);
@@ -2302,6 +2408,7 @@ mod tests {
             RasterStrokeMode::Paint,
             [255, 255, 255, 255],
             3.0,
+            100.0,
             &[ScenePoint { x: 2.0, y: 2.0 }],
         );
         assert_eq!(white.get_pixel(2, 2).0, [255, 255, 255, 255]);

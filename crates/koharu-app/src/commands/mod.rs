@@ -1,17 +1,28 @@
 pub(crate) mod agent;
+pub(crate) mod boxes;
 pub(crate) mod canvas;
+pub(crate) mod cleanup;
 pub(crate) mod context;
 pub(crate) mod editing;
+pub(crate) mod files;
 pub(crate) mod fonts;
 pub(crate) mod import;
 pub(crate) mod lettering;
 pub(crate) mod lifecycle;
 pub(crate) mod line_labels;
+pub(crate) mod mcp;
+pub(crate) mod notes;
+pub(crate) mod ocr_box;
 pub(crate) mod output;
 pub(crate) mod preferences;
 pub(crate) mod processing;
 pub(crate) mod project;
+pub(crate) mod qc;
+pub(crate) mod raw_prep;
+pub(crate) mod redesign;
+pub(crate) mod runs;
 pub(crate) mod styles;
+pub(crate) mod warp;
 
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -155,6 +166,77 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             lettering::get_effective_category,
             lettering::get_lettering_settings,
             lettering::save_lettering_settings,
+            // WO-20 (one box per bubble) commands go here.
+            boxes::get_box_settings,
+            boxes::save_box_settings,
+            boxes::redetect_page,
+            boxes::get_box_actions,
+            boxes::join_bubble_boxes,
+            boxes::join_page_bubbles,
+            boxes::split_box,
+            // WO-12 (QC list) commands go here.
+            qc::run_qc,
+            qc::mark_qc_ok,
+            qc::get_qc_settings,
+            qc::save_qc_settings,
+            qc::get_page_source,
+            // WO-13 (files and export) commands go here.
+            files::get_library_settings,
+            files::save_library_settings,
+            output::export_selected_pages,
+            files::scripts::export_script,
+            files::scripts::preview_script_import,
+            files::scripts::apply_script_import,
+            files::library::get_library_paths,
+            files::library::choose_library_folder,
+            files::library::reset_library_folder,
+            files::library::open_library_folder,
+            files::library::rename_project,
+            files::library::duplicate_project,
+            // WO-14 (runs and retries) commands go here.
+            runs::get_run_settings,
+            runs::save_run_settings,
+            runs::retry_failed_pages,
+            runs::preview_chapter_batch,
+            runs::run_chapter_batch,
+            runs::stop_chapter_batch,
+            // WO-06 (text style extras and box notes) commands go here.
+            notes::get_box_note,
+            notes::set_box_note,
+            // WO-21 (MCP server) commands go here.
+            mcp::get_mcp_status,
+            mcp::save_mcp_settings,
+            mcp::new_mcp_token,
+            // WO-07 (OCR box and redo) commands go here.
+            ocr_box::settings::get_ocr_box_settings,
+            ocr_box::settings::save_ocr_box_settings,
+            ocr_box::add_ocr_box,
+            ocr_box::get_ocr_redo_info,
+            ocr_box::redo_ocr_boxes,
+            ocr_box::add_sfx_subtitle,
+            // WO-15 (cleanup brushes) commands go here.
+            cleanup::get_cleanup_settings,
+            cleanup::save_cleanup_settings,
+            cleanup::clean_areas,
+            // WO-10 (skew and perspective) commands go here.
+            warp::get_text_warp,
+            warp::set_text_warp,
+            // WO-17 (raw prep) commands go here.
+            raw_prep::get_raw_prep_settings,
+            raw_prep::save_raw_prep_settings,
+            raw_prep::get_prep_page_status,
+            raw_prep::prepare_pages,
+            raw_prep::restore_original_pages,
+            raw_prep::preview_prep,
+            // WO-23 (redesigned panel and popups) commands go here.
+            redesign::get_box_effects,
+            redesign::reset_box_effects,
+            // WO-24 (automatic QC and context tab) commands go here.
+            qc::get_qc_results,
+            qc::mark_qc_finding,
+            context::reading::get_reading_model,
+            context::reading::get_reading_models,
+            context::reading::get_last_read_model,
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)

@@ -2,125 +2,39 @@
 
 import type { TFunction } from 'i18next'
 import {
-  AlignCenter,
-  AlignLeft,
-  AlignRight,
   ArrowDown,
-  ArrowRightLeft,
   ArrowUp,
   Brush,
-  ChevronDown,
   Eye,
   EyeOff,
   Folder,
+  GripVertical,
   Image as ImageIcon,
   Layers3,
   Lock,
-  Minus,
-  Plus,
   RotateCcw,
   Trash2,
   Type,
 } from 'lucide-react'
-import { type MouseEvent, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { type DragEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { GlossaryTextMenu } from '@/components/context/GlossaryTextMenu'
-import { ColorWell } from '@/components/controls/ColorWell'
-import { CommitTextarea } from '@/components/controls/CommitTextarea'
-import { FontPicker } from '@/components/controls/FontPicker'
-import { BubbleShapeLine } from '@/components/editor/BubbleShapeLine'
-import { LetteringCategoryLine } from '@/components/editor/LetteringCategoryLine'
-import { LineContextCard } from '@/components/editor/LineContextCard'
+import { layerDropIndex } from '@/components/files/layer-order'
+import { useBoxIssues } from '@/components/qc/useBoxIssues'
+import { BoxDialogs } from '@/components/redesign/BoxDialogs'
+import { RowTags } from '@/components/redesign/RowTags'
+import { TypeInspector } from '@/components/redesign/TypeControls'
+import { usePageEffects } from '@/components/redesign/usePageEffects'
 import { call } from '@/lib/backend'
-import { hexToRgba, rgbaToHex } from '@/lib/color'
-import {
-  expandLayerSelection,
-  isGroupLayer,
-  isLockedLayer,
-  isTextLayer,
-  layerChildren,
-} from '@/lib/document'
-import { pageKey, projectKey, queryClient, refresh, useFonts, usePage } from '@/lib/queries'
+import { isGroupLayer, isLockedLayer, isTextLayer, layerChildren } from '@/lib/document'
+import { pageKey, projectKey, queryClient, refresh, usePage } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { previewCanvasOpacity } from '@koharu/bridge/canvas'
-import {
-  commands,
-  type EntityId,
-  type FontFamily,
-  type FontStyle,
-  type StrokeMethod,
-  type StrokePosition,
-  type StrokeJoin,
-  type Layer,
-  type TextAlignment,
-  type Typography,
-  type WritingMode,
-} from '@koharu/bridge/protocol'
+import { commands, type EntityId, type Layer } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '@koharu/ui/components/dropdown-menu'
-import {
-  NumberField,
-  NumberFieldDecrement,
-  NumberFieldGroup,
-  NumberFieldIncrement,
-  NumberFieldInput,
-} from '@koharu/ui/components/number-field'
 import { ScrollArea } from '@koharu/ui/components/scroll-area'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@koharu/ui/components/select'
 import { Slider } from '@koharu/ui/components/slider'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/tooltip'
-
-const defaultFont: FontFamily = {
-  name: 'CCWildWords',
-  metadata: {
-    primary_script: 'latn',
-    scripts: ['latn'],
-    languages: ['en'],
-    category: 'HANDWRITING',
-    classifications: ['comic', 'dialogue'],
-    use_cases: ['comic-dialogue', 'word-balloons'],
-  },
-  sources: ['bundled'],
-  faces: [
-    {
-      postscript_name: 'CCWildWords-Regular',
-      weight: 400,
-      weight_range: null,
-      style: 'normal',
-    },
-  ],
-}
-
-const defaultTypography: Typography = {
-  preferred_font: null,
-  font_weight: 400,
-  font_style: 'normal',
-  size: null,
-  auto_fit: true,
-  color: [0, 0, 0, 255],
-  stroke_color: [255, 255, 255, 255],
-  stroke_width: 0,
-  stroke_method: null,
-  stroke_position: null,
-  stroke_join: null,
-  outer_stroke_color: [0, 0, 0, 255],
-  outer_stroke_width: 0,
-  alignment: null,
-  writing_mode: null,
-}
 
 export function Inspector() {
   const { t } = useTranslation()
@@ -137,533 +51,10 @@ export function Inspector() {
 
       <section className='flex min-h-0 flex-1 flex-col'>
         <LayersInspector />
+        <BoxDialogs />
       </section>
     </aside>
   )
-}
-
-function TypeInspector() {
-  const { t } = useTranslation()
-  const borderWidthId = useId()
-  const secondBorderWidthId = useId()
-  const page = usePage().data
-  const selectedIds = useKoharuStore((state) => state.selectedLayers)
-  const availableFonts = useFonts().data
-  const expandedSelection = page ? expandLayerSelection(page.layers, selectedIds) : []
-  const selected =
-    page?.layers.filter(isTextLayer).filter((layer) => expandedSelection.includes(layer.id)) ?? []
-  const current = selected[0]
-  const [draft, setDraft] = useState<{
-    layer: EntityId
-    typography: Typography
-  } | null>(null)
-  const updateSequence = useRef(0)
-
-  useEffect(() => setDraft(null), [current?.id])
-
-  const apply = (update: (value: Typography) => Typography) => {
-    if (!selected.length) return
-    const updates = selected.map((layer) => ({
-      layer: layer.id,
-      typography: update(layer.typography ?? defaultTypography),
-    }))
-    const optimistic = current && updates.find(({ layer }) => layer === current.id)
-    if (optimistic) setDraft(optimistic)
-    const sequence = ++updateSequence.current
-    void call(commands.setTypography, updates)
-      .then(() => refresh(projectKey, pageKey))
-      .catch(() => undefined)
-      .finally(() => {
-        if (updateSequence.current === sequence) setDraft(null)
-      })
-  }
-
-  const typography =
-    current && draft?.layer === current.id
-      ? draft.typography
-      : (current?.typography ?? defaultTypography)
-  const disabled = !current
-  const families = useMemo(() => {
-    const available = availableFonts ?? []
-    return available.some(
-      (family) => normalizeFontName(family.name) === normalizeFontName(defaultFont.name),
-    )
-      ? available
-      : [...available, defaultFont]
-  }, [availableFonts])
-  const size = Math.round((typography.size ?? 24) * 100) / 100
-  const weight = typography.font_weight ?? 400
-  const selectedFamily = findFontFamily(families, typography.preferred_font ?? defaultFont.name)
-  const styles = usableFontStyles(selectedFamily)
-  const style = styles.includes(typography.font_style ?? 'normal')
-    ? (typography.font_style ?? 'normal')
-    : (styles[0] ?? 'normal')
-  const weights = usableFontWeights(selectedFamily, style)
-  const strokeWidth = typography.stroke_width ?? 0
-  const strokeColor = typography.stroke_color ?? defaultTypography.stroke_color!
-  const strokeEnabled = strokeWidth > 0 && strokeColor[3] > 0
-  const displayedStrokeWidth = strokeWidth > 0 ? strokeWidth : 1.5
-  const strokeMethod = typography.stroke_method ?? 'expansion'
-  const strokePosition = typography.stroke_position ?? 'outside'
-  const strokeJoin = typography.stroke_join ?? 'round'
-  const outerWidth = typography.outer_stroke_width ?? 0
-  const outerColor = typography.outer_stroke_color ?? defaultTypography.outer_stroke_color!
-  const outerEnabled = strokeEnabled && outerWidth > 0 && outerColor[3] > 0
-  const displayedOuterWidth = outerWidth > 0 ? outerWidth : 3
-  const writingMode = typography.writing_mode ?? 'Horizontal'
-  const writingModeChoice = typography.writing_mode ?? 'Auto'
-  const effectiveAlignment =
-    typography.alignment ?? (writingMode === 'Vertical' ? 'Start' : 'Center')
-
-  return (
-    <div className='min-w-0 p-2' data-testid='type-inspector' aria-disabled={disabled}>
-      <div className='grid min-w-0 gap-1.5'>
-        {current && <BubbleShapeLine layer={current.id} />}
-        {current && <LetteringCategoryLine layer={current.id} />}
-        {current && <LineContextCard layer={current.id} />}
-        <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_2.5rem] gap-1.5'>
-          <InspectorField label={t('inspector.font')}>
-            <FontPicker
-              value={typography.preferred_font ?? defaultFont.name}
-              families={families}
-              disabled={disabled}
-              size='sm'
-              onChange={(preferred_font) => {
-                const family = findFontFamily(families, preferred_font)
-                const nextStyles = usableFontStyles(family)
-                const fontStyle = nextStyles.includes(style) ? style : (nextStyles[0] ?? 'normal')
-                const nextWeights = usableFontWeights(family, fontStyle)
-                const fontWeight = nearestFontWeight(nextWeights, weight)
-                apply((value) => ({
-                  ...value,
-                  preferred_font,
-                  font_weight: fontWeight,
-                  font_style: fontStyle,
-                }))
-              }}
-            />
-          </InspectorField>
-          <InspectorField label={t('inspector.color')}>
-            <ColorWell
-              label={t('inspector.textColor')}
-              size='sm'
-              disabled={disabled}
-              value={rgbaToHex(typography.color ?? defaultTypography.color!)}
-              onChange={(color) => apply((value) => ({ ...value, color: hexToRgba(color) }))}
-            />
-          </InspectorField>
-        </div>
-
-        <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_4.25rem_4.75rem] gap-1.5'>
-          <InspectorField label={t('inspector.size')}>
-            <FontSizeField
-              disabled={disabled}
-              value={size}
-              autoFit={typography.auto_fit}
-              onChange={(next) => apply((value) => ({ ...value, size: next, auto_fit: false }))}
-              onAutoFit={() =>
-                apply((value) => ({
-                  ...value,
-                  size: value.size ?? size,
-                  auto_fit: true,
-                }))
-              }
-            />
-          </InspectorField>
-          <InspectorField label={t('inspector.weight')}>
-            <Select
-              disabled={disabled}
-              value={String(weight)}
-              onValueChange={(font_weight) =>
-                apply((value) => ({
-                  ...value,
-                  font_weight: Number(font_weight),
-                }))
-              }
-            >
-              <SelectTrigger
-                size='sm'
-                aria-label={t('inspector.fontWeight')}
-                className='w-full min-w-0'
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {weights.map((value) => (
-                  <SelectItem key={value} value={String(value)}>
-                    {value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </InspectorField>
-          <InspectorField label={t('inspector.style')}>
-            <Select
-              disabled={disabled}
-              value={style}
-              onValueChange={(font_style) => {
-                const nextStyle = font_style as FontStyle
-                const nextWeights = usableFontWeights(selectedFamily, nextStyle)
-                apply((value) => ({
-                  ...value,
-                  font_style: nextStyle,
-                  font_weight: nearestFontWeight(nextWeights, weight),
-                }))
-              }}
-            >
-              <SelectTrigger
-                size='sm'
-                aria-label={t('inspector.fontStyle')}
-                className='w-full min-w-0'
-              >
-                <SelectValue>{t(`inspector.fontStyles.${style}`)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent align='end'>
-                {styles.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {t(`inspector.fontStyles.${value}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </InspectorField>
-        </div>
-
-        <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(6.5rem,1fr)] gap-1.5'>
-          <InspectorField label={t('inspector.alignment')}>
-            <div className='grid h-6 grid-cols-3 rounded-md border border-input bg-background p-px'>
-              {(
-                [
-                  [
-                    'Start',
-                    AlignLeft,
-                    writingMode === 'Vertical' ? t('inspector.alignTop') : t('inspector.alignLeft'),
-                  ],
-                  [
-                    'Center',
-                    AlignCenter,
-                    writingMode === 'Vertical'
-                      ? t('inspector.alignMiddle')
-                      : t('inspector.alignCenter'),
-                  ],
-                  [
-                    'End',
-                    AlignRight,
-                    writingMode === 'Vertical'
-                      ? t('inspector.alignBottom')
-                      : t('inspector.alignRight'),
-                  ],
-                ] as const
-              ).map(([alignment, Icon, label]) => (
-                <button
-                  key={alignment}
-                  type='button'
-                  aria-label={label}
-                  aria-pressed={effectiveAlignment === alignment}
-                  disabled={disabled}
-                  data-active={effectiveAlignment === alignment}
-                  className='grid place-items-center rounded-[4px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90'
-                  onClick={() =>
-                    apply((value) => ({
-                      ...value,
-                      alignment: alignment as TextAlignment,
-                    }))
-                  }
-                >
-                  <Icon className='size-3' />
-                </button>
-              ))}
-            </div>
-          </InspectorField>
-          <InspectorField label={t('inspector.direction')}>
-            <Select
-              disabled={disabled}
-              value={writingModeChoice}
-              onValueChange={(writing_mode) =>
-                apply((value) => ({
-                  ...value,
-                  writing_mode: writing_mode === 'Auto' ? null : (writing_mode as WritingMode),
-                }))
-              }
-            >
-              <SelectTrigger size='sm' aria-label={t('inspector.textDirection')} className='w-full'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='Auto'>{t('inspector.auto')}</SelectItem>
-                <SelectItem value='Horizontal'>{t('inspector.horizontal')}</SelectItem>
-                <SelectItem value='Vertical'>{t('inspector.vertical')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </InspectorField>
-        </div>
-
-        <div className='grid min-w-0 grid-cols-[2.75rem_minmax(5.5rem,1fr)_1.5rem] items-end gap-1.5'>
-          <InspectorField label={t('inspector.border')}>
-            <ColorWell
-              label={t('inspector.borderColor')}
-              size='sm'
-              disabled={disabled}
-              allowTransparent
-              value={strokeEnabled ? rgbaToHex(strokeColor) : null}
-              onChange={(stroke_color) => {
-                apply((value) => {
-                  const width = value.stroke_width ?? 0
-                  if (stroke_color !== null) {
-                    return {
-                      ...value,
-                      stroke_color: hexToRgba(stroke_color),
-                      stroke_width: width > 0 ? width : 1.5,
-                    }
-                  }
-                  const [red, green, blue] = value.stroke_color ?? defaultTypography.stroke_color!
-                  return {
-                    ...value,
-                    stroke_color: [red, green, blue, 0],
-                    stroke_width: width > 0 ? width : 1.5,
-                  }
-                })
-              }}
-            />
-          </InspectorField>
-          <InspectorField label={t('inspector.width')}>
-            <NumberField
-              id={borderWidthId}
-              name='border-width'
-              className='min-w-0'
-              disabled={disabled}
-              value={displayedStrokeWidth}
-              min={0.5}
-              max={32}
-              step={0.5}
-              onValueChange={(next) => {
-                if (next !== null && next >= 0.5 && next <= 32) {
-                  apply((value) => ({ ...value, stroke_width: next }))
-                }
-              }}
-            >
-              <NumberFieldGroup>
-                <NumberFieldDecrement aria-label={t('inspector.decreaseBorderWidth')}>
-                  <Minus />
-                </NumberFieldDecrement>
-                <NumberFieldInput aria-label={t('inspector.borderWidth')} />
-                <NumberFieldIncrement aria-label={t('inspector.increaseBorderWidth')}>
-                  <Plus />
-                </NumberFieldIncrement>
-              </NumberFieldGroup>
-            </NumberField>
-          </InspectorField>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='icon-xs'
-                  aria-label={t('inspector.swapFillOutline')}
-                  disabled={disabled}
-                  onClick={() => apply((value) => invertBorder(value, displayedStrokeWidth))}
-                />
-              }
-            >
-              <ArrowRightLeft className='size-3' />
-            </TooltipTrigger>
-            <TooltipContent side='left'>{t('inspector.swapFillOutline')}</TooltipContent>
-          </Tooltip>
-        </div>
-        <div className='grid min-w-0 grid-cols-[2.75rem_minmax(5.5rem,1fr)] items-end gap-1.5'>
-          <InspectorField label={t('inspector.secondBorder')}>
-            <ColorWell
-              label={t('inspector.secondBorderColor')}
-              size='sm'
-              disabled={disabled || !strokeEnabled}
-              allowTransparent
-              value={outerEnabled ? rgbaToHex(outerColor) : null}
-              onChange={(outer_stroke_color) => {
-                apply((value) => {
-                  if (outer_stroke_color === null) {
-                    return { ...value, outer_stroke_width: 0 }
-                  }
-                  const width = value.outer_stroke_width ?? 0
-                  return {
-                    ...value,
-                    outer_stroke_color: hexToRgba(outer_stroke_color),
-                    outer_stroke_width: width > 0 ? width : 3,
-                  }
-                })
-              }}
-            />
-          </InspectorField>
-          <InspectorField label={t('inspector.width')}>
-            <NumberField
-              id={secondBorderWidthId}
-              name='second-border-width'
-              className='min-w-0'
-              disabled={disabled || !strokeEnabled}
-              value={displayedOuterWidth}
-              min={0.5}
-              max={32}
-              step={0.5}
-              onValueChange={(next) => {
-                if (next !== null && next >= 0.5 && next <= 32) {
-                  apply((value) => ({ ...value, outer_stroke_width: next }))
-                }
-              }}
-            >
-              <NumberFieldGroup>
-                <NumberFieldDecrement aria-label={t('inspector.decreaseSecondBorderWidth')}>
-                  <Minus />
-                </NumberFieldDecrement>
-                <NumberFieldInput aria-label={t('inspector.secondBorderWidth')} />
-                <NumberFieldIncrement aria-label={t('inspector.increaseSecondBorderWidth')}>
-                  <Plus />
-                </NumberFieldIncrement>
-              </NumberFieldGroup>
-            </NumberField>
-          </InspectorField>
-        </div>
-        <div className='grid min-w-0 grid-cols-2 gap-1.5'>
-          <InspectorField label={t('inspector.outlineMethod')}>
-            <Select
-              disabled={disabled}
-              value={strokeMethod}
-              onValueChange={(method) =>
-                apply((value) => ({ ...value, stroke_method: method as StrokeMethod }))
-              }
-            >
-              <SelectTrigger size='sm' aria-label={t('inspector.outlineMethod')} className='w-full'>
-                <SelectValue>
-                  {t(
-                    strokeMethod === 'contour'
-                      ? 'inspector.outlineContour'
-                      : 'inspector.outlineExpansion',
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='expansion'>{t('inspector.outlineExpansion')}</SelectItem>
-                <SelectItem value='contour'>{t('inspector.outlineContour')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </InspectorField>
-          <InspectorField label={t('inspector.outlinePosition')}>
-            <Select
-              disabled={disabled || strokeMethod !== 'contour'}
-              value={strokePosition}
-              onValueChange={(position) =>
-                apply((value) => ({ ...value, stroke_position: position as StrokePosition }))
-              }
-            >
-              <SelectTrigger
-                size='sm'
-                aria-label={t('inspector.outlinePosition')}
-                className='w-full'
-              >
-                <SelectValue>
-                  {t(
-                    {
-                      outside: 'inspector.outlineOutside',
-                      center: 'inspector.outlineCenter',
-                      inside: 'inspector.outlineInside',
-                    }[strokePosition],
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='outside'>{t('inspector.outlineOutside')}</SelectItem>
-                <SelectItem value='center'>{t('inspector.outlineCenter')}</SelectItem>
-                <SelectItem value='inside'>{t('inspector.outlineInside')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </InspectorField>
-          <InspectorField label={t('inspector.outlineJoin')}>
-            <Select
-              disabled={disabled || strokeMethod !== 'contour'}
-              value={strokeJoin}
-              onValueChange={(join) =>
-                apply((value) => ({ ...value, stroke_join: join as StrokeJoin }))
-              }
-            >
-              <SelectTrigger size='sm' aria-label={t('inspector.outlineJoin')} className='w-full'>
-                <SelectValue>
-                  {t(
-                    {
-                      round: 'inspector.outlineRound',
-                      miter: 'inspector.outlineMiter',
-                      bevel: 'inspector.outlineBevel',
-                    }[strokeJoin],
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='round'>{t('inspector.outlineRound')}</SelectItem>
-                <SelectItem value='miter'>{t('inspector.outlineMiter')}</SelectItem>
-                <SelectItem value='bevel'>{t('inspector.outlineBevel')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </InspectorField>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Without a visible border, use a contrasting fill instead of transparent text.
-function invertBorder(value: Typography, displayedWidth: number): Typography {
-  const color = value.color ?? defaultTypography.color!
-  const stroke = value.stroke_color
-  if ((value.stroke_width ?? 0) > 0 && stroke && stroke[3] > 0) {
-    return { ...value, color: stroke, stroke_color: color }
-  }
-  const [red, green, blue] = color
-  const light = 0.2126 * red + 0.7152 * green + 0.0722 * blue > 127.5
-  return {
-    ...value,
-    color: light ? [0, 0, 0, 255] : [255, 255, 255, 255],
-    stroke_color: [red, green, blue, 255],
-    stroke_width: displayedWidth,
-  }
-}
-
-function findFontFamily(families: FontFamily[], name: string): FontFamily | undefined {
-  return families.find((family) => normalizeFontName(family.name) === normalizeFontName(name))
-}
-
-function usableFontStyles(family: FontFamily | undefined): FontStyle[] {
-  if (!family) return ['normal']
-  const styles = new Set(family.faces.map((font) => font.style))
-  const available = (['normal', 'italic', 'oblique'] satisfies FontStyle[]).filter((style) =>
-    styles.has(style),
-  )
-  return available.length ? available : ['normal']
-}
-
-function usableFontWeights(family: FontFamily | undefined, style: FontStyle): number[] {
-  if (!family) return [400]
-  const styled = family.faces.filter((font) => font.style === style)
-  const faces = styled.length ? styled : family.faces
-  const weights = new Set(faces.map((font) => font.weight))
-  for (const face of faces) {
-    if (!face.weight_range) continue
-    weights.add(face.weight_range.minimum)
-    weights.add(face.weight_range.maximum)
-    for (let weight = 100; weight <= 900; weight += 100) {
-      if (weight >= face.weight_range.minimum && weight <= face.weight_range.maximum) {
-        weights.add(weight)
-      }
-    }
-  }
-  return [...weights].sort((left, right) => left - right)
-}
-
-function nearestFontWeight(weights: number[], target: number): number {
-  return weights.reduce((nearest, weight) =>
-    Math.abs(weight - target) < Math.abs(nearest - target) ? weight : nearest,
-  )
-}
-
-function normalizeFontName(value: string): string {
-  return value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
 function displayedLayers(layers: Layer[], page: EntityId) {
@@ -684,12 +75,16 @@ function displayedLayers(layers: Layer[], page: EntityId) {
 function LayersInspector() {
   const { t } = useTranslation()
   const page = usePage().data
+  const effects = usePageEffects(page)
+  const issues = useBoxIssues(page?.id ?? null)
   const selected = useKoharuStore((state) => state.selectedLayers)
   const selectLayers = useKoharuStore((state) => state.selectLayers)
   const [expandedLayer, setExpandedLayer] = useState<EntityId | null>(
     selected.length === 1 ? (selected[0] ?? null) : null,
   )
   const [movingLayer, setMovingLayer] = useState<EntityId | null>(null)
+  const drag = useRef<{ layer: EntityId; page: EntityId } | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ layer: EntityId; after: boolean } | null>(null)
   const anchor = useRef<EntityId | null>(null)
 
   useEffect(() => {
@@ -699,6 +94,31 @@ function LayersInspector() {
   const layers = useMemo(() => (page ? displayedLayers(page.layers, page.id) : []), [page])
 
   if (!page) return <EmptyInspector>{t('inspector.selectPage')}</EmptyInspector>
+
+  const reorder = (layer: EntityId, parent: EntityId, index: number) => {
+    setMovingLayer(layer)
+    void call(commands.moveLayer, layer, parent, index).then(
+      (next) => {
+        queryClient.setQueryData(pageKey, next)
+        setMovingLayer(null)
+        void refresh(projectKey)
+      },
+      () => setMovingLayer(null),
+    )
+  }
+
+  const dragPosition = (layer: Layer, event: DragEvent<HTMLDivElement>) => {
+    if (!drag.current || drag.current.page !== page.id || movingLayer !== null) return null
+    const rect = event.currentTarget.getBoundingClientRect()
+    const after = event.clientY > rect.top + rect.height / 2
+    const position = layerDropIndex(page.layers, page.id, drag.current.layer, layer.id, after)
+    return position ? { ...position, after } : null
+  }
+
+  const endDrag = () => {
+    drag.current = null
+    setDropTarget(null)
+  }
 
   const move = (layer: Layer, displayDelta: number) => {
     if (movingLayer !== null || isLockedLayer(layer)) return
@@ -717,15 +137,7 @@ function LayersInspector() {
     if (shownSource < 0 || !targetLayer) return
     const target = storedSiblings.findIndex((candidate) => candidate.id === targetLayer.id)
 
-    setMovingLayer(layer.id)
-    void call(commands.moveLayer, layer.id, parent, target).then(
-      (next) => {
-        queryClient.setQueryData(pageKey, next)
-        setMovingLayer(null)
-        void refresh(projectKey)
-      },
-      () => setMovingLayer(null),
-    )
+    reorder(layer.id, parent, target)
   }
 
   const deleteLayer = (layer: EntityId) =>
@@ -803,6 +215,8 @@ function LayersInspector() {
               <LayerRow
                 key={`${layer.type}:${layer.id}`}
                 layer={layer}
+                hasEffects={effects.get(layer.id) ?? false}
+                issues={issues.get(layer.id) ?? 0}
                 index={index}
                 depth={depth}
                 selected={selected.includes(layer.id)}
@@ -820,6 +234,38 @@ function LayersInspector() {
                 canMoveUp={!locked && position > 0}
                 canMoveDown={!locked && position >= 0 && position < siblings.length - 1}
                 reordering={movingLayer !== null}
+                dropSide={
+                  dropTarget?.layer === layer.id ? (dropTarget.after ? 'after' : 'before') : null
+                }
+                onDragStart={(event) => {
+                  if (locked || movingLayer !== null) {
+                    event.preventDefault()
+                    return
+                  }
+                  drag.current = { layer: layer.id, page: page.id }
+                  event.dataTransfer.effectAllowed = 'move'
+                  event.dataTransfer.setData('application/x-booharu-layer', layer.id)
+                }}
+                onDragEnd={endDrag}
+                onDragLeave={() => setDropTarget(null)}
+                onDragOver={(event) => {
+                  const position = dragPosition(layer, event)
+                  if (!position) {
+                    setDropTarget(null)
+                    return
+                  }
+                  event.preventDefault()
+                  event.dataTransfer.dropEffect = 'move'
+                  setDropTarget({ layer: layer.id, after: position.after })
+                }}
+                onDrop={(event) => {
+                  const position = dragPosition(layer, event)
+                  const source = drag.current?.layer
+                  endDrag()
+                  if (!source || !position) return
+                  event.preventDefault()
+                  reorder(source, position.parent, position.index)
+                }}
                 onDelete={isGroupLayer(layer) ? undefined : () => deleteLayer(layer.id)}
               />
             )
@@ -833,6 +279,8 @@ function LayersInspector() {
 
 function LayerRow({
   layer,
+  hasEffects,
+  issues,
   index,
   depth,
   selected,
@@ -844,9 +292,17 @@ function LayerRow({
   canMoveUp,
   canMoveDown,
   reordering,
+  dropSide,
+  onDragStart,
+  onDragEnd,
+  onDragLeave,
+  onDragOver,
+  onDrop,
   onDelete,
 }: {
   layer: Layer
+  hasEffects: boolean
+  issues: number
   index: number
   depth: number
   selected: boolean
@@ -858,6 +314,12 @@ function LayerRow({
   canMoveUp: boolean
   canMoveDown: boolean
   reordering: boolean
+  dropSide: 'before' | 'after' | null
+  onDragStart: (event: DragEvent<HTMLButtonElement>) => void
+  onDragEnd: () => void
+  onDragLeave: () => void
+  onDragOver: (event: DragEvent<HTMLDivElement>) => void
+  onDrop: (event: DragEvent<HTMLDivElement>) => void
   onDelete?: () => void
 }) {
   const { t } = useTranslation()
@@ -871,7 +333,39 @@ function LayerRow({
         data-expanded={expanded}
         className='min-w-0 overflow-hidden rounded-lg transition-colors duration-150 data-[selected=true]:bg-accent motion-reduce:transition-none'
       >
-        <div className='relative flex min-w-0 items-center gap-0.5'>
+        <div
+          className='relative flex min-w-0 items-center gap-0.5'
+          data-layer-row={layer.id}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+          onDragLeave={(event) => {
+            if (
+              event.relatedTarget instanceof Node &&
+              event.currentTarget.contains(event.relatedTarget)
+            )
+              return
+            onDragLeave()
+          }}
+        >
+          {dropSide && (
+            <span
+              aria-hidden='true'
+              className={`pointer-events-none absolute inset-x-0 z-20 h-0.5 bg-primary ${dropSide === 'before' ? 'top-0' : 'bottom-0'}`}
+            />
+          )}
+          {!locked && (
+            <button
+              type='button'
+              draggable={!reordering}
+              disabled={reordering}
+              aria-label={t('files.dragLayer', { name })}
+              className='cursor-grab px-0.5 text-muted-foreground active:cursor-grabbing'
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+            >
+              <GripVertical className='size-3' />
+            </button>
+          )}
           <button
             type='button'
             aria-label={t('layers.edit', { name })}
@@ -889,9 +383,7 @@ function LayerRow({
             </span>
           </button>
           {!locked && (
-            <div
-              className={`pointer-events-none absolute top-1/2 z-10 flex -translate-y-1/2 rounded-md bg-background/80 p-0.5 opacity-0 shadow-sm ring-1 ring-border/40 backdrop-blur-md transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 motion-reduce:transition-none ${expanded ? 'right-7' : 'right-[3.25rem]'}`}
-            >
+            <div className='pointer-events-none absolute top-1/2 left-6 z-10 flex -translate-y-1/2 rounded-md bg-background/90 p-0.5 opacity-0 shadow-sm ring-1 ring-border/40 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 motion-reduce:transition-none'>
               <button
                 type='button'
                 aria-label={t('layers.moveUp', { name })}
@@ -912,11 +404,12 @@ function LayerRow({
               </button>
             </div>
           )}
-          {!expanded && (
-            <span className='w-7 shrink-0 text-right text-[9px] text-muted-foreground tabular-nums'>
-              {Math.round(layer.visibility.opacity * 100)}%
-            </span>
+          {isTextLayer(layer) && (
+            <RowTags layer={layer.id} name={name} hasEffects={hasEffects} issues={issues} />
           )}
+          <span className='w-7 shrink-0 text-right text-[9px] text-muted-foreground tabular-nums'>
+            {Math.round(layer.visibility.opacity * 100)}%
+          </span>
           {locked ? (
             <Tooltip>
               <TooltipTrigger
@@ -1116,161 +609,9 @@ function LayerEditor({ layer, onDelete }: { layer: Layer; onDelete?: () => void 
               </Tooltip>
             )}
           </div>
-          <InspectorField label={t('inspector.source')}>
-            <GlossaryTextMenu
-              field='source'
-              source={layer.content.source?.text ?? ''}
-              translation={layer.content.translation?.text ?? ''}
-            >
-              <CommitTextarea
-                data-testid={`edit-source-${layer.id}`}
-                aria-label={t('layers.sourceLabel', { name })}
-                wrap='soft'
-                className='max-h-14 min-h-8 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
-                value={layer.content.source?.text ?? ''}
-                onCommit={(text) =>
-                  void call(commands.setSourceText, layer.id, text)
-                    .then(() => refresh(projectKey, pageKey))
-                    .catch(() => undefined)
-                }
-              />
-            </GlossaryTextMenu>
-          </InspectorField>
-          <InspectorField label={t('inspector.translation')}>
-            <GlossaryTextMenu
-              field='translation'
-              source={layer.content.source?.text ?? ''}
-              translation={layer.content.translation?.text ?? ''}
-            >
-              <CommitTextarea
-                data-testid={`edit-translation-${layer.id}`}
-                aria-label={t('layers.translationLabel', { name })}
-                wrap='soft'
-                className='max-h-16 min-h-9 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md border-primary/25 bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
-                value={layer.content.translation?.text ?? ''}
-                onCommit={(text) =>
-                  void call(commands.setTranslation, layer.id, text.trim() ? text : null)
-                    .then(() => refresh(projectKey, pageKey))
-                    .catch(() => undefined)
-                }
-              />
-            </GlossaryTextMenu>
-          </InspectorField>
         </>
       )}
     </div>
-  )
-}
-
-function InspectorField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className='grid min-w-0 gap-0.5'>
-      <span className='text-[8px] font-medium tracking-[0.06em] text-muted-foreground uppercase'>
-        {label}
-      </span>
-      {children}
-    </div>
-  )
-}
-
-const fontSizePresets = [8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72, 96]
-
-function FontSizeField({
-  value,
-  autoFit,
-  disabled,
-  onChange,
-  onAutoFit,
-}: {
-  value: number
-  autoFit: boolean
-  disabled: boolean
-  onChange: (value: number) => void
-  onAutoFit: () => void
-}) {
-  const { t } = useTranslation()
-  const id = useId()
-  const [draft, setDraft] = useState<number | null>(value)
-
-  useEffect(() => {
-    setDraft(autoFit ? null : value)
-  }, [autoFit, value])
-
-  const select = (choice: string) => {
-    if (choice === 'auto') {
-      setDraft(null)
-      onAutoFit()
-      return
-    }
-    const size = Number(choice)
-    if (Number.isFinite(size) && size > 0 && size <= 300) {
-      setDraft(size)
-      onChange(size)
-    }
-  }
-
-  const commit = (next: number | null) => {
-    if (next !== null && next > 0 && next <= 300) {
-      onChange(next)
-    } else {
-      setDraft(autoFit ? null : value)
-    }
-  }
-
-  return (
-    <NumberField
-      id={id}
-      name='font-size'
-      className='min-w-0'
-      disabled={disabled}
-      value={draft}
-      min={0.5}
-      max={300}
-      step={0.5}
-      onValueChange={setDraft}
-      onValueCommitted={commit}
-    >
-      <NumberFieldGroup>
-        <NumberFieldInput
-          data-testid='type-size'
-          aria-label={t('inspector.fontSize')}
-          placeholder={t('inspector.auto')}
-          className='px-2 text-left'
-          onKeyDown={(event) => {
-            // Base UI commits a typed value only on blur, so Enter blurs to commit it.
-            if (event.key === 'Enter') event.currentTarget.blur()
-          }}
-        />
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            disabled={disabled}
-            aria-label={t('inspector.chooseFontSize')}
-            className='grid size-6 shrink-0 place-items-center border-l border-input text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground disabled:pointer-events-none disabled:opacity-40'
-          >
-            <ChevronDown className='size-3' />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align='end'
-            className='w-28 min-w-28 border border-border/50 p-0.5 shadow-sm ring-0'
-          >
-            <DropdownMenuRadioGroup value={autoFit ? 'auto' : String(value)} onValueChange={select}>
-              <DropdownMenuRadioItem value='auto' className='min-h-6 py-0.5 text-[10px]'>
-                {t('inspector.auto')}
-              </DropdownMenuRadioItem>
-              {fontSizePresets.map((size) => (
-                <DropdownMenuRadioItem
-                  key={size}
-                  value={String(size)}
-                  className='min-h-6 py-0.5 text-[10px] tabular-nums'
-                >
-                  {size}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </NumberFieldGroup>
-    </NumberField>
   )
 }
 

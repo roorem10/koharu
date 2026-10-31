@@ -25,13 +25,18 @@ pub use error::{ErrorKind, PipelineError};
 pub use hints::{GlossaryTerm, TranslationHints, page_glossary, previous_context, term_occurs};
 pub use pipeline::Pipeline;
 pub use progress::{Progress, ProgressSink};
-pub use report::{Committer, Report, RunStatus, StageOutput};
-pub use request::{InpaintingMask, Operation, Request, StopToken};
+pub use report::{Committer, PageFailure, Report, RunStatus, StageOutput};
+pub use request::{
+    InpaintingMask, OnPageFailure, Operation, Request, RunOrder, RunPolicy, StopToken,
+};
 pub use resources::{DeviceResources, ResourceSnapshot};
 pub use scope::{Bounds, Scope};
 pub use stage::Stage;
 pub use stages::bubble_shape;
-pub use stages::{Flux2KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, RoremMixedConfig};
+pub use stages::{
+    BoxSettings, CleanupSettings, Flux2KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, PaintTarget,
+    RemoveMode, RoremMixedConfig,
+};
 
 use images::ImageCache;
 use model_cell::ModelCell;

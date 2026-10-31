@@ -3,12 +3,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { stepBrush } from '@/components/canvas-tools/brushKeys'
+import { useOcrBoxTool } from '@/components/canvas-tools/ocrBox'
+import { useRemoveAreaTool } from '@/components/canvas-tools/removeArea'
+import type { CanvasToolHandler } from '@/components/canvas-tools/types'
 import { useColorSampling } from '@/components/controls/ColorSampling'
 import { CanvasCommandBar } from '@/components/editor/CanvasCommandBar'
+import { useCanvasContextMenu } from '@/components/editor/CanvasContextMenu'
 import { CanvasOverlay } from '@/components/editor/CanvasOverlay'
+import { CleanupQueueBar } from '@/components/editor/CleanupQueueBar'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { useCanvas } from '@/components/editor/useCanvas'
+import { WarpHandles } from '@/components/editor/WarpHandles'
+import { originalVisible, useCompareStore } from '@/components/qc/compare'
+import { OriginalOverlay } from '@/components/qc/OriginalOverlay'
 import { call } from '@/lib/backend'
 import { expandLayerSelection } from '@/lib/document'
 import {
@@ -30,6 +39,7 @@ import {
   refresh,
   usePage,
   usePages,
+  useProject,
 } from '@/lib/queries'
 import {
   findShortcut,
@@ -65,6 +75,7 @@ const canvasCursors = {
   color_picker: 'crosshair',
   remove: 'none',
   pan: 'grab',
+  ocr_box: 'crosshair',
 } as const satisfies Record<CanvasTool, string | undefined>
 
 type Gesture =
@@ -78,15 +89,18 @@ type Gesture =
     }
   | { kind: 'move'; pointer: number; start: Point; originals: TransformFrame[] }
   | { kind: 'text'; pointer: number; start: Point; frame: Frame }
+  | { kind: 'tool'; pointer: number; handler: CanvasToolHandler }
   | StrokeGesture
 
 interface StrokeGesture {
   kind: 'paint' | 'erase' | 'inpaint'
   pointer: number
   revision: number
+  page: string
   layer: string | null
   points: Point[]
   diameter: number
+  hardness: number
   color?: CanvasColor
 }
 
@@ -105,8 +119,12 @@ export function CanvasWorkspace() {
   const surface = useRef<HTMLDivElement>(null)
   const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(null)
   const gesture = useRef<Gesture | null>(null)
+  const ocrBoxTool = useOcrBoxTool()
+  const removeAreaTool = useRemoveAreaTool()
+  const contextMenu = useCanvasContextMenu()
   const previousPageIndex = useRef<number | null>(null)
   const spaceHeld = useRef(false)
+  const compareKey = useRef<string | null>(null)
   const lastZoomStep = useRef(-Infinity)
   const heldArrows = useRef(new Set<string>())
   const nudgeShift = useRef(false)
@@ -123,6 +141,8 @@ export function CanvasWorkspace() {
   const [cursor, setCursor] = useState<Point | null>(null)
   const colorSampling = useColorSampling()
 
+  const projectName = useProject().data?.name
+  const showingOriginal = useCompareStore((state) => state.pinned || state.held)
   const page = usePage().data
   const pages = usePages().data
   const canvasPage = useKoharuStore((state) => state.canvasPage)
@@ -169,6 +189,7 @@ export function CanvasWorkspace() {
   const beginTransform = useCallback(
     (elements: TransformFrame[]) => {
       if (
+        originalVisible() ||
         !canvas ||
         canvasRevision === null ||
         !elements.length ||
@@ -255,6 +276,7 @@ export function CanvasWorkspace() {
     const current = gesture.current
     gesture.current = null
     setSelectionRect(null)
+    if (current?.kind === 'tool') current.handler.finish(null)
     if (current?.kind === 'paint' || current?.kind === 'erase' || current?.kind === 'inpaint') {
       strokeUpdates.clear()
       canvas?.cancelStroke()
@@ -268,6 +290,19 @@ export function CanvasWorkspace() {
     setDraft(null)
     setPreviews({})
   }, [canvas, strokeUpdates, transformUpdates])
+
+  useEffect(() => {
+    if (showingOriginal) {
+      cancelGesture()
+      colorSampling?.cancel()
+    }
+  }, [cancelGesture, colorSampling, showingOriginal])
+
+  useEffect(() => {
+    useCompareStore.getState().reset()
+    compareKey.current = null
+    return () => useCompareStore.getState().reset()
+  }, [projectName])
 
   const fitCanvas = useCallback(() => {
     const element = surface.current
@@ -400,6 +435,19 @@ export function CanvasWorkspace() {
 
     const runShortcut = (event: KeyboardEvent, next: ShortcutAction | undefined) => {
       if (!next) return
+      if (next === 'brush_smaller' || next === 'brush_larger') {
+        event.preventDefault()
+        stepBrush(next === 'brush_smaller' ? -1 : 1)
+        return
+      }
+      if (next === 'compare') {
+        if (!page || useKoharuStore.getState().settingsOpen) return
+        event.preventDefault()
+        cancelGesture()
+        compareKey.current = event.code || event.key
+        useCompareStore.getState().setHeld(true)
+        return
+      }
       if (next === 'zoom_in' || next === 'zoom_out' || next === 'zoom_actual') {
         event.preventDefault()
         if (!page || (next === 'zoom_actual' && event.repeat)) return
@@ -425,6 +473,16 @@ export function CanvasWorkspace() {
 
     const down = (event: KeyboardEvent) => {
       const action = findShortcut(event, useKoharuStore.getState().shortcuts)
+      if (
+        originalVisible() &&
+        action !== 'compare' &&
+        action !== 'fit' &&
+        action !== 'zoom_in' &&
+        action !== 'zoom_out' &&
+        action !== 'zoom_actual'
+      ) {
+        return
+      }
       const modified = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey
       // CEF's capture-phase page-zoom blocker has already prevented the default here.
       // Configured modifier bindings also work immediately after a range input was used.
@@ -490,6 +548,10 @@ export function CanvasWorkspace() {
     }
 
     const up = (event: KeyboardEvent) => {
+      if (compareKey.current === (event.code || event.key)) {
+        compareKey.current = null
+        useCompareStore.getState().setHeld(false)
+      }
       if (event.key === 'Shift') nudgeShift.current = false
       if (event.key === 'Alt') event.preventDefault()
       if (event.code === 'Space') spaceHeld.current = false
@@ -499,17 +561,24 @@ export function CanvasWorkspace() {
       }
     }
     const blur = () => {
+      compareKey.current = null
+      useCompareStore.getState().setHeld(false)
       spaceHeld.current = false
       if (heldArrows.current.size) finishTransform()
       cancelGesture()
     }
 
+    const visibility = () => {
+      if (document.hidden) blur()
+    }
+    document.addEventListener('visibilitychange', visibility)
     window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
+    window.addEventListener('keyup', up, true)
     window.addEventListener('blur', blur)
     return () => {
+      document.removeEventListener('visibilitychange', visibility)
       window.removeEventListener('keydown', down)
-      window.removeEventListener('keyup', up)
+      window.removeEventListener('keyup', up, true)
       window.removeEventListener('blur', blur)
     }
   }, [
@@ -560,6 +629,10 @@ export function CanvasWorkspace() {
       return
     }
 
+    if (current.kind === 'tool') {
+      current.handler.move(clientPagePoint(sample.clientX, sample.clientY))
+      return
+    }
     if (current.kind === 'pan') {
       const { zoom } = useKoharuStore.getState().camera
       const bounds = surface.current!.getBoundingClientRect()
@@ -613,9 +686,13 @@ export function CanvasWorkspace() {
     }
   }
 
-  const finishGesture = () => {
+  const finishGesture = (event?: PointerEvent) => {
     const current = gesture.current
     gesture.current = null
+    if (current?.kind === 'tool') {
+      current.handler.finish(event ?? null)
+      return
+    }
     if (!current || !page) return
     if (current.kind === 'select') {
       const x = Math.min(current.start.x, current.current.x)
@@ -665,6 +742,7 @@ export function CanvasWorkspace() {
           ? enqueue(() =>
               call(commands.commitPaint, current.revision, current.layer, current.points, {
                 diameter: current.diameter,
+                hardness: current.hardness,
                 color: current.color!,
               }),
             ).then((result) => {
@@ -676,17 +754,26 @@ export function CanvasWorkspace() {
                 call(
                   commands.commitErase,
                   current.revision,
-                  current.layer!,
+                  current.layer,
                   current.points,
                   current.diameter,
+                  current.hardness,
                 ),
               ).then((result) => {
                 selectLayers([result.layer])
                 return refresh(projectKey, pagesKey, pageKey)
               })
             : enqueue(() =>
-                call(commands.commitInpaint, current.revision, current.points, current.diameter),
-              )
+                removeAreaTool.commitStroke(
+                  current.page,
+                  current.revision,
+                  current.points,
+                  current.diameter,
+                  current.hardness,
+                ),
+              ).then((job) => {
+                if (job === null) canvas?.cancelStroke()
+              })
       commitPending.current = true
       void operation
         .catch(() => canvas?.cancelStroke())
@@ -711,6 +798,7 @@ export function CanvasWorkspace() {
           onKeyDown={(event) => {
             const keys = heldArrows.current
             if (
+              originalVisible() ||
               !arrowKeys.includes(event.key) ||
               event.defaultPrevented ||
               event.target !== event.currentTarget ||
@@ -757,9 +845,14 @@ export function CanvasWorkspace() {
             if (heldArrows.current.size) finishTransform()
           }}
 
-          onContextMenu={(event) => event.preventDefault()}
+          onContextMenu={(event) => {
+            event.preventDefault()
+            if (originalVisible() || !page) return
+            contextMenu.open(event.nativeEvent, clientPagePoint(event.clientX, event.clientY))
+          }}
           onPointerDown={(event) => {
             if (
+              originalVisible() ||
               !page ||
               !canvas ||
               canvasState.status !== 'ready' ||
@@ -775,6 +868,20 @@ export function CanvasWorkspace() {
             const physical = clientPhysicalPoint(event.clientX, event.clientY)
             const point = clientPagePoint(event.clientX, event.clientY)
             setCursor(physical)
+
+            const toolHandler =
+              event.button === 0 && !spaceHeld.current
+                ? tool === 'ocr_box'
+                  ? ocrBoxTool
+                  : tool === 'remove'
+                    ? removeAreaTool
+                    : null
+                : null
+            if (toolHandler?.start(point, event.nativeEvent)) {
+              gesture.current = { kind: 'tool', pointer: event.pointerId, handler: toolHandler }
+              event.preventDefault()
+              return
+            }
 
             if (event.button === 1 || tool === 'pan' || spaceHeld.current) {
               gesture.current = {
@@ -823,13 +930,17 @@ export function CanvasWorkspace() {
             } else if (tool === 'draw') {
               strokeUpdates.clear()
               const color = hexToRgba(brush.color)
+              const options = useKoharuStore.getState().brushes.draw
+              color[3] = Math.round((color[3] * options.opacity) / 100)
               gesture.current = {
                 kind: 'paint',
                 pointer: event.pointerId,
                 revision: canvasRevision,
+                page: page.id,
                 layer: activeRaster?.id ?? null,
                 points: [point],
                 diameter: brush.diameter,
+                hardness: options.hardness,
                 color,
               }
               try {
@@ -845,23 +956,28 @@ export function CanvasWorkspace() {
                 receiveError(errorMessage(error))
               }
             } else if (tool === 'eraser') {
-              if (!activeRaster) {
-                receiveError('Select a paint or cleanup layer before using the Eraser.')
+              if (!activeRaster && removeAreaTool.settings.paint_target === 'paint_layer') {
+                receiveError(t('cleanup.eraserTarget'))
                 return
               }
+              const target =
+                activeRaster ??
+                page.layers.find((layer) => layer.type === 'raster' && layer.kind === 'cleanup')
               strokeUpdates.clear()
               gesture.current = {
                 kind: 'erase',
                 pointer: event.pointerId,
                 revision: canvasRevision,
-                layer: activeRaster.id,
+                page: page.id,
+                layer: target?.id ?? null,
                 points: [point],
                 diameter: brush.diameter,
+                hardness: useKoharuStore.getState().brushes.eraser.hardness,
               }
               try {
                 canvas.beginStroke({
                   kind: 'erase',
-                  layer: activeRaster.id,
+                  layer: target?.id ?? null,
                   point,
                   diameter: brush.diameter,
                 })
@@ -875,9 +991,11 @@ export function CanvasWorkspace() {
                 kind: 'inpaint',
                 pointer: event.pointerId,
                 revision: canvasRevision,
+                page: page.id,
                 layer: null,
                 points: [point],
                 diameter: brush.diameter,
+                hardness: useKoharuStore.getState().brushes.remove.hardness,
               }
               try {
                 canvas.beginStroke({
@@ -902,6 +1020,14 @@ export function CanvasWorkspace() {
             event.preventDefault()
           }}
           onPointerDownCapture={(event) => {
+            if (
+              originalVisible() &&
+              !(event.target instanceof Element && event.target.closest('[data-canvas-control]'))
+            ) {
+              event.preventDefault()
+              event.stopPropagation()
+              return
+            }
             if (heldArrows.current.size) {
               event.preventDefault()
               event.stopPropagation()
@@ -914,7 +1040,7 @@ export function CanvasWorkspace() {
           }}
           onPointerUp={(event) => {
             moveGesture(event.pointerId, [event.nativeEvent])
-            finishGesture()
+            finishGesture(event.nativeEvent)
             if (event.currentTarget.hasPointerCapture(event.pointerId)) {
               event.currentTarget.releasePointerCapture(event.pointerId)
             }
@@ -974,6 +1100,8 @@ export function CanvasWorkspace() {
             useKoharuStore.setState({ camera: { zoom: current.zoom, translation, fitted: false } })
           }}
         >
+          {page && !showingOriginal && tool === 'ocr_box' && ocrBoxTool.overlay}
+          {page && !showingOriginal && tool === 'remove' && removeAreaTool.overlay}
           {selectionRect && (
             <div
               data-testid='selection-rectangle'
@@ -994,7 +1122,7 @@ export function CanvasWorkspace() {
             aria-hidden
             className='pointer-events-none absolute inset-0 block size-full'
           />
-          {page && canvasState.status === 'ready' && (
+          {page && !showingOriginal && canvasState.status === 'ready' && (
             <CanvasOverlay
               page={page}
               selected={selected}
@@ -1010,7 +1138,16 @@ export function CanvasWorkspace() {
               onTransformEnd={finishTransform}
             />
           )}
-          {page && canvasState.status === 'error' && (
+          {page &&
+            !showingOriginal &&
+            canvasState.status === 'ready' &&
+            selected.length === 1 &&
+            page.layers.some((layer) => layer.id === selected[0] && layer.type === 'text') && (
+              <WarpHandles layerId={selected[0]} />
+            )}
+          {page && !showingOriginal && <CleanupQueueBar />}
+          {page && showingOriginal && <OriginalOverlay key={page.id} page={page} />}
+          {page && !showingOriginal && canvasState.status === 'error' && (
             <div
               role='alert'
               className={
@@ -1050,6 +1187,9 @@ export function CanvasWorkspace() {
             </div>
           )}
         </div>
+        {/* Outside the surface: React bubbles portal events to their parents, and the
+            surface's pointerdown captures the pointer, which swallowed menu clicks. */}
+        {page && !showingOriginal && contextMenu.menu}
       </div>
       <StatusBar onZoomChange={setZoom} />
     </main>

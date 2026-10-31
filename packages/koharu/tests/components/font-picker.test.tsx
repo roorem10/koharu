@@ -10,6 +10,7 @@ import { commands, type FontFamily } from '@koharu/bridge/protocol'
 const families: FontFamily[] = ['Anime Ace', 'CCMeanwhile', 'Komika Text', 'Wild Words'].map(
   (name) => ({
     name,
+    local_names: [],
     sources: ['system'],
     metadata: {
       primary_script: 'latn',
@@ -49,6 +50,28 @@ describe('font favorites', () => {
       return [...saved]
     })
     vi.spyOn(commands, 'getFontPreview').mockResolvedValue([])
+  })
+
+  it('finds a family by its localized name and shows that name beside the family name', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const local: FontFamily = {
+      ...families[0]!,
+      name: 'Source Han Sans',
+      local_names: ['源ノ角ゴシック'],
+    }
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FontPicker value='' families={[local, ...families]} onChange={onChange} ariaLabel='Font' />
+      </QueryClientProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await user.type(screen.getByRole('combobox', { name: 'Search fonts' }), '源ノ角')
+    const option = await screen.findByRole('option', { name: /Source Han Sans/ })
+    expect(option).toHaveTextContent('源ノ角ゴシック')
+    expect(screen.queryByRole('option', { name: /Komika Text/ })).not.toBeInTheDocument()
+    await user.click(option)
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('Source Han Sans')
   })
 
   it('keeps the empty choice first and keyboard accessible while filtering', async () => {

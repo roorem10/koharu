@@ -18,6 +18,8 @@ import { useChapterContext } from '@/components/context/data'
 import { ReadChapterStep } from '@/components/context/ReadChapterStep'
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { OutputPicker, type OutputDraft } from '@/components/controls/OutputPicker'
+import { presetLabel, useRunSettings } from '@/components/runs/data'
+import { prepareFinishSound } from '@/components/runs/sound'
 import { call, refreshTranslationModels, savePreferences } from '@/lib/backend'
 import { pagesKey, queryClient } from '@/lib/queries'
 import { pipelineStages, receivePreferences, useKoharuStore, type PipelineScope } from '@/lib/store'
@@ -56,9 +58,10 @@ export function InferenceControl({
   const provider = useKoharuStore((state) => state.preferences?.pipeline.translation.model.provider)
   const chapter = useChapterContext().data
   const noticeShown = useRef(false)
-  const run = () => {
+  const run = (chosenStages = stages) => {
+    prepareFinishSound()
     if (
-      stages.includes('translation') &&
+      chosenStages.includes('translation') &&
       ['deepl', 'google-cloud-translation', 'caiyun'].includes(provider ?? '') &&
       !noticeShown.current
     ) {
@@ -82,7 +85,7 @@ export function InferenceControl({
           .catch(() => undefined)
       }
     }
-    onRun(scope, stages)
+    onRun(scope, chosenStages)
   }
 
   const stop = () => {
@@ -99,6 +102,8 @@ export function InferenceControl({
         running={Boolean(running)}
         onScopeChange={setScope}
         onStagesChange={setStages}
+        onPreset={(stages) => run(stages)}
+        disabled={disabled || unavailable}
       />
 
       <Button
@@ -110,7 +115,7 @@ export function InferenceControl({
         )}
         disabled={(disabled || unavailable) && !running}
         aria-label={running ? t('inference.stopProcessing') : t('inference.runProcessing')}
-        onClick={running ? stop : run}
+        onClick={running ? stop : () => run()}
       >
         {running ? <Square className='size-3 fill-current' /> : <Play className='size-3' />}
         <span>{running ? t('inference.stop') : t('inference.run')}</span>
@@ -126,15 +131,20 @@ function RuntimeSelector({
   running,
   onScopeChange,
   onStagesChange,
+  onPreset,
+  disabled,
 }: {
   scope: PipelineScope
   stages: Stage[]
   selectionCount: number
   running: boolean
   onScopeChange: (scope: PipelineScope) => void
+  onPreset: (stages: Stage[]) => void
+  disabled: boolean
   onStagesChange: (stages: Stage[]) => void
 }) {
   const { t } = useTranslation()
+  const settings = useRunSettings()
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<SelectorView>('root')
   const [loadingModels, setLoadingModels] = useState(false)
@@ -274,6 +284,21 @@ function RuntimeSelector({
               value={outputLabel}
               onClick={() => setView('output')}
             />
+            {settings.data?.presets.map((preset, index) => (
+              <Button
+                key={index}
+                variant='ghost'
+                size='sm'
+                className='h-auto justify-start text-left text-[11px] break-words whitespace-normal'
+                disabled={running || disabled}
+                onClick={() => {
+                  setOpen(false)
+                  onPreset(preset.stages)
+                }}
+              >
+                {presetLabel(preset.name, t)}
+              </Button>
+            ))}
             <div className='my-1 border-t border-border/70' />
             <Button
               type='button'

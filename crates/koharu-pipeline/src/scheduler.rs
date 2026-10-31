@@ -52,6 +52,7 @@ pub(crate) struct Scheduler {
     active_pages: usize,
     head: usize,
     total: usize,
+    order: crate::RunOrder,
 }
 
 impl Scheduler {
@@ -81,7 +82,21 @@ impl Scheduler {
             active_pages: 0,
             head: 0,
             total,
+            order: crate::RunOrder::Overlapped,
         }
+    }
+
+    pub(crate) fn with_order(mut self, order: crate::RunOrder) -> Self {
+        self.order = order;
+        self
+    }
+
+    pub(crate) fn stage_finished(&self, stage: Stage) -> bool {
+        self.pages.iter().all(|page| {
+            page.stages
+                .iter()
+                .all(|work| work.stage != stage || work.state == WorkState::Finished)
+        })
     }
 
     pub(crate) fn total(&self) -> usize {
@@ -92,6 +107,25 @@ impl Scheduler {
         &mut self,
         busy_stages: &BTreeSet<Stage>,
     ) -> Option<(EntityId, Stage)> {
+        if self.order == crate::RunOrder::StageAtATime {
+            let stage = Stage::ALL
+                .into_iter()
+                .find(|stage| !self.stage_finished(*stage))?;
+            if busy_stages.contains(&stage) {
+                return None;
+            }
+            for page in &mut self.pages {
+                if let Some(work) = page
+                    .stages
+                    .iter_mut()
+                    .find(|work| work.stage == stage && work.state == WorkState::Pending)
+                {
+                    work.state = WorkState::Running;
+                    return Some((page.page, stage));
+                }
+            }
+            return None;
+        }
         for page_index in self.head..self.pages.len() {
             let started = self.pages[page_index].started();
             if !started && self.active_pages >= self.page_window {
@@ -120,6 +154,28 @@ impl Scheduler {
             return Some((page.page, work.stage));
         }
         None
+    }
+
+    pub(crate) fn fail_page(&mut self, page: EntityId) -> usize {
+        let Some(&index) = self.page_index.get(&page) else {
+            return 0;
+        };
+        let page = &mut self.pages[index];
+        let remaining = page
+            .stages
+            .iter()
+            .filter(|work| work.state != WorkState::Finished)
+            .count();
+        if page.started() && !page.finished() {
+            self.active_pages = self.active_pages.saturating_sub(1);
+        }
+        for work in &mut page.stages {
+            work.state = WorkState::Finished;
+        }
+        while self.head < self.pages.len() && self.pages[self.head].finished() {
+            self.head += 1;
+        }
+        remaining
     }
 
     pub(crate) fn complete_stage(&mut self, page: EntityId, stage: Stage) -> bool {
@@ -156,6 +212,39 @@ mod tests {
 
     fn pages(count: usize) -> Vec<EntityId> {
         (0..count).map(|_| EntityId::new()).collect()
+    }
+
+    #[test]
+    fn stage_at_a_time_finishes_every_page_before_the_next_stage() {
+        let pages = pages(3);
+        let mut scheduler =
+            Scheduler::new(&pages, &Stage::ALL).with_order(crate::RunOrder::StageAtATime);
+        for stage in Stage::ALL {
+            for page in &pages {
+                assert_eq!(scheduler.start_next(&BTreeSet::new()), Some((*page, stage)));
+                assert!(scheduler.start_next(&[stage].into()).is_none());
+                scheduler.complete_stage(*page, stage);
+            }
+            assert!(scheduler.stage_finished(stage));
+        }
+        assert!(scheduler.start_next(&BTreeSet::new()).is_none());
+    }
+
+    #[test]
+    fn a_failed_page_has_no_later_stages_in_either_order() {
+        for order in [crate::RunOrder::Overlapped, crate::RunOrder::StageAtATime] {
+            let pages = pages(2);
+            let mut scheduler = Scheduler::new(&pages, &Stage::ALL).with_order(order);
+            assert_eq!(
+                scheduler.start_next(&BTreeSet::new()),
+                Some((pages[0], Stage::Detection))
+            );
+            assert_eq!(scheduler.fail_page(pages[0]), 4);
+            while let Some((page, stage)) = scheduler.start_next(&BTreeSet::new()) {
+                assert_eq!(page, pages[1]);
+                scheduler.complete_stage(page, stage);
+            }
+        }
     }
 
     #[test]

@@ -129,8 +129,8 @@ async fn built_in_component_schema_revisions_are_explicit() {
         ],
         [1; 17]
     );
-    assert_eq!(schema::<Typography>(), 3);
-    assert_eq!(schema::<TextLayout>(), 2);
+    assert_eq!(schema::<Typography>(), 4);
+    assert_eq!(schema::<TextLayout>(), 3);
 }
 
 #[tokio::test]
@@ -611,6 +611,7 @@ async fn text_analysis_content_and_presentation_have_distinct_ownership() {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?;
             edit.relate::<RecognizedFrom>(content, region)?;
@@ -653,6 +654,7 @@ async fn text_group_owns_the_canonical_text_order() {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?;
             let second_content = edit.add_text_content(page, At::End)?;
@@ -664,6 +666,7 @@ async fn text_group_owns_the_canonical_text_order() {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?;
             ids = Some((page, first, second));
@@ -719,6 +722,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
                 angle_degrees: None,
+                warp: None,
             },
         )?;
         edit.relate::<Presents>(layer, region)?;
@@ -738,6 +742,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
                 angle_degrees: None,
+                warp: None,
             },
         )?;
         edit.relate::<Presents>(layer, second)?;
@@ -762,6 +767,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
                 angle_degrees: None,
+                warp: None,
             },
         )?;
         edit.relate::<FitsTo>(layer, bubble)?;
@@ -792,6 +798,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
                 angle_degrees: None,
+                warp: None,
             },
         )?;
         edit.relate::<FitsTo>(layer, text_region)?;
@@ -817,6 +824,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
                 angle_degrees: None,
+                warp: None,
             },
         )?;
         edit.relate::<FlowsIn>(layer, text_region)?;
@@ -842,6 +850,7 @@ async fn component_changes_cannot_invalidate_incident_typed_relations() {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?);
             Ok(())
@@ -1043,6 +1052,7 @@ async fn independent_pipeline_components_rebase() {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?;
             entities = Some((content, layer));
@@ -1081,6 +1091,9 @@ async fn independent_pipeline_components_rebase() {
                     stroke_join: None,
                     outer_stroke_color: None,
                     outer_stroke_width: None,
+                    line_spacing: None,
+                    letter_spacing: None,
+                    fill_gradient: None,
                     alignment: Some(TextAlignment::Center),
                     writing_mode: None,
                     extensions: BTreeMap::new(),
@@ -1616,4 +1629,305 @@ fn typography_revision_two_loads_without_a_second_outline() {
     assert_eq!(loaded.stroke_method, Some(crate::StrokeMethod::Contour));
     assert_eq!(loaded.outer_stroke_color, None);
     assert_eq!(loaded.outer_stroke_width, None);
+}
+
+fn typography_from_revision_three() -> Typography {
+    use revision::{DeserializeRevisioned, SerializeRevisioned};
+    #[revisioned(revision = 3)]
+    struct TypographyV3 {
+        origin: Origin,
+        preferred_font: Option<String>,
+        font_weight: Option<u16>,
+        font_style: Option<FontStyle>,
+        size: Option<f32>,
+        auto_fit: bool,
+        color: Option<[u8; 4]>,
+        stroke_color: Option<[u8; 4]>,
+        stroke_width: Option<f32>,
+        alignment: Option<TextAlignment>,
+        writing_mode: Option<crate::WritingMode>,
+        extensions: BTreeMap<String, String>,
+        #[revision(start = 2)]
+        stroke_method: Option<crate::StrokeMethod>,
+        #[revision(start = 2)]
+        stroke_position: Option<crate::StrokePosition>,
+        #[revision(start = 2)]
+        stroke_join: Option<crate::StrokeJoin>,
+        #[revision(start = 3)]
+        outer_stroke_color: Option<[u8; 4]>,
+        #[revision(start = 3)]
+        outer_stroke_width: Option<f32>,
+    }
+
+    let old = TypographyV3 {
+        origin: Origin::User,
+        preferred_font: Some("CCWildWords".to_owned()),
+        font_weight: Some(400),
+        font_style: None,
+        size: Some(300.0),
+        auto_fit: false,
+        color: Some([0, 0, 0, 255]),
+        stroke_color: Some([255, 255, 255, 255]),
+        stroke_width: Some(24.5),
+        alignment: None,
+        writing_mode: None,
+        extensions: BTreeMap::new(),
+        stroke_method: Some(crate::StrokeMethod::Contour),
+        stroke_position: Some(crate::StrokePosition::Outside),
+        stroke_join: Some(crate::StrokeJoin::Round),
+        outer_stroke_color: Some([12, 34, 56, 255]),
+        outer_stroke_width: Some(4.0),
+    };
+    let mut bytes = Vec::new();
+    old.serialize_revisioned(&mut bytes).unwrap();
+    Typography::deserialize_revisioned(&mut bytes.as_slice()).unwrap()
+}
+
+#[test]
+fn typography_revision_three_loads_with_default_spacing_and_fill() {
+    let loaded = typography_from_revision_three();
+    assert_eq!(loaded.preferred_font.as_deref(), Some("CCWildWords"));
+    assert_eq!(loaded.outer_stroke_width, Some(4.0));
+    assert_eq!(loaded.outer_stroke_color, Some([12, 34, 56, 255]));
+    assert_eq!(loaded.line_spacing, None);
+    assert_eq!(loaded.letter_spacing, None);
+    assert_eq!(loaded.fill_gradient, None);
+}
+
+#[test]
+fn typography_revision_four_round_trips_spacing_and_gradient() {
+    use revision::{DeserializeRevisioned, SerializeRevisioned};
+    let mut value = typography_from_revision_three();
+    value.line_spacing = Some(0.9);
+    value.letter_spacing = Some(-75.5);
+    value.fill_gradient = Some(crate::FillGradient {
+        kind: crate::GradientKind::Linear,
+        angle_degrees: 90.0,
+        stops: vec![
+            crate::GradientStop {
+                offset: 0.0,
+                color: [255, 0, 0, 255],
+            },
+            crate::GradientStop {
+                offset: 0.5,
+                color: [0, 255, 0, 128],
+            },
+            crate::GradientStop {
+                offset: 1.0,
+                color: [0, 0, 255, 255],
+            },
+        ],
+    });
+    let mut bytes = Vec::new();
+    value.serialize_revisioned(&mut bytes).unwrap();
+    assert_eq!(
+        Typography::deserialize_revisioned(&mut bytes.as_slice()).unwrap(),
+        value
+    );
+}
+
+#[test]
+fn typography_rejects_invalid_spacing_and_gradient() {
+    let context = ValidationContext::new(&|_| true, &|_| true);
+    let base = typography_from_revision_three();
+    for spacing in [f32::NAN, f32::INFINITY, 0.49, 3.01] {
+        let mut value = base.clone();
+        value.line_spacing = Some(spacing);
+        assert!(value.validate(&context).is_err());
+    }
+    for spacing in [f32::NAN, f32::NEG_INFINITY, -501.0, 2001.0] {
+        let mut value = base.clone();
+        value.letter_spacing = Some(spacing);
+        assert!(value.validate(&context).is_err());
+    }
+    for (line, letter) in [(0.5, -500.0), (3.0, 2000.0)] {
+        let mut value = base.clone();
+        value.line_spacing = Some(line);
+        value.letter_spacing = Some(letter);
+        assert!(value.validate(&context).is_ok());
+    }
+    let stop = |offset| crate::GradientStop {
+        offset,
+        color: [255; 4],
+    };
+    for offsets in [
+        vec![0.0],
+        vec![0.0; 9],
+        vec![0.7, 0.2],
+        vec![-0.1, 1.0],
+        vec![0.0, 1.1],
+        vec![0.0, f32::NAN],
+    ] {
+        let mut value = base.clone();
+        value.fill_gradient = Some(crate::FillGradient {
+            kind: crate::GradientKind::Radial,
+            angle_degrees: 0.0,
+            stops: offsets.into_iter().map(stop).collect(),
+        });
+        assert!(value.validate(&context).is_err());
+    }
+    let mut value = base;
+    value.fill_gradient = Some(crate::FillGradient {
+        kind: crate::GradientKind::Linear,
+        angle_degrees: f32::INFINITY,
+        stops: vec![stop(0.0), stop(1.0)],
+    });
+    assert!(value.validate(&context).is_err());
+}
+
+#[tokio::test]
+async fn source_reset_preserves_translation_and_language_and_requires_a_user_edit() {
+    let mut session = Session::memory().await.unwrap();
+    let mut content = None;
+    let patch = session
+        .snapshot()
+        .patch(|edit| {
+            let page = edit.add_page(PageDraft::new("page", 100., 100.), At::End)?;
+            let id = edit.add_text_content(page, At::End)?;
+            edit.set(
+                id,
+                &SourceText {
+                    text: Authored::user("manual source".into()),
+                    language: Some(LanguageTag::new("ja-JP")?),
+                },
+            )?;
+            edit.set(
+                id,
+                &Translation {
+                    text: Authored::user("manual translation".into()),
+                    language: None,
+                },
+            )?;
+            content = Some(id);
+            Ok(())
+        })
+        .unwrap();
+    let snapshot = session.commit(patch).await.unwrap().snapshot;
+    let id = content.unwrap();
+    let producer = ProducerId::new("dev.koharu.test.ocr").unwrap();
+    let mut automatic = snapshot.edit_as(Generation::new(producer.clone()));
+    assert!(matches!(
+        automatic.reset_source_text(id, producer.clone()),
+        Err(Error::Authorship(_))
+    ));
+    let mut edit = snapshot.edit();
+    edit.reset_source_text(id, producer.clone()).unwrap();
+    let reset = session
+        .commit(edit.finish().unwrap())
+        .await
+        .unwrap()
+        .snapshot;
+    let source = reset.component::<SourceText>(id).unwrap().unwrap();
+    assert!(source.text.value.is_empty());
+    assert_eq!(source.language.unwrap().as_str(), "ja-JP");
+    assert_eq!(
+        source.text.origin,
+        Origin::Generated(Generation::new(producer))
+    );
+    assert_eq!(
+        reset
+            .component::<Translation>(id)
+            .unwrap()
+            .unwrap()
+            .text
+            .value,
+        "manual translation"
+    );
+}
+
+#[test]
+fn text_layout_revision_two_decodes_without_warp_and_revision_three_round_trips() {
+    use revision::{DeserializeRevisioned, SerializeRevisioned};
+    #[revisioned(revision = 2)]
+    #[derive(Clone)]
+    struct TextLayoutV2 {
+        origin: Origin,
+        kind: TextLayoutKind,
+        #[revision(start = 2)]
+        angle_degrees: Option<f32>,
+    }
+    let old = TextLayoutV2 {
+        origin: Origin::User,
+        kind: TextLayoutKind::Paragraph,
+        angle_degrees: Some(23.0),
+    };
+    let mut bytes = Vec::new();
+    old.serialize_revisioned(&mut bytes).unwrap();
+    let mut layout = TextLayout::deserialize_revisioned(&mut bytes.as_slice()).unwrap();
+    assert_eq!(layout.origin, Origin::User);
+    assert_eq!(layout.kind, TextLayoutKind::Paragraph);
+    assert_eq!(layout.angle_degrees, Some(23.0));
+    assert_eq!(layout.warp, None);
+    for warp in [
+        None,
+        Some(TextWarp::Skew {
+            x_degrees: 30.0,
+            y_degrees: -20.0,
+        }),
+        Some(TextWarp::Perspective {
+            corners: [[0.2, 0.0], [0.8, 0.0], [1.0, 1.0], [0.0, 1.0]],
+        }),
+    ] {
+        layout.warp = warp;
+        bytes.clear();
+        layout.serialize_revisioned(&mut bytes).unwrap();
+        assert_eq!(
+            TextLayout::deserialize_revisioned(&mut bytes.as_slice()).unwrap(),
+            layout
+        );
+    }
+}
+
+#[test]
+fn text_warp_validation_rejects_nonfinite_crossed_concave_and_degenerate_quads() {
+    let context = ValidationContext::new(&|_| true, &|_| true);
+    let check = |warp| {
+        TextLayout {
+            origin: Origin::User,
+            kind: TextLayoutKind::Paragraph,
+            angle_degrees: None,
+            warp: Some(warp),
+        }
+        .validate(&context)
+    };
+    for x_degrees in [f32::NAN, f32::INFINITY, -60.01, 60.01] {
+        assert!(
+            check(TextWarp::Skew {
+                x_degrees,
+                y_degrees: 0.0
+            })
+            .is_err()
+        );
+        assert!(
+            check(TextWarp::Skew {
+                x_degrees: 0.0,
+                y_degrees: x_degrees
+            })
+            .is_err()
+        );
+    }
+    assert!(
+        check(TextWarp::Skew {
+            x_degrees: -60.0,
+            y_degrees: 60.0
+        })
+        .is_ok()
+    );
+    for corners in [
+        [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+        [[-1.0, -1.0], [2.0, -1.0], [2.0, 2.0], [-1.0, 2.0]],
+        [[0.3, 0.1], [0.7, 0.1], [1.1, 1.0], [-0.1, 1.0]],
+    ] {
+        assert!(check(TextWarp::Perspective { corners }).is_ok());
+    }
+    for corners in [
+        [[0.0, 0.0], [1.0, 1.0], [1.0, 0.0], [0.0, 1.0]],
+        [[0.0, 0.0], [1.0, 0.0], [0.2, 0.2], [0.0, 1.0]],
+        [[0.0, 0.0], [1.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+        [[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [1.0, 0.0]],
+        [[f32::NAN, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+        [[0.0, 0.0], [2.01, 0.0], [1.0, 1.0], [0.0, 1.0]],
+    ] {
+        assert!(check(TextWarp::Perspective { corners }).is_err());
+    }
 }

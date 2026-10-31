@@ -20,8 +20,9 @@ pub(crate) use assets::Assets;
 pub use assets::{Asset, AssetInput, AssetMetadata, AssetRole};
 pub use groups::{Group, TextGroup};
 pub use layers::{
-    FontStyle, RasterLayer, RasterLayerKind, StrokeJoin, StrokeMethod, StrokePosition,
-    TextAlignment, TextLayout, TextLayoutKind, Typography, WritingMode,
+    FillGradient, FontStyle, GradientKind, GradientStop, RasterLayer, RasterLayerKind, StrokeJoin,
+    StrokeMethod, StrokePosition, TextAlignment, TextLayout, TextLayoutKind, TextWarp, Typography,
+    WritingMode,
 };
 pub use provenance::{Authored, Generation, Origin};
 pub use spatial::{Geometry, Point, Visibility};

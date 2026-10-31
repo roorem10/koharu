@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 
+import { soundForJobTransition } from '@/components/runs/sound'
 import type {
   CanvasState,
   Download,
@@ -21,7 +22,15 @@ import { toast } from '@koharu/ui/components/toast'
 
 import { isBinding } from './shortcuts'
 
-export type CanvasTool = 'select' | 'text' | 'draw' | 'eraser' | 'color_picker' | 'remove' | 'pan'
+export type CanvasTool =
+  | 'select'
+  | 'text'
+  | 'draw'
+  | 'eraser'
+  | 'color_picker'
+  | 'remove'
+  | 'pan'
+  | 'ocr_box'
 export const MIN_BRUSH_DIAMETER = 1
 export function maxBrushDiameter(size: PageSize): number {
   // Assume that for all sizes below 2048 width, 128 is sufficient.
@@ -37,8 +46,22 @@ export interface CanvasBrush {
   diameter: number
   color: string
 }
+export type BrushTool = 'draw' | 'eraser' | 'remove'
+export interface BrushOptions {
+  diameter: number
+  hardness: number
+  opacity: number
+}
 export type InspectorSection = 'copy' | 'type' | 'layers'
-export type ShortcutAction = CanvasTool | 'fit' | 'zoom_in' | 'zoom_out' | 'zoom_actual'
+export type ShortcutAction =
+  | CanvasTool
+  | 'fit'
+  | 'zoom_in'
+  | 'zoom_out'
+  | 'zoom_actual'
+  | 'compare'
+  | 'brush_smaller'
+  | 'brush_larger'
 export type ShortcutSlot = ShortcutAction | `${ShortcutAction}_alt`
 export type Shortcuts = Record<ShortcutSlot, string>
 export type PipelineScope = 'page' | 'selected-pages' | 'project'
@@ -63,6 +86,7 @@ interface KoharuStore {
   selectedPages: EntityId[]
   tool: CanvasTool
   brush: CanvasBrush
+  brushes: Record<BrushTool, BrushOptions>
   inspector: InspectorSection
   fontFavoritesOnly: boolean
   processingScope: PipelineScope
@@ -79,6 +103,7 @@ interface KoharuStore {
   selectLayers: (layers: EntityId[]) => void
   setTool: (tool: CanvasTool) => void
   setBrush: (brush: CanvasBrush) => void
+  setBrushOptions: (options: Partial<Pick<BrushOptions, 'hardness' | 'opacity'>>) => void
   setShortcut: (slot: ShortcutSlot, binding: string) => void
   setShortcuts: (shortcuts: Shortcuts) => void
   setWheelZoom: (wheelZoom: WheelZoom) => void
@@ -99,6 +124,10 @@ export const defaultShortcuts: Shortcuts = {
   zoom_in: 'ctrl+plus',
   zoom_out: 'ctrl+-',
   zoom_actual: 'ctrl+0',
+  compare: '\\',
+  ocr_box: 'o',
+  brush_smaller: '[',
+  brush_larger: ']',
   select_alt: '',
   text_alt: '',
   draw_alt: '',
@@ -110,6 +139,10 @@ export const defaultShortcuts: Shortcuts = {
   zoom_in_alt: 'ctrl+numpadadd',
   zoom_out_alt: 'ctrl+numpadsubtract',
   zoom_actual_alt: '',
+  compare_alt: '',
+  ocr_box_alt: '',
+  brush_smaller_alt: '',
+  brush_larger_alt: '',
 }
 
 export const useKoharuStore = create<KoharuStore>()((set) => ({
@@ -131,6 +164,11 @@ export const useKoharuStore = create<KoharuStore>()((set) => ({
   selectedPages: [],
   tool: 'select',
   brush: { diameter: 48, color: '#FFFFFF' },
+  brushes: {
+    draw: { diameter: 48, hardness: 100, opacity: 100 },
+    eraser: { diameter: 48, hardness: 100, opacity: 100 },
+    remove: { diameter: 48, hardness: 100, opacity: 100 },
+  },
   inspector: 'copy',
   fontFavoritesOnly: false,
   processingScope: 'selected-pages',
@@ -145,8 +183,41 @@ export const useKoharuStore = create<KoharuStore>()((set) => ({
   setProcessingStages: (processingStages) => set({ processingStages }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   selectLayers: (selectedLayers) => set({ selectedLayers: [...new Set(selectedLayers)] }),
-  setTool: (tool) => set({ tool }),
-  setBrush: (brush) => set({ brush }),
+  setTool: (tool) =>
+    set((state) => ({
+      tool,
+      ...(isBrushTool(tool)
+        ? { brush: { ...state.brush, diameter: state.brushes[tool as BrushTool].diameter } }
+        : {}),
+    })),
+  setBrush: (brush) =>
+    set((state) => ({
+      brush,
+      ...(isBrushTool(state.tool)
+        ? {
+            brushes: {
+              ...state.brushes,
+              [state.tool]: { ...state.brushes[state.tool as BrushTool], diameter: brush.diameter },
+            },
+          }
+        : {}),
+    })),
+  setBrushOptions: (options) =>
+    set((state) => {
+      if (!isBrushTool(state.tool)) return state
+      const tool = state.tool as BrushTool
+      const current = state.brushes[tool]
+      return {
+        brushes: {
+          ...state.brushes,
+          [tool]: {
+            ...current,
+            hardness: Math.min(100, Math.max(0, options.hardness ?? current.hardness)),
+            opacity: Math.min(100, Math.max(1, options.opacity ?? current.opacity)),
+          },
+        },
+      }
+    }),
   setShortcut: (slot, binding) =>
     set((state) => ({
       shortcuts: { ...state.shortcuts, [slot]: binding },
@@ -192,6 +263,7 @@ export function receiveCanvas(canvas: CanvasState): void {
 }
 
 export function receiveJob(job: Job): void {
+  soundForJobTransition(useKoharuStore.getState().jobs[job.id], job)
   useKoharuStore.setState((state) => ({ jobs: { ...state.jobs, [job.id]: job } }))
 }
 

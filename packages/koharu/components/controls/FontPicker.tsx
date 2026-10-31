@@ -102,9 +102,11 @@ export function FontPicker({
     return orderedFamilies.filter((family) => {
       const matchesQuery =
         !normalized ||
-        [family.name, ...family.faces.map((face) => face.postscript_name)].some((name) =>
-          normalizeFontName(name).includes(normalized),
-        )
+        [
+          family.name,
+          ...family.local_names,
+          ...family.faces.map((face) => face.postscript_name),
+        ].some((name) => normalizeFontName(name).includes(normalized))
       const matchesSource = !filters.source || family.sources.includes(filters.source)
       const matchesScript =
         !filters.script ||
@@ -643,7 +645,15 @@ function FontList({
               >
                 <FontPreviewLabel family={family} className='h-4.5 w-full min-w-0' />
                 <div className='flex min-w-0 items-center justify-between gap-2 text-[8px] leading-none text-muted-foreground'>
-                  <span className='min-w-0 truncate'>{family.name}</span>
+                  <span
+                    className='min-w-0 truncate'
+                    title={[family.name, ...family.local_names].join(' · ')}
+                  >
+                    {family.name}
+                    {family.local_names[0] && (
+                      <span className='ml-1 text-muted-foreground'>{family.local_names[0]}</span>
+                    )}
+                  </span>
                   <span className='shrink-0'>{source}</span>
                 </div>
               </button>
