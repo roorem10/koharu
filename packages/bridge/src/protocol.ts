@@ -518,7 +518,8 @@ export type GlossaryEntry = {
 
 /**
  *  The drawn box of one character (or of one cluster, when several `char`s
- *  form one glyph: then `end - start > 1`).
+ *  form one glyph: then `end - start > 1`). Each line also ends with a
+ *  `start == end` caret box: zero width horizontally, zero height vertically.
  */
 export type GlyphBox = {
 	start: number,
