@@ -69,7 +69,7 @@ export const commands = {
 	dismissLineFlag: (layer: EntityId, index: number) => __TAURI_INVOKE<null>("dismiss_line_flag", { layer, index }),
 	glossaryUsage: (source: string) => __TAURI_INVOKE<TermUsage>("glossary_usage", { source }),
 	explainLine: (layer: EntityId) => __TAURI_INVOKE<LineExplanation>("explain_line", { layer }),
-	readChapter: (scope: Scope, textOnly: boolean) => __TAURI_INVOKE<JobId>("read_chapter", { scope, textOnly }),
+	readChapter: (scope: Scope, model: ModelSelection | null) => __TAURI_INVOKE<JobId>("read_chapter", { scope, model }),
 	listSeries: () => __TAURI_INVOKE<Series[]>("list_series"),
 	createSeries: (name: string) => __TAURI_INVOKE<Series>("create_series", { name }),
 	getSeries: (id: string) => __TAURI_INVOKE<Series>("get_series", { id }),
@@ -96,9 +96,9 @@ export const commands = {
 	addPointText: (point: Point) => __TAURI_INVOKE<LayerCommit>("add_point_text", { point }),
 	addTextBox: (frame: Frame) => __TAURI_INVOKE<LayerCommit>("add_text_box", { frame }),
 	commitPaint: (expectedRevision: Revision, layer: EntityId | null, points: Point[], brush: PaintBrush) => __TAURI_INVOKE<LayerCommit>("commit_paint", { expectedRevision, layer, points, brush }),
-	commitErase: (expectedRevision: Revision, layer: EntityId, points: Point[], diameter: number) => __TAURI_INVOKE<LayerCommit>("commit_erase", { expectedRevision, layer, points, diameter }),
+	commitErase: (expectedRevision: Revision, layer: EntityId | null, points: Point[], diameter: number, hardness: number) => __TAURI_INVOKE<LayerCommit>("commit_erase", { expectedRevision, layer, points, diameter, hardness }),
 	commitTransform: (expectedRevision: Revision, elements: TransformFrame[], persistUnchanged: boolean) => __TAURI_INVOKE<Revision | null>("commit_transform", { expectedRevision, elements, persistUnchanged }),
-	commitInpaint: (expectedRevision: Revision, points: Point[], diameter: number) => __TAURI_INVOKE<JobId | null>("commit_inpaint", { expectedRevision, points, diameter }),
+	commitInpaint: (expectedRevision: Revision, points: Point[], diameter: number, hardness: number) => __TAURI_INVOKE<JobId | null>("commit_inpaint", { expectedRevision, points, diameter, hardness }),
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
@@ -109,7 +109,7 @@ export const commands = {
 	joinBubbleBoxes: (layer: EntityId) => __TAURI_INVOKE<EntityId>("join_bubble_boxes", { layer }),
 	joinPageBubbles: (page: EntityId) => __TAURI_INVOKE<number>("join_page_bubbles", { page }),
 	splitBox: (layer: EntityId) => __TAURI_INVOKE<EntityId[]>("split_box", { layer }),
-	runQc: (scope: QcScope, onProgress: Channel<QcProgress>) => __TAURI_INVOKE<QcReport>("run_qc", { scope, onProgress }),
+	runQc: (scope: QcScope, onProgress: Channel<QcProgress>, automatic: boolean | null) => __TAURI_INVOKE<QcReport>("run_qc", { scope, onProgress, automatic }),
 	markQcOk: (layer: EntityId, check: QcCheck, ok: boolean) => __TAURI_INVOKE<null>("mark_qc_ok", { layer, check, ok }),
 	getQcSettings: () => __TAURI_INVOKE<QcSettings>("get_qc_settings"),
 	saveQcSettings: (settings: QcSettings) => __TAURI_INVOKE<QcSettings>("save_qc_settings", { settings }),
@@ -143,6 +143,24 @@ export const commands = {
 	getOcrRedoInfo: (layers: EntityId[]) => __TAURI_INVOKE<RedoInfo>("get_ocr_redo_info", { layers }),
 	redoOcrBoxes: (layers: EntityId[], action: RedoAction, overwrite: boolean) => __TAURI_INVOKE<JobId[]>("redo_ocr_boxes", { layers, action, overwrite }),
 	addSfxSubtitle: (layer: EntityId) => __TAURI_INVOKE<EntityId>("add_sfx_subtitle", { layer }),
+	getCleanupSettings: () => __TAURI_INVOKE<CleanupSettings>("get_cleanup_settings"),
+	saveCleanupSettings: (settings: CleanupSettings) => __TAURI_INVOKE<CleanupSettings>("save_cleanup_settings", { settings }),
+	cleanAreas: (page: EntityId, strokes: CleanupStroke[], rects: CleanupRect[]) => __TAURI_INVOKE<JobId>("clean_areas", { page, strokes, rects }),
+	getTextWarp: (layers: EntityId[]) => __TAURI_INVOKE<(TextWarp | null)[]>("get_text_warp", { layers }),
+	setTextWarp: (layers: EntityId[], warp: TextWarp | null) => __TAURI_INVOKE<null>("set_text_warp", { layers, warp }),
+	getRawPrepSettings: () => __TAURI_INVOKE<RawPrepSettings>("get_raw_prep_settings"),
+	saveRawPrepSettings: (settings: RawPrepSettings) => __TAURI_INVOKE<RawPrepSettings>("save_raw_prep_settings", { settings }),
+	getPrepPageStatus: (pages: EntityId[]) => __TAURI_INVOKE<PrepPageStatus[]>("get_prep_page_status", { pages }),
+	preparePages: (pages: EntityId[], options: RawPrepOptions) => __TAURI_INVOKE<PrepResult>("prepare_pages", { pages, options }),
+	restoreOriginalPages: (pages: EntityId[]) => __TAURI_INVOKE<PrepResult>("restore_original_pages", { pages }),
+	previewPrep: (page: EntityId, options: RawPrepOptions) => __TAURI_INVOKE<PrepPreview>("preview_prep", { page, options }),
+	getBoxEffects: (layers: EntityId[]) => __TAURI_INVOKE<boolean[]>("get_box_effects", { layers }),
+	resetBoxEffects: (layers: EntityId[]) => __TAURI_INVOKE<null>("reset_box_effects", { layers }),
+	getQcResults: () => __TAURI_INVOKE<QcReport>("get_qc_results"),
+	markQcFinding: (layer: EntityId, check: QcCheck, flag: Flag | null, ok: boolean) => __TAURI_INVOKE<null>("mark_qc_finding", { layer, check, flag, ok }),
+	getReadingModel: () => __TAURI_INVOKE<ReadModelInfo>("get_reading_model"),
+	getReadingModels: () => __TAURI_INVOKE<Model[]>("get_reading_models"),
+	getLastReadModel: () => __TAURI_INVOKE<string | null>("get_last_read_model"),
 };
 
 /* Types */
@@ -296,6 +314,25 @@ export type Character = {
 
 export type ClaudeConfig = Record<string, never>;
 
+export type CleanupRect = {
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+};
+
+export type CleanupSettings = {
+	remove_mode?: RemoveMode,
+	paint_target?: PaintTarget,
+	grow_px?: number,
+};
+
+export type CleanupStroke = {
+	points: Point[],
+	diameter: number,
+	hardness: number,
+};
+
 export type CodexModel = {
 	id: string,
 	name: string,
@@ -310,6 +347,8 @@ export type Config = {
 export type ContextSettings = {
 	read_when?: ReadWhen,
 	send_images?: boolean,
+	ask_before_reading?: boolean,
+	read_model?: ModelSelection | null,
 	pages_per_request?: number,
 	previous_pages?: number,
 	agent_messages?: number,
@@ -723,8 +762,11 @@ export type PageSummary = {
 
 export type PaintBrush = {
 	diameter: number,
+	hardness: number,
 	color: [number, number, number, number],
 };
+
+export type PaintTarget = "cleanup" | "paint_layer";
 
 export type PipelineConfig = {
 	detect_text_color: boolean,
@@ -750,6 +792,32 @@ export type Preferences = {
 	providers: ProviderPreferences,
 	typesetting: TypesettingConfig,
 	languages: LanguageChoice[],
+};
+
+export type PrepPageStatus = {
+	page: EntityId,
+	has_original: boolean,
+	has_cleanup: boolean,
+};
+
+export type PrepPreview = {
+	before: number[],
+	after: number[],
+	black: number,
+	white: number,
+};
+
+export type PrepResult = {
+	changed: number,
+	skipped: PrepSkipped[],
+};
+
+export type PrepSkipReason = "cleanup" | "missing_source" | "no_original" | "unchanged";
+
+export type PrepSkipped = {
+	page: EntityId,
+	label: string,
+	reason: PrepSkipReason,
 };
 
 export type ProcessorConfig = {
@@ -835,6 +903,25 @@ export type Quantization = {
 
 export type RasterLayerKind = "cleanup" | "paint";
 
+export type RawPrepOptions = {
+	levels?: boolean,
+	clip_percent?: number,
+	whiten?: boolean,
+	threshold?: number,
+};
+
+export type RawPrepSettings = {
+	options?: RawPrepOptions,
+	fix_on_import?: boolean,
+};
+
+export type ReadModelInfo = {
+	selection: ModelSelection,
+	vision: boolean,
+	local: boolean,
+	label: string,
+};
+
 export type ReadWhen = "missing" | "always" | "never";
 
 export type Reasoning = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
@@ -845,6 +932,8 @@ export type RedoInfo = {
 	user_sources: number,
 	user_translations: number,
 };
+
+export type RemoveMode = "immediate" | "queue";
 
 export type RetryProgress = {
 	attempt: number,
@@ -998,6 +1087,16 @@ export type TextStyles = {
 	/**  Distinguish a deliberate Clear from a pre-migration missing fill. */
 	legacy_color_migrated?: boolean,
 };
+
+/**  Skew or perspective applied to the laid-out text of a box. */
+export type TextWarp = 
+/**  Horizontal and vertical shear in degrees. */
+{ kind: "skew"; x_degrees: number; y_degrees: number } | 
+/**
+ *  Where the frame's corners go in frame-local units, clockwise from the top-left;
+ *  the unit square leaves the text unchanged.
+ */
+{ kind: "perspective"; corners: [([number, number]), ([number, number]), ([number, number]), ([number, number])] };
 
 export type ThumbnailBytes = number[];
 
