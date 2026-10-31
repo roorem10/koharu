@@ -222,6 +222,12 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             warp::get_text_warp,
             warp::set_text_warp,
             // WO-17 (raw prep) commands go here.
+            raw_prep::get_raw_prep_settings,
+            raw_prep::save_raw_prep_settings,
+            raw_prep::get_prep_page_status,
+            raw_prep::prepare_pages,
+            raw_prep::restore_original_pages,
+            raw_prep::preview_prep,
             // WO-23 (redesigned panel and popups) commands go here.
             // WO-24 (automatic QC and context tab) commands go here.
         ])
