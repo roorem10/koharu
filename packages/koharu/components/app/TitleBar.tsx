@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AboutDialog } from '@/components/app/AboutDialog'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
+import { retryFailedPages } from '@/components/runs/data'
 import { call } from '@/lib/backend'
 import { selectableLayer } from '@/lib/geometry'
 import {
@@ -46,6 +47,11 @@ export function TitleBar() {
   const pageQuery = usePage(Boolean(project))
   const pages = project ? (pagesQuery.data ?? []) : []
   const page = project ? (pageQuery.data ?? null) : null
+  const jobs = useKoharuStore((state) => state.jobs)
+  const lastJob = Object.values(jobs)
+    .filter((job) => job.project === project?.name)
+    .at(-1)
+  const running = Object.values(jobs).some((job) => job.state === 'running')
   const selectedPages = useKoharuStore((state) => state.selectedPages)
   const selectedLayers = useKoharuStore((state) => state.selectedLayers)
   const selectLayers = useKoharuStore((state) => state.selectLayers)
@@ -218,6 +224,12 @@ export function TitleBar() {
                 {t('menu.processLayers')}
               </MenubarItem>
               <MenubarSeparator />
+              <MenubarItem
+                disabled={running || !lastJob?.failures?.length}
+                onClick={() => lastJob && void retryFailedPages(lastJob).catch(() => undefined)}
+              >
+                {t('runs.retryFailedPages')}
+              </MenubarItem>
               {(['detection', 'ocr', 'translation', 'inpainting'] as Stage[]).map((stage) => (
                 <MenubarItem
                   key={stage}

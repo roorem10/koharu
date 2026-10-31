@@ -50,6 +50,8 @@ pub struct Job {
     pub error: Option<String>,
     pub retry: Option<RetryProgress>,
     pub failures: Vec<koharu_pipeline::PageFailure>,
+    pub project: Option<String>,
+    pub operation: Option<koharu_pipeline::Operation>,
 }
 
 #[derive(Clone, Debug, Serialize, Type)]
@@ -68,10 +70,18 @@ pub enum JobState {
     Stopped,
 }
 
+#[derive(Clone)]
+pub(crate) struct RunRecord {
+    pub(crate) project: koharu_scene::ProjectId,
+    pub(crate) operation: koharu_pipeline::Operation,
+    pub(crate) failed: Vec<koharu_scene::EntityId>,
+}
+
 #[derive(Default)]
 pub(crate) struct Processing {
     pub(crate) stops: Mutex<HashMap<JobId, StopToken>>,
     pub(crate) jobs: Mutex<HashMap<JobId, Job>>,
+    pub(crate) runs: Mutex<HashMap<JobId, RunRecord>>,
     pub(crate) inpainting_mask: Mutex<Option<koharu_pipeline::InpaintingMask>>,
 }
 
@@ -116,12 +126,12 @@ pub(crate) async fn start_job(
     job_channel: &JobChannel,
 ) -> Result<JobId> {
     let settings = super::runs::RunSettings::load()?;
-    let translation_hints = {
+    let (translation_hints, run_project, project_name) = {
         let project = project.project.lock().await;
         let project = project.as_ref().context("no project is open")?;
         let snapshot = project.snapshot();
         let hints = super::context::translation_hints(&project.load_context()?, &snapshot)?;
-        Arc::new(hints)
+        (Arc::new(hints), snapshot.project_id(), project.name.clone())
     };
     let id = JobId::new();
     let stop = StopToken::default();
@@ -143,7 +153,17 @@ pub(crate) async fn start_job(
         error: None,
         retry: None,
         failures: Vec::new(),
+        project: Some(project_name),
+        operation: Some(operation.clone()),
     };
+    processing.runs.lock().insert(
+        id,
+        RunRecord {
+            project: run_project,
+            operation: operation.clone(),
+            failed: Vec::new(),
+        },
+    );
     processing.jobs.lock().insert(id, job.clone());
     job_channel.channel.publish(job);
 
@@ -187,6 +207,14 @@ pub(crate) async fn start_job(
                     Some((progress.0, progress.1, Some(page), Some(stage), None))
                 }
                 Progress::PageFailed { failure, settled } => {
+                    if let Some(record) = progress_handle
+                        .state::<Processing>()
+                        .runs
+                        .lock()
+                        .get_mut(&id)
+                    {
+                        record.failed.push(failure.page);
+                    }
                     let counts = {
                         let mut progress = progress.lock();
                         progress.0 = progress.0.saturating_add(settled).min(progress.1);
@@ -322,8 +350,8 @@ pub(crate) async fn start_job(
             .state::<Processing>()
             .jobs
             .lock()
-            .remove(&id)
-            .map(|mut job| {
+            .get_mut(&id)
+            .map(|job| {
                 job.state = if stopped {
                     JobState::Stopped
                 } else if error.is_some() {
@@ -334,7 +362,8 @@ pub(crate) async fn start_job(
                     JobState::FinishedWithProblems
                 };
                 job.error = error;
-                job
+                job.retry = None;
+                job.clone()
             });
         if let Some(job) = job {
             task_handle.state::<JobChannel>().channel.publish(job);

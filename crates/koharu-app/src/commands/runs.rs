@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use koharu_pipeline::{OnPageFailure, RunOrder, RunPolicy, Stage};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -96,6 +96,53 @@ pub(crate) async fn save_run_settings(
     *value = settings.clone();
     value.save()?;
     Ok(settings)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn retry_failed_pages(
+    job: super::processing::JobId,
+    handle: tauri::AppHandle<tauri_runtime_cef::CefRuntime>,
+) -> std::result::Result<super::processing::JobId, Error> {
+    use tauri::Manager as _;
+    let processing = handle.state::<super::processing::Processing>();
+    require(
+        !processing.stops.lock().contains_key(&job),
+        "the job is still running",
+    )?;
+    let previous = processing
+        .runs
+        .lock()
+        .get(&job)
+        .cloned()
+        .context("job is no longer available")?;
+    require(!previous.failed.is_empty(), "the job has no failed pages")?;
+    let expected = previous.project;
+    let project = handle.state::<super::project::CurrentProject>();
+    {
+        let current = project.project.lock().await;
+        require(
+            current
+                .as_ref()
+                .context("no project is open")?
+                .snapshot()
+                .project_id()
+                == expected,
+            "the job belongs to another project",
+        )?;
+    }
+    let pages = previous.failed;
+    let operation = previous.operation;
+    Ok(super::processing::start_job(
+        handle.clone(),
+        koharu_pipeline::Scope::Pages(pages),
+        operation,
+        false,
+        &project,
+        &processing,
+        &handle.state::<super::processing::JobChannel>(),
+    )
+    .await?)
 }
 
 fn require(condition: bool, message: &str) -> Result<()> {

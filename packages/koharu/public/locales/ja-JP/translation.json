@@ -563,7 +563,11 @@
     "vramValue": "VRAM {{value}}"
   },
   "runs": {
-    "title": "Runs"
+    "title": "Runs",
+    "retrying": "Retrying ({{attempt}}/{{attempts}})",
+    "retryFailedPages": "Retry failed pages",
+    "finishedWithProblems": "Finished with problems",
+    "failed": "Failed"
   },
   "settings": {
     "appearance": {

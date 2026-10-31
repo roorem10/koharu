@@ -312,6 +312,8 @@ pub(crate) async fn read_chapter(
                 error: None,
                 retry: None,
                 failures: Vec::new(),
+                project: None,
+                operation: None,
             },
         );
     }

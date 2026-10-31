@@ -104,6 +104,7 @@ export const commands = {
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
 	getRunSettings: () => __TAURI_INVOKE<RunSettings>("get_run_settings"),
 	saveRunSettings: (settings: RunSettings) => __TAURI_INVOKE<RunSettings>("save_run_settings", { settings }),
+	retryFailedPages: (job: JobId) => __TAURI_INVOKE<JobId>("retry_failed_pages", { job }),
 };
 
 /* Types */
@@ -417,6 +418,8 @@ export type Job = {
 	error: string | null,
 	retry: RetryProgress | null,
 	failures: PageFailure[],
+	project: string | null,
+	operation: Operation | null,
 };
 
 export type JobId = string;
