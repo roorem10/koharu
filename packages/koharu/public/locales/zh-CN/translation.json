@@ -1230,6 +1230,41 @@
     "title": "Word styles"
   },
   "emphasis": {
-    "title": "Emphasis"
+    "title": "Emphasis",
+    "description": "Set the style copied to selected words by ★ or the AI. Unset category fields use the emphasis default.",
+    "enabledForAi": "Let the AI emphasise words",
+    "category": "Lettering category",
+    "default": "Default emphasis",
+    "sameAsDefault": "Same as default",
+    "useBoxStyle": "Use box style",
+    "font": "Font",
+    "weight": "Weight",
+    "italic": "Italic",
+    "normal": "Normal",
+    "oblique": "Oblique",
+    "sizePercent": "Size (%)",
+    "color": "Colour",
+    "stroke_color": "Outline colour",
+    "stroke_width": "Outline width",
+    "outer_stroke_color": "Second outline colour",
+    "outer_stroke_width": "Second outline width",
+    "resetCategory": "Use default emphasis for this category",
+    "categories": {
+      "normal_dialogue": "Normal Dialogue",
+      "thoughts": "Thoughts",
+      "floating": "Floating",
+      "small_text": "Small Text",
+      "narration_box": "Narration Box",
+      "shout": "Shout",
+      "weak_shout": "Weak/Panic Shout",
+      "sfx": "SFX",
+      "moan": "Moan",
+      "title": "Title",
+      "phone_text": "Phone Text",
+      "whisper": "Whisper",
+      "shy": "Shy / Hesitant",
+      "crying": "Crying / Trembling",
+      "menacing": "Menacing / Sinister"
+    }
   }
 }
