@@ -1,6 +1,7 @@
 //! Translation through local and hosted providers.
 
 mod backend;
+pub mod emphasis;
 mod error;
 mod language;
 mod local;
@@ -16,7 +17,10 @@ use koharu_ml::Device;
 use error::{Error, Result};
 use local::LocalTranslator;
 
-pub use backend::{GlossaryHint, TaskRequest, TranslationContext, TranslationRequest};
+pub use backend::{
+    GlossaryHint, TaskRequest, TranslatedSegment, TranslationContext, TranslationRequest,
+};
+pub use emphasis::EmphasisSettings;
 pub use language::Language;
 pub use model::{GenerationConfig, Model, ModelSelection, Quantization};
 pub(crate) use model::{ModelGeneration, QuantizationDefinition, display_name};
@@ -101,12 +105,14 @@ impl Translator {
         selection: &ModelSelection,
         generation: GenerationConfig,
         mut request: TranslationRequest,
-    ) -> anyhow::Result<(&'static str, Vec<String>)> {
+    ) -> anyhow::Result<(&'static str, Vec<TranslatedSegment>)> {
         let provider = selection.provider;
         let provider_id: &'static str = provider.into();
         if request.segments.is_empty() {
-            return Ok((provider_id, request.segments));
+            return Ok((provider_id, Vec::new()));
         }
+
+        request.emphasis = EmphasisSettings::load()?.read()?.enabled_for_ai;
 
         let generation = generation.for_model(selection);
 

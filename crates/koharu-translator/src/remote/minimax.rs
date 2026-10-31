@@ -193,7 +193,7 @@ mod tests {
             temperature: Some(0.7),
             top_p: Some(0.95),
             max_completion_tokens: Some(1024),
-            response_format: response_format("MiniMax-M3", prompt::output_schema(2)),
+            response_format: response_format("MiniMax-M3", prompt::output_schema(2, true)),
         };
         let value = serde_json::to_value(body).unwrap();
         assert_eq!(value["model"], "MiniMax-M3");
@@ -220,7 +220,7 @@ mod tests {
             temperature: None,
             top_p: None,
             max_completion_tokens: None,
-            response_format: response_format("MiniMax-Text-01", prompt::output_schema(2)),
+            response_format: response_format("MiniMax-Text-01", prompt::output_schema(2, true)),
         };
         let value = serde_json::to_value(body).unwrap();
 

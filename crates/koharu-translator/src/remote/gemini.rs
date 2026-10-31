@@ -248,7 +248,7 @@ mod tests {
             max_output_tokens: None,
             thinking_config: None,
             response_mime_type: "application/json",
-            response_json_schema: prompt::output_schema(2),
+            response_json_schema: prompt::output_schema(2, true),
         };
         let value = serde_json::to_value(config).unwrap();
         assert_eq!(value["responseMimeType"], "application/json");

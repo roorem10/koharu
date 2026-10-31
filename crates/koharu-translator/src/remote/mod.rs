@@ -40,8 +40,8 @@ pub(crate) async fn translate(
     selection: &ModelSelection,
     generation: &GenerationConfig,
     request: &TranslationRequest,
-) -> Result<Vec<String>> {
-    match selection.provider {
+) -> Result<Vec<crate::TranslatedSegment>> {
+    let plain = match selection.provider {
         Provider::DeepL => deepl::translate(client, &providers.deepl, request).await,
         Provider::GoogleCloudTranslation => {
             google_cloud::translate(client, &providers.google_cloud_translation, request).await
@@ -50,13 +50,21 @@ pub(crate) async fn translate(
         _ => {
             let task = TaskRequest::translation(request)?;
             let text = run_task(client, providers, selection, generation, &task).await?;
-            Ok(crate::prompt::translations(
+            return Ok(crate::prompt::translations(
                 selection.provider.into(),
                 &text,
                 &request.segments,
-            )?)
+                request.emphasis,
+            )?);
         }
-    }
+    }?;
+    Ok(plain
+        .into_iter()
+        .map(|text| crate::TranslatedSegment {
+            text,
+            emphasis: Vec::new(),
+        })
+        .collect())
 }
 
 pub(crate) async fn run_task(

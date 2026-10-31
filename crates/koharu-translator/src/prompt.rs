@@ -5,7 +5,7 @@ use indoc::indoc;
 use serde::{Deserialize, Deserializer, Serialize, de};
 use serde_json::{Value, json};
 
-use crate::{GlossaryHint, Language, TranslationContext, TranslationRequest};
+use crate::{GlossaryHint, Language, TranslatedSegment, TranslationContext, TranslationRequest};
 
 pub(crate) fn prompts(request: &TranslationRequest) -> anyhow::Result<(String, String)> {
     let input = TranslationInput {
@@ -33,7 +33,8 @@ pub(crate) fn translations(
     provider: &str,
     text: &str,
     source_segments: &[String],
-) -> anyhow::Result<Vec<String>> {
+    emphasis: bool,
+) -> anyhow::Result<Vec<TranslatedSegment>> {
     let output = serde_json::from_str::<TranslationOutput>(text).with_context(|| {
         format!(
             "{provider} returned invalid translation JSON for {} segments; response was: {}",
@@ -41,12 +42,25 @@ pub(crate) fn translations(
             snippet(text),
         )
     })?;
-    let mut translations = source_segments.to_vec();
+    let mut translations: Vec<_> = source_segments
+        .iter()
+        .map(|text| TranslatedSegment {
+            text: text.clone(),
+            emphasis: Vec::new(),
+        })
+        .collect();
     let mut translated = vec![false; source_segments.len()];
 
     for translation in output.translations {
         if translation.id < translations.len() && !translated[translation.id] {
-            translations[translation.id] = translation.text;
+            translations[translation.id] = TranslatedSegment {
+                text: translation.text,
+                emphasis: if emphasis {
+                    translation.emphasis
+                } else {
+                    Vec::new()
+                },
+            };
             translated[translation.id] = true;
         }
     }
@@ -86,8 +100,8 @@ pub(crate) fn snippet(text: &str) -> String {
     output
 }
 
-pub(crate) fn output_schema(expected: usize) -> Value {
-    json!({
+pub(crate) fn output_schema(expected: usize, emphasis: bool) -> Value {
+    let mut schema = json!({
         "type": "object",
         "properties": {
             "translations": {
@@ -115,7 +129,16 @@ pub(crate) fn output_schema(expected: usize) -> Value {
         },
         "required": ["translations"],
         "additionalProperties": false
-    })
+    });
+    if emphasis {
+        let item = &mut schema["properties"]["translations"]["items"];
+        item["properties"]["emphasis"] = json!({
+            "type": "array", "items": { "type": "string" },
+            "description": "Exact words or phrases from the translated text to stress; [] when none."
+        });
+        item["required"] = json!(["id", "text", "emphasis"]);
+    }
+    schema
 }
 
 fn translation_system_prompt(request: &TranslationRequest) -> String {
@@ -146,6 +169,10 @@ fn translation_system_prompt(request: &TranslationRequest) -> String {
     )
     .trim_end()
     .to_owned();
+
+    if request.emphasis {
+        prompt.push_str("\n- Include `emphasis`: an array of exact words or phrases as they appear in the translated text. Stress shouting, explicitly stressed source words, or SFX-like words sparingly; return [] when nothing needs stress. Keep text plain, without markup.");
+    }
 
     if !request.glossary.is_empty() {
         prompt.push_str("\n\nGlossary requirements:\nUse these translations for these terms. These mappings are mandatory; preserve their target spelling.");
@@ -216,6 +243,8 @@ struct TranslationOutputSegment {
     #[serde(deserialize_with = "deserialize_segment_id")]
     id: usize,
     text: String,
+    #[serde(default)]
+    emphasis: Vec<String>,
 }
 
 fn deserialize_segment_id<'de, D>(deserializer: D) -> Result<usize, D::Error>
@@ -300,7 +329,11 @@ mod tests {
         let response = r#"{"translations":[{"id":0,"text":"hello"},{"id":1,"text":"world"}]}"#;
 
         assert_eq!(
-            translations("test", response, &source).unwrap(),
+            translations("test", response, &source, true)
+                .unwrap()
+                .into_iter()
+                .map(|item| item.text)
+                .collect::<Vec<_>>(),
             ["hello", "world"]
         );
     }
@@ -315,7 +348,7 @@ mod tests {
             "{\"translations\":[{\"id\":0,\"text\":\"hello\"},{\"id\":1,\"text\":\"world\"",
         ] {
             assert!(
-                translations("test", response, &source).is_err(),
+                translations("test", response, &source, true).is_err(),
                 "{response}"
             );
         }
@@ -327,7 +360,7 @@ mod tests {
         let response = "{\n  \"translations\": [{\"id\": 0}]\n}";
         let error = format!(
             "{:#}",
-            translations("test", response, &source).expect_err("missing text should fail")
+            translations("test", response, &source, true).expect_err("missing text should fail")
         );
 
         assert!(error.contains("missing field `text`"), "{error}");
@@ -342,7 +375,11 @@ mod tests {
         let source = ["one".to_owned(), "two".to_owned()];
         let response = r#"{"translations":[{"id":1,"text":"world"},{"id":0,"text":"hello"}]}"#;
         assert_eq!(
-            translations("test", response, &source).unwrap(),
+            translations("test", response, &source, true)
+                .unwrap()
+                .into_iter()
+                .map(|item| item.text)
+                .collect::<Vec<_>>(),
             ["hello", "world"]
         );
     }
@@ -352,7 +389,11 @@ mod tests {
         let source = ["one".to_owned(), "two".to_owned()];
         let short = r#"{"translations":[{"id":1,"text":"world"}]}"#;
         assert_eq!(
-            translations("test", short, &source).unwrap(),
+            translations("test", short, &source, true)
+                .unwrap()
+                .into_iter()
+                .map(|item| item.text)
+                .collect::<Vec<_>>(),
             ["one", "world"]
         );
 
@@ -364,7 +405,11 @@ mod tests {
             "]}"
         );
         assert_eq!(
-            translations("test", response, &source).unwrap(),
+            translations("test", response, &source, true)
+                .unwrap()
+                .into_iter()
+                .map(|item| item.text)
+                .collect::<Vec<_>>(),
             ["hello", "two"]
         );
     }
@@ -394,7 +439,7 @@ mod tests {
 
     #[test]
     fn schema_requires_the_expected_number_of_id_text_pairs() {
-        let schema = output_schema(3);
+        let schema = output_schema(3, true);
         let translations = &schema["properties"]["translations"];
         assert_eq!(translations["minItems"], 3);
         assert_eq!(translations["maxItems"], 3);
@@ -426,5 +471,48 @@ mod tests {
         let prompt = translation_system_prompt(&request);
         assert!(prompt.contains("attached original page image"));
         assert!(prompt.contains("Translate only the supplied segments"));
+    }
+}
+
+#[cfg(test)]
+mod emphasis_tests {
+    use super::*;
+
+    #[test]
+    fn schema_and_prompt_only_request_emphasis_when_enabled() {
+        let enabled = output_schema(2, true);
+        let item = &enabled["properties"]["translations"]["items"];
+        assert_eq!(item["required"], json!(["id", "text", "emphasis"]));
+        assert_eq!(item["properties"]["emphasis"]["items"]["type"], "string");
+        let disabled = output_schema(2, false);
+        let item = &disabled["properties"]["translations"]["items"];
+        assert_eq!(item["required"], json!(["id", "text"]));
+        assert!(item["properties"].get("emphasis").is_none());
+        let mut request = TranslationRequest::new(["NO!"], Language::English);
+        assert!(translation_system_prompt(&request).contains("`emphasis`"));
+        request.emphasis = false;
+        assert!(!translation_system_prompt(&request).contains("`emphasis`"));
+        assert_eq!(
+            crate::TaskRequest::translation(&request).unwrap().schema,
+            output_schema(1, false)
+        );
+    }
+
+    #[test]
+    fn words_stay_with_their_segment_and_are_discarded_when_disabled() {
+        let source = vec!["one".to_owned(), "two".to_owned()];
+        let response =
+            r#"{"translations":[{"id":1,"text":"NO!","emphasis":["NO"]},{"id":0,"text":"Hello"}]}"#;
+        let parsed = translations("test", response, &source, true).unwrap();
+        assert_eq!(parsed[0].text, "Hello");
+        assert!(parsed[0].emphasis.is_empty());
+        assert_eq!(parsed[1].text, "NO!");
+        assert_eq!(parsed[1].emphasis, ["NO"]);
+        assert!(
+            translations("test", response, &source, false)
+                .unwrap()
+                .iter()
+                .all(|item| item.emphasis.is_empty())
+        );
     }
 }

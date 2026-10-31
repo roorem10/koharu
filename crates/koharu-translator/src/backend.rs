@@ -20,6 +20,7 @@ pub struct TranslationRequest {
     pub glossary: Vec<GlossaryHint>,
     pub brief: Option<String>,
     pub image: Option<Arc<DynamicImage>>,
+    pub emphasis: bool,
 }
 
 impl TranslationRequest {
@@ -37,6 +38,7 @@ impl TranslationRequest {
             glossary: Vec::new(),
             brief: None,
             image: None,
+            emphasis: true,
         }
     }
 
@@ -142,7 +144,7 @@ impl TaskRequest {
             system,
             user,
             images: request.image.iter().cloned().collect(),
-            schema: crate::prompt::output_schema(request.segments.len()),
+            schema: crate::prompt::output_schema(request.segments.len(), request.emphasis),
         })
     }
 
@@ -155,6 +157,13 @@ impl TaskRequest {
             .collect::<anyhow::Result<_>>()?;
         Ok(())
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TranslatedSegment {
+    pub text: String,
+    #[serde(default)]
+    pub emphasis: Vec<String>,
 }
 
 fn resize_image(image: Arc<DynamicImage>, limit: u32) -> anyhow::Result<Arc<DynamicImage>> {
