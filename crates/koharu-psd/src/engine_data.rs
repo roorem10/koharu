@@ -24,6 +24,8 @@ pub struct TextEngineSpec {
     pub font_index: usize,
     pub font_set: Vec<String>,
     pub font_size: f64,
+    pub line_spacing: Option<f64>,
+    pub letter_spacing: f64,
     pub color: [u8; 4],
     pub faux_bold: bool,
     pub faux_italic: bool,
@@ -58,7 +60,8 @@ pub fn encode_engine_data(spec: &TextEngineSpec) -> Vec<u8> {
         TextOrientation::Vertical => 1,
     };
 
-    let paragraph_properties = paragraph_properties(spec.justification);
+    let paragraph_properties =
+        paragraph_properties(spec.justification, spec.line_spacing.unwrap_or(1.2));
     let base_style_sheet = base_style_sheet(font_index);
     let style_run_sheet = style_run_sheet(spec, font_index);
     let font_set = spec
@@ -353,7 +356,10 @@ fn utf16_len(text: &str) -> usize {
     text.encode_utf16().count()
 }
 
-fn paragraph_properties(justification: TextJustification) -> Vec<(String, EngineValue)> {
+fn paragraph_properties(
+    justification: TextJustification,
+    line_spacing: f64,
+) -> Vec<(String, EngineValue)> {
     vec![
         (
             "Justification".to_string(),
@@ -398,7 +404,7 @@ fn paragraph_properties(justification: TextJustification) -> Vec<(String, Engine
                 EngineValue::Float(1.0),
             ]),
         ),
-        ("AutoLeading".to_string(), EngineValue::Float(1.2)),
+        ("AutoLeading".to_string(), EngineValue::Float(line_spacing)),
         ("LeadingType".to_string(), EngineValue::Int(0)),
         ("Hanging".to_string(), EngineValue::Bool(false)),
         ("Burasagari".to_string(), EngineValue::Bool(false)),
@@ -460,6 +466,21 @@ fn style_run_sheet(spec: &TextEngineSpec, font_index: i32) -> Vec<(String, Engin
         (
             "FauxItalic".to_string(),
             EngineValue::Bool(spec.faux_italic),
+        ),
+        (
+            "AutoLeading".to_string(),
+            EngineValue::Bool(spec.line_spacing.is_none()),
+        ),
+        (
+            "Leading".to_string(),
+            EngineValue::Float(
+                spec.line_spacing
+                    .map_or(0.0, |spacing| spacing * spec.font_size),
+            ),
+        ),
+        (
+            "Tracking".to_string(),
+            EngineValue::Float(spec.letter_spacing),
         ),
         ("AutoKerning".to_string(), EngineValue::Bool(true)),
         ("Kerning".to_string(), EngineValue::Int(0)),
@@ -774,12 +795,37 @@ mod tests {
     use super::{TextEngineSpec, TextJustification, TextOrientation, encode_engine_data};
 
     #[test]
+    fn engine_data_preserves_explicit_leading_and_tracking() {
+        let spec = TextEngineSpec {
+            text: "Line one\nLine two".into(),
+            font_index: 0,
+            font_set: vec!["Test".into()],
+            font_size: 20.0,
+            color: [0, 0, 0, 255],
+            line_spacing: Some(0.8),
+            letter_spacing: -125.5,
+            faux_bold: false,
+            faux_italic: false,
+            orientation: TextOrientation::Horizontal,
+            justification: TextJustification::Center,
+            box_width: 200.0,
+            box_height: 60.0,
+        };
+        let data = String::from_utf8_lossy(&encode_engine_data(&spec)).into_owned();
+        assert!(data.contains("/AutoLeading false"));
+        assert!(data.contains("/Leading 16.0"));
+        assert!(data.contains("/Tracking -125.5"));
+    }
+
+    #[test]
     fn engine_data_contains_expected_sections_and_utf16_text() {
         let bytes = encode_engine_data(&TextEngineSpec {
             text: "Hello".to_string(),
             font_index: 1,
             font_set: vec!["AdobeInvisFont".to_string(), "ArialMT".to_string()],
             font_size: 14.0,
+            line_spacing: None,
+            letter_spacing: 0.0,
             color: [1, 2, 3, 255],
             faux_bold: true,
             faux_italic: false,
@@ -814,6 +860,8 @@ mod tests {
             font_index: 1,
             font_set: vec!["AdobeInvisFont".to_string(), "ArialMT".to_string()],
             font_size: 14.0,
+            line_spacing: None,
+            letter_spacing: 0.0,
             color: [1, 2, 3, 255],
             faux_bold: true,
             faux_italic: false,

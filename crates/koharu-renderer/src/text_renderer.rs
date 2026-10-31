@@ -71,6 +71,8 @@ pub(crate) struct RenderedTextMetadata {
     pub(crate) post_script_fonts: Vec<String>,
     pub(crate) font_size: f32,
     pub(crate) color: [u8; 4],
+    pub(crate) line_spacing: Option<f32>,
+    pub(crate) letter_spacing: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -317,7 +319,8 @@ impl TextRenderer {
             .with_writing_mode(descriptor.writing_mode)
             .with_alignment(descriptor.alignment)
             .with_line_height(descriptor.line_height)
-            .with_spacing(descriptor.letter_spacing, descriptor.word_spacing)
+            .with_spacing(0.0, descriptor.word_spacing)
+            .with_tracking(descriptor.letter_spacing / 1000.0)
             .with_cjk_punctuation_layout(
                 is_chinese_or_japanese_text(&descriptor.text)
                     || descriptor
@@ -454,6 +457,8 @@ impl TextRenderer {
                     .collect(),
                 font_size: layout.font_size,
                 color,
+                line_spacing: (descriptor.line_height != 1.2).then_some(descriptor.line_height),
+                letter_spacing: descriptor.letter_spacing,
             },
             diagnostics,
         })

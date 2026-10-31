@@ -509,7 +509,12 @@
     "selected": "拣中个页面：{{count}} 页"
   },
   "textExtras": {
-    "title": "Text style extras"
+    "title": "Text style extras",
+    "lineSpacing": "Line spacing",
+    "letterSpacing": "Letter spacing",
+    "reset": "Reset",
+    "resetLineSpacing": "Reset line spacing",
+    "resetLetterSpacing": "Reset letter spacing"
   },
   "outputPicker": {
     "instructions": "翻译说明",

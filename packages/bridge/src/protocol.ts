@@ -285,6 +285,12 @@ export type Event = { type: "started"; run: RunId } | { type: "text_delta"; run:
 
 export type ExportFormat = "png" | "psd" | "cbz";
 
+export type FillGradient = {
+	kind: GradientKind,
+	angle_degrees: number,
+	stops: GradientStop[],
+};
+
 export type Flag = { kind: "glossary"; term: string; page: number } | { kind: "review"; message: string; page: number };
 
 export type Flux2KleinConfig = {
@@ -373,6 +379,13 @@ export type GlossaryEntry = {
 };
 
 export type GoogleCloudConfig = Record<string, never>;
+
+export type GradientKind = "Linear" | "Radial";
+
+export type GradientStop = {
+	offset: number,
+	color: [number, number, number, number],
+};
 
 export type GrokConfig = Record<string, never>;
 
@@ -803,6 +816,9 @@ export type Typography = {
 	stroke_join: StrokeJoin | null,
 	outer_stroke_color: [number, number, number, number] | null,
 	outer_stroke_width: number | null,
+	line_spacing: number | null,
+	letter_spacing: number | null,
+	fill_gradient: FillGradient | null,
 	alignment: TextAlignment | null,
 	writing_mode: WritingMode | null,
 };

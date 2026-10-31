@@ -129,7 +129,7 @@ async fn built_in_component_schema_revisions_are_explicit() {
         ],
         [1; 17]
     );
-    assert_eq!(schema::<Typography>(), 3);
+    assert_eq!(schema::<Typography>(), 4);
     assert_eq!(schema::<TextLayout>(), 2);
 }
 
@@ -1081,6 +1081,9 @@ async fn independent_pipeline_components_rebase() {
                     stroke_join: None,
                     outer_stroke_color: None,
                     outer_stroke_width: None,
+                    line_spacing: None,
+                    letter_spacing: None,
+                    fill_gradient: None,
                     alignment: Some(TextAlignment::Center),
                     writing_mode: None,
                     extensions: BTreeMap::new(),
@@ -1616,4 +1619,148 @@ fn typography_revision_two_loads_without_a_second_outline() {
     assert_eq!(loaded.stroke_method, Some(crate::StrokeMethod::Contour));
     assert_eq!(loaded.outer_stroke_color, None);
     assert_eq!(loaded.outer_stroke_width, None);
+}
+
+fn typography_from_revision_three() -> Typography {
+    use revision::{DeserializeRevisioned, SerializeRevisioned};
+    #[revisioned(revision = 3)]
+    struct TypographyV3 {
+        origin: Origin,
+        preferred_font: Option<String>,
+        font_weight: Option<u16>,
+        font_style: Option<FontStyle>,
+        size: Option<f32>,
+        auto_fit: bool,
+        color: Option<[u8; 4]>,
+        stroke_color: Option<[u8; 4]>,
+        stroke_width: Option<f32>,
+        alignment: Option<TextAlignment>,
+        writing_mode: Option<crate::WritingMode>,
+        extensions: BTreeMap<String, String>,
+        #[revision(start = 2)]
+        stroke_method: Option<crate::StrokeMethod>,
+        #[revision(start = 2)]
+        stroke_position: Option<crate::StrokePosition>,
+        #[revision(start = 2)]
+        stroke_join: Option<crate::StrokeJoin>,
+        #[revision(start = 3)]
+        outer_stroke_color: Option<[u8; 4]>,
+        #[revision(start = 3)]
+        outer_stroke_width: Option<f32>,
+    }
+
+    let old = TypographyV3 {
+        origin: Origin::User,
+        preferred_font: Some("CCWildWords".to_owned()),
+        font_weight: Some(400),
+        font_style: None,
+        size: Some(300.0),
+        auto_fit: false,
+        color: Some([0, 0, 0, 255]),
+        stroke_color: Some([255, 255, 255, 255]),
+        stroke_width: Some(24.5),
+        alignment: None,
+        writing_mode: None,
+        extensions: BTreeMap::new(),
+        stroke_method: Some(crate::StrokeMethod::Contour),
+        stroke_position: Some(crate::StrokePosition::Outside),
+        stroke_join: Some(crate::StrokeJoin::Round),
+        outer_stroke_color: Some([12, 34, 56, 255]),
+        outer_stroke_width: Some(4.0),
+    };
+    let mut bytes = Vec::new();
+    old.serialize_revisioned(&mut bytes).unwrap();
+    Typography::deserialize_revisioned(&mut bytes.as_slice()).unwrap()
+}
+
+#[test]
+fn typography_revision_three_loads_with_default_spacing_and_fill() {
+    let loaded = typography_from_revision_three();
+    assert_eq!(loaded.preferred_font.as_deref(), Some("CCWildWords"));
+    assert_eq!(loaded.outer_stroke_width, Some(4.0));
+    assert_eq!(loaded.outer_stroke_color, Some([12, 34, 56, 255]));
+    assert_eq!(loaded.line_spacing, None);
+    assert_eq!(loaded.letter_spacing, None);
+    assert_eq!(loaded.fill_gradient, None);
+}
+
+#[test]
+fn typography_revision_four_round_trips_spacing_and_gradient() {
+    use revision::{DeserializeRevisioned, SerializeRevisioned};
+    let mut value = typography_from_revision_three();
+    value.line_spacing = Some(0.9);
+    value.letter_spacing = Some(-75.5);
+    value.fill_gradient = Some(crate::FillGradient {
+        kind: crate::GradientKind::Linear,
+        angle_degrees: 90.0,
+        stops: vec![
+            crate::GradientStop {
+                offset: 0.0,
+                color: [255, 0, 0, 255],
+            },
+            crate::GradientStop {
+                offset: 0.5,
+                color: [0, 255, 0, 128],
+            },
+            crate::GradientStop {
+                offset: 1.0,
+                color: [0, 0, 255, 255],
+            },
+        ],
+    });
+    let mut bytes = Vec::new();
+    value.serialize_revisioned(&mut bytes).unwrap();
+    assert_eq!(
+        Typography::deserialize_revisioned(&mut bytes.as_slice()).unwrap(),
+        value
+    );
+}
+
+#[test]
+fn typography_rejects_invalid_spacing_and_gradient() {
+    let context = ValidationContext::new(&|_| true, &|_| true);
+    let base = typography_from_revision_three();
+    for spacing in [f32::NAN, f32::INFINITY, 0.49, 3.01] {
+        let mut value = base.clone();
+        value.line_spacing = Some(spacing);
+        assert!(value.validate(&context).is_err());
+    }
+    for spacing in [f32::NAN, f32::NEG_INFINITY, -501.0, 2001.0] {
+        let mut value = base.clone();
+        value.letter_spacing = Some(spacing);
+        assert!(value.validate(&context).is_err());
+    }
+    for (line, letter) in [(0.5, -500.0), (3.0, 2000.0)] {
+        let mut value = base.clone();
+        value.line_spacing = Some(line);
+        value.letter_spacing = Some(letter);
+        assert!(value.validate(&context).is_ok());
+    }
+    let stop = |offset| crate::GradientStop {
+        offset,
+        color: [255; 4],
+    };
+    for offsets in [
+        vec![0.0],
+        vec![0.0; 9],
+        vec![0.7, 0.2],
+        vec![-0.1, 1.0],
+        vec![0.0, 1.1],
+        vec![0.0, f32::NAN],
+    ] {
+        let mut value = base.clone();
+        value.fill_gradient = Some(crate::FillGradient {
+            kind: crate::GradientKind::Radial,
+            angle_degrees: 0.0,
+            stops: offsets.into_iter().map(stop).collect(),
+        });
+        assert!(value.validate(&context).is_err());
+    }
+    let mut value = base;
+    value.fill_gradient = Some(crate::FillGradient {
+        kind: crate::GradientKind::Linear,
+        angle_degrees: f32::INFINITY,
+        stops: vec![stop(0.0), stop(1.0)],
+    });
+    assert!(value.validate(&context).is_err());
 }

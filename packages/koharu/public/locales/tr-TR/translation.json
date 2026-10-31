@@ -509,7 +509,12 @@
     "selected": "{{count}} seçili"
   },
   "textExtras": {
-    "title": "Text style extras"
+    "title": "Text style extras",
+    "lineSpacing": "Line spacing",
+    "letterSpacing": "Letter spacing",
+    "reset": "Reset",
+    "resetLineSpacing": "Reset line spacing",
+    "resetLetterSpacing": "Reset letter spacing"
   },
   "outputPicker": {
     "instructions": "Çeviri talimatları",

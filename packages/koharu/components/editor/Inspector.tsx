@@ -34,6 +34,7 @@ import { BoxNoteLine } from '@/components/editor/BoxNoteLine'
 import { BubbleShapeLine } from '@/components/editor/BubbleShapeLine'
 import { LetteringCategoryLine } from '@/components/editor/LetteringCategoryLine'
 import { LineContextCard } from '@/components/editor/LineContextCard'
+import { SpacingControls } from '@/components/text-extras/SpacingControls'
 import { call } from '@/lib/backend'
 import { hexToRgba, rgbaToHex } from '@/lib/color'
 import {
@@ -120,6 +121,9 @@ const defaultTypography: Typography = {
   stroke_join: null,
   outer_stroke_color: [0, 0, 0, 255],
   outer_stroke_width: 0,
+  line_spacing: null,
+  letter_spacing: null,
+  fill_gradient: null,
   alignment: null,
   writing_mode: null,
 }
@@ -332,6 +336,13 @@ function TypeInspector() {
             </Select>
           </InspectorField>
         </div>
+
+        <SpacingControls
+          key={current?.id}
+          typography={typography}
+          disabled={disabled || draft !== null}
+          apply={apply}
+        />
 
         <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(6.5rem,1fr)] gap-1.5'>
           <InspectorField label={t('inspector.alignment')}>

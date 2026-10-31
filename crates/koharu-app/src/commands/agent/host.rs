@@ -547,6 +547,9 @@ impl Host for KoharuHost {
                     }),
                     outer_stroke_color: arguments.outer_stroke_color,
                     outer_stroke_width: arguments.outer_stroke_width,
+                    line_spacing: arguments.line_spacing,
+                    letter_spacing: arguments.letter_spacing,
+                    fill_gradient: arguments.fill_gradient,
                     alignment: arguments.alignment.map(Into::into),
                     writing_mode: arguments.writing_mode.map(Into::into),
                 };
@@ -934,8 +937,34 @@ struct SetTypography {
     outer_stroke_color: Option<[u8; 4]>,
     /// Width of the second outline in pixels; omit or 0 for none.
     outer_stroke_width: Option<f32>,
+    line_spacing: Option<f32>,
+    letter_spacing: Option<f32>,
+    #[schemars(with = "Option<AgentFillGradient>")]
+    fill_gradient: Option<koharu_scene::FillGradient>,
     alignment: Option<AgentTextAlignment>,
     writing_mode: Option<AgentWritingMode>,
+}
+
+#[derive(JsonSchema)]
+#[allow(dead_code)]
+struct AgentFillGradient {
+    kind: AgentGradientKind,
+    angle_degrees: f32,
+    stops: Vec<AgentGradientStop>,
+}
+
+#[derive(JsonSchema)]
+#[allow(dead_code)]
+enum AgentGradientKind {
+    Linear,
+    Radial,
+}
+
+#[derive(JsonSchema)]
+#[allow(dead_code)]
+struct AgentGradientStop {
+    offset: f32,
+    color: [u8; 4],
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -1091,6 +1120,9 @@ mod text_style_tests {
                     stroke_join: None,
                     outer_stroke_color: None,
                     outer_stroke_width: None,
+                    line_spacing: None,
+                    letter_spacing: None,
+                    fill_gradient: None,
                     alignment: None,
                     writing_mode: Some(koharu_scene::WritingMode::Vertical),
                     extensions: Default::default(),
