@@ -22,7 +22,7 @@ pub use config::{
 pub use error::{Error, Result};
 pub use frame::{
     Frame, ImageKind, ImageMetadata, Layer, LayerKind, Presentation, RasterImage, RenderBounds,
-    RenderDependency, RenderDiagnostic, RetentionStats, TextMetadata,
+    RenderDependency, RenderDiagnostic, RetentionStats, TextGlyphBox, TextMetadata, TextStyleRun,
 };
 pub use layout::WritingMode;
 pub use renderer::Renderer;

@@ -138,6 +138,21 @@ async fn export_selection(
     for (batch, chunk) in pages.chunks(EXPORT_BATCH_PAGES).enumerate() {
         let frames =
             try_join_all(chunk.iter().map(|&page| renderer.render(&snapshot, page))).await?;
+        let psd_reports = if matches!(format, ExportFormat::Psd) {
+            frames
+                .iter()
+                .map(|frame| {
+                    let notices = koharu_psd::export_notices(frame);
+                    if notices.is_empty() {
+                        Ok(None)
+                    } else {
+                        serde_json::to_vec_pretty(&notices).map(Some)
+                    }
+                })
+                .collect::<std::result::Result<Vec<_>, _>>()?
+        } else {
+            vec![None; frames.len()]
+        };
         let images = match format {
             ExportFormat::Png | ExportFormat::Cbz => {
                 let rasterizer = Arc::clone(&rasterizer);
@@ -160,7 +175,7 @@ async fn export_selection(
         let batch_names = names[start..start + images.len()].to_vec();
         let directory = destination.clone();
         archive = tokio_rayon::spawn(move || -> Result<_> {
-            for (name, bytes) in batch_names.into_iter().zip(images) {
+            for ((name, bytes), report) in batch_names.into_iter().zip(images).zip(psd_reports) {
                 if let Some(archive) = &mut archive {
                     // PNG data is already compressed.
                     let options = zip::write::SimpleFileOptions::default()
@@ -168,7 +183,19 @@ async fn export_selection(
                     archive.start_file(name, options)?;
                     archive.write_all(&bytes)?;
                 } else {
-                    std::fs::write(directory.join(name), bytes)?;
+                    std::fs::write(directory.join(&name), bytes)?;
+                    if matches!(format, ExportFormat::Psd) {
+                        let path = directory.join(format!("{name}.report.json"));
+                        if let Some(report) = report {
+                            std::fs::write(path, report)?;
+                        } else {
+                            match std::fs::remove_file(path) {
+                                Ok(()) => {}
+                                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                                Err(error) => return Err(error.into()),
+                            }
+                        }
+                    }
                 }
             }
             Ok(archive)
