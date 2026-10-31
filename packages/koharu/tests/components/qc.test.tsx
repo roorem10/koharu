@@ -1,11 +1,23 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { historyChangedEvent } from '@/components/context/events'
+import { RightSidebar } from '@/components/editor/RightSidebar'
+import { QcPreferences } from '@/components/preferences/QcPreferences'
+import { BoxQcSection } from '@/components/qc/BoxQcSection'
+import { useAutomaticQc, qcKey, qcSettingsKey } from '@/components/qc/data'
 import { QcPanel } from '@/components/qc/QcPanel'
-import { pageKey, projectKey, queryClient } from '@/lib/queries'
+import { useBoxIssues } from '@/components/qc/useBoxIssues'
+import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { commands, type Page, type ProjectInfo, type QcFinding } from '@koharu/bridge/protocol'
+import {
+  commands,
+  type Page,
+  type ProjectInfo,
+  type QcFinding,
+  type QcReport,
+} from '@koharu/bridge/protocol'
 
 vi.mock('@tauri-apps/api/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tauri-apps/api/core')>()),
@@ -13,8 +25,9 @@ vi.mock('@tauri-apps/api/core', async (importOriginal) => ({
     onmessage = (_value: T) => {}
   },
 }))
-
 vi.mock('@koharu/bridge/canvas', () => ({ showCanvasPage: vi.fn(() => false) }))
+vi.mock('@/components/editor/Inspector', () => ({ Inspector: () => <div>Inspector content</div> }))
+vi.mock('@/components/editor/AgentPanel', () => ({ AgentPanel: () => <div>Agent content</div> }))
 
 const project: ProjectInfo = {
   name: 'QC test',
@@ -39,134 +52,168 @@ const finding: QcFinding = {
   translation: 'Hello 世界',
   flag: null,
 }
-
-function open() {
+const initial: QcReport = { revision: 1, findings: [finding], hidden: [], pages_checked: 2 }
+const key = qcKey(project.name)
+function setup(report = initial) {
   queryClient.setQueryData(projectKey, project)
   queryClient.setQueryData(pageKey, page)
-  vi.mocked(commands.runQc).mockResolvedValue({
-    revision: 1,
-    findings: [finding],
-    hidden: [],
-    pages_checked: 2,
-  })
-  render(
-    <QueryClientProvider client={queryClient}>
-      <QcPanel />
-    </QueryClientProvider>,
-  )
+  queryClient.setQueryData(pagesKey, [{ id: 'page-1' }, { id: 'page-2' }])
+  queryClient.setQueryData(key, report)
+  vi.mocked(commands.getQcResults).mockResolvedValue(report)
+}
+function mount(element: React.ReactNode) {
+  return render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>)
 }
 
-async function run() {
-  const button = await screen.findByRole('button', { name: 'Check chapter' })
-  await waitFor(() => expect(button).toBeEnabled())
-  fireEvent.click(button)
-  await screen.findByText('Hello 世界')
+function Counts() {
+  const counts = useBoxIssues('page-2')
+  return <output>{counts.get('box-2') ?? 0}</output>
 }
 
-describe('QC review', () => {
-  it('opens a finding with the shared page selection and box selection state', async () => {
-    open()
+function Auto() {
+  useAutomaticQc()
+  return null
+}
+
+describe('automatic QC', () => {
+  it('opens findings through the shared page and layer selection', async () => {
+    setup()
     const next = { ...page, id: 'page-2', label: '02.png' }
     vi.spyOn(commands, 'selectPage').mockResolvedValue({
       project: { ...project, active_page: 'page-2' },
       page: next,
     })
-    await run()
+    mount(<QcPanel />)
     fireEvent.click(screen.getByRole('button', { name: /Japanese remains.*Hello 世界/ }))
     await waitFor(() => expect(useKoharuStore.getState().selectedLayers).toEqual(['box-2']))
-    expect(commands.selectPage).toHaveBeenCalledWith('page-2')
     expect(useKoharuStore.getState().selectedPages).toEqual(['page-2'])
     expect(queryClient.getQueryData(pageKey)).toEqual(next)
-    expect(queryClient.getQueryData<ProjectInfo>(projectKey)?.active_page).toBe('page-2')
   })
 
-  it('persists OK, reveals saved hidden findings on another check, and supports Undo OK', async () => {
-    open()
-    await run()
-    fireEvent.click(screen.getByRole('button', { name: /Mark Japanese remains.*OK/ }))
-    await waitFor(() => expect(screen.queryByText('Hello 世界')).not.toBeInTheDocument())
-    expect(commands.markQcOk).toHaveBeenCalledWith('box-2', 'leftover_source', true)
-    vi.mocked(commands.runQc).mockResolvedValue({
-      revision: 1,
+  it('shares one results query across consumers and counts only open findings on the requested page', async () => {
+    setup({
+      ...initial,
+      findings: [
+        finding,
+        { ...finding, check: 'overflow' },
+        { ...finding, page: 'page-1', layer: 'other' },
+      ],
+      hidden: [{ ...finding, check: 'too_small' }],
+    })
+    queryClient.removeQueries({ queryKey: key })
+    mount(
+      <>
+        <Counts />
+        <Counts />
+      </>,
+    )
+    await waitFor(() => expect(screen.getAllByText('2')).toHaveLength(2))
+    expect(commands.getQcResults).toHaveBeenCalledOnce()
+    act(() => queryClient.setQueryData(key, { ...initial, findings: [], hidden: [finding] }))
+    await waitFor(() => expect(screen.getAllByText('0')).toHaveLength(2))
+  })
+
+  it('marks OK and restores hidden findings from the box details', async () => {
+    setup()
+    mount(<BoxQcSection layer='box-2' />)
+    vi.mocked(commands.getQcResults).mockResolvedValue({
+      ...initial,
       findings: [],
       hidden: [finding],
-      pages_checked: 2,
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Check chapter' }))
-    await waitFor(() => expect(commands.runQc).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Check chapter' })).toBeEnabled())
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Show hidden' }))
-    await screen.findByText('Hello 世界')
+    fireEvent.click(screen.getByRole('button', { name: /Mark Japanese remains.*OK/ }))
+    await screen.findByRole('button', { name: /Undo OK for Japanese remains/ })
+    expect(commands.markQcOk).toHaveBeenCalledWith('box-2', 'leftover_source', true)
+    vi.mocked(commands.getQcResults).mockResolvedValue(initial)
     fireEvent.click(screen.getByRole('button', { name: /Undo OK for Japanese remains/ }))
-    await waitFor(() =>
-      expect(commands.markQcOk).toHaveBeenLastCalledWith('box-2', 'leftover_source', false),
-    )
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Mark Japanese remains.*OK/ })).toBeEnabled(),
-    )
+    await screen.findByRole('button', { name: /Mark Japanese remains.*OK/ })
+    expect(commands.markQcOk).toHaveBeenLastCalledWith('box-2', 'leftover_source', false)
   })
 
-  it('keeps the previous results after edits and warns about their revision', async () => {
-    open()
-    await run()
-    act(() => queryClient.setQueryData(projectKey, { ...project, revision: 2 }))
-    expect(await screen.findByText('Results may be out of date')).toBeInTheDocument()
-    expect(screen.getByText('Hello 世界')).toBeInTheDocument()
-    expect(commands.runQc).toHaveBeenCalledOnce()
-  })
-
-  it('dismisses the matching current flag rather than acknowledging or using an old index', async () => {
-    open()
+  it('acknowledges a specific agent note without deleting it and filters agent findings', async () => {
     const flag = { kind: 'review', message: 'Check the joke', page: 2 } as const
-    vi.mocked(commands.runQc).mockResolvedValue({
-      revision: 1,
-      findings: [{ ...finding, check: 'flag', detail: flag.message, flag }],
-      hidden: [],
-      pages_checked: 2,
-    })
-    vi.spyOn(commands, 'getChapterContext').mockResolvedValue({
-      context: {
-        version: 1,
-        series: null,
-        brief: null,
-        suggestions: [],
-        lines: { 'box-2': { flags: [{ kind: 'review', message: 'Another flag', page: 2 }, flag] } },
-      },
-      series: null,
-      supports_tasks: false,
-    })
-    vi.spyOn(commands, 'dismissLineFlag').mockResolvedValue(null)
-    await run()
+    const note = { ...finding, check: 'flag', detail: flag.message, flag } as QcFinding
+    setup({ ...initial, findings: [finding, note] })
+    mount(<QcPanel />)
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }))
+    expect(screen.queryByText('Japanese remains in the translation')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Mark Check the joke OK' }))
-    await waitFor(() => expect(commands.dismissLineFlag).toHaveBeenCalledWith('box-2', 1))
-    expect(commands.markQcOk).not.toHaveBeenCalled()
-    await waitFor(() => expect(screen.queryByText('Check the joke')).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(commands.markQcFinding).toHaveBeenCalledWith('box-2', 'flag', flag, true),
+    )
   })
 
-  it('disables the panel during a check and consumes per-page progress', async () => {
-    open()
-    let finish!: (value: Awaited<ReturnType<typeof commands.runQc>>) => void
-    vi.mocked(commands.runQc).mockImplementation((_scope, channel) => {
-      channel.onmessage({ completed: 1, total: 40 })
-      return new Promise((resolve) => {
-        finish = resolve
-      })
-    })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Check chapter' })).toBeEnabled())
-    fireEvent.click(screen.getByRole('button', { name: 'Check chapter' }))
-    await screen.findByText('Checking pages: 1 / 40')
-    expect(screen.getByRole('button', { name: 'Check page' })).toBeDisabled()
-    expect(screen.getByRole('checkbox', { name: 'Show hidden' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
+  it('hides an empty QC tab, shows its count, leaves other tabs alone and returns to Properties when cleared', async () => {
+    setup({ ...initial, findings: [] })
+    mount(<RightSidebar />)
+    const tabs = within(screen.getByRole('group', { name: 'Editor panels' }))
+    expect(tabs.queryByRole('button', { name: /^QC/ })).not.toBeInTheDocument()
+    fireEvent.click(tabs.getByRole('button', { name: /^Agent/ }))
+    act(() => queryClient.setQueryData(key, initial))
+    await waitFor(() => expect(tabs.getByRole('button', { name: /^QC 1$/ })).toBeInTheDocument())
+    expect(tabs.getByRole('button', { name: /^Agent/ })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(tabs.getByRole('button', { name: /^QC 1$/ }))
+    expect(screen.getByText('Hello 世界')).toBeVisible()
+    act(() => queryClient.setQueryData(key, { ...initial, findings: [], hidden: [finding] }))
+    await waitFor(() =>
+      expect(tabs.getByRole('button', { name: /^Properties/ })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      ),
     )
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Show hidden' }))
-    expect(screen.getByRole('checkbox', { name: 'Show hidden' })).toHaveAttribute(
-      'aria-checked',
-      'false',
+    expect(tabs.queryByRole('button', { name: /^QC/ })).not.toBeInTheDocument()
+  })
+
+  it('debounces edits, observes terminal jobs, settings and agent completion without manual checks', async () => {
+    setup()
+    mount(<Auto />)
+    await waitFor(() => expect(commands.getChapterContext).toHaveBeenCalled())
+    act(() => queryClient.setQueryData(projectKey, { ...project, revision: 2 }))
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(commands.runQc).not.toHaveBeenCalled()
+    await waitFor(() => expect(commands.runQc).toHaveBeenCalledOnce(), { timeout: 1800 })
+    expect(commands.runQc).toHaveBeenLastCalledWith({ scope: 'project' }, expect.anything(), true)
+    act(() =>
+      useKoharuStore.setState({
+        jobs: {
+          pipeline: {
+            id: 'pipeline',
+            state: 'finished_with_problems',
+            completed: 1,
+            total: 2,
+            page: null,
+            stage: null,
+            model: null,
+            error: null,
+            retry: null,
+            failures: [],
+            project: null,
+            operation: null,
+            finish_sound: false,
+          },
+        },
+      }),
     )
-    expect(screen.getByRole('spinbutton')).toBeDisabled()
-    await act(async () => finish({ revision: 1, findings: [], hidden: [], pages_checked: 40 }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Check chapter' })).toBeEnabled())
+    await waitFor(() => expect(commands.runQc).toHaveBeenCalledTimes(2), { timeout: 1800 })
+    act(() => window.dispatchEvent(new Event(historyChangedEvent)))
+    await waitFor(() => expect(commands.runQc).toHaveBeenCalledTimes(3), { timeout: 1800 })
+    act(() => queryClient.setQueryData(qcSettingsKey, { min_font_size: 16 }))
+    await waitFor(() => expect(commands.runQc).toHaveBeenCalledTimes(4), { timeout: 1800 })
+  })
+  it('validates and saves the minimum font size in preferences', async () => {
+    setup()
+    mount(<QcPreferences />)
+    const minimum = await screen.findByRole('spinbutton')
+    await waitFor(() => expect(minimum).toBeEnabled())
+    fireEvent.change(minimum, { target: { value: '0' } })
+    fireEvent.blur(minimum)
+    expect(commands.saveQcSettings).not.toHaveBeenCalled()
+    expect(minimum).toHaveValue(12)
+    fireEvent.change(minimum, { target: { value: '16' } })
+    fireEvent.blur(minimum)
+    await waitFor(() => expect(commands.saveQcSettings).toHaveBeenCalledWith({ min_font_size: 16 }))
+    await waitFor(() =>
+      expect(queryClient.getQueryData(qcSettingsKey)).toEqual({ min_font_size: 16 }),
+    )
   })
 })

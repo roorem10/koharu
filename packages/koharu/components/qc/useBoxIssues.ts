@@ -1,9 +1,19 @@
+'use client'
+
+import { useMemo } from 'react'
+
 import type { EntityId } from '@koharu/bridge/protocol'
 
-const none = new Map<EntityId, number>()
+import { useQcResults } from './data'
 
-// Owned by WO-24: open QC issues per text box on a page, for the "?" highlight. Empty until
-// WO-24 fills it in.
-export function useBoxIssues(_page: EntityId | null): Map<EntityId, number> {
-  return none
+export function useBoxIssues(page: EntityId | null | undefined): Map<EntityId, number> {
+  const findings = useQcResults().data?.findings
+  return useMemo(() => {
+    const counts = new Map<EntityId, number>()
+    if (page)
+      for (const finding of findings ?? []) {
+        if (finding.page === page) counts.set(finding.layer, (counts.get(finding.layer) ?? 0) + 1)
+      }
+    return counts
+  }, [findings, page])
 }

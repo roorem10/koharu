@@ -57,6 +57,16 @@ fn set_flags(
             });
         }
     }
+    let current: Vec<_> = line.flags.iter().map(flag_acknowledgement).collect();
+    line.qc_ok
+        .retain(|id| !id.starts_with("flag:") || current.contains(id));
+}
+
+pub(crate) fn flag_acknowledgement(flag: &Flag) -> String {
+    format!(
+        "flag:{}",
+        serde_json::to_string(flag).expect("serializable flag")
+    )
 }
 
 struct Row {
@@ -259,10 +269,16 @@ mod tests {
         line.dismissed.push("魔王".into());
         set_flags(&mut line, &row, &terms);
         assert_eq!(line.flags.len(), 1);
+        let glossary = Flag::Glossary {
+            term: "魔王".into(),
+            page: 2,
+        };
+        line.qc_ok.push(flag_acknowledgement(&glossary));
         row.translation = "The Demon King".into();
         set_flags(&mut line, &row, &terms);
         assert_eq!(line.flags.len(), 1);
         assert!(line.dismissed.is_empty());
+        assert!(line.qc_ok.is_empty());
         row.translation = "The king".into();
         set_flags(&mut line, &row, &terms);
         assert_eq!(line.flags.len(), 2);

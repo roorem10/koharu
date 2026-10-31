@@ -692,7 +692,14 @@
     "off": "Off",
     "compareShortcut": "Show original (hold)",
     "loadingOriginal": "Loading original…",
-    "sourceFailed": "Could not load the original page."
+    "sourceFailed": "Could not load the original page.",
+    "automatic": "Checked automatically after processing and edits",
+    "all": "All",
+    "autoChecks": "Auto checks",
+    "agent": "Agent",
+    "noBoxIssues": "No issues on this box.",
+    "hidden": "Hidden (marked OK)",
+    "editorPanels": "Editor panels"
   },
   "rawPrep": {
     "title": "Page levels"

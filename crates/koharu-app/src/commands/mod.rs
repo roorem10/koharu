@@ -213,6 +213,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             // WO-17 (raw prep) commands go here.
             // WO-23 (redesigned panel and popups) commands go here.
             // WO-24 (automatic QC and context tab) commands go here.
+            qc::get_qc_results,
+            qc::mark_qc_finding,
             context::reading::get_reading_model,
             context::reading::get_reading_models,
             context::reading::get_last_read_model,
