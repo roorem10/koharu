@@ -8,7 +8,12 @@ import { useTranslation } from 'react-i18next'
 
 import { AboutDialog } from '@/components/app/AboutDialog'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
-import { retryFailedPages } from '@/components/runs/data'
+import {
+  currentRunScope,
+  presetLabel,
+  useRunSettings,
+  retryFailedPages,
+} from '@/components/runs/data'
 import { call } from '@/lib/backend'
 import { selectableLayer } from '@/lib/geometry'
 import {
@@ -47,6 +52,8 @@ export function TitleBar() {
   const pageQuery = usePage(Boolean(project))
   const pages = project ? (pagesQuery.data ?? []) : []
   const page = project ? (pageQuery.data ?? null) : null
+  const runSettings = useRunSettings()
+  const processingScope = useKoharuStore((state) => state.processingScope)
   const jobs = useKoharuStore((state) => state.jobs)
   const lastJob = Object.values(jobs)
     .filter((job) => job.project === project?.name)
@@ -64,8 +71,9 @@ export function TitleBar() {
     'menu.export',
   )
 
-  const run = (scope: Scope, operation: Operation = { operation: 'full' }) =>
+  const run = (scope: Scope, operation: Operation = { operation: 'full' }) => {
     void call(commands.process, scope, operation).catch(() => undefined)
+  }
 
   const closeProject = () => void call(commands.closeProject).catch(() => undefined)
 
@@ -230,6 +238,33 @@ export function TitleBar() {
               >
                 {t('runs.retryFailedPages')}
               </MenubarItem>
+              <MenubarSub>
+                <MenubarSubTrigger
+                  disabled={!project || pages.length === 0 || running}
+                  className='min-h-8 px-2 text-xs'
+                >
+                  {t('runs.presets')}
+                </MenubarSubTrigger>
+                <MenubarSubContent className='max-w-80 p-1'>
+                  {runSettings.data?.presets.map((preset, index) => (
+                    <MenubarItem
+                      key={index}
+                      className='break-words whitespace-normal'
+                      disabled={
+                        (processingScope === 'selected-pages' && selectedPages.length === 0) ||
+                        (processingScope === 'page' && !page)
+                      }
+                      onClick={() => {
+                        const scope = currentRunScope()
+                        if (scope) run(scope, { operation: 'stages', stages: preset.stages })
+                      }}
+                    >
+                      {presetLabel(preset.name, t)}
+                    </MenubarItem>
+                  ))}
+                </MenubarSubContent>
+              </MenubarSub>
+
               {(['detection', 'ocr', 'translation', 'inpainting'] as Stage[]).map((stage) => (
                 <MenubarItem
                   key={stage}
