@@ -404,10 +404,10 @@ impl TextRenderer {
                 source,
             })?;
         let mut diagnostics = Vec::new();
-        if layout.font_size + f32::EPSILON < descriptor.minimum_font_size {
+        if layout.smallest_font_size() + f32::EPSILON < descriptor.minimum_font_size {
             diagnostics.push(RenderDiagnostic::TextBelowReadableSize {
                 entity: descriptor.entity,
-                font_size: layout.font_size,
+                font_size: layout.smallest_font_size(),
                 minimum_font_size: descriptor.minimum_font_size,
             });
         }

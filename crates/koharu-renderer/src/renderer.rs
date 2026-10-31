@@ -287,6 +287,11 @@ impl Renderer {
             .prepare(&font_requests)
             .await
             .map_err(Error::FontResource)?;
+        for request in word_font_requests(&pending) {
+            if let Err(error) = self.inner.fonts.prepare(&[request]).await {
+                tracing::warn!(%error, "word font unavailable; using the box font");
+            }
+        }
         let image_ids = pending
             .iter()
             .filter_map(|(_, descriptor)| match descriptor {
@@ -841,6 +846,11 @@ impl Traversal<'_> {
                 .map(|runs| runs.runs)
                 .unwrap_or_default(),
         };
+        for run in &descriptor.runs {
+            if let Some(family) = &run.style.font {
+                dependencies.insert(RenderDependency::Font(family.clone()));
+            }
+        }
         Ok(Some(LayerDraft {
             entity,
             geometry,
@@ -1343,6 +1353,45 @@ fn transform_diagnostic(diagnostic: RenderDiagnostic, transform: Affine) -> Rend
         },
         diagnostic => diagnostic,
     }
+}
+
+fn word_font_requests(pending: &[(usize, NodeDescriptor)]) -> Vec<FontRequest> {
+    let mut seen = BTreeSet::new();
+    let mut requests = Vec::new();
+    for (_, descriptor) in pending {
+        let NodeDescriptor::Text(text) = descriptor else {
+            continue;
+        };
+        for run in &text.runs {
+            if run.style.font.is_none()
+                && run.style.font_weight.is_none()
+                && run.style.font_style.is_none()
+            {
+                continue;
+            }
+            let family = run
+                .style
+                .font
+                .as_ref()
+                .or(text.preferred_font.as_ref())
+                .or(text.font_families.first());
+            let Some(family) = family else { continue };
+            let weight = run.style.font_weight.or(text.font_weight);
+            let style = run
+                .style
+                .font_style
+                .map(FontStyle::from)
+                .or(text.font_style);
+            if seen.insert((family.to_ascii_lowercase(), weight, style)) {
+                requests.push(FontRequest {
+                    family: family.clone(),
+                    weight,
+                    style,
+                });
+            }
+        }
+    }
+    requests
 }
 
 fn font_requests(pending: &[(usize, NodeDescriptor)]) -> Vec<FontRequest> {

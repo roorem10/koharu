@@ -86,6 +86,16 @@ pub struct LayoutRun<'a> {
 }
 
 impl LayoutRun<'_> {
+    /// The base size remains the auto-fit control; readability uses actual glyph sizes.
+    pub(crate) fn smallest_font_size(&self) -> f32 {
+        self.lines
+            .iter()
+            .flat_map(|line| &line.glyphs)
+            .map(|glyph| glyph.font_size)
+            .reduce(f32::min)
+            .unwrap_or(self.font_size)
+    }
+
     #[must_use]
     pub const fn overflowed(&self) -> bool {
         self.overflowed
