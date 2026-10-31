@@ -1046,6 +1046,7 @@ impl Project {
         self.commit(patch).await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn apply_raster_stroke(
         &mut self,
         page: EntityId,
@@ -1053,6 +1054,7 @@ impl Project {
         mode: RasterStrokeMode,
         color: [u8; 4],
         diameter: f32,
+        hardness: f32,
         points: Vec<ScenePoint>,
     ) -> Result<(Commit, EntityId)> {
         if !diameter.is_finite() || diameter <= 0.0 || points.is_empty() {
@@ -1101,7 +1103,7 @@ impl Project {
         if image.dimensions() != (width, height) {
             bail!("raster layer dimensions must match the page");
         }
-        rasterize_stroke(&mut image, mode, color, diameter, &points);
+        rasterize_stroke(&mut image, mode, color, diameter, hardness, &points);
         let mut bytes = Cursor::new(Vec::new());
         DynamicImage::ImageRgba8(image).write_to(&mut bytes, ImageFormat::Png)?;
         let source = AssetRole::new("source")?;
@@ -1584,6 +1586,7 @@ fn rasterize_stroke(
     mode: RasterStrokeMode,
     color: [u8; 4],
     diameter: f32,
+    _hardness: f32,
     points: &[ScenePoint],
 ) {
     let radius = f64::from(diameter) * 0.5;
@@ -2385,6 +2388,7 @@ mod tests {
             RasterStrokeMode::Paint,
             [210, 40, 20, 255],
             5.0,
+            100.0,
             &points,
         );
         for x in 4..28 {
@@ -2396,6 +2400,7 @@ mod tests {
             RasterStrokeMode::Erase,
             [0, 0, 0, 0],
             5.0,
+            100.0,
             &[ScenePoint { x: 16.0, y: 8.0 }],
         );
         assert_eq!(image.get_pixel(16, 8)[3], 0);
@@ -2407,6 +2412,7 @@ mod tests {
             RasterStrokeMode::Paint,
             [255, 255, 255, 255],
             3.0,
+            100.0,
             &[ScenePoint { x: 2.0, y: 2.0 }],
         );
         assert_eq!(white.get_pixel(2, 2).0, [255, 255, 255, 255]);

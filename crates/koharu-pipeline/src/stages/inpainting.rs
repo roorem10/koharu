@@ -33,6 +33,40 @@ use crate::{InpaintingModel, ModelCell};
 
 const PRODUCER: &str = "dev.koharu.pipeline.inpainting";
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum RemoveMode {
+    Immediate,
+    #[default]
+    Queue,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum PaintTarget {
+    #[default]
+    Cleanup,
+    PaintLayer,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Type)]
+#[serde(default)]
+pub struct CleanupSettings {
+    pub remove_mode: RemoveMode,
+    pub paint_target: PaintTarget,
+    pub grow_px: u8,
+}
+
+impl Default for CleanupSettings {
+    fn default() -> Self {
+        Self {
+            remove_mode: RemoveMode::Queue,
+            paint_target: PaintTarget::Cleanup,
+            grow_px: 2,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(default)]
 pub struct Flux2KleinConfig {

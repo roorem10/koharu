@@ -265,6 +265,7 @@ async fn commit_raster_stroke(
                 mode,
                 color,
                 diameter,
+                100.0,
                 points
                     .into_iter()
                     .map(|point| koharu_scene::Point {

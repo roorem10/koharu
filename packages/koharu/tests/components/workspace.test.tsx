@@ -568,6 +568,7 @@ describe('canvas interaction adapter', () => {
     expect(canvas.finishStroke).toHaveBeenCalledOnce()
     expect(commit).toHaveBeenCalledWith(1, null, expect.arrayContaining([{ x: 45, y: 45 }]), {
       diameter: 48,
+      hardness: 100,
       color: [255, 255, 255, 255],
     })
   })
@@ -1013,14 +1014,26 @@ describe('canvas interaction adapter', () => {
       point: { x: 20, y: 20 },
       diameter: 48,
     })
-    expect(commit).toHaveBeenCalledWith(1, 'paint', expect.arrayContaining([{ x: 20, y: 20 }]), 48)
+    expect(commit).toHaveBeenCalledWith(
+      1,
+      'paint',
+      expect.arrayContaining([{ x: 20, y: 20 }]),
+      48,
+      100,
+    )
   })
 
-  it('maps the Remove tool to an inpainting mask gesture', async () => {
+  it('maps Immediate Remove to an inpainting mask gesture', async () => {
     installProject()
+    vi.mocked(commands.getCleanupSettings).mockResolvedValue({
+      remove_mode: 'immediate',
+      paint_target: 'cleanup',
+      grow_px: 2,
+    })
     useKoharuStore.setState({ tool: 'remove' })
     const commit = vi.spyOn(commands, 'commitInpaint').mockResolvedValue('job')
     const surface = renderWorkspace()
+    await waitFor(() => expect(queryClient.getQueryData(['cleanup-settings'])).toBeDefined())
 
     fireEvent.pointerDown(surface, { button: 0, pointerId: 12, clientX: 30, clientY: 40 })
     fireEvent.pointerUp(surface, { pointerId: 12, clientX: 30, clientY: 40 })
@@ -1032,7 +1045,7 @@ describe('canvas interaction adapter', () => {
       point: { x: 20, y: 20 },
       diameter: 48,
     })
-    expect(commit).toHaveBeenCalledWith(1, expect.arrayContaining([{ x: 20, y: 20 }]), 48)
+    expect(commit).toHaveBeenCalledWith(1, expect.arrayContaining([{ x: 20, y: 20 }]), 48, 100)
   })
 
   it('creates point text on click and paragraph text on drag', async () => {

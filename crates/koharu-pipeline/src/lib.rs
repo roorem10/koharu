@@ -33,7 +33,10 @@ pub use resources::{DeviceResources, ResourceSnapshot};
 pub use scope::{Bounds, Scope};
 pub use stage::Stage;
 pub use stages::bubble_shape;
-pub use stages::{BoxSettings, Flux2KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, RoremMixedConfig};
+pub use stages::{
+    BoxSettings, CleanupSettings, Flux2KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, PaintTarget,
+    RemoveMode, RoremMixedConfig,
+};
 
 use images::ImageCache;
 use model_cell::ModelCell;
