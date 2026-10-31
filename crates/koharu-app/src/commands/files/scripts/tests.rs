@@ -17,6 +17,7 @@ async fn fixture() -> Project {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: None,
+                        warp: None,
                     },
                 )?;
                 edit.set(

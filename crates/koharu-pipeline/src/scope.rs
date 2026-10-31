@@ -261,6 +261,7 @@ mod tests {
                             origin: Origin::User,
                             kind: TextLayoutKind::Paragraph,
                             angle_degrees: None,
+                            warp: None,
                         },
                     )?;
                     edit.relate::<RecognizedFrom>(content, region)?;

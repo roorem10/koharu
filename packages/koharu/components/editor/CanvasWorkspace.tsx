@@ -3,12 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { stepBrush } from '@/components/canvas-tools/brushKeys'
+import { useOcrBoxTool } from '@/components/canvas-tools/ocrBox'
+import { useRemoveAreaTool } from '@/components/canvas-tools/removeArea'
+import type { CanvasToolHandler } from '@/components/canvas-tools/types'
 import { useColorSampling } from '@/components/controls/ColorSampling'
 import { CanvasCommandBar } from '@/components/editor/CanvasCommandBar'
+import { useCanvasContextMenu } from '@/components/editor/CanvasContextMenu'
 import { CanvasOverlay } from '@/components/editor/CanvasOverlay'
+import { CleanupQueueBar } from '@/components/editor/CleanupQueueBar'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { useCanvas } from '@/components/editor/useCanvas'
+import { WarpHandles } from '@/components/editor/WarpHandles'
 import { originalVisible, useCompareStore } from '@/components/qc/compare'
 import { OriginalOverlay } from '@/components/qc/OriginalOverlay'
 import { call } from '@/lib/backend'
@@ -68,6 +75,7 @@ const canvasCursors = {
   color_picker: 'crosshair',
   remove: 'none',
   pan: 'grab',
+  ocr_box: 'crosshair',
 } as const satisfies Record<CanvasTool, string | undefined>
 
 type Gesture =
@@ -81,6 +89,7 @@ type Gesture =
     }
   | { kind: 'move'; pointer: number; start: Point; originals: TransformFrame[] }
   | { kind: 'text'; pointer: number; start: Point; frame: Frame }
+  | { kind: 'tool'; pointer: number; handler: CanvasToolHandler }
   | StrokeGesture
 
 interface StrokeGesture {
@@ -108,6 +117,9 @@ export function CanvasWorkspace() {
   const surface = useRef<HTMLDivElement>(null)
   const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(null)
   const gesture = useRef<Gesture | null>(null)
+  const ocrBoxTool = useOcrBoxTool()
+  const removeAreaTool = useRemoveAreaTool()
+  const contextMenu = useCanvasContextMenu()
   const previousPageIndex = useRef<number | null>(null)
   const spaceHeld = useRef(false)
   const compareKey = useRef<string | null>(null)
@@ -262,6 +274,7 @@ export function CanvasWorkspace() {
     const current = gesture.current
     gesture.current = null
     setSelectionRect(null)
+    if (current?.kind === 'tool') current.handler.finish(null)
     if (current?.kind === 'paint' || current?.kind === 'erase' || current?.kind === 'inpaint') {
       strokeUpdates.clear()
       canvas?.cancelStroke()
@@ -420,6 +433,11 @@ export function CanvasWorkspace() {
 
     const runShortcut = (event: KeyboardEvent, next: ShortcutAction | undefined) => {
       if (!next) return
+      if (next === 'brush_smaller' || next === 'brush_larger') {
+        event.preventDefault()
+        stepBrush(next === 'brush_smaller' ? -1 : 1)
+        return
+      }
       if (next === 'compare') {
         if (!page || useKoharuStore.getState().settingsOpen) return
         event.preventDefault()
@@ -609,6 +627,10 @@ export function CanvasWorkspace() {
       return
     }
 
+    if (current.kind === 'tool') {
+      current.handler.move(clientPagePoint(sample.clientX, sample.clientY))
+      return
+    }
     if (current.kind === 'pan') {
       const { zoom } = useKoharuStore.getState().camera
       const bounds = surface.current!.getBoundingClientRect()
@@ -662,9 +684,13 @@ export function CanvasWorkspace() {
     }
   }
 
-  const finishGesture = () => {
+  const finishGesture = (event?: PointerEvent) => {
     const current = gesture.current
     gesture.current = null
+    if (current?.kind === 'tool') {
+      current.handler.finish(event ?? null)
+      return
+    }
     if (!current || !page) return
     if (current.kind === 'select') {
       const x = Math.min(current.start.x, current.current.x)
@@ -807,7 +833,11 @@ export function CanvasWorkspace() {
             if (heldArrows.current.size) finishTransform()
           }}
 
-          onContextMenu={(event) => event.preventDefault()}
+          onContextMenu={(event) => {
+            event.preventDefault()
+            if (originalVisible() || !page) return
+            contextMenu.open(event.nativeEvent, clientPagePoint(event.clientX, event.clientY))
+          }}
           onPointerDown={(event) => {
             if (
               originalVisible() ||
@@ -826,6 +856,20 @@ export function CanvasWorkspace() {
             const physical = clientPhysicalPoint(event.clientX, event.clientY)
             const point = clientPagePoint(event.clientX, event.clientY)
             setCursor(physical)
+
+            const toolHandler =
+              event.button === 0 && !spaceHeld.current
+                ? tool === 'ocr_box'
+                  ? ocrBoxTool
+                  : tool === 'remove'
+                    ? removeAreaTool
+                    : null
+                : null
+            if (toolHandler?.start(point, event.nativeEvent)) {
+              gesture.current = { kind: 'tool', pointer: event.pointerId, handler: toolHandler }
+              event.preventDefault()
+              return
+            }
 
             if (event.button === 1 || tool === 'pan' || spaceHeld.current) {
               gesture.current = {
@@ -973,7 +1017,7 @@ export function CanvasWorkspace() {
           }}
           onPointerUp={(event) => {
             moveGesture(event.pointerId, [event.nativeEvent])
-            finishGesture()
+            finishGesture(event.nativeEvent)
             if (event.currentTarget.hasPointerCapture(event.pointerId)) {
               event.currentTarget.releasePointerCapture(event.pointerId)
             }
@@ -1033,6 +1077,8 @@ export function CanvasWorkspace() {
             useKoharuStore.setState({ camera: { zoom: current.zoom, translation, fitted: false } })
           }}
         >
+          {page && !showingOriginal && tool === 'ocr_box' && ocrBoxTool.overlay}
+          {page && !showingOriginal && tool === 'remove' && removeAreaTool.overlay}
           {selectionRect && (
             <div
               data-testid='selection-rectangle'
@@ -1069,6 +1115,15 @@ export function CanvasWorkspace() {
               onTransformEnd={finishTransform}
             />
           )}
+          {page &&
+            !showingOriginal &&
+            canvasState.status === 'ready' &&
+            selected.length === 1 &&
+            page.layers.some((layer) => layer.id === selected[0] && layer.type === 'text') && (
+              <WarpHandles layerId={selected[0]} />
+            )}
+          {page && !showingOriginal && <CleanupQueueBar />}
+          {page && !showingOriginal && contextMenu.menu}
           {page && showingOriginal && <OriginalOverlay key={page.id} page={page} />}
           {page && !showingOriginal && canvasState.status === 'error' && (
             <div

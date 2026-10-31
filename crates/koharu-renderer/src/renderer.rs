@@ -1875,6 +1875,7 @@ mod tests {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: Some(0.0),
+                        warp: None,
                     },
                 )?;
                 edit.set(text, &Geometry::rectangle(10.0, 10.0, 80.0, 40.0))?;
@@ -1968,6 +1969,7 @@ mod tests {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: Some(0.0),
+                        warp: None,
                     },
                 )?;
                 edit.set(first, &Geometry::rectangle(10.0, 10.0, 80.0, 40.0))?;
@@ -1994,6 +1996,7 @@ mod tests {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: Some(0.0),
+                        warp: None,
                     },
                 )?;
                 edit.set(second, &Geometry::rectangle(100.0, 10.0, 80.0, 40.0))?;
@@ -2106,6 +2109,7 @@ mod tests {
                                 origin: Origin::User,
                                 kind: TextLayoutKind::Paragraph,
                                 angle_degrees: None,
+                                warp: None,
                             },
                         )?;
                         edit.relate::<FlowsIn>(layer, bubble)?;
@@ -2234,6 +2238,7 @@ mod tests {
                             origin: Origin::User,
                             kind: TextLayoutKind::Paragraph,
                             angle_degrees: None,
+                            warp: None,
                         },
                     )?;
                     edit.relate::<RecognizedFrom>(content, region)?;

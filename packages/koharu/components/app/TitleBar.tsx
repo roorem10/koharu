@@ -7,6 +7,8 @@ import { useState, type ComponentProps } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AboutDialog } from '@/components/app/AboutDialog'
+import { ProcessPrepItems } from '@/components/app/ProcessPrepItems'
+import { ProcessRedoItems } from '@/components/app/ProcessRedoItems'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
 import { RedetectPageMenuItem, RedetectPageDialog } from '@/components/boxes/PageBoxActions'
 import { PageJoinMenuItem } from '@/components/boxes/PageJoinMenuItem'
@@ -281,6 +283,7 @@ export function TitleBar() {
               >
                 {t('menu.processLayers')}
               </MenubarItem>
+              <ProcessRedoItems />
               <MenubarSeparator />
               <MenubarItem
                 disabled={running || !lastJob?.failures?.length}
@@ -330,6 +333,7 @@ export function TitleBar() {
               <MenubarItem disabled={running} onClick={() => setBatchOpen(true)}>
                 {t('runs.batchTitle')}
               </MenubarItem>
+              <ProcessPrepItems />
             </MenubarContent>
             <BatchChaptersDialog open={batchOpen} onOpenChange={setBatchOpen} />
           </MenubarMenu>

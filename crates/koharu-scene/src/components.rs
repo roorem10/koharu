@@ -21,7 +21,7 @@ pub use assets::{Asset, AssetInput, AssetMetadata, AssetRole};
 pub use groups::{Group, TextGroup};
 pub use layers::{
     FillGradient, FontStyle, GradientKind, GradientStop, RasterLayer, RasterLayerKind, StrokeJoin,
-    StrokeMethod, StrokePosition, TextAlignment, TextLayout, TextLayoutKind, Typography,
+    StrokeMethod, StrokePosition, TextAlignment, TextLayout, TextLayoutKind, TextWarp, Typography,
     WritingMode,
 };
 pub use provenance::{Authored, Generation, Origin};

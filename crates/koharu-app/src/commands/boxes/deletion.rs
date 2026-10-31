@@ -115,6 +115,7 @@ mod tests {
             origin: Origin::User,
             kind: TextLayoutKind::Paragraph,
             angle_degrees: None,
+            warp: None,
         };
         let layer = edit
             .add_text_layer(page, At::End, content, &layout)

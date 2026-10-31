@@ -624,6 +624,7 @@ impl Project {
                     origin: Origin::User,
                     kind,
                     angle_degrees: Some(frame.angle_degrees),
+                    warp: None,
                 },
             )?;
             layer = Some(added_layer);
@@ -1696,6 +1697,7 @@ mod tests {
                                 origin: Origin::User,
                                 kind: TextLayoutKind::Paragraph,
                                 angle_degrees: None,
+                                warp: None,
                             },
                         )?;
                         edit.set(layer, &original)?;
@@ -1783,6 +1785,7 @@ mod tests {
                             origin: Origin::User,
                             kind: TextLayoutKind::Paragraph,
                             angle_degrees: None,
+                            warp: None,
                         },
                     )?;
                     edit.set(layer, &style_test_typography())?;
@@ -1850,6 +1853,7 @@ mod tests {
                             origin: Origin::User,
                             kind: TextLayoutKind::Paragraph,
                             angle_degrees: None,
+                            warp: None,
                         },
                     )?;
                     edit.set(layer, &original)?;
@@ -1876,6 +1880,7 @@ mod tests {
                                 origin: Origin::User,
                                 kind: TextLayoutKind::Paragraph,
                                 angle_degrees: None,
+                                warp: None,
                             },
                         )?;
                         edit.set(layer, &original)?;
@@ -1981,6 +1986,7 @@ mod tests {
                         origin: Origin::Generated(generation.clone()),
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: None,
+                        warp: None,
                     },
                 )
                 .unwrap();
@@ -2206,6 +2212,7 @@ mod tests {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: None,
+                        warp: None,
                     },
                 )
                 .unwrap();

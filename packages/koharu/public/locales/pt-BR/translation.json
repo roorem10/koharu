@@ -170,6 +170,11 @@
     "conversationDivider": "Previous conversation",
     "autoReadUnavailable": "Read chapter was skipped because the selected provider is not a language model."
   },
+  "cleanup": {
+    "title": "Cleanup brushes",
+    "brushSmaller": "Smaller brush",
+    "brushLarger": "Larger brush"
+  },
   "colorPicker": {
     "brushColor": "Cor do pincel",
     "hexCode": "Código hexadecimal da cor",
@@ -577,6 +582,9 @@
     "renameTitle": "Renomear página",
     "selected": "{{count}} selecionadas"
   },
+  "ocrBox": {
+    "title": "OCR box"
+  },
   "textExtras": {
     "title": "Text style extras",
     "lineSpacing": "Line spacing",
@@ -669,6 +677,12 @@
     "compareShortcut": "Show original (hold)",
     "loadingOriginal": "Loading original…",
     "sourceFailed": "Could not load the original page."
+  },
+  "rawPrep": {
+    "title": "Page levels"
+  },
+  "redesign": {
+    "title": "Panel and popups"
   },
   "resources": {
     "unloadModels": "Descarregar modelos",
@@ -952,6 +966,7 @@
     "draw": "Desenhar",
     "eraser": "Borracha",
     "increaseBrushSize": "Aumentar tamanho do pincel",
+    "ocr_box": "OCR box",
     "pan": "Mover",
     "remove": "Remover",
     "select": "Selecionar",
@@ -975,6 +990,9 @@
     "noNotes": "Nenhuma nota de versão fornecida.",
     "retry": "Tentar novamente",
     "update": "Atualizar"
+  },
+  "warp": {
+    "title": "Skew and perspective"
   },
   "window": {
     "close": "Fechar",

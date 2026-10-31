@@ -9,7 +9,10 @@ use koharu_scene::{
 use serde::Serialize;
 use specta::Type;
 
-use super::deletion::remove_layers;
+use super::{
+    create::{BoxDraft, add_detected_style_box},
+    deletion::remove_layers,
+};
 use crate::commands::project::Project;
 
 #[derive(Clone, Debug, Serialize, Type)]
@@ -414,38 +417,32 @@ impl Project {
         edit.remove::<OcrAnalysis>(region)?;
         edit.remove::<SourceText>(content)?;
         edit.remove::<Translation>(content)?;
-        let new_region = edit.add_entity(page, At::End)?;
-        edit.set(
-            new_region,
-            &snapshot
-                .component::<Region>(text.region)?
-                .context("missing text region metadata")?,
-        )?;
-        edit.set(new_region, &rectangle(second))?;
-        let new_content = edit.add_text_content(page, At::End)?;
-        copy_role(&snapshot, &mut edit, text.content, new_content)?;
-        edit.relate::<RecognizedFrom>(new_content, new_region)?;
-        let new_layer = edit.add_text_layer(
-            page,
-            At::After(layer),
-            new_content,
-            &snapshot
-                .component::<TextLayout>(layer)?
-                .context("missing text layout")?,
-        )?;
-        if let Some(typography) = &text.typography {
-            edit.set(new_layer, typography)?;
-        }
-        if snapshot.component::<Geometry>(layer)?.is_some() {
+        let has_frame = snapshot.component::<Geometry>(layer)?.is_some();
+        if has_frame {
             edit.set(layer, &rectangle(first))?;
-            edit.set(new_layer, &rectangle(second))?;
         }
-        if let Some(bubble) = snapshot.relation_from::<FlowsIn>(layer)? {
-            edit.relate::<FlowsIn>(new_layer, bubble.value().target)?;
-            edit.relate::<Inside>(new_region, bubble.value().target)?;
-        } else {
-            edit.relate::<FitsTo>(new_layer, new_region)?;
-        }
+        let bubble = snapshot
+            .relation_from::<FlowsIn>(layer)?
+            .map(|relation| relation.value().target);
+        let new_layer = add_detected_style_box(
+            &mut edit,
+            BoxDraft {
+                page,
+                at: At::After(layer),
+                region: snapshot
+                    .component::<Region>(text.region)?
+                    .context("missing text region metadata")?,
+                geometry: rectangle(second),
+                role: snapshot.component::<TextRole>(text.content)?,
+                layout: snapshot
+                    .component::<TextLayout>(layer)?
+                    .context("missing text layout")?,
+                typography: text.typography.clone(),
+                layer_geometry: has_frame.then(|| rectangle(second)),
+                bubble,
+            },
+        )?
+        .layer;
         Ok((self.commit(edit.finish()?).await?, [layer, new_layer]))
     }
 }
@@ -525,6 +522,7 @@ mod tests {
                             origin: Origin::User,
                             kind: TextLayoutKind::Paragraph,
                             angle_degrees: None,
+                            warp: None,
                         },
                     )
                     .unwrap();
@@ -701,6 +699,7 @@ mod tests {
                             origin: Origin::User,
                             kind: TextLayoutKind::Paragraph,
                             angle_degrees: None,
+                            warp: None,
                         },
                     )?;
                     edit.relate::<FitsTo>(other, original.region)?;

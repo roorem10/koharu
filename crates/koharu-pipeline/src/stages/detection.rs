@@ -538,6 +538,7 @@ fn write_region<'a>(
             origin: Origin::Generated(generation.clone()),
             kind: TextLayoutKind::Paragraph,
             angle_degrees: None,
+            warp: None,
         },
     )?;
     write_text_role(edit, content, "dev.koharu.text.free-text", generation)
@@ -2212,6 +2213,7 @@ mod tests {
             origin: Origin::User,
             kind: TextLayoutKind::Paragraph,
             angle_degrees: None,
+            warp: None,
         };
         let layer = edit
             .add_text_layer(page, At::End, content, &layout)
@@ -2304,6 +2306,7 @@ mod tests {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )
             .unwrap();
@@ -2379,6 +2382,7 @@ mod tests {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: None,
+                        warp: None,
                     },
                 )?;
                 link_dialogue_regions(

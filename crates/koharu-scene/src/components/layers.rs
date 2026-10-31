@@ -58,7 +58,7 @@ pub enum TextLayoutKind {
     Paragraph,
 }
 
-#[revisioned(revision = 2)]
+#[revisioned(revision = 3)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 pub struct TextLayout {
     pub origin: Origin,
@@ -66,6 +66,20 @@ pub struct TextLayout {
     /// Overrides the axes inferred from geometry when a frame is transformed.
     #[revision(start = 2)]
     pub angle_degrees: Option<f32>,
+    #[revision(start = 3)]
+    pub warp: Option<TextWarp>,
+}
+
+/// Skew or perspective applied to the laid-out text of a box.
+#[revisioned(revision = 1)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum TextWarp {
+    /// Horizontal and vertical shear in degrees.
+    Skew { x_degrees: f32, y_degrees: f32 },
+    /// Where the frame's corners go in frame-local units, clockwise from the top-left;
+    /// the unit square leaves the text unchanged.
+    Perspective { corners: [[f32; 2]; 4] },
 }
 
 impl Component for TextLayout {

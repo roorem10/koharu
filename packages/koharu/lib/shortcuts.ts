@@ -8,11 +8,14 @@ export const shortcutActions: readonly ShortcutAction[] = [
   'color_picker',
   'remove',
   'pan',
+  'ocr_box',
   'fit',
   'zoom_in',
   'zoom_out',
   'zoom_actual',
   'compare',
+  'brush_smaller',
+  'brush_larger',
 ]
 
 export const shortcutLabels: Record<ShortcutAction, string> = {
@@ -28,6 +31,9 @@ export const shortcutLabels: Record<ShortcutAction, string> = {
   zoom_out: 'settings.shortcuts.zoomOut',
   zoom_actual: 'settings.shortcuts.zoomActual',
   compare: 'qc.compareShortcut',
+  ocr_box: 'tools.ocr_box',
+  brush_smaller: 'cleanup.brushSmaller',
+  brush_larger: 'cleanup.brushLarger',
 }
 
 const modifiers = ['ctrl', 'alt', 'shift'] as const

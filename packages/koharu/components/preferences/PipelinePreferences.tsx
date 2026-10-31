@@ -4,6 +4,7 @@ import { Eraser, FileText, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { BoxJoinPreferences } from '@/components/preferences/BoxJoinPreferences'
+import { CleanupPreferences } from '@/components/preferences/CleanupPreferences'
 import { LibraryPreferences } from '@/components/preferences/LibraryPreferences'
 import {
   defaultModel,
@@ -15,6 +16,7 @@ import {
   type ModelStage,
   type PipelineModel,
 } from '@/components/preferences/models'
+import { OcrBoxPreferences } from '@/components/preferences/OcrBoxPreferences'
 import {
   NumberField,
   PreferencePage,
@@ -22,6 +24,8 @@ import {
   PreferenceSection,
   TextField,
 } from '@/components/preferences/PreferenceFields'
+import { QcPreferences } from '@/components/preferences/QcPreferences'
+import { RawPrepPreferences } from '@/components/preferences/RawPrepPreferences'
 import { RunPreferences } from '@/components/preferences/RunPreferences'
 import type { PipelineConfig } from '@koharu/bridge/protocol'
 import {
@@ -126,6 +130,10 @@ export function PipelinePreferences({
       <BoxJoinPreferences />
       <RunPreferences />
       <LibraryPreferences />
+      <OcrBoxPreferences />
+      <CleanupPreferences />
+      <RawPrepPreferences />
+      <QcPreferences />
     </PreferencePage>
   )
 }

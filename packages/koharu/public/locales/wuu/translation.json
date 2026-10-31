@@ -170,6 +170,11 @@
     "conversationDivider": "Previous conversation",
     "autoReadUnavailable": "Read chapter was skipped because the selected provider is not a language model."
   },
+  "cleanup": {
+    "title": "Cleanup brushes",
+    "brushSmaller": "Smaller brush",
+    "brushLarger": "Larger brush"
+  },
   "colorPicker": {
     "brushColor": "笔刷颜色",
     "hexCode": "十六进制颜色代码",
@@ -577,6 +582,9 @@
     "renameTitle": "页面改名",
     "selected": "拣中个页面：{{count}} 页"
   },
+  "ocrBox": {
+    "title": "OCR box"
+  },
   "textExtras": {
     "title": "Text style extras",
     "lineSpacing": "Line spacing",
@@ -669,6 +677,12 @@
     "compareShortcut": "Show original (hold)",
     "loadingOriginal": "Loading original…",
     "sourceFailed": "Could not load the original page."
+  },
+  "rawPrep": {
+    "title": "Page levels"
+  },
+  "redesign": {
+    "title": "Panel and popups"
   },
   "resources": {
     "unloadModels": "卸载模型",
@@ -952,6 +966,7 @@
     "draw": "笔刷",
     "eraser": "橡皮擦",
     "increaseBrushSize": "拿笔刷调大点",
+    "ocr_box": "OCR box",
     "pan": "平移",
     "remove": "移除",
     "select": "选择",
@@ -975,6 +990,9 @@
     "noNotes": "呒没发行说明。",
     "retry": "再试一趟",
     "update": "更新"
+  },
+  "warp": {
+    "title": "Skew and perspective"
   },
   "window": {
     "close": "关闭",

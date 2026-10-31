@@ -7,11 +7,17 @@ import { emptyTextStyle, emptyShapeStyles, emptyCategoryStyles } from '@/lib/tex
 import { commands } from '@koharu/bridge/protocol'
 
 import { mockWo06 } from './mocks/wo06'
+import { mockWo07 } from './mocks/wo07'
+import { mockWo10 } from './mocks/wo10'
 import { mockWo12 } from './mocks/wo12'
 import { mockWo13 } from './mocks/wo13'
 import { mockWo14 } from './mocks/wo14'
+import { mockWo15 } from './mocks/wo15'
+import { mockWo17 } from './mocks/wo17'
 import { mockWo20 } from './mocks/wo20'
 import { mockWo21 } from './mocks/wo21'
+import { mockWo23 } from './mocks/wo23'
+import { mockWo24 } from './mocks/wo24'
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
@@ -112,6 +118,12 @@ beforeEach(() => {
   mockWo14()
   mockWo06()
   mockWo21()
+  mockWo07()
+  mockWo15()
+  mockWo10()
+  mockWo17()
+  mockWo23()
+  mockWo24()
   queryClient.clear()
   useKoharuStore.setState({
     ...initial,

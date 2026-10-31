@@ -124,6 +124,7 @@ async fn translation_leaves_hinted_layers_alone() {
                     origin: koharu_scene::Origin::User,
                     kind: koharu_scene::TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?);
             Ok(())
@@ -269,6 +270,7 @@ async fn a_failed_page_does_not_block_other_pages_but_stop_run_does() {
                         origin: koharu_scene::Origin::User,
                         kind: koharu_scene::TextLayoutKind::Paragraph,
                         angle_degrees: None,
+                        warp: None,
                     },
                 )?;
                 edit.add_page(

@@ -8,6 +8,7 @@ import {
   MousePointer2,
   Pipette,
   Plus,
+  ScanText,
   Sparkles,
   Type,
 } from 'lucide-react'
@@ -47,6 +48,7 @@ const tools = [
   ['eraser', Eraser],
   ['color_picker', Pipette],
   ['remove', Sparkles],
+  ['ocr_box', ScanText],
   ['pan', Hand],
 ] as const satisfies ReadonlyArray<readonly [CanvasTool, typeof MousePointer2]>
 
