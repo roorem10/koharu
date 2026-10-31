@@ -609,12 +609,10 @@ impl Project {
         let mut layer = None;
         let patch = snapshot.patch(|edit| {
             let content = edit.add_text_content(page, At::End)?;
-            edit.set(
+            // A translation needs a source record, but this unread placeholder is not a hand edit.
+            edit.reset_source_text(
                 content,
-                &SceneSourceText {
-                    text: Authored::user(String::new()),
-                    language: None,
-                },
+                koharu_scene::ProducerId::new("dev.koharu.pipeline.ocr")?,
             )?;
             let added_layer = edit.add_text_layer(
                 page,

@@ -1774,3 +1774,63 @@ fn typography_rejects_invalid_spacing_and_gradient() {
     });
     assert!(value.validate(&context).is_err());
 }
+
+#[tokio::test]
+async fn source_reset_preserves_translation_and_language_and_requires_a_user_edit() {
+    let mut session = Session::memory().await.unwrap();
+    let mut content = None;
+    let patch = session
+        .snapshot()
+        .patch(|edit| {
+            let page = edit.add_page(PageDraft::new("page", 100., 100.), At::End)?;
+            let id = edit.add_text_content(page, At::End)?;
+            edit.set(
+                id,
+                &SourceText {
+                    text: Authored::user("manual source".into()),
+                    language: Some(LanguageTag::new("ja-JP")?),
+                },
+            )?;
+            edit.set(
+                id,
+                &Translation {
+                    text: Authored::user("manual translation".into()),
+                    language: None,
+                },
+            )?;
+            content = Some(id);
+            Ok(())
+        })
+        .unwrap();
+    let snapshot = session.commit(patch).await.unwrap().snapshot;
+    let id = content.unwrap();
+    let producer = ProducerId::new("dev.koharu.test.ocr").unwrap();
+    let mut automatic = snapshot.edit_as(Generation::new(producer.clone()));
+    assert!(matches!(
+        automatic.reset_source_text(id, producer.clone()),
+        Err(Error::Authorship(_))
+    ));
+    let mut edit = snapshot.edit();
+    edit.reset_source_text(id, producer.clone()).unwrap();
+    let reset = session
+        .commit(edit.finish().unwrap())
+        .await
+        .unwrap()
+        .snapshot;
+    let source = reset.component::<SourceText>(id).unwrap().unwrap();
+    assert!(source.text.value.is_empty());
+    assert_eq!(source.language.unwrap().as_str(), "ja-JP");
+    assert_eq!(
+        source.text.origin,
+        Origin::Generated(Generation::new(producer))
+    );
+    assert_eq!(
+        reset
+            .component::<Translation>(id)
+            .unwrap()
+            .unwrap()
+            .text
+            .value,
+        "manual translation"
+    );
+}
