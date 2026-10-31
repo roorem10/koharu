@@ -55,7 +55,16 @@
     "working": "Работа…"
   },
   "boxes": {
-    "title": "One box per bubble"
+    "title": "Text boxes",
+    "joinAutomatically": "Join text in the same bubble",
+    "joinExplanation": "Detection creates one text box per speech bubble; free text stays separate.",
+    "joinWithBubble": "Join with bubble",
+    "split": "Split",
+    "splitExplanation": "Split the region in half, then read and translate both boxes again.",
+    "joinPage": "Join split boxes on this page",
+    "redetectPage": "Detect page again",
+    "redetectConfirmation": "Generated boxes on this page, including their OCR text and translations, will be replaced. Hand-made and hand-edited boxes are kept.",
+    "cancel": "Cancel"
   },
   "canvas": {
     "empty": "Выберите страницу, чтобы начать.",

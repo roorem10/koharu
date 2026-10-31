@@ -10,10 +10,10 @@ use koharu_desktop::Frame;
 use koharu_scene::{
     AssetInput, AssetMetadata, AssetRole, At, Authored, Commit, EntityId, EntityOrigin,
     Geometry as SceneGeometry, Group as SceneGroup, Origin, PageDraft, Point as ScenePoint,
-    Presents, RasterLayer as SceneRasterLayer, RasterLayerKind, Region as SceneRegion,
-    RemovePolicy, Revision, Session, Snapshot, SourceText as SceneSourceText,
-    TextGroup as SceneTextGroup, TextLayout as SceneTextLayout, TextLayoutKind,
-    Translation as SceneTranslation, Typography as SceneTypography, Visibility as SceneVisibility,
+    RasterLayer as SceneRasterLayer, RasterLayerKind, Region as SceneRegion, RemovePolicy,
+    Revision, Session, Snapshot, SourceText as SceneSourceText, TextGroup as SceneTextGroup,
+    TextLayout as SceneTextLayout, TextLayoutKind, Translation as SceneTranslation,
+    Typography as SceneTypography, Visibility as SceneVisibility,
 };
 use serde::Serialize;
 use specta::Type;
@@ -871,32 +871,8 @@ impl Project {
             }
         }
         let layers = Self::unique_roots(&snapshot, expanded)?;
-        let mut orphaned_contents = Vec::new();
-        for layer in &layers {
-            let Some(relation) = snapshot.relation_from::<Presents>(*layer)? else {
-                continue;
-            };
-            let content = relation.value().target;
-            if snapshot.relations_to_as::<Presents>(content).count() == 1 {
-                orphaned_contents.push(content);
-            }
-        }
-        let patch = snapshot.patch(|edit| {
-            for layer in layers {
-                if snapshot.page(layer).is_ok() {
-                    return Err(koharu_scene::Error::Invalid(
-                        "delete pages with delete_pages".to_owned(),
-                    ));
-                }
-                edit.remove_entity(layer, RemovePolicy::Cascade)?;
-            }
-            for content in orphaned_contents {
-                if snapshot.entity(content).is_ok() {
-                    edit.remove_entity(content, RemovePolicy::Cascade)?;
-                }
-            }
-            Ok(())
-        })?;
+        let patch = snapshot
+            .patch(|edit| super::boxes::deletion::remove_layers(&snapshot, edit, &layers, false))?;
         self.commit(patch).await
     }
 
@@ -1555,7 +1531,7 @@ fn rasterize_stroke(
 
 #[cfg(test)]
 mod tests {
-    use koharu_scene::{Generation, ProducerId, WritingMode};
+    use koharu_scene::{Generation, Presents, ProducerId, WritingMode};
 
     use super::*;
 

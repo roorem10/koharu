@@ -162,6 +162,13 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             lettering::get_lettering_settings,
             lettering::save_lettering_settings,
             // WO-20 (one box per bubble) commands go here.
+            boxes::get_box_settings,
+            boxes::save_box_settings,
+            boxes::redetect_page,
+            boxes::get_box_actions,
+            boxes::join_bubble_boxes,
+            boxes::join_page_bubbles,
+            boxes::split_box,
             // WO-12 (QC list) commands go here.
             // WO-13 (files and export) commands go here.
             // WO-14 (runs and retries) commands go here.

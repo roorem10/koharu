@@ -865,6 +865,38 @@ describe('canvas interaction adapter', () => {
     )
   })
 
+  it('moves a tiny text box from its centre while resize targets stay outside', async () => {
+    installNudgeProject()
+    const original = { x: 30, y: 40, width: 20, height: 12, angle_degrees: 0 }
+    useKoharuStore.setState({ layerFrames: { element: original } })
+    const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(2)
+    const surface = renderWorkspace()
+    const east = document.querySelector<HTMLElement>('[data-resize-handle="e"]')!
+    const west = document.querySelector<HTMLElement>('[data-resize-handle="w"]')!
+    expect(east.style.transform).toBe('translate(0%, -50%)')
+    expect(west.style.transform).toBe('translate(-100%, -50%)')
+
+    fireEvent.pointerDown(surface, { button: 0, pointerId: 19, clientX: 50, clientY: 66 })
+    fireEvent.pointerMove(surface, { pointerId: 19, clientX: 60, clientY: 81 })
+    fireEvent.pointerUp(surface, { pointerId: 19, clientX: 60, clientY: 81 })
+
+    await waitFor(() => expect(commit).toHaveBeenCalledOnce())
+    expect(commit).toHaveBeenCalledWith(
+      1,
+      [
+        {
+          element: 'element',
+          frame: {
+            ...original,
+            x: 40,
+            y: 55,
+          },
+        },
+      ],
+      false,
+    )
+  })
+
   it('resizes a selected layer through Koharu selection controls', async () => {
     installProject()
     useKoharuStore.setState({ selectedLayers: ['element'] })

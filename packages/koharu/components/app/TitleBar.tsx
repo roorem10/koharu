@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next'
 
 import { AboutDialog } from '@/components/app/AboutDialog'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
+import { RedetectPageMenuItem, RedetectPageDialog } from '@/components/boxes/PageBoxActions'
+import { PageJoinMenuItem } from '@/components/boxes/PageJoinMenuItem'
 import { call } from '@/lib/backend'
 import { selectableLayer } from '@/lib/geometry'
 import {
@@ -40,6 +42,7 @@ import { cn } from '@koharu/ui/lib/utils'
 export function TitleBar() {
   const { t } = useTranslation()
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [redetectPage, setRedetectPage] = useState<string | null>(null)
   const macOS = useMacOS()
   const project = useProject().data
   const pagesQuery = usePages(Boolean(project))
@@ -188,7 +191,10 @@ export function TitleBar() {
                 {t('menu.delete')}
                 <MenubarShortcut>Del</MenubarShortcut>
               </MenubarItem>
+              <RedetectPageMenuItem page={page?.id ?? null} onRedetect={setRedetectPage} />
+              <PageJoinMenuItem page={page?.id ?? null} />
             </MenubarContent>
+            <RedetectPageDialog page={redetectPage} onClose={() => setRedetectPage(null)} />
           </MenubarMenu>
 
           <MenubarMenu>
