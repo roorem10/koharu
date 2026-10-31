@@ -96,9 +96,9 @@ export const commands = {
 	addPointText: (point: Point) => __TAURI_INVOKE<LayerCommit>("add_point_text", { point }),
 	addTextBox: (frame: Frame) => __TAURI_INVOKE<LayerCommit>("add_text_box", { frame }),
 	commitPaint: (expectedRevision: Revision, layer: EntityId | null, points: Point[], brush: PaintBrush) => __TAURI_INVOKE<LayerCommit>("commit_paint", { expectedRevision, layer, points, brush }),
-	commitErase: (expectedRevision: Revision, layer: EntityId, points: Point[], diameter: number) => __TAURI_INVOKE<LayerCommit>("commit_erase", { expectedRevision, layer, points, diameter }),
+	commitErase: (expectedRevision: Revision, layer: EntityId | null, points: Point[], diameter: number, hardness: number) => __TAURI_INVOKE<LayerCommit>("commit_erase", { expectedRevision, layer, points, diameter, hardness }),
 	commitTransform: (expectedRevision: Revision, elements: TransformFrame[], persistUnchanged: boolean) => __TAURI_INVOKE<Revision | null>("commit_transform", { expectedRevision, elements, persistUnchanged }),
-	commitInpaint: (expectedRevision: Revision, points: Point[], diameter: number) => __TAURI_INVOKE<JobId | null>("commit_inpaint", { expectedRevision, points, diameter }),
+	commitInpaint: (expectedRevision: Revision, points: Point[], diameter: number, hardness: number) => __TAURI_INVOKE<JobId | null>("commit_inpaint", { expectedRevision, points, diameter, hardness }),
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
@@ -137,6 +137,9 @@ export const commands = {
 	getMcpStatus: () => __TAURI_INVOKE<McpStatus>("get_mcp_status"),
 	saveMcpSettings: (options: McpOptions) => __TAURI_INVOKE<McpStatus>("save_mcp_settings", { options }),
 	newMcpToken: () => __TAURI_INVOKE<McpStatus>("new_mcp_token"),
+	getCleanupSettings: () => __TAURI_INVOKE<CleanupSettings>("get_cleanup_settings"),
+	saveCleanupSettings: (settings: CleanupSettings) => __TAURI_INVOKE<CleanupSettings>("save_cleanup_settings", { settings }),
+	cleanAreas: (page: EntityId, strokes: CleanupStroke[], rects: CleanupRect[]) => __TAURI_INVOKE<JobId>("clean_areas", { page, strokes, rects }),
 };
 
 /* Types */
@@ -289,6 +292,25 @@ export type Character = {
 };
 
 export type ClaudeConfig = Record<string, never>;
+
+export type CleanupRect = {
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+};
+
+export type CleanupSettings = {
+	remove_mode?: RemoveMode,
+	paint_target?: PaintTarget,
+	grow_px?: number,
+};
+
+export type CleanupStroke = {
+	points: Point[],
+	diameter: number,
+	hardness: number,
+};
 
 export type CodexModel = {
 	id: string,
@@ -707,8 +729,11 @@ export type PageSummary = {
 
 export type PaintBrush = {
 	diameter: number,
+	hardness: number,
 	color: [number, number, number, number],
 };
+
+export type PaintTarget = "cleanup" | "paint_layer";
 
 export type PipelineConfig = {
 	detect_text_color: boolean,
@@ -822,6 +847,8 @@ export type RasterLayerKind = "cleanup" | "paint";
 export type ReadWhen = "missing" | "always" | "never";
 
 export type Reasoning = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
+
+export type RemoveMode = "immediate" | "queue";
 
 export type RetryProgress = {
 	attempt: number,

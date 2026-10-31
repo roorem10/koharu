@@ -209,6 +209,9 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             mcp::new_mcp_token,
             // WO-07 (OCR box and redo) commands go here.
             // WO-15 (cleanup brushes) commands go here.
+            cleanup::get_cleanup_settings,
+            cleanup::save_cleanup_settings,
+            cleanup::clean_areas,
             // WO-10 (skew and perspective) commands go here.
             // WO-17 (raw prep) commands go here.
             // WO-23 (redesigned panel and popups) commands go here.
