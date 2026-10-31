@@ -170,6 +170,11 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             boxes::join_page_bubbles,
             boxes::split_box,
             // WO-12 (QC list) commands go here.
+            qc::run_qc,
+            qc::mark_qc_ok,
+            qc::get_qc_settings,
+            qc::save_qc_settings,
+            qc::get_page_source,
             // WO-13 (files and export) commands go here.
             // WO-14 (runs and retries) commands go here.
             // WO-06 (text style extras and box notes) commands go here.
