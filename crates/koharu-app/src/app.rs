@@ -164,6 +164,16 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
             // WO-13 (files and export)
             // WO-14 (runs and retries)
             // WO-21 (MCP server)
+            let mcp = std::sync::Arc::new(crate::commands::mcp::McpState::new(
+                std::sync::Arc::new(crate::commands::agent::host::KoharuHost::new(
+                    handle.clone(),
+                )),
+                handle.package_info().version.to_string(),
+            )?);
+            application.manage(mcp.clone());
+            drop(tauri::async_runtime::spawn(
+                async move { mcp.start().await },
+            ));
 
             let window_config = application
                 .config()
@@ -272,6 +282,9 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
                 processing.stops.lock().clear();
                 processing.jobs.lock().clear();
                 window.state::<AgentState>().cancel_all();
+                window
+                    .state::<std::sync::Arc<crate::commands::mcp::McpState>>()
+                    .cancel();
             }
         })
         .run(context)?;

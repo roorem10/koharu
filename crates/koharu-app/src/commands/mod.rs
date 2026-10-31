@@ -167,6 +167,9 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             // WO-14 (runs and retries) commands go here.
             // WO-06 (text style extras and box notes) commands go here.
             // WO-21 (MCP server) commands go here.
+            mcp::get_mcp_status,
+            mcp::save_mcp_settings,
+            mcp::new_mcp_token,
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)

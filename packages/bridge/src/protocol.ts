@@ -102,6 +102,9 @@ export const commands = {
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
+	getMcpStatus: () => __TAURI_INVOKE<McpStatus>("get_mcp_status"),
+	saveMcpSettings: (options: McpOptions) => __TAURI_INVOKE<McpStatus>("save_mcp_settings", { options }),
+	newMcpToken: () => __TAURI_INVOKE<McpStatus>("new_mcp_token"),
 };
 
 /* Types */
@@ -488,6 +491,26 @@ export type LmStudioConfig = {
 export type LocalConfig = Record<string, never>;
 
 export type LoginEvent = { type: "progress"; message: string } | { type: "device_code"; verification_url: string; user_code: string };
+
+export type McpOptions = {
+	enabled: boolean,
+	port: number,
+	allow_edits: boolean,
+};
+
+export type McpSettings = {
+	enabled?: boolean,
+	port?: number,
+	token?: string,
+	allow_edits?: boolean,
+};
+
+export type McpStatus = {
+	settings: McpSettings,
+	running: boolean,
+	endpoint: string,
+	error: string | null,
+};
 
 export type MiniMaxConfig = Record<string, never>;
 
