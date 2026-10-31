@@ -219,6 +219,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             cleanup::save_cleanup_settings,
             cleanup::clean_areas,
             // WO-10 (skew and perspective) commands go here.
+            warp::get_text_warp,
+            warp::set_text_warp,
             // WO-17 (raw prep) commands go here.
             // WO-23 (redesigned panel and popups) commands go here.
             // WO-24 (automatic QC and context tab) commands go here.
