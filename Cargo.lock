@@ -4935,6 +4935,7 @@ dependencies = [
  "koharu-translator",
  "nvml-wrapper",
  "rayon",
+ "revision",
  "serde",
  "serde_json",
  "specta",
@@ -5142,6 +5143,7 @@ dependencies = [
  "koharu-config",
  "koharu-ml",
  "koharu-runtime",
+ "koharu-scene",
  "koharu-secrets",
  "reqwest",
  "serde",
@@ -5151,6 +5153,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-rayon",
+ "toml",
  "tracing",
  "url",
 ]

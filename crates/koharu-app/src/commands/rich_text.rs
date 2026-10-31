@@ -455,6 +455,10 @@ async fn reset_translation_styles(
     Ok(Some(project.commit(patch).await?))
 }
 
+/// Called by the processing committer right after a Translation stage commit
+/// (normal runs and Translate again). For every box whose translation that
+/// commit rewrote, removes its word styles and resets its style to the lettering
+/// default (decision 4), then applies fresh emphasis hints in the same patch.
 pub(crate) async fn after_translation(
     project: &mut Project,
     commit: &Commit,
@@ -466,12 +470,14 @@ pub(crate) async fn after_translation(
     let detect_colors = koharu_pipeline::PipelineConfig::load()?
         .read()?
         .detect_text_color;
+    // Lettering labels live in the sidecar, not the scene; load them before the patch.
+    let context = project.load_context()?;
     reset_translation_styles(
         project,
         commit,
         &styles,
         detect_colors,
-        super::emphasis::apply_hints,
+        |edit, snapshot, layers| super::emphasis::apply_hints(edit, snapshot, layers, &context),
     )
     .await
 }

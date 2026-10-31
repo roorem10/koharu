@@ -2,6 +2,7 @@
 
 mod accelerator;
 mod config;
+mod emphasis;
 mod error;
 mod execution;
 mod hints;
@@ -21,6 +22,7 @@ mod stages;
 pub use config::{
     DetectionModel, InpaintingModel, OcrModel, PipelineConfig, ProcessorConfig, TranslationConfig,
 };
+pub use emphasis::EmphasisHints;
 pub use error::{ErrorKind, PipelineError};
 pub use hints::{GlossaryTerm, TranslationHints, page_glossary, previous_context, term_occurs};
 pub use pipeline::Pipeline;

@@ -421,3 +421,37 @@ async fn disconnect_cancels_the_control_and_releases_the_call_lane() {
     );
     server.stop().await;
 }
+
+#[tokio::test]
+async fn word_styles_are_hidden_and_refused_when_mcp_edits_are_disabled() {
+    struct WordHost;
+    #[async_trait]
+    impl Host for WordHost {
+        async fn context(&self) -> Result<Value> {
+            Ok(json!({}))
+        }
+        fn tools(&self) -> Vec<AgentTool> {
+            vec![AgentTool::new(
+                "style_words",
+                "Style selected words",
+                json!({"type":"object"}),
+            )]
+        }
+        async fn invoke(&self, _: ToolCall, _: &Control) -> Result<Invocation> {
+            panic!("a read-only MCP client reached the word-style write tool")
+        }
+    }
+    let bridge = bridge(Arc::new(WordHost), false);
+    assert!(
+        bridge
+            .tools()
+            .unwrap()
+            .iter()
+            .all(|tool| tool.name != "style_words")
+    );
+    let server = Server::start(bridge).await;
+    let session = server.initialize().await;
+    let result = rpc(server.call(&session, 1, "style_words").await).await;
+    assert_eq!(result["result"]["isError"], true);
+    server.stop().await;
+}
