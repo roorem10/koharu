@@ -137,6 +137,12 @@ export const commands = {
 	getMcpStatus: () => __TAURI_INVOKE<McpStatus>("get_mcp_status"),
 	saveMcpSettings: (options: McpOptions) => __TAURI_INVOKE<McpStatus>("save_mcp_settings", { options }),
 	newMcpToken: () => __TAURI_INVOKE<McpStatus>("new_mcp_token"),
+	getOcrBoxSettings: () => __TAURI_INVOKE<OcrBoxSettings>("get_ocr_box_settings"),
+	saveOcrBoxSettings: (settings: OcrBoxSettings) => __TAURI_INVOKE<OcrBoxSettings>("save_ocr_box_settings", { settings }),
+	addOcrBox: (page: EntityId, rect: Bounds, mode: OcrBoxMode) => __TAURI_INVOKE<EntityId>("add_ocr_box", { page, rect, mode }),
+	getOcrRedoInfo: (layers: EntityId[]) => __TAURI_INVOKE<RedoInfo>("get_ocr_redo_info", { layers }),
+	redoOcrBoxes: (layers: EntityId[], action: RedoAction, overwrite: boolean) => __TAURI_INVOKE<JobId[]>("redo_ocr_boxes", { layers, action, overwrite }),
+	addSfxSubtitle: (layer: EntityId) => __TAURI_INVOKE<EntityId>("add_sfx_subtitle", { layer }),
 };
 
 /* Types */
@@ -643,6 +649,16 @@ export type ModelSelection = {
 	reasoning?: boolean,
 };
 
+export type OcrBoxMode = "read" | "read_translate" | "read_translate_clean";
+
+export type OcrBoxSettings = {
+	default_mode?: OcrBoxMode,
+	subtitle_font_family?: string | null,
+	subtitle_size?: number,
+	subtitle_fill?: [number, number, number, number],
+	subtitle_outline?: [number, number, number, number],
+};
+
 export type OcrModel = { model: "paddleocr-vl-1.6" } | { model: "manga-ocr" } | { model: "baberu-ocr" } | { model: "hayai-ocr" };
 
 export type OnPageFailure = "continue_with_other_pages" | "stop_run";
@@ -822,6 +838,13 @@ export type RasterLayerKind = "cleanup" | "paint";
 export type ReadWhen = "missing" | "always" | "never";
 
 export type Reasoning = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
+
+export type RedoAction = "read" | "translate" | "clean";
+
+export type RedoInfo = {
+	user_sources: number,
+	user_translations: number,
+};
 
 export type RetryProgress = {
 	attempt: number,
