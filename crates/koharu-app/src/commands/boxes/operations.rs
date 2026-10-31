@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, HashSet};
 use anyhow::{Context as _, Result, bail};
 use koharu_scene::{
     At, Authored, Commit, Edit, EntityId, FitsTo, FlowsIn, Geometry, Inside, OcrAnalysis, Presents,
-    RecognizedFrom, Region, Snapshot, SourceText, TextLayout, TextRole, Translation, Typography,
-    WritingMode,
+    RecognizedFrom, Region, Snapshot, SourceText, TextLayout, TextRole, TextRuns, Translation,
+    Typography, WritingMode,
 };
 use serde::Serialize;
 use specta::Type;
@@ -253,6 +253,7 @@ fn join_group(snapshot: &Snapshot, edit: &mut Edit, boxes: &[TextBox]) -> Result
         ]
     });
     edit.promote_entity_to_user(first.layer)?;
+    edit.remove::<TextRuns>(first.layer)?;
     edit.set(region, &rectangle(union))?;
     edit.remove::<OcrAnalysis>(region)?;
     let mut seen = HashSet::new();
@@ -413,6 +414,7 @@ impl Project {
         let content = exclusive_content(&snapshot, &mut edit, &text, page, &participants)?;
         let region = exclusive_region(&snapshot, &mut edit, &text, page, content, &participants)?;
         edit.promote_entity_to_user(layer)?;
+        edit.remove::<TextRuns>(layer)?;
         edit.set(region, &rectangle(first))?;
         edit.remove::<OcrAnalysis>(region)?;
         edit.remove::<SourceText>(content)?;
@@ -731,5 +733,58 @@ mod tests {
         project.join_bubble_boxes(layer).await.unwrap();
         assert!(project.snapshot().entity(split[1]).is_err());
         assert!(project.snapshot().entity(new_region).is_err());
+    }
+
+    #[tokio::test]
+    async fn split_and_join_drop_word_styles_and_undo_restores_them() {
+        for split in [false, true] {
+            let (mut project, _, groups) = fixture(WritingMode::Vertical, 1).await;
+            let runs = TextRuns {
+                origin: Origin::User,
+                runs: vec![koharu_scene::StyleRun {
+                    start: 0,
+                    end: 3,
+                    style: koharu_scene::RunStyle {
+                        font_weight: Some(700),
+                        ..Default::default()
+                    },
+                }],
+            };
+            let patch = project
+                .snapshot()
+                .patch(|edit| {
+                    for &layer in &groups[0] {
+                        edit.set(layer, &runs)?;
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            project.commit(patch).await.unwrap();
+            let (commit, resulting_layers) = if split {
+                let (commit, layers) = project.split_box(groups[0][0]).await.unwrap();
+                (commit, layers.to_vec())
+            } else {
+                let (commit, kept) = project.join_bubble_boxes(groups[0][0]).await.unwrap();
+                (commit.unwrap(), vec![kept])
+            };
+            project.record_commit(&commit);
+            for layer in resulting_layers {
+                assert!(
+                    project
+                        .snapshot()
+                        .component::<TextRuns>(layer)
+                        .unwrap()
+                        .is_none()
+                );
+            }
+            project.undo().await.unwrap();
+            for &layer in &groups[0] {
+                assert_eq!(
+                    project.snapshot().component::<TextRuns>(layer).unwrap(),
+                    Some(runs.clone())
+                );
+            }
+            assert!(project.undo.is_empty());
+        }
     }
 }
