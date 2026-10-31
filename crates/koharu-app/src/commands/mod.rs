@@ -229,6 +229,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             raw_prep::restore_original_pages,
             raw_prep::preview_prep,
             // WO-23 (redesigned panel and popups) commands go here.
+            redesign::get_box_effects,
+            redesign::reset_box_effects,
             // WO-24 (automatic QC and context tab) commands go here.
             qc::get_qc_results,
             qc::mark_qc_finding,
