@@ -170,6 +170,12 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             files::scripts::export_script,
             files::scripts::preview_script_import,
             files::scripts::apply_script_import,
+            files::library::get_library_paths,
+            files::library::choose_library_folder,
+            files::library::reset_library_folder,
+            files::library::open_library_folder,
+            files::library::rename_project,
+            files::library::duplicate_project,
             // WO-14 (runs and retries) commands go here.
             // WO-06 (text style extras and box notes) commands go here.
             // WO-21 (MCP server) commands go here.

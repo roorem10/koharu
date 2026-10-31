@@ -192,15 +192,119 @@ pub(crate) struct ProjectLibrary {
 
 impl ProjectLibrary {
     pub(crate) fn new() -> Result<Self> {
-        let root = match koharu_config::preview::root()? {
+        let configured = match super::files::load_settings() {
+            Ok(settings) => settings.projects_folder,
+            Err(error) => {
+                tracing::warn!(%error, "could not read library settings; using default projects folder");
+                None
+            }
+        };
+        if let Some(root) = configured {
+            match Self::from_root(root) {
+                Ok(library) => return Ok(library),
+                Err(error) => {
+                    tracing::warn!(%error, "could not use configured projects folder; using default")
+                }
+            }
+        }
+        Self::from_root(Self::default_root()?)
+    }
+
+    pub(crate) fn default_root() -> Result<PathBuf> {
+        Ok(match koharu_config::preview::root()? {
             Some(root) => root.join("projects"),
             None => dirs::document_dir()
                 .context("the Documents directory is unavailable")?
                 .join("Koharu"),
-        };
-        std::fs::create_dir_all(&root)
+        })
+    }
+
+    pub(crate) fn from_root(root: PathBuf) -> Result<Self> {
+        super::files::prepare_folder(&root)
             .with_context(|| format!("failed to create {}", root.display()))?;
         Ok(Self { root })
+    }
+
+    pub(crate) fn root(&self) -> &Path {
+        &self.root
+    }
+
+    pub(crate) fn rename(
+        &self,
+        name: &str,
+        new_name: &str,
+        open_project: Option<&str>,
+    ) -> Result<()> {
+        let (name, source) = self.resolve(name)?;
+        anyhow::ensure!(
+            !open_project.is_some_and(|open| open.to_lowercase() == name.to_lowercase()),
+            "close the project before renaming it"
+        );
+        anyhow::ensure!(
+            new_name == new_name.trim(),
+            "project names cannot start or end with whitespace"
+        );
+        let (new_name, destination) = self.resolve(new_name)?;
+        anyhow::ensure!(
+            new_name.encode_utf16().count() <= 247,
+            "project name is too long"
+        );
+        anyhow::ensure!(
+            source.symlink_metadata()?.file_type().is_dir(),
+            "project does not exist or is not a directory"
+        );
+        anyhow::ensure!(
+            !self.name_exists(&new_name)?,
+            "a project with that name already exists"
+        );
+        std::fs::rename(&source, &destination).context("failed to rename project")
+    }
+
+    pub(crate) fn duplicate(&self, name: &str) -> Result<String> {
+        let (name, source) = self.resolve(name)?;
+        anyhow::ensure!(
+            source.symlink_metadata()?.file_type().is_dir(),
+            "project does not exist or is not a directory"
+        );
+        let mut number = 1;
+        let new_name = loop {
+            let candidate = if number == 1 {
+                format!("{name} copy")
+            } else {
+                format!("{name} copy {number}")
+            };
+            validate_project_name(&candidate)?;
+            anyhow::ensure!(
+                candidate.encode_utf16().count() <= 247,
+                "duplicate project name is too long"
+            );
+            if !self.name_exists(&candidate)? {
+                break candidate;
+            }
+            number += 1;
+        };
+        let stage = tempfile::Builder::new()
+            .prefix(".duplicate-")
+            .tempdir_in(&self.root)?;
+        super::files::library::copy_directory(&source, stage.path())?;
+        let destination = self.root.join(format!("{new_name}.khrproj"));
+        anyhow::ensure!(
+            !destination.try_exists()?,
+            "a project with that name already exists"
+        );
+        std::fs::rename(stage.path(), destination)
+            .context("failed to publish duplicate project")?;
+        Ok(new_name)
+    }
+
+    fn name_exists(&self, name: &str) -> Result<bool> {
+        let filename = format!("{name}.khrproj").to_lowercase();
+        for entry in std::fs::read_dir(&self.root)? {
+            if entry?.file_name().to_string_lossy().to_lowercase() == filename {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub(crate) fn list(&self) -> Result<Vec<ProjectSummary>> {

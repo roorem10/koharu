@@ -197,7 +197,20 @@
     "emptyTranslation": "(Empty translation)",
     "apply": "Apply",
     "cancel": "Cancel",
-    "dragLayer": "Drag {{name}} to reorder"
+    "dragLayer": "Drag {{name}} to reorder",
+    "projectsFolder": "Project library folder",
+    "projectsRestart": "Applies after a restart. Existing projects are not moved.",
+    "changeFolder": "Change…",
+    "useDefault": "Use default",
+    "openFolder": "Open folder",
+    "nextLaunch": "Next launch: {{path}}",
+    "loading": "Loading…",
+    "renameProject": "Rename {{name}}",
+    "duplicateProject": "Duplicate {{name}}",
+    "renameTitle": "Rename project",
+    "newProjectName": "New project name",
+    "rename": "Rename",
+    "defaultFolder": "Default: {{path}}"
   },
   "fontPicker": {
     "activeFilterCount": "{{count}} filtres actifs",

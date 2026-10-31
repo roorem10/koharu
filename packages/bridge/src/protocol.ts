@@ -108,6 +108,12 @@ export const commands = {
 	exportScript: () => __TAURI_INVOKE<null>("export_script"),
 	previewScriptImport: () => __TAURI_INVOKE<ScriptPreview | null>("preview_script_import"),
 	applyScriptImport: (preview: ScriptPreview) => __TAURI_INVOKE<null>("apply_script_import", { preview }),
+	getLibraryPaths: () => __TAURI_INVOKE<LibraryPaths>("get_library_paths"),
+	chooseLibraryFolder: (kind: LibraryFolder) => __TAURI_INVOKE<LibrarySettings | null>("choose_library_folder", { kind }),
+	resetLibraryFolder: (kind: LibraryFolder) => __TAURI_INVOKE<LibrarySettings>("reset_library_folder", { kind }),
+	openLibraryFolder: (kind: LibraryFolder) => __TAURI_INVOKE<null>("open_library_folder", { kind }),
+	renameProject: (name: string, newName: string) => __TAURI_INVOKE<null>("rename_project", { name, newName }),
+	duplicateProject: (name: string) => __TAURI_INVOKE<string>("duplicate_project", { name }),
 };
 
 /* Types */
@@ -467,8 +473,16 @@ export type LetteringSettings = {
 	small_text_threshold?: number,
 };
 
+export type LibraryFolder = "projects";
+
+export type LibraryPaths = {
+	projects_folder: string,
+	default_projects_folder: string,
+};
+
 export type LibrarySettings = {
 	export_name_pattern?: string,
+	projects_folder?: string | null,
 };
 
 export type LineCategory = {

@@ -1,21 +1,26 @@
 'use client'
 
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useIsMutating, useMutation, useQuery } from '@tanstack/react-query'
 
 import { call } from '@/lib/backend'
 import { queryClient } from '@/lib/queries'
 import { commands, type LibrarySettings } from '@koharu/bridge/protocol'
 
-const libraryKey = ['library-settings'] as const
+export const libraryKey = ['library-settings'] as const
 
 export function useLibrarySettings() {
+  const saving = useIsMutating({ mutationKey: libraryKey }) > 0
   const query = useQuery({
     queryKey: libraryKey,
     queryFn: () => call(commands.getLibrarySettings),
   })
   const mutation = useMutation({
+    mutationKey: libraryKey,
+    scope: { id: 'library-settings' },
     mutationFn: (settings: LibrarySettings) => call(commands.saveLibrarySettings, settings),
-    onSuccess: (settings) => { queryClient.setQueryData(libraryKey, settings) },
+    onSuccess: (settings) => {
+      queryClient.setQueryData(libraryKey, settings)
+    },
   })
-  return { ...query, save: mutation.mutateAsync, saving: mutation.isPending }
+  return { ...query, save: mutation.mutateAsync, saving }
 }
