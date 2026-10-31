@@ -196,7 +196,8 @@
     "newText": "Imported translation",
     "emptyTranslation": "(Empty translation)",
     "apply": "Apply",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "dragLayer": "Drag {{name}} to reorder"
   },
   "fontPicker": {
     "activeFilterCount": "{{count}} 個啟用的篩選條件",
