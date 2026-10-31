@@ -259,6 +259,7 @@ async fn run_checks(
         for row in rows.iter().filter(|row| row.page == page) {
             let mut checks = Vec::new();
             let mut small_size = None;
+            let mut base_size = None;
             for diagnostic in frame.diagnostics() {
                 match diagnostic {
                     RenderDiagnostic::TextOverflow { entity, .. } if *entity == row.layer => {
@@ -274,14 +275,12 @@ async fn run_checks(
             }
             if let Some(layer) = frame.layer(row.layer)
                 && let LayerKind::Text(text) = layer.kind()
-                && text.font_size < settings.min_font_size
             {
-                small_size = Some(text.font_size);
+                base_size = Some(text.font_size);
+                small_size = Some(text.smallest_font_size);
             }
-            if let Some(size) = small_size
-                && size < settings.min_font_size
-            {
-                checks.push((QcCheck::TooSmall, format!("{size:.1}")));
+            if let Some(detail) = small_text_detail(small_size, base_size, settings.min_font_size) {
+                checks.push((QcCheck::TooSmall, detail));
             }
             text_checks(row, &skip, &majorities, &mut checks);
             for (check, detail) in checks {
@@ -359,6 +358,15 @@ async fn run_checks(
     ))
 }
 
+fn small_text_detail(size: Option<f32>, base: Option<f32>, minimum: f32) -> Option<String> {
+    let size = size.filter(|size| *size < minimum)?;
+    Some(if base.is_some_and(|base| base >= minimum) {
+        format!("word:{size:.1}")
+    } else {
+        format!("{size:.1}")
+    })
+}
+
 fn for_progress(channel: &Option<Channel<QcProgress>>, completed: u32, total: u32) {
     if let Some(channel) = channel {
         let _ = channel.send(QcProgress { completed, total });
@@ -406,6 +414,7 @@ fn signature(
     let page_data = Project::page(snapshot, page)?;
     let mut lines = BTreeMap::new();
     let mut layouts = Vec::new();
+    let mut word_styles = Vec::new();
     for layer in snapshot.page(page)?.text_layers()? {
         if let Some(line) = context.lines.get(&layer.id()) {
             let mut line = line.clone();
@@ -413,12 +422,20 @@ fn signature(
             lines.insert(layer.id(), line);
         }
         layouts.push(snapshot.component::<koharu_scene::TextLayout>(layer.id())?);
+        word_styles.push(snapshot.component::<koharu_scene::TextRuns>(layer.id())?);
     }
     let styles = koharu_config::load::<koharu_renderer::TextStyles>("text-styles")?
         .read()?
         .clone();
     let bytes = serde_json::to_vec(&(
-        page_data, layouts, lines, settings, majorities, skip, styles,
+        page_data,
+        layouts,
+        word_styles,
+        lines,
+        settings,
+        majorities,
+        skip,
+        styles,
     ))?;
     let mut hash = std::collections::hash_map::DefaultHasher::new();
     bytes.hash(&mut hash);
@@ -773,5 +790,59 @@ mod tests {
                 .any(|finding| finding.flag.is_some())
         );
         super::super::context::series::delete_series(series.id).unwrap();
+    }
+    #[test]
+    fn too_small_names_a_word_only_when_the_box_base_is_readable() {
+        assert_eq!(
+            small_text_detail(Some(9.0), Some(24.0), 12.0),
+            Some("word:9.0".into())
+        );
+        assert_eq!(
+            small_text_detail(Some(9.0), Some(10.0), 12.0),
+            Some("9.0".into())
+        );
+        assert_eq!(small_text_detail(Some(14.0), Some(24.0), 12.0), None);
+    }
+
+    #[tokio::test]
+    async fn editing_an_existing_word_size_invalidates_the_qc_cache() {
+        let (_directory, mut project, page, layer) = chapter().await;
+        let context = project.load_context().unwrap();
+        let settings = QcSettings::default();
+        let mut signatures = Vec::new();
+        for scale in [0.8, 0.2] {
+            let snapshot = project.snapshot();
+            let patch = snapshot
+                .patch(|edit| {
+                    edit.set(
+                        layer,
+                        &koharu_scene::TextRuns {
+                            origin: Origin::User,
+                            runs: vec![koharu_scene::StyleRun {
+                                start: 0,
+                                end: 3,
+                                style: koharu_scene::RunStyle {
+                                    size_scale: Some(scale),
+                                    ..Default::default()
+                                },
+                            }],
+                        },
+                    )
+                })
+                .unwrap();
+            project.commit(patch).await.unwrap();
+            signatures.push(
+                signature(
+                    &project.snapshot(),
+                    &context,
+                    page,
+                    &settings,
+                    &BTreeMap::new(),
+                    &BTreeSet::new(),
+                )
+                .unwrap(),
+            );
+        }
+        assert_ne!(signatures[0], signatures[1]);
     }
 }

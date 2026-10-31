@@ -699,6 +699,7 @@
     "openrouter": "OpenRouter를 통해 라우팅되는 모델입니다."
   },
   "qc": {
+    "smallWord": "One word is {{detail}} px",
     "title": "QC",
     "checkPage": "Check page",
     "checkChapter": "Check chapter",

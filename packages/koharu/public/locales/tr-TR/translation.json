@@ -699,6 +699,7 @@
     "openrouter": "OpenRouter üzerinden yönlendirilen modeller."
   },
   "qc": {
+    "smallWord": "One word is {{detail}} px",
     "title": "QC",
     "checkPage": "Check page",
     "checkChapter": "Check chapter",

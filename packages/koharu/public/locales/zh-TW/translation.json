@@ -699,6 +699,7 @@
     "openrouter": "透過 OpenRouter 路由的模型。"
   },
   "qc": {
+    "smallWord": "One word is {{detail}} px",
     "title": "QC",
     "checkPage": "Check page",
     "checkChapter": "Check chapter",

@@ -699,6 +699,7 @@
     "openrouter": "نماذج تُوجَّه عبر OpenRouter."
   },
   "qc": {
+    "smallWord": "One word is {{detail}} px",
     "title": "QC",
     "checkPage": "Check page",
     "checkChapter": "Check chapter",
