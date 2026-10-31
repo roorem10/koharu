@@ -41,6 +41,7 @@ pub(crate) struct Execution<'a> {
     translation_hints: Arc<crate::TranslationHints>,
     redetect: bool,
     policy: crate::RunPolicy,
+    resume: bool,
 }
 
 impl<'a> Execution<'a> {
@@ -98,6 +99,10 @@ impl<'a> Execution<'a> {
             translation_hints: request.translation_hints,
             redetect: request.redetect,
             policy: request.policy,
+            resume: matches!(
+                request.operation,
+                crate::Operation::Full | crate::Operation::Through { .. }
+            ),
         })
     }
 
@@ -159,7 +164,8 @@ impl<'a> Execution<'a> {
                     .cloned(),
             )
             .with_translation_hints(self.translation_hints.clone())
-            .with_redetect(self.redetect),
+            .with_redetect(self.redetect)
+            .with_resume(self.resume),
             self.stop.clone(),
             self.progress.clone(),
             self.policy.retries,

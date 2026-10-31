@@ -26,6 +26,26 @@ impl StageProcessor for Processor {
         Translator::model(&self.config.model)
     }
 
+    fn skip(&self, input: &StageInput) -> Result<bool> {
+        if !input.resume {
+            return Ok(false);
+        }
+        if let Some(group) = input.scene.page(input.page)?.text_group()? {
+            for layer in group.text_layers()? {
+                if input.contains_entity(layer.id())?
+                    && !input.translation_hints.skip.contains(&layer.id())
+                    && !layer.content()?.translation()?.is_some_and(|translation| {
+                        !translation.text.value.trim().is_empty()
+                            || matches!(translation.text.origin, Origin::User)
+                    })
+                {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
+    }
+
     fn unload(&self) -> bool {
         self.translator.unload()
     }
@@ -44,6 +64,12 @@ impl StageProcessor for Processor {
                     continue;
                 }
                 let content = layer.content()?;
+                if content.translation()?.is_some_and(|translation| {
+                    matches!(translation.text.origin, Origin::User)
+                        || (input.resume && !translation.text.value.trim().is_empty())
+                }) {
+                    continue;
+                }
                 let Some(source) = content.source()? else {
                     continue;
                 };

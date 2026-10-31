@@ -43,6 +43,25 @@ impl StageProcessor for Processor {
         }
     }
 
+    fn skip(&self, input: &StageInput) -> Result<bool> {
+        if !input.resume {
+            return Ok(false);
+        }
+        if let Some(group) = input.scene.page(input.page)?.text_group()? {
+            for layer in group.text_layers()? {
+                if input.contains_entity(layer.id())?
+                    && !layer.content()?.source()?.is_some_and(|source| {
+                        !source.text.value.trim().is_empty()
+                            || matches!(source.text.origin, Origin::User)
+                    })
+                {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
+    }
+
     fn unload(&self) -> bool {
         self.model.unload()
     }
@@ -124,10 +143,10 @@ impl Model {
             for relation in input.scene.relations_to_as::<RecognizedFrom>(region) {
                 let content = relation.value().source;
                 let previous = input.scene.component::<SourceText>(content)?;
-                if previous
-                    .as_ref()
-                    .is_some_and(|value| matches!(value.text.origin, Origin::User))
-                {
+                if previous.as_ref().is_some_and(|value| {
+                    matches!(value.text.origin, Origin::User)
+                        || (input.resume && !value.text.value.trim().is_empty())
+                }) {
                     continue;
                 }
                 targets.push(OcrTarget {
