@@ -137,6 +137,8 @@ export const commands = {
 	getMcpStatus: () => __TAURI_INVOKE<McpStatus>("get_mcp_status"),
 	saveMcpSettings: (options: McpOptions) => __TAURI_INVOKE<McpStatus>("save_mcp_settings", { options }),
 	newMcpToken: () => __TAURI_INVOKE<McpStatus>("new_mcp_token"),
+	getTextWarp: (layers: EntityId[]) => __TAURI_INVOKE<(TextWarp | null)[]>("get_text_warp", { layers }),
+	setTextWarp: (layers: EntityId[], warp: TextWarp | null) => __TAURI_INVOKE<null>("set_text_warp", { layers, warp }),
 };
 
 /* Types */
@@ -975,6 +977,16 @@ export type TextStyles = {
 	/**  Distinguish a deliberate Clear from a pre-migration missing fill. */
 	legacy_color_migrated?: boolean,
 };
+
+/**  Skew or perspective applied to the laid-out text of a box. */
+export type TextWarp = 
+/**  Horizontal and vertical shear in degrees. */
+{ kind: "skew"; x_degrees: number; y_degrees: number } | 
+/**
+ *  Where the frame's corners go in frame-local units, clockwise from the top-left;
+ *  the unit square leaves the text unchanged.
+ */
+{ kind: "perspective"; corners: [([number, number]), ([number, number]), ([number, number]), ([number, number])] };
 
 export type ThumbnailBytes = number[];
 
