@@ -55,6 +55,7 @@ export function SelectionControls({
 }: SelectionControlsProps) {
   const gesture = useRef<ControlGesture | null>(null)
   const position = cssFrame(frame, camera)
+  const outside = position.width < 40 || position.height < 40
 
   const eventPoint = (event: ReactPointerEvent<HTMLDivElement>): Point | null => {
     const bounds = container.current?.getBoundingClientRect()
@@ -146,11 +147,13 @@ export function SelectionControls({
           key={handle}
           data-canvas-control
           data-resize-handle={handle}
-          className='pointer-events-auto absolute grid size-3.5 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center'
+          className='pointer-events-auto absolute grid size-3.5 touch-none place-items-center'
           style={{
             left,
             top,
             cursor,
+            // Keep the whole centre available to the canvas move gesture.
+            transform: `translate(${outside && left !== '50%' ? (left === '0%' ? '-100%' : '0%') : '-50%'}, ${outside && top !== '50%' ? (top === '0%' ? '-100%' : '0%') : '-50%'})`,
             width:
               edgesOnly && (handle === 'n' || handle === 's')
                 ? 'max(14px, calc(100% - 14px))'
