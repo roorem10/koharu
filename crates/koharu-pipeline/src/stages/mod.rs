@@ -25,6 +25,7 @@ pub(crate) struct StageInput {
     inpainting_mask: Option<InpaintingMask>,
     translation_hints: Arc<TranslationHints>,
     redetect: bool,
+    resume: bool,
 }
 
 impl StageInput {
@@ -45,7 +46,14 @@ impl StageInput {
             inpainting_mask,
             translation_hints: Arc::default(),
             redetect: false,
+            resume: false,
         }
+    }
+
+    #[must_use]
+    pub(crate) fn with_resume(mut self, resume: bool) -> Self {
+        self.resume = resume;
+        self
     }
 
     #[must_use]
@@ -168,6 +176,100 @@ mod tests {
                 attributes: std::collections::BTreeMap::new(),
             },
         )
+    }
+
+    #[tokio::test]
+    async fn resume_skips_complete_boxes_but_explicit_stages_do_not() {
+        let translator = koharu_translator::Translator::from_config(
+            koharu_ml::Device::cpu(),
+            koharu_config::Config::memory(koharu_translator::ProvidersConfig::default()),
+        )
+        .unwrap();
+        let stages = Stages::new(
+            &PipelineConfig::default(),
+            translator,
+            &koharu_ml::Device::cpu(),
+        )
+        .unwrap();
+        let mut session = koharu_scene::Session::memory().await.unwrap();
+        let mut page_id = None;
+        let mut content_id = None;
+        let mut layer_id = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(
+                    koharu_scene::PageDraft::new("page", 1.0, 1.0),
+                    koharu_scene::At::End,
+                )?;
+                page_id = Some(page);
+                let content = edit.add_text_content(page, koharu_scene::At::End)?;
+                content_id = Some(content);
+                edit.set(
+                    content,
+                    &koharu_scene::SourceText {
+                        text: koharu_scene::Authored::user("source".into()),
+                        language: None,
+                    },
+                )?;
+                layer_id = Some(edit.add_text_layer(
+                    page,
+                    koharu_scene::At::End,
+                    content,
+                    &koharu_scene::TextLayout {
+                        origin: koharu_scene::Origin::User,
+                        kind: koharu_scene::TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                    },
+                )?);
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let input = StageInput::new(
+            session.snapshot(),
+            page_id.unwrap(),
+            None,
+            None,
+            Arc::default(),
+            None,
+        )
+        .with_resume(true);
+        assert!(stages.skip(Stage::Ocr, &input).unwrap());
+        assert!(!stages.skip(Stage::Translation, &input).unwrap());
+        let skipped = input
+            .clone()
+            .with_translation_hints(Arc::new(TranslationHints {
+                skip: [layer_id.unwrap()].into(),
+                ..Default::default()
+            }));
+        assert!(stages.skip(Stage::Translation, &skipped).unwrap());
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                edit.set(
+                    content_id.unwrap(),
+                    &koharu_scene::Translation {
+                        text: koharu_scene::Authored::user("translation".into()),
+                        language: None,
+                    },
+                )
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let input = StageInput::new(
+            session.snapshot(),
+            page_id.unwrap(),
+            None,
+            None,
+            Arc::default(),
+            None,
+        )
+        .with_resume(true);
+        assert!(stages.skip(Stage::Translation, &input).unwrap());
+        let explicit = input.with_resume(false);
+        assert!(!stages.skip(Stage::Ocr, &explicit).unwrap());
+        assert!(!stages.skip(Stage::Translation, &explicit).unwrap());
     }
 
     #[tokio::test]

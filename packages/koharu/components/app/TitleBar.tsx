@@ -12,6 +12,14 @@ import { RedetectPageMenuItem, RedetectPageDialog } from '@/components/boxes/Pag
 import { PageJoinMenuItem } from '@/components/boxes/PageJoinMenuItem'
 import { useCompareStore } from '@/components/qc/compare'
 import { useScriptFiles } from '@/components/files/ScriptImport'
+import { BatchChaptersDialog } from '@/components/runs/BatchChaptersDialog'
+import {
+  currentRunScope,
+  presetLabel,
+  useRunSettings,
+  retryFailedPages,
+} from '@/components/runs/data'
+import { prepareFinishSound } from '@/components/runs/sound'
 import { call } from '@/lib/backend'
 import { selectableLayer } from '@/lib/geometry'
 import {
@@ -45,6 +53,7 @@ export function TitleBar() {
   const { t } = useTranslation()
   const pinned = useCompareStore((state) => state.pinned)
   const toggleOriginal = useCompareStore((state) => state.toggle)
+  const [batchOpen, setBatchOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [redetectPage, setRedetectPage] = useState<string | null>(null)
   const scripts = useScriptFiles()
@@ -54,6 +63,13 @@ export function TitleBar() {
   const pageQuery = usePage(Boolean(project))
   const pages = project ? (pagesQuery.data ?? []) : []
   const page = project ? (pageQuery.data ?? null) : null
+  const runSettings = useRunSettings()
+  const processingScope = useKoharuStore((state) => state.processingScope)
+  const jobs = useKoharuStore((state) => state.jobs)
+  const lastJob = Object.values(jobs)
+    .filter((job) => job.project === project?.name)
+    .at(-1)
+  const running = Object.values(jobs).some((job) => job.state === 'running')
   const selectedPages = useKoharuStore((state) => state.selectedPages)
   const selectedLayers = useKoharuStore((state) => state.selectedLayers)
   const selectLayers = useKoharuStore((state) => state.selectLayers)
@@ -71,8 +87,10 @@ export function TitleBar() {
     'files.selectedPages',
   )
 
-  const run = (scope: Scope, operation: Operation = { operation: 'full' }) =>
+  const run = (scope: Scope, operation: Operation = { operation: 'full' }) => {
+    prepareFinishSound()
     void call(commands.process, scope, operation).catch(() => undefined)
+  }
 
   const closeProject = () => void call(commands.closeProject).catch(() => undefined)
 
@@ -264,6 +282,39 @@ export function TitleBar() {
                 {t('menu.processLayers')}
               </MenubarItem>
               <MenubarSeparator />
+              <MenubarItem
+                disabled={running || !lastJob?.failures?.length}
+                onClick={() => lastJob && void retryFailedPages(lastJob).catch(() => undefined)}
+              >
+                {t('runs.retryFailedPages')}
+              </MenubarItem>
+              <MenubarSub>
+                <MenubarSubTrigger
+                  disabled={!project || pages.length === 0 || running}
+                  className='min-h-8 px-2 text-xs'
+                >
+                  {t('runs.presets')}
+                </MenubarSubTrigger>
+                <MenubarSubContent className='max-w-80 p-1'>
+                  {runSettings.data?.presets.map((preset, index) => (
+                    <MenubarItem
+                      key={index}
+                      className='break-words whitespace-normal'
+                      disabled={
+                        (processingScope === 'selected-pages' && selectedPages.length === 0) ||
+                        (processingScope === 'page' && !page)
+                      }
+                      onClick={() => {
+                        const scope = currentRunScope()
+                        if (scope) run(scope, { operation: 'stages', stages: preset.stages })
+                      }}
+                    >
+                      {presetLabel(preset.name, t)}
+                    </MenubarItem>
+                  ))}
+                </MenubarSubContent>
+              </MenubarSub>
+
               {(['detection', 'ocr', 'translation', 'inpainting'] as Stage[]).map((stage) => (
                 <MenubarItem
                   key={stage}
@@ -275,7 +326,12 @@ export function TitleBar() {
                   })}
                 </MenubarItem>
               ))}
+              <MenubarSeparator />
+              <MenubarItem disabled={running} onClick={() => setBatchOpen(true)}>
+                {t('runs.batchTitle')}
+              </MenubarItem>
             </MenubarContent>
+            <BatchChaptersDialog open={batchOpen} onOpenChange={setBatchOpen} />
           </MenubarMenu>
 
           <MenubarMenu>

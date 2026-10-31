@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 
+import { soundForJobTransition } from '@/components/runs/sound'
 import type {
   CanvasState,
   Download,
@@ -194,6 +195,7 @@ export function receiveCanvas(canvas: CanvasState): void {
 }
 
 export function receiveJob(job: Job): void {
+  soundForJobTransition(useKoharuStore.getState().jobs[job.id], job)
   useKoharuStore.setState((state) => ({ jobs: { ...state.jobs, [job.id]: job } }))
 }
 

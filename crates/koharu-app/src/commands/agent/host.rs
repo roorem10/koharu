@@ -285,6 +285,13 @@ impl KoharuHost {
         {
             let processing = self.handle.state::<Processing>();
             let mut stops = processing.stops.lock();
+            anyhow::ensure!(
+                !self
+                    .handle
+                    .state::<super::super::runs::BatchState>()
+                    .active(),
+                "a chapter batch is running"
+            );
             if !stops.is_empty() {
                 bail!("another pipeline process is already running");
             }
@@ -308,6 +315,7 @@ impl KoharuHost {
             inpainting_mask: None,
             translation_hints,
             redetect: false,
+            policy: super::super::runs::RunSettings::load()?.policy(),
         };
         let mut request = request;
         let result = async {
@@ -344,6 +352,7 @@ impl KoharuHost {
             "completed": report.completed,
             "total": report.total,
             "elapsed_ms": report.elapsed.as_millis(),
+            "failures": report.failures,
         }))
     }
 }

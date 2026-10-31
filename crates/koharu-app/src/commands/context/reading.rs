@@ -310,6 +310,11 @@ pub(crate) async fn read_chapter(
                 stage: None,
                 model: Some("chapter_context_reading".into()),
                 error: None,
+                retry: None,
+                failures: Vec::new(),
+                project: None,
+                operation: None,
+                finish_sound: false,
             },
         );
     }

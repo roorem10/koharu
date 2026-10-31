@@ -229,3 +229,133 @@ fn operations_expand_to_the_supported_workflows() {
         vec![Stage::Detection, Stage::Translation],
     );
 }
+
+#[tokio::test]
+async fn a_failed_page_does_not_block_other_pages_but_stop_run_does() {
+    for stop_run in [false, true] {
+        let pipeline = pipeline(TranslationConfig {
+            model: koharu_translator::ModelSelection {
+                provider: koharu_translator::Provider::OpenAi,
+                model: Some("test".into()),
+                quantization: None,
+                vision: false,
+                reasoning: false,
+            },
+            ..Default::default()
+        });
+        let mut session = koharu_scene::Session::memory().await.unwrap();
+        let mut first = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(
+                    koharu_scene::PageDraft::new("bad", 1.0, 1.0),
+                    koharu_scene::At::End,
+                )?;
+                first = Some(page);
+                let text = edit.add_text_content(page, koharu_scene::At::End)?;
+                edit.set(
+                    text,
+                    &koharu_scene::SourceText {
+                        text: koharu_scene::Authored::user("hello".into()),
+                        language: None,
+                    },
+                )?;
+                edit.add_text_layer(
+                    page,
+                    koharu_scene::At::End,
+                    text,
+                    &koharu_scene::TextLayout {
+                        origin: koharu_scene::Origin::User,
+                        kind: koharu_scene::TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                    },
+                )?;
+                edit.add_page(
+                    koharu_scene::PageDraft::new("good", 1.0, 1.0),
+                    koharu_scene::At::End,
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let request = Request {
+            operation: Operation::Only {
+                stage: Stage::Translation,
+            },
+            policy: RunPolicy {
+                retries: 0,
+                on_page_failure: if stop_run {
+                    OnPageFailure::StopRun
+                } else {
+                    OnPageFailure::ContinueWithOtherPages
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let snapshot = session.snapshot();
+        let result = pipeline
+            .execute(snapshot, request, &mut SessionCommitter(&mut session))
+            .await;
+        if stop_run {
+            assert!(result.is_err());
+        } else {
+            let report = result.unwrap();
+            assert_eq!(report.status, RunStatus::CompletedWithProblems);
+            assert_eq!(report.completed, 2);
+            assert_eq!(report.failures.len(), 1);
+            assert_eq!(report.failures[0].page, first.unwrap());
+            assert_eq!(report.failures[0].label, "bad");
+            assert_eq!(report.failures[0].stage, Stage::Translation);
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_graceful_stop_finishes_the_current_page_item_before_stopping() {
+    let pipeline = pipeline(TranslationConfig {
+        model: koharu_translator::ModelSelection {
+            provider: koharu_translator::Provider::OpenAi,
+            model: Some("test".into()),
+            quantization: None,
+            vision: false,
+            reasoning: false,
+        },
+        ..Default::default()
+    });
+    let mut session = koharu_scene::Session::memory().await.unwrap();
+    let patch = session
+        .snapshot()
+        .patch(|edit| {
+            for name in ["one", "two"] {
+                edit.add_page(
+                    koharu_scene::PageDraft::new(name, 1.0, 1.0),
+                    koharu_scene::At::End,
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    session.commit(patch).await.unwrap();
+    let stop = StopToken::default();
+    let requested = stop.clone();
+    let request = Request {
+        operation: Operation::Only {
+            stage: Stage::Translation,
+        },
+        stop,
+        progress: Some(std::sync::Arc::new(move |event| {
+            if matches!(event, Progress::Skipped { .. }) {
+                requested.finish_current_page();
+            }
+        })),
+        ..Default::default()
+    };
+    let report = pipeline
+        .execute(session.snapshot(), request, &mut RejectCommitter)
+        .await
+        .unwrap();
+    assert_eq!(report.status, RunStatus::Stopped);
+    assert_eq!(report.completed, 1);
+}
