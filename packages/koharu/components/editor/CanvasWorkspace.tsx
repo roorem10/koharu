@@ -96,9 +96,11 @@ interface StrokeGesture {
   kind: 'paint' | 'erase' | 'inpaint'
   pointer: number
   revision: number
+  page: string
   layer: string | null
   points: Point[]
   diameter: number
+  hardness: number
   color?: CanvasColor
 }
 
@@ -740,6 +742,7 @@ export function CanvasWorkspace() {
           ? enqueue(() =>
               call(commands.commitPaint, current.revision, current.layer, current.points, {
                 diameter: current.diameter,
+                hardness: current.hardness,
                 color: current.color!,
               }),
             ).then((result) => {
@@ -751,17 +754,26 @@ export function CanvasWorkspace() {
                 call(
                   commands.commitErase,
                   current.revision,
-                  current.layer!,
+                  current.layer,
                   current.points,
                   current.diameter,
+                  current.hardness,
                 ),
               ).then((result) => {
                 selectLayers([result.layer])
                 return refresh(projectKey, pagesKey, pageKey)
               })
             : enqueue(() =>
-                call(commands.commitInpaint, current.revision, current.points, current.diameter),
-              )
+                removeAreaTool.commitStroke(
+                  current.page,
+                  current.revision,
+                  current.points,
+                  current.diameter,
+                  current.hardness,
+                ),
+              ).then((job) => {
+                if (job === null) canvas?.cancelStroke()
+              })
       commitPending.current = true
       void operation
         .catch(() => canvas?.cancelStroke())
@@ -918,13 +930,17 @@ export function CanvasWorkspace() {
             } else if (tool === 'draw') {
               strokeUpdates.clear()
               const color = hexToRgba(brush.color)
+              const options = useKoharuStore.getState().brushes.draw
+              color[3] = Math.round((color[3] * options.opacity) / 100)
               gesture.current = {
                 kind: 'paint',
                 pointer: event.pointerId,
                 revision: canvasRevision,
+                page: page.id,
                 layer: activeRaster?.id ?? null,
                 points: [point],
                 diameter: brush.diameter,
+                hardness: options.hardness,
                 color,
               }
               try {
@@ -940,23 +956,28 @@ export function CanvasWorkspace() {
                 receiveError(errorMessage(error))
               }
             } else if (tool === 'eraser') {
-              if (!activeRaster) {
-                receiveError('Select a paint or cleanup layer before using the Eraser.')
+              if (!activeRaster && removeAreaTool.settings.paint_target === 'paint_layer') {
+                receiveError(t('cleanup.eraserTarget'))
                 return
               }
+              const target =
+                activeRaster ??
+                page.layers.find((layer) => layer.type === 'raster' && layer.kind === 'cleanup')
               strokeUpdates.clear()
               gesture.current = {
                 kind: 'erase',
                 pointer: event.pointerId,
                 revision: canvasRevision,
-                layer: activeRaster.id,
+                page: page.id,
+                layer: target?.id ?? null,
                 points: [point],
                 diameter: brush.diameter,
+                hardness: useKoharuStore.getState().brushes.eraser.hardness,
               }
               try {
                 canvas.beginStroke({
                   kind: 'erase',
-                  layer: activeRaster.id,
+                  layer: target?.id ?? null,
                   point,
                   diameter: brush.diameter,
                 })
@@ -970,9 +991,11 @@ export function CanvasWorkspace() {
                 kind: 'inpaint',
                 pointer: event.pointerId,
                 revision: canvasRevision,
+                page: page.id,
                 layer: null,
                 points: [point],
                 diameter: brush.diameter,
+                hardness: useKoharuStore.getState().brushes.remove.hardness,
               }
               try {
                 canvas.beginStroke({

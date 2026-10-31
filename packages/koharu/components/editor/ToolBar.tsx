@@ -12,6 +12,7 @@ import {
   Sparkles,
   Type,
 } from 'lucide-react'
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ColorWell } from '@/components/controls/ColorWell'
@@ -23,6 +24,7 @@ import {
   MIN_BRUSH_DIAMETER,
   useKoharuStore,
   type CanvasTool,
+  type BrushTool,
 } from '@/lib/store'
 import { Button } from '@koharu/ui/components/button'
 import {
@@ -93,6 +95,7 @@ export function ToolBar() {
                     .filter(Boolean)
                     .join(' / ')}
                 </span>
+                {tool === 'remove' && <p className='mt-1 text-xs'>{t('cleanup.removeHint')}</p>}
               </TooltipContent>
             </Tooltip>
           </div>
@@ -116,9 +119,15 @@ export function ToolBar() {
 
 function BrushSize({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   const { t } = useTranslation()
+  const labelId = useId()
   const roundedValue = Math.round(value)
   const page = usePage().data
   const maxSize = maxBrushDiameter(page?.size ?? { width: 2048, height: 2048 })
+  const active = useKoharuStore((state) => state.tool)
+  const options = useKoharuStore(
+    (state) => state.brushes[isBrushTool(active) ? (active as BrushTool) : 'draw'],
+  )
+  const setOptions = useKoharuStore((state) => state.setBrushOptions)
 
   return (
     <Popover>
@@ -151,14 +160,17 @@ function BrushSize({ value, onChange }: { value: number; onChange: (value: numbe
         className='w-48 gap-2.5 rounded-xl p-2.5'
       >
         <div className='flex items-center justify-between gap-3'>
-          <PopoverTitle className='text-[11px]'>{t('tools.brushSize')}</PopoverTitle>
+          <PopoverTitle id={labelId} className='text-[11px]'>
+            {t('tools.brushSize')}
+          </PopoverTitle>
           <NumberField
             min={MIN_BRUSH_DIAMETER}
+            max={maxSize}
             step={1}
             value={roundedValue}
             className='w-20'
             onValueChange={(next) => {
-              if (next !== null) onChange(Math.max(next, MIN_BRUSH_DIAMETER))
+              if (next !== null) onChange(clamp(next, MIN_BRUSH_DIAMETER, maxSize))
             }}
           >
             <NumberFieldGroup className='h-7'>
@@ -173,7 +185,7 @@ function BrushSize({ value, onChange }: { value: number; onChange: (value: numbe
           </NumberField>
         </div>
         <Slider
-          aria-label={t('tools.brushSize')}
+          aria-labelledby={labelId}
           min={MIN_BRUSH_DIAMETER}
           max={maxSize}
           step={1}
@@ -181,8 +193,56 @@ function BrushSize({ value, onChange }: { value: number; onChange: (value: numbe
           className='py-1 [&_[data-slot=slider-thumb]]:size-2.5'
           onValueChange={onChange}
         />
+        <BrushSlider
+          label={t('cleanup.hardness')}
+          value={options.hardness}
+          min={0}
+          onChange={(hardness) => setOptions({ hardness })}
+        />
+        {active === 'draw' && (
+          <BrushSlider
+            label={t('cleanup.opacity')}
+            value={options.opacity}
+            min={1}
+            onChange={(opacity) => setOptions({ opacity })}
+          />
+        )}
       </PopoverContent>
     </Popover>
+  )
+}
+
+function BrushSlider({
+  label,
+  value,
+  min,
+  onChange,
+}: {
+  label: string
+  value: number
+  min: number
+  onChange: (value: number) => void
+}) {
+  const { t } = useTranslation()
+  const labelId = useId()
+  return (
+    <div className='grid gap-1.5'>
+      <div className='flex justify-between text-[11px]'>
+        <span id={labelId}>{label}</span>
+        <span className='text-muted-foreground tabular-nums'>
+          {t('cleanup.percent', { value })}
+        </span>
+      </div>
+      <Slider
+        aria-labelledby={labelId}
+        min={min}
+        max={100}
+        step={1}
+        value={value}
+        className='py-1 [&_[data-slot=slider-thumb]]:size-2.5'
+        onValueChange={onChange}
+      />
+    </div>
   )
 }
 
