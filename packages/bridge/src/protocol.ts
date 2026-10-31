@@ -69,7 +69,7 @@ export const commands = {
 	dismissLineFlag: (layer: EntityId, index: number) => __TAURI_INVOKE<null>("dismiss_line_flag", { layer, index }),
 	glossaryUsage: (source: string) => __TAURI_INVOKE<TermUsage>("glossary_usage", { source }),
 	explainLine: (layer: EntityId) => __TAURI_INVOKE<LineExplanation>("explain_line", { layer }),
-	readChapter: (scope: Scope, textOnly: boolean) => __TAURI_INVOKE<JobId>("read_chapter", { scope, textOnly }),
+	readChapter: (scope: Scope, model: ModelSelection | null) => __TAURI_INVOKE<JobId>("read_chapter", { scope, model }),
 	listSeries: () => __TAURI_INVOKE<Series[]>("list_series"),
 	createSeries: (name: string) => __TAURI_INVOKE<Series>("create_series", { name }),
 	getSeries: (id: string) => __TAURI_INVOKE<Series>("get_series", { id }),
@@ -137,6 +137,9 @@ export const commands = {
 	getMcpStatus: () => __TAURI_INVOKE<McpStatus>("get_mcp_status"),
 	saveMcpSettings: (options: McpOptions) => __TAURI_INVOKE<McpStatus>("save_mcp_settings", { options }),
 	newMcpToken: () => __TAURI_INVOKE<McpStatus>("new_mcp_token"),
+	getReadingModel: () => __TAURI_INVOKE<ReadModelInfo>("get_reading_model"),
+	getReadingModels: () => __TAURI_INVOKE<Model[]>("get_reading_models"),
+	getLastReadModel: () => __TAURI_INVOKE<string | null>("get_last_read_model"),
 };
 
 /* Types */
@@ -304,6 +307,8 @@ export type Config = {
 export type ContextSettings = {
 	read_when?: ReadWhen,
 	send_images?: boolean,
+	ask_before_reading?: boolean,
+	read_model?: ModelSelection | null,
 	pages_per_request?: number,
 	previous_pages?: number,
 	agent_messages?: number,
@@ -818,6 +823,13 @@ export type Quantization = {
 };
 
 export type RasterLayerKind = "cleanup" | "paint";
+
+export type ReadModelInfo = {
+	selection: ModelSelection,
+	vision: boolean,
+	local: boolean,
+	label: string,
+};
 
 export type ReadWhen = "missing" | "always" | "never";
 
