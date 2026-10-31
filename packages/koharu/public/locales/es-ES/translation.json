@@ -186,7 +186,17 @@
     "invalidPattern": "Enter a name pattern with balanced braces and supported tokens.",
     "save": "Save",
     "selectedPages": "Selected pages…",
-    "exportFormat": "{{format}}…"
+    "exportFormat": "{{format}}…",
+    "exportScript": "Export script…",
+    "importScript": "Import script…",
+    "scriptPreview": "Review script changes",
+    "scriptCounts": "{{changed}} changed · {{unchanged}} unchanged · {{missing}} IDs not found",
+    "scriptBox": "Page {{page}}: {{label}} · Box {{box}}",
+    "oldText": "Current translation",
+    "newText": "Imported translation",
+    "emptyTranslation": "(Empty translation)",
+    "apply": "Apply",
+    "cancel": "Cancel"
   },
   "fontPicker": {
     "activeFilterCount": "{{count}} filtros activos",

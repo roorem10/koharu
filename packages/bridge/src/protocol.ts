@@ -105,6 +105,9 @@ export const commands = {
 	getLibrarySettings: () => __TAURI_INVOKE<LibrarySettings>("get_library_settings"),
 	saveLibrarySettings: (settings: LibrarySettings) => __TAURI_INVOKE<LibrarySettings>("save_library_settings", { settings }),
 	exportSelectedPages: (format: ExportFormat, pages: EntityId[]) => __TAURI_INVOKE<null>("export_selected_pages", { format, pages }),
+	exportScript: () => __TAURI_INVOKE<null>("export_script"),
+	previewScriptImport: () => __TAURI_INVOKE<ScriptPreview | null>("preview_script_import"),
+	applyScriptImport: (preview: ScriptPreview) => __TAURI_INVOKE<null>("apply_script_import", { preview }),
 };
 
 /* Types */
@@ -263,6 +266,8 @@ export type DeviceResources = {
 	memory_used: number | null,
 	utilization: number | null,
 };
+
+export type DocumentId = string;
 
 export type Download = {
 	id: number,
@@ -622,6 +627,8 @@ export type ProjectContext = {
 	lines?: { [key in EntityId]: LineContext },
 };
 
+export type ProjectId = DocumentId;
+
 export type ProjectInfo = {
 	name: string,
 	revision: Revision,
@@ -673,6 +680,24 @@ export type Scope = { scope: "project" } | { scope: "pages"; value: EntityId[] }
 	page: EntityId,
 	bounds: Bounds,
 } } | { scope: "entities"; value: EntityId[] };
+
+export type ScriptChange = {
+	layer: EntityId,
+	page: number,
+	page_label: string,
+	box_number: number,
+	old_text: string,
+	new_text: string,
+};
+
+export type ScriptPreview = {
+	project: ProjectId,
+	project_name: string,
+	revision: Revision,
+	changes: ScriptChange[],
+	unchanged: number,
+	not_found: number,
+};
 
 export type Series = {
 	id?: string,

@@ -8,4 +8,7 @@ export function mockWo13() {
   })
   vi.spyOn(commands, 'saveLibrarySettings').mockImplementation(async (settings) => settings)
   vi.spyOn(commands, 'exportSelectedPages').mockResolvedValue(null)
+  vi.spyOn(commands, 'exportScript').mockResolvedValue(null)
+  vi.spyOn(commands, 'previewScriptImport').mockResolvedValue(null)
+  vi.spyOn(commands, 'applyScriptImport').mockResolvedValue(null)
 }

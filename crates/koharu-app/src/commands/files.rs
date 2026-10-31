@@ -1,6 +1,7 @@
 //! WO-13: export names, script export and import, project library and models folder.
 
 pub(super) mod names;
+pub(crate) mod scripts;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;

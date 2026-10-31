@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AboutDialog } from '@/components/app/AboutDialog'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
+import { useScriptFiles } from '@/components/files/ScriptImport'
 import { call } from '@/lib/backend'
 import { selectableLayer } from '@/lib/geometry'
 import {
@@ -40,6 +41,7 @@ import { cn } from '@koharu/ui/lib/utils'
 export function TitleBar() {
   const { t } = useTranslation()
   const [aboutOpen, setAboutOpen] = useState(false)
+  const scripts = useScriptFiles()
   const macOS = useMacOS()
   const project = useProject().data
   const pagesQuery = usePages(Boolean(project))
@@ -58,7 +60,9 @@ export function TitleBar() {
     'menu.export',
   )
   const { run: exportSelected, busy: exportingSelected } = useCommand(
-    ['export-selected-pages'], commands.exportSelectedPages, 'files.selectedPages',
+    ['export-selected-pages'],
+    commands.exportSelectedPages,
+    'files.selectedPages',
   )
 
   const run = (scope: Scope, operation: Operation = { operation: 'full' }) =>
@@ -132,12 +136,17 @@ export function TitleBar() {
                   ))}
                   <MenubarSeparator />
                   <MenubarSub>
-                    <MenubarSubTrigger disabled={selectedPages.length === 0 || exporting || exportingSelected}>
+                    <MenubarSubTrigger
+                      disabled={selectedPages.length === 0 || exporting || exportingSelected}
+                    >
                       {t('files.selectedPages')}
                     </MenubarSubTrigger>
                     <MenubarSubContent>
                       {(['png', 'psd', 'cbz'] as const).map((format) => (
-                        <MenubarItem key={format} onClick={() => exportSelected(format, selectedPages)}>
+                        <MenubarItem
+                          key={format}
+                          onClick={() => exportSelected(format, selectedPages)}
+                        >
                           {t('files.exportFormat', { format: format.toUpperCase() })}
                         </MenubarItem>
                       ))}
@@ -145,6 +154,18 @@ export function TitleBar() {
                   </MenubarSub>
                 </MenubarSubContent>
               </MenubarSub>
+              <MenubarItem
+                disabled={!project || scripts.busy}
+                onClick={() => void scripts.exportScript().catch(() => undefined)}
+              >
+                {t('files.exportScript')}
+              </MenubarItem>
+              <MenubarItem
+                disabled={!project || scripts.busy}
+                onClick={() => void scripts.importScript().catch(() => undefined)}
+              >
+                {t('files.importScript')}
+              </MenubarItem>
               <MenubarSeparator />
               <MenubarItem disabled={!project} onClick={closeProject}>
                 {t('menu.closeProject')}
@@ -298,6 +319,7 @@ export function TitleBar() {
         {!macOS && <WindowControls />}
       </header>
       <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
+      {scripts.dialog}
     </>
   )
 }
