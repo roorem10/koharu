@@ -87,6 +87,19 @@ impl Perspective {
         )
     }
 
+    pub(crate) fn point(&self, point: Point) -> Result<Point> {
+        ensure!(
+            self.divisor(point) > 1e-8,
+            "text extends across the perspective horizon"
+        );
+        let point = self.map(point);
+        ensure!(
+            point.x.is_finite() && point.y.is_finite(),
+            "text perspective produced nonfinite coordinates"
+        );
+        Ok(point)
+    }
+
     pub(crate) fn path(&self, path: &BezPath) -> Result<BezPath> {
         if path.is_empty() {
             return Ok(BezPath::new());

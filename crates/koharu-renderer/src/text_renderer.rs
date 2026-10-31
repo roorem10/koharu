@@ -1,5 +1,10 @@
 //! Text layout and portable glyph recording.
 
+mod glyphs;
+mod word_paint;
+#[cfg(test)]
+mod word_tests;
+
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -70,6 +75,7 @@ pub(crate) struct RenderedTextNode {
     pub(crate) resources: Arc<[PreparedResource]>,
     pub(crate) local_bounds: RenderBounds,
     pub(crate) unwarped: Option<UnwarpedText>,
+    pub(crate) editable: Option<UnwarpedText>,
     pub(crate) metadata: RenderedTextMetadata,
     pub(crate) diagnostics: Vec<RenderDiagnostic>,
 }
@@ -82,6 +88,10 @@ pub(crate) struct UnwarpedText {
 }
 
 pub(crate) struct RenderedTextMetadata {
+    pub(crate) glyph_boxes: Arc<[crate::TextGlyphBox]>,
+    pub(crate) style_runs: Vec<crate::TextStyleRun>,
+    pub(crate) smallest_font_size: f32,
+    pub(crate) word_effects: bool,
     pub(crate) rendered_bounds: RenderBounds,
     pub(crate) layout_bounds: RenderBounds,
     pub(crate) post_script_fonts: Vec<String>,
@@ -394,8 +404,8 @@ impl TextRenderer {
         if let Some(stroke) = descriptor.stroke {
             options.stroke = Some(stroke);
         }
-        let contour_bounds = self
-            .render(
+        let contour_bounds = if descriptor.runs.is_empty() {
+            self.render(
                 &mut scene,
                 &mut resources,
                 &layout,
@@ -406,12 +416,22 @@ impl TextRenderer {
             .map_err(|source| Error::Layout {
                 entity: descriptor.entity,
                 source,
-            })?;
+            })?
+        } else {
+            Some(
+                word_paint::render(&mut scene, &layout, descriptor, &options, transform, None)
+                    .map_err(|source| Error::Layout {
+                        entity: descriptor.entity,
+                        source,
+                    })?,
+            )
+        };
+        let smallest_font_size = glyphs::smallest_size(descriptor, &layout);
         let mut diagnostics = Vec::new();
-        if layout.smallest_font_size() + f32::EPSILON < descriptor.minimum_font_size {
+        if smallest_font_size + f32::EPSILON < descriptor.minimum_font_size {
             diagnostics.push(RenderDiagnostic::TextBelowReadableSize {
                 entity: descriptor.entity,
-                font_size: layout.smallest_font_size(),
+                font_size: smallest_font_size,
                 minimum_font_size: descriptor.minimum_font_size,
             });
         }
@@ -448,6 +468,51 @@ impl TextRenderer {
         if let Some(contour_bounds) = contour_bounds {
             local_bounds = local_bounds.union(contour_bounds);
         }
+        let word_effects = descriptor.runs.iter().any(|run| {
+            let style = &run.style;
+            style.stroke_color.is_some()
+                || style.stroke_width.is_some()
+                || style.outer_stroke_color.is_some()
+                || style.outer_stroke_width.is_some()
+                || style.fill_gradient.is_some()
+        });
+        let editable = if word_effects {
+            let mut plain = descriptor.clone();
+            plain.fill_gradient = None;
+            plain.stroke = None;
+            for run in &mut plain.runs {
+                let style = &mut run.style;
+                if let Some(gradient) = style.fill_gradient.take() {
+                    style.color = gradient.stops.first().map(|stop| stop.color);
+                }
+                style.stroke_width = Some(0.0);
+                style.outer_stroke_width = Some(0.0);
+            }
+            let mut plain_scene = PreparedScene::default();
+            let plain_options = TextRenderOptions {
+                color,
+                ..TextRenderOptions::default()
+            };
+            let plain_bounds = word_paint::render(
+                &mut plain_scene,
+                &layout,
+                &plain,
+                &plain_options,
+                transform,
+                None,
+            )
+            .map_err(|source| Error::Layout {
+                entity: descriptor.entity,
+                source,
+            })?;
+            Some(UnwarpedText {
+                scene: Arc::new(plain_scene),
+                resources: Arc::from([]),
+                local_bounds: rect_bounds(plain_bounds),
+            })
+        } else {
+            None
+        };
         let unwarped = if let Some(TextWarp::Perspective { corners }) = &descriptor.warp {
             let original = UnwarpedText {
                 scene: Arc::new(std::mem::take(&mut scene)),
@@ -460,12 +525,22 @@ impl TextRenderer {
                         entity: descriptor.entity,
                         source,
                     })?;
-            local_bounds =
+            local_bounds = (if descriptor.runs.is_empty() {
                 render_perspective(&mut scene, &layout, &options, transform, &perspective)
-                    .map_err(|source| Error::Layout {
-                        entity: descriptor.entity,
-                        source,
-                    })?;
+            } else {
+                word_paint::render(
+                    &mut scene,
+                    &layout,
+                    descriptor,
+                    &options,
+                    transform,
+                    Some(&perspective),
+                )
+            })
+            .map_err(|source| Error::Layout {
+                entity: descriptor.entity,
+                source,
+            })?;
             Some(original)
         } else {
             None
@@ -473,9 +548,19 @@ impl TextRenderer {
         Ok(RenderedTextNode {
             scene: Arc::new(scene),
             unwarped,
+            editable,
             resources: resources.into(),
             local_bounds: rect_bounds(local_bounds),
             metadata: RenderedTextMetadata {
+                glyph_boxes: glyphs::boxes(descriptor, &layout, &fonts[0], transform)
+                    .map_err(|source| Error::Layout {
+                        entity: descriptor.entity,
+                        source,
+                    })?
+                    .into(),
+                style_runs: glyphs::style_runs(descriptor, &layout, &fonts[0]),
+                smallest_font_size,
+                word_effects,
                 rendered_bounds,
                 layout_bounds: if descriptor.point_text {
                     rendered_bounds
@@ -511,7 +596,16 @@ fn gradient_command(
     color: [u8; 4],
     gradient: &FillGradient,
 ) -> PreparedSceneCommand {
-    let bounds = path.bounding_box();
+    gradient_command_in_bounds(path, transform, color, gradient, path.bounding_box())
+}
+
+fn gradient_command_in_bounds(
+    path: &BezPath,
+    transform: Affine,
+    color: [u8; 4],
+    gradient: &FillGradient,
+    bounds: Rect,
+) -> PreparedSceneCommand {
     let center = bounds.center();
     let (start, end) = match gradient.kind {
         GradientKind::Linear => {
@@ -633,7 +727,7 @@ fn text_path(layout: &LayoutRun<'_>, options: &TextRenderOptions) -> Result<BezP
             if let Some(outline) = font.outline_glyphs().get(GlyphId::new(glyph.glyph_id)) {
                 let mut path = BezPath::new();
                 outline.draw(
-                    DrawSettings::unhinted(Size::new(layout.font_size), glyph.font.location()),
+                    DrawSettings::unhinted(Size::new(glyph.font_size), glyph.font.location()),
                     &mut ContourPen(&mut path),
                 )?;
                 if glyph.font.synthetic_bold() {
@@ -1020,8 +1114,12 @@ fn draw_layout(
         while start < line.glyphs.len() {
             let font = line.glyphs[start].font;
             let key = font_key(font);
+            let font_size = line.glyphs[start].font_size;
             let mut end = start + 1;
-            while end < line.glyphs.len() && font_key(line.glyphs[end].font) == key {
+            while end < line.glyphs.len()
+                && font_key(line.glyphs[end].font) == key
+                && line.glyphs[end].font_size == font_size
+            {
                 end += 1;
             }
 
@@ -1051,7 +1149,7 @@ fn draw_layout(
                 .push(PreparedSceneCommand::GlyphRun(PreparedGlyphRun {
                     font: font_id,
                     font_index: font.index(),
-                    font_size: layout.font_size,
+                    font_size,
                     normalized_coords: font.normalized_coords().to_vec(),
                     transform: transform.as_coeffs(),
                     glyph_transform,
@@ -1484,7 +1582,7 @@ mod tests {
         }
     }
 
-    fn text_bundle(
+    pub(super) fn text_bundle(
         scene: PreparedScene,
         resources: Vec<PreparedResource>,
         width: u32,

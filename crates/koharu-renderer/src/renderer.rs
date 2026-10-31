@@ -1182,6 +1182,7 @@ fn build_node(
                     height: decoded.height as f32,
                 },
                 unwarped: None,
+                editable: None,
                 image: Some(raster),
                 text: None,
                 diagnostics: Arc::from([]),
@@ -1193,10 +1194,15 @@ fn build_node(
                 descriptor,
                 scene: rendered.scene,
                 unwarped: rendered.unwarped,
+                editable: rendered.editable,
                 resources: rendered.resources,
                 local_bounds: rendered.local_bounds,
                 image: None,
                 text: Some(LocalTextMetadata {
+                    glyph_boxes: rendered.metadata.glyph_boxes,
+                    style_runs: rendered.metadata.style_runs,
+                    smallest_font_size: rendered.metadata.smallest_font_size,
+                    word_effects: rendered.metadata.word_effects,
                     rendered_bounds: rendered.metadata.rendered_bounds,
                     layout_bounds: rendered.metadata.layout_bounds,
                     post_script_fonts: rendered.metadata.post_script_fonts,
@@ -1240,6 +1246,9 @@ fn assemble_frame(
                     .as_ref()
                     .expect("text descriptor must build text metadata");
                 LayerKind::Text(TextMetadata {
+                    style_runs: metadata.style_runs.clone(),
+                    smallest_font_size: metadata.smallest_font_size,
+                    word_effects: metadata.word_effects,
                     text,
                     language,
                     rendered_bounds: transform_bounds(metadata.rendered_bounds, layout_placement),
@@ -1401,22 +1410,28 @@ fn font_requests(pending: &[(usize, NodeDescriptor)]) -> Vec<FontRequest> {
         let NodeDescriptor::Text(text) = descriptor else {
             continue;
         };
-        for family in text
-            .preferred_font
-            .iter()
-            .chain(text.font_families.first())
-            .take(1)
-        {
-            let style = match text.font_style.unwrap_or(FontStyle::Normal) {
+        let primary = text.preferred_font.as_ref().or(text.font_families.first());
+        let candidates = primary
+            .map(|family| (family, text.font_weight, text.font_style))
+            .into_iter()
+            .chain(text.runs.iter().filter_map(|run| {
+                Some((
+                    run.style.font.as_ref().or(primary)?,
+                    run.style.font_weight.or(text.font_weight),
+                    run.style.font_style.map(Into::into).or(text.font_style),
+                ))
+            }));
+        for (family, weight, style) in candidates {
+            let style_id = match style.unwrap_or(FontStyle::Normal) {
                 FontStyle::Normal => 0,
                 FontStyle::Italic => 1,
                 FontStyle::Oblique => 2,
             };
-            if seen.insert((family.to_ascii_lowercase(), text.font_weight, style)) {
+            if seen.insert((family.to_ascii_lowercase(), weight, style_id)) {
                 requests.push(FontRequest {
                     family: family.clone(),
-                    weight: text.font_weight,
-                    style: text.font_style,
+                    weight,
+                    style,
                 });
             }
         }
@@ -2704,5 +2719,62 @@ mod tests {
             reset.layer(layer).unwrap().0.node.scene,
             original.layer(layer).unwrap().0.node.scene
         );
+    }
+    #[test]
+    fn word_font_requests_prepare_faces_and_inherit_box_attributes() {
+        let text = TextNodeDescriptor {
+            entity: EntityId::new(),
+            text: "ABCD".into(),
+            language: None,
+            width: 200.0,
+            height: 80.0,
+            warp: None,
+            balloon_contour: None,
+            preferred_font: Some("BoxFont".into()),
+            font_families: Vec::new(),
+            font_weight: Some(400),
+            font_style: Some(FontStyle::Normal),
+            font_size: Some(30.0),
+            minimum_font_size: 9.0,
+            auto_fit: false,
+            alignment: TextAlign::Left,
+            writing_mode: WritingMode::Horizontal,
+            foreground_color: [0, 0, 0, 255],
+            fill_gradient: None,
+            stroke: None,
+            line_height: 1.2,
+            letter_spacing: 0.0,
+            word_spacing: 0.0,
+            text_inset: [0.0; 4],
+            point_text: true,
+            runs: vec![
+                koharu_scene::StyleRun {
+                    start: 0,
+                    end: 1,
+                    style: koharu_scene::RunStyle {
+                        font: Some("WordFont".into()),
+                        font_weight: Some(700),
+                        font_style: Some(koharu_scene::FontStyle::Italic),
+                        ..Default::default()
+                    },
+                },
+                koharu_scene::StyleRun {
+                    start: 2,
+                    end: 3,
+                    style: koharu_scene::RunStyle {
+                        font_weight: Some(900),
+                        ..Default::default()
+                    },
+                },
+            ],
+        };
+        let requests = font_requests(&[(0, NodeDescriptor::Text(Box::new(text)))]);
+        assert_eq!(requests.len(), 3);
+        assert_eq!(requests[1].family, "WordFont");
+        assert_eq!(requests[1].weight, Some(700));
+        assert_eq!(requests[1].style, Some(FontStyle::Italic));
+        assert_eq!(requests[2].family, "BoxFont");
+        assert_eq!(requests[2].weight, Some(900));
+        assert_eq!(requests[2].style, Some(FontStyle::Normal));
     }
 }
