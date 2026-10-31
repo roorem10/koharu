@@ -10,8 +10,8 @@ import { AboutDialog } from '@/components/app/AboutDialog'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
 import { RedetectPageMenuItem, RedetectPageDialog } from '@/components/boxes/PageBoxActions'
 import { PageJoinMenuItem } from '@/components/boxes/PageJoinMenuItem'
-import { useCompareStore } from '@/components/qc/compare'
 import { useScriptFiles } from '@/components/files/ScriptImport'
+import { useCompareStore } from '@/components/qc/compare'
 import { BatchChaptersDialog } from '@/components/runs/BatchChaptersDialog'
 import {
   currentRunScope,
