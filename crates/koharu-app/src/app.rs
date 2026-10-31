@@ -182,7 +182,11 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
                 std::sync::Arc::new(crate::commands::agent::host::KoharuHost::new(
                     handle.clone(),
                 )),
-                handle.package_info().version.to_string(),
+                // Report the Booharu release (e.g. "0.1.0"), not the upstream Koharu version.
+                include_str!("../../../FORK_VERSION")
+                    .trim()
+                    .trim_start_matches("Booharu ")
+                    .to_owned(),
             )?);
             application.manage(mcp.clone());
             drop(tauri::async_runtime::spawn(
