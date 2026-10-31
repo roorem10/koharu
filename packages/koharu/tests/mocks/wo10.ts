@@ -1,2 +1,8 @@
-// Owned by WO-10: global command mocks its components need in every test.
-export function mockWo10() {}
+import { vi } from 'vitest'
+
+import { commands } from '@koharu/bridge/protocol'
+
+export function mockWo10() {
+  vi.spyOn(commands, 'getTextWarp').mockImplementation(async (layers) => layers.map(() => null))
+  vi.spyOn(commands, 'setTextWarp').mockResolvedValue(null)
+}
