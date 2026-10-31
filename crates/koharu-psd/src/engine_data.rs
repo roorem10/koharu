@@ -20,6 +20,7 @@ pub enum TextJustification {
 
 #[derive(Debug, Clone)]
 pub struct TextEngineSpec {
+    pub runs: Vec<TextEngineRun>,
     pub text: String,
     pub font_index: usize,
     pub font_set: Vec<String>,
@@ -35,6 +36,19 @@ pub struct TextEngineSpec {
     pub box_height: f64,
 }
 
+/// Plain run properties resolved by the renderer. Ranges count source Unicode characters;
+/// EngineData converts them after newline normalization and adds Photoshop's final paragraph.
+#[derive(Debug, Clone)]
+pub struct TextEngineRun {
+    pub start: u32,
+    pub end: u32,
+    pub font_index: usize,
+    pub font_size: f64,
+    pub color: [u8; 4],
+    pub faux_bold: bool,
+    pub faux_italic: bool,
+}
+
 #[derive(Debug, Clone)]
 enum EngineValue {
     Int(i32),
@@ -48,7 +62,7 @@ enum EngineValue {
 pub fn encode_engine_data(spec: &TextEngineSpec) -> Vec<u8> {
     let text = normalize_text(&spec.text);
     let paragraph_lengths = paragraph_run_lengths(&text);
-    let total_length = utf16_len(&text) as i32;
+    let (run_sheets, run_lengths) = style_runs(spec);
 
     let font_index = spec.font_index as i32;
     let writing_direction = match spec.orientation {
@@ -63,7 +77,6 @@ pub fn encode_engine_data(spec: &TextEngineSpec) -> Vec<u8> {
     let paragraph_properties =
         paragraph_properties(spec.justification, spec.line_spacing.unwrap_or(1.2));
     let base_style_sheet = base_style_sheet(font_index);
-    let style_run_sheet = style_run_sheet(spec, font_index);
     let font_set = spec
         .font_set
         .iter()
@@ -188,17 +201,26 @@ pub fn encode_engine_data(spec: &TextEngineSpec) -> Vec<u8> {
                         ),
                         (
                             "RunArray".to_string(),
-                            EngineValue::Array(vec![EngineValue::Dict(vec![(
-                                "StyleSheet".to_string(),
-                                EngineValue::Dict(vec![(
-                                    "StyleSheetData".to_string(),
-                                    EngineValue::Dict(style_run_sheet.clone()),
-                                )]),
-                            )])]),
+                            EngineValue::Array(
+                                run_sheets
+                                    .into_iter()
+                                    .map(|sheet| {
+                                        EngineValue::Dict(vec![(
+                                            "StyleSheet".to_string(),
+                                            EngineValue::Dict(vec![(
+                                                "StyleSheetData".to_string(),
+                                                EngineValue::Dict(sheet),
+                                            )]),
+                                        )])
+                                    })
+                                    .collect(),
+                            ),
                         ),
                         (
                             "RunLengthArray".to_string(),
-                            EngineValue::Array(vec![EngineValue::Int(total_length)]),
+                            EngineValue::Array(
+                                run_lengths.into_iter().map(EngineValue::Int).collect(),
+                            ),
                         ),
                         ("IsJoinable".to_string(), EngineValue::Int(2)),
                     ]),
@@ -336,6 +358,65 @@ pub fn encode_engine_data(spec: &TextEngineSpec) -> Vec<u8> {
     write_value(&mut out, &root, 0, false, None);
     out.push(b'\n');
     out
+}
+
+fn style_runs(spec: &TextEngineSpec) -> (Vec<Vec<(String, EngineValue)>>, Vec<i32>) {
+    let mut offsets = vec![0_i32];
+    let mut previous_cr = false;
+    for ch in spec.text.chars() {
+        let length = if ch == '\n' && previous_cr {
+            0
+        } else {
+            ch.len_utf16() as i32
+        };
+        offsets.push(offsets.last().copied().unwrap() + length);
+        previous_cr = ch == '\r';
+    }
+    let count = offsets.len() - 1;
+    let mut boundaries = vec![0, count];
+    for run in &spec.runs {
+        boundaries.push((run.start as usize).min(count));
+        boundaries.push((run.end as usize).min(count));
+    }
+    boundaries.sort_unstable();
+    boundaries.dedup();
+    let mut sheets = Vec::new();
+    let mut lengths = Vec::new();
+    for pair in boundaries.windows(2) {
+        let length = offsets[pair[1]] - offsets[pair[0]];
+        if length == 0 {
+            continue;
+        }
+        let mut sheet = style_run_sheet(spec, spec.font_index as i32);
+        if let Some(run) = spec
+            .runs
+            .iter()
+            .find(|run| (run.start as usize) <= pair[0] && pair[0] < run.end as usize)
+        {
+            for (key, value) in &mut sheet {
+                *value = match key.as_str() {
+                    "Font" => EngineValue::Int(run.font_index as i32),
+                    "FontSize" => EngineValue::Float(run.font_size),
+                    "FauxBold" => EngineValue::Bool(run.faux_bold),
+                    "FauxItalic" => EngineValue::Bool(run.faux_italic),
+                    "FillColor" => EngineValue::Dict(color_type_values(run.color)),
+                    "Leading" => EngineValue::Float(
+                        spec.line_spacing
+                            .map_or(0.0, |spacing| spacing * run.font_size),
+                    ),
+                    _ => continue,
+                };
+            }
+        }
+        sheets.push(sheet);
+        lengths.push(length);
+    }
+    if lengths.is_empty() {
+        sheets.push(style_run_sheet(spec, spec.font_index as i32));
+        lengths.push(0);
+    }
+    *lengths.last_mut().unwrap() += 1;
+    (sheets, lengths)
 }
 
 fn normalize_text(text: &str) -> String {
@@ -797,6 +878,7 @@ mod tests {
     #[test]
     fn engine_data_preserves_explicit_leading_and_tracking() {
         let spec = TextEngineSpec {
+            runs: Vec::new(),
             text: "Line one\nLine two".into(),
             font_index: 0,
             font_set: vec!["Test".into()],
@@ -820,6 +902,7 @@ mod tests {
     #[test]
     fn engine_data_contains_expected_sections_and_utf16_text() {
         let bytes = encode_engine_data(&TextEngineSpec {
+            runs: Vec::new(),
             text: "Hello".to_string(),
             font_index: 1,
             font_set: vec!["AdobeInvisFont".to_string(), "ArialMT".to_string()],
@@ -856,6 +939,7 @@ mod tests {
     #[test]
     fn engine_data_keeps_float_tokens_for_font_size_and_transforms() {
         let bytes = encode_engine_data(&TextEngineSpec {
+            runs: Vec::new(),
             text: "Hello".to_string(),
             font_index: 1,
             font_set: vec!["AdobeInvisFont".to_string(), "ArialMT".to_string()],
@@ -881,5 +965,65 @@ mod tests {
                 .windows("/Axis [ 1.0 0.0 1.0 ]".len())
                 .any(|w| w == b"/Axis [ 1.0 0.0 1.0 ]")
         );
+    }
+    #[test]
+    fn two_style_sheets_count_non_bmp_text_in_utf16_units() {
+        let spec = TextEngineSpec {
+            text: "A😀B".into(),
+            font_index: 0,
+            font_set: vec!["Regular".into(), "BoldItalic".into()],
+            font_size: 20.0,
+            color: [0, 0, 0, 255],
+            line_spacing: None,
+            letter_spacing: 0.0,
+            faux_bold: false,
+            faux_italic: false,
+            orientation: TextOrientation::Horizontal,
+            justification: TextJustification::Left,
+            box_width: 200.0,
+            box_height: 60.0,
+            runs: vec![
+                super::TextEngineRun {
+                    start: 0,
+                    end: 2,
+                    font_index: 0,
+                    font_size: 20.0,
+                    color: [0, 0, 0, 255],
+                    faux_bold: false,
+                    faux_italic: false,
+                },
+                super::TextEngineRun {
+                    start: 2,
+                    end: 3,
+                    font_index: 1,
+                    font_size: 30.0,
+                    color: [255, 0, 0, 255],
+                    faux_bold: true,
+                    faux_italic: true,
+                },
+            ],
+        };
+        let (sheets, lengths) = super::style_runs(&spec);
+        assert_eq!(lengths, [3, 2]); // The final run owns Photoshop's terminal CR.
+        assert_eq!(sheets.len(), 2);
+        let data = String::from_utf8_lossy(&encode_engine_data(&spec)).into_owned();
+        let style = data
+            .split("/StyleRun")
+            .nth(1)
+            .unwrap()
+            .split("/GridInfo")
+            .next()
+            .unwrap();
+        assert_eq!(style.matches("/StyleSheetData").count(), 3); // Default + two actual sheets.
+        assert!(style.contains("/Font 1"));
+        assert!(style.contains("/FontSize 30.0"));
+        assert!(style.contains("/FauxBold true") && style.contains("/FauxItalic true"));
+        assert!(style.contains("/RunLengthArray [ 3 2 ]"));
+        let mut normalized = spec;
+        normalized.text = "A\r\n😀B".into();
+        normalized.runs[0].end = 4;
+        normalized.runs[1].start = 4;
+        normalized.runs[1].end = 5;
+        assert_eq!(super::style_runs(&normalized).1, [4, 2]);
     }
 }

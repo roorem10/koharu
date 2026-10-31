@@ -15,7 +15,7 @@ use koharu_renderer::{
 use koharu_scene::{AssetRole, EntityId, Snapshot, TextLayout};
 
 use crate::{
-    engine_data::{TextJustification, TextOrientation},
+    engine_data::{TextEngineRun, TextJustification, TextOrientation},
     error::PsdExportError,
 };
 
@@ -71,6 +71,7 @@ pub(crate) struct Layer {
 
 #[derive(Debug, Clone)]
 pub(crate) struct TextMetadata {
+    pub runs: Vec<TextEngineRun>,
     pub index: i32,
     pub text: String,
     pub bounds: [f64; 4],
@@ -96,10 +97,11 @@ pub(crate) async fn build(
 ) -> Result<Document, PsdExportError> {
     let mut warped_text = HashSet::new();
     for layer in frame.layers() {
-        if matches!(layer.kind(), LayerKind::Text(_))
-            && snapshot
-                .component::<TextLayout>(layer.entity())?
-                .is_some_and(|layout| layout.warp.is_some())
+        if matches!(layer.kind(), LayerKind::Text(text) if text.word_effects)
+            || matches!(layer.kind(), LayerKind::Text(_))
+                && snapshot
+                    .component::<TextLayout>(layer.entity())?
+                    .is_some_and(|layout| layout.warp.is_some())
         {
             warped_text.insert(layer.entity());
         }
@@ -433,7 +435,11 @@ fn validate_pixels(layer: &str, pixels: &RgbaImage) -> Result<(), PsdExportError
 
 fn collect_fonts<'a>(texts: impl Iterator<Item = &'a RenderedText>) -> Vec<String> {
     let mut fonts = Vec::new();
-    for font in texts.flat_map(|text| &text.post_script_fonts) {
+    for font in texts.flat_map(|text| {
+        text.post_script_fonts
+            .iter()
+            .chain(text.style_runs.iter().map(|run| &run.post_script_font))
+    }) {
         if !fonts.iter().any(|candidate| candidate == font) {
             fonts.push(font.clone());
         }
@@ -449,6 +455,22 @@ fn text_metadata(index: i32, text: &RenderedText, font_set: &[String]) -> TextMe
         .and_then(|font| font_set.iter().position(|candidate| candidate == font))
         .unwrap_or(0);
     TextMetadata {
+        runs: text
+            .style_runs
+            .iter()
+            .map(|run| TextEngineRun {
+                start: run.start,
+                end: run.end,
+                font_index: font_set
+                    .iter()
+                    .position(|font| font == &run.post_script_font)
+                    .unwrap_or(font_index),
+                font_size: f64::from(run.font_size),
+                color: run.color,
+                faux_bold: run.faux_bold,
+                faux_italic: run.faux_italic,
+            })
+            .collect(),
         index,
         text: text.text.clone(),
         bounds: [
@@ -493,6 +515,9 @@ mod tests {
 
     fn rendered_text(fonts: &[&str]) -> RenderedText {
         RenderedText {
+            style_runs: Vec::new(),
+            smallest_font_size: 24.0,
+            word_effects: false,
             text: "Hello".to_owned(),
             language: None,
             rendered_bounds: RenderBounds {
@@ -598,5 +623,212 @@ mod tests {
             assert_eq!(layers.len(), 1);
             assert_eq!(layers[0].text.is_some(), mode == TextLayerMode::Editable);
         }
+    }
+    #[test]
+    fn resolved_word_fonts_sizes_and_colours_reach_engine_runs() {
+        let mut text = rendered_text(&["Primary"]);
+        text.style_runs = vec![koharu_renderer::TextStyleRun {
+            start: 1,
+            end: 3,
+            post_script_font: "WordFont".into(),
+            font_size: 36.0,
+            color: [255, 0, 0, 255],
+            faux_bold: true,
+            faux_italic: true,
+        }];
+        let fonts = collect_fonts([&text].into_iter());
+        assert_eq!(fonts, ["Primary", "WordFont"]);
+        let metadata = text_metadata(1, &text, &fonts);
+        let run = &metadata.runs[0];
+        assert_eq!((run.start, run.end, run.font_index), (1, 3, 1));
+        assert_eq!(run.font_size, 36.0);
+        assert_eq!(run.color, [255, 0, 0, 255]);
+        assert!(run.faux_bold && run.faux_italic);
+    }
+    #[tokio::test]
+    async fn word_effects_export_pixels_hidden_plain_runs_and_a_notice() {
+        use koharu_scene::{
+            At, Authored, Geometry, Origin, PageDraft, RunStyle, Session, StyleRun, TextLayoutKind,
+            TextRuns, Translation, Typography,
+        };
+        let mut session = Session::memory().await.unwrap();
+        let mut ids = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("01", 256.0, 128.0), At::End)?;
+                let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &koharu_scene::SourceText {
+                        text: Authored::user("original".into()),
+                        language: None,
+                    },
+                )?;
+                edit.set(
+                    content,
+                    &Translation {
+                        text: Authored::user("MM".into()),
+                        language: None,
+                    },
+                )?;
+                let layer = edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &TextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Point,
+                        angle_degrees: None,
+                        warp: None,
+                    },
+                )?;
+                edit.set(layer, &Geometry::rectangle(20.0, 20.0, 150.0, 70.0))?;
+                edit.set(
+                    layer,
+                    &Typography {
+                        origin: Origin::User,
+                        size: Some(40.0),
+                        auto_fit: false,
+                        preferred_font: None,
+                        font_weight: None,
+                        font_style: None,
+                        color: None,
+                        stroke_color: None,
+                        stroke_width: None,
+                        alignment: None,
+                        writing_mode: None,
+                        extensions: Default::default(),
+                        stroke_method: None,
+                        stroke_position: None,
+                        stroke_join: None,
+                        outer_stroke_color: None,
+                        outer_stroke_width: None,
+                        line_spacing: None,
+                        letter_spacing: None,
+                        fill_gradient: None,
+                    },
+                )?;
+                edit.set(
+                    layer,
+                    &TextRuns {
+                        origin: Origin::User,
+                        runs: vec![StyleRun {
+                            start: 0,
+                            end: 1,
+                            style: RunStyle {
+                                color: Some([255, 0, 0, 255]),
+                                stroke_color: Some([0, 255, 0, 255]),
+                                stroke_width: Some(4.0),
+                                ..Default::default()
+                            },
+                        }],
+                    },
+                )?;
+                ids = Some((page, layer));
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let (page, entity) = ids.unwrap();
+        let renderer = koharu_renderer::Renderer::default();
+        let frame = renderer.render(&snapshot, page).await.unwrap();
+        let rasterizer = Arc::new(Rasterizer::new().unwrap());
+        let document = build(
+            &snapshot,
+            &frame,
+            rasterizer.clone(),
+            RasterOptions::default(),
+            &PsdExportOptions {
+                include_source: false,
+                include_raster_layers: false,
+                include_removal_mask: false,
+                text_layer_mode: TextLayerMode::Editable,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(document.layers.len(), 2);
+        assert!(!document.layers[0].hidden && document.layers[0].text.is_none());
+        assert!(
+            document.layers[0]
+                .pixels
+                .pixels()
+                .any(|pixel| pixel.0 == [0, 255, 0, 255])
+        );
+        assert!(document.layers[1].hidden);
+        assert!(
+            !document.layers[1]
+                .pixels
+                .pixels()
+                .any(|pixel| pixel.0 == [0, 255, 0, 255])
+        );
+        let editable = document.layers[1].text.as_ref().unwrap();
+        assert_eq!(editable.runs.len(), 2);
+        assert_eq!(editable.runs[0].color, [255, 0, 0, 255]);
+        let notices = crate::export_notices(&frame);
+        assert_eq!(notices.len(), 1);
+        assert_eq!(notices[0]["layer"], entity.to_string());
+        assert_eq!(notices[0]["reason"], "word_effects_rasterized");
+        let bytes = crate::export_page(
+            rasterizer,
+            &snapshot,
+            &frame,
+            &PsdExportOptions {
+                include_source: false,
+                include_raster_layers: false,
+                include_removal_mask: false,
+                text_layer_mode: TextLayerMode::Editable,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(&bytes[..4], b"8BPS");
+        assert!(bytes.windows(4).any(|window| window == b"TySh"));
+        let patch = snapshot
+            .patch(|edit| {
+                edit.set(
+                    entity,
+                    &TextRuns {
+                        origin: Origin::User,
+                        runs: vec![StyleRun {
+                            start: 0,
+                            end: 1,
+                            style: RunStyle {
+                                color: Some([255, 0, 0, 255]),
+                                ..Default::default()
+                            },
+                        }],
+                    },
+                )
+            })
+            .unwrap();
+        let plain_snapshot = session.commit(patch).await.unwrap().snapshot;
+        let plain_frame = renderer.render(&plain_snapshot, page).await.unwrap();
+        let plain_document = build(
+            &plain_snapshot,
+            &plain_frame,
+            Arc::new(Rasterizer::new().unwrap()),
+            RasterOptions::default(),
+            &PsdExportOptions {
+                include_source: false,
+                include_raster_layers: false,
+                include_removal_mask: false,
+                text_layer_mode: TextLayerMode::Editable,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(plain_document.layers.len(), 1);
+        assert!(plain_document.layers[0].text.is_some());
+        assert!(crate::export_notices(&plain_frame).is_empty());
+        let started = std::time::Instant::now();
+        for _ in 0..1000 {
+            assert!(!plain_frame.text_glyph_boxes(entity).unwrap().is_empty());
+        }
+        println!(
+            "cached glyph-box lookup: {:?} per call",
+            started.elapsed() / 1000
+        );
     }
 }
