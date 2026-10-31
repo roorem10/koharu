@@ -23,9 +23,9 @@ import { ResourceMonitor } from '@/components/editor/ResourceMonitor'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { ProviderPreferences } from '@/components/preferences/ProviderPreferences'
-import { TextStylePreferences } from '@/components/preferences/TextStylePreferences'
-import { ShapeStylePreferences } from '@/components/preferences/ShapeStylePreferences'
 import { SettingsPage } from '@/components/preferences/SettingsPage'
+import { ShapeStylePreferences } from '@/components/preferences/ShapeStylePreferences'
+import { TextStylePreferences } from '@/components/preferences/TextStylePreferences'
 import {
   fontsKey,
   pageKey,
@@ -36,11 +36,7 @@ import {
   useCommand,
 } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import {
-  emptyTextStyle,
-  emptyShapeStyles,
-  emptyCategoryStyles,
-} from '@/lib/text-styles'
+import { emptyTextStyle, emptyShapeStyles, emptyCategoryStyles } from '@/lib/text-styles'
 import * as canvasRuntime from '@koharu/bridge/canvas'
 import {
   commands,
@@ -50,8 +46,8 @@ import {
   type Preferences,
   type ProjectInfo,
 } from '@koharu/bridge/protocol'
-import { TooltipProvider } from '@koharu/ui/components/tooltip'
 import { toast } from '@koharu/ui/components/toast'
+import { TooltipProvider } from '@koharu/ui/components/tooltip'
 
 const nativeWindow = vi.hoisted(() => ({
   close: vi.fn(async () => undefined),
@@ -105,6 +101,9 @@ const textLayer: Layer = {
     stroke_join: null,
     outer_stroke_color: null,
     outer_stroke_width: null,
+    line_spacing: null,
+    letter_spacing: null,
+    fill_gradient: null,
     alignment: 'Center',
     writing_mode: null,
   },
@@ -529,6 +528,108 @@ describe('greenfield editor', () => {
         },
       },
     ])
+  })
+
+  it('commits line spacing once for the full selection without changing its other styles', async () => {
+    installProject()
+    queryClient.setQueryData(pageKey, {
+      ...queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey),
+      layers: [textLayer, secondLayer],
+    })
+    useKoharuStore.setState({ selectedLayers: ['element', 'second'] })
+    const update = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
+    render(<Inspector />)
+    const user = userEvent.setup()
+    const field = screen.getByRole('textbox', { name: 'Line spacing' })
+    await user.clear(field)
+    await user.type(field, '0.85{Enter}')
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(update.mock.calls[0]![0]).toEqual([
+      { layer: 'element', typography: { ...textLayer.typography, line_spacing: 0.85 } },
+      { layer: 'second', typography: { ...secondLayer.typography, line_spacing: 0.85 } },
+    ])
+  })
+
+  it('commits negative tracking once and can reset a saved override', async () => {
+    installProject()
+    const update = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
+    render(<Inspector />)
+    const user = userEvent.setup()
+    const field = screen.getByRole('textbox', { name: 'Letter spacing' })
+    await user.clear(field)
+    await user.type(field, '-125{Enter}')
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(update.mock.calls[0]![0][0].typography.letter_spacing).toBe(-125)
+    await waitFor(() => expect(field).toHaveValue('0'))
+    await user.click(screen.getByRole('button', { name: 'Reset letter spacing' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2))
+    expect(update.mock.calls[1]![0][0].typography.letter_spacing).toBeNull()
+  })
+
+  it('edits gradient endpoints without dropping middle stops or alpha', async () => {
+    installProject()
+    const gradient = {
+      kind: 'Linear' as const,
+      angle_degrees: 45,
+      stops: [
+        { offset: 0, color: [255, 0, 0, 160] as [number, number, number, number] },
+        { offset: 0.4, color: [0, 255, 0, 255] as [number, number, number, number] },
+        { offset: 1, color: [0, 0, 255, 255] as [number, number, number, number] },
+      ],
+    }
+    queryClient.setQueryData(pageKey, {
+      ...queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey),
+      layers: [{ ...textLayer, typography: { ...textLayer.typography!, fill_gradient: gradient } }],
+    })
+    const update = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
+    render(<Inspector />)
+    const user = userEvent.setup()
+    expect(screen.getByRole('button', { name: 'Text color' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Start color' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Hex color code' }), {
+      target: { value: '#ABCDEF' },
+    })
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(update.mock.calls[0]![0][0].typography.fill_gradient).toEqual({
+      ...gradient,
+      stops: [{ offset: 0, color: [171, 205, 239, 160] }, ...gradient.stops.slice(1)],
+    })
+  })
+
+  it('changes gradient kind for the full selection while preserving each box colors', async () => {
+    installProject()
+    const first = {
+      ...textLayer,
+      typography: {
+        ...textLayer.typography!,
+        fill_gradient: {
+          kind: 'Linear' as const,
+          angle_degrees: 90,
+          stops: [
+            { offset: 0, color: [255, 0, 0, 255] as [number, number, number, number] },
+            { offset: 1, color: [0, 0, 255, 255] as [number, number, number, number] },
+          ],
+        },
+      },
+    }
+    queryClient.setQueryData(pageKey, {
+      ...queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey),
+      layers: [first, secondLayer],
+    })
+    useKoharuStore.setState({ selectedLayers: ['element', 'second'] })
+    const update = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
+    render(<Inspector />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('combobox', { name: 'Gradient kind' }))
+    await user.click(await screen.findByRole('option', { name: 'Radial' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(update.mock.calls[0]![0][0].typography.fill_gradient).toEqual({
+      ...first.typography.fill_gradient,
+      kind: 'Radial',
+    })
+    expect(update.mock.calls[0]![0][1].typography.fill_gradient?.stops[0].color).toEqual(
+      secondLayer.typography!.color,
+    )
   })
 
   it('registers one native resize listener in React strict mode', async () => {
@@ -1117,12 +1218,14 @@ describe('greenfield editor', () => {
       expect(screen.getByRole('textbox', { name: 'Second border width' })).toBeEnabled(),
     )
     await user.click(screen.getByRole('button', { name: 'Increase second border width' }))
-    await waitFor(() => expect(setTypography).toHaveBeenCalledWith([
-      expect.objectContaining({
-        layer: 'element',
-        typography: expect.objectContaining({ stroke_width: 4, outer_stroke_width: 3.5 }),
-      }),
-    ]))
+    await waitFor(() =>
+      expect(setTypography).toHaveBeenCalledWith([
+        expect.objectContaining({
+          layer: 'element',
+          typography: expect.objectContaining({ stroke_width: 4, outer_stroke_width: 3.5 }),
+        }),
+      ]),
+    )
   })
 
   it('enables and clears the second outline without changing the first', async () => {
@@ -1133,8 +1236,11 @@ describe('greenfield editor', () => {
       typography: { ...textLayer.typography!, stroke_width: 4 },
     }
     queryClient.setQueryData(pageKey, {
-      id: 'page', label: 'Page 1', size: { width: 1000, height: 1500 },
-      layers: [layer], regions: [],
+      id: 'page',
+      label: 'Page 1',
+      size: { width: 1000, height: 1500 },
+      layers: [layer],
+      regions: [],
     })
     const setTypography = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
     render(<Inspector />)
@@ -1143,24 +1249,30 @@ describe('greenfield editor', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Hex color code' }), {
       target: { value: '#FF0000' },
     })
-    await waitFor(() => expect(setTypography).toHaveBeenCalledWith([
-      expect.objectContaining({
-        layer: 'element',
-        typography: expect.objectContaining({
-          stroke_color: [255, 255, 255, 255], stroke_width: 4,
-          outer_stroke_color: [255, 0, 0, 255], outer_stroke_width: 3,
+    await waitFor(() =>
+      expect(setTypography).toHaveBeenCalledWith([
+        expect.objectContaining({
+          layer: 'element',
+          typography: expect.objectContaining({
+            stroke_color: [255, 255, 255, 255],
+            stroke_width: 4,
+            outer_stroke_color: [255, 0, 0, 255],
+            outer_stroke_width: 3,
+          }),
         }),
-      }),
-    ]))
+      ]),
+    )
 
     setTypography.mockClear()
     await user.click(screen.getByRole('button', { name: 'Transparent' }))
-    await waitFor(() => expect(setTypography).toHaveBeenCalledWith([
-      expect.objectContaining({
-        layer: 'element',
-        typography: expect.objectContaining({ stroke_width: 4, outer_stroke_width: 0 }),
-      }),
-    ]))
+    await waitFor(() =>
+      expect(setTypography).toHaveBeenCalledWith([
+        expect.objectContaining({
+          layer: 'element',
+          typography: expect.objectContaining({ stroke_width: 4, outer_stroke_width: 0 }),
+        }),
+      ]),
+    )
   })
 
   it('only offers styles and weights available for the selected font family', async () => {
@@ -1356,8 +1468,14 @@ describe('greenfield editor', () => {
     installProject()
     const auto = { ...textLayer, geometry: null, parent: 'text-group', automatic_region: 'bubble' }
     const layers: Layer[] = [
-      { type: 'group', id: 'text-group', parent: 'page', name: 'Text', role: 'text',
-        visibility: { visible: true, opacity: 1 } },
+      {
+        type: 'group',
+        id: 'text-group',
+        parent: 'page',
+        name: 'Text',
+        role: 'text',
+        visibility: { visible: true, opacity: 1 },
+      },
       auto,
       { ...auto, id: 'rotated' },
       { ...auto, id: 'no-frame' },
@@ -1375,15 +1493,27 @@ describe('greenfield editor', () => {
     const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(2)
     render(<Inspector />)
     fireEvent.click(screen.getByRole('button', { name: 'Fix all in bubble' }))
-    await waitFor(() => expect(commit).toHaveBeenCalledExactlyOnceWith(1, [
-      { element: 'element', frame: frames.element },
-      { element: 'rotated', frame: frames.rotated },
-    ], true))
-    act(() => queryClient.setQueryData(pageKey, (page: { layers: Layer[] }) => ({
-      ...page, layers: layers.map((layer) => layer.type === 'text'
-        ? { ...layer, geometry: textLayer.geometry } : layer),
-    })))
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Fix all in bubble' })).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(commit).toHaveBeenCalledExactlyOnceWith(
+        1,
+        [
+          { element: 'element', frame: frames.element },
+          { element: 'rotated', frame: frames.rotated },
+        ],
+        true,
+      ),
+    )
+    act(() =>
+      queryClient.setQueryData(pageKey, (page: { layers: Layer[] }) => ({
+        ...page,
+        layers: layers.map((layer) =>
+          layer.type === 'text' ? { ...layer, geometry: textLayer.geometry } : layer,
+        ),
+      })),
+    )
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Fix all in bubble' })).not.toBeInTheDocument(),
+    )
   })
 
   it('resets a custom text frame to its automatic region', async () => {
@@ -1969,22 +2099,33 @@ describe('greenfield editor', () => {
     const user = userEvent.setup()
     useKoharuStore.setState({ settingsOpen: true })
     const existingColor = [...textLayer.typography!.color!]
-    const save = vi.spyOn(commands, 'savePreferences')
+    const save = vi
+      .spyOn(commands, 'savePreferences')
       .mockImplementation(async (pipeline, providers, typesetting) => ({
-        ...preferences, pipeline, providers, typesetting,
+        ...preferences,
+        pipeline,
+        providers,
+        typesetting,
       }))
     const setTypography = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
-    render(<ThemeProvider attribute='class'><SettingsPage /></ThemeProvider>)
+    render(
+      <ThemeProvider attribute='class'>
+        <SettingsPage />
+      </ThemeProvider>,
+    )
 
     await user.click(screen.getByRole('button', { name: 'Pipeline' }))
     const toggle = screen.getByRole('switch', { name: 'Detect text and outline colors' })
     expect(toggle).toBeChecked()
     expect(screen.queryByRole('button', { name: 'Default text color' })).not.toBeInTheDocument()
     await user.click(toggle)
-    await waitFor(() => expect(save).toHaveBeenLastCalledWith(
-      expect.objectContaining({ detect_text_color: false }),
-      preferences.providers, preferences.typesetting,
-    ))
+    await waitFor(() =>
+      expect(save).toHaveBeenLastCalledWith(
+        expect.objectContaining({ detect_text_color: false }),
+        preferences.providers,
+        preferences.typesetting,
+      ),
+    )
     const links = screen.getAllByRole('button', { name: 'Typesetting' })
     await user.click(links[links.length - 1])
     expect(screen.getByRole('heading', { level: 2, name: 'Typesetting' })).toBeInTheDocument()
@@ -2199,12 +2340,19 @@ describe('greenfield editor', () => {
 
   it('unloads from the resource monitor and blocks duplicate or running-job requests', async () => {
     const user = userEvent.setup()
-    useKoharuStore.setState({ resources: {
-      process_memory: 1024, system_memory: 4096, process_cpu: 8, devices: [],
-    } })
+    useKoharuStore.setState({
+      resources: {
+        process_memory: 1024,
+        system_memory: 4096,
+        process_cpu: 8,
+        devices: [],
+      },
+    })
     const first = Promise.withResolvers<number>()
-    const unload = vi.spyOn(commands, 'unloadModels')
-      .mockReturnValueOnce(first.promise).mockResolvedValue(0)
+    const unload = vi
+      .spyOn(commands, 'unloadModels')
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValue(0)
     const notify = vi.spyOn(toast, 'add')
     render(<ResourceMonitor />)
     await user.click(screen.getByText('8%').closest('button')!)

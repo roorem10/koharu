@@ -36,6 +36,8 @@ import { BubbleShapeLine } from '@/components/editor/BubbleShapeLine'
 import { LetteringCategoryLine } from '@/components/editor/LetteringCategoryLine'
 import { LineContextCard } from '@/components/editor/LineContextCard'
 import { layerDropIndex } from '@/components/files/layer-order'
+import { GradientControls } from '@/components/text-extras/GradientControls'
+import { SpacingControls } from '@/components/text-extras/SpacingControls'
 import { call } from '@/lib/backend'
 import { hexToRgba, rgbaToHex } from '@/lib/color'
 import {
@@ -123,6 +125,9 @@ const defaultTypography: Typography = {
   stroke_join: null,
   outer_stroke_color: [0, 0, 0, 255],
   outer_stroke_width: 0,
+  line_spacing: null,
+  letter_spacing: null,
+  fill_gradient: null,
   alignment: null,
   writing_mode: null,
 }
@@ -208,7 +213,7 @@ function TypeInspector() {
   const strokeColor = typography.stroke_color ?? defaultTypography.stroke_color!
   const strokeEnabled = strokeWidth > 0 && strokeColor[3] > 0
   const displayedStrokeWidth = strokeWidth > 0 ? strokeWidth : 1.5
-  const strokeMethod = typography.stroke_method ?? 'expansion'
+  const strokeMethod = typography.stroke_method ?? 'contour'
   const strokePosition = typography.stroke_position ?? 'outside'
   const strokeJoin = typography.stroke_join ?? 'round'
   const outerWidth = typography.outer_stroke_width ?? 0
@@ -254,7 +259,7 @@ function TypeInspector() {
             <ColorWell
               label={t('inspector.textColor')}
               size='sm'
-              disabled={disabled}
+              disabled={disabled || !!typography.fill_gradient}
               value={rgbaToHex(typography.color ?? defaultTypography.color!)}
               onChange={(color) => apply((value) => ({ ...value, color: hexToRgba(color) }))}
             />
@@ -335,6 +340,20 @@ function TypeInspector() {
             </Select>
           </InspectorField>
         </div>
+
+        <GradientControls
+          key={`gradient-${current?.id}`}
+          typography={typography}
+          disabled={disabled || draft !== null}
+          apply={apply}
+        />
+
+        <SpacingControls
+          key={current?.id}
+          typography={typography}
+          disabled={disabled || draft !== null}
+          apply={apply}
+        />
 
         <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(6.5rem,1fr)] gap-1.5'>
           <InspectorField label={t('inspector.alignment')}>
@@ -617,16 +636,17 @@ function TypeInspector() {
 
 // Without a visible border, use a contrasting fill instead of transparent text.
 function invertBorder(value: Typography, displayedWidth: number): Typography {
-  const color = value.color ?? defaultTypography.color!
+  const color = value.fill_gradient?.stops[0]?.color ?? value.color ?? defaultTypography.color!
   const stroke = value.stroke_color
   if ((value.stroke_width ?? 0) > 0 && stroke && stroke[3] > 0) {
-    return { ...value, color: stroke, stroke_color: color }
+    return { ...value, color: stroke, stroke_color: color, fill_gradient: null }
   }
   const [red, green, blue] = color
   const light = 0.2126 * red + 0.7152 * green + 0.0722 * blue > 127.5
   return {
     ...value,
     color: light ? [0, 0, 0, 255] : [255, 255, 255, 255],
+    fill_gradient: null,
     stroke_color: [red, green, blue, 255],
     stroke_width: displayedWidth,
   }

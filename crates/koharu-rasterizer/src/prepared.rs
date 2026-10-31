@@ -11,7 +11,7 @@ use crate::{Error, Result};
 
 const MANIFEST_MAGIC: [u8; 8] = *b"KHRMANF\0";
 const RESOURCE_MAGIC: [u8; 8] = *b"KHRRSRC\0";
-pub const PREPARED_FRAME_MANIFEST_VERSION: u16 = 5;
+pub const PREPARED_FRAME_MANIFEST_VERSION: u16 = 6;
 pub const PREPARED_RESOURCE_FORMAT_VERSION: u16 = 3;
 /// Logical raster tile edge used by portable frames. The one-pixel sampling
 /// gutter is stored outside this logical extent where adjacent pixels exist.
@@ -628,6 +628,25 @@ impl PreparedScene {
                     run.validate()?;
                 }
                 PreparedSceneCommand::FillPath(path) => path.validate()?,
+                PreparedSceneCommand::GradientPath {
+                    path,
+                    radial: _,
+                    start,
+                    end,
+                    stops,
+                } => {
+                    path.validate()?;
+                    if start.iter().chain(end).any(|value| !value.is_finite())
+                        || start == end
+                        || !(2..=8).contains(&stops.len())
+                        || stops
+                            .iter()
+                            .any(|(offset, _)| !offset.is_finite() || !(0.0..=1.0).contains(offset))
+                        || stops.windows(2).any(|pair| pair[0].0 > pair[1].0)
+                    {
+                        return Err(Error::invalid("prepared gradient is invalid"));
+                    }
+                }
                 PreparedSceneCommand::StrokePath(stroke) => {
                     stroke.path.validate()?;
                     if !stroke.width.is_finite() || stroke.width <= 0.0 {
@@ -645,6 +664,13 @@ pub enum PreparedSceneCommand {
     GlyphRun(PreparedGlyphRun),
     FillPath(PreparedPath),
     StrokePath(PreparedStrokePath),
+    GradientPath {
+        path: PreparedPath,
+        radial: bool,
+        start: [f64; 2],
+        end: [f64; 2],
+        stops: Vec<(f32, [u8; 4])>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

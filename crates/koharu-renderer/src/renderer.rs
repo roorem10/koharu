@@ -817,9 +817,18 @@ impl Traversal<'_> {
                 .as_ref()
                 .and_then(|value| value.color)
                 .unwrap_or([0, 0, 0, 255]),
+            fill_gradient: typography
+                .as_ref()
+                .and_then(|value| value.fill_gradient.clone()),
             stroke: resolve_stroke(typography.as_ref()),
-            line_height: 1.2,
-            letter_spacing: 0.0,
+            line_height: typography
+                .as_ref()
+                .and_then(|value| value.line_spacing)
+                .unwrap_or(1.2),
+            letter_spacing: typography
+                .as_ref()
+                .and_then(|value| value.letter_spacing)
+                .unwrap_or(0.0),
             word_spacing: 0.0,
             text_inset: [4.0; 4],
             point_text: !is_bubble && layout.kind == TextLayoutKind::Point,
@@ -1173,6 +1182,8 @@ fn build_node(
                     post_script_fonts: rendered.metadata.post_script_fonts,
                     font_size: rendered.metadata.font_size,
                     color: rendered.metadata.color,
+                    line_spacing: rendered.metadata.line_spacing,
+                    letter_spacing: rendered.metadata.letter_spacing,
                 }),
                 diagnostics: rendered.diagnostics.into(),
             })
@@ -1211,6 +1222,8 @@ fn assemble_frame(
                     post_script_fonts: metadata.post_script_fonts.clone(),
                     font_size: metadata.font_size,
                     color: metadata.color,
+                    line_spacing: metadata.line_spacing,
+                    letter_spacing: metadata.letter_spacing,
                     alignment,
                     writing_mode,
                     angle_degrees,
@@ -1461,7 +1474,7 @@ fn resolve_stroke(typography: Option<&Typography>) -> Option<StrokeOptions> {
         width_px,
         method: typography
             .stroke_method
-            .unwrap_or(koharu_scene::StrokeMethod::Expansion),
+            .unwrap_or(koharu_scene::StrokeMethod::Contour),
         position: typography
             .stroke_position
             .unwrap_or(koharu_scene::StrokePosition::Outside),
@@ -1740,6 +1753,9 @@ mod tests {
             stroke_join: None,
             outer_stroke_color: None,
             outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
             alignment: None,
             writing_mode: Some(koharu_scene::WritingMode::Vertical),
             extensions: BTreeMap::new(),
@@ -1781,6 +1797,9 @@ mod tests {
             stroke_join: None,
             outer_stroke_color: None,
             outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
             alignment: None,
             writing_mode: Some(koharu_scene::WritingMode::Vertical),
             extensions: BTreeMap::new(),

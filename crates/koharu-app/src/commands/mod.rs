@@ -196,6 +196,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             runs::run_chapter_batch,
             runs::stop_chapter_batch,
             // WO-06 (text style extras and box notes) commands go here.
+            notes::get_box_note,
+            notes::set_box_note,
             // WO-21 (MCP server) commands go here.
         ])
         .disable_serde_phases()

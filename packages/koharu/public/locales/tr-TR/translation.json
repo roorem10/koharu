@@ -551,7 +551,27 @@
     "selected": "{{count}} seçili"
   },
   "textExtras": {
-    "title": "Text style extras"
+    "title": "Text style extras",
+    "lineSpacing": "Line spacing",
+    "letterSpacing": "Letter spacing",
+    "reset": "Reset",
+    "resetLineSpacing": "Reset line spacing",
+    "resetLetterSpacing": "Reset letter spacing",
+    "fill": "Fill",
+    "color": "Color",
+    "gradient": "Gradient",
+    "gradientKind": "Gradient kind",
+    "linear": "Linear",
+    "radial": "Radial",
+    "angle": "Gradient angle",
+    "startColor": "Start color",
+    "endColor": "End color",
+    "note": "Note",
+    "boxNote": "Box note",
+    "notePlaceholder": "Leave a note for the next pass…",
+    "saving": "Saving…",
+    "noteLoadError": "Could not load the note.",
+    "noteSaveError": "Could not save the note. Your edit is still here; try again."
   },
   "outputPicker": {
     "instructions": "Çeviri talimatları",
