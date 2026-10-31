@@ -51,6 +51,20 @@ const MIN_EXTREME_COLOR_PIXELS: u32 = 4;
 const MIN_MEASURED_STROKE_WIDTH: u8 = 2;
 const DIALOGUE_MASK_CONTAINMENT_THRESHOLD: f32 = 0.9;
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(default)]
+pub struct BoxSettings {
+    pub join_in_bubble: bool,
+}
+
+impl Default for BoxSettings {
+    fn default() -> Self {
+        Self {
+            join_in_bubble: true,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
 #[serde(default)]
 pub struct KoharuLayoutRFDetrSeg2XLConfig {
@@ -152,12 +166,15 @@ impl StageProcessor for Processor {
 
     async fn process(&self, input: StageInput) -> Result<koharu_scene::Patch> {
         let styles = self.text_styles.read()?.clone();
+        let join_in_bubble = koharu_config::load::<BoxSettings>("boxes")?
+            .read()?
+            .join_in_bubble;
         self.model
             .lock()
             .await
             .as_ref()
             .ok_or_else(|| anyhow!("detection model is not loaded"))?
-            .run(input, self.text_colors, &styles)
+            .run(input, self.text_colors, &styles, join_in_bubble)
             .await
     }
 }
@@ -186,6 +203,7 @@ impl Model {
         input: StageInput,
         colors: TextColorOptions,
         styles: &TextStyles,
+        join_in_bubble: bool,
     ) -> Result<koharu_scene::Patch> {
         let page = input.page;
         let image = input
@@ -201,6 +219,7 @@ impl Model {
             &generation(PRODUCER, MODEL_ID)?,
             colors,
             styles,
+            join_in_bubble,
         )
         .await
     }
@@ -252,6 +271,7 @@ struct ImageSize {
     height: u32,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_patch(
     input: &StageInput,
     image: &DynamicImage,
@@ -259,6 +279,7 @@ async fn build_patch(
     generation: &Generation,
     colors: TextColorOptions,
     styles: &TextStyles,
+    join_in_bubble: bool,
 ) -> Result<koharu_scene::Patch> {
     let page = input.page;
     let mut edit = input.scene.edit_as(generation.clone());
@@ -266,7 +287,15 @@ async fn build_patch(
     remove_previous_regions(input, &mut edit, generation)
         .context("failed to replace the previous detection regions")?;
     write_page(
-        input, &mut edit, page, image, output, generation, colors, styles,
+        input,
+        &mut edit,
+        page,
+        image,
+        output,
+        generation,
+        colors,
+        styles,
+        join_in_bubble,
     )
     .await
     .context("failed to write detection output")?;
@@ -312,6 +341,7 @@ async fn write_page(
     generation: &Generation,
     colors: TextColorOptions,
     styles: &TextStyles,
+    join_in_bubble: bool,
 ) -> Result<()> {
     let KoharuLayoutDetections {
         mut detections,
@@ -327,6 +357,7 @@ async fn write_page(
     }
     non_maximum_suppression(&mut detections, 0.5);
     suppress_contained_text(&mut detections);
+    join_text_in_bubbles(&mut detections, join_in_bubble);
     sort_by_layout(&mut detections);
 
     let image = image.to_rgb8();
@@ -1777,6 +1808,73 @@ fn suppress_contained_text(detections: &mut Vec<KoharuLayoutDetection>) {
     *detections = kept;
 }
 
+fn join_text_in_bubbles(detections: &mut Vec<KoharuLayoutDetection>, enabled: bool) {
+    if !enabled {
+        return;
+    }
+    let bubbles = indices_with_label(detections, "bubble");
+    let mut groups = BTreeMap::<usize, Vec<usize>>::new();
+    for (index, text) in detections
+        .iter()
+        .enumerate()
+        .filter(|(_, d)| d.label == "text")
+    {
+        let bubble = bubbles
+            .iter()
+            .copied()
+            .filter(|&bubble| {
+                mask_containment(&detections[bubble].mask, &text.mask, text.bbox)
+                    >= DIALOGUE_MASK_CONTAINMENT_THRESHOLD
+            })
+            .min_by_key(|&bubble| detections[bubble].area);
+        if let Some(bubble) = bubble {
+            groups.entry(bubble).or_default().push(index);
+        }
+    }
+    let mut removed = vec![false; detections.len()];
+    for group in groups.into_values().filter(|group| group.len() > 1) {
+        let first = group[0];
+        let mut bounds = detections[first].bbox;
+        let mut score = detections[first].score;
+        for &index in &group[1..] {
+            let text = &detections[index];
+            bounds = [
+                bounds[0].min(text.bbox[0]),
+                bounds[1].min(text.bbox[1]),
+                bounds[2].max(text.bbox[2]),
+                bounds[3].max(text.bbox[3]),
+            ];
+            score = score.max(text.score);
+            removed[index] = true;
+        }
+        let x = bounds[0].floor().max(0.0) as u32;
+        let y = bounds[1].floor().max(0.0) as u32;
+        let width = (bounds[2].ceil() as u32).saturating_sub(x);
+        let height = (bounds[3].ceil() as u32).saturating_sub(y);
+        let mut pixels = GrayImage::new(width, height);
+        for index in group {
+            stamp_mask(&mut pixels, &detections[index].mask, x, y);
+        }
+        let text = &mut detections[first];
+        text.bbox = bounds;
+        text.score = score;
+        text.area = pixels.as_raw().iter().filter(|&&pixel| pixel != 0).count() as u32;
+        text.mask = KoharuLayoutMask {
+            x,
+            y,
+            width,
+            height,
+            pixels: pixels.into_raw(),
+        };
+    }
+    let mut index = 0;
+    detections.retain(|_| {
+        let keep = !removed[index];
+        index += 1;
+        keep
+    });
+}
+
 fn sort_by_layout(detections: &mut Vec<KoharuLayoutDetection>) {
     let order = layout_order(detections);
     let mut values = std::mem::take(detections)
@@ -2199,6 +2297,83 @@ mod tests {
             assert_eq!(values.len(), 1);
             assert_eq!(values[0].score, 0.95);
         }
+    }
+
+    fn filled_detection(label: &str, bounds: [f32; 4]) -> KoharuLayoutDetection {
+        let mut value = detection(label, 0.9, bounds);
+        let width = (bounds[2] - bounds[0]) as u32;
+        let height = (bounds[3] - bounds[1]) as u32;
+        value.mask = KoharuLayoutMask {
+            x: bounds[0] as u32,
+            y: bounds[1] as u32,
+            width,
+            height,
+            pixels: vec![255; (width * height) as usize],
+        };
+        value.area = width * height;
+        value
+    }
+
+    #[test]
+    fn bubble_text_union_preserves_the_mask_gap_and_best_score() {
+        let mut values = vec![
+            filled_detection("bubble", [0., 0., 100., 100.]),
+            filled_detection("text", [10., 10., 20., 50.]),
+            filled_detection("text", [40., 20., 60., 60.]),
+        ];
+        values[2].score = 0.97;
+        super::join_text_in_bubbles(&mut values, true);
+        assert_eq!(values.len(), 2);
+        let text = &values[1];
+        assert_eq!(text.bbox, [10., 10., 60., 60.]);
+        assert_eq!(text.score, 0.97);
+        assert_eq!(
+            (text.mask.x, text.mask.y, text.mask.width, text.mask.height),
+            (10, 10, 50, 50)
+        );
+        assert!(text.mask.contains(10, 10));
+        assert!(text.mask.contains(59, 59));
+        assert!(!text.mask.contains(30, 30));
+        assert_eq!(text.area, 1200);
+    }
+
+    #[test]
+    fn bubble_text_join_keeps_other_bubbles_and_free_text_separate() {
+        let mut values = vec![
+            filled_detection("bubble", [0., 0., 100., 100.]),
+            filled_detection("bubble", [110., 0., 200., 100.]),
+            filled_detection("text", [10., 10., 20., 50.]),
+            filled_detection("text", [120., 10., 140., 50.]),
+            filled_detection("text", [201., 10., 220., 50.]),
+        ];
+        super::join_text_in_bubbles(&mut values, true);
+        assert_eq!(values.len(), 5);
+    }
+
+    #[test]
+    fn bubble_text_join_uses_the_smallest_mask_container() {
+        let mut values = vec![
+            filled_detection("bubble", [0., 0., 100., 100.]),
+            filled_detection("bubble", [10., 10., 40., 80.]),
+            filled_detection("text", [15., 20., 20., 60.]),
+            filled_detection("text", [25., 20., 30., 60.]),
+            filled_detection("text", [70., 20., 80., 60.]),
+        ];
+        super::join_text_in_bubbles(&mut values, true);
+        assert_eq!(values.len(), 4);
+        assert_eq!(values[2].bbox, [15., 20., 30., 60.]);
+        assert_eq!(values[3].bbox, [70., 20., 80., 60.]);
+    }
+
+    #[test]
+    fn bubble_text_join_off_leaves_columns_alone() {
+        let mut values = vec![
+            filled_detection("bubble", [0., 0., 100., 100.]),
+            filled_detection("text", [10., 10., 20., 50.]),
+            filled_detection("text", [40., 20., 60., 60.]),
+        ];
+        super::join_text_in_bubbles(&mut values, false);
+        assert_eq!(values.len(), 3);
     }
 
     #[test]

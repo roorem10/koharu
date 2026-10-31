@@ -55,7 +55,9 @@
     "working": "来勒处理任务…"
   },
   "boxes": {
-    "title": "One box per bubble"
+    "title": "Text boxes",
+    "joinAutomatically": "Join text in the same bubble",
+    "joinExplanation": "Detection creates one text box per speech bubble; free text stays separate."
   },
   "canvas": {
     "empty": "先选一页，就好开始。",

@@ -55,7 +55,9 @@
     "working": "작업 중…"
   },
   "boxes": {
-    "title": "One box per bubble"
+    "title": "Text boxes",
+    "joinAutomatically": "Join text in the same bubble",
+    "joinExplanation": "Detection creates one text box per speech bubble; free text stays separate."
   },
   "canvas": {
     "empty": "시작할 페이지를 선택하세요.",

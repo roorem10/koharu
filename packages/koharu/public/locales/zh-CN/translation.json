@@ -55,7 +55,9 @@
     "working": "正在工作…"
   },
   "boxes": {
-    "title": "One box per bubble"
+    "title": "Text boxes",
+    "joinAutomatically": "Join text in the same bubble",
+    "joinExplanation": "Detection creates one text box per speech bubble; free text stays separate."
   },
   "canvas": {
     "empty": "请选择页面以开始。",
