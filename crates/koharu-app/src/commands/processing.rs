@@ -49,6 +49,7 @@ pub struct Job {
     pub model: Option<String>,
     pub error: Option<String>,
     pub retry: Option<RetryProgress>,
+    pub failures: Vec<koharu_pipeline::PageFailure>,
 }
 
 #[derive(Clone, Debug, Serialize, Type)]
@@ -62,6 +63,7 @@ pub struct RetryProgress {
 pub enum JobState {
     Running,
     Finished,
+    FinishedWithProblems,
     Failed,
     Stopped,
 }
@@ -140,6 +142,7 @@ pub(crate) async fn start_job(
         model: None,
         error: None,
         retry: None,
+        failures: Vec::new(),
     };
     processing.jobs.lock().insert(id, job.clone());
     job_channel.channel.publish(job);
@@ -182,6 +185,27 @@ pub(crate) async fn start_job(
                     let mut progress = progress.lock();
                     progress.0 = progress.0.saturating_add(1).min(progress.1);
                     Some((progress.0, progress.1, Some(page), Some(stage), None))
+                }
+                Progress::PageFailed { failure, settled } => {
+                    let counts = {
+                        let mut progress = progress.lock();
+                        progress.0 = progress.0.saturating_add(settled).min(progress.1);
+                        *progress
+                    };
+                    let processing = progress_handle.state::<Processing>();
+                    let job = {
+                        let mut jobs = processing.jobs.lock();
+                        jobs.get_mut(&id).map(|job| {
+                            job.failures.push(failure);
+                            job.completed = counts.0;
+                            job.total = counts.1;
+                            job.clone()
+                        })
+                    };
+                    if let Some(job) = job {
+                        progress_handle.state::<JobChannel>().channel.publish(job);
+                    }
+                    None
                 }
                 Progress::Retrying {
                     page,
@@ -304,8 +328,10 @@ pub(crate) async fn start_job(
                     JobState::Stopped
                 } else if error.is_some() {
                     JobState::Failed
-                } else {
+                } else if job.failures.is_empty() {
                     JobState::Finished
+                } else {
+                    JobState::FinishedWithProblems
                 };
                 job.error = error;
                 job

@@ -345,6 +345,7 @@ impl KoharuHost {
             "completed": report.completed,
             "total": report.total,
             "elapsed_ms": report.elapsed.as_millis(),
+            "failures": report.failures,
         }))
     }
 }

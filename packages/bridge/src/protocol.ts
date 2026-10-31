@@ -416,11 +416,12 @@ export type Job = {
 	model: string | null,
 	error: string | null,
 	retry: RetryProgress | null,
+	failures: PageFailure[],
 };
 
 export type JobId = string;
 
-export type JobState = "running" | "finished" | "failed" | "stopped";
+export type JobState = "running" | "finished" | "finished_with_problems" | "failed" | "stopped";
 
 export type KoharuLayoutRFDetrSeg2XLConfig = {
 	text_threshold?: number | null,
@@ -551,6 +552,13 @@ export type Page = {
 	size: PageSize,
 	layers: Layer[],
 	regions: AnalysisRegion[],
+};
+
+export type PageFailure = {
+	page: EntityId,
+	label: string,
+	stage: Stage,
+	error: string,
 };
 
 export type PageImportSource = "files" | "folder";

@@ -33,6 +33,8 @@ pub(crate) struct Execution<'a> {
     busy_stages: BTreeSet<Stage>,
     completed: usize,
     failure: Option<PipelineError>,
+    failures: Vec<crate::PageFailure>,
+    failed_pages: BTreeSet<EntityId>,
     base: koharu_scene::Revision,
     started: Instant,
     inpainting_mask: Option<crate::InpaintingMask>,
@@ -88,6 +90,8 @@ impl<'a> Execution<'a> {
             busy_stages: BTreeSet::new(),
             completed: 0,
             failure: None,
+            failures: Vec::new(),
+            failed_pages: BTreeSet::new(),
             base,
             started,
             inpainting_mask: request.inpainting_mask,
@@ -116,7 +120,10 @@ impl<'a> Execution<'a> {
                 break;
             };
             self.busy_stages.remove(&completion.stage);
-            if self.stopped() || self.failure.is_some() {
+            if self.stopped()
+                || self.failure.is_some()
+                || self.failed_pages.contains(&completion.page)
+            {
                 continue;
             }
             if let Err(error) = self.apply_completion(completion).await {
@@ -170,14 +177,34 @@ impl<'a> Execution<'a> {
             elapsed,
             outcome,
         } = completion;
-        match outcome? {
+        let outcome = match outcome {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                self.record_failure(page, stage, &error);
+                return if self.policy.on_page_failure == crate::OnPageFailure::StopRun
+                    || matches!(error.kind, ErrorKind::InvalidInput | ErrorKind::Commit)
+                {
+                    Err(error)
+                } else {
+                    Ok(())
+                };
+            }
+        };
+        match outcome {
             StageOutcome::Stopped => {}
             StageOutcome::Skipped => {
                 self.mark_complete(page, stage);
                 progress::emit(self.progress.as_ref(), Progress::Skipped { page, stage });
             }
             StageOutcome::Patch(patch) => {
-                if !self.commit_patch(page, stage, patch).await? {
+                let committed = match self.commit_patch(page, stage, patch).await {
+                    Ok(committed) => committed,
+                    Err(error) => {
+                        self.record_failure(page, stage, &error);
+                        return Err(error);
+                    }
+                };
+                if !committed {
                     return Ok(());
                 }
                 self.mark_complete(page, stage);
@@ -193,6 +220,29 @@ impl<'a> Execution<'a> {
             }
         }
         Ok(())
+    }
+
+    fn record_failure(&mut self, page: EntityId, stage: Stage, error: &PipelineError) {
+        let failure = crate::PageFailure {
+            page,
+            label: self
+                .scene
+                .page(page)
+                .and_then(|page| page.page())
+                .map(|page| page.label)
+                .unwrap_or_else(|_| page.to_string()),
+            stage,
+            error: format!("{error:#}"),
+        };
+        self.failed_pages.insert(page);
+        let settled = self.scheduler.fail_page(page);
+        self.completed += settled;
+        self.images.remove(&page);
+        self.failures.push(failure.clone());
+        progress::emit(
+            self.progress.as_ref(),
+            Progress::PageFailed { failure, settled },
+        );
     }
 
     async fn commit_patch(
@@ -254,7 +304,11 @@ impl<'a> Execution<'a> {
         let status = if self.stopped() {
             RunStatus::Stopped
         } else {
-            RunStatus::Completed
+            if self.failures.is_empty() {
+                RunStatus::Completed
+            } else {
+                RunStatus::CompletedWithProblems
+            }
         };
         Ok(self.report(status))
     }
@@ -267,6 +321,7 @@ impl<'a> Execution<'a> {
             completed: self.completed,
             total: self.scheduler.total(),
             elapsed: self.started.elapsed(),
+            failures: self.failures.clone(),
         }
     }
 }

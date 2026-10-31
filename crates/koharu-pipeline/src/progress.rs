@@ -19,6 +19,10 @@ pub enum Progress {
         stage: Stage,
         model: String,
     },
+    PageFailed {
+        failure: crate::PageFailure,
+        settled: usize,
+    },
     Retrying {
         page: EntityId,
         stage: Stage,

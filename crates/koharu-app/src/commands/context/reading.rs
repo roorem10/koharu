@@ -311,6 +311,7 @@ pub(crate) async fn read_chapter(
                 model: Some("chapter_context_reading".into()),
                 error: None,
                 retry: None,
+                failures: Vec::new(),
             },
         );
     }

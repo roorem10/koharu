@@ -8,7 +8,16 @@ use crate::Stage;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RunStatus {
     Completed,
+    CompletedWithProblems,
     Stopped,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
+pub struct PageFailure {
+    pub page: koharu_scene::EntityId,
+    pub label: String,
+    pub stage: Stage,
+    pub error: String,
 }
 
 #[derive(Debug)]
@@ -19,6 +28,7 @@ pub struct Report {
     pub completed: usize,
     pub total: usize,
     pub elapsed: Duration,
+    pub failures: Vec<PageFailure>,
 }
 
 #[derive(Debug)]

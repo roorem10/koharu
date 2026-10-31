@@ -122,6 +122,28 @@ impl Scheduler {
         None
     }
 
+    pub(crate) fn fail_page(&mut self, page: EntityId) -> usize {
+        let Some(&index) = self.page_index.get(&page) else {
+            return 0;
+        };
+        let page = &mut self.pages[index];
+        let remaining = page
+            .stages
+            .iter()
+            .filter(|work| work.state != WorkState::Finished)
+            .count();
+        if page.started() && !page.finished() {
+            self.active_pages = self.active_pages.saturating_sub(1);
+        }
+        for work in &mut page.stages {
+            work.state = WorkState::Finished;
+        }
+        while self.head < self.pages.len() && self.pages[self.head].finished() {
+            self.head += 1;
+        }
+        remaining
+    }
+
     pub(crate) fn complete_stage(&mut self, page: EntityId, stage: Stage) -> bool {
         let Some(&page_index) = self.page_index.get(&page) else {
             return false;
