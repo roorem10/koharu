@@ -390,6 +390,10 @@ impl Host for KoharuHost {
                         "Replace an element's typography settings. Font is a family name from available_fonts.",
                     ),
                     text_style_definition(),
+                    definition::<crate::commands::emphasis::agent::StyleWords>(
+                        "style_words",
+                        "Style words in one text layer, in one undoable edit. Choose text (first whole-word/phrase match; plain match for CJK) or start/end (Unicode character offsets, end exclusive). Choose style: emphasis for its category preset, explicit bold/italic/size_percent/color/outline_color/outline_width, or clear: true. Colors are RGBA byte arrays. Word styles remain editable. Example: {\"layer\":\"<ID>\",\"text\":\"NO\",\"size_percent\":130}.",
+                    ),
                     definition::<AddGlossaryEntry>("add_glossary_entry", "Suggest a glossary term for this chapter without replacing an existing series term."),
                     definition::<SetLineCategory>("set_line_category", "Set a model lettering category for a text layer. A user label always wins."),
                     definition::<FlagLine>("flag_line", "Mark a text layer for human review with a short message."),
@@ -532,6 +536,16 @@ impl Host for KoharuHost {
                             project.set_translation(element, arguments.text).await?,
                             json!({ "element": element }),
                         ))
+                    })
+                })
+                .await
+            }
+            "style_words" => {
+                let arguments: crate::commands::emphasis::agent::StyleWords = arguments(&call)?;
+                self.mutate(|project| {
+                    Box::pin(async move {
+                        let commit = project.style_words(arguments).await?;
+                        Ok((commit, json!({ "styled": true })))
                     })
                 })
                 .await

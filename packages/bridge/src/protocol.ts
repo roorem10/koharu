@@ -166,11 +166,9 @@ export const commands = {
 	replaceTextRange: (layer: EntityId, start: number, end: number, insert: string) => __TAURI_INVOKE<null>("replace_text_range", { layer, start, end, insert }),
 	getWordStyles: (layer: EntityId) => __TAURI_INVOKE<StyleRun[]>("get_word_styles", { layer }),
 	getTextGlyphBoxes: (layer: EntityId) => __TAURI_INVOKE<GlyphBox[]>("get_text_glyph_boxes", { layer }),
-	/**
-	 *  Applies the box's lettering-category Emphasis style to `start..end`, as
-	 *  ordinary word styles (one undo step). Used by the ★ button.
-	 */
 	applyEmphasis: (layer: EntityId, start: number, end: number) => __TAURI_INVOKE<null>("apply_emphasis", { layer, start, end }),
+	getEmphasisSettings: () => __TAURI_INVOKE<EmphasisPreferences>("get_emphasis_settings"),
+	saveEmphasisSettings: (settings: EmphasisPreferences) => __TAURI_INVOKE<EmphasisPreferences>("save_emphasis_settings", { settings }),
 };
 
 /* Types */
@@ -404,6 +402,16 @@ export type DownloadState = "running" | "finished" | "failed";
 export type EffectiveCategory = {
 	category: LetteringCategory,
 	reason: CategoryReason,
+};
+
+/**
+ *  IPC always includes the preset, while persisted configuration may omit its
+ *  baseline table to preserve cleared fields across config-default merging.
+ */
+export type EmphasisPreferences = {
+	enabled_for_ai: boolean,
+	default: RunStyle,
+	categories: { [key in string]: RunStyle },
 };
 
 export type EntityId = string;

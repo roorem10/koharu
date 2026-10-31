@@ -252,6 +252,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             // WO-11E (panel acting on selected words) commands go here.
             // WO-11F (emphasis style and AI emphasis) commands go here.
             emphasis::apply_emphasis,
+            emphasis::get_emphasis_settings,
+            emphasis::save_emphasis_settings,
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)
