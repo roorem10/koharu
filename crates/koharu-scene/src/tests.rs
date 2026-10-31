@@ -156,6 +156,7 @@ async fn built_in_component_kinds_express_domain_ownership() {
             DetectionAnalysis::KIND,
             OcrAnalysis::KIND,
             crate::components::Assets::KIND,
+            TextRuns::KIND,
         ],
         [
             "dev.koharu.project",
@@ -177,6 +178,7 @@ async fn built_in_component_kinds_express_domain_ownership() {
             "dev.koharu.analysis.detection",
             "dev.koharu.analysis.ocr",
             "dev.koharu.assets",
+            "dev.koharu.text.style_runs",
         ]
     );
 }
@@ -1930,4 +1932,68 @@ fn text_warp_validation_rejects_nonfinite_crossed_concave_and_degenerate_quads()
     ] {
         assert!(check(TextWarp::Perspective { corners }).is_err());
     }
+}
+
+#[tokio::test]
+async fn word_styles_belong_to_text_layers_and_keep_their_runs_ordered() {
+    let mut session = Session::memory().await.unwrap();
+    let mut ids = None;
+    let patch = session
+        .snapshot()
+        .patch(|edit| {
+            let page = edit.add_page(PageDraft::new("page", 100., 100.), At::End)?;
+            let content = edit.add_text_content(page, At::End)?;
+            let layer = edit.add_text_layer(
+                page,
+                At::End,
+                content,
+                &TextLayout {
+                    origin: Origin::User,
+                    kind: TextLayoutKind::Paragraph,
+                    angle_degrees: None,
+                    warp: None,
+                },
+            )?;
+            ids = Some((content, layer));
+            Ok(())
+        })
+        .unwrap();
+    session.commit(patch).await.unwrap();
+    let (content, layer) = ids.unwrap();
+    let runs = |ranges: &[(u32, u32)]| TextRuns {
+        origin: Origin::User,
+        runs: ranges
+            .iter()
+            .map(|&(start, end)| StyleRun {
+                start,
+                end,
+                style: RunStyle {
+                    font_weight: Some(700),
+                    ..Default::default()
+                },
+            })
+            .collect(),
+    };
+    let snapshot = session.snapshot();
+    let patch = snapshot
+        .patch(|edit| edit.set(layer, &runs(&[(0, 3), (5, 8)])))
+        .unwrap();
+    let snapshot = session.commit(patch).await.unwrap().snapshot;
+    assert_eq!(
+        snapshot
+            .component::<TextRuns>(layer)
+            .unwrap()
+            .unwrap()
+            .runs
+            .len(),
+        2
+    );
+    for bad in [&[(3, 3)][..], &[(0, 4), (3, 6)][..], &[(5, 8), (0, 3)][..]] {
+        assert!(snapshot.patch(|edit| edit.set(layer, &runs(bad))).is_err());
+    }
+    assert!(
+        snapshot
+            .patch(|edit| edit.set(content, &runs(&[(0, 1)])))
+            .is_err()
+    );
 }

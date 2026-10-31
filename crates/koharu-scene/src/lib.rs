@@ -27,9 +27,10 @@ pub use components::{
     Asset, AssetInput, AssetMetadata, AssetRole, Authored, DetectionAnalysis, DetectionLabel,
     EntityOrigin, FillGradient, FontStyle, Generation, Geometry, GradientKind, GradientStop, Group,
     LanguageTag, OcrAnalysis, Origin, Page, PageDraft, Point, Project, RasterLayer,
-    RasterLayerKind, Region, RegionKind, Relation, RelationKind, SourceText, StrokeJoin,
-    StrokeMethod, StrokePosition, TextAlignment, TextContent, TextDirection, TextGroup, TextLayout,
-    TextLayoutKind, TextRole, TextWarp, Translation, Typography, Visibility, WritingMode,
+    RasterLayerKind, Region, RegionKind, Relation, RelationKind, RunStyle, SourceText, StrokeJoin,
+    StrokeMethod, StrokePosition, StyleRun, TextAlignment, TextContent, TextDirection, TextGroup,
+    TextLayout, TextLayoutKind, TextRole, TextRuns, TextWarp, Translation, Typography, Visibility,
+    WritingMode, char_range_to_byte_range,
 };
 pub use document::{AnalysisRegionRef, GroupRef, TextContentRef, TextLayerRef};
 pub use edit::{At, Edit, RemovePolicy};

@@ -345,11 +345,19 @@ async fn start_job_inner(
                         project.snapshot().project_id() == self.project,
                         "the project changed during processing"
                     );
-                    let Some(commit) = project.commit_rebased(output.patch).await? else {
+                    let Some(mut commit) = project.commit_rebased(output.patch).await? else {
                         return Ok(project.snapshot());
                     };
                     project.record_commit(&commit);
                     if output.stage == koharu_pipeline::Stage::Translation {
+                        // WO-11A: a new translation wipes word styles and resets
+                        // the box style (decision 4).
+                        if let Some(reset) =
+                            super::rich_text::after_translation(project, &commit).await?
+                        {
+                            project.record_commit(&reset);
+                            commit = reset;
+                        }
                         super::context::refresh_flags(project)?;
                     }
                     let page = project.active_page();

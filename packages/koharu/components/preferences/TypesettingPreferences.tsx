@@ -5,6 +5,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { FontPicker } from '@/components/controls/FontPicker'
+import { EmphasisPreferences } from '@/components/emphasis/EmphasisPreferences'
 import { PreferencePage } from '@/components/preferences/PreferenceFields'
 import { ShapeStylePreferences } from '@/components/preferences/ShapeStylePreferences'
 import { TextStylePreferences } from '@/components/preferences/TextStylePreferences'
@@ -48,6 +49,7 @@ export function TypesettingPreferences({
     >
       <TextStylePreferences />
       <ShapeStylePreferences />
+      <EmphasisPreferences />
       <section aria-labelledby='typesetting-font-stack'>
         <header className='mb-3'>
           <h3 id='typesetting-font-stack' className='text-[12px] font-semibold'>

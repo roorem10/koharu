@@ -4,6 +4,7 @@ pub(crate) mod canvas;
 pub(crate) mod cleanup;
 pub(crate) mod context;
 pub(crate) mod editing;
+pub(crate) mod emphasis;
 pub(crate) mod files;
 pub(crate) mod fonts;
 pub(crate) mod import;
@@ -20,8 +21,10 @@ pub(crate) mod project;
 pub(crate) mod qc;
 pub(crate) mod raw_prep;
 pub(crate) mod redesign;
+pub(crate) mod rich_text;
 pub(crate) mod runs;
 pub(crate) mod styles;
+pub(crate) mod text_glyphs;
 pub(crate) mod warp;
 
 use parking_lot::Mutex;
@@ -237,6 +240,18 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             context::reading::get_reading_model,
             context::reading::get_reading_models,
             context::reading::get_last_read_model,
+            // WO-11A (word styles data and commands) commands go here.
+            rich_text::set_word_style,
+            rich_text::clear_word_styles,
+            rich_text::replace_text_range,
+            rich_text::get_word_styles,
+            // WO-11B (mixed fonts and sizes in layout) adds no commands.
+            // WO-11C (word paint, PSD, QC, glyph boxes) commands go here.
+            text_glyphs::get_text_glyph_boxes,
+            // WO-11D (on-page editor) adds no commands.
+            // WO-11E (panel acting on selected words) commands go here.
+            // WO-11F (emphasis style and AI emphasis) commands go here.
+            emphasis::apply_emphasis,
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)

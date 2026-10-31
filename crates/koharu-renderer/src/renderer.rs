@@ -13,8 +13,8 @@ use koharu_scene::{
     Asset, AssetRole, BlobId, Change, Component, ComponentOwner, EntityChange, EntityId, FitsTo,
     FlowsIn, Geometry, Group, OcrAnalysis, Origin, Page, Presents, RasterLayer, RasterLayerKind,
     RecognizedFrom, Region, RelationChange, RelationId, RelationSpec, Revision, Snapshot,
-    TextAlignment, TextDirection, TextLayout as SceneTextLayout, TextLayoutKind, Translation,
-    Typography, Visibility,
+    TextAlignment, TextDirection, TextLayout as SceneTextLayout, TextLayoutKind, TextRuns,
+    Translation, Typography, Visibility,
 };
 use parking_lot::Mutex;
 use rayon::prelude::*;
@@ -660,6 +660,7 @@ impl Traversal<'_> {
             if let Some(layout) = self.snapshot.component::<SceneTextLayout>(entity)? {
                 common.insert(component_dependency::<SceneTextLayout>(entity));
                 common.insert(component_dependency::<Typography>(entity));
+                common.insert(component_dependency::<TextRuns>(entity));
                 common.insert(component_dependency::<Geometry>(entity));
                 for kind in [Presents::KIND, FitsTo::KIND, FlowsIn::KIND] {
                     common.insert(RenderDependency::RelationQuery {
@@ -833,6 +834,12 @@ impl Traversal<'_> {
             word_spacing: 0.0,
             text_inset: [4.0; 4],
             point_text: !is_bubble && layout.kind == TextLayoutKind::Point,
+            // Word styles (batch 3). Empty for every box without them.
+            runs: self
+                .snapshot
+                .component::<TextRuns>(entity)?
+                .map(|runs| runs.runs)
+                .unwrap_or_default(),
         };
         Ok(Some(LayerDraft {
             entity,
