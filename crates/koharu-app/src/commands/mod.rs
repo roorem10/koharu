@@ -208,6 +208,12 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             mcp::save_mcp_settings,
             mcp::new_mcp_token,
             // WO-07 (OCR box and redo) commands go here.
+            ocr_box::settings::get_ocr_box_settings,
+            ocr_box::settings::save_ocr_box_settings,
+            ocr_box::add_ocr_box,
+            ocr_box::get_ocr_redo_info,
+            ocr_box::redo_ocr_boxes,
+            ocr_box::add_sfx_subtitle,
             // WO-15 (cleanup brushes) commands go here.
             // WO-10 (skew and perspective) commands go here.
             // WO-17 (raw prep) commands go here.
