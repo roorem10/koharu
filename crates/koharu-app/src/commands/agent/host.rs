@@ -24,12 +24,12 @@ use crate::commands::{
 };
 
 #[derive(Clone)]
-pub(super) struct KoharuHost {
+pub(crate) struct KoharuHost {
     handle: AppHandle<CefRuntime>,
 }
 
 impl KoharuHost {
-    pub(super) fn new(handle: AppHandle<CefRuntime>) -> Self {
+    pub(crate) fn new(handle: AppHandle<CefRuntime>) -> Self {
         Self { handle }
     }
 
@@ -285,6 +285,13 @@ impl KoharuHost {
         {
             let processing = self.handle.state::<Processing>();
             let mut stops = processing.stops.lock();
+            anyhow::ensure!(
+                !self
+                    .handle
+                    .state::<super::super::runs::BatchState>()
+                    .active(),
+                "a chapter batch is running"
+            );
             if !stops.is_empty() {
                 bail!("another pipeline process is already running");
             }
@@ -307,6 +314,8 @@ impl KoharuHost {
             progress: None,
             inpainting_mask: None,
             translation_hints,
+            redetect: false,
+            policy: super::super::runs::RunSettings::load()?.policy(),
         };
         let mut request = request;
         let result = async {
@@ -343,6 +352,7 @@ impl KoharuHost {
             "completed": report.completed,
             "total": report.total,
             "elapsed_ms": report.elapsed.as_millis(),
+            "failures": report.failures,
         }))
     }
 }
@@ -399,6 +409,15 @@ impl Host for KoharuHost {
                     definition::<RunPipeline>(
                         "run_pipeline",
                         "Run Koharu's configured processing pipeline for the whole project, selected pages, or selected text elements.",
+                    ),
+                    // WO-20 (one box per bubble) tool definitions go here.
+                    definition::<crate::commands::boxes::FindSplitBubblesArgs>(
+                        "find_split_bubbles",
+                        "Find bubbles with multiple text boxes, including box IDs, source text, and translations. Pass a page ID to inspect one page; omit it to inspect the project. Report split bubbles to the user before joining unless the user asked to fix them.",
+                    ),
+                    definition::<crate::commands::boxes::JoinBubbleBoxesArgs>(
+                        "join_bubble_boxes",
+                        "Join all boxes in the selected text layer's bubble in reading order, preserving their text in one undoable edit. Report the split bubbles first unless the user asked to fix them.",
                     ),
                 ]
             })
@@ -545,6 +564,9 @@ impl Host for KoharuHost {
                     }),
                     outer_stroke_color: arguments.outer_stroke_color,
                     outer_stroke_width: arguments.outer_stroke_width,
+                    line_spacing: arguments.line_spacing,
+                    letter_spacing: arguments.letter_spacing,
+                    fill_gradient: arguments.fill_gradient,
                     alignment: arguments.alignment.map(Into::into),
                     writing_mode: arguments.writing_mode.map(Into::into),
                 };
@@ -652,6 +674,26 @@ impl Host for KoharuHost {
                 self.context_tool(&call).await
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
+            // WO-20 (one box per bubble) tool calls go here.
+            "find_split_bubbles" => {
+                let arguments: crate::commands::boxes::FindSplitBubblesArgs = arguments(&call)?;
+                let page = arguments.page.as_deref().map(entity).transpose()?;
+                let current = self.handle.state::<CurrentProject>();
+                let current = current.project.lock().await;
+                let project = current.as_ref().context("no project is open")?;
+                Invocation::read(project.find_split_bubbles(page)?)
+            }
+            "join_bubble_boxes" => {
+                let arguments: crate::commands::boxes::JoinBubbleBoxesArgs = arguments(&call)?;
+                let layer = entity(&arguments.layer)?;
+                self.mutate_optional(|project| {
+                    Box::pin(async move {
+                        let (commit, kept) = project.join_bubble_boxes(layer).await?;
+                        Ok((commit, json!({ "layer": kept })))
+                    })
+                })
+                .await
+            }
             name => bail!("unknown Koharu tool {name}"),
         }
     }
@@ -931,8 +973,34 @@ struct SetTypography {
     outer_stroke_color: Option<[u8; 4]>,
     /// Width of the second outline in pixels; omit or 0 for none.
     outer_stroke_width: Option<f32>,
+    line_spacing: Option<f32>,
+    letter_spacing: Option<f32>,
+    #[schemars(with = "Option<AgentFillGradient>")]
+    fill_gradient: Option<koharu_scene::FillGradient>,
     alignment: Option<AgentTextAlignment>,
     writing_mode: Option<AgentWritingMode>,
+}
+
+#[derive(JsonSchema)]
+#[allow(dead_code)]
+struct AgentFillGradient {
+    kind: AgentGradientKind,
+    angle_degrees: f32,
+    stops: Vec<AgentGradientStop>,
+}
+
+#[derive(JsonSchema)]
+#[allow(dead_code)]
+enum AgentGradientKind {
+    Linear,
+    Radial,
+}
+
+#[derive(JsonSchema)]
+#[allow(dead_code)]
+struct AgentGradientStop {
+    offset: f32,
+    color: [u8; 4],
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -1088,6 +1156,9 @@ mod text_style_tests {
                     stroke_join: None,
                     outer_stroke_color: None,
                     outer_stroke_width: None,
+                    line_spacing: None,
+                    letter_spacing: None,
+                    fill_gradient: None,
                     alignment: None,
                     writing_mode: Some(koharu_scene::WritingMode::Vertical),
                     extensions: Default::default(),

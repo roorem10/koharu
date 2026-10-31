@@ -4,6 +4,7 @@ import { Eraser } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { McpPreferences } from '@/components/preferences/McpPreferences'
 import {
   PreferencePage,
   PreferenceRow,
@@ -80,6 +81,7 @@ export function ProviderPreferences({
           </PreferenceRow>
         ))}
       </PreferenceSection>
+      <McpPreferences />
     </PreferencePage>
   )
 }

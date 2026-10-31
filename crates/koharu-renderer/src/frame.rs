@@ -375,6 +375,8 @@ pub struct TextMetadata {
     pub post_script_fonts: Vec<String>,
     pub font_size: f32,
     pub color: [u8; 4],
+    pub line_spacing: Option<f32>,
+    pub letter_spacing: f32,
     pub alignment: TextAlign,
     pub writing_mode: WritingMode,
     pub angle_degrees: f32,
@@ -469,6 +471,8 @@ pub(crate) struct LocalTextMetadata {
     pub(crate) post_script_fonts: Vec<String>,
     pub(crate) font_size: f32,
     pub(crate) color: [u8; 4],
+    pub(crate) line_spacing: Option<f32>,
+    pub(crate) letter_spacing: f32,
 }
 
 pub(crate) fn prepare_frame(

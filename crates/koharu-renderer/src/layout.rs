@@ -187,6 +187,7 @@ pub struct TextLayout<'a> {
     alignment: Option<TextAlign>,
     line_height: Option<f32>,
     letter_spacing: f32,
+    tracking: f32,
     word_spacing: f32,
     cjk_punctuation_layout: bool,
 }
@@ -256,6 +257,7 @@ impl<'a> TextLayout<'a> {
             alignment: None,
             line_height: None,
             letter_spacing: 0.0,
+            tracking: 0.0,
             word_spacing: 0.0,
             cjk_punctuation_layout: false,
         }
@@ -353,6 +355,13 @@ impl<'a> TextLayout<'a> {
     pub fn with_spacing(mut self, letter: f32, word: f32) -> Self {
         self.letter_spacing = letter;
         self.word_spacing = word;
+        self
+    }
+
+    /// Additional spacing in ems, recomputed for every auto-fit candidate.
+    #[must_use]
+    pub fn with_tracking(mut self, ems: f32) -> Self {
+        self.tracking = ems;
         self
     }
 
@@ -531,6 +540,7 @@ impl<'a> TextLayout<'a> {
             let mut advance = 0.0f32;
             for mut shaped in shape_script_runs(&shaper, suffix.as_str(), &fonts, &suffix_options)?
             {
+                self.apply_spacing(font_size, suffix.as_str(), &mut shaped);
                 for glyph in &mut shaped.glyphs {
                     glyph.cluster += cluster as u32;
                 }
@@ -588,7 +598,7 @@ impl<'a> TextLayout<'a> {
                     let script_runs =
                         shape_script_runs(&shaper, shaping_text, &fonts, &run_options)?;
                     for mut shaped in script_runs {
-                        self.apply_spacing(shaping_text, &mut shaped);
+                        self.apply_spacing(font_size, shaping_text, &mut shaped);
                         if self.writing_mode.is_vertical() && self.center_vertical_punctuation {
                             self.center_vertical_punctuation(
                                 font_size,
@@ -1314,7 +1324,10 @@ impl<'a> TextLayout<'a> {
                 {
                     glyph.x_offset = -x_min;
                     glyph.x_advance = if index == last {
-                        extend_advance(x_max - x_min, self.letter_spacing)
+                        extend_advance(
+                            x_max - x_min,
+                            self.letter_spacing + self.tracking * font_size,
+                        )
                     } else {
                         x_max - x_min + gap
                     };
@@ -1328,15 +1341,16 @@ impl<'a> TextLayout<'a> {
         shaped.y_advance = shaped.glyphs.iter().map(|glyph| glyph.y_advance).sum();
     }
 
-    fn apply_spacing(&self, text: &str, shaped: &mut ShapedRun<'a>) {
-        if self.letter_spacing == 0.0 && self.word_spacing == 0.0 {
+    fn apply_spacing(&self, font_size: f32, text: &str, shaped: &mut ShapedRun<'a>) {
+        let letter_spacing = self.letter_spacing + self.tracking * font_size;
+        if letter_spacing == 0.0 && self.word_spacing == 0.0 {
             return;
         }
         for glyph in &mut shaped.glyphs {
             let character = text
                 .get(glyph.cluster as usize..)
                 .and_then(|tail| tail.chars().next());
-            let extra = self.letter_spacing
+            let extra = letter_spacing
                 + character
                     .filter(|character| character.is_whitespace())
                     .map_or(0.0, |_| self.word_spacing);
@@ -2165,6 +2179,36 @@ mod tests {
             contour,
             minimum_air,
         }
+    }
+
+    #[test]
+    fn tracking_and_line_spacing_change_layout_and_auto_fit() -> anyhow::Result<()> {
+        let font = any_system_font();
+        let base = TextLayout::new(&font)
+            .with_font_size(24.0)
+            .with_line_height(1.2);
+        let normal = base.run("MMMMMMMM")?;
+        let tight = base.clone().with_tracking(-0.2).run("MMMMMMMM")?;
+        let loose = base.clone().with_tracking(0.2).run("MMMMMMMM")?;
+        assert!(tight.width < normal.width && normal.width < loose.width);
+        let normal_lines = base.run("First\nSecond\nThird")?;
+        let tight_lines = base
+            .clone()
+            .with_line_height(0.8)
+            .run("First\nSecond\nThird")?;
+        assert!(tight_lines.height < normal_lines.height);
+        let width = (tight.width + normal.width) * 0.5;
+        let fit = |tracking| {
+            TextLayout::new(&font)
+                .with_min_font_size(6.0)
+                .with_max_font_size(24.0)
+                .with_max_width(width)
+                .with_max_height(30.0)
+                .with_tracking(tracking)
+                .run("MMMMMMMM")
+        };
+        assert!(fit(-0.2)?.font_size > fit(0.0)?.font_size);
+        Ok(())
     }
 
     #[test]

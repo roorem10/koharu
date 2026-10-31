@@ -31,6 +31,7 @@ impl From<koharu_scene::FontStyle> for FontStyle {
 #[serde(rename_all = "camelCase")]
 pub struct FontFamily {
     pub name: String,
+    pub local_names: Vec<String>,
     pub metadata: FontMetadata,
     pub sources: Vec<FontSource>,
     pub faces: Vec<FontFace>,

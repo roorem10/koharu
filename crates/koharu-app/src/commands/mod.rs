@@ -1,16 +1,22 @@
 pub(crate) mod agent;
+pub(crate) mod boxes;
 pub(crate) mod canvas;
 pub(crate) mod context;
 pub(crate) mod editing;
+pub(crate) mod files;
 pub(crate) mod fonts;
 pub(crate) mod import;
 pub(crate) mod lettering;
 pub(crate) mod lifecycle;
 pub(crate) mod line_labels;
+pub(crate) mod mcp;
+pub(crate) mod notes;
 pub(crate) mod output;
 pub(crate) mod preferences;
 pub(crate) mod processing;
 pub(crate) mod project;
+pub(crate) mod qc;
+pub(crate) mod runs;
 pub(crate) mod styles;
 
 use parking_lot::Mutex;
@@ -155,6 +161,47 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             lettering::get_effective_category,
             lettering::get_lettering_settings,
             lettering::save_lettering_settings,
+            // WO-20 (one box per bubble) commands go here.
+            boxes::get_box_settings,
+            boxes::save_box_settings,
+            boxes::redetect_page,
+            boxes::get_box_actions,
+            boxes::join_bubble_boxes,
+            boxes::join_page_bubbles,
+            boxes::split_box,
+            // WO-12 (QC list) commands go here.
+            qc::run_qc,
+            qc::mark_qc_ok,
+            qc::get_qc_settings,
+            qc::save_qc_settings,
+            qc::get_page_source,
+            // WO-13 (files and export) commands go here.
+            files::get_library_settings,
+            files::save_library_settings,
+            output::export_selected_pages,
+            files::scripts::export_script,
+            files::scripts::preview_script_import,
+            files::scripts::apply_script_import,
+            files::library::get_library_paths,
+            files::library::choose_library_folder,
+            files::library::reset_library_folder,
+            files::library::open_library_folder,
+            files::library::rename_project,
+            files::library::duplicate_project,
+            // WO-14 (runs and retries) commands go here.
+            runs::get_run_settings,
+            runs::save_run_settings,
+            runs::retry_failed_pages,
+            runs::preview_chapter_batch,
+            runs::run_chapter_batch,
+            runs::stop_chapter_batch,
+            // WO-06 (text style extras and box notes) commands go here.
+            notes::get_box_note,
+            notes::set_box_note,
+            // WO-21 (MCP server) commands go here.
+            mcp::get_mcp_status,
+            mcp::save_mcp_settings,
+            mcp::new_mcp_token,
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)

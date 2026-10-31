@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     io::Cursor,
     sync::{Arc, Mutex},
 };
@@ -25,7 +25,7 @@ use koharu_renderer::{TextStyle, TextStyles};
 use koharu_scene::{
     AssetInput, AssetMetadata, AssetRole, At, BubbleRegion, DetectionAnalysis, DetectionLabel,
     EntityId, EntityOrigin, FitsTo, FlowsIn, Generation, Geometry, Inside, Origin, PanelRegion,
-    Point, RecognizedFrom, Region, RegionKind, RegionSpec, RemovePolicy, TextLayout,
+    Point, Presents, RecognizedFrom, Region, RegionKind, RegionSpec, RemovePolicy, TextLayout,
     TextLayoutKind, TextRegion, TextRole, Typography, WritingMode,
 };
 use rayon::prelude::*;
@@ -50,6 +50,20 @@ const COLOR_CLUSTER_COUNT: usize = 4;
 const MIN_EXTREME_COLOR_PIXELS: u32 = 4;
 const MIN_MEASURED_STROKE_WIDTH: u8 = 2;
 const DIALOGUE_MASK_CONTAINMENT_THRESHOLD: f32 = 0.9;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(default)]
+pub struct BoxSettings {
+    pub join_in_bubble: bool,
+}
+
+impl Default for BoxSettings {
+    fn default() -> Self {
+        Self {
+            join_in_bubble: true,
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
 #[serde(default)]
@@ -124,6 +138,9 @@ impl StageProcessor for Processor {
     }
 
     fn skip(&self, input: &StageInput) -> Result<bool> {
+        if input.redetect {
+            return Ok(false);
+        }
         for entity in input.scene.descendants(input.page)? {
             let id = entity.id();
             if input.contains_entity(id)?
@@ -149,12 +166,15 @@ impl StageProcessor for Processor {
 
     async fn process(&self, input: StageInput) -> Result<koharu_scene::Patch> {
         let styles = self.text_styles.read()?.clone();
+        let join_in_bubble = koharu_config::load::<BoxSettings>("boxes")?
+            .read()?
+            .join_in_bubble;
         self.model
             .lock()
             .await
             .as_ref()
             .ok_or_else(|| anyhow!("detection model is not loaded"))?
-            .run(input, self.text_colors, &styles)
+            .run(input, self.text_colors, &styles, join_in_bubble)
             .await
     }
 }
@@ -183,6 +203,7 @@ impl Model {
         input: StageInput,
         colors: TextColorOptions,
         styles: &TextStyles,
+        join_in_bubble: bool,
     ) -> Result<koharu_scene::Patch> {
         let page = input.page;
         let image = input
@@ -198,6 +219,7 @@ impl Model {
             &generation(PRODUCER, MODEL_ID)?,
             colors,
             styles,
+            join_in_bubble,
         )
         .await
     }
@@ -249,6 +271,7 @@ struct ImageSize {
     height: u32,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_patch(
     input: &StageInput,
     image: &DynamicImage,
@@ -256,6 +279,7 @@ async fn build_patch(
     generation: &Generation,
     colors: TextColorOptions,
     styles: &TextStyles,
+    join_in_bubble: bool,
 ) -> Result<koharu_scene::Patch> {
     let page = input.page;
     let mut edit = input.scene.edit_as(generation.clone());
@@ -263,7 +287,15 @@ async fn build_patch(
     remove_previous_regions(input, &mut edit, generation)
         .context("failed to replace the previous detection regions")?;
     write_page(
-        input, &mut edit, page, image, output, generation, colors, styles,
+        input,
+        &mut edit,
+        page,
+        image,
+        output,
+        generation,
+        colors,
+        styles,
+        join_in_bubble,
     )
     .await
     .context("failed to write detection output")?;
@@ -275,26 +307,63 @@ fn remove_previous_regions(
     edit: &mut koharu_scene::Edit,
     generation: &Generation,
 ) -> Result<()> {
-    let mut remove = Vec::new();
+    let owned = |id| -> Result<bool> {
+        Ok(input.scene.component::<EntityOrigin>(id)?.is_some_and(|origin| {
+            matches!(origin.origin, Origin::Generated(owner) if owner.producer == generation.producer)
+        }))
+    };
+    let mut remove = BTreeSet::new();
     for entity in input.scene.descendants(input.page)? {
         let id = entity.id();
-        if !input.contains_entity(id)? {
-            continue;
+        if input.contains_entity(id)? && owned(id)? && entity.component::<Region>()?.is_some() {
+            remove.insert(id);
         }
-        let owned_region = entity
-            .component::<EntityOrigin>()?
-            .is_some_and(|origin| {
-                matches!(origin.origin, Origin::Generated(ref owner) if owner.producer == generation.producer)
+    }
+    let regions = remove.iter().copied().collect::<Vec<_>>();
+    for region in regions {
+        for relation in input.scene.relations_to_as::<RecognizedFrom>(region) {
+            let content = relation.value().source;
+            let source = input.scene.component::<koharu_scene::SourceText>(content)?;
+            let translation = input
+                .scene
+                .component::<koharu_scene::Translation>(content)?;
+            if !owned(content)?
+                || source.is_some_and(|s| s.text.origin == Origin::User)
+                || translation.is_some_and(|t| t.text.origin == Origin::User)
+            {
+                continue;
+            }
+            remove.insert(content);
+            for presentation in input.scene.relations_to_as::<Presents>(content) {
+                let layer = presentation.value().source;
+                if owned(layer)? {
+                    remove.insert(layer);
+                }
+            }
+        }
+    }
+    // Retain the support regions of any hand-edited presentation, including
+    // its bubble. Removing an incident relation would otherwise strand it.
+    loop {
+        let retained = remove
+            .iter()
+            .copied()
+            .filter(|&id| {
+                input
+                    .scene
+                    .relations_to(id, None)
+                    .any(|relation| !remove.contains(&relation.value().source))
             })
-            && entity.component::<Region>()?.is_some();
-        if owned_region {
-            remove.push(id);
+            .collect::<Vec<_>>();
+        if retained.is_empty() {
+            break;
+        }
+        for id in retained {
+            remove.remove(&id);
         }
     }
     for entity in remove {
-        if input.scene.entity(entity).is_ok() {
-            edit.remove_entity(entity, RemovePolicy::Cascade)?;
-        }
+        edit.remove_entity(entity, RemovePolicy::Cascade)?;
     }
     Ok(())
 }
@@ -309,6 +378,7 @@ async fn write_page(
     generation: &Generation,
     colors: TextColorOptions,
     styles: &TextStyles,
+    join_in_bubble: bool,
 ) -> Result<()> {
     let KoharuLayoutDetections {
         mut detections,
@@ -323,6 +393,8 @@ async fn write_page(
         detections.retain(|detection| intersects(detection.bbox, region));
     }
     non_maximum_suppression(&mut detections, 0.5);
+    suppress_contained_text(&mut detections);
+    join_text_in_bubbles(&mut detections, join_in_bubble);
     sort_by_layout(&mut detections);
 
     let image = image.to_rgb8();
@@ -494,6 +566,9 @@ fn write_region<'a>(
         stroke_join: None,
         outer_stroke_color: None,
         outer_stroke_width: None,
+        line_spacing: None,
+        letter_spacing: None,
+        fill_gradient: None,
         alignment: None,
         writing_mode: inferred.map(|value| value.writing_mode),
         extensions: Default::default(),
@@ -1753,6 +1828,93 @@ fn non_maximum_suppression(detections: &mut Vec<KoharuLayoutDetection>, threshol
     *detections = kept;
 }
 
+fn suppress_contained_text(detections: &mut Vec<KoharuLayoutDetection>) {
+    detections.sort_by(|left, right| {
+        right
+            .score
+            .total_cmp(&left.score)
+            .then_with(|| detection_order(left, right))
+    });
+    let mut kept = Vec::with_capacity(detections.len());
+    for candidate in detections.drain(..) {
+        let suppressed = candidate.label == "text"
+            && kept.iter().any(|existing: &KoharuLayoutDetection| {
+                existing.label == "text" && containment(existing.bbox, candidate.bbox) >= 0.8
+            });
+        if !suppressed {
+            kept.push(candidate);
+        }
+    }
+    *detections = kept;
+}
+
+fn join_text_in_bubbles(detections: &mut Vec<KoharuLayoutDetection>, enabled: bool) {
+    if !enabled {
+        return;
+    }
+    let bubbles = indices_with_label(detections, "bubble");
+    let mut groups = BTreeMap::<usize, Vec<usize>>::new();
+    for (index, text) in detections
+        .iter()
+        .enumerate()
+        .filter(|(_, d)| d.label == "text")
+    {
+        let bubble = bubbles
+            .iter()
+            .copied()
+            .filter(|&bubble| {
+                mask_containment(&detections[bubble].mask, &text.mask, text.bbox)
+                    >= DIALOGUE_MASK_CONTAINMENT_THRESHOLD
+            })
+            .min_by_key(|&bubble| detections[bubble].area);
+        if let Some(bubble) = bubble {
+            groups.entry(bubble).or_default().push(index);
+        }
+    }
+    let mut removed = vec![false; detections.len()];
+    for group in groups.into_values().filter(|group| group.len() > 1) {
+        let first = group[0];
+        let mut bounds = detections[first].bbox;
+        let mut score = detections[first].score;
+        for &index in &group[1..] {
+            let text = &detections[index];
+            bounds = [
+                bounds[0].min(text.bbox[0]),
+                bounds[1].min(text.bbox[1]),
+                bounds[2].max(text.bbox[2]),
+                bounds[3].max(text.bbox[3]),
+            ];
+            score = score.max(text.score);
+            removed[index] = true;
+        }
+        let x = bounds[0].floor().max(0.0) as u32;
+        let y = bounds[1].floor().max(0.0) as u32;
+        let width = (bounds[2].ceil() as u32).saturating_sub(x);
+        let height = (bounds[3].ceil() as u32).saturating_sub(y);
+        let mut pixels = GrayImage::new(width, height);
+        for index in group {
+            stamp_mask(&mut pixels, &detections[index].mask, x, y);
+        }
+        let text = &mut detections[first];
+        text.bbox = bounds;
+        text.score = score;
+        text.area = pixels.as_raw().iter().filter(|&&pixel| pixel != 0).count() as u32;
+        text.mask = KoharuLayoutMask {
+            x,
+            y,
+            width,
+            height,
+            pixels: pixels.into_raw(),
+        };
+    }
+    let mut index = 0;
+    detections.retain(|_| {
+        let keep = !removed[index];
+        index += 1;
+        keep
+    });
+}
+
 fn sort_by_layout(detections: &mut Vec<KoharuLayoutDetection>) {
     let order = layout_order(detections);
     let mut values = std::mem::take(detections)
@@ -2010,6 +2172,173 @@ mod tests {
         );
 
         assert!(processor.skip(&input).unwrap());
+        assert!(!processor.skip(&input.with_redetect(true)).unwrap());
+    }
+
+    #[tokio::test]
+    async fn redetection_replaces_generated_boxes_but_keeps_handmade_boxes_and_their_bubble() {
+        let mut session = Session::memory().await.unwrap();
+        let mut page = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                page = Some(edit.add_page(PageDraft::new("page", 100., 100.), At::End)?);
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let page = page.unwrap();
+        let generation = generation(super::PRODUCER, super::MODEL_ID).unwrap();
+        let snapshot = session.snapshot();
+        let mut edit = snapshot.edit_as(generation.clone());
+        let bubble = edit
+            .add_analysis_region::<BubbleRegion>(
+                page,
+                At::End,
+                &Geometry::rectangle(0., 0., 100., 100.),
+                None,
+            )
+            .unwrap();
+        let region = edit
+            .add_analysis_region::<TextRegion>(
+                page,
+                At::End,
+                &Geometry::rectangle(20., 20., 20., 40.),
+                None,
+            )
+            .unwrap();
+        let content = edit.add_text_content(page, At::End).unwrap();
+        let layout = TextLayout {
+            origin: Origin::User,
+            kind: TextLayoutKind::Paragraph,
+            angle_degrees: None,
+        };
+        let layer = edit
+            .add_text_layer(page, At::End, content, &layout)
+            .unwrap();
+        edit.relate::<super::RecognizedFrom>(content, region)
+            .unwrap();
+        edit.relate::<FlowsIn>(layer, bubble).unwrap();
+        edit.relate::<Inside>(region, bubble).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let snapshot = session.snapshot();
+        let mut edit = snapshot.edit();
+        let manual_region = edit
+            .add_analysis_region::<TextRegion>(
+                page,
+                At::End,
+                &Geometry::rectangle(60., 20., 20., 40.),
+                None,
+            )
+            .unwrap();
+        let manual_content = edit.add_text_content(page, At::End).unwrap();
+        let manual_layer = edit
+            .add_text_layer(page, At::End, manual_content, &layout)
+            .unwrap();
+        edit.relate::<super::RecognizedFrom>(manual_content, manual_region)
+            .unwrap();
+        edit.relate::<FlowsIn>(manual_layer, bubble).unwrap();
+        edit.relate::<Inside>(manual_region, bubble).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let input = StageInput::new(
+            session.snapshot(),
+            page,
+            None,
+            None,
+            std::sync::Arc::new(crate::ImageCache::default()),
+            None,
+        )
+        .with_redetect(true);
+        let mut edit = input.scene.edit_as(generation.clone());
+        super::remove_previous_regions(&input, &mut edit, &generation).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        for id in [layer, content, region] {
+            assert!(session.snapshot().entity(id).is_err());
+        }
+        for id in [manual_layer, manual_content, manual_region, bubble] {
+            assert!(session.snapshot().entity(id).is_ok());
+        }
+        assert_eq!(
+            session
+                .snapshot()
+                .relation_from::<FlowsIn>(manual_layer)
+                .unwrap()
+                .unwrap()
+                .value()
+                .target,
+            bubble
+        );
+    }
+
+    #[tokio::test]
+    async fn redetection_keeps_user_text_even_if_the_detection_still_owns_the_entities() {
+        let mut session = Session::memory().await.unwrap();
+        let mut page = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                page = Some(edit.add_page(PageDraft::new("page", 100., 100.), At::End)?);
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let page = page.unwrap();
+        let generation = generation(super::PRODUCER, super::MODEL_ID).unwrap();
+        let snapshot = session.snapshot();
+        let mut edit = snapshot.edit_as(generation.clone());
+        let region = edit
+            .add_analysis_region::<TextRegion>(
+                page,
+                At::End,
+                &Geometry::rectangle(20., 20., 20., 40.),
+                None,
+            )
+            .unwrap();
+        let content = edit.add_text_content(page, At::End).unwrap();
+        let layer = edit
+            .add_text_layer(
+                page,
+                At::End,
+                content,
+                &TextLayout {
+                    origin: Origin::User,
+                    kind: TextLayoutKind::Paragraph,
+                    angle_degrees: None,
+                },
+            )
+            .unwrap();
+        edit.relate::<super::RecognizedFrom>(content, region)
+            .unwrap();
+        edit.relate::<FitsTo>(layer, region).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                edit.set(
+                    content,
+                    &koharu_scene::SourceText {
+                        text: koharu_scene::Authored::user("checked by hand".into()),
+                        language: None,
+                    },
+                )
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let input = StageInput::new(
+            session.snapshot(),
+            page,
+            None,
+            None,
+            std::sync::Arc::new(crate::ImageCache::default()),
+            None,
+        )
+        .with_redetect(true);
+        let mut edit = input.scene.edit_as(generation.clone());
+        super::remove_previous_regions(&input, &mut edit, &generation).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        for id in [layer, content, region] {
+            assert!(session.snapshot().entity(id).is_ok());
+        }
     }
 
     #[tokio::test]
@@ -2077,6 +2406,9 @@ mod tests {
                                 stroke_join: None,
                                 outer_stroke_color: None,
                                 outer_stroke_width: None,
+                                line_spacing: None,
+                                letter_spacing: None,
+                                fill_gradient: None,
                                 alignment: None,
                                 writing_mode: None,
                                 extensions: Default::default(),
@@ -2136,6 +2468,121 @@ mod tests {
                 pixels: vec![0],
             },
         }
+    }
+
+    #[test]
+    fn contained_text_is_suppressed_even_with_low_iou() {
+        let mut values = vec![
+            detection("text", 0.7, [10.0, 10.0, 20.0, 20.0]),
+            detection("text", 0.9, [0.0, 0.0, 100.0, 100.0]),
+            detection("bubble", 0.95, [0.0, 0.0, 100.0, 100.0]),
+        ];
+        super::suppress_contained_text(&mut values);
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[1].score, 0.9);
+    }
+
+    #[test]
+    fn contained_text_suppression_keeps_adjacent_columns() {
+        let mut values = vec![
+            detection("text", 0.9, [0.0, 0.0, 20.0, 100.0]),
+            detection("text", 0.8, [22.0, 0.0, 42.0, 100.0]),
+        ];
+        super::suppress_contained_text(&mut values);
+        assert_eq!(values.len(), 2);
+    }
+
+    #[test]
+    fn contained_text_suppression_prefers_confidence_over_input_order() {
+        for reversed in [false, true] {
+            let mut values = vec![
+                detection("text", 0.6, [10.0, 0.0, 60.0, 100.0]),
+                detection("text", 0.95, [0.0, 0.0, 50.0, 100.0]),
+            ];
+            if reversed {
+                values.reverse();
+            }
+            super::suppress_contained_text(&mut values);
+            assert_eq!(values.len(), 1);
+            assert_eq!(values[0].score, 0.95);
+        }
+    }
+
+    fn filled_detection(label: &str, bounds: [f32; 4]) -> KoharuLayoutDetection {
+        let mut value = detection(label, 0.9, bounds);
+        let width = (bounds[2] - bounds[0]) as u32;
+        let height = (bounds[3] - bounds[1]) as u32;
+        value.mask = KoharuLayoutMask {
+            x: bounds[0] as u32,
+            y: bounds[1] as u32,
+            width,
+            height,
+            pixels: vec![255; (width * height) as usize],
+        };
+        value.area = width * height;
+        value
+    }
+
+    #[test]
+    fn bubble_text_union_preserves_the_mask_gap_and_best_score() {
+        let mut values = vec![
+            filled_detection("bubble", [0., 0., 100., 100.]),
+            filled_detection("text", [10., 10., 20., 50.]),
+            filled_detection("text", [40., 20., 60., 60.]),
+        ];
+        values[2].score = 0.97;
+        super::join_text_in_bubbles(&mut values, true);
+        assert_eq!(values.len(), 2);
+        let text = &values[1];
+        assert_eq!(text.bbox, [10., 10., 60., 60.]);
+        assert_eq!(text.score, 0.97);
+        assert_eq!(
+            (text.mask.x, text.mask.y, text.mask.width, text.mask.height),
+            (10, 10, 50, 50)
+        );
+        assert!(text.mask.contains(10, 10));
+        assert!(text.mask.contains(59, 59));
+        assert!(!text.mask.contains(30, 30));
+        assert_eq!(text.area, 1200);
+    }
+
+    #[test]
+    fn bubble_text_join_keeps_other_bubbles_and_free_text_separate() {
+        let mut values = vec![
+            filled_detection("bubble", [0., 0., 100., 100.]),
+            filled_detection("bubble", [110., 0., 200., 100.]),
+            filled_detection("text", [10., 10., 20., 50.]),
+            filled_detection("text", [120., 10., 140., 50.]),
+            filled_detection("text", [201., 10., 220., 50.]),
+        ];
+        super::join_text_in_bubbles(&mut values, true);
+        assert_eq!(values.len(), 5);
+    }
+
+    #[test]
+    fn bubble_text_join_uses_the_smallest_mask_container() {
+        let mut values = vec![
+            filled_detection("bubble", [0., 0., 100., 100.]),
+            filled_detection("bubble", [10., 10., 40., 80.]),
+            filled_detection("text", [15., 20., 20., 60.]),
+            filled_detection("text", [25., 20., 30., 60.]),
+            filled_detection("text", [70., 20., 80., 60.]),
+        ];
+        super::join_text_in_bubbles(&mut values, true);
+        assert_eq!(values.len(), 4);
+        assert_eq!(values[2].bbox, [15., 20., 30., 60.]);
+        assert_eq!(values[3].bbox, [70., 20., 80., 60.]);
+    }
+
+    #[test]
+    fn bubble_text_join_off_leaves_columns_alone() {
+        let mut values = vec![
+            filled_detection("bubble", [0., 0., 100., 100.]),
+            filled_detection("text", [10., 10., 20., 50.]),
+            filled_detection("text", [40., 20., 60., 60.]),
+        ];
+        super::join_text_in_bubbles(&mut values, false);
+        assert_eq!(values.len(), 3);
     }
 
     #[test]

@@ -13,6 +13,7 @@ import {
   Eye,
   EyeOff,
   Folder,
+  GripVertical,
   Image as ImageIcon,
   Layers3,
   Lock,
@@ -22,16 +23,21 @@ import {
   Trash2,
   Type,
 } from 'lucide-react'
-import { type MouseEvent, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { type DragEvent, type MouseEvent, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { GlossaryTextMenu } from '@/components/context/GlossaryTextMenu'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { FontPicker } from '@/components/controls/FontPicker'
+import { BoxActions } from '@/components/editor/BoxActions'
+import { BoxNoteLine } from '@/components/editor/BoxNoteLine'
 import { BubbleShapeLine } from '@/components/editor/BubbleShapeLine'
 import { LetteringCategoryLine } from '@/components/editor/LetteringCategoryLine'
 import { LineContextCard } from '@/components/editor/LineContextCard'
+import { layerDropIndex } from '@/components/files/layer-order'
+import { GradientControls } from '@/components/text-extras/GradientControls'
+import { SpacingControls } from '@/components/text-extras/SpacingControls'
 import { call } from '@/lib/backend'
 import { hexToRgba, rgbaToHex } from '@/lib/color'
 import {
@@ -93,6 +99,7 @@ const defaultFont: FontFamily = {
     classifications: ['comic', 'dialogue'],
     use_cases: ['comic-dialogue', 'word-balloons'],
   },
+  local_names: [],
   sources: ['bundled'],
   faces: [
     {
@@ -118,6 +125,9 @@ const defaultTypography: Typography = {
   stroke_join: null,
   outer_stroke_color: [0, 0, 0, 255],
   outer_stroke_width: 0,
+  line_spacing: null,
+  letter_spacing: null,
+  fill_gradient: null,
   alignment: null,
   writing_mode: null,
 }
@@ -203,7 +213,7 @@ function TypeInspector() {
   const strokeColor = typography.stroke_color ?? defaultTypography.stroke_color!
   const strokeEnabled = strokeWidth > 0 && strokeColor[3] > 0
   const displayedStrokeWidth = strokeWidth > 0 ? strokeWidth : 1.5
-  const strokeMethod = typography.stroke_method ?? 'expansion'
+  const strokeMethod = typography.stroke_method ?? 'contour'
   const strokePosition = typography.stroke_position ?? 'outside'
   const strokeJoin = typography.stroke_join ?? 'round'
   const outerWidth = typography.outer_stroke_width ?? 0
@@ -221,6 +231,8 @@ function TypeInspector() {
         {current && <BubbleShapeLine layer={current.id} />}
         {current && <LetteringCategoryLine layer={current.id} />}
         {current && <LineContextCard layer={current.id} />}
+        {current && <BoxActions layer={current.id} />}
+        {current && <BoxNoteLine layer={current.id} />}
         <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_2.5rem] gap-1.5'>
           <InspectorField label={t('inspector.font')}>
             <FontPicker
@@ -247,7 +259,7 @@ function TypeInspector() {
             <ColorWell
               label={t('inspector.textColor')}
               size='sm'
-              disabled={disabled}
+              disabled={disabled || !!typography.fill_gradient}
               value={rgbaToHex(typography.color ?? defaultTypography.color!)}
               onChange={(color) => apply((value) => ({ ...value, color: hexToRgba(color) }))}
             />
@@ -328,6 +340,20 @@ function TypeInspector() {
             </Select>
           </InspectorField>
         </div>
+
+        <GradientControls
+          key={`gradient-${current?.id}`}
+          typography={typography}
+          disabled={disabled || draft !== null}
+          apply={apply}
+        />
+
+        <SpacingControls
+          key={current?.id}
+          typography={typography}
+          disabled={disabled || draft !== null}
+          apply={apply}
+        />
 
         <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(6.5rem,1fr)] gap-1.5'>
           <InspectorField label={t('inspector.alignment')}>
@@ -610,16 +636,17 @@ function TypeInspector() {
 
 // Without a visible border, use a contrasting fill instead of transparent text.
 function invertBorder(value: Typography, displayedWidth: number): Typography {
-  const color = value.color ?? defaultTypography.color!
+  const color = value.fill_gradient?.stops[0]?.color ?? value.color ?? defaultTypography.color!
   const stroke = value.stroke_color
   if ((value.stroke_width ?? 0) > 0 && stroke && stroke[3] > 0) {
-    return { ...value, color: stroke, stroke_color: color }
+    return { ...value, color: stroke, stroke_color: color, fill_gradient: null }
   }
   const [red, green, blue] = color
   const light = 0.2126 * red + 0.7152 * green + 0.0722 * blue > 127.5
   return {
     ...value,
     color: light ? [0, 0, 0, 255] : [255, 255, 255, 255],
+    fill_gradient: null,
     stroke_color: [red, green, blue, 255],
     stroke_width: displayedWidth,
   }
@@ -690,6 +717,8 @@ function LayersInspector() {
     selected.length === 1 ? (selected[0] ?? null) : null,
   )
   const [movingLayer, setMovingLayer] = useState<EntityId | null>(null)
+  const drag = useRef<{ layer: EntityId; page: EntityId } | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ layer: EntityId; after: boolean } | null>(null)
   const anchor = useRef<EntityId | null>(null)
 
   useEffect(() => {
@@ -699,6 +728,31 @@ function LayersInspector() {
   const layers = useMemo(() => (page ? displayedLayers(page.layers, page.id) : []), [page])
 
   if (!page) return <EmptyInspector>{t('inspector.selectPage')}</EmptyInspector>
+
+  const reorder = (layer: EntityId, parent: EntityId, index: number) => {
+    setMovingLayer(layer)
+    void call(commands.moveLayer, layer, parent, index).then(
+      (next) => {
+        queryClient.setQueryData(pageKey, next)
+        setMovingLayer(null)
+        void refresh(projectKey)
+      },
+      () => setMovingLayer(null),
+    )
+  }
+
+  const dragPosition = (layer: Layer, event: DragEvent<HTMLDivElement>) => {
+    if (!drag.current || drag.current.page !== page.id || movingLayer !== null) return null
+    const rect = event.currentTarget.getBoundingClientRect()
+    const after = event.clientY > rect.top + rect.height / 2
+    const position = layerDropIndex(page.layers, page.id, drag.current.layer, layer.id, after)
+    return position ? { ...position, after } : null
+  }
+
+  const endDrag = () => {
+    drag.current = null
+    setDropTarget(null)
+  }
 
   const move = (layer: Layer, displayDelta: number) => {
     if (movingLayer !== null || isLockedLayer(layer)) return
@@ -717,15 +771,7 @@ function LayersInspector() {
     if (shownSource < 0 || !targetLayer) return
     const target = storedSiblings.findIndex((candidate) => candidate.id === targetLayer.id)
 
-    setMovingLayer(layer.id)
-    void call(commands.moveLayer, layer.id, parent, target).then(
-      (next) => {
-        queryClient.setQueryData(pageKey, next)
-        setMovingLayer(null)
-        void refresh(projectKey)
-      },
-      () => setMovingLayer(null),
-    )
+    reorder(layer.id, parent, target)
   }
 
   const deleteLayer = (layer: EntityId) =>
@@ -820,6 +866,38 @@ function LayersInspector() {
                 canMoveUp={!locked && position > 0}
                 canMoveDown={!locked && position >= 0 && position < siblings.length - 1}
                 reordering={movingLayer !== null}
+                dropSide={
+                  dropTarget?.layer === layer.id ? (dropTarget.after ? 'after' : 'before') : null
+                }
+                onDragStart={(event) => {
+                  if (locked || movingLayer !== null) {
+                    event.preventDefault()
+                    return
+                  }
+                  drag.current = { layer: layer.id, page: page.id }
+                  event.dataTransfer.effectAllowed = 'move'
+                  event.dataTransfer.setData('application/x-booharu-layer', layer.id)
+                }}
+                onDragEnd={endDrag}
+                onDragLeave={() => setDropTarget(null)}
+                onDragOver={(event) => {
+                  const position = dragPosition(layer, event)
+                  if (!position) {
+                    setDropTarget(null)
+                    return
+                  }
+                  event.preventDefault()
+                  event.dataTransfer.dropEffect = 'move'
+                  setDropTarget({ layer: layer.id, after: position.after })
+                }}
+                onDrop={(event) => {
+                  const position = dragPosition(layer, event)
+                  const source = drag.current?.layer
+                  endDrag()
+                  if (!source || !position) return
+                  event.preventDefault()
+                  reorder(source, position.parent, position.index)
+                }}
                 onDelete={isGroupLayer(layer) ? undefined : () => deleteLayer(layer.id)}
               />
             )
@@ -844,6 +922,12 @@ function LayerRow({
   canMoveUp,
   canMoveDown,
   reordering,
+  dropSide,
+  onDragStart,
+  onDragEnd,
+  onDragLeave,
+  onDragOver,
+  onDrop,
   onDelete,
 }: {
   layer: Layer
@@ -858,6 +942,12 @@ function LayerRow({
   canMoveUp: boolean
   canMoveDown: boolean
   reordering: boolean
+  dropSide: 'before' | 'after' | null
+  onDragStart: (event: DragEvent<HTMLButtonElement>) => void
+  onDragEnd: () => void
+  onDragLeave: () => void
+  onDragOver: (event: DragEvent<HTMLDivElement>) => void
+  onDrop: (event: DragEvent<HTMLDivElement>) => void
   onDelete?: () => void
 }) {
   const { t } = useTranslation()
@@ -871,7 +961,39 @@ function LayerRow({
         data-expanded={expanded}
         className='min-w-0 overflow-hidden rounded-lg transition-colors duration-150 data-[selected=true]:bg-accent motion-reduce:transition-none'
       >
-        <div className='relative flex min-w-0 items-center gap-0.5'>
+        <div
+          className='relative flex min-w-0 items-center gap-0.5'
+          data-layer-row={layer.id}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+          onDragLeave={(event) => {
+            if (
+              event.relatedTarget instanceof Node &&
+              event.currentTarget.contains(event.relatedTarget)
+            )
+              return
+            onDragLeave()
+          }}
+        >
+          {dropSide && (
+            <span
+              aria-hidden='true'
+              className={`pointer-events-none absolute inset-x-0 z-20 h-0.5 bg-primary ${dropSide === 'before' ? 'top-0' : 'bottom-0'}`}
+            />
+          )}
+          {!locked && (
+            <button
+              type='button'
+              draggable={!reordering}
+              disabled={reordering}
+              aria-label={t('files.dragLayer', { name })}
+              className='cursor-grab px-0.5 text-muted-foreground active:cursor-grabbing'
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+            >
+              <GripVertical className='size-3' />
+            </button>
+          )}
           <button
             type='button'
             aria-label={t('layers.edit', { name })}

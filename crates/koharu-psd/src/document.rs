@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use image::{DynamicImage, GrayImage, Rgba, RgbaImage};
-use koharu_rasterizer::{Raster, RasterOptions, Rasterizer};
+use koharu_rasterizer::{PreparedContent, PreparedSceneCommand, Raster, RasterOptions, Rasterizer};
 use koharu_renderer::{
     Frame, ImageKind, LayerKind, TextAlign, TextMetadata as RenderedText, WritingMode,
 };
@@ -80,6 +80,8 @@ pub(crate) struct TextMetadata {
     pub font_index: usize,
     pub font_set: Vec<String>,
     pub font_size: f64,
+    pub line_spacing: Option<f64>,
+    pub letter_spacing: f64,
     pub color: [u8; 4],
     pub box_width: f64,
     pub box_height: f64,
@@ -226,7 +228,41 @@ async fn rasterize(
     frame: &Frame,
     options: RasterOptions,
 ) -> Result<Raster, PsdExportError> {
-    let frame = frame.raster_frame()?;
+    let mut prepared = frame.prepared().clone();
+    let mut flattened = false;
+    for layer in &mut prepared.frame.layers {
+        if let PreparedContent::Vector(scene) = &mut layer.content {
+            for command in &mut scene.commands {
+                if let PreparedSceneCommand::GradientPath { path, stops, .. } = command {
+                    let mut fill = path.clone();
+                    fill.color = stops[0].1;
+                    *command = PreparedSceneCommand::FillPath(fill);
+                    flattened = true;
+                }
+            }
+        }
+    }
+    // Keep the cached pixels and merged preview consistent with the editable start-color fill.
+    let frame = if flattened {
+        let sources = prepared
+            .frame
+            .layers
+            .iter()
+            .zip(frame.layers())
+            .filter_map(|(prepared, layer)| {
+                let PreparedContent::Raster(raster) = &prepared.content else {
+                    return None;
+                };
+                Some((
+                    raster.source,
+                    Arc::<[u8]>::from(layer.raster_image()?.pixels()),
+                ))
+            })
+            .collect();
+        prepared.into_frame_with_raster_sources(&sources)?
+    } else {
+        frame.raster_frame()?
+    };
     tokio_rayon::spawn(move || rasterizer.rasterize(&frame, options))
         .await
         .map_err(PsdExportError::Rasterizer)
@@ -367,6 +403,8 @@ fn text_metadata(index: i32, text: &RenderedText, font_set: &[String]) -> TextMe
         font_index,
         font_set: font_set.to_vec(),
         font_size: f64::from(text.font_size),
+        line_spacing: text.line_spacing.map(f64::from),
+        letter_spacing: f64::from(text.letter_spacing),
         color: text.color,
         box_width: f64::from(bounds.width.max(1.0)),
         box_height: f64::from(bounds.height.max(1.0)),
@@ -397,6 +435,8 @@ mod tests {
             },
             post_script_fonts: fonts.iter().map(|font| (*font).to_owned()).collect(),
             font_size: 24.0,
+            line_spacing: None,
+            letter_spacing: 0.0,
             color: [1, 2, 3, 255],
             alignment: TextAlign::Center,
             writing_mode: WritingMode::Horizontal,

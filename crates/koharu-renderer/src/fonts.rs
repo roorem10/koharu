@@ -346,6 +346,7 @@ pub(crate) fn font_key(font: &Font) -> usize {
 #[derive(Clone, Debug)]
 struct SystemFace {
     pub(crate) family_name: String,
+    pub(crate) local_names: Vec<String>,
     pub(crate) post_script_name: String,
     pub(crate) weight: u16,
     pub(crate) style: PublicFontStyle,
@@ -569,6 +570,10 @@ impl FontSystem {
                 };
                 faces.push(SystemFace {
                     family_name: family_name.clone(),
+                    local_names: font
+                        .skrifa_ref()
+                        .map(|font| local_family_names(&font, &family_name))
+                        .unwrap_or_default(),
                     post_script_name: font.post_script_name,
                     weight: info.weight().value().round().clamp(1.0, 1000.0) as u16,
                     style: match info.style() {
@@ -631,10 +636,12 @@ impl Fonts {
             let key = normalize(&face.family_name);
             let family = families.entry(key).or_insert_with(|| FontFamily {
                 name: face.family_name.clone(),
+                local_names: Vec::new(),
                 metadata: FontMetadata::default(),
                 sources: vec![FontSource::System],
                 faces: Vec::new(),
             });
+            append_local_names(&mut family.local_names, face.local_names);
             family.faces.push(FontFace {
                 post_script_name: face.post_script_name,
                 weight: face.weight,
@@ -646,6 +653,10 @@ impl Fonts {
         for bundled in &catalog.families {
             let key = normalize(&bundled.family_name);
             let family = families.entry(key).or_insert_with(|| bundled.info());
+            append_local_names(
+                &mut family.local_names,
+                bundled.cached_local_names().await.clone(),
+            );
             if family.metadata.primary_script.is_none() {
                 family.metadata.clone_from(&bundled.metadata);
             }
@@ -954,6 +965,7 @@ impl FontCatalog {
             }
             let family = Arc::new(BundledFamily {
                 family_name: family.family_name,
+                local_names: OnceCell::new(),
                 metadata: FontMetadata {
                     primary_script: family.primary_script,
                     scripts: family.scripts,
@@ -1003,17 +1015,81 @@ impl FontCatalog {
 
 struct BundledFamily {
     family_name: String,
+    local_names: OnceCell<Vec<String>>,
     metadata: FontMetadata,
     faces: Vec<Arc<BundledFace>>,
 }
 
 impl BundledFamily {
+    async fn cached_local_names(&self) -> &Vec<String> {
+        self.local_names
+            .get_or_init(|| async {
+                let mut names = Vec::new();
+                // Listing fonts must not download every face in the bundled catalog.
+                for face in &self.faces {
+                    let file = HuggingFaceFile::pinned_dataset(
+                        FONT_REPOSITORY,
+                        FONT_REVISION,
+                        &face.file_name,
+                    );
+                    if !file.exists() {
+                        continue;
+                    }
+                    let Ok(path) = file.resolve().await else {
+                        continue;
+                    };
+                    let Ok(bytes) = tokio::fs::read(path).await else {
+                        continue;
+                    };
+                    if let Ok(font) = skrifa::FontRef::from_index(&bytes, 0) {
+                        append_local_names(
+                            &mut names,
+                            local_family_names(&font, &self.family_name),
+                        );
+                    }
+                }
+                names
+            })
+            .await
+    }
+
     fn info(&self) -> FontFamily {
         FontFamily {
             name: self.family_name.clone(),
+            local_names: Vec::new(),
             metadata: self.metadata.clone(),
             sources: vec![FontSource::Bundled],
             faces: self.faces.iter().map(|face| face.info()).collect(),
+        }
+    }
+}
+
+fn local_family_names(font: &skrifa::FontRef<'_>, canonical: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for id in [16, 1] {
+        for record in font.localized_strings(StringId::new(id)) {
+            if record
+                .language()
+                .is_some_and(|language| language == "en" || language.starts_with("en-"))
+            {
+                continue;
+            }
+            let name = record.to_string().trim_matches('\0').trim().to_owned();
+            if !name.is_empty() && normalize(&name) != normalize(canonical) {
+                append_local_names(&mut names, [name]);
+            }
+        }
+    }
+    names
+}
+
+fn append_local_names(names: &mut Vec<String>, additional: impl IntoIterator<Item = String>) {
+    for name in additional {
+        if !names
+            .iter()
+            .any(|known| normalize(known) == normalize(&name))
+        {
+            names.push(name);
         }
     }
 }

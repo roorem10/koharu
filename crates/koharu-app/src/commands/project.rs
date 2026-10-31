@@ -10,10 +10,10 @@ use koharu_desktop::Frame;
 use koharu_scene::{
     AssetInput, AssetMetadata, AssetRole, At, Authored, Commit, EntityId, EntityOrigin,
     Geometry as SceneGeometry, Group as SceneGroup, Origin, PageDraft, Point as ScenePoint,
-    Presents, RasterLayer as SceneRasterLayer, RasterLayerKind, Region as SceneRegion,
-    RemovePolicy, Revision, Session, Snapshot, SourceText as SceneSourceText,
-    TextGroup as SceneTextGroup, TextLayout as SceneTextLayout, TextLayoutKind,
-    Translation as SceneTranslation, Typography as SceneTypography, Visibility as SceneVisibility,
+    RasterLayer as SceneRasterLayer, RasterLayerKind, Region as SceneRegion, RemovePolicy,
+    Revision, Session, Snapshot, SourceText as SceneSourceText, TextGroup as SceneTextGroup,
+    TextLayout as SceneTextLayout, TextLayoutKind, Translation as SceneTranslation,
+    Typography as SceneTypography, Visibility as SceneVisibility,
 };
 use serde::Serialize;
 use specta::Type;
@@ -177,6 +177,9 @@ pub struct Typography {
     pub stroke_join: Option<koharu_scene::StrokeJoin>,
     pub outer_stroke_color: Option<[u8; 4]>,
     pub outer_stroke_width: Option<f32>,
+    pub line_spacing: Option<f32>,
+    pub letter_spacing: Option<f32>,
+    pub fill_gradient: Option<koharu_scene::FillGradient>,
     pub alignment: Option<koharu_scene::TextAlignment>,
     pub writing_mode: Option<koharu_scene::WritingMode>,
 }
@@ -192,15 +195,119 @@ pub(crate) struct ProjectLibrary {
 
 impl ProjectLibrary {
     pub(crate) fn new() -> Result<Self> {
-        let root = match koharu_config::preview::root()? {
+        let configured = match super::files::load_settings() {
+            Ok(settings) => settings.projects_folder,
+            Err(error) => {
+                tracing::warn!(%error, "could not read library settings; using default projects folder");
+                None
+            }
+        };
+        if let Some(root) = configured {
+            match Self::from_root(root) {
+                Ok(library) => return Ok(library),
+                Err(error) => {
+                    tracing::warn!(%error, "could not use configured projects folder; using default")
+                }
+            }
+        }
+        Self::from_root(Self::default_root()?)
+    }
+
+    pub(crate) fn default_root() -> Result<PathBuf> {
+        Ok(match koharu_config::preview::root()? {
             Some(root) => root.join("projects"),
             None => dirs::document_dir()
                 .context("the Documents directory is unavailable")?
                 .join("Koharu"),
-        };
-        std::fs::create_dir_all(&root)
+        })
+    }
+
+    pub(crate) fn from_root(root: PathBuf) -> Result<Self> {
+        super::files::prepare_folder(&root)
             .with_context(|| format!("failed to create {}", root.display()))?;
         Ok(Self { root })
+    }
+
+    pub(crate) fn root(&self) -> &Path {
+        &self.root
+    }
+
+    pub(crate) fn rename(
+        &self,
+        name: &str,
+        new_name: &str,
+        open_project: Option<&str>,
+    ) -> Result<()> {
+        let (name, source) = self.resolve(name)?;
+        anyhow::ensure!(
+            !open_project.is_some_and(|open| open.to_lowercase() == name.to_lowercase()),
+            "close the project before renaming it"
+        );
+        anyhow::ensure!(
+            new_name == new_name.trim(),
+            "project names cannot start or end with whitespace"
+        );
+        let (new_name, destination) = self.resolve(new_name)?;
+        anyhow::ensure!(
+            new_name.encode_utf16().count() <= 247,
+            "project name is too long"
+        );
+        anyhow::ensure!(
+            source.symlink_metadata()?.file_type().is_dir(),
+            "project does not exist or is not a directory"
+        );
+        anyhow::ensure!(
+            !self.name_exists(&new_name)?,
+            "a project with that name already exists"
+        );
+        std::fs::rename(&source, &destination).context("failed to rename project")
+    }
+
+    pub(crate) fn duplicate(&self, name: &str) -> Result<String> {
+        let (name, source) = self.resolve(name)?;
+        anyhow::ensure!(
+            source.symlink_metadata()?.file_type().is_dir(),
+            "project does not exist or is not a directory"
+        );
+        let mut number = 1;
+        let new_name = loop {
+            let candidate = if number == 1 {
+                format!("{name} copy")
+            } else {
+                format!("{name} copy {number}")
+            };
+            validate_project_name(&candidate)?;
+            anyhow::ensure!(
+                candidate.encode_utf16().count() <= 247,
+                "duplicate project name is too long"
+            );
+            if !self.name_exists(&candidate)? {
+                break candidate;
+            }
+            number += 1;
+        };
+        let stage = tempfile::Builder::new()
+            .prefix(".duplicate-")
+            .tempdir_in(&self.root)?;
+        super::files::library::copy_directory(&source, stage.path())?;
+        let destination = self.root.join(format!("{new_name}.khrproj"));
+        anyhow::ensure!(
+            !destination.try_exists()?,
+            "a project with that name already exists"
+        );
+        std::fs::rename(stage.path(), destination)
+            .context("failed to publish duplicate project")?;
+        Ok(new_name)
+    }
+
+    fn name_exists(&self, name: &str) -> Result<bool> {
+        let filename = format!("{name}.khrproj").to_lowercase();
+        for entry in std::fs::read_dir(&self.root)? {
+            if entry?.file_name().to_string_lossy().to_lowercase() == filename {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub(crate) fn list(&self) -> Result<Vec<ProjectSummary>> {
@@ -536,6 +643,9 @@ impl Project {
                 stroke_join: None,
                 outer_stroke_color: None,
                 outer_stroke_width: None,
+                line_spacing: None,
+                letter_spacing: None,
+                fill_gradient: None,
                 alignment: match kind {
                     TextLayoutKind::Point => Some(koharu_scene::TextAlignment::Start),
                     TextLayoutKind::Paragraph => None,
@@ -640,6 +750,9 @@ impl Project {
                             .typography
                             .outer_stroke_width
                             .filter(|width| *width > 0.0),
+                        line_spacing: update.typography.line_spacing,
+                        letter_spacing: update.typography.letter_spacing,
+                        fill_gradient: update.typography.fill_gradient,
                         alignment: update.typography.alignment,
                         writing_mode: update.typography.writing_mode,
                         extensions: Default::default(),
@@ -871,32 +984,8 @@ impl Project {
             }
         }
         let layers = Self::unique_roots(&snapshot, expanded)?;
-        let mut orphaned_contents = Vec::new();
-        for layer in &layers {
-            let Some(relation) = snapshot.relation_from::<Presents>(*layer)? else {
-                continue;
-            };
-            let content = relation.value().target;
-            if snapshot.relations_to_as::<Presents>(content).count() == 1 {
-                orphaned_contents.push(content);
-            }
-        }
-        let patch = snapshot.patch(|edit| {
-            for layer in layers {
-                if snapshot.page(layer).is_ok() {
-                    return Err(koharu_scene::Error::Invalid(
-                        "delete pages with delete_pages".to_owned(),
-                    ));
-                }
-                edit.remove_entity(layer, RemovePolicy::Cascade)?;
-            }
-            for content in orphaned_contents {
-                if snapshot.entity(content).is_ok() {
-                    edit.remove_entity(content, RemovePolicy::Cascade)?;
-                }
-            }
-            Ok(())
-        })?;
+        let patch = snapshot
+            .patch(|edit| super::boxes::deletion::remove_layers(&snapshot, edit, &layers, false))?;
         self.commit(patch).await
     }
 
@@ -1140,7 +1229,7 @@ impl Project {
         Ok(Some(self.commit(patch).await?))
     }
 
-    async fn commit(&mut self, patch: koharu_scene::Patch) -> Result<Commit> {
+    pub(crate) async fn commit(&mut self, patch: koharu_scene::Patch) -> Result<Commit> {
         Ok(self.session.commit(patch).await?)
     }
 
@@ -1330,6 +1419,9 @@ impl Project {
             stroke_join: typography.stroke_join,
             outer_stroke_color: typography.outer_stroke_color,
             outer_stroke_width: typography.outer_stroke_width,
+            line_spacing: typography.line_spacing,
+            letter_spacing: typography.letter_spacing,
+            fill_gradient: typography.fill_gradient,
             alignment: typography.alignment,
             writing_mode,
         }
@@ -1555,7 +1647,7 @@ fn rasterize_stroke(
 
 #[cfg(test)]
 mod tests {
-    use koharu_scene::{Generation, ProducerId, WritingMode};
+    use koharu_scene::{Generation, Presents, ProducerId, WritingMode};
 
     use super::*;
 
@@ -1575,6 +1667,9 @@ mod tests {
             stroke_join: None,
             outer_stroke_color: None,
             outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
             alignment: Some(koharu_scene::TextAlignment::Center),
             writing_mode: Some(WritingMode::Horizontal),
             extensions: [("dev.booharu.test".into(), "kept".into())].into(),
@@ -2049,6 +2144,9 @@ mod tests {
             stroke_join: None,
             outer_stroke_color: None,
             outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
             alignment: None,
             writing_mode: Some(WritingMode::Vertical),
             extensions: Default::default(),

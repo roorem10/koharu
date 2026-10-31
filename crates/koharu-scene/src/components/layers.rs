@@ -139,7 +139,29 @@ pub enum StrokeJoin {
     Bevel,
 }
 
-#[revisioned(revision = 3)]
+#[revisioned(revision = 1)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Type)]
+pub enum GradientKind {
+    Linear,
+    Radial,
+}
+
+#[revisioned(revision = 1)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+pub struct GradientStop {
+    pub offset: f32,
+    pub color: [u8; 4],
+}
+
+#[revisioned(revision = 1)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+pub struct FillGradient {
+    pub kind: GradientKind,
+    pub angle_degrees: f32,
+    pub stops: Vec<GradientStop>,
+}
+
+#[revisioned(revision = 4)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 pub struct Typography {
     pub origin: Origin,
@@ -166,6 +188,12 @@ pub struct Typography {
     /// Width of the second outline; absent or zero means none.
     #[revision(start = 3)]
     pub outer_stroke_width: Option<f32>,
+    #[revision(start = 4)]
+    pub line_spacing: Option<f32>,
+    #[revision(start = 4)]
+    pub letter_spacing: Option<f32>,
+    #[revision(start = 4)]
+    pub fill_gradient: Option<FillGradient>,
 }
 
 impl Component for Typography {
@@ -189,10 +217,30 @@ impl Component for Typography {
             || self
                 .outer_stroke_width
                 .is_some_and(|width| !width.is_finite() || width < 0.0)
+            || self
+                .line_spacing
+                .is_some_and(|value| !value.is_finite() || !(0.5..=3.0).contains(&value))
+            || self
+                .letter_spacing
+                .is_some_and(|value| !value.is_finite() || !(-500.0..=2000.0).contains(&value))
         {
             return Err(Error::invalid("typography intent is invalid"));
         }
         self.origin.validate()?;
+        if let Some(gradient) = &self.fill_gradient
+            && (!gradient.angle_degrees.is_finite()
+                || !(2..=8).contains(&gradient.stops.len())
+                || gradient
+                    .stops
+                    .iter()
+                    .any(|stop| !stop.offset.is_finite() || !(0.0..=1.0).contains(&stop.offset))
+                || gradient
+                    .stops
+                    .windows(2)
+                    .any(|stops| stops[0].offset > stops[1].offset))
+        {
+            return Err(Error::invalid("typography gradient is invalid"));
+        }
         if self.extensions.len() > 1024
             || self.extensions.iter().any(|(key, value)| {
                 validate_namespaced(key, "typography extension").is_err()

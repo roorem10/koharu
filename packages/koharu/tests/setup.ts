@@ -6,6 +6,13 @@ import { defaultShortcuts, useKoharuStore } from '@/lib/store'
 import { emptyTextStyle, emptyShapeStyles, emptyCategoryStyles } from '@/lib/text-styles'
 import { commands } from '@koharu/bridge/protocol'
 
+import { mockWo06 } from './mocks/wo06'
+import { mockWo12 } from './mocks/wo12'
+import { mockWo13 } from './mocks/wo13'
+import { mockWo14 } from './mocks/wo14'
+import { mockWo20 } from './mocks/wo20'
+import { mockWo21 } from './mocks/wo21'
+
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
   const { createInstance } = await import('i18next')
@@ -99,6 +106,12 @@ beforeEach(() => {
     model_confidence: 0.6,
     small_text_threshold: 0.012,
   })
+  mockWo20()
+  mockWo12()
+  mockWo13()
+  mockWo14()
+  mockWo06()
+  mockWo21()
   queryClient.clear()
   useKoharuStore.setState({
     ...initial,
