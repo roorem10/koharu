@@ -19,6 +19,7 @@ import { ReadChapterStep } from '@/components/context/ReadChapterStep'
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { OutputPicker, type OutputDraft } from '@/components/controls/OutputPicker'
 import { presetLabel, useRunSettings } from '@/components/runs/data'
+import { prepareFinishSound } from '@/components/runs/sound'
 import { call, refreshTranslationModels, savePreferences } from '@/lib/backend'
 import { pagesKey, queryClient } from '@/lib/queries'
 import { pipelineStages, receivePreferences, useKoharuStore, type PipelineScope } from '@/lib/store'
@@ -58,6 +59,7 @@ export function InferenceControl({
   const chapter = useChapterContext().data
   const noticeShown = useRef(false)
   const run = (chosenStages = stages) => {
+    prepareFinishSound()
     if (
       chosenStages.includes('translation') &&
       ['deepl', 'google-cloud-translation', 'caiyun'].includes(provider ?? '') &&

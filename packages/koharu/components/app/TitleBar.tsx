@@ -14,6 +14,7 @@ import {
   useRunSettings,
   retryFailedPages,
 } from '@/components/runs/data'
+import { prepareFinishSound } from '@/components/runs/sound'
 import { call } from '@/lib/backend'
 import { selectableLayer } from '@/lib/geometry'
 import {
@@ -72,6 +73,7 @@ export function TitleBar() {
   )
 
   const run = (scope: Scope, operation: Operation = { operation: 'full' }) => {
+    prepareFinishSound()
     void call(commands.process, scope, operation).catch(() => undefined)
   }
 

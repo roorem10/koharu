@@ -52,6 +52,7 @@ pub struct Job {
     pub failures: Vec<koharu_pipeline::PageFailure>,
     pub project: Option<String>,
     pub operation: Option<koharu_pipeline::Operation>,
+    pub finish_sound: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Type)]
@@ -155,6 +156,7 @@ pub(crate) async fn start_job(
         failures: Vec::new(),
         project: Some(project_name),
         operation: Some(operation.clone()),
+        finish_sound: settings.finish_sound,
     };
     processing.runs.lock().insert(
         id,

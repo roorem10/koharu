@@ -33,7 +33,7 @@ function job(overrides: Partial<Job> = {}): Job {
     failures: [],
     project: 'chapter',
     operation: { operation: 'full' },
-
+    finish_sound: true,
     ...overrides,
   }
 }

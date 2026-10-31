@@ -2214,7 +2214,7 @@ describe('greenfield editor', () => {
     await user.click(button)
     await waitFor(() => expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'info' })))
     act(() => useKoharuStore.setState({ jobs: {
-      job: { id: 'job', retry: null, failures: [], project: null, operation: null, state: 'running', completed: 0, total: 1, page: null,
+      job: { id: 'job', retry: null, failures: [], project: null, operation: null, finish_sound: false, state: 'running', completed: 0, total: 1, page: null,
         stage: null, model: null, error: null },
     } }))
     expect(button).toBeDisabled()
@@ -2265,7 +2265,7 @@ describe('greenfield editor', () => {
       jobs: {
         job: {
           state: 'running',
-          id: 'job', retry: null, failures: [], project: null, operation: null,
+          id: 'job', retry: null, failures: [], project: null, operation: null, finish_sound: false,
           completed: 1,
           total: 4,
           page: 'page',

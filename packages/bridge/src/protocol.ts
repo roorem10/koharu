@@ -420,6 +420,7 @@ export type Job = {
 	failures: PageFailure[],
 	project: string | null,
 	operation: Operation | null,
+	finish_sound: boolean,
 };
 
 export type JobId = string;

@@ -13,7 +13,10 @@ import {
   type ProjectInfo,
 } from '@koharu/bridge/protocol'
 
+import { prepareFinishSound } from './sound'
+
 export async function retryFailedPages(job: Job) {
+  prepareFinishSound()
   await call(commands.retryFailedPages, job.id)
 }
 
