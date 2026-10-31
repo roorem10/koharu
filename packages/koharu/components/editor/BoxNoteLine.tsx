@@ -10,12 +10,27 @@ import type { EntityId } from '@koharu/bridge/protocol'
 import { commands } from '@koharu/bridge/protocol'
 import { Textarea } from '@koharu/ui/components/textarea'
 
-export function BoxNoteLine({ layer }: { layer: EntityId }) {
+export function BoxNoteLine({ layer, expanded = false }: { layer: EntityId; expanded?: boolean }) {
   const project = useProject().data?.name
-  return <NoteEditor key={JSON.stringify([project, layer])} layer={layer} project={project} />
+  return (
+    <NoteEditor
+      key={JSON.stringify([project, layer])}
+      layer={layer}
+      project={project}
+      expanded={expanded}
+    />
+  )
 }
 
-function NoteEditor({ layer, project }: { layer: EntityId; project: string | undefined }) {
+function NoteEditor({
+  layer,
+  project,
+  expanded,
+}: {
+  layer: EntityId
+  project: string | undefined
+  expanded: boolean
+}) {
   const { t } = useTranslation()
   const queryKey = ['box-note', project, layer]
   const note = useQuery({
@@ -24,7 +39,7 @@ function NoteEditor({ layer, project }: { layer: EntityId; project: string | und
     staleTime: 0,
     networkMode: 'always',
   })
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(expanded)
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState(false)

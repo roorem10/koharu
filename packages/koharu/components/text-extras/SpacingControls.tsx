@@ -1,115 +1,66 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Field, NumericControl } from '@/components/redesign/Controls'
+import { isMixed } from '@/components/redesign/useTypography'
 import type { Typography } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
-import { NumberField, NumberFieldGroup, NumberFieldInput } from '@koharu/ui/components/number-field'
 
 export type ApplyTypography = (update: (value: Typography) => Typography) => void
 
 export function SpacingControls({
   typography,
+  values = [typography],
   disabled,
   apply,
 }: {
   typography: Typography
+  values?: Typography[]
   disabled: boolean
   apply: ApplyTypography
 }) {
   const { t } = useTranslation()
   return (
     <div className='grid min-w-0 grid-cols-2 gap-1.5'>
-      <SpacingField
-        label={t('textExtras.lineSpacing')}
-        resetLabel={t('textExtras.resetLineSpacing')}
-        disabled={disabled}
-        value={typography.line_spacing ?? 1.2}
-        min={0.5}
-        max={3}
-        step={0.05}
-        onCommit={(line_spacing) => apply((value) => ({ ...value, line_spacing }))}
-      />
-      <SpacingField
-        label={t('textExtras.letterSpacing')}
-        resetLabel={t('textExtras.resetLetterSpacing')}
-        disabled={disabled}
-        value={typography.letter_spacing ?? 0}
-        min={-500}
-        max={2000}
-        step={10}
-        onCommit={(letter_spacing) => apply((value) => ({ ...value, letter_spacing }))}
-      />
-    </div>
-  )
-}
-
-function SpacingField({
-  label,
-  resetLabel,
-  value,
-  min,
-  max,
-  step,
-  disabled,
-  onCommit,
-}: {
-  label: string
-  resetLabel: string
-  value: number
-  min: number
-  max: number
-  step: number
-  disabled: boolean
-  onCommit: (value: number | null) => void
-}) {
-  const { t } = useTranslation()
-  const id = useId()
-  const [draft, setDraft] = useState<number | null>(value)
-  useEffect(() => setDraft(value), [value])
-  return (
-    <div className='grid min-w-0 gap-0.5'>
-      <label htmlFor={id} className='text-[8px] font-medium text-muted-foreground'>
-        {label}
-      </label>
-      <div className='flex min-w-0 gap-0.5'>
-        <NumberField
-          id={id}
-          className='min-w-0 flex-1'
-          value={draft}
-          min={min}
-          max={max}
-          step={step}
-          disabled={disabled}
-          onValueChange={setDraft}
-          onValueCommitted={(next) => {
-            if (next !== null && Number.isFinite(next) && next >= min && next <= max) {
-              if (next !== value) onCommit(next)
-            } else setDraft(value)
-          }}
-        >
-          <NumberFieldGroup>
-            <NumberFieldInput
-              aria-label={label}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') event.currentTarget.blur()
-              }}
-            />
-          </NumberFieldGroup>
-        </NumberField>
-        <Button
-          type='button'
-          size='sm'
-          variant='ghost'
-          className='h-6 shrink-0 px-1 text-[9px]'
-          aria-label={resetLabel}
-          disabled={disabled}
-          onClick={() => onCommit(null)}
-        >
-          {t('textExtras.reset')}
-        </Button>
-      </div>
+      {(['line_spacing', 'letter_spacing'] as const).map((key) => {
+        const line = key === 'line_spacing'
+        const label = t(line ? 'textExtras.lineSpacing' : 'textExtras.letterSpacing')
+        return (
+          <Field key={key} label={label}>
+            <div className='flex min-w-0 gap-0.5'>
+              <div className='min-w-0 flex-1'>
+                <NumericControl
+                  label={label}
+                  disabled={disabled}
+                  value={
+                    isMixed(values, (value) => value[key])
+                      ? null
+                      : (typography[key] ?? (line ? 1.2 : 0))
+                  }
+                  min={line ? 0.5 : -500}
+                  max={line ? 3 : 2000}
+                  step={line ? 0.05 : 10}
+                  onCommit={(next) => apply((value) => ({ ...value, [key]: next }))}
+                />
+              </div>
+              <Button
+                type='button'
+                size='sm'
+                variant='ghost'
+                className='h-6 shrink-0 px-1 text-[9px]'
+                aria-label={t(
+                  line ? 'textExtras.resetLineSpacing' : 'textExtras.resetLetterSpacing',
+                )}
+                disabled={disabled}
+                onClick={() => apply((value) => ({ ...value, [key]: null }))}
+              >
+                {t('textExtras.reset')}
+              </Button>
+            </div>
+          </Field>
+        )
+      })}
     </div>
   )
 }

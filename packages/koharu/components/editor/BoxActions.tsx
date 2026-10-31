@@ -11,7 +11,7 @@ export function BoxActions({ layer }: { layer: EntityId }) {
   const info = useBoxActionInfo(layer).data
   const edit = useBoxEdits()
   const running = useBoxesBusy()
-  if (!info?.can_split) return null
+  if (!info) return null
 
   return (
     <div className='flex flex-wrap gap-1.5'>
@@ -27,17 +27,19 @@ export function BoxActions({ layer }: { layer: EntityId }) {
           {t('boxes.joinWithBubble')}
         </Button>
       )}
-      <Button
-        type='button'
-        size='sm'
-        variant='outline'
-        className='text-[10px]'
-        title={t('boxes.splitExplanation')}
-        disabled={running || edit.isPending}
-        onClick={() => edit.mutate({ action: 'split', layer })}
-      >
-        {t('boxes.split')}
-      </Button>
+      {info.can_split && (
+        <Button
+          type='button'
+          size='sm'
+          variant='outline'
+          className='text-[10px]'
+          title={t('boxes.splitExplanation')}
+          disabled={running || edit.isPending}
+          onClick={() => edit.mutate({ action: 'split', layer })}
+        >
+          {t('boxes.split')}
+        </Button>
+      )}
     </div>
   )
 }
