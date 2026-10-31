@@ -992,7 +992,21 @@
     "update": "Atualizar"
   },
   "warp": {
-    "title": "Skew and perspective"
+    "title": "Skew / perspective",
+    "mode": "Warp mode",
+    "none": "None",
+    "skew": "Skew",
+    "perspective": "Perspective",
+    "mixed": "Mixed",
+    "horizontal": "Horizontal (°)",
+    "vertical": "Vertical (°)",
+    "resetSkew": "Reset skew",
+    "resetCorners": "Reset corners",
+    "dragHint": "Drag the round corner handles on the canvas to match the surface.",
+    "multiple": "Different values selected. Changes apply to every selected box.",
+    "corner": "Perspective corner {{number}}",
+    "error": "Could not load or save the text warp.",
+    "saving": "Applying text warp"
   },
   "window": {
     "close": "Fechar",
