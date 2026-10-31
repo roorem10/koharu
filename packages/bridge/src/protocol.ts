@@ -102,6 +102,11 @@ export const commands = {
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
+	runQc: (scope: QcScope, onProgress: Channel<QcProgress>) => __TAURI_INVOKE<QcReport>("run_qc", { scope, onProgress }),
+	markQcOk: (layer: EntityId, check: QcCheck, ok: boolean) => __TAURI_INVOKE<null>("mark_qc_ok", { layer, check, ok }),
+	getQcSettings: () => __TAURI_INVOKE<QcSettings>("get_qc_settings"),
+	saveQcSettings: (settings: QcSettings) => __TAURI_INVOKE<QcSettings>("save_qc_settings", { settings }),
+	getPageSource: (page: EntityId) => __TAURI_INVOKE<SourceBytes>("get_page_source", { page }),
 };
 
 /* Types */
@@ -641,6 +646,37 @@ export type ProviderPreferences = {
 	entries: ProviderPreference[],
 };
 
+export type QcCheck = "overflow" | "too_small" | "missing_translation" | "empty_source" | "leftover_source" | "odd_font" | "flag";
+
+export type QcFinding = {
+	page: EntityId,
+	page_label: string,
+	layer: EntityId,
+	check: QcCheck,
+	/**  A measurement, font name, or the reviewer's message; labels are localized in the UI. */
+	detail: string,
+	translation: string,
+	flag: Flag | null,
+};
+
+export type QcProgress = {
+	completed: number,
+	total: number,
+};
+
+export type QcReport = {
+	revision: Revision,
+	findings: QcFinding[],
+	hidden: QcFinding[],
+	pages_checked: number,
+};
+
+export type QcScope = { scope: "page"; page: EntityId } | { scope: "project" };
+
+export type QcSettings = {
+	min_font_size?: number,
+};
+
 export type Quantization = {
 	id: string,
 	name: string,
@@ -695,6 +731,8 @@ export type SizePart = {
 	auto_fit: boolean,
 	size: number | null,
 };
+
+export type SourceBytes = number[];
 
 export type SourceText = {
 	text: string,

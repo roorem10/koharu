@@ -113,8 +113,10 @@ mod tests {
 
     #[test]
     fn acknowledgements_do_not_hide_other_checks_or_review_flags() {
-        let mut line = LineContext::default();
-        line.qc_ok = vec!["overflow".into(), "flag".into()];
+        let line = LineContext {
+            qc_ok: vec!["overflow".into(), "flag".into()],
+            ..Default::default()
+        };
         assert!(is_hidden(Some(&line), QcCheck::Overflow));
         assert!(!is_hidden(Some(&line), QcCheck::TooSmall));
         assert!(!is_hidden(Some(&line), QcCheck::Flag));
