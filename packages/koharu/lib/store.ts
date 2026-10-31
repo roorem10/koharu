@@ -22,7 +22,15 @@ import { toast } from '@koharu/ui/components/toast'
 
 import { isBinding } from './shortcuts'
 
-export type CanvasTool = 'select' | 'text' | 'draw' | 'eraser' | 'color_picker' | 'remove' | 'pan'
+export type CanvasTool =
+  | 'select'
+  | 'text'
+  | 'draw'
+  | 'eraser'
+  | 'color_picker'
+  | 'remove'
+  | 'pan'
+  | 'ocr_box'
 export const MIN_BRUSH_DIAMETER = 1
 export function maxBrushDiameter(size: PageSize): number {
   // Assume that for all sizes below 2048 width, 128 is sufficient.
@@ -39,7 +47,15 @@ export interface CanvasBrush {
   color: string
 }
 export type InspectorSection = 'copy' | 'type' | 'layers'
-export type ShortcutAction = CanvasTool | 'fit' | 'zoom_in' | 'zoom_out' | 'zoom_actual' | 'compare'
+export type ShortcutAction =
+  | CanvasTool
+  | 'fit'
+  | 'zoom_in'
+  | 'zoom_out'
+  | 'zoom_actual'
+  | 'compare'
+  | 'brush_smaller'
+  | 'brush_larger'
 export type ShortcutSlot = ShortcutAction | `${ShortcutAction}_alt`
 export type Shortcuts = Record<ShortcutSlot, string>
 export type PipelineScope = 'page' | 'selected-pages' | 'project'
@@ -101,6 +117,9 @@ export const defaultShortcuts: Shortcuts = {
   zoom_out: 'ctrl+-',
   zoom_actual: 'ctrl+0',
   compare: '\\',
+  ocr_box: 'o',
+  brush_smaller: '[',
+  brush_larger: ']',
   select_alt: '',
   text_alt: '',
   draw_alt: '',
@@ -113,6 +132,9 @@ export const defaultShortcuts: Shortcuts = {
   zoom_out_alt: 'ctrl+numpadsubtract',
   zoom_actual_alt: '',
   compare_alt: '',
+  ocr_box_alt: '',
+  brush_smaller_alt: '',
+  brush_larger_alt: '',
 }
 
 export const useKoharuStore = create<KoharuStore>()((set) => ({

@@ -186,6 +186,7 @@ mod glyph_tests {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: None,
+                        warp: None,
                     },
                 )?;
                 edit.set(id, &Geometry::rectangle(0.0, 0.0, 1000.0, 2000.0))?;

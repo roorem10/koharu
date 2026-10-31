@@ -1136,6 +1136,7 @@ mod text_style_tests {
                         origin: Origin::Generated(generation.clone()),
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: None,
+                        warp: None,
                     },
                 )
                 .unwrap();

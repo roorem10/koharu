@@ -170,6 +170,11 @@
     "conversationDivider": "Previous conversation",
     "autoReadUnavailable": "Read chapter was skipped because the selected provider is not a language model."
   },
+  "cleanup": {
+    "title": "Cleanup brushes",
+    "brushSmaller": "Smaller brush",
+    "brushLarger": "Larger brush"
+  },
   "colorPicker": {
     "brushColor": "Цвет кисти",
     "hexCode": "Шестнадцатеричный код цвета",
@@ -577,6 +582,9 @@
     "renameTitle": "Переименовать страницу",
     "selected": "Выбрано: {{count}}"
   },
+  "ocrBox": {
+    "title": "OCR box"
+  },
   "textExtras": {
     "title": "Text style extras",
     "lineSpacing": "Line spacing",
@@ -669,6 +677,12 @@
     "compareShortcut": "Show original (hold)",
     "loadingOriginal": "Loading original…",
     "sourceFailed": "Could not load the original page."
+  },
+  "rawPrep": {
+    "title": "Page levels"
+  },
+  "redesign": {
+    "title": "Panel and popups"
   },
   "resources": {
     "unloadModels": "Выгрузить модели",
@@ -952,6 +966,7 @@
     "draw": "Рисование",
     "eraser": "Ластик",
     "increaseBrushSize": "Увеличить размер кисти",
+    "ocr_box": "OCR box",
     "pan": "Перемещение",
     "remove": "Удаление",
     "select": "Выбор",
@@ -975,6 +990,9 @@
     "noNotes": "Примечания к выпуску отсутствуют.",
     "retry": "Повторить",
     "update": "Обновить"
+  },
+  "warp": {
+    "title": "Skew and perspective"
   },
   "window": {
     "close": "Закрыть",

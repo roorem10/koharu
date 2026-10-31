@@ -170,6 +170,11 @@
     "conversationDivider": "Previous conversation",
     "autoReadUnavailable": "Read chapter was skipped because the selected provider is not a language model."
   },
+  "cleanup": {
+    "title": "Cleanup brushes",
+    "brushSmaller": "Smaller brush",
+    "brushLarger": "Larger brush"
+  },
   "colorPicker": {
     "brushColor": "브러시 색상",
     "hexCode": "16진수 색상 코드",
@@ -577,6 +582,9 @@
     "renameTitle": "페이지 이름 바꾸기",
     "selected": "{{count}}개 선택됨"
   },
+  "ocrBox": {
+    "title": "OCR box"
+  },
   "textExtras": {
     "title": "Text style extras",
     "lineSpacing": "Line spacing",
@@ -669,6 +677,12 @@
     "compareShortcut": "Show original (hold)",
     "loadingOriginal": "Loading original…",
     "sourceFailed": "Could not load the original page."
+  },
+  "rawPrep": {
+    "title": "Page levels"
+  },
+  "redesign": {
+    "title": "Panel and popups"
   },
   "resources": {
     "unloadModels": "모델 해제",
@@ -952,6 +966,7 @@
     "draw": "그리기",
     "eraser": "지우개",
     "increaseBrushSize": "브러시 크기 늘리기",
+    "ocr_box": "OCR box",
     "pan": "이동",
     "remove": "제거",
     "select": "선택",
@@ -975,6 +990,9 @@
     "noNotes": "릴리스 노트가 제공되지 않았습니다.",
     "retry": "다시 시도",
     "update": "업데이트"
+  },
+  "warp": {
+    "title": "Skew and perspective"
   },
   "window": {
     "close": "닫기",

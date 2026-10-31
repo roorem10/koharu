@@ -220,6 +220,7 @@ mod tests {
                         origin: koharu_scene::Origin::User,
                         kind: koharu_scene::TextLayoutKind::Paragraph,
                         angle_degrees: None,
+                        warp: None,
                     },
                 )?);
                 Ok(())

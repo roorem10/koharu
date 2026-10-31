@@ -130,7 +130,7 @@ async fn built_in_component_schema_revisions_are_explicit() {
         [1; 17]
     );
     assert_eq!(schema::<Typography>(), 4);
-    assert_eq!(schema::<TextLayout>(), 2);
+    assert_eq!(schema::<TextLayout>(), 3);
 }
 
 #[tokio::test]
@@ -611,6 +611,7 @@ async fn text_analysis_content_and_presentation_have_distinct_ownership() {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?;
             edit.relate::<RecognizedFrom>(content, region)?;
@@ -653,6 +654,7 @@ async fn text_group_owns_the_canonical_text_order() {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?;
             let second_content = edit.add_text_content(page, At::End)?;
@@ -664,6 +666,7 @@ async fn text_group_owns_the_canonical_text_order() {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?;
             ids = Some((page, first, second));
@@ -719,6 +722,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
                 angle_degrees: None,
+                warp: None,
             },
         )?;
         edit.relate::<Presents>(layer, region)?;
@@ -738,6 +742,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
                 angle_degrees: None,
+                warp: None,
             },
         )?;
         edit.relate::<Presents>(layer, second)?;
@@ -762,6 +767,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
                 angle_degrees: None,
+                warp: None,
             },
         )?;
         edit.relate::<FitsTo>(layer, bubble)?;
@@ -792,6 +798,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
                 angle_degrees: None,
+                warp: None,
             },
         )?;
         edit.relate::<FitsTo>(layer, text_region)?;
@@ -817,6 +824,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
                 angle_degrees: None,
+                warp: None,
             },
         )?;
         edit.relate::<FlowsIn>(layer, text_region)?;
@@ -842,6 +850,7 @@ async fn component_changes_cannot_invalidate_incident_typed_relations() {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?);
             Ok(())
@@ -1043,6 +1052,7 @@ async fn independent_pipeline_components_rebase() {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )?;
             entities = Some((content, layer));

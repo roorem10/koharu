@@ -172,6 +172,7 @@ async fn project_fixture() -> (tempfile::TempDir, Project, Vec<EntityId>) {
                     origin: Origin::Generated(generation.clone()),
                     kind: TextLayoutKind::Paragraph,
                     angle_degrees: None,
+                    warp: None,
                 },
             )
             .unwrap();

@@ -1,5 +1,6 @@
 //! Join and split text boxes that share a bubble.
 
+pub(crate) mod create;
 pub(crate) mod deletion;
 mod operations;
 

@@ -1,6 +1,7 @@
 pub(crate) mod agent;
 pub(crate) mod boxes;
 pub(crate) mod canvas;
+pub(crate) mod cleanup;
 pub(crate) mod context;
 pub(crate) mod editing;
 pub(crate) mod files;
@@ -11,13 +12,17 @@ pub(crate) mod lifecycle;
 pub(crate) mod line_labels;
 pub(crate) mod mcp;
 pub(crate) mod notes;
+pub(crate) mod ocr_box;
 pub(crate) mod output;
 pub(crate) mod preferences;
 pub(crate) mod processing;
 pub(crate) mod project;
 pub(crate) mod qc;
+pub(crate) mod raw_prep;
+pub(crate) mod redesign;
 pub(crate) mod runs;
 pub(crate) mod styles;
+pub(crate) mod warp;
 
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -202,6 +207,12 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             mcp::get_mcp_status,
             mcp::save_mcp_settings,
             mcp::new_mcp_token,
+            // WO-07 (OCR box and redo) commands go here.
+            // WO-15 (cleanup brushes) commands go here.
+            // WO-10 (skew and perspective) commands go here.
+            // WO-17 (raw prep) commands go here.
+            // WO-23 (redesigned panel and popups) commands go here.
+            // WO-24 (automatic QC and context tab) commands go here.
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)

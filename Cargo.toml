@@ -41,6 +41,7 @@ koharu-rasterizer = { path = "crates/koharu-rasterizer", default-features = fals
 koharu-desktop = { path = "crates/koharu-desktop" }
 koharu-secrets = { path = "crates/koharu-secrets" }
 booharu-context = { path = "crates/booharu-context" }
+booharu-rawprep = { path = "crates/booharu-rawprep" }
 
 # external dependencies
 alphanumeric-sort = "1.5.8"
