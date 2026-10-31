@@ -326,6 +326,7 @@ async fn write_page(
         detections.retain(|detection| intersects(detection.bbox, region));
     }
     non_maximum_suppression(&mut detections, 0.5);
+    suppress_contained_text(&mut detections);
     sort_by_layout(&mut detections);
 
     let image = image.to_rgb8();
@@ -1756,6 +1757,26 @@ fn non_maximum_suppression(detections: &mut Vec<KoharuLayoutDetection>, threshol
     *detections = kept;
 }
 
+fn suppress_contained_text(detections: &mut Vec<KoharuLayoutDetection>) {
+    detections.sort_by(|left, right| {
+        right
+            .score
+            .total_cmp(&left.score)
+            .then_with(|| detection_order(left, right))
+    });
+    let mut kept = Vec::with_capacity(detections.len());
+    for candidate in detections.drain(..) {
+        let suppressed = candidate.label == "text"
+            && kept.iter().any(|existing: &KoharuLayoutDetection| {
+                existing.label == "text" && containment(existing.bbox, candidate.bbox) >= 0.8
+            });
+        if !suppressed {
+            kept.push(candidate);
+        }
+    }
+    *detections = kept;
+}
+
 fn sort_by_layout(detections: &mut Vec<KoharuLayoutDetection>) {
     let order = layout_order(detections);
     let mut values = std::mem::take(detections)
@@ -2139,6 +2160,44 @@ mod tests {
                 height: 1,
                 pixels: vec![0],
             },
+        }
+    }
+
+    #[test]
+    fn contained_text_is_suppressed_even_with_low_iou() {
+        let mut values = vec![
+            detection("text", 0.7, [10.0, 10.0, 20.0, 20.0]),
+            detection("text", 0.9, [0.0, 0.0, 100.0, 100.0]),
+            detection("bubble", 0.95, [0.0, 0.0, 100.0, 100.0]),
+        ];
+        super::suppress_contained_text(&mut values);
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[1].score, 0.9);
+    }
+
+    #[test]
+    fn contained_text_suppression_keeps_adjacent_columns() {
+        let mut values = vec![
+            detection("text", 0.9, [0.0, 0.0, 20.0, 100.0]),
+            detection("text", 0.8, [22.0, 0.0, 42.0, 100.0]),
+        ];
+        super::suppress_contained_text(&mut values);
+        assert_eq!(values.len(), 2);
+    }
+
+    #[test]
+    fn contained_text_suppression_prefers_confidence_over_input_order() {
+        for reversed in [false, true] {
+            let mut values = vec![
+                detection("text", 0.6, [10.0, 0.0, 60.0, 100.0]),
+                detection("text", 0.95, [0.0, 0.0, 50.0, 100.0]),
+            ];
+            if reversed {
+                values.reverse();
+            }
+            super::suppress_contained_text(&mut values);
+            assert_eq!(values.len(), 1);
+            assert_eq!(values[0].score, 0.95);
         }
     }
 
