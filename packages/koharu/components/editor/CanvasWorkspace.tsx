@@ -9,6 +9,8 @@ import { CanvasOverlay } from '@/components/editor/CanvasOverlay'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { useCanvas } from '@/components/editor/useCanvas'
+import { originalVisible, useCompareStore } from '@/components/qc/compare'
+import { OriginalOverlay } from '@/components/qc/OriginalOverlay'
 import { call } from '@/lib/backend'
 import { expandLayerSelection } from '@/lib/document'
 import {
@@ -30,6 +32,7 @@ import {
   refresh,
   usePage,
   usePages,
+  useProject,
 } from '@/lib/queries'
 import {
   findShortcut,
@@ -107,6 +110,7 @@ export function CanvasWorkspace() {
   const gesture = useRef<Gesture | null>(null)
   const previousPageIndex = useRef<number | null>(null)
   const spaceHeld = useRef(false)
+  const compareKey = useRef<string | null>(null)
   const lastZoomStep = useRef(-Infinity)
   const heldArrows = useRef(new Set<string>())
   const nudgeShift = useRef(false)
@@ -123,6 +127,8 @@ export function CanvasWorkspace() {
   const [cursor, setCursor] = useState<Point | null>(null)
   const colorSampling = useColorSampling()
 
+  const projectName = useProject().data?.name
+  const showingOriginal = useCompareStore((state) => state.pinned || state.held)
   const page = usePage().data
   const pages = usePages().data
   const canvasPage = useKoharuStore((state) => state.canvasPage)
@@ -169,6 +175,7 @@ export function CanvasWorkspace() {
   const beginTransform = useCallback(
     (elements: TransformFrame[]) => {
       if (
+        originalVisible() ||
         !canvas ||
         canvasRevision === null ||
         !elements.length ||
@@ -268,6 +275,19 @@ export function CanvasWorkspace() {
     setDraft(null)
     setPreviews({})
   }, [canvas, strokeUpdates, transformUpdates])
+
+  useEffect(() => {
+    if (showingOriginal) {
+      cancelGesture()
+      colorSampling?.cancel()
+    }
+  }, [cancelGesture, colorSampling, showingOriginal])
+
+  useEffect(() => {
+    useCompareStore.getState().reset()
+    compareKey.current = null
+    return () => useCompareStore.getState().reset()
+  }, [projectName])
 
   const fitCanvas = useCallback(() => {
     const element = surface.current
@@ -400,6 +420,14 @@ export function CanvasWorkspace() {
 
     const runShortcut = (event: KeyboardEvent, next: ShortcutAction | undefined) => {
       if (!next) return
+      if (next === 'compare') {
+        if (!page || useKoharuStore.getState().settingsOpen) return
+        event.preventDefault()
+        cancelGesture()
+        compareKey.current = event.code || event.key
+        useCompareStore.getState().setHeld(true)
+        return
+      }
       if (next === 'zoom_in' || next === 'zoom_out' || next === 'zoom_actual') {
         event.preventDefault()
         if (!page || (next === 'zoom_actual' && event.repeat)) return
@@ -425,6 +453,16 @@ export function CanvasWorkspace() {
 
     const down = (event: KeyboardEvent) => {
       const action = findShortcut(event, useKoharuStore.getState().shortcuts)
+      if (
+        originalVisible() &&
+        action !== 'compare' &&
+        action !== 'fit' &&
+        action !== 'zoom_in' &&
+        action !== 'zoom_out' &&
+        action !== 'zoom_actual'
+      ) {
+        return
+      }
       const modified = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey
       // CEF's capture-phase page-zoom blocker has already prevented the default here.
       // Configured modifier bindings also work immediately after a range input was used.
@@ -490,6 +528,10 @@ export function CanvasWorkspace() {
     }
 
     const up = (event: KeyboardEvent) => {
+      if (compareKey.current === (event.code || event.key)) {
+        compareKey.current = null
+        useCompareStore.getState().setHeld(false)
+      }
       if (event.key === 'Shift') nudgeShift.current = false
       if (event.key === 'Alt') event.preventDefault()
       if (event.code === 'Space') spaceHeld.current = false
@@ -499,17 +541,24 @@ export function CanvasWorkspace() {
       }
     }
     const blur = () => {
+      compareKey.current = null
+      useCompareStore.getState().setHeld(false)
       spaceHeld.current = false
       if (heldArrows.current.size) finishTransform()
       cancelGesture()
     }
 
+    const visibility = () => {
+      if (document.hidden) blur()
+    }
+    document.addEventListener('visibilitychange', visibility)
     window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
+    window.addEventListener('keyup', up, true)
     window.addEventListener('blur', blur)
     return () => {
+      document.removeEventListener('visibilitychange', visibility)
       window.removeEventListener('keydown', down)
-      window.removeEventListener('keyup', up)
+      window.removeEventListener('keyup', up, true)
       window.removeEventListener('blur', blur)
     }
   }, [
@@ -711,6 +760,7 @@ export function CanvasWorkspace() {
           onKeyDown={(event) => {
             const keys = heldArrows.current
             if (
+              originalVisible() ||
               !arrowKeys.includes(event.key) ||
               event.defaultPrevented ||
               event.target !== event.currentTarget ||
@@ -760,6 +810,7 @@ export function CanvasWorkspace() {
           onContextMenu={(event) => event.preventDefault()}
           onPointerDown={(event) => {
             if (
+              originalVisible() ||
               !page ||
               !canvas ||
               canvasState.status !== 'ready' ||
@@ -902,6 +953,14 @@ export function CanvasWorkspace() {
             event.preventDefault()
           }}
           onPointerDownCapture={(event) => {
+            if (
+              originalVisible() &&
+              !(event.target instanceof Element && event.target.closest('[data-canvas-control]'))
+            ) {
+              event.preventDefault()
+              event.stopPropagation()
+              return
+            }
             if (heldArrows.current.size) {
               event.preventDefault()
               event.stopPropagation()
@@ -994,7 +1053,7 @@ export function CanvasWorkspace() {
             aria-hidden
             className='pointer-events-none absolute inset-0 block size-full'
           />
-          {page && canvasState.status === 'ready' && (
+          {page && !showingOriginal && canvasState.status === 'ready' && (
             <CanvasOverlay
               page={page}
               selected={selected}
@@ -1010,7 +1069,8 @@ export function CanvasWorkspace() {
               onTransformEnd={finishTransform}
             />
           )}
-          {page && canvasState.status === 'error' && (
+          {page && showingOriginal && <OriginalOverlay key={page.id} page={page} />}
+          {page && !showingOriginal && canvasState.status === 'error' && (
             <div
               role='alert'
               className={

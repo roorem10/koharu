@@ -12,6 +12,7 @@ export const shortcutActions: readonly ShortcutAction[] = [
   'zoom_in',
   'zoom_out',
   'zoom_actual',
+  'compare',
 ]
 
 export const shortcutLabels: Record<ShortcutAction, string> = {
@@ -26,6 +27,7 @@ export const shortcutLabels: Record<ShortcutAction, string> = {
   zoom_in: 'settings.shortcuts.zoomIn',
   zoom_out: 'settings.shortcuts.zoomOut',
   zoom_actual: 'settings.shortcuts.zoomActual',
+  compare: 'qc.compareShortcut',
 }
 
 const modifiers = ['ctrl', 'alt', 'shift'] as const

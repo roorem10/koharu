@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AboutDialog } from '@/components/app/AboutDialog'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
+import { useCompareStore } from '@/components/qc/compare'
 import { call } from '@/lib/backend'
 import { selectableLayer } from '@/lib/geometry'
 import {
@@ -39,6 +40,8 @@ import { cn } from '@koharu/ui/lib/utils'
 
 export function TitleBar() {
   const { t } = useTranslation()
+  const pinned = useCompareStore((state) => state.pinned)
+  const toggleOriginal = useCompareStore((state) => state.toggle)
   const [aboutOpen, setAboutOpen] = useState(false)
   const macOS = useMacOS()
   const project = useProject().data
@@ -237,6 +240,10 @@ export function TitleBar() {
             <MenubarContent>
               <MenubarItem disabled={!page} onClick={requestCanvasFit}>
                 {t('menu.fit')}
+              </MenubarItem>
+              <MenubarItem disabled={!page} onClick={toggleOriginal}>
+                {t('qc.showOriginal')}
+                <MenubarShortcut>{pinned ? t('qc.on') : t('qc.off')}</MenubarShortcut>
               </MenubarItem>
             </MenubarContent>
           </MenubarMenu>
