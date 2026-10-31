@@ -57,7 +57,10 @@
   "boxes": {
     "title": "Text boxes",
     "joinAutomatically": "Join text in the same bubble",
-    "joinExplanation": "Detection creates one text box per speech bubble; free text stays separate."
+    "joinExplanation": "Detection creates one text box per speech bubble; free text stays separate.",
+    "redetectPage": "Detect page again",
+    "redetectConfirmation": "Generated boxes on this page, including their OCR text and translations, will be replaced. Hand-made and hand-edited boxes are kept.",
+    "cancel": "Cancel"
   },
   "canvas": {
     "empty": "ページを選択して開始します。",

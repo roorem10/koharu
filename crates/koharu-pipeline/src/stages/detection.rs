@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     io::Cursor,
     sync::{Arc, Mutex},
 };
@@ -25,7 +25,7 @@ use koharu_renderer::{TextStyle, TextStyles};
 use koharu_scene::{
     AssetInput, AssetMetadata, AssetRole, At, BubbleRegion, DetectionAnalysis, DetectionLabel,
     EntityId, EntityOrigin, FitsTo, FlowsIn, Generation, Geometry, Inside, Origin, PanelRegion,
-    Point, RecognizedFrom, Region, RegionKind, RegionSpec, RemovePolicy, TextLayout,
+    Point, Presents, RecognizedFrom, Region, RegionKind, RegionSpec, RemovePolicy, TextLayout,
     TextLayoutKind, TextRegion, TextRole, Typography, WritingMode,
 };
 use rayon::prelude::*;
@@ -307,26 +307,63 @@ fn remove_previous_regions(
     edit: &mut koharu_scene::Edit,
     generation: &Generation,
 ) -> Result<()> {
-    let mut remove = Vec::new();
+    let owned = |id| -> Result<bool> {
+        Ok(input.scene.component::<EntityOrigin>(id)?.is_some_and(|origin| {
+            matches!(origin.origin, Origin::Generated(owner) if owner.producer == generation.producer)
+        }))
+    };
+    let mut remove = BTreeSet::new();
     for entity in input.scene.descendants(input.page)? {
         let id = entity.id();
-        if !input.contains_entity(id)? {
-            continue;
+        if input.contains_entity(id)? && owned(id)? && entity.component::<Region>()?.is_some() {
+            remove.insert(id);
         }
-        let owned_region = entity
-            .component::<EntityOrigin>()?
-            .is_some_and(|origin| {
-                matches!(origin.origin, Origin::Generated(ref owner) if owner.producer == generation.producer)
+    }
+    let regions = remove.iter().copied().collect::<Vec<_>>();
+    for region in regions {
+        for relation in input.scene.relations_to_as::<RecognizedFrom>(region) {
+            let content = relation.value().source;
+            let source = input.scene.component::<koharu_scene::SourceText>(content)?;
+            let translation = input
+                .scene
+                .component::<koharu_scene::Translation>(content)?;
+            if !owned(content)?
+                || source.is_some_and(|s| s.text.origin == Origin::User)
+                || translation.is_some_and(|t| t.text.origin == Origin::User)
+            {
+                continue;
+            }
+            remove.insert(content);
+            for presentation in input.scene.relations_to_as::<Presents>(content) {
+                let layer = presentation.value().source;
+                if owned(layer)? {
+                    remove.insert(layer);
+                }
+            }
+        }
+    }
+    // Retain the support regions of any hand-edited presentation, including
+    // its bubble. Removing an incident relation would otherwise strand it.
+    loop {
+        let retained = remove
+            .iter()
+            .copied()
+            .filter(|&id| {
+                input
+                    .scene
+                    .relations_to(id, None)
+                    .any(|relation| !remove.contains(&relation.value().source))
             })
-            && entity.component::<Region>()?.is_some();
-        if owned_region {
-            remove.push(id);
+            .collect::<Vec<_>>();
+        if retained.is_empty() {
+            break;
+        }
+        for id in retained {
+            remove.remove(&id);
         }
     }
     for entity in remove {
-        if input.scene.entity(entity).is_ok() {
-            edit.remove_entity(entity, RemovePolicy::Cascade)?;
-        }
+        edit.remove_entity(entity, RemovePolicy::Cascade)?;
     }
     Ok(())
 }
@@ -2133,6 +2170,172 @@ mod tests {
 
         assert!(processor.skip(&input).unwrap());
         assert!(!processor.skip(&input.with_redetect(true)).unwrap());
+    }
+
+    #[tokio::test]
+    async fn redetection_replaces_generated_boxes_but_keeps_handmade_boxes_and_their_bubble() {
+        let mut session = Session::memory().await.unwrap();
+        let mut page = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                page = Some(edit.add_page(PageDraft::new("page", 100., 100.), At::End)?);
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let page = page.unwrap();
+        let generation = generation(super::PRODUCER, super::MODEL_ID).unwrap();
+        let snapshot = session.snapshot();
+        let mut edit = snapshot.edit_as(generation.clone());
+        let bubble = edit
+            .add_analysis_region::<BubbleRegion>(
+                page,
+                At::End,
+                &Geometry::rectangle(0., 0., 100., 100.),
+                None,
+            )
+            .unwrap();
+        let region = edit
+            .add_analysis_region::<TextRegion>(
+                page,
+                At::End,
+                &Geometry::rectangle(20., 20., 20., 40.),
+                None,
+            )
+            .unwrap();
+        let content = edit.add_text_content(page, At::End).unwrap();
+        let layout = TextLayout {
+            origin: Origin::User,
+            kind: TextLayoutKind::Paragraph,
+            angle_degrees: None,
+        };
+        let layer = edit
+            .add_text_layer(page, At::End, content, &layout)
+            .unwrap();
+        edit.relate::<super::RecognizedFrom>(content, region)
+            .unwrap();
+        edit.relate::<FlowsIn>(layer, bubble).unwrap();
+        edit.relate::<Inside>(region, bubble).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let snapshot = session.snapshot();
+        let mut edit = snapshot.edit();
+        let manual_region = edit
+            .add_analysis_region::<TextRegion>(
+                page,
+                At::End,
+                &Geometry::rectangle(60., 20., 20., 40.),
+                None,
+            )
+            .unwrap();
+        let manual_content = edit.add_text_content(page, At::End).unwrap();
+        let manual_layer = edit
+            .add_text_layer(page, At::End, manual_content, &layout)
+            .unwrap();
+        edit.relate::<super::RecognizedFrom>(manual_content, manual_region)
+            .unwrap();
+        edit.relate::<FlowsIn>(manual_layer, bubble).unwrap();
+        edit.relate::<Inside>(manual_region, bubble).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let input = StageInput::new(
+            session.snapshot(),
+            page,
+            None,
+            None,
+            std::sync::Arc::new(crate::ImageCache::default()),
+            None,
+        )
+        .with_redetect(true);
+        let mut edit = input.scene.edit_as(generation.clone());
+        super::remove_previous_regions(&input, &mut edit, &generation).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        for id in [layer, content, region] {
+            assert!(session.snapshot().entity(id).is_err());
+        }
+        for id in [manual_layer, manual_content, manual_region, bubble] {
+            assert!(session.snapshot().entity(id).is_ok());
+        }
+        assert_eq!(
+            session
+                .snapshot()
+                .relation_from::<FlowsIn>(manual_layer)
+                .unwrap()
+                .unwrap()
+                .value()
+                .target,
+            bubble
+        );
+    }
+
+    #[tokio::test]
+    async fn redetection_keeps_user_text_even_if_the_detection_still_owns_the_entities() {
+        let mut session = Session::memory().await.unwrap();
+        let mut page = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                page = Some(edit.add_page(PageDraft::new("page", 100., 100.), At::End)?);
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let page = page.unwrap();
+        let generation = generation(super::PRODUCER, super::MODEL_ID).unwrap();
+        let snapshot = session.snapshot();
+        let mut edit = snapshot.edit_as(generation.clone());
+        let region = edit
+            .add_analysis_region::<TextRegion>(
+                page,
+                At::End,
+                &Geometry::rectangle(20., 20., 20., 40.),
+                None,
+            )
+            .unwrap();
+        let content = edit.add_text_content(page, At::End).unwrap();
+        let layer = edit
+            .add_text_layer(
+                page,
+                At::End,
+                content,
+                &TextLayout {
+                    origin: Origin::User,
+                    kind: TextLayoutKind::Paragraph,
+                    angle_degrees: None,
+                },
+            )
+            .unwrap();
+        edit.relate::<super::RecognizedFrom>(content, region)
+            .unwrap();
+        edit.relate::<FitsTo>(layer, region).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                edit.set(
+                    content,
+                    &koharu_scene::SourceText {
+                        text: koharu_scene::Authored::user("checked by hand".into()),
+                        language: None,
+                    },
+                )
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let input = StageInput::new(
+            session.snapshot(),
+            page,
+            None,
+            None,
+            std::sync::Arc::new(crate::ImageCache::default()),
+            None,
+        )
+        .with_redetect(true);
+        let mut edit = input.scene.edit_as(generation.clone());
+        super::remove_previous_regions(&input, &mut edit, &generation).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        for id in [layer, content, region] {
+            assert!(session.snapshot().entity(id).is_ok());
+        }
     }
 
     #[tokio::test]
