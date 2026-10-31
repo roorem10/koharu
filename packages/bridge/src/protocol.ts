@@ -137,6 +137,8 @@ export const commands = {
 	getMcpStatus: () => __TAURI_INVOKE<McpStatus>("get_mcp_status"),
 	saveMcpSettings: (options: McpOptions) => __TAURI_INVOKE<McpStatus>("save_mcp_settings", { options }),
 	newMcpToken: () => __TAURI_INVOKE<McpStatus>("new_mcp_token"),
+	getBoxEffects: (layers: EntityId[]) => __TAURI_INVOKE<boolean[]>("get_box_effects", { layers }),
+	resetBoxEffects: (layers: EntityId[]) => __TAURI_INVOKE<null>("reset_box_effects", { layers }),
 };
 
 /* Types */
