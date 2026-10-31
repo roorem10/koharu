@@ -131,18 +131,31 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
     };
     builder
         .setup(move |application| {
-            if let Some(root) = &preview_root {
-                koharu_runtime::Store::configure(root.join("packages"))?;
-            }
-            #[cfg(all(target_os = "windows", not(debug_assertions)))]
-            if preview_root.is_none() {
-                koharu_runtime::Store::configure(
-                    application
-                        .path()
-                        .resource_dir()
-                        .context("failed to locate Koharu's installation directory")?
-                        .join("store"),
-                )?;
+            let models_folder = koharu_config::load::<crate::commands::files::LibrarySettings>("library")
+                .and_then(|settings| Ok(settings.read()?.models_folder.clone()));
+            let custom_store = match models_folder {
+                Ok(Some(root)) => match crate::commands::files::prepare_folder(&root)
+                    .and_then(|()| koharu_runtime::Store::configure(root)) {
+                    Ok(()) => true,
+                    Err(error) => { tracing::warn!(%error, "could not use configured models folder; using default"); false }
+                },
+                Ok(None) => false,
+                Err(error) => { tracing::warn!(%error, "could not read library settings; using default models folder"); false }
+            };
+            if !custom_store {
+                if let Some(root) = &preview_root {
+                    koharu_runtime::Store::configure(root.join("packages"))?;
+                }
+                #[cfg(all(target_os = "windows", not(debug_assertions)))]
+                if preview_root.is_none() {
+                    koharu_runtime::Store::configure(
+                        application
+                            .path()
+                            .resource_dir()
+                            .context("failed to locate Koharu's installation directory")?
+                            .join("store"),
+                    )?;
+                }
             }
 
             application.manage(CurrentProject {

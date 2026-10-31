@@ -11,6 +11,7 @@ import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
 import { RedetectPageMenuItem, RedetectPageDialog } from '@/components/boxes/PageBoxActions'
 import { PageJoinMenuItem } from '@/components/boxes/PageJoinMenuItem'
 import { useCompareStore } from '@/components/qc/compare'
+import { useScriptFiles } from '@/components/files/ScriptImport'
 import { call } from '@/lib/backend'
 import { selectableLayer } from '@/lib/geometry'
 import {
@@ -46,6 +47,7 @@ export function TitleBar() {
   const toggleOriginal = useCompareStore((state) => state.toggle)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [redetectPage, setRedetectPage] = useState<string | null>(null)
+  const scripts = useScriptFiles()
   const macOS = useMacOS()
   const project = useProject().data
   const pagesQuery = usePages(Boolean(project))
@@ -62,6 +64,11 @@ export function TitleBar() {
     ['export-project'],
     commands.export,
     'menu.export',
+  )
+  const { run: exportSelected, busy: exportingSelected } = useCommand(
+    ['export-selected-pages'],
+    commands.exportSelectedPages,
+    'files.selectedPages',
   )
 
   const run = (scope: Scope, operation: Operation = { operation: 'full' }) =>
@@ -116,8 +123,8 @@ export function TitleBar() {
               </MenubarSub>
               <MenubarSub>
                 <MenubarSubTrigger
-                  disabled={!project || pages.length === 0 || exporting}
-                  aria-busy={exporting}
+                  disabled={!project || pages.length === 0 || exporting || exportingSelected}
+                  aria-busy={exporting || exportingSelected}
                   className='min-h-8 gap-1.5 px-2 py-1 text-xs'
                 >
                   {exporting && <LoaderCircle className='animate-spin' aria-hidden='true' />}
@@ -133,8 +140,38 @@ export function TitleBar() {
                       {format.toUpperCase()}…
                     </MenubarItem>
                   ))}
+                  <MenubarSeparator />
+                  <MenubarSub>
+                    <MenubarSubTrigger
+                      disabled={selectedPages.length === 0 || exporting || exportingSelected}
+                    >
+                      {t('files.selectedPages')}
+                    </MenubarSubTrigger>
+                    <MenubarSubContent>
+                      {(['png', 'psd', 'cbz'] as const).map((format) => (
+                        <MenubarItem
+                          key={format}
+                          onClick={() => exportSelected(format, selectedPages)}
+                        >
+                          {t('files.exportFormat', { format: format.toUpperCase() })}
+                        </MenubarItem>
+                      ))}
+                    </MenubarSubContent>
+                  </MenubarSub>
                 </MenubarSubContent>
               </MenubarSub>
+              <MenubarItem
+                disabled={!project || scripts.busy}
+                onClick={() => void scripts.exportScript().catch(() => undefined)}
+              >
+                {t('files.exportScript')}
+              </MenubarItem>
+              <MenubarItem
+                disabled={!project || scripts.busy}
+                onClick={() => void scripts.importScript().catch(() => undefined)}
+              >
+                {t('files.importScript')}
+              </MenubarItem>
               <MenubarSeparator />
               <MenubarItem disabled={!project} onClick={closeProject}>
                 {t('menu.closeProject')}
@@ -295,6 +332,7 @@ export function TitleBar() {
         {!macOS && <WindowControls />}
       </header>
       <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
+      {scripts.dialog}
     </>
   )
 }

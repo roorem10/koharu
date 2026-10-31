@@ -46,14 +46,66 @@ pub(crate) async fn export(
     project: State<'_, CurrentProject>,
     desktop: State<'_, Desktop>,
 ) -> std::result::Result<(), Error> {
+    Ok(export_selection(window, format, None, &project, &desktop).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn export_selected_pages(
+    window: WebviewWindow<CefRuntime>,
+    format: ExportFormat,
+    pages: Vec<EntityId>,
+    project: State<'_, CurrentProject>,
+    desktop: State<'_, Desktop>,
+) -> std::result::Result<(), Error> {
+    Ok(export_selection(window, format, Some(pages), &project, &desktop).await?)
+}
+
+async fn export_selection(
+    window: WebviewWindow<CefRuntime>,
+    format: ExportFormat,
+    selected: Option<Vec<EntityId>>,
+    project: &CurrentProject,
+    desktop: &Desktop,
+) -> Result<()> {
     let (name, snapshot) = {
         let project = project.project.lock().await;
         let project = project.as_ref().context("no project is open")?;
         (project.name.clone(), project.snapshot())
     };
-    let pages = snapshot.pages().map(|page| page.id()).collect::<Vec<_>>();
+    let all_pages = snapshot.pages().map(|page| page.id()).collect::<Vec<_>>();
+    if let Some(selected) = &selected {
+        anyhow::ensure!(
+            selected.iter().all(|page| all_pages.contains(page)),
+            "a selected page no longer exists"
+        );
+    }
+    let extension = match format {
+        ExportFormat::Png | ExportFormat::Cbz => "png",
+        ExportFormat::Psd => "psd",
+    };
+    let labels = all_pages
+        .iter()
+        .map(|&id| Ok(snapshot.page(id)?.page()?.label.clone()))
+        .collect::<Result<Vec<_>>>()?;
+    let settings = super::files::load_settings()?;
+    let all_names = super::files::names::export_names(
+        &settings.export_name_pattern,
+        &name,
+        &labels.iter().map(String::as_str).collect::<Vec<_>>(),
+        extension,
+    )?;
+    let (pages, names): (Vec<_>, Vec<_>) = all_pages
+        .into_iter()
+        .zip(all_names)
+        .filter(|(page, _)| {
+            selected
+                .as_ref()
+                .is_none_or(|selected| selected.contains(page))
+        })
+        .unzip();
     if pages.is_empty() {
-        return Err(anyhow::anyhow!("there are no pages to export").into());
+        return Err(anyhow::anyhow!("there are no pages to export"));
     }
     let dialog = rfd::AsyncFileDialog::new().set_parent(&window);
     let destination = match format {
@@ -71,31 +123,6 @@ pub(crate) async fn export(
     };
     let renderer = desktop.renderer();
     let rasterizer = desktop.rasterizer().await?;
-    let extension = match format {
-        ExportFormat::Png | ExportFormat::Cbz => "png",
-        ExportFormat::Psd => "psd",
-    };
-    let width = pages.len().to_string().len().max(4);
-    let names = pages
-        .iter()
-        .enumerate()
-        .map(|(index, &page_id)| -> Result<String> {
-            let page = snapshot.page(page_id)?.page()?;
-            let name = page
-                .label
-                .trim()
-                .trim_end_matches(|character: char| character == '.' || character.is_whitespace());
-            let name = name
-                .rsplit_once('.')
-                .map_or(name, |(stem, _)| stem)
-                .replace(['<', '>', ':', '"', '/', '\\', '|', '?', '*'], "_");
-            Ok(format!(
-                "{:0width$}_{}.{extension}",
-                index + 1,
-                if name.is_empty() { "page" } else { &name }
-            ))
-        })
-        .collect::<Result<Vec<_>>>()?;
     let mut archive = if matches!(format, ExportFormat::Cbz) {
         let directory = destination.parent().context("archive path has no parent")?;
         Some(zip::ZipWriter::new(tempfile::NamedTempFile::new_in(
