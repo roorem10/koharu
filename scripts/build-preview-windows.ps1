@@ -98,7 +98,6 @@ foreach ($directory in @('locales', 'swiftshader')) {
     $path = Join-Path $runtime $directory
     if (Test-Path $path) { Copy-Item $path -Destination $stage -Recurse -Force }
 }
-Copy-Item (Join-Path $root 'LICENSE-MIT'), (Join-Path $root 'LICENSE-APACHE'), (Join-Path $root 'PREVIEW_INSTALL.md') -Destination $stage -Force
 
 # CEF stores its third-party notices beside its build headers. Preserve them in the preview.
 $cefRoot = $env:CEF_PATH
@@ -108,6 +107,18 @@ if (-not $cefRoot) {
     if ($cef) { $cefRoot = $cef.DirectoryName }
 }
 if (-not $cefRoot) { throw 'Cannot locate CEF notices. Keep the CEF build directory and retry.' }
+# A restored CI cache can skip the CEF build script, which is what copies the CEF runtime
+# next to koharu.exe. Take the runtime from the CEF directory itself in that case.
+if (-not (Test-Path (Join-Path $stage 'libcef.dll'))) {
+    Get-ChildItem $cefRoot -File | Where-Object { $_.Extension -in $extensions -and $_.Name -ne 'archive.json' } |
+        Copy-Item -Destination $stage -Force
+    foreach ($directory in @('locales', 'swiftshader')) {
+        $path = Join-Path $cefRoot $directory
+        if (Test-Path $path) { Copy-Item $path -Destination $stage -Recurse -Force }
+    }
+}
+Copy-Item (Join-Path $root 'LICENSE-MIT'), (Join-Path $root 'LICENSE-APACHE'), (Join-Path $root 'PREVIEW_INSTALL.md') -Destination $stage -Force
+
 # Cargo's CEF download keeps CREDITS.html but drops the archive's LICENSE.txt; fall back to the checked-in copy.
 $cefLicense = Join-Path $cefRoot 'LICENSE.txt'
 if (-not (Test-Path $cefLicense)) { $cefLicense = Join-Path $root 'preview\CEF-LICENSE.txt' }
