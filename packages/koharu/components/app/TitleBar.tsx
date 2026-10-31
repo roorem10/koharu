@@ -7,7 +7,7 @@ import { useState, type ComponentProps } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AboutDialog } from '@/components/app/AboutDialog'
-import { ProcessPrepItems } from '@/components/app/ProcessPrepItems'
+import { ProcessPrepItems, RawPrepDialogs } from '@/components/app/ProcessPrepItems'
 import { ProcessRedoItems } from '@/components/app/ProcessRedoItems'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
 import { RedetectPageMenuItem, RedetectPageDialog } from '@/components/boxes/PageBoxActions'
@@ -98,6 +98,7 @@ export function TitleBar() {
 
   return (
     <>
+      <RawPrepDialogs />
       <header
         data-tauri-drag-region='deep'
         className='relative flex h-10 shrink-0 items-center bg-[var(--surface-titlebar)] text-[12px]'
