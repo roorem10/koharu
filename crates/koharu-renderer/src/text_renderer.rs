@@ -687,8 +687,10 @@ fn automatic_maximum(
         } else {
             bounds.width
         }
-    } else {
+    } else if descriptor.point_text {
         24.0
+    } else {
+        bounds.width.min(bounds.height).max(24.0)
     }
 }
 
@@ -1438,7 +1440,7 @@ mod tests {
     }
 
     #[test]
-    fn automatic_size_preserves_free_text_default_and_balloon_extent() {
+    fn automatic_size_scales_with_free_text_frames_and_keeps_point_text_default() {
         let descriptor = TextNodeDescriptor {
             entity: EntityId::new(),
             text: "Hi".to_owned(),
@@ -1471,7 +1473,24 @@ mod tests {
             height: 120.0,
         };
 
-        assert_eq!(automatic_maximum(&descriptor, bounds, false), 24.0);
+        assert_eq!(automatic_maximum(&descriptor, bounds, false), 120.0);
+        let larger = LayoutBox {
+            width: 480.0,
+            height: 240.0,
+            ..bounds
+        };
+        assert_eq!(automatic_maximum(&descriptor, larger, false), 240.0);
+        let small = LayoutBox {
+            width: 18.0,
+            height: 12.0,
+            ..bounds
+        };
+        assert_eq!(automatic_maximum(&descriptor, small, false), 24.0);
+        let point = TextNodeDescriptor {
+            point_text: true,
+            ..descriptor.clone()
+        };
+        assert_eq!(automatic_maximum(&point, larger, false), 24.0);
         assert_eq!(automatic_maximum(&descriptor, bounds, true), 240.0);
     }
 
