@@ -1136,8 +1136,8 @@ export function CanvasWorkspace() {
           {page && !showingOriginal && canvasState.status === 'ready' && (
             <CanvasOverlay
               page={page}
-              selected={selected}
-              hovered={hovered}
+              selected={selected.filter((id) => id !== richTextEditor.editing)}
+              hovered={hovered === richTextEditor.editing ? null : hovered}
               frames={layerFrames}
               previews={previews}
               draft={draft}
@@ -1152,6 +1152,7 @@ export function CanvasWorkspace() {
           {page &&
             !showingOriginal &&
             canvasState.status === 'ready' &&
+            !richTextEditor.editing &&
             selected.length === 1 &&
             page.layers.some((layer) => layer.id === selected[0] && layer.type === 'text') && (
               <WarpHandles layerId={selected[0]} />
