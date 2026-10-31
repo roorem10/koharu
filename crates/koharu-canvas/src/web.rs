@@ -119,7 +119,7 @@ enum StrokeCommitDto {
     Erase {
         page: String,
         revision: u64,
-        layer: String,
+        layer: Option<String>,
         diameter: f32,
         points: Vec<Point>,
     },
