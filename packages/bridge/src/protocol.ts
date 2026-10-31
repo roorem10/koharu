@@ -137,6 +137,12 @@ export const commands = {
 	getMcpStatus: () => __TAURI_INVOKE<McpStatus>("get_mcp_status"),
 	saveMcpSettings: (options: McpOptions) => __TAURI_INVOKE<McpStatus>("save_mcp_settings", { options }),
 	newMcpToken: () => __TAURI_INVOKE<McpStatus>("new_mcp_token"),
+	getRawPrepSettings: () => __TAURI_INVOKE<RawPrepSettings>("get_raw_prep_settings"),
+	saveRawPrepSettings: (settings: RawPrepSettings) => __TAURI_INVOKE<RawPrepSettings>("save_raw_prep_settings", { settings }),
+	getPrepPageStatus: (pages: EntityId[]) => __TAURI_INVOKE<PrepPageStatus[]>("get_prep_page_status", { pages }),
+	preparePages: (pages: EntityId[], options: RawPrepOptions) => __TAURI_INVOKE<PrepResult>("prepare_pages", { pages, options }),
+	restoreOriginalPages: (pages: EntityId[]) => __TAURI_INVOKE<PrepResult>("restore_original_pages", { pages }),
+	previewPrep: (page: EntityId, options: RawPrepOptions) => __TAURI_INVOKE<PrepPreview>("preview_prep", { page, options }),
 };
 
 /* Types */
@@ -736,6 +742,32 @@ export type Preferences = {
 	languages: LanguageChoice[],
 };
 
+export type PrepPageStatus = {
+	page: EntityId,
+	has_original: boolean,
+	has_cleanup: boolean,
+};
+
+export type PrepPreview = {
+	before: number[],
+	after: number[],
+	black: number,
+	white: number,
+};
+
+export type PrepResult = {
+	changed: number,
+	skipped: PrepSkipped[],
+};
+
+export type PrepSkipReason = "cleanup" | "missing_source" | "no_original" | "unchanged";
+
+export type PrepSkipped = {
+	page: EntityId,
+	label: string,
+	reason: PrepSkipReason,
+};
+
 export type ProcessorConfig = {
 	"koharu-layout-rfdetr-seg-2xl"?: KoharuLayoutRFDetrSeg2XLConfig | null,
 	"flux2-klein"?: Flux2KleinConfig | null,
@@ -818,6 +850,18 @@ export type Quantization = {
 };
 
 export type RasterLayerKind = "cleanup" | "paint";
+
+export type RawPrepOptions = {
+	levels?: boolean,
+	clip_percent?: number,
+	whiten?: boolean,
+	threshold?: number,
+};
+
+export type RawPrepSettings = {
+	options?: RawPrepOptions,
+	fix_on_import?: boolean,
+};
 
 export type ReadWhen = "missing" | "always" | "never";
 
