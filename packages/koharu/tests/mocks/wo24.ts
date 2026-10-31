@@ -3,6 +3,13 @@ import { vi } from 'vitest'
 import { commands } from '@koharu/bridge/protocol'
 
 export function mockWo24() {
+  vi.spyOn(commands, 'getQcResults').mockResolvedValue({
+    revision: 1,
+    findings: [],
+    hidden: [],
+    pages_checked: 0,
+  })
+  vi.spyOn(commands, 'markQcFinding').mockResolvedValue(null)
   vi.spyOn(commands, 'getReadingModel').mockResolvedValue({
     selection: { provider: 'openai', model: 'reader', vision: true },
     vision: true,
