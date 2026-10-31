@@ -1055,15 +1055,8 @@ impl Project {
         hardness: f32,
         points: Vec<ScenePoint>,
     ) -> Result<(Commit, EntityId)> {
-        if !diameter.is_finite() || diameter <= 0.0 || points.is_empty() {
-            bail!("a raster stroke requires a positive diameter and at least one point");
-        }
-        if points
-            .iter()
-            .any(|point| !point.x.is_finite() || !point.y.is_finite())
-        {
-            bail!("raster stroke points must be finite");
-        }
+        let points_for_mask: Vec<Point> = points.iter().map(|p| Point { x: p.x, y: p.y }).collect();
+        super::cleanup::stroke::validate(&points_for_mask, diameter, hardness)?;
         let snapshot = self.snapshot();
         let page_value = snapshot.page(page)?.page()?;
         let width = page_value.width.round() as u32;
@@ -1071,6 +1064,21 @@ impl Project {
         if width == 0 || height == 0 {
             bail!("page dimensions must be positive");
         }
+        let target = koharu_config::load::<koharu_pipeline::CleanupSettings>("cleanup")?
+            .read()?
+            .paint_target;
+        let create_cleanup = layer.is_none() && target == koharu_pipeline::PaintTarget::Cleanup;
+        let layer = if create_cleanup {
+            snapshot.children(page)?.find(|entity| {
+                snapshot
+                    .component::<SceneRasterLayer>(*entity)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|layer| layer.kind == RasterLayerKind::Cleanup)
+            })
+        } else {
+            layer
+        };
         let mut raster_layer = None;
         let mut promote_layer = false;
         let mut image = if let Some(layer) = layer {
@@ -1092,6 +1100,12 @@ impl Project {
                 }
                 None => RgbaImage::new(width, height),
             }
+        } else if create_cleanup {
+            let asset = snapshot
+                .asset(page, &AssetRole::new("source")?)?
+                .context("the page has no source image for manual cleanup")?;
+            let bytes = snapshot.read_blob(asset.blob).await?;
+            image::load_from_memory(&bytes)?.to_rgba8()
         } else {
             if mode == RasterStrokeMode::Erase {
                 bail!("eraser requires a raster layer target");
@@ -1105,20 +1119,24 @@ impl Project {
         let mut bytes = Cursor::new(Vec::new());
         DynamicImage::ImageRgba8(image).write_to(&mut bytes, ImageFormat::Png)?;
         let source = AssetRole::new("source")?;
-        let name = format!(
-            "Paint {}",
-            snapshot
-                .children(page)?
-                .filter(|entity| {
-                    snapshot
-                        .component::<SceneRasterLayer>(*entity)
-                        .ok()
-                        .flatten()
-                        .is_some_and(|layer| layer.kind == RasterLayerKind::Paint)
-                })
-                .count()
-                + 1
-        );
+        let name = if create_cleanup {
+            "Cleanup".to_owned()
+        } else {
+            format!(
+                "Paint {}",
+                snapshot
+                    .children(page)?
+                    .filter(|entity| {
+                        snapshot
+                            .component::<SceneRasterLayer>(*entity)
+                            .ok()
+                            .flatten()
+                            .is_some_and(|layer| layer.kind == RasterLayerKind::Paint)
+                    })
+                    .count()
+                    + 1
+            )
+        };
         let mut committed_layer = layer;
         let patch = snapshot.patch(|edit| {
             let layer = if let Some(layer) = committed_layer {
@@ -1132,17 +1150,25 @@ impl Project {
                 }
                 layer
             } else {
-                let at = snapshot
-                    .page(page)?
-                    .text_group()?
-                    .map_or(At::End, |group| At::Before(group.id()));
+                let at = if create_cleanup {
+                    At::Start
+                } else {
+                    snapshot
+                        .page(page)?
+                        .text_group()?
+                        .map_or(At::End, |group| At::Before(group.id()))
+                };
                 let layer = edit.add_entity(page, at)?;
                 edit.set(
                     layer,
                     &SceneRasterLayer {
                         origin: Origin::User,
                         name,
-                        kind: RasterLayerKind::Paint,
+                        kind: if create_cleanup {
+                            RasterLayerKind::Cleanup
+                        } else {
+                            RasterLayerKind::Paint
+                        },
                     },
                 )?;
                 committed_layer = Some(layer);
@@ -1587,61 +1613,33 @@ fn rasterize_stroke(
     _hardness: f32,
     points: &[ScenePoint],
 ) {
-    let radius = f64::from(diameter) * 0.5;
-    for (start, end) in points
-        .iter()
-        .zip(points.iter().skip(1))
-        .chain(points.last().map(|point| (point, point)))
-    {
-        let left = (start.x.min(end.x) - radius - 0.5).floor().max(0.0) as u32;
-        let top = (start.y.min(end.y) - radius - 0.5).floor().max(0.0) as u32;
-        let right = (start.x.max(end.x) + radius + 0.5)
-            .ceil()
-            .min(f64::from(image.width())) as u32;
-        let bottom = (start.y.max(end.y) + radius + 0.5)
-            .ceil()
-            .min(f64::from(image.height())) as u32;
-        let dx = end.x - start.x;
-        let dy = end.y - start.y;
-        let length_squared = dx * dx + dy * dy;
-        for y in top..bottom {
-            for x in left..right {
-                let px = f64::from(x) + 0.5;
-                let py = f64::from(y) + 0.5;
-                let t = if length_squared == 0.0 {
-                    0.0
-                } else {
-                    (((px - start.x) * dx + (py - start.y) * dy) / length_squared).clamp(0.0, 1.0)
-                };
-                let distance =
-                    ((px - (start.x + t * dx)).powi(2) + (py - (start.y + t * dy)).powi(2)).sqrt();
-                let coverage = (radius + 0.5 - distance).clamp(0.0, 1.0) as f32;
-                if coverage == 0.0 {
-                    continue;
-                }
-                let pixel = image.get_pixel_mut(x, y);
-                match mode {
-                    RasterStrokeMode::Paint => {
-                        let source_alpha = f32::from(color[3]) / 255.0 * coverage;
-                        let destination_alpha = f32::from(pixel[3]) / 255.0;
-                        let output_alpha = source_alpha + destination_alpha * (1.0 - source_alpha);
-                        if output_alpha > 0.0 {
-                            for channel in 0..3 {
-                                let source = f32::from(color[channel]) / 255.0;
-                                let destination = f32::from(pixel[channel]) / 255.0;
-                                pixel[channel] = (((source * source_alpha
-                                    + destination * destination_alpha * (1.0 - source_alpha))
-                                    / output_alpha)
-                                    * 255.0)
-                                    .round() as u8;
-                            }
-                        }
-                        pixel[3] = (output_alpha * 255.0).round() as u8;
-                    }
-                    RasterStrokeMode::Erase => {
-                        pixel[3] = (f32::from(pixel[3]) * (1.0 - coverage)).round() as u8;
+    let points: Vec<Point> = points.iter().map(|p| Point { x: p.x, y: p.y }).collect();
+    let mut mask = image::GrayImage::new(image.width(), image.height());
+    super::cleanup::stroke::add_stroke(&mut mask, &points, diameter, _hardness);
+    // Union the stroke first: opacity must not increase at segment joins or pointer samples.
+    for (x, y, pixel) in image.enumerate_pixels_mut() {
+        let coverage = f32::from(mask.get_pixel(x, y)[0]) / 255.0;
+        if coverage == 0.0 {
+            continue;
+        }
+        match mode {
+            RasterStrokeMode::Paint => {
+                let source_alpha = f32::from(color[3]) / 255.0 * coverage;
+                let destination_alpha = f32::from(pixel[3]) / 255.0;
+                let output_alpha = source_alpha + destination_alpha * (1.0 - source_alpha);
+                if output_alpha > 0.0 {
+                    for channel in 0..3 {
+                        pixel[channel] = ((f32::from(color[channel]) * source_alpha
+                            + f32::from(pixel[channel]) * destination_alpha * (1.0 - source_alpha))
+                            / output_alpha)
+                            .round() as u8;
                     }
                 }
+                pixel[3] = (output_alpha * 255.0).round() as u8;
+            }
+            // Source artwork is a separate layer below Cleanup, so this reveals the original.
+            RasterStrokeMode::Erase => {
+                pixel[3] = (f32::from(pixel[3]) * (1.0 - coverage)).round() as u8
             }
         }
     }
