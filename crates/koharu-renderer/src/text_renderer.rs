@@ -15,7 +15,9 @@ use koharu_rasterizer::{
     FillRule, PathElement, PreparedGlyph, PreparedGlyphRun, PreparedPath, PreparedResource,
     PreparedScene, PreparedSceneCommand, ResourceId,
 };
-use koharu_scene::{FillGradient, GradientKind, StrokeJoin, StrokeMethod, StrokePosition};
+use koharu_scene::{
+    FillGradient, GradientKind, StrokeJoin, StrokeMethod, StrokePosition, TextWarp,
+};
 use skrifa::{
     GlyphId, MetadataProvider,
     instance::Size,
@@ -38,6 +40,7 @@ pub(crate) struct TextNodeDescriptor {
     pub(crate) language: Option<koharu_scene::LanguageTag>,
     pub(crate) width: f32,
     pub(crate) height: f32,
+    pub(crate) warp: Option<TextWarp>,
     pub(crate) balloon_contour: Option<Vec<(f32, f32)>>,
     pub(crate) preferred_font: Option<String>,
     pub(crate) font_families: Vec<String>,
@@ -62,8 +65,16 @@ pub(crate) struct RenderedTextNode {
     pub(crate) scene: Arc<PreparedScene>,
     pub(crate) resources: Arc<[PreparedResource]>,
     pub(crate) local_bounds: RenderBounds,
+    pub(crate) unwarped: Option<UnwarpedText>,
     pub(crate) metadata: RenderedTextMetadata,
     pub(crate) diagnostics: Vec<RenderDiagnostic>,
+}
+
+#[derive(Clone)]
+pub(crate) struct UnwarpedText {
+    pub(crate) scene: Arc<PreparedScene>,
+    pub(crate) resources: Arc<[PreparedResource]>,
+    pub(crate) local_bounds: RenderBounds,
 }
 
 pub(crate) struct RenderedTextMetadata {
@@ -430,15 +441,33 @@ impl TextRenderer {
         if let Some(contour_bounds) = contour_bounds {
             local_bounds = local_bounds.union(contour_bounds);
         }
+        let unwarped = if let Some(TextWarp::Perspective { corners }) = &descriptor.warp {
+            let original = UnwarpedText {
+                scene: Arc::new(std::mem::take(&mut scene)),
+                resources: std::mem::take(&mut resources).into(),
+                local_bounds: rect_bounds(local_bounds),
+            };
+            let perspective =
+                crate::warp::Perspective::new(*corners, descriptor.width, descriptor.height)
+                    .map_err(|source| Error::Layout {
+                        entity: descriptor.entity,
+                        source,
+                    })?;
+            local_bounds =
+                render_perspective(&mut scene, &layout, &options, transform, &perspective)
+                    .map_err(|source| Error::Layout {
+                        entity: descriptor.entity,
+                        source,
+                    })?;
+            Some(original)
+        } else {
+            None
+        };
         Ok(RenderedTextNode {
             scene: Arc::new(scene),
+            unwarped,
             resources: resources.into(),
-            local_bounds: RenderBounds {
-                x: local_bounds.x0 as f32,
-                y: local_bounds.y0 as f32,
-                width: local_bounds.width() as f32,
-                height: local_bounds.height() as f32,
-            },
+            local_bounds: rect_bounds(local_bounds),
             metadata: RenderedTextMetadata {
                 rendered_bounds,
                 layout_bounds: if descriptor.point_text {
@@ -458,6 +487,131 @@ impl TextRenderer {
             diagnostics,
         })
     }
+}
+
+fn rect_bounds(rect: Rect) -> RenderBounds {
+    RenderBounds {
+        x: rect.x0 as f32,
+        y: rect.y0 as f32,
+        width: rect.width() as f32,
+        height: rect.height() as f32,
+    }
+}
+
+fn gradient_command(
+    path: &BezPath,
+    transform: Affine,
+    color: [u8; 4],
+    gradient: &FillGradient,
+) -> PreparedSceneCommand {
+    let bounds = path.bounding_box();
+    let center = bounds.center();
+    let (start, end) = match gradient.kind {
+        GradientKind::Linear => {
+            let angle = f64::from(gradient.angle_degrees).to_radians();
+            let direction = vello::kurbo::Vec2::new(angle.cos(), -angle.sin());
+            let half_extent =
+                (bounds.width() * direction.x.abs() + bounds.height() * direction.y.abs()) * 0.5;
+            (
+                center - direction * half_extent,
+                center + direction * half_extent,
+            )
+        }
+        GradientKind::Radial => {
+            let radius = bounds.width().hypot(bounds.height()) * 0.5;
+            (center, center + vello::kurbo::Vec2::new(radius, 0.0))
+        }
+    };
+    PreparedSceneCommand::GradientPath {
+        path: prepared_path(path, transform, color),
+        radial: gradient.kind == GradientKind::Radial,
+        start: [start.x, start.y],
+        end: [end.x, end.y],
+        stops: gradient
+            .stops
+            .iter()
+            .map(|stop| (stop.offset, stop.color))
+            .collect(),
+    }
+}
+
+fn render_perspective(
+    scene: &mut PreparedScene,
+    layout: &LayoutRun<'_>,
+    options: &TextRenderOptions,
+    transform: Affine,
+    perspective: &crate::warp::Perspective,
+) -> Result<Rect> {
+    let fill = text_path(layout, options)?;
+    let contours = union_contours(&fill);
+    let map = |mut path: BezPath| {
+        path.apply_affine(transform);
+        perspective.path(&path)
+    };
+    let warped_fill = map(fill)?;
+    let mut bounds = warped_fill.bounding_box();
+    let stroke = options
+        .stroke
+        .filter(|stroke| stroke.width_px > 0.0 && stroke.color[3] > 0);
+    let mut front_border = None;
+    if let Some(stroke) = stroke {
+        let opaque_fill = options
+            .fill_gradient
+            .as_ref()
+            .map_or(options.color[3] == 255, |gradient| {
+                gradient.stops.iter().all(|stop| stop.color[3] == 255)
+            });
+        let behind_fill = stroke.method == StrokeMethod::Expansion
+            || (stroke.position == StrokePosition::Outside && opaque_fill);
+        let border = if stroke.method == StrokeMethod::Expansion {
+            // Glyph-run dilation cannot carry a projective transform. Expand the merged glyph
+            // contours first, keeping the fill and both outlines vector paths throughout.
+            contours_path(&offset_region(
+                &contours,
+                f64::from(stroke.width_px),
+                stroke.join,
+            ))
+        } else {
+            contour_border(&contours, stroke, behind_fill)
+        };
+        if let Some(outer) = stroke.visible_outer() {
+            let region = map(outer_border(
+                &contours,
+                stroke,
+                outer,
+                opaque_fill && stroke.color[3] == 255,
+            ))?;
+            if !region.is_empty() {
+                bounds = bounds.union(region.bounding_box());
+                scene
+                    .commands
+                    .push(fill_command(&region, Affine::IDENTITY, outer.color));
+            }
+        }
+        let border = map(border)?;
+        if !border.is_empty() {
+            bounds = bounds.union(border.bounding_box());
+            let command = fill_command(&border, Affine::IDENTITY, stroke.color);
+            if behind_fill {
+                scene.commands.push(command);
+            } else {
+                front_border = Some(command);
+            }
+        }
+    }
+    if !warped_fill.is_empty() {
+        scene
+            .commands
+            .push(if let Some(gradient) = &options.fill_gradient {
+                gradient_command(&warped_fill, Affine::IDENTITY, options.color, gradient)
+            } else {
+                fill_command(&warped_fill, Affine::IDENTITY, options.color)
+            });
+    }
+    if let Some(command) = front_border {
+        scene.commands.push(command);
+    }
+    Ok(bounds)
 }
 
 type ContourRegion = Vec<Vec<Vec<[f64; 2]>>>;
@@ -750,37 +904,9 @@ fn draw_fill(
         if path.is_empty() {
             return Ok(());
         }
-        let bounds = path.bounding_box();
-        let center = bounds.center();
-        let (start, end) = match gradient.kind {
-            GradientKind::Linear => {
-                // Page coordinates run downwards; Photoshop's positive angles run upwards.
-                let angle = f64::from(gradient.angle_degrees).to_radians();
-                let direction = vello::kurbo::Vec2::new(angle.cos(), -angle.sin());
-                let half_extent = (bounds.width() * direction.x.abs()
-                    + bounds.height() * direction.y.abs())
-                    * 0.5;
-                (
-                    center - direction * half_extent,
-                    center + direction * half_extent,
-                )
-            }
-            GradientKind::Radial => {
-                let radius = bounds.width().hypot(bounds.height()) * 0.5;
-                (center, center + vello::kurbo::Vec2::new(radius, 0.0))
-            }
-        };
-        scene.commands.push(PreparedSceneCommand::GradientPath {
-            path: prepared_path(&path, transform, options.color),
-            radial: gradient.kind == GradientKind::Radial,
-            start: [start.x, start.y],
-            end: [end.x, end.y],
-            stops: gradient
-                .stops
-                .iter()
-                .map(|stop| (stop.offset, stop.color))
-                .collect(),
-        });
+        scene
+            .commands
+            .push(gradient_command(&path, transform, options.color, gradient));
     } else {
         draw_layout(
             scene,
@@ -1407,6 +1533,7 @@ mod tests {
             language: None,
             width: 7.0,
             height: 43.0,
+            warp: None,
             balloon_contour: Some(vec![(0.0, 0.0), (7.0, 0.0), (7.0, 43.0), (0.0, 43.0)]),
             preferred_font: Some(family.clone()),
             font_families: vec![family],
@@ -1447,6 +1574,7 @@ mod tests {
             language: None,
             width: 240.0,
             height: 120.0,
+            warp: None,
             balloon_contour: None,
             preferred_font: Some("Arial".to_owned()),
             font_families: vec!["Arial".to_owned()],
@@ -1647,5 +1775,114 @@ mod tests {
             compiled.composition_commands(1).as_slice(),
             [CompositionCommand::Vector(_)]
         ));
+    }
+    #[test]
+    fn perspective_pixels_narrow_the_top_and_keep_gradient_and_both_outlines() {
+        use koharu_rasterizer::{RasterOptions, Rasterizer};
+        use koharu_scene::GradientStop;
+        let font = FontSystem::new().first_font().unwrap();
+        let layout = TextLayout::new(&font)
+            .with_font_size(40.0)
+            .run("MMMMMMMM\nMMMMMMMM")
+            .unwrap();
+        let raw = text_path(&layout, &TextRenderOptions::default())
+            .unwrap()
+            .bounding_box();
+        let width = raw.width().ceil() as u32 + 40;
+        let height = raw.height().ceil() as u32 + 40;
+        let transform = Affine::translate((20.0 - raw.x0, 20.0 - raw.y0));
+        let perspective = crate::warp::Perspective::new(
+            [[0.25, 0.0], [0.75, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            width as f32,
+            height as f32,
+        )
+        .unwrap();
+        let rasterizer = Rasterizer::new().unwrap();
+        for method in [StrokeMethod::Contour, StrokeMethod::Expansion] {
+            let mut scene = PreparedScene::default();
+            let options = TextRenderOptions {
+                color: [255, 0, 0, 255],
+                fill_gradient: Some(FillGradient {
+                    kind: GradientKind::Linear,
+                    angle_degrees: 0.0,
+                    stops: vec![
+                        GradientStop {
+                            offset: 0.0,
+                            color: [255, 0, 0, 255],
+                        },
+                        GradientStop {
+                            offset: 1.0,
+                            color: [0, 0, 255, 255],
+                        },
+                    ],
+                }),
+                stroke: Some(StrokeOptions {
+                    color: [255, 255, 255, 255],
+                    width_px: 2.0,
+                    method,
+                    position: StrokePosition::Outside,
+                    join: StrokeJoin::Round,
+                    outer: Some(OuterStroke {
+                        color: [0, 200, 0, 255],
+                        width_px: 2.0,
+                    }),
+                }),
+                ..Default::default()
+            };
+            let bounds =
+                render_perspective(&mut scene, &layout, &options, transform, &perspective).unwrap();
+            assert_eq!(scene.commands.len(), 3);
+            let bundle = text_bundle(scene, Vec::new(), width, height);
+            let frame =
+                PreparedFrameManifest::decode(&bundle.manifest().unwrap().encode().unwrap())
+                    .unwrap()
+                    .compile(&PreparedResourceStore::default())
+                    .unwrap();
+            let image = rasterizer
+                .rasterize(&frame, RasterOptions::default())
+                .unwrap()
+                .image;
+            let span = |top: bool| {
+                let xs = image
+                    .enumerate_pixels()
+                    .filter(|(_, y, pixel)| {
+                        pixel[3] > 128
+                            && if top {
+                                *y < height / 2
+                            } else {
+                                *y >= height / 2
+                            }
+                    })
+                    .map(|(x, _, _)| x)
+                    .collect::<Vec<_>>();
+                xs.iter().max().unwrap() - xs.iter().min().unwrap()
+            };
+            assert!(span(true) + 10 < span(false));
+            assert!(
+                image
+                    .pixels()
+                    .any(|p| i32::from(p[0]) > i32::from(p[2]) + 30 && p[3] > 200)
+            );
+            assert!(
+                image
+                    .pixels()
+                    .any(|p| i32::from(p[2]) > i32::from(p[0]) + 30 && p[3] > 200)
+            );
+            assert!(
+                image
+                    .pixels()
+                    .any(|p| p[0] > 240 && p[1] > 240 && p[2] > 240 && p[3] > 200)
+            );
+            assert!(
+                image
+                    .pixels()
+                    .any(|p| p[1] > 150 && p[0] < 30 && p[2] < 30 && p[3] > 200)
+            );
+            for (x, y, p) in image.enumerate_pixels().filter(|(_, _, p)| p[3] > 0) {
+                let _ = p;
+                assert!(f64::from(x) + 1.0 >= bounds.x0 && f64::from(x) <= bounds.x1 + 1.0);
+                assert!(f64::from(y) + 1.0 >= bounds.y0 && f64::from(y) <= bounds.y1 + 1.0);
+            }
+        }
     }
 }

@@ -800,6 +800,7 @@ impl Traversal<'_> {
             language: translation.language.clone(),
             width: frame.bounds.width,
             height: frame.bounds.height,
+            warp: layout.warp.clone(),
             balloon_contour,
             preferred_font,
             font_families,
@@ -1163,6 +1164,7 @@ fn build_node(
                     width: decoded.width as f32,
                     height: decoded.height as f32,
                 },
+                unwarped: None,
                 image: Some(raster),
                 text: None,
                 diagnostics: Arc::from([]),
@@ -1173,6 +1175,7 @@ fn build_node(
             Ok(RetainedNode {
                 descriptor,
                 scene: rendered.scene,
+                unwarped: rendered.unwarped,
                 resources: rendered.resources,
                 local_bounds: rendered.local_bounds,
                 image: None,
@@ -1201,6 +1204,11 @@ fn assemble_frame(
     for (draft, node) in compiled.layers.into_iter().zip(nodes) {
         let placement = placement(&draft, &node);
         let bounds = transform_bounds(node.local_bounds, placement);
+        let layout_placement = if matches!(draft.descriptor, NodeDescriptor::Text(_)) {
+            crate::warp::text_placement(draft.frame)
+        } else {
+            placement
+        };
         let kind = match draft.metadata {
             DraftMetadata::Image(metadata) => LayerKind::Image(metadata),
             DraftMetadata::Text {
@@ -1217,8 +1225,8 @@ fn assemble_frame(
                 LayerKind::Text(TextMetadata {
                     text,
                     language,
-                    rendered_bounds: transform_bounds(metadata.rendered_bounds, placement),
-                    layout_bounds: transform_bounds(metadata.layout_bounds, placement),
+                    rendered_bounds: transform_bounds(metadata.rendered_bounds, layout_placement),
+                    layout_bounds: transform_bounds(metadata.layout_bounds, layout_placement),
                     post_script_fonts: metadata.post_script_fonts.clone(),
                     font_size: metadata.font_size,
                     color: metadata.color,
@@ -1234,7 +1242,7 @@ fn assemble_frame(
             node.diagnostics
                 .iter()
                 .cloned()
-                .map(|diagnostic| transform_diagnostic(diagnostic, placement)),
+                .map(|diagnostic| transform_diagnostic(diagnostic, layout_placement)),
         );
         layers.push(Layer(Arc::new(LayerData {
             entity: draft.entity,
@@ -1289,16 +1297,9 @@ fn placement(draft: &LayerDraft, node: &RetainedNode) -> Affine {
             f64::from(draft.frame.bounds.x),
             f64::from(draft.frame.bounds.y),
         )),
-        NodeDescriptor::Text(_) => {
-            let frame = draft.frame.bounds;
-            Affine::translate((
-                f64::from(frame.x + frame.width * 0.5),
-                f64::from(frame.y + frame.height * 0.5),
-            )) * Affine::rotate(f64::from(draft.frame.angle_degrees).to_radians())
-                * Affine::translate((
-                    -f64::from(frame.width * 0.5),
-                    -f64::from(frame.height * 0.5),
-                ))
+        NodeDescriptor::Text(ref text) => {
+            crate::warp::text_placement(draft.frame)
+                * crate::warp::skew(text.warp.as_ref(), text.width, text.height)
         }
     }
 }
@@ -2512,5 +2513,140 @@ mod tests {
             .await
             .unwrap_err();
         assert!(error.to_string().contains("not contiguous"));
+    }
+    #[tokio::test]
+    async fn warps_preserve_layout_diagnostics_and_unwarped_pixels_through_incremental_updates() {
+        use koharu_scene::TextWarp;
+        let mut session = Session::memory().await.unwrap();
+        let mut ids = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 512.0, 300.0), At::End)?;
+                let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &SourceText {
+                        text: Authored::user("HHHHHHHH".to_owned()),
+                        language: None,
+                    },
+                )?;
+                edit.set(
+                    content,
+                    &Translation {
+                        text: Authored::user("HHHHHHHH".to_owned()),
+                        language: None,
+                    },
+                )?;
+                let layer = edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &SceneTextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: Some(0.0),
+                        warp: None,
+                    },
+                )?;
+                edit.set(layer, &Geometry::rectangle(100.0, 80.0, 240.0, 120.0))?;
+                ids = Some((page, layer));
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let (page, layer) = ids.unwrap();
+        let renderer = Renderer::default();
+        let original = renderer.render(&snapshot, page).await.unwrap();
+        let rasterizer = Rasterizer::new().unwrap();
+        let raster = |frame: &Frame| {
+            rasterizer
+                .rasterize(&frame.raster_frame().unwrap(), RasterOptions::default())
+                .unwrap()
+                .image
+        };
+        let golden = raster(&original);
+        let golden_crop = original.cropped(layer).unwrap().unwrap();
+        let golden_pixels = raster(&golden_crop);
+        let mut previous = original.clone();
+        for warp in [
+            TextWarp::Skew {
+                x_degrees: 30.0,
+                y_degrees: 0.0,
+            },
+            TextWarp::Perspective {
+                corners: [[0.25, 0.0], [0.75, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            },
+        ] {
+            let snapshot = session.snapshot();
+            let mut layout = snapshot.text_layer(layer).unwrap().layout().unwrap();
+            layout.warp = Some(warp.clone());
+            let patch = snapshot.patch(|edit| edit.set(layer, &layout)).unwrap();
+            let commit = session.commit(patch).await.unwrap();
+            let incremental = renderer
+                .update(&previous, &commit.snapshot, &commit.changes)
+                .await
+                .unwrap();
+            let full = renderer.render(&commit.snapshot, page).await.unwrap();
+            assert_eq!(raster(&incremental), raster(&full));
+            assert_eq!(incremental.diagnostics(), original.diagnostics());
+            assert_eq!(
+                incremental.layer(layer).unwrap().kind(),
+                original.layer(layer).unwrap().kind()
+            );
+            assert_eq!(
+                incremental
+                    .layer(layer)
+                    .unwrap()
+                    .element_frame()
+                    .unwrap()
+                    .width,
+                240.0
+            );
+            let unwarped = incremental.cropped_unwarped_text(layer).unwrap().unwrap();
+            assert_eq!(unwarped.origin(), golden_crop.origin());
+            assert_eq!(raster(&unwarped), golden_pixels);
+            if matches!(warp, TextWarp::Skew { .. }) {
+                let pixels = raster(&incremental);
+                let ys = pixels
+                    .enumerate_pixels()
+                    .filter(|(_, _, p)| p[3] > 200)
+                    .map(|(_, y, _)| y)
+                    .collect::<Vec<_>>();
+                let top = *ys.iter().min().unwrap();
+                let bottom = *ys.iter().max().unwrap();
+                let mean = |upper: bool| {
+                    let xs = pixels
+                        .enumerate_pixels()
+                        .filter(|(_, y, p)| {
+                            p[3] > 200
+                                && if upper {
+                                    *y <= top + (bottom - top) / 5
+                                } else {
+                                    *y >= bottom - (bottom - top) / 5
+                                }
+                        })
+                        .map(|(x, _, _)| f64::from(x))
+                        .collect::<Vec<_>>();
+                    xs.iter().sum::<f64>() / xs.len() as f64
+                };
+                assert!(mean(false) - mean(true) > 5.0);
+            }
+            previous = incremental;
+        }
+        let snapshot = session.snapshot();
+        let mut layout = snapshot.text_layer(layer).unwrap().layout().unwrap();
+        layout.warp = None;
+        let patch = snapshot.patch(|edit| edit.set(layer, &layout)).unwrap();
+        let commit = session.commit(patch).await.unwrap();
+        let reset = renderer
+            .update(&previous, &commit.snapshot, &commit.changes)
+            .await
+            .unwrap();
+        assert_eq!(raster(&reset).as_raw(), golden.as_raw());
+        assert_eq!(
+            reset.layer(layer).unwrap().0.node.scene,
+            original.layer(layer).unwrap().0.node.scene
+        );
     }
 }
