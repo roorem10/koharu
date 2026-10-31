@@ -277,6 +277,7 @@ describe('greenfield editor', () => {
     queryClient.setQueryData(fontsKey, [
       {
         name: 'Font A',
+        local_names: [],
         sources: ['system'],
         metadata: {
           primary_script: 'latn',
@@ -346,6 +347,7 @@ describe('greenfield editor', () => {
     queryClient.setQueryData(fontsKey, [
       {
         name: 'Font A',
+        local_names: [],
         sources: ['system'],
         metadata: {
           primary_script: 'latn',
@@ -1176,6 +1178,7 @@ describe('greenfield editor', () => {
           classifications: ['sans-serif'],
           use_cases: ['body-text'],
         },
+        local_names: [],
         sources: ['system'],
         faces: [
           {
@@ -2107,6 +2110,7 @@ describe('greenfield editor', () => {
           classifications: ['sans-serif'],
           use_cases: ['body-text'],
         },
+        local_names: [],
         sources: ['system'],
         faces: [
           {
@@ -2127,6 +2131,7 @@ describe('greenfield editor', () => {
           classifications: ['sans-serif'],
           use_cases: ['body-text'],
         },
+        local_names: [],
         sources: ['system'],
         faces: [
           {
@@ -2340,6 +2345,7 @@ describe('font picker controls', () => {
         classifications: [],
         use_cases: [],
       },
+      local_names: [],
       sources: ['system'],
       faces: [
         {

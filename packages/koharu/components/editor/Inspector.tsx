@@ -97,6 +97,7 @@ const defaultFont: FontFamily = {
     classifications: ['comic', 'dialogue'],
     use_cases: ['comic-dialogue', 'word-balloons'],
   },
+  local_names: [],
   sources: ['bundled'],
   faces: [
     {

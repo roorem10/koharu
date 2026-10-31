@@ -50,6 +50,7 @@ function styles() {
 function family(name: string): FontFamily {
   return {
     name,
+    local_names: [],
     sources: ['system'],
     metadata: {
       primary_script: 'latn',

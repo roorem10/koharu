@@ -308,6 +308,7 @@ export type FontFace = {
 
 export type FontFamily = {
 	name: string,
+	local_names: string[],
 	metadata: FontMetadata,
 	sources: FontSource[],
 	faces: FontFace[],
