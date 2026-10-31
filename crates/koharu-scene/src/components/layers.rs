@@ -82,12 +82,57 @@ pub enum TextWarp {
     Perspective { corners: [[f32; 2]; 4] },
 }
 
+impl TextWarp {
+    pub fn validate(&self) -> Result<()> {
+        match self {
+            Self::Skew {
+                x_degrees,
+                y_degrees,
+            } => {
+                if [x_degrees, y_degrees]
+                    .into_iter()
+                    .any(|value| !value.is_finite() || !(-60.0..=60.0).contains(value))
+                {
+                    return Err(Error::invalid(
+                        "text skew must be finite and within -60..=60 degrees",
+                    ));
+                }
+            }
+            Self::Perspective { corners } => {
+                if corners
+                    .iter()
+                    .flatten()
+                    .any(|value| !value.is_finite() || !(-1.0..=2.0).contains(value))
+                {
+                    return Err(Error::invalid(
+                        "text perspective corners must be finite and within -1..=2",
+                    ));
+                }
+                for index in 0..4 {
+                    let [a, b, c] =
+                        [0, 1, 2].map(|offset| corners[(index + offset) % 4].map(f64::from));
+                    let cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+                    if cross <= 0.0 {
+                        return Err(Error::invalid(
+                            "text perspective must be a convex quad with positive area",
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Component for TextLayout {
     const KIND: &'static str = "dev.koharu.layer.text";
 
     fn validate(&self, _context: &ValidationContext<'_>) -> Result<()> {
         if self.angle_degrees.is_some_and(|angle| !angle.is_finite()) {
             return Err(Error::invalid("text layout angle must be finite"));
+        }
+        if let Some(warp) = &self.warp {
+            warp.validate()?;
         }
         self.origin.validate()
     }

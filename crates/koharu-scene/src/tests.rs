@@ -1774,3 +1774,100 @@ fn typography_rejects_invalid_spacing_and_gradient() {
     });
     assert!(value.validate(&context).is_err());
 }
+
+#[test]
+fn text_layout_revision_two_decodes_without_warp_and_revision_three_round_trips() {
+    use revision::{DeserializeRevisioned, SerializeRevisioned};
+    #[revisioned(revision = 2)]
+    #[derive(Clone)]
+    struct TextLayoutV2 {
+        origin: Origin,
+        kind: TextLayoutKind,
+        #[revision(start = 2)]
+        angle_degrees: Option<f32>,
+    }
+    let old = TextLayoutV2 {
+        origin: Origin::User,
+        kind: TextLayoutKind::Paragraph,
+        angle_degrees: Some(23.0),
+    };
+    let mut bytes = Vec::new();
+    old.serialize_revisioned(&mut bytes).unwrap();
+    let mut layout = TextLayout::deserialize_revisioned(&mut bytes.as_slice()).unwrap();
+    assert_eq!(layout.origin, Origin::User);
+    assert_eq!(layout.kind, TextLayoutKind::Paragraph);
+    assert_eq!(layout.angle_degrees, Some(23.0));
+    assert_eq!(layout.warp, None);
+    for warp in [
+        None,
+        Some(TextWarp::Skew {
+            x_degrees: 30.0,
+            y_degrees: -20.0,
+        }),
+        Some(TextWarp::Perspective {
+            corners: [[0.2, 0.0], [0.8, 0.0], [1.0, 1.0], [0.0, 1.0]],
+        }),
+    ] {
+        layout.warp = warp;
+        bytes.clear();
+        layout.serialize_revisioned(&mut bytes).unwrap();
+        assert_eq!(
+            TextLayout::deserialize_revisioned(&mut bytes.as_slice()).unwrap(),
+            layout
+        );
+    }
+}
+
+#[test]
+fn text_warp_validation_rejects_nonfinite_crossed_concave_and_degenerate_quads() {
+    let context = ValidationContext::new(&|_| true, &|_| true);
+    let check = |warp| {
+        TextLayout {
+            origin: Origin::User,
+            kind: TextLayoutKind::Paragraph,
+            angle_degrees: None,
+            warp: Some(warp),
+        }
+        .validate(&context)
+    };
+    for x_degrees in [f32::NAN, f32::INFINITY, -60.01, 60.01] {
+        assert!(
+            check(TextWarp::Skew {
+                x_degrees,
+                y_degrees: 0.0
+            })
+            .is_err()
+        );
+        assert!(
+            check(TextWarp::Skew {
+                x_degrees: 0.0,
+                y_degrees: x_degrees
+            })
+            .is_err()
+        );
+    }
+    assert!(
+        check(TextWarp::Skew {
+            x_degrees: -60.0,
+            y_degrees: 60.0
+        })
+        .is_ok()
+    );
+    for corners in [
+        [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+        [[-1.0, -1.0], [2.0, -1.0], [2.0, 2.0], [-1.0, 2.0]],
+        [[0.3, 0.1], [0.7, 0.1], [1.1, 1.0], [-0.1, 1.0]],
+    ] {
+        assert!(check(TextWarp::Perspective { corners }).is_ok());
+    }
+    for corners in [
+        [[0.0, 0.0], [1.0, 1.0], [1.0, 0.0], [0.0, 1.0]],
+        [[0.0, 0.0], [1.0, 0.0], [0.2, 0.2], [0.0, 1.0]],
+        [[0.0, 0.0], [1.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+        [[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [1.0, 0.0]],
+        [[f32::NAN, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+        [[0.0, 0.0], [2.01, 0.0], [1.0, 1.0], [0.0, 1.0]],
+    ] {
+        assert!(check(TextWarp::Perspective { corners }).is_err());
+    }
+}
