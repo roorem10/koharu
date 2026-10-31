@@ -29,9 +29,7 @@ pub struct PositionedGlyph<'a> {
     /// How much the glyph moves on the Y-axis before drawing it, this should
     /// not affect how much the line advances.
     pub y_offset: f32,
-    /// Size this glyph was shaped at. Equal to the layout's size until word
-    /// styles (WO-11B) give runs their own size. WO-11C paints from it.
-    #[allow(dead_code)]
+    /// Size this glyph was shaped at, including its word style's scale.
     pub font_size: f32,
 }
 

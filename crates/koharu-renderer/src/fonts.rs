@@ -764,6 +764,38 @@ impl Fonts {
         Ok(resolved)
     }
 
+    pub(crate) fn resolve_word_font(
+        &self,
+        request: &FontRequest,
+        box_fonts: &[Font],
+        text: &str,
+        language: Option<&str>,
+    ) -> Vec<Font> {
+        let candidates = self
+            .resolve(
+                Some(&request.family),
+                request.weight,
+                request.style,
+                &[],
+                text,
+                language,
+            )
+            .unwrap_or_default();
+        // An unavailable family must keep the box face, rather than replace it
+        // with the resolver's generic fallback. Missing glyphs try the box next.
+        candidates
+            .iter()
+            .filter(|font| font.family_name().eq_ignore_ascii_case(&request.family))
+            .chain(box_fonts)
+            .chain(
+                candidates
+                    .iter()
+                    .filter(|font| !font.family_name().eq_ignore_ascii_case(&request.family)),
+            )
+            .cloned()
+            .collect()
+    }
+
     pub(crate) async fn preview(&self, family_name: &str) -> Result<FontPreview> {
         let system = self.ensure_system().await;
         let catalog = self.catalog().await?;
@@ -1296,6 +1328,40 @@ fn axis_distance(value: f32, default: u16, range: Option<FontRange>) -> u32 {
 }
 
 #[cfg(test)]
+pub(crate) fn layout_fixture_font() -> Font {
+    static FONT: OnceLock<Font> = OnceLock::new();
+    FONT.get_or_init(|| {
+        let mut collection = Collection::new(CollectionOptions {
+            shared: false,
+            system_fonts: false,
+        });
+        collection.register_fonts(
+            Blob::from(
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../packages/koharu/app/fonts/NotoSansCJK-VF.otf"
+                ))
+                .to_vec(),
+            ),
+            Some(FontInfoOverride {
+                family_name: Some("Layout Fixture"),
+                ..FontInfoOverride::default()
+            }),
+        );
+        let mut sources = SourceCache::new(Default::default());
+        let mut query = collection.query(&mut sources);
+        query.set_families([QueryFamily::Named("Layout Fixture")]);
+        let mut result = None;
+        query.matches_with(|font| {
+            result = Some(Font::from_query(font.clone(), "Layout Fixture".into()).unwrap());
+            QueryStatus::Stop
+        });
+        result.expect("embedded layout font must resolve")
+    })
+    .clone()
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -1354,6 +1420,43 @@ mod tests {
                 minimum: 75,
                 maximum: 100
             })
+        );
+    }
+
+    #[tokio::test]
+    async fn word_font_missing_family_keeps_box_face_before_normal_fallbacks() {
+        let fonts = Fonts::new();
+        fonts.ensure_system().await;
+        let box_font = layout_fixture_font();
+        let request = FontRequest {
+            family: "A missing word font for layout testing".into(),
+            weight: Some(700),
+            style: Some(PublicFontStyle::Italic),
+        };
+        let resolved =
+            fonts.resolve_word_font(&request, std::slice::from_ref(&box_font), "ABC", None);
+        assert_eq!(resolved[0].post_script_name(), box_font.post_script_name());
+        assert_eq!(resolved[0].data(), box_font.data());
+    }
+
+    #[tokio::test]
+    async fn word_font_resolves_weight_and_italic_before_box_fallback() {
+        let fonts = Fonts::new();
+        fonts.ensure_system().await;
+        let box_font = FontSystem::new().first_font().unwrap();
+        let request = FontRequest {
+            family: box_font.family_name().to_owned(),
+            weight: Some(700),
+            style: Some(PublicFontStyle::Italic),
+        };
+        let resolved =
+            fonts.resolve_word_font(&request, std::slice::from_ref(&box_font), "ABC", None);
+        assert_eq!(resolved[0].family_name(), box_font.family_name());
+        assert!(
+            resolved[0].post_script_name() != box_font.post_script_name()
+                || resolved[0].synthetic_bold()
+                || resolved[0].synthetic_skew().is_some()
+                || resolved[0].location().coords() != box_font.location().coords()
         );
     }
 }

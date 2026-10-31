@@ -29,7 +29,8 @@ use crate::{
     Error, FontStyle, HyphenationPolicy, LayoutRun, RenderBounds, RenderDiagnostic,
     Result as RenderResult, TextAlign, TextLayout, WritingMode,
     bubble::LayoutBox,
-    fonts::{Fonts, font_key},
+    fonts::{Font, FontRequest, Fonts, font_key},
+    layout::LayoutStyleRun,
     script::is_chinese_or_japanese_text,
 };
 
@@ -295,6 +296,7 @@ impl TextRenderer {
                 descriptor.entity
             )));
         }
+        let font_system = fonts;
         let fonts = fonts
             .resolve(
                 descriptor.preferred_font.as_deref(),
@@ -311,6 +313,7 @@ impl TextRenderer {
                 entity: descriptor.entity,
                 source,
             })?;
+        let style_runs = resolve_layout_runs(descriptor, font_system, &fonts);
         let automatic_maximum = || automatic_maximum(descriptor, bounds, is_bubble_text);
         let maximum = if descriptor.auto_fit {
             automatic_maximum()
@@ -320,6 +323,7 @@ impl TextRenderer {
         let minimum = descriptor.minimum_font_size.min(maximum);
         let mut layout = TextLayout::new(&fonts[0])
             .with_fallback_fonts(&fonts[1..])
+            .with_runs(&style_runs)
             .with_writing_mode(descriptor.writing_mode)
             .with_alignment(descriptor.alignment)
             .with_line_height(descriptor.line_height)
@@ -831,6 +835,75 @@ impl OutlinePen for ContourPen<'_> {
     fn close(&mut self) {
         self.0.close_path();
     }
+}
+
+fn resolve_layout_runs(
+    descriptor: &TextNodeDescriptor,
+    fonts: &Fonts,
+    box_fonts: &[Font],
+) -> Vec<LayoutStyleRun> {
+    if descriptor.runs.is_empty() {
+        return Vec::new();
+    }
+    let offsets = descriptor
+        .text
+        .char_indices()
+        .map(|(offset, _)| offset)
+        .chain(std::iter::once(descriptor.text.len()))
+        .collect::<Vec<_>>();
+    descriptor
+        .runs
+        .iter()
+        .filter_map(|run| {
+            let byte = |offset: u32| {
+                offsets
+                    .get(offset as usize)
+                    .copied()
+                    .unwrap_or(descriptor.text.len())
+            };
+            let range = byte(run.start)..byte(run.end);
+            if range.is_empty() {
+                return None;
+            }
+            let style = &run.style;
+            let run_fonts = if style.font.is_none()
+                && style.font_weight.is_none()
+                && style.font_style.is_none()
+            {
+                Vec::new()
+            } else {
+                let request = FontRequest {
+                    family: style
+                        .font
+                        .clone()
+                        .or_else(|| descriptor.preferred_font.clone())
+                        .unwrap_or_else(|| box_fonts[0].family_name().to_owned()),
+                    weight: style.font_weight.or(descriptor.font_weight),
+                    style: style
+                        .font_style
+                        .map(FontStyle::from)
+                        .or(descriptor.font_style),
+                };
+                fonts.resolve_word_font(
+                    &request,
+                    box_fonts,
+                    &descriptor.text[range.clone()],
+                    descriptor
+                        .language
+                        .as_ref()
+                        .map(koharu_scene::LanguageTag::as_str),
+                )
+            };
+            Some(LayoutStyleRun {
+                range,
+                fonts: run_fonts,
+                size_scale: style
+                    .size_scale
+                    .filter(|scale| scale.is_finite() && *scale > 0.0)
+                    .unwrap_or(1.0),
+            })
+        })
+        .collect()
 }
 
 fn automatic_maximum(
@@ -1889,5 +1962,85 @@ mod tests {
                 assert!(f64::from(y) + 1.0 >= bounds.y0 && f64::from(y) <= bounds.y1 + 1.0);
             }
         }
+    }
+
+    #[tokio::test]
+    async fn word_layout_resolution_converts_char_ranges_and_inherits_box_attributes()
+    -> anyhow::Result<()> {
+        let box_font = FontSystem::new().first_font()?;
+        let family = box_font.family_name().to_owned();
+        let fonts = Fonts::new();
+        fonts
+            .prepare(&[FontRequest {
+                family: family.clone(),
+                weight: None,
+                style: None,
+            }])
+            .await?;
+        let descriptor = TextNodeDescriptor {
+            entity: EntityId::new(),
+            text: "Aé魔😀Z".into(),
+            language: None,
+            width: 400.0,
+            height: 100.0,
+            warp: None,
+            balloon_contour: None,
+            preferred_font: Some(family.clone()),
+            font_families: vec![family.clone()],
+            font_weight: Some(700),
+            font_style: Some(FontStyle::Italic),
+            font_size: Some(20.0),
+            minimum_font_size: 9.0,
+            auto_fit: false,
+            alignment: TextAlign::Center,
+            writing_mode: WritingMode::Horizontal,
+            foreground_color: [0, 0, 0, 255],
+            fill_gradient: None,
+            stroke: None,
+            line_height: 1.2,
+            letter_spacing: 0.0,
+            word_spacing: 0.0,
+            text_inset: [0.0; 4],
+            point_text: false,
+            runs: vec![koharu_scene::StyleRun {
+                start: 1,
+                end: 4,
+                style: koharu_scene::RunStyle {
+                    font: Some(family),
+                    size_scale: Some(1.5),
+                    ..Default::default()
+                },
+            }],
+        };
+        let base_fonts = fonts.resolve(
+            descriptor.preferred_font.as_deref(),
+            descriptor.font_weight,
+            descriptor.font_style,
+            &[],
+            &descriptor.text,
+            None,
+        )?;
+        let runs = resolve_layout_runs(&descriptor, &fonts, &base_fonts);
+        assert_eq!(runs[0].range, 1..10);
+        assert_eq!(runs[0].size_scale, 1.5);
+        assert_eq!(
+            runs[0].fonts[0].post_script_name(),
+            base_fonts[0].post_script_name()
+        );
+        assert_eq!(
+            runs[0].fonts[0].location().coords(),
+            base_fonts[0].location().coords()
+        );
+        let mut missing = descriptor.clone();
+        missing.runs[0].style.font = Some("A missing mixed-layout font".into());
+        let fallback = resolve_layout_runs(&missing, &fonts, &base_fonts);
+        assert_eq!(
+            fallback[0].fonts[0].post_script_name(),
+            base_fonts[0].post_script_name()
+        );
+        let mut empty = descriptor;
+        empty.runs.clear();
+        assert!(resolve_layout_runs(&empty, &fonts, &base_fonts).is_empty());
+        Ok(())
     }
 }
