@@ -93,6 +93,11 @@ export function ToolBar() {
                     .filter(Boolean)
                     .join(' / ')}
                 </span>
+                {tool === 'ocr_box' && (
+                  <span className='mt-1 block text-[10px] opacity-80'>
+                    {t('ocrBox.modifierHint')}
+                  </span>
+                )}
               </TooltipContent>
             </Tooltip>
           </div>
