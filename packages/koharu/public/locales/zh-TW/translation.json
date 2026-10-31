@@ -545,7 +545,41 @@
     "openrouter": "透過 OpenRouter 路由的模型。"
   },
   "qc": {
-    "title": "QC list"
+    "title": "QC",
+    "checkPage": "Check page",
+    "checkChapter": "Check chapter",
+    "showHidden": "Show hidden",
+    "stale": "Results may be out of date",
+    "progress": "Checking pages: {{completed}} / {{total}}",
+    "working": "Working…",
+    "hint": "Check a page or chapter to find likely problems.",
+    "noFindings": "No visible findings. Check Show hidden for boxes marked OK.",
+    "noTranslation": "No translation",
+    "ok": "OK",
+    "undoOk": "Undo OK",
+    "okFor": "Mark {{check}} OK",
+    "undoFor": "Undo OK for {{check}}",
+    "minimumFontSize": "Minimum font size (px)",
+    "defaultFont": "the default font",
+    "glossaryFlag": "Glossary: {{term}}",
+    "settingsFailed": "Could not load QC settings.",
+    "retry": "Try again",
+    "checks": {
+      "overflow": "Text overflows the box",
+      "too_small": "Small text: {{detail}} px",
+      "missing_translation": "Missing translation",
+      "empty_source": "Empty OCR result",
+      "leftover_source": "Japanese remains in the translation",
+      "odd_font": "Unusual font. Expected {{detail}}",
+      "flag": "Review flag"
+    },
+    "showOriginal": "Show original",
+    "original": "Original",
+    "on": "On",
+    "off": "Off",
+    "compareShortcut": "Show original (hold)",
+    "loadingOriginal": "Loading original…",
+    "sourceFailed": "Could not load the original page."
   },
   "resources": {
     "unloadModels": "卸載模型",

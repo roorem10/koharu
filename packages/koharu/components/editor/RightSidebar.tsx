@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, Bot, SlidersHorizontal } from 'lucide-react'
+import { BookOpen, Bot, ListChecks, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -8,6 +8,7 @@ import { ContextPanel } from '@/components/context/ContextPanel'
 import { discussLineEvent, openContextEvent } from '@/components/context/events'
 import { AgentPanel } from '@/components/editor/AgentPanel'
 import { Inspector } from '@/components/editor/Inspector'
+import { QcPanel } from '@/components/qc/QcPanel'
 import { invalidateLineLabels } from '@/lib/line-labels'
 import { useKoharuStore } from '@/lib/store'
 import { Button } from '@koharu/ui/components/button'
@@ -22,7 +23,7 @@ export function RightSidebar() {
   useEffect(() => {
     void invalidateLineLabels()
   }, [completedReads])
-  const [panel, setPanel] = useState<'agent' | 'properties' | 'context'>('properties')
+  const [panel, setPanel] = useState<'agent' | 'properties' | 'context' | 'qc'>('properties')
 
   useEffect(() => {
     const open = () => setPanel('agent')
@@ -36,7 +37,7 @@ export function RightSidebar() {
   }, [])
 
   return (
-    <aside className='flex h-full min-h-0 flex-col bg-[var(--surface-panel)]'>
+    <aside className='flex h-full min-h-0 min-w-0 flex-col bg-[var(--surface-panel)]'>
       <div className='flex h-10 shrink-0 items-center gap-1 border-b border-border/80 px-2.5'>
         <Button
           variant={panel === 'properties' ? 'secondary' : 'ghost'}
@@ -62,6 +63,17 @@ export function RightSidebar() {
         >
           <Bot className='size-3' /> {t('agent.title')}
         </Button>
+        <Button
+          variant={panel === 'qc' ? 'secondary' : 'ghost'}
+          size='sm'
+          className='h-7 min-w-0 flex-1 px-1 text-[10px]'
+          onClick={() => setPanel('qc')}
+        >
+          <ListChecks className='size-3 shrink-0' /> {t('qc.title')}
+        </Button>
+      </div>
+      <div className={panel === 'qc' ? 'flex min-h-0 min-w-0 flex-1 flex-col' : 'hidden'}>
+        <QcPanel />
       </div>
       <div className={panel === 'agent' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
         <AgentPanel />
