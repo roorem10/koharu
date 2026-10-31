@@ -171,9 +171,27 @@
     "autoReadUnavailable": "Read chapter was skipped because the selected provider is not a language model."
   },
   "cleanup": {
-    "title": "Cleanup brushes",
-    "brushSmaller": "Smaller brush",
-    "brushLarger": "Larger brush"
+    "title": "Cleanup",
+    "removeHint": "Shift-drag to select a rectangle. Enter: Clean queued areas. Esc: Clear.",
+    "queued_one": "{{count}} area queued",
+    "queued_other": "{{count}} areas queued",
+    "clean": "Clean",
+    "clear": "Clear",
+    "hardness": "Hardness",
+    "opacity": "Opacity",
+    "percent": "{{value}}%",
+    "removeMode": "Remove mode",
+    "queueMode": "Queue areas",
+    "immediateMode": "Immediate",
+    "queueHelp": "Queue several strokes or rectangles, then clean them in one run. Enter cleans; Esc clears.",
+    "paintTarget": "Brush and Eraser target",
+    "cleanupLayer": "Cleanup layer",
+    "paintLayer": "Paint layer",
+    "targetHelp": "When no raster layer is selected, use this layer. A selected raster layer always takes priority.",
+    "eraserTarget": "Select a paint or cleanup layer before using the Eraser.",
+    "growMask": "Grow cleanup mask",
+    "growPixels": "Pixels (0–16)",
+    "growHelp": "Expand hand-marked areas before cleanup to remove faint lettering at the edges. Detected masks keep their existing size."
   },
   "colorPicker": {
     "brushColor": "Brush color",
