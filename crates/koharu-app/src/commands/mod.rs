@@ -1,16 +1,22 @@
 pub(crate) mod agent;
+pub(crate) mod boxes;
 pub(crate) mod canvas;
 pub(crate) mod context;
 pub(crate) mod editing;
+pub(crate) mod files;
 pub(crate) mod fonts;
 pub(crate) mod import;
 pub(crate) mod lettering;
 pub(crate) mod lifecycle;
 pub(crate) mod line_labels;
+pub(crate) mod mcp;
+pub(crate) mod notes;
 pub(crate) mod output;
 pub(crate) mod preferences;
 pub(crate) mod processing;
 pub(crate) mod project;
+pub(crate) mod qc;
+pub(crate) mod runs;
 pub(crate) mod styles;
 
 use parking_lot::Mutex;
@@ -155,6 +161,12 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             lettering::get_effective_category,
             lettering::get_lettering_settings,
             lettering::save_lettering_settings,
+            // WO-20 (one box per bubble) commands go here.
+            // WO-12 (QC list) commands go here.
+            // WO-13 (files and export) commands go here.
+            // WO-14 (runs and retries) commands go here.
+            // WO-06 (text style extras and box notes) commands go here.
+            // WO-21 (MCP server) commands go here.
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)

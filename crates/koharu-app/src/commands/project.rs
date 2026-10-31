@@ -1140,7 +1140,7 @@ impl Project {
         Ok(Some(self.commit(patch).await?))
     }
 
-    async fn commit(&mut self, patch: koharu_scene::Patch) -> Result<Commit> {
+    pub(crate) async fn commit(&mut self, patch: koharu_scene::Patch) -> Result<Commit> {
         Ok(self.session.commit(patch).await?)
     }
 

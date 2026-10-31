@@ -54,6 +54,9 @@
     "title": "Агент",
     "working": "Работа…"
   },
+  "boxes": {
+    "title": "One box per bubble"
+  },
   "canvas": {
     "empty": "Выберите страницу, чтобы начать.",
     "fit": "Вписать в окно",
@@ -174,6 +177,9 @@
   "errors": {
     "fatalTitle": "Koharu не может продолжить работу",
     "tryAgain": "Повторить"
+  },
+  "files": {
+    "title": "Files and export"
   },
   "fontPicker": {
     "activeFilterCount": "Активных фильтров: {{count}}",
@@ -433,6 +439,9 @@
       "translate_all": "Translate SFX both inside and outside bubbles."
     }
   },
+  "mcp": {
+    "title": "MCP server"
+  },
   "menu": {
     "about": "О программе",
     "closeProject": "Закрыть проект",
@@ -499,6 +508,9 @@
     "renameTitle": "Переименовать страницу",
     "selected": "Выбрано: {{count}}"
   },
+  "textExtras": {
+    "title": "Text style extras"
+  },
   "outputPicker": {
     "instructions": "Инструкции по переводу",
     "instructionsPlaceholder": "Необязательные указания по стилю, именам и форматированию.",
@@ -532,6 +544,9 @@
     "openai-compatible": "Любой сервер с API, совместимым с OpenAI.",
     "openrouter": "Модели, маршрутизируемые через OpenRouter."
   },
+  "qc": {
+    "title": "QC list"
+  },
   "resources": {
     "unloadModels": "Выгрузить модели",
     "modelsUnloaded": "Выгружено моделей: {{count}}",
@@ -546,6 +561,9 @@
     "usedOfTotal": "Использовано {{used}} из {{total}}",
     "vramUnavailable": "Недоступно",
     "vramValue": "Видеопамять: {{value}}"
+  },
+  "runs": {
+    "title": "Runs"
   },
   "settings": {
     "appearance": {

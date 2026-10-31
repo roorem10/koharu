@@ -29,6 +29,8 @@ import { GlossaryTextMenu } from '@/components/context/GlossaryTextMenu'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { FontPicker } from '@/components/controls/FontPicker'
+import { BoxActions } from '@/components/editor/BoxActions'
+import { BoxNoteLine } from '@/components/editor/BoxNoteLine'
 import { BubbleShapeLine } from '@/components/editor/BubbleShapeLine'
 import { LetteringCategoryLine } from '@/components/editor/LetteringCategoryLine'
 import { LineContextCard } from '@/components/editor/LineContextCard'
@@ -221,6 +223,8 @@ function TypeInspector() {
         {current && <BubbleShapeLine layer={current.id} />}
         {current && <LetteringCategoryLine layer={current.id} />}
         {current && <LineContextCard layer={current.id} />}
+        {current && <BoxActions layer={current.id} />}
+        {current && <BoxNoteLine layer={current.id} />}
         <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_2.5rem] gap-1.5'>
           <InspectorField label={t('inspector.font')}>
             <FontPicker

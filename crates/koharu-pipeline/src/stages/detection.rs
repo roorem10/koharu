@@ -124,6 +124,9 @@ impl StageProcessor for Processor {
     }
 
     fn skip(&self, input: &StageInput) -> Result<bool> {
+        if input.redetect {
+            return Ok(false);
+        }
         for entity in input.scene.descendants(input.page)? {
             let id = entity.id();
             if input.contains_entity(id)?
@@ -2010,6 +2013,7 @@ mod tests {
         );
 
         assert!(processor.skip(&input).unwrap());
+        assert!(!processor.skip(&input.with_redetect(true)).unwrap());
     }
 
     #[tokio::test]

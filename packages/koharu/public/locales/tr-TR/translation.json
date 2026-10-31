@@ -54,6 +54,9 @@
     "title": "Ajan",
     "working": "Çalışıyor…"
   },
+  "boxes": {
+    "title": "One box per bubble"
+  },
   "canvas": {
     "empty": "Başlamak için bir sayfa seçin.",
     "fit": "Pencereye Sığdır",
@@ -174,6 +177,9 @@
   "errors": {
     "fatalTitle": "Koharu devam edemedi",
     "tryAgain": "Tekrar dene"
+  },
+  "files": {
+    "title": "Files and export"
   },
   "fontPicker": {
     "activeFilterCount": "{{count}} etkin filtre",
@@ -433,6 +439,9 @@
       "translate_all": "Translate SFX both inside and outside bubbles."
     }
   },
+  "mcp": {
+    "title": "MCP server"
+  },
   "menu": {
     "about": "Hakkında",
     "closeProject": "Projeyi Kapat",
@@ -499,6 +508,9 @@
     "renameTitle": "Sayfayı yeniden adlandır",
     "selected": "{{count}} seçili"
   },
+  "textExtras": {
+    "title": "Text style extras"
+  },
   "outputPicker": {
     "instructions": "Çeviri talimatları",
     "instructionsPlaceholder": "Üslup, adlar ve biçimlendirme için isteğe bağlı yönlendirme.",
@@ -532,6 +544,9 @@
     "openai-compatible": "OpenAI uyumlu API sunan herhangi bir sunucu.",
     "openrouter": "OpenRouter üzerinden yönlendirilen modeller."
   },
+  "qc": {
+    "title": "QC list"
+  },
   "resources": {
     "unloadModels": "Modelleri bellekten kaldır",
     "modelsUnloaded": "Kaldırılan model sayısı: {{count}}",
@@ -546,6 +561,9 @@
     "usedOfTotal": "{{total}} içinden {{used}} kullanılıyor",
     "vramUnavailable": "Kullanılamıyor",
     "vramValue": "{{value}} VRAM"
+  },
+  "runs": {
+    "title": "Runs"
   },
   "settings": {
     "appearance": {

@@ -470,6 +470,10 @@ export type LineContext = {
 	note?: string | null,
 	flags?: Flag[],
 	dismissed?: string[],
+	/**  QC checks (WO-12) the user marked OK for this line, by check id. */
+	qc_ok?: string[],
+	/**  The user's own note on the box (WO-06). `note` is the chapter reader's. */
+	box_note?: string | null,
 };
 
 export type LineExplanation = {

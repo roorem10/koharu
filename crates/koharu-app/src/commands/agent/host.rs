@@ -24,12 +24,12 @@ use crate::commands::{
 };
 
 #[derive(Clone)]
-pub(super) struct KoharuHost {
+pub(crate) struct KoharuHost {
     handle: AppHandle<CefRuntime>,
 }
 
 impl KoharuHost {
-    pub(super) fn new(handle: AppHandle<CefRuntime>) -> Self {
+    pub(crate) fn new(handle: AppHandle<CefRuntime>) -> Self {
         Self { handle }
     }
 
@@ -307,6 +307,7 @@ impl KoharuHost {
             progress: None,
             inpainting_mask: None,
             translation_hints,
+            redetect: false,
         };
         let mut request = request;
         let result = async {
@@ -400,6 +401,7 @@ impl Host for KoharuHost {
                         "run_pipeline",
                         "Run Koharu's configured processing pipeline for the whole project, selected pages, or selected text elements.",
                     ),
+                    // WO-20 (one box per bubble) tool definitions go here.
                 ]
             })
             .clone()
@@ -652,6 +654,7 @@ impl Host for KoharuHost {
                 self.context_tool(&call).await
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
+            // WO-20 (one box per bubble) tool calls go here.
             name => bail!("unknown Koharu tool {name}"),
         }
     }

@@ -24,6 +24,7 @@ pub(crate) struct StageInput {
     images: Arc<ImageCache>,
     inpainting_mask: Option<InpaintingMask>,
     translation_hints: Arc<TranslationHints>,
+    redetect: bool,
 }
 
 impl StageInput {
@@ -43,7 +44,14 @@ impl StageInput {
             images,
             inpainting_mask,
             translation_hints: Arc::default(),
+            redetect: false,
         }
+    }
+
+    #[must_use]
+    pub(crate) fn with_redetect(mut self, redetect: bool) -> Self {
+        self.redetect = redetect;
+        self
     }
 
     #[must_use]

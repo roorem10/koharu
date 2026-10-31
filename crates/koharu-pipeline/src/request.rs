@@ -69,6 +69,9 @@ pub struct Request {
     pub progress: Option<ProgressSink>,
     pub inpainting_mask: Option<InpaintingMask>,
     pub translation_hints: Arc<TranslationHints>,
+    /// Detect pages again even when they already have detected text (WO-20's "Detect again").
+    /// Generated regions are replaced; hand-made boxes are kept.
+    pub redetect: bool,
 }
 
 impl Default for Request {
@@ -80,6 +83,7 @@ impl Default for Request {
             progress: None,
             inpainting_mask: None,
             translation_hints: Arc::default(),
+            redetect: false,
         }
     }
 }

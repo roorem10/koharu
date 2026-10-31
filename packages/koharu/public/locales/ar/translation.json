@@ -54,6 +54,9 @@
     "title": "Agent",
     "working": "جارٍ العمل..."
   },
+  "boxes": {
+    "title": "One box per bubble"
+  },
   "canvas": {
     "empty": "اختر صفحة للبدء.",
     "fit": "ملاءمة النافذة",
@@ -174,6 +177,9 @@
   "errors": {
     "fatalTitle": "تعذّر على Koharu المتابعة",
     "tryAgain": "أعد المحاولة"
+  },
+  "files": {
+    "title": "Files and export"
   },
   "fontPicker": {
     "activeFilterCount": "{{count}} مرشّحات نشطة",
@@ -433,6 +439,9 @@
       "translate_all": "Translate SFX both inside and outside bubbles."
     }
   },
+  "mcp": {
+    "title": "MCP server"
+  },
   "menu": {
     "about": "عن البرنامج",
     "closeProject": "إغلاق المشروع",
@@ -499,6 +508,9 @@
     "renameTitle": "إعادة تسمية الصفحة",
     "selected": "{{count}} محدّد"
   },
+  "textExtras": {
+    "title": "Text style extras"
+  },
   "outputPicker": {
     "instructions": "تعليمات الترجمة",
     "instructionsPlaceholder": "إرشادات اختيارية للنبرة والأسماء والتنسيق.",
@@ -532,6 +544,9 @@
     "openai-compatible": "أي خادم يوفّر واجهة متوافقة مع OpenAI.",
     "openrouter": "نماذج تُوجَّه عبر OpenRouter."
   },
+  "qc": {
+    "title": "QC list"
+  },
   "resources": {
     "unloadModels": "إلغاء تحميل النماذج",
     "modelsUnloaded": "النماذج التي أُلغي تحميلها: {{count}}",
@@ -546,6 +561,9 @@
     "usedOfTotal": "{{used}} من {{total}} مستخدم",
     "vramUnavailable": "غير متاح",
     "vramValue": "{{value}} VRAM"
+  },
+  "runs": {
+    "title": "Runs"
   },
   "settings": {
     "appearance": {

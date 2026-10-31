@@ -82,6 +82,30 @@ pub(crate) async fn process(
     processing: State<'_, Processing>,
     job_channel: State<'_, JobChannel>,
 ) -> std::result::Result<JobId, Error> {
+    Ok(start_job(
+        handle,
+        scope,
+        operation,
+        false,
+        &project,
+        &processing,
+        &job_channel,
+    )
+    .await?)
+}
+
+/// Starts a pipeline job, as the Run menu does. `redetect` makes detection run again on pages
+/// that already have detected text (WO-20's "Detect again"). WO-14 owns the body; the
+/// signature is shared.
+pub(crate) async fn start_job(
+    handle: AppHandle<CefRuntime>,
+    scope: koharu_pipeline::Scope,
+    operation: koharu_pipeline::Operation,
+    redetect: bool,
+    project: &CurrentProject,
+    processing: &Processing,
+    job_channel: &JobChannel,
+) -> Result<JobId> {
     let translation_hints = {
         let project = project.project.lock().await;
         let project = project.as_ref().context("no project is open")?;
@@ -94,7 +118,7 @@ pub(crate) async fn process(
     {
         let mut stops = processing.stops.lock();
         if !stops.is_empty() {
-            return Err(anyhow::anyhow!("another process is already running").into());
+            anyhow::bail!("another process is already running");
         }
         stops.insert(id, stop.clone());
     }
@@ -124,6 +148,7 @@ pub(crate) async fn process(
             progress: None,
             inpainting_mask,
             translation_hints,
+            redetect,
         };
         request.progress = Some(Arc::new(move |event| {
             let update = match event {

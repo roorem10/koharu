@@ -54,6 +54,9 @@
     "title": "智能体",
     "working": "正在工作…"
   },
+  "boxes": {
+    "title": "One box per bubble"
+  },
   "canvas": {
     "empty": "请选择页面以开始。",
     "fit": "适应窗口",
@@ -174,6 +177,9 @@
   "errors": {
     "fatalTitle": "Koharu 无法继续运行",
     "tryAgain": "重试"
+  },
+  "files": {
+    "title": "Files and export"
   },
   "fontPicker": {
     "activeFilterCount": "{{count}} 个启用的筛选条件",
@@ -433,6 +439,9 @@
       "translate_all": "Translate SFX both inside and outside bubbles."
     }
   },
+  "mcp": {
+    "title": "MCP server"
+  },
   "menu": {
     "about": "关于",
     "closeProject": "关闭项目",
@@ -499,6 +508,9 @@
     "renameTitle": "重命名页面",
     "selected": "已选择 {{count}}"
   },
+  "textExtras": {
+    "title": "Text style extras"
+  },
   "outputPicker": {
     "instructions": "翻译说明",
     "instructionsPlaceholder": "关于语气、名称和格式的可选说明。",
@@ -532,6 +544,9 @@
     "openai-compatible": "任何提供 OpenAI 兼容 API 的服务器。",
     "openrouter": "通过 OpenRouter 路由的模型。"
   },
+  "qc": {
+    "title": "QC list"
+  },
   "resources": {
     "unloadModels": "卸载模型",
     "modelsUnloaded": "已卸载模型：{{count}}",
@@ -546,6 +561,9 @@
     "usedOfTotal": "已使用 {{used}}，共 {{total}}",
     "vramUnavailable": "不可用",
     "vramValue": "{{value}} 显存"
+  },
+  "runs": {
+    "title": "Runs"
   },
   "settings": {
     "appearance": {

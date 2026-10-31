@@ -54,6 +54,9 @@
     "title": "Agent",
     "working": "Working..."
   },
+  "boxes": {
+    "title": "One box per bubble"
+  },
   "canvas": {
     "empty": "Select a page to begin.",
     "fit": "Fit Window",
@@ -174,6 +177,9 @@
   "errors": {
     "fatalTitle": "Koharu could not continue",
     "tryAgain": "Try again"
+  },
+  "files": {
+    "title": "Files and export"
   },
   "fontPicker": {
     "activeFilterCount": "{{count}} active filters",
@@ -433,6 +439,9 @@
       "translate_all": "Translate SFX both inside and outside bubbles."
     }
   },
+  "mcp": {
+    "title": "MCP server"
+  },
   "menu": {
     "about": "About",
     "closeProject": "Close Project",
@@ -499,6 +508,9 @@
     "renameTitle": "Rename page",
     "selected": "{{count}} selected"
   },
+  "textExtras": {
+    "title": "Text style extras"
+  },
   "outputPicker": {
     "instructions": "Translation instructions",
     "instructionsPlaceholder": "Optional guidance for tone, names, and formatting.",
@@ -532,6 +544,9 @@
     "openai-compatible": "Any server exposing an OpenAI-compatible API.",
     "openrouter": "Models routed through OpenRouter."
   },
+  "qc": {
+    "title": "QC list"
+  },
   "resources": {
     "unloadModels": "Unload models",
     "modelsUnloaded": "Models unloaded: {{count}}",
@@ -546,6 +561,9 @@
     "usedOfTotal": "{{used}} of {{total}} used",
     "vramUnavailable": "Unavailable",
     "vramValue": "{{value}} VRAM"
+  },
+  "runs": {
+    "title": "Runs"
   },
   "settings": {
     "appearance": {

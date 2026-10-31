@@ -3,6 +3,8 @@
 import { Eraser, FileText, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { BoxJoinPreferences } from '@/components/preferences/BoxJoinPreferences'
+import { LibraryPreferences } from '@/components/preferences/LibraryPreferences'
 import {
   defaultModel,
   modelNames,
@@ -20,6 +22,7 @@ import {
   PreferenceSection,
   TextField,
 } from '@/components/preferences/PreferenceFields'
+import { RunPreferences } from '@/components/preferences/RunPreferences'
 import type { PipelineConfig } from '@koharu/bridge/protocol'
 import {
   Select,
@@ -120,6 +123,9 @@ export function PipelinePreferences({
           </button>
         </p>
       </PreferenceSection>
+      <BoxJoinPreferences />
+      <RunPreferences />
+      <LibraryPreferences />
     </PreferencePage>
   )
 }

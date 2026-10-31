@@ -37,6 +37,7 @@ pub(crate) struct Execution<'a> {
     started: Instant,
     inpainting_mask: Option<crate::InpaintingMask>,
     translation_hints: Arc<crate::TranslationHints>,
+    redetect: bool,
 }
 
 impl<'a> Execution<'a> {
@@ -90,6 +91,7 @@ impl<'a> Execution<'a> {
             started,
             inpainting_mask: request.inpainting_mask,
             translation_hints: request.translation_hints,
+            redetect: request.redetect,
         })
     }
 
@@ -147,7 +149,8 @@ impl<'a> Execution<'a> {
                     .filter(|mask| stage == Stage::Inpainting && mask.page == page)
                     .cloned(),
             )
-            .with_translation_hints(self.translation_hints.clone()),
+            .with_translation_hints(self.translation_hints.clone())
+            .with_redetect(self.redetect),
             self.stop.clone(),
             self.progress.clone(),
         ))

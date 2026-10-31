@@ -54,6 +54,9 @@
     "title": "エージェント",
     "working": "作業中…"
   },
+  "boxes": {
+    "title": "One box per bubble"
+  },
   "canvas": {
     "empty": "ページを選択して開始します。",
     "fit": "ウィンドウに合わせる",
@@ -174,6 +177,9 @@
   "errors": {
     "fatalTitle": "Koharuを続行できませんでした",
     "tryAgain": "再試行"
+  },
+  "files": {
+    "title": "Files and export"
   },
   "fontPicker": {
     "activeFilterCount": "有効なフィルター: {{count}}件",
@@ -433,6 +439,9 @@
       "translate_all": "Translate SFX both inside and outside bubbles."
     }
   },
+  "mcp": {
+    "title": "MCP server"
+  },
   "menu": {
     "about": "Koharuについて",
     "closeProject": "プロジェクトを閉じる",
@@ -499,6 +508,9 @@
     "renameTitle": "ページ名を変更",
     "selected": "{{count}}件選択中"
   },
+  "textExtras": {
+    "title": "Text style extras"
+  },
   "outputPicker": {
     "instructions": "翻訳指示",
     "instructionsPlaceholder": "文体、固有名詞、書式に関する任意の指示。",
@@ -532,6 +544,9 @@
     "openai-compatible": "OpenAI 互換 API を公開する任意のサーバー。",
     "openrouter": "OpenRouter 経由で提供されるモデル。"
   },
+  "qc": {
+    "title": "QC list"
+  },
   "resources": {
     "unloadModels": "モデルを解放",
     "modelsUnloaded": "解放したモデル数: {{count}}",
@@ -546,6 +561,9 @@
     "usedOfTotal": "{{total}}中{{used}}を使用",
     "vramUnavailable": "利用不可",
     "vramValue": "VRAM {{value}}"
+  },
+  "runs": {
+    "title": "Runs"
   },
   "settings": {
     "appearance": {

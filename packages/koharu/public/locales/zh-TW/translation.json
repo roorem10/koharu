@@ -54,6 +54,9 @@
     "title": "代理",
     "working": "正在工作…"
   },
+  "boxes": {
+    "title": "One box per bubble"
+  },
   "canvas": {
     "empty": "請選擇頁面以開始。",
     "fit": "適應視窗",
@@ -174,6 +177,9 @@
   "errors": {
     "fatalTitle": "Koharu 無法繼續執行",
     "tryAgain": "再試一次"
+  },
+  "files": {
+    "title": "Files and export"
   },
   "fontPicker": {
     "activeFilterCount": "{{count}} 個啟用的篩選條件",
@@ -433,6 +439,9 @@
       "translate_all": "Translate SFX both inside and outside bubbles."
     }
   },
+  "mcp": {
+    "title": "MCP server"
+  },
   "menu": {
     "about": "關於",
     "closeProject": "關閉專案",
@@ -499,6 +508,9 @@
     "renameTitle": "重新命名頁面",
     "selected": "已選擇 {{count}}"
   },
+  "textExtras": {
+    "title": "Text style extras"
+  },
   "outputPicker": {
     "instructions": "翻譯指示",
     "instructionsPlaceholder": "關於語氣、名稱和格式的選填說明。",
@@ -532,6 +544,9 @@
     "openai-compatible": "任何提供 OpenAI 相容 API 的伺服器。",
     "openrouter": "透過 OpenRouter 路由的模型。"
   },
+  "qc": {
+    "title": "QC list"
+  },
   "resources": {
     "unloadModels": "卸載模型",
     "modelsUnloaded": "已卸載模型：{{count}}",
@@ -546,6 +561,9 @@
     "usedOfTotal": "已使用 {{used}}，共 {{total}}",
     "vramUnavailable": "無法使用",
     "vramValue": "{{value}} 顯示記憶體"
+  },
+  "runs": {
+    "title": "Runs"
   },
   "settings": {
     "appearance": {

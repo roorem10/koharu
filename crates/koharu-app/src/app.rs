@@ -160,6 +160,10 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
             let handle = application.handle().clone();
             application.manage(koharu_desktop::Desktop::new()?);
             application.manage(AgentState::new(handle.clone())?);
+            // Batch 1: each WO adds its own `manage(...)` or startup lines below its marker.
+            // WO-13 (files and export)
+            // WO-14 (runs and retries)
+            // WO-21 (MCP server)
 
             let window_config = application
                 .config()

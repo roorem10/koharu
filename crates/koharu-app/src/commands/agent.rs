@@ -1,4 +1,4 @@
-mod host;
+pub(crate) mod host;
 
 use std::{collections::HashMap, sync::Arc};
 
