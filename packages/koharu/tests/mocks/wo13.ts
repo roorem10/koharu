@@ -1,2 +1,11 @@
-// Owned by WO-13: global command mocks its components need in every test.
-export function mockWo13() {}
+import { vi } from 'vitest'
+
+import { commands } from '@koharu/bridge/protocol'
+
+export function mockWo13() {
+  vi.spyOn(commands, 'getLibrarySettings').mockResolvedValue({
+    export_name_pattern: '{index}_{page}',
+  })
+  vi.spyOn(commands, 'saveLibrarySettings').mockImplementation(async (settings) => settings)
+  vi.spyOn(commands, 'exportSelectedPages').mockResolvedValue(null)
+}

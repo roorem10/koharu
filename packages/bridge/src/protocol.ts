@@ -102,6 +102,9 @@ export const commands = {
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
+	getLibrarySettings: () => __TAURI_INVOKE<LibrarySettings>("get_library_settings"),
+	saveLibrarySettings: (settings: LibrarySettings) => __TAURI_INVOKE<LibrarySettings>("save_library_settings", { settings }),
+	exportSelectedPages: (format: ExportFormat, pages: EntityId[]) => __TAURI_INVOKE<null>("export_selected_pages", { format, pages }),
 };
 
 /* Types */
@@ -456,6 +459,10 @@ export type LetteringSettings = {
 	model_confidence?: number,
 	/**  Estimated source glyph size as a fraction of page height. */
 	small_text_threshold?: number,
+};
+
+export type LibrarySettings = {
+	export_name_pattern?: string,
 };
 
 export type LineCategory = {

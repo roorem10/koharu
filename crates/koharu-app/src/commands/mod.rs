@@ -164,6 +164,9 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             // WO-20 (one box per bubble) commands go here.
             // WO-12 (QC list) commands go here.
             // WO-13 (files and export) commands go here.
+            files::get_library_settings,
+            files::save_library_settings,
+            output::export_selected_pages,
             // WO-14 (runs and retries) commands go here.
             // WO-06 (text style extras and box notes) commands go here.
             // WO-21 (MCP server) commands go here.

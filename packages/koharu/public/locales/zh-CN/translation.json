@@ -179,7 +179,14 @@
     "tryAgain": "重试"
   },
   "files": {
-    "title": "Files and export"
+    "title": "Files and folders",
+    "exportPattern": "Export file names",
+    "patternHelp": "Tokens: {project}, {index} (0001), {number} (1), {page} (label without extension). Extensions are added automatically.",
+    "unknownToken": "Unknown token {{token}}. Use {project}, {index}, {number} or {page}.",
+    "invalidPattern": "Enter a name pattern with balanced braces and supported tokens.",
+    "save": "Save",
+    "selectedPages": "Selected pages…",
+    "exportFormat": "{{format}}…"
   },
   "fontPicker": {
     "activeFilterCount": "{{count}} 个启用的筛选条件",

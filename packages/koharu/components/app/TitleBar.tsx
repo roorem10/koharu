@@ -57,6 +57,9 @@ export function TitleBar() {
     commands.export,
     'menu.export',
   )
+  const { run: exportSelected, busy: exportingSelected } = useCommand(
+    ['export-selected-pages'], commands.exportSelectedPages, 'files.selectedPages',
+  )
 
   const run = (scope: Scope, operation: Operation = { operation: 'full' }) =>
     void call(commands.process, scope, operation).catch(() => undefined)
@@ -110,8 +113,8 @@ export function TitleBar() {
               </MenubarSub>
               <MenubarSub>
                 <MenubarSubTrigger
-                  disabled={!project || pages.length === 0 || exporting}
-                  aria-busy={exporting}
+                  disabled={!project || pages.length === 0 || exporting || exportingSelected}
+                  aria-busy={exporting || exportingSelected}
                   className='min-h-8 gap-1.5 px-2 py-1 text-xs'
                 >
                   {exporting && <LoaderCircle className='animate-spin' aria-hidden='true' />}
@@ -127,6 +130,19 @@ export function TitleBar() {
                       {format.toUpperCase()}…
                     </MenubarItem>
                   ))}
+                  <MenubarSeparator />
+                  <MenubarSub>
+                    <MenubarSubTrigger disabled={selectedPages.length === 0 || exporting || exportingSelected}>
+                      {t('files.selectedPages')}
+                    </MenubarSubTrigger>
+                    <MenubarSubContent>
+                      {(['png', 'psd', 'cbz'] as const).map((format) => (
+                        <MenubarItem key={format} onClick={() => exportSelected(format, selectedPages)}>
+                          {t('files.exportFormat', { format: format.toUpperCase() })}
+                        </MenubarItem>
+                      ))}
+                    </MenubarSubContent>
+                  </MenubarSub>
                 </MenubarSubContent>
               </MenubarSub>
               <MenubarSeparator />
