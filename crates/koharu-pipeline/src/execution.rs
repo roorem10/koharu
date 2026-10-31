@@ -85,7 +85,7 @@ impl<'a> Execution<'a> {
             stop: request.stop,
             progress: request.progress,
             scope,
-            scheduler: Scheduler::new(&pages, &stages),
+            scheduler: Scheduler::new(&pages, &stages).with_order(request.policy.order),
             scene: snapshot,
             images: BTreeMap::new(),
             busy_stages: BTreeSet::new(),
@@ -111,6 +111,9 @@ impl<'a> Execution<'a> {
             return Ok(self.report(RunStatus::Stopped));
         }
 
+        if self.policy.order == crate::RunOrder::StageAtATime {
+            self.runner.unload_models();
+        }
         self.resources.start();
         self.resources.wait_for_sample().await;
 
@@ -131,11 +134,20 @@ impl<'a> Execution<'a> {
             {
                 continue;
             }
+            let stage = completion.stage;
             if let Err(error) = self.apply_completion(completion).await {
                 self.failure = Some(error);
             }
+            if self.policy.order == crate::RunOrder::StageAtATime
+                && self.scheduler.stage_finished(stage)
+            {
+                self.runner.unload_stage(stage);
+            }
         }
 
+        if self.policy.order == crate::RunOrder::StageAtATime {
+            self.runner.unload_models();
+        }
         self.finalize()
     }
 

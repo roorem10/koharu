@@ -69,6 +69,10 @@ impl StageRunner {
         }
     }
 
+    pub(crate) fn unload_stage(&self, stage: Stage) {
+        self.stages.unload(stage);
+    }
+
     pub(crate) fn unload_models(&self) -> u32 {
         let mut count = 0;
         for stage in Stage::ALL {
