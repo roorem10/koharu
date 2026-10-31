@@ -161,23 +161,9 @@ export const commands = {
 	getReadingModel: () => __TAURI_INVOKE<ReadModelInfo>("get_reading_model"),
 	getReadingModels: () => __TAURI_INVOKE<Model[]>("get_reading_models"),
 	getLastReadModel: () => __TAURI_INVOKE<string | null>("get_last_read_model"),
-	/**  Sets or clears styles on `start..end` of one box, as one undo step. */
 	setWordStyle: (layer: EntityId, start: number, end: number, patch: RunStylePatch) => __TAURI_INVOKE<null>("set_word_style", { layer, start, end, patch }),
-	/**
-	 *  Removes word styles: on `start..end` of each box when given, otherwise
-	 *  all of them ("Clear all word styles"). One undo step for all boxes.
-	 */
 	clearWordStyles: (layers: EntityId[], range: [number, number] | null) => __TAURI_INVOKE<null>("clear_word_styles", { layers, range }),
-	/**
-	 *  Replaces `start..end` of the box's shown text with `insert` (typing on the
-	 *  page), keeping word styles on their characters. Typed text takes the style
-	 *  of the character before it. One undo step.
-	 */
 	replaceTextRange: (layer: EntityId, start: number, end: number, insert: string) => __TAURI_INVOKE<null>("replace_text_range", { layer, start, end, insert }),
-	/**
-	 *  The box's word styles (empty when it has none), for the editor's and the
-	 *  panel's mixed values. WO-11A fills it.
-	 */
 	getWordStyles: (layer: EntityId) => __TAURI_INVOKE<StyleRun[]>("get_word_styles", { layer }),
 	getTextGlyphBoxes: (layer: EntityId) => __TAURI_INVOKE<GlyphBox[]>("get_text_glyph_boxes", { layer }),
 	/**
@@ -1028,13 +1014,13 @@ export type RunStyle = {
 	outer_stroke_width: number | null,
 };
 
-/**  One field of [`RunStyle`], for clearing it on a range. */
+/**
+ *  A field to return to the box's inherited style. This is an edit intent,
+ *  not part of the persisted component.
+ */
 export type RunStyleField = "font" | "font_weight" | "font_style" | "size_scale" | "color" | "fill_gradient" | "stroke_color" | "stroke_width" | "outer_stroke_color" | "outer_stroke_width";
 
-/**
- *  A change to the word styles of a range: fields in `set` that are `Some`
- *  are set, fields listed in `clear` go back to the box's own style.
- */
+/**  Fields in `clear` return to the box's style, including when also in `set`. */
 export type RunStylePatch = {
 	set: RunStyle,
 	clear: RunStyleField[],
