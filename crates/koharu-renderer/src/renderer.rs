@@ -817,9 +817,18 @@ impl Traversal<'_> {
                 .as_ref()
                 .and_then(|value| value.color)
                 .unwrap_or([0, 0, 0, 255]),
+            fill_gradient: typography
+                .as_ref()
+                .and_then(|value| value.fill_gradient.clone()),
             stroke: resolve_stroke(typography.as_ref()),
-            line_height: typography.as_ref().and_then(|value| value.line_spacing).unwrap_or(1.2),
-            letter_spacing: typography.as_ref().and_then(|value| value.letter_spacing).unwrap_or(0.0),
+            line_height: typography
+                .as_ref()
+                .and_then(|value| value.line_spacing)
+                .unwrap_or(1.2),
+            letter_spacing: typography
+                .as_ref()
+                .and_then(|value| value.letter_spacing)
+                .unwrap_or(0.0),
             word_spacing: 0.0,
             text_inset: [4.0; 4],
             point_text: !is_bubble && layout.kind == TextLayoutKind::Point,

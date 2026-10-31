@@ -15,7 +15,7 @@ use koharu_rasterizer::{
     FillRule, PathElement, PreparedGlyph, PreparedGlyphRun, PreparedPath, PreparedResource,
     PreparedScene, PreparedSceneCommand, ResourceId,
 };
-use koharu_scene::{StrokeJoin, StrokeMethod, StrokePosition};
+use koharu_scene::{FillGradient, GradientKind, StrokeJoin, StrokeMethod, StrokePosition};
 use skrifa::{
     GlyphId, MetadataProvider,
     instance::Size,
@@ -49,6 +49,7 @@ pub(crate) struct TextNodeDescriptor {
     pub(crate) alignment: TextAlign,
     pub(crate) writing_mode: WritingMode,
     pub(crate) foreground_color: [u8; 4],
+    pub(crate) fill_gradient: Option<FillGradient>,
     pub(crate) stroke: Option<StrokeOptions>,
     pub(crate) line_height: f32,
     pub(crate) letter_spacing: f32,
@@ -114,6 +115,7 @@ impl StrokeOptions {
 #[derive(Debug, Clone)]
 pub(crate) struct TextRenderOptions {
     pub color: [u8; 4],
+    pub fill_gradient: Option<FillGradient>,
     pub hint_glyphs: bool,
     pub padding: f32,
     pub baseline_shift: f32,
@@ -124,6 +126,7 @@ impl Default for TextRenderOptions {
     fn default() -> Self {
         Self {
             color: [0, 0, 0, 255],
+            fill_gradient: None,
             hint_glyphs: true,
             padding: 0.0,
             baseline_shift: 0.0,
@@ -163,31 +166,33 @@ impl TextRenderer {
             // The contour and fill must use the same unhinted geometry at every zoom level.
             fill_options.hint_glyphs = false;
             if contours.is_empty() {
-                draw_layout(
+                draw_fill(
                     scene,
                     resources,
                     layout,
                     writing_mode,
                     &fill_options,
                     transform,
-                    GlyphPaint {
-                        color: options.color,
-                        dilation_px: 0.0,
-                    },
-                );
+                )?;
                 return Ok(None);
             }
             // Opaque letters cover the expanded region's interior. Subtracting the letters first
             // would antialias their shared edge twice and expose the background. Translucent
             // letters need an outside-only region to preserve their alpha instead.
-            let behind_fill = stroke.position == StrokePosition::Outside && options.color[3] == 255;
+            let opaque_fill = options
+                .fill_gradient
+                .as_ref()
+                .map_or(options.color[3] == 255, |gradient| {
+                    gradient.stops.iter().all(|stop| stop.color[3] == 255)
+                });
+            let behind_fill = stroke.position == StrokePosition::Outside && opaque_fill;
             let border = contour_border(&contours, stroke, behind_fill);
             let mut bounds =
                 (!border.is_empty()).then(|| transform.transform_rect_bbox(border.bounding_box()));
             if let Some(outer) = stroke.visible_outer() {
                 // Everything drawn over a solid outer region covers its interior, so it can be
                 // filled whole without a shared antialiased seam against the first outline.
-                let solid = options.color[3] == 255 && stroke.color[3] == 255;
+                let solid = opaque_fill && stroke.color[3] == 255;
                 let region = outer_border(&contours, stroke, outer, solid);
                 if !region.is_empty() {
                     let outer_bounds = transform.transform_rect_bbox(region.bounding_box());
@@ -201,18 +206,14 @@ impl TextRenderer {
             if behind_fill && !border.is_empty() {
                 scene.commands.push(command.clone());
             }
-            draw_layout(
+            draw_fill(
                 scene,
                 resources,
                 layout,
                 writing_mode,
                 &fill_options,
                 transform,
-                GlyphPaint {
-                    color: options.color,
-                    dilation_px: 0.0,
-                },
-            );
+            )?;
             if !behind_fill && !border.is_empty() {
                 scene.commands.push(command);
             }
@@ -253,18 +254,7 @@ impl TextRenderer {
                 },
             );
         }
-        draw_layout(
-            scene,
-            resources,
-            layout,
-            writing_mode,
-            options,
-            transform,
-            GlyphPaint {
-                color: options.color,
-                dilation_px: 0.0,
-            },
-        );
+        draw_fill(scene, resources, layout, writing_mode, options, transform)?;
         Ok(None)
     }
 
@@ -370,9 +360,14 @@ impl TextRenderer {
         x += layout.placement_offset_x();
         y += layout.placement_offset_y();
         let transform = Affine::translate((f64::from(x), f64::from(y)));
-        let color = descriptor.foreground_color;
+        let color = descriptor
+            .fill_gradient
+            .as_ref()
+            .and_then(|gradient| gradient.stops.first())
+            .map_or(descriptor.foreground_color, |stop| stop.color);
         let mut options = TextRenderOptions {
             color,
+            fill_gradient: descriptor.fill_gradient.clone(),
             stroke: None,
             ..TextRenderOptions::default()
         };
@@ -467,7 +462,7 @@ impl TextRenderer {
 
 type ContourRegion = Vec<Vec<Vec<[f64; 2]>>>;
 
-fn text_contours(layout: &LayoutRun<'_>, options: &TextRenderOptions) -> Result<ContourRegion> {
+fn text_path(layout: &LayoutRun<'_>, options: &TextRenderOptions) -> Result<BezPath> {
     let mut contours = BezPath::new();
     for line in &layout.lines {
         let (baseline_x, baseline_y) = line.baseline;
@@ -512,7 +507,11 @@ fn text_contours(layout: &LayoutRun<'_>, options: &TextRenderOptions) -> Result<
             pen_y -= glyph.y_advance;
         }
     }
-    Ok(union_contours(&contours))
+    Ok(contours)
+}
+
+fn text_contours(layout: &LayoutRun<'_>, options: &TextRenderOptions) -> Result<ContourRegion> {
+    Ok(union_contours(&text_path(layout, options)?))
 }
 
 /// Stroke the visible boundary of the complete text, including touching glyphs and overlaps
@@ -590,7 +589,11 @@ fn outer_border(
 }
 
 fn fill_command(region: &BezPath, transform: Affine, color: [u8; 4]) -> PreparedSceneCommand {
-    PreparedSceneCommand::FillPath(PreparedPath {
+    PreparedSceneCommand::FillPath(prepared_path(region, transform, color))
+}
+
+fn prepared_path(region: &BezPath, transform: Affine, color: [u8; 4]) -> PreparedPath {
+    PreparedPath {
         fill: FillRule::NonZero,
         transform: transform.as_coeffs(),
         color,
@@ -600,13 +603,12 @@ fn fill_command(region: &BezPath, transform: Affine, color: [u8; 4]) -> Prepared
             .map(|element| match *element {
                 PathEl::MoveTo(p) => PathElement::MoveTo([p.x, p.y]),
                 PathEl::LineTo(p) => PathElement::LineTo([p.x, p.y]),
-                PathEl::QuadTo(..) | PathEl::CurveTo(..) => {
-                    unreachable!("polygon offsets contain only straight segments")
-                }
+                PathEl::QuadTo(p, q) => PathElement::QuadTo([p.x, p.y, q.x, q.y]),
+                PathEl::CurveTo(p, q, r) => PathElement::CurveTo([p.x, p.y, q.x, q.y, r.x, r.y]),
                 PathEl::ClosePath => PathElement::Close,
             })
             .collect(),
-    })
+    }
 }
 
 fn contour_border(contours: &ContourRegion, stroke: StrokeOptions, behind_fill: bool) -> BezPath {
@@ -731,6 +733,67 @@ fn placement(rect: LayoutBox, width: f32, height: f32) -> (f32, f32) {
 struct GlyphPaint {
     color: [u8; 4],
     dilation_px: f32,
+}
+
+fn draw_fill(
+    scene: &mut PreparedScene,
+    resources: &mut Vec<PreparedResource>,
+    layout: &LayoutRun<'_>,
+    writing_mode: WritingMode,
+    options: &TextRenderOptions,
+    transform: Affine,
+) -> Result<()> {
+    if let Some(gradient) = &options.fill_gradient {
+        let path = text_path(layout, options)?;
+        if path.is_empty() {
+            return Ok(());
+        }
+        let bounds = path.bounding_box();
+        let center = bounds.center();
+        let (start, end) = match gradient.kind {
+            GradientKind::Linear => {
+                // Page coordinates run downwards; Photoshop's positive angles run upwards.
+                let angle = f64::from(gradient.angle_degrees).to_radians();
+                let direction = vello::kurbo::Vec2::new(angle.cos(), -angle.sin());
+                let half_extent = (bounds.width() * direction.x.abs()
+                    + bounds.height() * direction.y.abs())
+                    * 0.5;
+                (
+                    center - direction * half_extent,
+                    center + direction * half_extent,
+                )
+            }
+            GradientKind::Radial => {
+                let radius = bounds.width().hypot(bounds.height()) * 0.5;
+                (center, center + vello::kurbo::Vec2::new(radius, 0.0))
+            }
+        };
+        scene.commands.push(PreparedSceneCommand::GradientPath {
+            path: prepared_path(&path, transform, options.color),
+            radial: gradient.kind == GradientKind::Radial,
+            start: [start.x, start.y],
+            end: [end.x, end.y],
+            stops: gradient
+                .stops
+                .iter()
+                .map(|stop| (stop.offset, stop.color))
+                .collect(),
+        });
+    } else {
+        draw_layout(
+            scene,
+            resources,
+            layout,
+            writing_mode,
+            options,
+            transform,
+            GlyphPaint {
+                color: options.color,
+                dilation_px: 0.0,
+            },
+        );
+    }
+    Ok(())
 }
 
 fn draw_layout(
@@ -1054,6 +1117,9 @@ mod tests {
                 PreparedSceneCommand::FillPath(path) => path.color,
                 PreparedSceneCommand::GlyphRun(run) => run.color,
                 PreparedSceneCommand::StrokePath(stroke) => stroke.path.color,
+                PreparedSceneCommand::GradientPath { .. } => {
+                    panic!("outline must stay a solid color")
+                }
             };
             assert_eq!(first_color, [255, 0, 0, 255], "{method:?}");
             if method == StrokeMethod::Contour {
@@ -1350,6 +1416,7 @@ mod tests {
             alignment: TextAlign::Center,
             writing_mode: WritingMode::Horizontal,
             foreground_color: [0, 0, 0, 255],
+            fill_gradient: None,
             stroke: None,
             line_height: 1.2,
             letter_spacing: 0.0,
@@ -1389,6 +1456,7 @@ mod tests {
             alignment: TextAlign::Center,
             writing_mode: WritingMode::Horizontal,
             foreground_color: [0, 0, 0, 255],
+            fill_gradient: None,
             stroke: None,
             line_height: 1.2,
             letter_spacing: 0.0,
@@ -1405,6 +1473,97 @@ mod tests {
 
         assert_eq!(automatic_maximum(&descriptor, bounds, false), 24.0);
         assert_eq!(automatic_maximum(&descriptor, bounds, true), 240.0);
+    }
+
+    #[test]
+    fn gradients_span_glyph_bounds_and_survive_the_portable_frame() {
+        use koharu_rasterizer::{RasterOptions, Rasterizer};
+        use koharu_scene::GradientStop;
+        let font = FontSystem::new().first_font().unwrap();
+        let layout = TextLayout::new(&font)
+            .with_font_size(40.0)
+            .run("MMMMMMMM")
+            .unwrap();
+        let bounds = text_path(&layout, &TextRenderOptions::default())
+            .unwrap()
+            .bounding_box();
+        let transform = Affine::translate((4.0 - bounds.x0, 4.0 - bounds.y0));
+        let rasterizer = Rasterizer::new().unwrap();
+        for kind in [GradientKind::Linear, GradientKind::Radial] {
+            let gradient = FillGradient {
+                kind,
+                angle_degrees: 0.0,
+                stops: vec![
+                    GradientStop {
+                        offset: 0.0,
+                        color: [255, 0, 0, 255],
+                    },
+                    GradientStop {
+                        offset: 1.0,
+                        color: [0, 0, 255, 255],
+                    },
+                ],
+            };
+            let mut scene = PreparedScene::default();
+            let mut resources = Vec::new();
+            TextRenderer::new()
+                .render(
+                    &mut scene,
+                    &mut resources,
+                    &layout,
+                    WritingMode::Horizontal,
+                    &TextRenderOptions {
+                        fill_gradient: Some(gradient),
+                        ..Default::default()
+                    },
+                    transform,
+                )
+                .unwrap();
+            let width = bounds.width().ceil() as u32 + 8;
+            let bundle = text_bundle(scene, resources, width, bounds.height().ceil() as u32 + 8);
+            let manifest = bundle.manifest().unwrap();
+            let decoded = PreparedFrameManifest::decode(&manifest.encode().unwrap()).unwrap();
+            let frame = decoded.compile(&PreparedResourceStore::default()).unwrap();
+            let image = rasterizer
+                .rasterize(&frame, RasterOptions::default())
+                .unwrap()
+                .image;
+            let pixels_in = |left: bool| {
+                image
+                    .enumerate_pixels()
+                    .filter(move |(x, _, p)| {
+                        p.0[3] > 240
+                            && if left {
+                                *x < width / 4
+                            } else {
+                                *x > 3 * width / 4
+                            }
+                    })
+                    .map(|(_, _, p)| (p.0[0] as i32, p.0[2] as i32))
+                    .collect::<Vec<_>>()
+            };
+            let left = pixels_in(true);
+            let right = pixels_in(false);
+            assert!(!left.is_empty() && !right.is_empty());
+            if kind == GradientKind::Linear {
+                assert!(left.iter().map(|p| p.0 - p.1).sum::<i32>() > 0);
+                assert!(right.iter().map(|p| p.1 - p.0).sum::<i32>() > 0);
+            } else {
+                let center: Vec<_> = image
+                    .enumerate_pixels()
+                    .filter(|(x, _, p)| p.0[3] > 240 && x.abs_diff(width / 2) < width / 8)
+                    .collect();
+                assert!(!center.is_empty());
+                assert!(
+                    center
+                        .iter()
+                        .map(|(_, _, p)| p.0[0] as i32 - p.0[2] as i32)
+                        .sum::<i32>()
+                        > 0
+                );
+                assert!(left.iter().any(|p| p.1 > p.0));
+            }
+        }
     }
 
     #[test]

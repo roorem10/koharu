@@ -84,6 +84,7 @@ impl TextStyle {
         }
         if let Some(fill) = self.fill {
             typography.color = Some(fill);
+            typography.fill_gradient = None;
         }
         if let Some(part) = &self.outline {
             typography.stroke_width = part.stroke_width;

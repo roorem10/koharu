@@ -34,6 +34,7 @@ import { BoxNoteLine } from '@/components/editor/BoxNoteLine'
 import { BubbleShapeLine } from '@/components/editor/BubbleShapeLine'
 import { LetteringCategoryLine } from '@/components/editor/LetteringCategoryLine'
 import { LineContextCard } from '@/components/editor/LineContextCard'
+import { GradientControls } from '@/components/text-extras/GradientControls'
 import { SpacingControls } from '@/components/text-extras/SpacingControls'
 import { call } from '@/lib/backend'
 import { hexToRgba, rgbaToHex } from '@/lib/color'
@@ -255,7 +256,7 @@ function TypeInspector() {
             <ColorWell
               label={t('inspector.textColor')}
               size='sm'
-              disabled={disabled}
+              disabled={disabled || !!typography.fill_gradient}
               value={rgbaToHex(typography.color ?? defaultTypography.color!)}
               onChange={(color) => apply((value) => ({ ...value, color: hexToRgba(color) }))}
             />
@@ -336,6 +337,13 @@ function TypeInspector() {
             </Select>
           </InspectorField>
         </div>
+
+        <GradientControls
+          key={`gradient-${current?.id}`}
+          typography={typography}
+          disabled={disabled || draft !== null}
+          apply={apply}
+        />
 
         <SpacingControls
           key={current?.id}
@@ -625,16 +633,17 @@ function TypeInspector() {
 
 // Without a visible border, use a contrasting fill instead of transparent text.
 function invertBorder(value: Typography, displayedWidth: number): Typography {
-  const color = value.color ?? defaultTypography.color!
+  const color = value.fill_gradient?.stops[0]?.color ?? value.color ?? defaultTypography.color!
   const stroke = value.stroke_color
   if ((value.stroke_width ?? 0) > 0 && stroke && stroke[3] > 0) {
-    return { ...value, color: stroke, stroke_color: color }
+    return { ...value, color: stroke, stroke_color: color, fill_gradient: null }
   }
   const [red, green, blue] = color
   const light = 0.2126 * red + 0.7152 * green + 0.0722 * blue > 127.5
   return {
     ...value,
     color: light ? [0, 0, 0, 255] : [255, 255, 255, 255],
+    fill_gradient: null,
     stroke_color: [red, green, blue, 255],
     stroke_width: displayedWidth,
   }

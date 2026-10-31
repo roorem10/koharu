@@ -564,6 +564,72 @@ describe('greenfield editor', () => {
     expect(update.mock.calls[1]![0][0].typography.letter_spacing).toBeNull()
   })
 
+  it('edits gradient endpoints without dropping middle stops or alpha', async () => {
+    installProject()
+    const gradient = {
+      kind: 'Linear' as const,
+      angle_degrees: 45,
+      stops: [
+        { offset: 0, color: [255, 0, 0, 160] as [number, number, number, number] },
+        { offset: 0.4, color: [0, 255, 0, 255] as [number, number, number, number] },
+        { offset: 1, color: [0, 0, 255, 255] as [number, number, number, number] },
+      ],
+    }
+    queryClient.setQueryData(pageKey, {
+      ...queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey),
+      layers: [{ ...textLayer, typography: { ...textLayer.typography!, fill_gradient: gradient } }],
+    })
+    const update = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
+    render(<Inspector />)
+    const user = userEvent.setup()
+    expect(screen.getByRole('button', { name: 'Text color' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Start color' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Hex color code' }), {
+      target: { value: '#ABCDEF' },
+    })
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(update.mock.calls[0]![0][0].typography.fill_gradient).toEqual({
+      ...gradient,
+      stops: [{ offset: 0, color: [171, 205, 239, 160] }, ...gradient.stops.slice(1)],
+    })
+  })
+
+  it('changes gradient kind for the full selection while preserving each box colors', async () => {
+    installProject()
+    const first = {
+      ...textLayer,
+      typography: {
+        ...textLayer.typography!,
+        fill_gradient: {
+          kind: 'Linear' as const,
+          angle_degrees: 90,
+          stops: [
+            { offset: 0, color: [255, 0, 0, 255] as [number, number, number, number] },
+            { offset: 1, color: [0, 0, 255, 255] as [number, number, number, number] },
+          ],
+        },
+      },
+    }
+    queryClient.setQueryData(pageKey, {
+      ...queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey),
+      layers: [first, secondLayer],
+    })
+    useKoharuStore.setState({ selectedLayers: ['element', 'second'] })
+    const update = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
+    render(<Inspector />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('combobox', { name: 'Gradient kind' }))
+    await user.click(await screen.findByRole('option', { name: 'Radial' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(update.mock.calls[0]![0][0].typography.fill_gradient).toEqual({
+      ...first.typography.fill_gradient,
+      kind: 'Radial',
+    })
+    expect(update.mock.calls[0]![0][1].typography.fill_gradient?.stops[0].color).toEqual(
+      secondLayer.typography!.color,
+    )
+  })
+
   it('registers one native resize listener in React strict mode', async () => {
     const unlisten = vi.fn()
     nativeWindow.onResized.mockClear()

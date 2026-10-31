@@ -514,7 +514,16 @@
     "letterSpacing": "Letter spacing",
     "reset": "Reset",
     "resetLineSpacing": "Reset line spacing",
-    "resetLetterSpacing": "Reset letter spacing"
+    "resetLetterSpacing": "Reset letter spacing",
+    "fill": "Fill",
+    "color": "Color",
+    "gradient": "Gradient",
+    "gradientKind": "Gradient kind",
+    "linear": "Linear",
+    "radial": "Radial",
+    "angle": "Gradient angle",
+    "startColor": "Start color",
+    "endColor": "End color"
   },
   "outputPicker": {
     "instructions": "Instruções de tradução",

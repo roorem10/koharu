@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use image::{DynamicImage, GrayImage, Rgba, RgbaImage};
-use koharu_rasterizer::{Raster, RasterOptions, Rasterizer};
+use koharu_rasterizer::{PreparedContent, PreparedSceneCommand, Raster, RasterOptions, Rasterizer};
 use koharu_renderer::{
     Frame, ImageKind, LayerKind, TextAlign, TextMetadata as RenderedText, WritingMode,
 };
@@ -228,7 +228,41 @@ async fn rasterize(
     frame: &Frame,
     options: RasterOptions,
 ) -> Result<Raster, PsdExportError> {
-    let frame = frame.raster_frame()?;
+    let mut prepared = frame.prepared().clone();
+    let mut flattened = false;
+    for layer in &mut prepared.frame.layers {
+        if let PreparedContent::Vector(scene) = &mut layer.content {
+            for command in &mut scene.commands {
+                if let PreparedSceneCommand::GradientPath { path, stops, .. } = command {
+                    let mut fill = path.clone();
+                    fill.color = stops[0].1;
+                    *command = PreparedSceneCommand::FillPath(fill);
+                    flattened = true;
+                }
+            }
+        }
+    }
+    // Keep the cached pixels and merged preview consistent with the editable start-color fill.
+    let frame = if flattened {
+        let sources = prepared
+            .frame
+            .layers
+            .iter()
+            .zip(frame.layers())
+            .filter_map(|(prepared, layer)| {
+                let PreparedContent::Raster(raster) = &prepared.content else {
+                    return None;
+                };
+                Some((
+                    raster.source,
+                    Arc::<[u8]>::from(layer.raster_image()?.pixels()),
+                ))
+            })
+            .collect();
+        prepared.into_frame_with_raster_sources(&sources)?
+    } else {
+        frame.raster_frame()?
+    };
     tokio_rayon::spawn(move || rasterizer.rasterize(&frame, options))
         .await
         .map_err(PsdExportError::Rasterizer)
