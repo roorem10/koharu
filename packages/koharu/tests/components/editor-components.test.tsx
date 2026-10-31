@@ -1358,6 +1358,26 @@ describe('greenfield editor', () => {
     )
   })
 
+  it('edits source and translation in the expanded layer row', async () => {
+    installProject()
+    const source = vi.spyOn(commands, 'setSourceText').mockResolvedValue(null)
+    const translation = vi.spyOn(commands, 'setTranslation').mockResolvedValue(null)
+    render(<Inspector />)
+    const layer = screen.getByRole('button', { name: 'Edit Hello' })
+    expect(screen.getByTestId('row-source-element')).toBeInTheDocument()
+    fireEvent.click(layer)
+    expect(screen.queryByTestId('row-source-element')).not.toBeInTheDocument()
+    fireEvent.click(layer)
+    const sourceField = screen.getByTestId('row-source-element')
+    fireEvent.change(sourceField, { target: { value: 'corrected OCR' } })
+    fireEvent.blur(sourceField)
+    await waitFor(() => expect(source).toHaveBeenCalledWith('element', 'corrected OCR'))
+    const translationField = screen.getByTestId('row-translation-element')
+    fireEvent.change(translationField, { target: { value: 'Fixed line' } })
+    fireEvent.blur(translationField)
+    await waitFor(() => expect(translation).toHaveBeenCalledWith('element', 'Fixed line'))
+  })
+
   it('debounces translation editing in Box details and keeps source read-only', async () => {
     installProject()
     const save = vi.spyOn(commands, 'setTranslation').mockResolvedValue(null)

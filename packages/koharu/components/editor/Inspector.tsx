@@ -19,6 +19,8 @@ import {
 import { type DragEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { GlossaryTextMenu } from '@/components/context/GlossaryTextMenu'
+import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { layerDropIndex } from '@/components/files/layer-order'
 import { useBoxIssues } from '@/components/qc/useBoxIssues'
 import { BoxDialogs } from '@/components/redesign/BoxDialogs'
@@ -609,8 +611,59 @@ function LayerEditor({ layer, onDelete }: { layer: Layer; onDelete?: () => void 
               </Tooltip>
             )}
           </div>
+          <InspectorField label={t('inspector.source')}>
+            <GlossaryTextMenu
+              field='source'
+              source={layer.content.source?.text ?? ''}
+              translation={layer.content.translation?.text ?? ''}
+            >
+              <CommitTextarea
+                data-testid={`row-source-${layer.id}`}
+                aria-label={t('layers.sourceLabel', { name })}
+                wrap='soft'
+                className='max-h-14 min-h-8 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
+                value={layer.content.source?.text ?? ''}
+                onCommit={(text) =>
+                  void call(commands.setSourceText, layer.id, text)
+                    .then(() => refresh(projectKey, pageKey))
+                    .catch(() => undefined)
+                }
+              />
+            </GlossaryTextMenu>
+          </InspectorField>
+          <InspectorField label={t('inspector.translation')}>
+            <GlossaryTextMenu
+              field='translation'
+              source={layer.content.source?.text ?? ''}
+              translation={layer.content.translation?.text ?? ''}
+            >
+              <CommitTextarea
+                data-testid={`row-translation-${layer.id}`}
+                aria-label={t('layers.translationLabel', { name })}
+                wrap='soft'
+                className='max-h-16 min-h-9 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md border-primary/25 bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
+                value={layer.content.translation?.text ?? ''}
+                onCommit={(text) =>
+                  void call(commands.setTranslation, layer.id, text.trim() ? text : null)
+                    .then(() => refresh(projectKey, pageKey))
+                    .catch(() => undefined)
+                }
+              />
+            </GlossaryTextMenu>
+          </InspectorField>
         </>
       )}
+    </div>
+  )
+}
+
+function InspectorField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className='grid min-w-0 gap-0.5'>
+      <span className='text-[8px] font-medium tracking-[0.06em] text-muted-foreground uppercase'>
+        {label}
+      </span>
+      {children}
     </div>
   )
 }
