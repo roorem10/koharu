@@ -1,22 +1,23 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { Lock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { call } from '@/lib/backend'
-import { usePages, useProject } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
+import { useProject } from '@/lib/queries'
 import { commands } from '@koharu/bridge/protocol'
 import { Badge } from '@koharu/ui/components/badge'
 import { Button } from '@koharu/ui/components/button'
-import { Checkbox } from '@koharu/ui/components/checkbox'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@koharu/ui/components/dialog'
 import { Input } from '@koharu/ui/components/input'
 import { ScrollArea } from '@koharu/ui/components/scroll-area'
 import { Textarea } from '@koharu/ui/components/textarea'
 
-import { jumpToFlag, refreshContext, useChapterContext } from './data'
+import { refreshContext, useChapterContext } from './data'
 import { GlossaryDialog } from './GlossaryDialog'
+import { ReadChapterButton } from './ReadChapterButton'
 import { SeriesPicker } from './SeriesPicker'
 import { TermForm } from './TermForm'
 import type { GlossaryEntry } from './types'
@@ -25,27 +26,25 @@ export function ContextPanel() {
   const { t } = useTranslation()
   const project = useProject().data
   const chapter = useChapterContext()
-  const pages = usePages().data ?? []
   const [summary, setSummary] = useState('')
   const [dirty, setDirty] = useState(false)
-  const [textOnly, setTextOnly] = useState(false)
+  const [briefOpen, setBriefOpen] = useState(false)
+  const lastModel = useQuery({
+    queryKey: ['last-read-model', project?.name, chapter.data?.context.brief?.read_at],
+    queryFn: () => call(commands.getLastReadModel),
+    enabled: Boolean(project),
+  })
   useEffect(() => {
     setDirty(false)
     setSummary('')
+    setBriefOpen(false)
   }, [project?.name])
   const [search, setSearch] = useState('')
   const [glossaryOpen, setGlossaryOpen] = useState(false)
   const [editing, setEditing] = useState<GlossaryEntry | null>(null)
-  const jobs = useKoharuStore((state) => state.jobs)
-  const running = Object.values(jobs).some((job) => job.state === 'running')
   useEffect(() => {
     if (!dirty) setSummary(chapter.data?.context.brief?.summary ?? '')
   }, [chapter.data?.context.brief?.summary, dirty])
-  useEffect(() => {
-    void call(commands.getContextSettings)
-      .then((settings) => setTextOnly(!settings.send_images))
-      .catch(() => undefined)
-  }, [])
   const data = chapter.data
   if (!data)
     return (
@@ -54,10 +53,13 @@ export function ContextPanel() {
       </p>
     )
   const terms = [...(data.series?.glossary ?? []), ...data.context.suggestions]
-  const flags = Object.entries(data.context.lines).flatMap(([layer, line]) =>
-    line.flags.map((flag, index) => ({ layer, flag, index })),
-  )
   const readAt = data.context.brief?.read_at
+  const readStatus = readAt
+    ? t('chapterContext.lastReadWith', {
+        time: new Date(Number(readAt) * 1000).toLocaleString(),
+        model: lastModel.data ?? t('chapterContext.unknownModel'),
+      })
+    : t('chapterContext.notRead')
   return (
     <ScrollArea className='min-h-0 flex-1'>
       <div className='grid min-w-0 gap-4 p-3 text-xs'>
@@ -71,72 +73,63 @@ export function ContextPanel() {
         {!data.series && (
           <p className='text-muted-foreground'>{t('chapterContext.chooseSeriesHint')}</p>
         )}
-        <section className='grid gap-2'>
-          <Button
-            size='sm'
-            disabled={running || !data.series || !data.supports_tasks}
-            title={!data.supports_tasks ? t('chapterContext.needsModel') : undefined}
-            onClick={() =>
-              void call(commands.readChapter, { scope: 'project' }, textOnly)
-                .then(refreshContext)
-                .catch(() => undefined)
-            }
-          >
-            {t('chapterContext.readChapter')}
-          </Button>
-          {!data.supports_tasks && (
-            <p className='text-muted-foreground'>{t('chapterContext.needsModel')}</p>
-          )}
-          <span className='text-muted-foreground'>
-            {readAt
-              ? t('chapterContext.lastRead', {
-                  time: new Date(Number(readAt) * 1000).toLocaleString(),
-                })
-              : t('chapterContext.notRead')}
-          </span>
-          <label className='flex items-center gap-2'>
-            <Checkbox checked={textOnly} onCheckedChange={(checked) => setTextOnly(checked)} />
-            {t('chapterContext.textOnly')}
-          </label>
-        </section>
-        <section className='grid gap-2'>
-          <h3 className='font-semibold'>{t('chapterContext.brief')}</h3>
-          <Textarea
-            aria-label={t('chapterContext.brief')}
-            value={summary}
-            className='min-h-32 text-xs'
-            onChange={(event) => {
-              setSummary(event.target.value)
-              setDirty(true)
-            }}
-          />
-          {dirty && (
-            <Button
-              size='sm'
-              onClick={() =>
-                void call(commands.saveChapterSummary, summary)
-                  .then(async () => {
-                    setDirty(false)
-                    await refreshContext()
-                  })
-                  .catch(() => undefined)
-              }
-            >
-              {t('chapterContext.saveBrief')}
-            </Button>
-          )}
-          <div className='flex flex-wrap gap-1'>
-            {data.context.brief?.characters.map((character) => (
-              <Badge
-                className='max-w-full break-words whitespace-normal'
-                variant='outline'
-                key={`${character.name}:${character.original}`}
-              >
-                {character.name}
-              </Badge>
-            ))}
+        <ReadChapterButton scope={{ scope: 'project' }} />
+        <div className='flex min-w-0 items-center gap-2'>
+          <div className='min-w-0 flex-1'>
+            <h3 className='font-semibold'>{t('chapterContext.brief')}</h3>
+            <p className='truncate text-[10px] text-muted-foreground' title={readStatus}>
+              {readStatus}
+            </p>
           </div>
-        </section>
+          <Button size='sm' variant='outline' onClick={() => setBriefOpen(true)}>
+            {t('chapterContext.view')}
+          </Button>
+        </div>
+        <Dialog open={briefOpen} onOpenChange={setBriefOpen}>
+          <DialogContent showCloseButton={false} className='sm:max-w-xl'>
+            <DialogHeader>
+              <DialogTitle>{t('chapterContext.brief')}</DialogTitle>
+            </DialogHeader>
+            <Textarea
+              aria-label={t('chapterContext.brief')}
+              value={summary}
+              className='min-h-32 text-xs'
+              onChange={(event) => {
+                setSummary(event.target.value)
+                setDirty(true)
+              }}
+            />
+            {dirty && (
+              <Button
+                size='sm'
+                onClick={() =>
+                  void call(commands.saveChapterSummary, summary)
+                    .then(async () => {
+                      setDirty(false)
+                      await refreshContext()
+                    })
+                    .catch(() => undefined)
+                }
+              >
+                {t('chapterContext.saveBrief')}
+              </Button>
+            )}
+            <div className='flex flex-wrap gap-1'>
+              {data.context.brief?.characters.map((character) => (
+                <Badge
+                  className='max-w-full break-words whitespace-normal'
+                  variant='outline'
+                  key={`${character.name}:${character.original}`}
+                >
+                  {character.name}
+                </Badge>
+              ))}
+            </div>
+            <Button size='sm' variant='outline' onClick={() => setBriefOpen(false)}>
+              {t('chapterContext.close')}
+            </Button>
+          </DialogContent>
+        </Dialog>
         <section className='grid min-w-0 gap-2'>
           <h3 className='font-semibold'>{t('chapterContext.glossary')}</h3>
           <Input
@@ -207,39 +200,6 @@ export function ContextPanel() {
           <Button size='sm' variant='outline' onClick={() => setGlossaryOpen(true)}>
             {t('chapterContext.openGlossary')}
           </Button>
-        </section>
-        <section className='grid gap-2'>
-          <div className='flex flex-wrap items-center justify-between gap-1'>
-            <h3 className='font-semibold'>{t('chapterContext.flags')}</h3>
-            <Button
-              size='sm'
-              variant='ghost'
-              onClick={() =>
-                void call(commands.checkGlossary)
-                  .then(refreshContext)
-                  .catch(() => undefined)
-              }
-            >
-              {t('chapterContext.checkGlossary')}
-            </Button>
-          </div>
-          {flags.length === 0 && (
-            <p className='text-muted-foreground'>{t('chapterContext.noFlags')}</p>
-          )}
-          {flags.map(({ layer, flag, index }) => (
-            <Button
-              key={`${layer}:${index}`}
-              className='h-auto justify-start text-left text-xs whitespace-normal'
-              size='sm'
-              variant='outline'
-              onClick={() => void jumpToFlag(layer, flag, pages).catch(() => undefined)}
-            >
-              {t('chapterContext.flagPage', { page: flag.page })} ·{' '}
-              {flag.kind === 'glossary'
-                ? t('chapterContext.glossaryFlag', { term: flag.term })
-                : flag.message}
-            </Button>
-          ))}
         </section>
         {glossaryOpen && (
           <GlossaryDialog open onClose={() => setGlossaryOpen(false)} seriesId={data.series?.id} />

@@ -230,6 +230,9 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             raw_prep::preview_prep,
             // WO-23 (redesigned panel and popups) commands go here.
             // WO-24 (automatic QC and context tab) commands go here.
+            context::reading::get_reading_model,
+            context::reading::get_reading_models,
+            context::reading::get_last_read_model,
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)
