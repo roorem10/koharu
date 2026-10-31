@@ -523,7 +523,13 @@
     "radial": "Radial",
     "angle": "Gradient angle",
     "startColor": "Start color",
-    "endColor": "End color"
+    "endColor": "End color",
+    "note": "Note",
+    "boxNote": "Box note",
+    "notePlaceholder": "Leave a note for the next pass…",
+    "saving": "Saving…",
+    "noteLoadError": "Could not load the note.",
+    "noteSaveError": "Could not save the note. Your edit is still here; try again."
   },
   "outputPicker": {
     "instructions": "تعليمات الترجمة",

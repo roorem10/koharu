@@ -102,6 +102,8 @@ export const commands = {
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
+	getBoxNote: (layer: EntityId) => __TAURI_INVOKE<string | null>("get_box_note", { layer }),
+	setBoxNote: (layer: EntityId, note: string | null) => __TAURI_INVOKE<null>("set_box_note", { layer, note }),
 };
 
 /* Types */
