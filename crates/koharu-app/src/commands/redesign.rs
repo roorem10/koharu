@@ -8,7 +8,7 @@ use anyhow::Context as _;
 use koharu_desktop::Desktop;
 use koharu_pipeline::bubble_shape::text_bubble_shape;
 use koharu_renderer::TextStyles;
-use koharu_scene::{Commit, EntityId, Origin, Snapshot, TextLayout, Typography};
+use koharu_scene::{Commit, EntityId, Origin, Snapshot, TextLayout, TextRuns, Typography};
 use tauri::State;
 
 use super::{
@@ -16,7 +16,7 @@ use super::{
     canvas::CanvasChannel,
     project::{CurrentProject, Project},
 };
-use effects::{automatic_effects, copy_effects, effects_differ};
+use effects::{automatic_effects, copy_effects, effects_differ, strip_word_effects, word_effects};
 
 #[tauri::command]
 #[specta::specta]
@@ -34,17 +34,7 @@ pub(crate) async fn get_box_effects(
     let resolver = EffectResolver::new(project, &styles, detect_colors)?;
     layers
         .into_iter()
-        .map(|layer| {
-            snapshot.text_layer(layer)?;
-            let typography = snapshot
-                .component::<Typography>(layer)?
-                .context("text layer has no typography")?;
-            let expected = resolver.resolve(&snapshot, layer, &typography)?;
-            let warp = snapshot
-                .component::<TextLayout>(layer)?
-                .and_then(|layout| layout.warp);
-            Ok(effects_differ(&typography, &expected, warp.as_ref()))
-        })
+        .map(|layer| resolver.has_effects(&snapshot, layer))
         .collect::<anyhow::Result<_>>()
         .map_err(Into::into)
 }
@@ -89,6 +79,20 @@ pub(crate) struct EffectResolver<'a> {
 }
 
 impl<'a> EffectResolver<'a> {
+    fn has_effects(&self, snapshot: &Snapshot, layer: EntityId) -> anyhow::Result<bool> {
+        snapshot.text_layer(layer)?;
+        let typography = snapshot
+            .component::<Typography>(layer)?
+            .context("text layer has no typography")?;
+        let expected = self.resolve(snapshot, layer, &typography)?;
+        let warp = snapshot
+            .component::<TextLayout>(layer)?
+            .and_then(|layout| layout.warp);
+        let runs = snapshot.component::<TextRuns>(layer)?;
+        Ok(effects_differ(&typography, &expected, warp.as_ref())
+            || runs.as_ref().is_some_and(word_effects))
+    }
+
     pub(crate) fn new(
         project: &Project,
         styles: &'a TextStyles,
@@ -156,7 +160,11 @@ impl Project {
                 .context("text layer has no layout")?;
             let warped = layout.warp.take().is_some();
             let changed = typography != original;
-            if !changed && !warped {
+            let runs = snapshot
+                .component::<TextRuns>(layer)?
+                .filter(word_effects)
+                .map(strip_word_effects);
+            if !changed && !warped && runs.is_none() {
                 continue;
             }
             if changed {
@@ -165,18 +173,25 @@ impl Project {
             if warped {
                 layout.origin = Origin::User;
             }
-            updates.push((layer, typography, layout, changed, warped));
+            updates.push((layer, typography, layout, changed, warped, runs));
         }
         if updates.is_empty() {
             return Ok(None);
         }
         let patch = snapshot.patch(|edit| {
-            for (layer, typography, layout, changed, warped) in &updates {
+            for (layer, typography, layout, changed, warped, runs) in &updates {
                 if *changed {
                     edit.set(*layer, typography)?;
                 }
                 if *warped {
                     edit.set(*layer, layout)?;
+                }
+                if let Some(runs) = runs {
+                    if runs.runs.is_empty() {
+                        edit.remove::<TextRuns>(*layer)?;
+                    } else {
+                        edit.set(*layer, runs)?;
+                    }
                 }
             }
             Ok(())

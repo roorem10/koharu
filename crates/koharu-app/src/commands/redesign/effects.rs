@@ -1,5 +1,32 @@
 use koharu_renderer::TextStyles;
-use koharu_scene::{StrokeJoin, StrokeMethod, StrokePosition, TextWarp, Typography};
+use koharu_scene::{
+    Origin, RunStyle, StrokeJoin, StrokeMethod, StrokePosition, TextRuns, TextWarp, Typography,
+};
+
+pub(super) fn word_effects(runs: &TextRuns) -> bool {
+    runs.runs.iter().any(|run| {
+        let style = &run.style;
+        style.stroke_color.is_some()
+            || style.stroke_width.is_some()
+            || style.outer_stroke_color.is_some()
+            || style.outer_stroke_width.is_some()
+            || style.fill_gradient.is_some()
+    })
+}
+
+pub(super) fn strip_word_effects(mut runs: TextRuns) -> TextRuns {
+    for run in &mut runs.runs {
+        let style = &mut run.style;
+        style.stroke_color = None;
+        style.stroke_width = None;
+        style.outer_stroke_color = None;
+        style.outer_stroke_width = None;
+        style.fill_gradient = None;
+    }
+    runs.runs.retain(|run| run.style != RunStyle::default());
+    runs.origin = Origin::User;
+    runs
+}
 
 pub(super) fn automatic_effects(
     current: &Typography,

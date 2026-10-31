@@ -1,8 +1,9 @@
 use super::*;
 use koharu_renderer::{OuterPart, OutlinePart};
 use koharu_scene::{
-    At, FillGradient, FontStyle, GradientKind, GradientStop, PageDraft, Session, StrokeJoin,
-    StrokeMethod, StrokePosition, TextAlignment, TextLayoutKind, TextWarp, WritingMode,
+    At, FillGradient, FontStyle, GradientKind, GradientStop, PageDraft, RunStyle, Session,
+    StrokeJoin, StrokeMethod, StrokePosition, StyleRun, TextAlignment, TextLayoutKind, TextWarp,
+    WritingMode,
 };
 
 fn typography() -> Typography {
@@ -27,6 +28,139 @@ fn typography() -> Typography {
         alignment: Some(TextAlignment::End),
         writing_mode: Some(WritingMode::Vertical),
         extensions: [("dev.booharu.test".into(), "kept".into())].into(),
+    }
+}
+
+#[tokio::test]
+async fn word_effects_reset_with_box_effects_in_one_undo_step() {
+    let mut session = Session::memory().await.unwrap();
+    let styled = TextRuns {
+        origin: Origin::Generated(koharu_scene::Generation::new(
+            "dev.booharu.test".parse().unwrap(),
+        )),
+        runs: vec![
+            StyleRun {
+                start: 0,
+                end: 2,
+                style: RunStyle {
+                    font: Some("Emphasis".into()),
+                    font_weight: Some(700),
+                    font_style: Some(FontStyle::Italic),
+                    size_scale: Some(1.15),
+                    color: Some([255, 0, 0, 255]),
+                    stroke_color: Some([255; 4]),
+                    stroke_width: Some(2.0),
+                    outer_stroke_color: Some([0, 0, 0, 255]),
+                    outer_stroke_width: Some(3.0),
+                    fill_gradient: Some(gradient()),
+                },
+            },
+            StyleRun {
+                start: 2,
+                end: 4,
+                style: RunStyle {
+                    fill_gradient: Some(gradient()),
+                    ..RunStyle::default()
+                },
+            },
+        ],
+    };
+    let effects_only = TextRuns {
+        origin: Origin::User,
+        runs: vec![styled.runs[1].clone()],
+    };
+    let fonts_only = strip_word_effects(styled.clone());
+    assert!(!word_effects(&fonts_only));
+    let originals = [styled, effects_only, fonts_only];
+    let mut layers = Vec::new();
+    let patch = session
+        .snapshot()
+        .patch(|edit| {
+            let page = edit.add_page(PageDraft::new("page", 100.0, 100.0), At::End)?;
+            for (index, runs) in originals.iter().enumerate() {
+                let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &koharu_scene::Translation {
+                        text: koharu_scene::Authored {
+                            origin: Origin::User,
+                            value: "Word".into(),
+                        },
+                        language: None,
+                    },
+                )?;
+                let layer = edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &TextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                        warp: None,
+                    },
+                )?;
+                let mut style = typography();
+                if index == 0 {
+                    style.outer_stroke_width = Some(8.0);
+                }
+                edit.set(layer, &style)?;
+                edit.set(layer, runs)?;
+                layers.push(layer);
+            }
+            Ok(())
+        })
+        .unwrap();
+    session.commit(patch).await.unwrap();
+    let mut project = Project::new(session, "word-effects".into());
+    let styles = TextStyles::default();
+    let resolver = EffectResolver::new(&project, &styles, false).unwrap();
+    let before = project.snapshot();
+    assert!(resolver.has_effects(&before, layers[0]).unwrap());
+    assert!(resolver.has_effects(&before, layers[1]).unwrap());
+    assert!(!resolver.has_effects(&before, layers[2]).unwrap());
+    let commit = project
+        .reset_effects(
+            &[layers[0], layers[1], layers[2], layers[0]],
+            &styles,
+            false,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    project.record_commit(&commit);
+    assert_eq!(project.undo.len(), 1);
+    let snapshot = project.snapshot();
+    assert_eq!(
+        snapshot.component::<TextRuns>(layers[0]).unwrap(),
+        Some(strip_word_effects(originals[0].clone()))
+    );
+    assert!(snapshot.component::<TextRuns>(layers[1]).unwrap().is_none());
+    assert_eq!(
+        snapshot.component::<TextRuns>(layers[2]).unwrap(),
+        Some(originals[2].clone())
+    );
+    let resolver = EffectResolver::new(&project, &styles, false).unwrap();
+    for &layer in &layers {
+        assert!(!resolver.has_effects(&snapshot, layer).unwrap());
+    }
+    assert!(
+        project
+            .reset_effects(&layers, &styles, false)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    project.undo().await.unwrap();
+    for (&layer, runs) in layers.iter().zip(originals) {
+        assert_eq!(
+            project.snapshot().component::<TextRuns>(layer).unwrap(),
+            Some(runs)
+        );
+        assert_eq!(
+            project.snapshot().component::<Typography>(layer).unwrap(),
+            before.component::<Typography>(layer).unwrap()
+        );
     }
 }
 
