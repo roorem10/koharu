@@ -107,10 +107,11 @@ fn page_of(snapshot: &Snapshot, mut id: EntityId) -> Result<EntityId> {
 }
 
 fn bubble_boxes(snapshot: &Snapshot, bubble: EntityId) -> Result<Vec<TextBox>> {
+    // A hand-made box without a detected region can't be joined; leave it out instead of failing the page.
     let mut boxes = snapshot
         .relations_to_as::<FlowsIn>(bubble)
-        .map(|relation| TextBox::read(snapshot, relation.value().source))
-        .collect::<Result<Vec<_>>>()?;
+        .filter_map(|relation| TextBox::read(snapshot, relation.value().source).ok())
+        .collect::<Vec<_>>();
     // Typography determines the reading axis; source-region positions determine order.
     let mode = boxes
         .first()

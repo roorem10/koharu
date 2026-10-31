@@ -102,6 +102,13 @@ export const commands = {
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
+	getBoxSettings: () => __TAURI_INVOKE<BoxSettings>("get_box_settings"),
+	saveBoxSettings: (settings: BoxSettings) => __TAURI_INVOKE<BoxSettings>("save_box_settings", { settings }),
+	redetectPage: (page: EntityId) => __TAURI_INVOKE<JobId>("redetect_page", { page }),
+	getBoxActions: (layer: EntityId) => __TAURI_INVOKE<BoxActionInfo>("get_box_actions", { layer }),
+	joinBubbleBoxes: (layer: EntityId) => __TAURI_INVOKE<EntityId>("join_bubble_boxes", { layer }),
+	joinPageBubbles: (page: EntityId) => __TAURI_INVOKE<number>("join_page_bubbles", { page }),
+	splitBox: (layer: EntityId) => __TAURI_INVOKE<EntityId[]>("split_box", { layer }),
 };
 
 /* Types */
@@ -144,6 +151,15 @@ export type Bounds = {
 	y: number,
 	width: number,
 	height: number,
+};
+
+export type BoxActionInfo = {
+	can_split: boolean,
+	bubble_boxes: number,
+};
+
+export type BoxSettings = {
+	join_in_bubble?: boolean,
 };
 
 export type BubbleShape = "rectangle" | "round" | "spiky";
