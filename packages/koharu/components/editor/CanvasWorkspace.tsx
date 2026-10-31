@@ -1146,7 +1146,6 @@ export function CanvasWorkspace() {
               <WarpHandles layerId={selected[0]} />
             )}
           {page && !showingOriginal && <CleanupQueueBar />}
-          {page && !showingOriginal && contextMenu.menu}
           {page && showingOriginal && <OriginalOverlay key={page.id} page={page} />}
           {page && !showingOriginal && canvasState.status === 'error' && (
             <div
@@ -1188,6 +1187,9 @@ export function CanvasWorkspace() {
             </div>
           )}
         </div>
+        {/* Outside the surface: React bubbles portal events to their parents, and the
+            surface's pointerdown captures the pointer, which swallowed menu clicks. */}
+        {page && !showingOriginal && contextMenu.menu}
       </div>
       <StatusBar onZoomChange={setZoom} />
     </main>

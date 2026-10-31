@@ -80,6 +80,20 @@ export function nearestFontWeight(weights: number[], target: number): number {
   )
 }
 
+/**
+ * Snaps a weight to a real face on the same side of bold (600). When the family has no
+ * face on that side, the weight is kept and the renderer draws synthetic bold.
+ */
+export function styledFontWeight(
+  family: FontFamily | undefined,
+  style: FontStyle,
+  target: number,
+): number {
+  const heavy = target >= 600
+  const side = usableFontWeights(family, style).filter((weight) => weight >= 600 === heavy)
+  return side.length ? nearestFontWeight(side, target) : target
+}
+
 export function normalizeFontName(value: string): string {
   return value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase()
 }

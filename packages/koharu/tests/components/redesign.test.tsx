@@ -207,11 +207,21 @@ describe('text panel redesign', () => {
     expect(update.mock.calls[0][0].map((item) => item.typography.size)).toEqual([21.5, 21.5])
   })
 
-  it('disables italic when a selected family has no italic face', () => {
-    install(undefined, ['one', 'two'])
+  it('keeps bold and italic usable on a family with only a regular face', async () => {
+    const { update } = install(undefined, ['one', 'two'])
     queryClient.setQueryData(fontsKey, [defaultFont])
     editor()
-    expect(screen.getByRole('button', { name: 'Italic' })).toBeDisabled()
+    const italic = screen.getByRole('button', { name: 'Italic' })
+    expect(italic).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Bold' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(update.mock.calls[0][0].map((item) => item.typography.font_weight)).toEqual([700, 700])
+    await userEvent.click(italic)
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2))
+    expect(update.mock.calls[1][0].map((item) => item.typography.font_style)).toEqual([
+      'italic',
+      'italic',
+    ])
   })
 
   it('queries effects once per page revision and opens the tagged box without changing selection', async () => {

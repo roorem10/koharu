@@ -24,7 +24,7 @@ import {
   findFontFamily,
   nearestFontWeight,
   normalizeFontName,
-  usableFontStyles,
+  styledFontWeight,
   usableFontWeights,
 } from './typography'
 import { isMixed, useTypography } from './useTypography'
@@ -102,17 +102,15 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
             families={families}
             onChange={(preferred_font) =>
               apply((value) => {
-                const family = findFontFamily(families, preferred_font)
-                const styles = usableFontStyles(family)
-                const font_style = styles.includes(value.font_style ?? 'normal')
-                  ? (value.font_style ?? 'normal')
-                  : (styles[0] ?? 'normal')
+                // Bold and italic survive a font change, synthesized when the face is missing.
+                const font_style = value.font_style ?? 'normal'
                 return {
                   ...value,
                   preferred_font,
                   font_style,
-                  font_weight: nearestFontWeight(
-                    usableFontWeights(family, font_style),
+                  font_weight: styledFontWeight(
+                    findFontFamily(families, preferred_font),
+                    font_style,
                     value.font_weight ?? 400,
                   ),
                 }
@@ -173,22 +171,19 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
                   aria-label={label}
                   aria-pressed={active}
                   title={mixed ? t('redesign.mixedToggle', { field: label }) : label}
-                  disabled={
-                    disabled ||
-                    (kind === 'italic' &&
-                      values.some(
-                        (value) => !usableFontStyles(familyFor(value)).includes('italic'),
-                      ))
-                  }
+                  disabled={disabled}
                   data-mixed={mixed}
                   className='grid size-6 place-items-center rounded-sm border border-input text-[11px] disabled:opacity-40 aria-pressed:bg-primary aria-pressed:text-primary-foreground'
                   onClick={() =>
                     apply((value) => {
+                      // A family without a bold or italic face still gets the style:
+                      // the renderer draws synthetic bold and slant for missing faces.
                       if (kind === 'bold')
                         return {
                           ...value,
-                          font_weight: nearestFontWeight(
-                            usableFontWeights(familyFor(value), value.font_style ?? 'normal'),
+                          font_weight: styledFontWeight(
+                            familyFor(value),
+                            value.font_style ?? 'normal',
                             active ? 400 : 700,
                           ),
                         }
@@ -196,8 +191,9 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
                       return {
                         ...value,
                         font_style,
-                        font_weight: nearestFontWeight(
-                          usableFontWeights(familyFor(value), font_style),
+                        font_weight: styledFontWeight(
+                          familyFor(value),
+                          font_style,
                           value.font_weight ?? 400,
                         ),
                       }
