@@ -1248,7 +1248,14 @@
     "loading": "Loading text positions…"
   },
   "richTextPanel": {
-    "title": "Word styles"
+    "title": "Word styles",
+    "appliesTo": "Applies to \"{{text}}\"",
+    "wholeBox": "Whole box",
+    "wholeBoxOnly": "These controls apply to the whole box.",
+    "clearAll": "Clear all word styles in this box",
+    "styledWords": "{{category}} · styled words",
+    "inheritedGradient": "Words inherit the box gradient. Choose Whole box to switch it to a flat colour.",
+    "mixedFillHint": "Choose Color or Gradient to set the fill for the selected words."
   },
   "emphasis": {
     "title": "Emphasis",

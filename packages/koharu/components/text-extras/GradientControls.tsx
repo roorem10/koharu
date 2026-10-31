@@ -35,17 +35,21 @@ export function GradientControls({
   values = [typography],
   disabled,
   apply,
+  inheritedGradient = false,
+  wordScope = false,
 }: {
   typography: Typography
   values?: Typography[]
   disabled: boolean
   apply: ApplyTypography
+  inheritedGradient?: boolean
+  wordScope?: boolean
 }) {
   const { t } = useTranslation()
   const gradient = typography.fill_gradient
   const mixedMode = isMixed(values, (value) => !!value.fill_gradient)
   const update = (change: (value: FillGradient) => FillGradient) =>
-    apply((value) => ({ ...value, fill_gradient: change(gradientFor(value)) }))
+    apply((value) => ({ ...value, fill_gradient: change(gradientFor(value)) }), ['fill_gradient'])
   return (
     <div className='grid min-w-0 gap-1.5'>
       <Select
@@ -53,8 +57,9 @@ export function GradientControls({
         value={mixedMode ? '__mixed__' : gradient ? 'gradient' : 'color'}
         onValueChange={(mode) => {
           if (mode === 'gradient')
-            apply((value) => ({ ...value, fill_gradient: gradientFor(value) }))
-          if (mode === 'color') apply((value) => ({ ...value, fill_gradient: null }))
+            apply((value) => ({ ...value, fill_gradient: gradientFor(value) }), ['fill_gradient'])
+          if (mode === 'color' && !inheritedGradient)
+            apply((value) => ({ ...value, fill_gradient: null }), ['fill_gradient'])
         }}
       >
         <SelectTrigger size='sm' aria-label={t('textExtras.fill')} className='w-full min-w-0'>
@@ -70,13 +75,18 @@ export function GradientControls({
               {t('redesign.mixed')}
             </SelectItem>
           )}
-          <SelectItem value='color'>{t('textExtras.color')}</SelectItem>
+          <SelectItem value='color' disabled={inheritedGradient}>
+            {t('textExtras.color')}
+          </SelectItem>
           <SelectItem value='gradient'>{t('textExtras.gradient')}</SelectItem>
           <SelectItem value='screentone' disabled>
             {t('redesign.screentoneLater')}
           </SelectItem>
         </SelectContent>
       </Select>
+      {inheritedGradient && (
+        <p className='text-[10px] text-muted-foreground'>{t('richTextPanel.inheritedGradient')}</p>
+      )}
       {gradient && !mixedMode ? (
         <>
           <div className='grid min-w-0 grid-cols-2 gap-1.5'>
@@ -157,9 +167,34 @@ export function GradientControls({
           </div>
         </>
       ) : (
-        <p className='text-[10px] text-muted-foreground'>
-          {t(mixedMode ? 'redesign.mixedFillHint' : 'redesign.flatFillHint')}
-        </p>
+        <>
+          {wordScope && (
+            <Field
+              label={
+                isMixed(values, (value) => value.color) ? t('redesign.mixed') : t('inspector.color')
+              }
+            >
+              <ColorWell
+                label={t('inspector.textColor')}
+                size='sm'
+                disabled={disabled || mixedMode}
+                value={rgbaToHex(typography.color ?? [0, 0, 0, 255])}
+                onChange={(color) =>
+                  apply((value) => ({ ...value, color: hexToRgba(color) }), ['color'])
+                }
+              />
+            </Field>
+          )}
+          <p className='text-[10px] text-muted-foreground'>
+            {t(
+              mixedMode
+                ? wordScope
+                  ? 'richTextPanel.mixedFillHint'
+                  : 'redesign.mixedFillHint'
+                : 'redesign.flatFillHint',
+            )}
+          </p>
+        </>
       )}
     </div>
   )

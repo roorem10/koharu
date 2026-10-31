@@ -25,6 +25,7 @@ import { layerDropIndex } from '@/components/files/layer-order'
 import { useBoxIssues } from '@/components/qc/useBoxIssues'
 import { BoxDialogs } from '@/components/redesign/BoxDialogs'
 import { RowTags } from '@/components/redesign/RowTags'
+import { TextLayerKind } from '@/components/redesign/TextLayerKind'
 import { TypeInspector } from '@/components/redesign/TypeControls'
 import { usePageEffects } from '@/components/redesign/usePageEffects'
 import { call } from '@/lib/backend'
@@ -380,7 +381,11 @@ function LayerRow({
             <span className='min-w-0 flex-1'>
               <span className='block truncate text-[11px] font-medium'>{name}</span>
               <span className='block truncate text-[9px] leading-3 text-muted-foreground capitalize'>
-                {detail}
+                {isTextLayer(layer) && layer.word_styles ? (
+                  <TextLayerKind layer={layer} fallback={detail} />
+                ) : (
+                  detail
+                )}
               </span>
             </span>
           </button>
@@ -407,7 +412,12 @@ function LayerRow({
             </div>
           )}
           {isTextLayer(layer) && (
-            <RowTags layer={layer.id} name={name} hasEffects={hasEffects} issues={issues} />
+            <RowTags
+              layer={layer.id}
+              name={name}
+              hasEffects={hasEffects || !!layer.word_styles?.effects}
+              issues={issues}
+            />
           )}
           <span className='w-7 shrink-0 text-right text-[9px] text-muted-foreground tabular-nums'>
             {Math.round(layer.visibility.opacity * 100)}%

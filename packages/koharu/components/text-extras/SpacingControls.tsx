@@ -7,7 +7,10 @@ import { isMixed } from '@/components/redesign/useTypography'
 import type { Typography } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 
-export type ApplyTypography = (update: (value: Typography) => Typography) => void
+export type ApplyTypography = (
+  update: (value: Typography) => Typography,
+  fields?: readonly (keyof Typography)[],
+) => void
 
 export function SpacingControls({
   typography,

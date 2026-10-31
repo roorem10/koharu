@@ -33,6 +33,7 @@ export type TypographyControlsProps = {
   values: Typography[]
   disabled: boolean
   apply: ApplyTypography
+  wordScope?: boolean
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -226,6 +227,7 @@ export function OutlineControls({
   disabled,
   apply,
   section = 'both',
+  wordScope = false,
 }: TypographyControlsProps & { section?: 'outline' | 'outer' | 'both' }) {
   const { t } = useTranslation()
   const mixed = (key: keyof Typography) => isMixed(values, (value) => value[key])
@@ -244,7 +246,17 @@ export function OutlineControls({
             checked={strokeEnabled}
             mixed={isMixed(values, outlineEnabled)}
             disabled={disabled}
-            onChange={(enabled) => apply((value) => toggleOutline(value, enabled))}
+            onChange={(enabled) =>
+              apply(
+                (value) => toggleOutline(value, enabled),
+                [
+                  'stroke_color',
+                  ...(!wordScope || (enabled && values.some((value) => !(value.stroke_width! > 0)))
+                    ? ['stroke_width' as const]
+                    : []),
+                ],
+              )
+            }
           />
           <div className='grid grid-cols-[3rem_minmax(0,1fr)_1.5rem] items-end gap-1.5'>
             <Field label={mixed('stroke_color') ? t('redesign.mixed') : t('inspector.border')}>
@@ -255,10 +267,12 @@ export function OutlineControls({
                 allowTransparent
                 value={strokeEnabled ? rgbaToHex(strokeColor) : null}
                 onChange={(color) =>
-                  apply((value) =>
-                    color
-                      ? { ...toggleOutline(value, true), stroke_color: hexToRgba(color) }
-                      : toggleOutline(value, false),
+                  apply(
+                    (value) =>
+                      color
+                        ? { ...toggleOutline(value, true), stroke_color: hexToRgba(color) }
+                        : toggleOutline(value, false),
+                    wordScope ? ['stroke_color'] : ['stroke_color', 'stroke_width'],
                   )
                 }
               />
@@ -282,7 +296,9 @@ export function OutlineControls({
                   t('inspector.decreaseBorderWidth'),
                   t('inspector.increaseBorderWidth'),
                 ]}
-                onCommit={(stroke_width) => apply((value) => ({ ...value, stroke_width }))}
+                onCommit={(stroke_width) =>
+                  apply((value) => ({ ...value, stroke_width }), ['stroke_width'])
+                }
               />
             </Field>
             <Button
@@ -293,11 +309,13 @@ export function OutlineControls({
               title={t('inspector.swapFillOutline')}
               disabled={disabled}
               onClick={() =>
-                apply((value) =>
-                  invertBorder(
-                    value,
-                    (typography.stroke_width ?? 0) > 0 ? typography.stroke_width! : 1.5,
-                  ),
+                apply(
+                  (value) =>
+                    invertBorder(
+                      value,
+                      (typography.stroke_width ?? 0) > 0 ? typography.stroke_width! : 1.5,
+                    ),
+                  ['color', 'stroke_color', 'stroke_width', 'fill_gradient'],
                 )
               }
             >
@@ -308,7 +326,7 @@ export function OutlineControls({
             <Field label={t('inspector.outlineMethod')}>
               <SelectControl
                 label={t('inspector.outlineMethod')}
-                disabled={disabled}
+                disabled={disabled || wordScope}
                 value={mixed('stroke_method') ? null : method}
                 options={[
                   ['expansion', t('inspector.outlineExpansion')],
@@ -325,7 +343,7 @@ export function OutlineControls({
             <Field label={t('inspector.outlinePosition')}>
               <SelectControl
                 label={t('inspector.outlinePosition')}
-                disabled={disabled || method !== 'contour' || mixed('stroke_method')}
+                disabled={disabled || wordScope || method !== 'contour' || mixed('stroke_method')}
                 value={mixed('stroke_position') ? null : (typography.stroke_position ?? 'outside')}
                 options={(['outside', 'center', 'inside'] as const).map((id) => [
                   id,
@@ -342,7 +360,7 @@ export function OutlineControls({
             <Field label={t('inspector.outlineJoin')}>
               <SelectControl
                 label={t('inspector.outlineJoin')}
-                disabled={disabled || method !== 'contour' || mixed('stroke_method')}
+                disabled={disabled || wordScope || method !== 'contour' || mixed('stroke_method')}
                 value={mixed('stroke_join') ? null : (typography.stroke_join ?? 'round')}
                 options={(['round', 'miter', 'bevel'] as const).map((id) => [
                   id,
@@ -357,6 +375,9 @@ export function OutlineControls({
               />
             </Field>
           </div>
+          {wordScope && (
+            <p className='text-[9px] text-muted-foreground'>{t('richTextPanel.wholeBoxOnly')}</p>
+          )}
         </>
       )}
       {outer && (
@@ -366,7 +387,12 @@ export function OutlineControls({
             checked={outerEnabled(typography)}
             mixed={isMixed(values, outerEnabled)}
             disabled={disabled || values.some((value) => !outlineEnabled(value))}
-            onChange={(enabled) => apply((value) => toggleOutline(value, enabled, true))}
+            onChange={(enabled) =>
+              apply(
+                (value) => toggleOutline(value, enabled, true),
+                ['outer_stroke_color', 'outer_stroke_width'],
+              )
+            }
           />
           <div className='grid grid-cols-[3rem_minmax(0,1fr)] items-end gap-1.5'>
             <Field
@@ -381,13 +407,17 @@ export function OutlineControls({
                 allowTransparent
                 value={outerEnabled(typography) ? rgbaToHex(outerColor) : null}
                 onChange={(color) =>
-                  apply((value) =>
-                    color
-                      ? {
-                          ...toggleOutline(value, true, true),
-                          outer_stroke_color: hexToRgba(color),
-                        }
-                      : toggleOutline(value, false, true),
+                  apply(
+                    (value) =>
+                      color
+                        ? {
+                            ...toggleOutline(value, true, true),
+                            outer_stroke_color: hexToRgba(color),
+                          }
+                        : toggleOutline(value, false, true),
+                    wordScope
+                      ? ['outer_stroke_color']
+                      : ['outer_stroke_color', 'outer_stroke_width'],
                   )
                 }
               />
@@ -412,11 +442,16 @@ export function OutlineControls({
                   t('inspector.increaseSecondBorderWidth'),
                 ]}
                 onCommit={(outer_stroke_width) =>
-                  apply((value) => ({
-                    ...value,
-                    outer_stroke_width,
-                    outer_stroke_color: value.outer_stroke_color ?? [0, 0, 0, 255],
-                  }))
+                  apply(
+                    (value) => ({
+                      ...value,
+                      outer_stroke_width,
+                      outer_stroke_color: value.outer_stroke_color ?? [0, 0, 0, 255],
+                    }),
+                    wordScope
+                      ? ['outer_stroke_width']
+                      : ['outer_stroke_width', 'outer_stroke_color'],
+                  )
                 }
               />
             </Field>

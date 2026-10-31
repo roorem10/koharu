@@ -11,8 +11,11 @@ import { SpacingControls } from '@/components/text-extras/SpacingControls'
 import { hexToRgba, rgbaToHex } from '@/lib/color'
 import { expandLayerSelection, isTextLayer } from '@/lib/document'
 import { useFonts, usePage } from '@/lib/queries'
+import { charToUtf16Offset } from '@/lib/richText'
+import { useRichTextSelection } from '@/lib/richTextSelection'
 import { useKoharuStore } from '@/lib/store'
 import type { Typography } from '@koharu/bridge/protocol'
+import { Button } from '@koharu/ui/components/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@koharu/ui/components/tabs'
 
 import { Field, OutlineControls, SelectControl, type TypographyControlsProps } from './Controls'
@@ -28,6 +31,7 @@ import {
   usableFontWeights,
 } from './typography'
 import { isMixed, useTypography } from './useTypography'
+import { useWordTypography } from './useWordTypography'
 
 export function TypeInspector() {
   const page = usePage().data
@@ -46,9 +50,49 @@ function TypePanel({ targets }: { targets: string[] }) {
   const tab = useRedesignStore((state) => state.tab)
   const setTab = useRedesignStore((state) => state.setTab)
   const data = useTypography(targets)
+  const words = useWordTypography(data.layers)
+  const wordScope = words.selection !== null
+  const controls = wordScope ? words : data
+  const setSelection = useRichTextSelection((state) => state.setSelection)
+  const selectedText = words.selection
+    ? words.text.slice(
+        charToUtf16Offset(words.text, words.selection.start),
+        charToUtf16Offset(words.text, words.selection.end),
+      )
+    : ''
   return (
     <div className='min-w-0 p-2' data-testid='type-inspector' aria-disabled={data.disabled}>
-      <Tabs value={tab} onValueChange={(next) => setTab(next as TypeTab)}>
+      {wordScope && (
+        <div className='mb-2 flex min-w-0 items-center gap-2 rounded-md border border-primary/50 bg-primary/10 px-2 py-1 text-[10px]'>
+          <span className='min-w-0 flex-1 truncate' title={selectedText}>
+            {t('richTextPanel.appliesTo', { text: selectedText })}
+          </span>
+          <Button
+            size='xs'
+            variant='outline'
+            className='shrink-0'
+            onClick={() => setSelection(null)}
+          >
+            {t('richTextPanel.wholeBox')}
+          </Button>
+        </div>
+      )}
+      {!wordScope && data.layers.length === 1 && data.layers[0].word_styles && (
+        <Button
+          size='xs'
+          variant='outline'
+          className='mb-2 max-w-full whitespace-normal'
+          disabled={words.clearing}
+          onClick={words.clearAll}
+        >
+          {t('richTextPanel.clearAll')}
+        </Button>
+      )}
+      <Tabs
+        key={JSON.stringify(words.selection)}
+        value={tab}
+        onValueChange={(next) => setTab(next as TypeTab)}
+      >
         <TabsList className='h-7 w-full' aria-label={t('inspector.type')}>
           {(['text', 'outline', 'fill'] as const).map((value) => (
             <TabsTrigger key={value} className='text-[10px]' value={value}>
@@ -56,17 +100,27 @@ function TypePanel({ targets }: { targets: string[] }) {
             </TabsTrigger>
           ))}
         </TabsList>
-        <TabsContent value='text'>{tab === 'text' && <TextControls {...data} />}</TabsContent>
-        <TabsContent value='outline'>
-          {tab === 'outline' && <OutlineControls {...data} />}
+        <TabsContent value='text'>
+          {tab === 'text' && <TextControls {...controls} wordScope={wordScope} />}
         </TabsContent>
-        <TabsContent value='fill'>{tab === 'fill' && <GradientControls {...data} />}</TabsContent>
+        <TabsContent value='outline'>
+          {tab === 'outline' && <OutlineControls {...controls} wordScope={wordScope} />}
+        </TabsContent>
+        <TabsContent value='fill'>
+          {tab === 'fill' && (
+            <GradientControls
+              {...controls}
+              wordScope={wordScope}
+              inheritedGradient={wordScope && words.inheritedGradient}
+            />
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   )
 }
 
-function TextControls({ typography, values, disabled, apply }: TypographyControlsProps) {
+function TextControls({ typography, values, disabled, apply, wordScope }: TypographyControlsProps) {
   const { t } = useTranslation()
   const availableFonts = useFonts().data
   const families = useMemo(() => {
@@ -95,26 +149,30 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
       <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_3rem] gap-1.5'>
         <Field label={t('inspector.font')}>
           <FontPicker
+            ariaLabel={t('inspector.font')}
             size='sm'
             disabled={disabled}
             value={mixed('preferred_font') ? '' : (typography.preferred_font ?? defaultFont.name)}
             placeholder={t('redesign.mixed')}
             families={families}
             onChange={(preferred_font) =>
-              apply((value) => {
-                // Bold and italic survive a font change, synthesized when the face is missing.
-                const font_style = value.font_style ?? 'normal'
-                return {
-                  ...value,
-                  preferred_font,
-                  font_style,
-                  font_weight: styledFontWeight(
-                    findFontFamily(families, preferred_font),
+              apply(
+                (value) => {
+                  // Bold and italic survive a font change, synthesized when the face is missing.
+                  const font_style = value.font_style ?? 'normal'
+                  return {
+                    ...value,
+                    preferred_font,
                     font_style,
-                    value.font_weight ?? 400,
-                  ),
-                }
-              })
+                    font_weight: styledFontWeight(
+                      findFontFamily(families, preferred_font),
+                      font_style,
+                      value.font_weight ?? 400,
+                    ),
+                  }
+                },
+                ['preferred_font'],
+              )
             }
           />
         </Field>
@@ -124,7 +182,9 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
             size='sm'
             disabled={disabled || values.some((value) => !!value.fill_gradient)}
             value={rgbaToHex(typography.color ?? defaultTypography.color!)}
-            onChange={(color) => apply((value) => ({ ...value, color: hexToRgba(color) }))}
+            onChange={(color) =>
+              apply((value) => ({ ...value, color: hexToRgba(color) }), ['color'])
+            }
           />
         </Field>
       </div>
@@ -135,7 +195,8 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
             autoFit={typography.auto_fit}
             mixed={mixed('size') || mixed('auto_fit')}
             disabled={disabled}
-            onChange={(size) => apply((value) => ({ ...value, size, auto_fit: false }))}
+            allowAutoFit={!wordScope}
+            onChange={(size) => apply((value) => ({ ...value, size, auto_fit: false }), ['size'])}
             onAutoFit={() => apply((value) => ({ ...value, auto_fit: true }))}
           />
         </Field>
@@ -148,13 +209,16 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
               .sort((a, b) => a - b)
               .map((value) => [String(value), String(value)])}
             onChange={(weight) =>
-              apply((value) => ({
-                ...value,
-                font_weight: nearestFontWeight(
-                  usableFontWeights(familyFor(value), value.font_style ?? 'normal'),
-                  Number(weight),
-                ),
-              }))
+              apply(
+                (value) => ({
+                  ...value,
+                  font_weight: nearestFontWeight(
+                    usableFontWeights(familyFor(value), value.font_style ?? 'normal'),
+                    Number(weight),
+                  ),
+                }),
+                ['font_weight'],
+              )
             }
           />
         </Field>
@@ -175,29 +239,32 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
                   data-mixed={mixed}
                   className='grid size-6 place-items-center rounded-sm border border-input text-[11px] disabled:opacity-40 aria-pressed:bg-primary aria-pressed:text-primary-foreground'
                   onClick={() =>
-                    apply((value) => {
-                      // A family without a bold or italic face still gets the style:
-                      // the renderer draws synthetic bold and slant for missing faces.
-                      if (kind === 'bold')
+                    apply(
+                      (value) => {
+                        // A family without a bold or italic face still gets the style:
+                        // the renderer draws synthetic bold and slant for missing faces.
+                        if (kind === 'bold')
+                          return {
+                            ...value,
+                            font_weight: styledFontWeight(
+                              familyFor(value),
+                              value.font_style ?? 'normal',
+                              active ? 400 : 700,
+                            ),
+                          }
+                        const font_style = active ? 'normal' : 'italic'
                         return {
                           ...value,
+                          font_style,
                           font_weight: styledFontWeight(
                             familyFor(value),
-                            value.font_style ?? 'normal',
-                            active ? 400 : 700,
+                            font_style,
+                            value.font_weight ?? 400,
                           ),
                         }
-                      const font_style = active ? 'normal' : 'italic'
-                      return {
-                        ...value,
-                        font_style,
-                        font_weight: styledFontWeight(
-                          familyFor(value),
-                          font_style,
-                          value.font_weight ?? 400,
-                        ),
-                      }
-                    })
+                      },
+                      [kind === 'bold' ? 'font_weight' : 'font_style'],
+                    )
                   }
                 >
                   {kind === 'bold' ? <b>B</b> : <i>I</i>}
@@ -226,7 +293,7 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
                   aria-pressed={
                     !isMixed(values, alignmentFor) && alignmentFor(typography) === alignment
                   }
-                  disabled={disabled}
+                  disabled={disabled || wordScope}
                   className='grid place-items-center rounded-sm text-muted-foreground disabled:opacity-40 aria-pressed:bg-primary aria-pressed:text-primary-foreground'
                   onClick={() => apply((value) => ({ ...value, alignment }))}
                 >
@@ -239,7 +306,7 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
         <Field label={t('inspector.direction')}>
           <SelectControl
             label={t('inspector.textDirection')}
-            disabled={disabled}
+            disabled={disabled || wordScope}
             value={mixed('writing_mode') ? null : (typography.writing_mode ?? 'Auto')}
             options={[
               ['Auto', t('inspector.auto')],
@@ -256,7 +323,15 @@ function TextControls({ typography, values, disabled, apply }: TypographyControl
           />
         </Field>
       </div>
-      <SpacingControls typography={typography} values={values} disabled={disabled} apply={apply} />
+      <SpacingControls
+        typography={typography}
+        values={values}
+        disabled={disabled || !!wordScope}
+        apply={apply}
+      />
+      {wordScope && (
+        <p className='text-[9px] text-muted-foreground'>{t('richTextPanel.wholeBoxOnly')}</p>
+      )}
       <p className='text-[9px] leading-4 text-muted-foreground'>{t('redesign.wheelHint')}</p>
     </div>
   )

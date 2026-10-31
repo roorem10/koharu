@@ -22,6 +22,7 @@ export function FontSizeField({
   disabled,
   onChange,
   onAutoFit,
+  allowAutoFit = true,
 }: {
   value: number
   autoFit: boolean
@@ -29,6 +30,7 @@ export function FontSizeField({
   disabled: boolean
   onChange: (value: number) => void
   onAutoFit: () => void
+  allowAutoFit?: boolean
 }) {
   const { t } = useTranslation()
   const id = useId()
@@ -99,9 +101,11 @@ export function FontSizeField({
               value={mixed ? '' : autoFit ? 'auto' : String(value)}
               onValueChange={select}
             >
-              <DropdownMenuRadioItem value='auto' className='min-h-6 py-0.5 text-[10px]'>
-                {t('inspector.auto')}
-              </DropdownMenuRadioItem>
+              {allowAutoFit && (
+                <DropdownMenuRadioItem value='auto' className='min-h-6 py-0.5 text-[10px]'>
+                  {t('inspector.auto')}
+                </DropdownMenuRadioItem>
+              )}
               {fontSizePresets.map((size) => (
                 <DropdownMenuRadioItem
                   key={size}
