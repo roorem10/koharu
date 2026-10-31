@@ -5,14 +5,14 @@
 //! GIMP reference: `TySh` transforms and descriptors consumed by the importer:
 //! https://github.com/GNOME/gimp/blob/758fb4ed995bbb339282d3f777089a33f0a391b8/plug-ins/file-psd/psd-layer-res-load.c#L1345-L1438
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use image::{DynamicImage, GrayImage, Rgba, RgbaImage};
 use koharu_rasterizer::{PreparedContent, PreparedSceneCommand, Raster, RasterOptions, Rasterizer};
 use koharu_renderer::{
     Frame, ImageKind, LayerKind, TextAlign, TextMetadata as RenderedText, WritingMode,
 };
-use koharu_scene::{AssetRole, Snapshot};
+use koharu_scene::{AssetRole, EntityId, Snapshot, TextLayout};
 
 use crate::{
     engine_data::{TextJustification, TextOrientation},
@@ -94,7 +94,17 @@ pub(crate) async fn build(
     raster_options: RasterOptions,
     options: &PsdExportOptions,
 ) -> Result<Document, PsdExportError> {
-    let merged = rasterize(Arc::clone(&rasterizer), frame, raster_options).await?;
+    let mut warped_text = HashSet::new();
+    for layer in frame.layers() {
+        if matches!(layer.kind(), LayerKind::Text(_))
+            && snapshot
+                .component::<TextLayout>(layer.entity())?
+                .is_some_and(|layout| layout.warp.is_some())
+        {
+            warped_text.insert(layer.entity());
+        }
+    }
+    let merged = rasterize(Arc::clone(&rasterizer), frame, raster_options, &warped_text).await?;
     let width = merged.image.width();
     let height = merged.image.height();
     validate_dimensions(width, height)?;
@@ -160,7 +170,13 @@ pub(crate) async fn build(
             let cropped = frame
                 .cropped(visual.entity())?
                 .ok_or(PsdExportError::MissingRenderedEntity(visual.entity()))?;
-            let rendered = rasterize(Arc::clone(&rasterizer), &cropped, raster_options).await?;
+            let rendered = rasterize(
+                Arc::clone(&rasterizer),
+                &cropped,
+                raster_options,
+                &warped_text,
+            )
+            .await?;
             let image = image.expect("image branch was selected above");
             let name = image.name.clone().unwrap_or_else(|| match image.kind {
                 ImageKind::Source | ImageKind::Embedded => "Image".to_owned(),
@@ -190,20 +206,38 @@ pub(crate) async fn build(
             let cropped = frame
                 .cropped(visual.entity())?
                 .ok_or(PsdExportError::MissingRenderedEntity(visual.entity()))?;
-            let rendered = rasterize(Arc::clone(&rasterizer), &cropped, raster_options).await?;
+            let rendered = rasterize(
+                Arc::clone(&rasterizer),
+                &cropped,
+                raster_options,
+                &warped_text,
+            )
+            .await?;
             validate_pixels(&visual.entity().to_string(), &rendered.image)?;
-            layers.push(Layer {
-                id: 0,
-                name: format!("TL {index:03} {}", visual.entity()),
-                left: rendered.left,
-                top: rendered.top,
-                pixels: rendered.image,
-                hidden: false,
-                text: match options.text_layer_mode {
-                    TextLayerMode::Rasterized => None,
-                    TextLayerMode::Editable => Some(text_metadata(index, text, &font_set)),
-                },
-            });
+            let editable_pixels = if warped_text.contains(&visual.entity()) {
+                let unwarped = frame
+                    .cropped_unwarped_text(visual.entity())?
+                    .ok_or(PsdExportError::MissingRenderedEntity(visual.entity()))?;
+                Some(
+                    rasterize(
+                        Arc::clone(&rasterizer),
+                        &unwarped,
+                        raster_options,
+                        &HashSet::new(),
+                    )
+                    .await?,
+                )
+            } else {
+                None
+            };
+            push_text_layers(
+                &mut layers,
+                format!("TL {index:03} {}", visual.entity()),
+                rendered,
+                editable_pixels,
+                text_metadata(index, text, &font_set),
+                options.text_layer_mode,
+            );
         }
     }
     let layer_count = layers.len();
@@ -223,14 +257,54 @@ pub(crate) async fn build(
     })
 }
 
+fn push_text_layers(
+    layers: &mut Vec<Layer>,
+    name: String,
+    rendered: Raster,
+    unwarped: Option<Raster>,
+    metadata: TextMetadata,
+    mode: TextLayerMode,
+) {
+    let warped = unwarped.is_some();
+    layers.push(Layer {
+        id: 0,
+        name: name.clone(),
+        left: rendered.left,
+        top: rendered.top,
+        pixels: rendered.image,
+        hidden: false,
+        text: if !warped && mode == TextLayerMode::Editable {
+            Some(metadata.clone())
+        } else {
+            None
+        },
+    });
+    // Records are emitted in visual order, so this editable copy sits directly below its pixels.
+    if let Some(unwarped) = unwarped {
+        layers.push(Layer {
+            id: 0,
+            name: format!("{name} (unwarped, editable)"),
+            left: unwarped.left,
+            top: unwarped.top,
+            pixels: unwarped.image,
+            hidden: true,
+            text: Some(metadata),
+        });
+    }
+}
+
 async fn rasterize(
     rasterizer: Arc<Rasterizer>,
     frame: &Frame,
     options: RasterOptions,
+    warped_text: &HashSet<EntityId>,
 ) -> Result<Raster, PsdExportError> {
     let mut prepared = frame.prepared().clone();
     let mut flattened = false;
-    for layer in &mut prepared.frame.layers {
+    for (layer, visual) in prepared.frame.layers.iter_mut().zip(frame.layers()) {
+        if warped_text.contains(&visual.entity()) {
+            continue;
+        }
         if let PreparedContent::Vector(scene) = &mut layer.content {
             for command in &mut scene.commands {
                 if let PreparedSceneCommand::GradientPath { path, stops, .. } = command {
@@ -479,5 +553,50 @@ mod tests {
             error,
             PsdExportError::MismatchedMaskDimensions { .. }
         ));
+    }
+    #[test]
+    fn warped_text_exports_visible_pixels_then_hidden_editable_text_in_both_export_modes() {
+        let rendered = || Raster {
+            image: RgbaImage::from_pixel(2, 2, Rgba([1, 2, 3, 255])),
+            left: 20,
+            top: 30,
+        };
+        let original = || Raster {
+            image: RgbaImage::from_pixel(3, 2, Rgba([4, 5, 6, 255])),
+            left: 10,
+            top: 15,
+        };
+        let metadata = text_metadata(1, &rendered_text(&["Primary"]), &["Primary".to_owned()]);
+        for mode in [TextLayerMode::Editable, TextLayerMode::Rasterized] {
+            let mut layers = Vec::new();
+            push_text_layers(
+                &mut layers,
+                "TL 001 box".into(),
+                rendered(),
+                Some(original()),
+                metadata.clone(),
+                mode,
+            );
+            assert_eq!(layers.len(), 2);
+            assert!(!layers[0].hidden);
+            assert!(layers[0].text.is_none());
+            assert_eq!(layers[0].name, "TL 001 box");
+            assert!(layers[1].hidden);
+            assert_eq!(layers[1].text.as_ref().unwrap().text, "Hello");
+            assert_eq!(layers[1].name, "TL 001 box (unwarped, editable)");
+            assert_eq!(layers[1].pixels.width(), 3);
+            assert_eq!((layers[1].left, layers[1].top), (10, 15));
+            layers.clear();
+            push_text_layers(
+                &mut layers,
+                "plain".into(),
+                rendered(),
+                None,
+                metadata.clone(),
+                mode,
+            );
+            assert_eq!(layers.len(), 1);
+            assert_eq!(layers[0].text.is_some(), mode == TextLayerMode::Editable);
+        }
     }
 }

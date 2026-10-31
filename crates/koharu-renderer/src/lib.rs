@@ -13,6 +13,7 @@ mod segment;
 mod shape;
 mod text_renderer;
 mod types;
+mod warp;
 
 pub use config::{
     AlignmentPart, CategoryStyles, FontPart, OuterPart, OutlinePart, ShapeStyles, SizePart,

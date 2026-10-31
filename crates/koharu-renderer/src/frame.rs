@@ -129,6 +129,55 @@ impl Frame {
         let Some(layer) = self.layer(entity).cloned() else {
             return Ok(None);
         };
+        self.crop_layer(layer).map(Some)
+    }
+
+    /// The same laid-out text before warping, for an editable PSD layer's pixel preview.
+    /// Reuses the original recorded drawing instead of laying out or shaping the text again.
+    pub fn cropped_unwarped_text(&self, entity: EntityId) -> Result<Option<Self>> {
+        let Some(layer) = self.layer(entity) else {
+            return Ok(None);
+        };
+        let LayerKind::Text(metadata) = layer.kind() else {
+            return Ok(None);
+        };
+        let Some(frame) =
+            crate::bubble::geometry_frame(layer.geometry(), Some(metadata.angle_degrees))
+        else {
+            return Err(Error::invalid("text layer has no unwarped frame"));
+        };
+        let mut node = layer.0.node.as_ref().clone();
+        if let Some(original) = node.unwarped.take() {
+            node.scene = original.scene;
+            node.resources = original.resources;
+            node.local_bounds = original.local_bounds;
+        }
+        if let NodeDescriptor::Text(text) = &mut node.descriptor {
+            text.warp = None;
+        }
+        let placement = crate::warp::text_placement(frame);
+        let bounds = placement.transform_rect_bbox(vello::kurbo::Rect::new(
+            f64::from(node.local_bounds.x),
+            f64::from(node.local_bounds.y),
+            f64::from(node.local_bounds.x + node.local_bounds.width),
+            f64::from(node.local_bounds.y + node.local_bounds.height),
+        ));
+        self.crop_layer(Layer(Arc::new(LayerData {
+            bounds: RenderBounds {
+                x: bounds.x0 as f32,
+                y: bounds.y0 as f32,
+                width: bounds.width() as f32,
+                height: bounds.height() as f32,
+            },
+            placement,
+            node: Arc::new(node),
+            ..layer.0.clone_for_frame()
+        })))
+        .map(Some)
+    }
+
+    fn crop_layer(&self, layer: Layer) -> Result<Self> {
+        let entity = layer.entity();
         let bounds = layer.bounds();
         if ![bounds.x, bounds.y, bounds.width, bounds.height]
             .into_iter()
@@ -181,7 +230,7 @@ impl Frame {
             Affine::translate((-f64::from(left), -f64::from(top))),
             &layers,
         )?;
-        Ok(Some(Self(Arc::new(FrameData {
+        Ok(Self(Arc::new(FrameData {
             revision: self.revision(),
             page: self.page(),
             width,
@@ -194,7 +243,7 @@ impl Frame {
             diagnostics: self.0.diagnostics.clone(),
             stats: self.0.stats,
             prepared: Arc::new(prepared),
-        }))))
+        })))
     }
 
     pub(crate) fn at_revision(&self, revision: Revision, stats: RetentionStats) -> Self {
@@ -454,11 +503,13 @@ pub(crate) struct ImageNodeDescriptor {
     pub(crate) require_size: Option<(u32, u32)>,
 }
 
+#[derive(Clone)]
 pub(crate) struct RetainedNode {
     pub(crate) descriptor: NodeDescriptor,
     pub(crate) scene: Arc<koharu_rasterizer::PreparedScene>,
     pub(crate) resources: Arc<[PreparedResource]>,
     pub(crate) local_bounds: RenderBounds,
+    pub(crate) unwarped: Option<crate::text_renderer::UnwarpedText>,
     pub(crate) image: Option<RasterImage>,
     pub(crate) text: Option<LocalTextMetadata>,
     pub(crate) diagnostics: Arc<[RenderDiagnostic]>,
@@ -607,6 +658,19 @@ fn element_frame(layer: &Layer) -> Option<PreparedElementFrame> {
     let LayerKind::Text(text) = layer.kind() else {
         return None;
     };
+    if let NodeDescriptor::Text(descriptor) = &layer.0.node.descriptor
+        && descriptor.warp.is_some()
+        && let Some(frame) =
+            crate::bubble::geometry_frame(layer.geometry(), Some(text.angle_degrees))
+    {
+        return Some(PreparedElementFrame {
+            x: frame.bounds.x,
+            y: frame.bounds.y,
+            width: frame.bounds.width,
+            height: frame.bounds.height,
+            angle_degrees: frame.angle_degrees,
+        });
+    }
     let bounds = text.rendered_bounds;
     if bounds.width > 0.0 && bounds.height > 0.0 {
         return Some(PreparedElementFrame {
