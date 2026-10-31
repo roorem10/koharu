@@ -583,7 +583,30 @@
     "selected": "已选择 {{count}}"
   },
   "ocrBox": {
-    "title": "OCR box"
+    "title": "OCR boxes and SFX subtitles",
+    "modifierHint": "Release with Alt to read only; Shift to read, translate and clean. Alt takes priority if both are held.",
+    "defaultMode": "OCR box default action",
+    "modes": {
+      "read": "Read only",
+      "read_translate": "Read and translate",
+      "read_translate_clean": "Read, translate and clean"
+    },
+    "readAgain": "Read again",
+    "translateAgain": "Translate again",
+    "cleanAgain": "Clean again",
+    "addSubtitle": "Add SFX subtitle",
+    "overwriteTitle": "Overwrite hand-edited text?",
+    "overwriteSource": "Some selected boxes have a hand-edited source. Replace those sources with OCR? Translations are kept.",
+    "overwriteTranslation": "Some selected boxes have a hand-edited translation. Replace those translations? Sources are kept.",
+    "overwrite": "Overwrite and run",
+    "cancel": "Cancel",
+    "subtitleFont": "SFX subtitle font",
+    "defaultFont": "Use the app default font",
+    "subtitleSize": "SFX subtitle size",
+    "sizePixels": "Size in pixels",
+    "subtitleFill": "SFX subtitle fill",
+    "subtitleOutline": "SFX subtitle outline",
+    "settingsError": "OCR box settings could not be loaded."
   },
   "textExtras": {
     "title": "Text style extras",
