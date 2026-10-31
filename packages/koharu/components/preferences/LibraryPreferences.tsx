@@ -62,6 +62,18 @@ export function LibraryPreferences() {
         />
       </PreferenceRow>
       <PreferenceRow
+        title={t('files.modelsFolder')}
+        description={t('files.modelsRestart')}
+        align='start'
+      >
+        <FolderPreference
+          kind='models'
+          active={paths.data?.models_folder}
+          defaultPath={paths.data?.default_models_folder}
+          selected={settings.data?.models_folder}
+        />
+      </PreferenceRow>
+      <PreferenceRow
         title={t('files.exportPattern')}
         description={t('files.patternHelp')}
         align='start'

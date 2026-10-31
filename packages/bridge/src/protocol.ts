@@ -473,16 +473,19 @@ export type LetteringSettings = {
 	small_text_threshold?: number,
 };
 
-export type LibraryFolder = "projects";
+export type LibraryFolder = "projects" | "models";
 
 export type LibraryPaths = {
 	projects_folder: string,
 	default_projects_folder: string,
+	models_folder: string,
+	default_models_folder: string,
 };
 
 export type LibrarySettings = {
 	export_name_pattern?: string,
 	projects_folder?: string | null,
+	models_folder?: string | null,
 };
 
 export type LineCategory = {

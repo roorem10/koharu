@@ -48,17 +48,21 @@ impl Store {
     /// Returns the configured root, or the operating system cache by default.
     #[must_use]
     pub fn root() -> &'static Path {
-        ROOT.get_or_init(|| {
-            if let Some(root) = koharu_config::preview::root()
-                .expect("could not locate isolated preview runtime storage")
-            {
-                return root.join("packages");
-            }
-            dirs::cache_dir()
-                .unwrap_or_else(std::env::temp_dir)
-                .join("koharu")
-                .join("packages")
-        })
+        ROOT.get_or_init(Self::default_root)
+    }
+
+    /// The platform default before an app-selected store overrides it.
+    #[must_use]
+    pub fn default_root() -> PathBuf {
+        if let Some(root) = koharu_config::preview::root()
+            .expect("could not locate isolated preview runtime storage")
+        {
+            return root.join("packages");
+        }
+        dirs::cache_dir()
+            .unwrap_or_else(std::env::temp_dir)
+            .join("koharu")
+            .join("packages")
     }
 
     pub(crate) async fn directory<Valid, Install, Pending>(

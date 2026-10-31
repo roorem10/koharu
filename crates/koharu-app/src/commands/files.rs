@@ -16,6 +16,7 @@ use super::Error;
 pub struct LibrarySettings {
     pub export_name_pattern: String,
     pub projects_folder: Option<PathBuf>,
+    pub models_folder: Option<PathBuf>,
 }
 
 impl Default for LibrarySettings {
@@ -23,6 +24,7 @@ impl Default for LibrarySettings {
         Self {
             export_name_pattern: "{index}_{page}".to_owned(),
             projects_folder: None,
+            models_folder: None,
         }
     }
 }
@@ -44,6 +46,9 @@ pub(crate) fn get_library_settings() -> Result<LibrarySettings, Error> {
 pub(crate) fn save_library_settings(settings: LibrarySettings) -> Result<LibrarySettings, Error> {
     names::validate_pattern(&settings.export_name_pattern)?;
     if let Some(path) = &settings.projects_folder {
+        prepare_folder(path)?;
+    }
+    if let Some(path) = &settings.models_folder {
         prepare_folder(path)?;
     }
     let config = koharu_config::load::<LibrarySettings>("library")?;

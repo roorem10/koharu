@@ -210,6 +210,8 @@
     "renameTitle": "Rename project",
     "newProjectName": "New project name",
     "rename": "Rename",
+    "modelsFolder": "Models folder",
+    "modelsRestart": "Applies after a restart. To keep the models you already downloaded, close Booharu and move the contents of the old folder into the new one.",
     "defaultFolder": "Default: {{path}}"
   },
   "fontPicker": {

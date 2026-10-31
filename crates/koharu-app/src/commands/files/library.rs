@@ -17,36 +17,58 @@ use super::{LibrarySettings, load_settings, prepare_folder};
 #[serde(rename_all = "snake_case")]
 pub enum LibraryFolder {
     Projects,
+    Models,
 }
 
 #[derive(Clone, Debug, Serialize, Type)]
 pub struct LibraryPaths {
     pub projects_folder: PathBuf,
     pub default_projects_folder: PathBuf,
+    pub models_folder: PathBuf,
+    pub default_models_folder: PathBuf,
+}
+
+fn default_models_folder(handle: &AppHandle<CefRuntime>) -> Result<PathBuf> {
+    #[cfg(all(target_os = "windows", not(debug_assertions)))]
+    if koharu_config::preview::root()?.is_none() {
+        return Ok(handle
+            .path()
+            .resource_dir()
+            .context("failed to locate the installation directory")?
+            .join("store"));
+    }
+    let _ = handle;
+    Ok(koharu_runtime::Store::default_root())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn get_library_paths(
-    _handle: AppHandle<CefRuntime>,
+    handle: AppHandle<CefRuntime>,
     library: State<'_, ProjectLibrary>,
 ) -> std::result::Result<LibraryPaths, Error> {
     Ok(LibraryPaths {
         projects_folder: library.root().to_owned(),
         default_projects_folder: ProjectLibrary::default_root()?,
+        models_folder: koharu_runtime::Store::root().to_owned(),
+        default_models_folder: default_models_folder(&handle)?,
     })
 }
 
 fn next_folder(
     kind: LibraryFolder,
     library: &ProjectLibrary,
-    _handle: &AppHandle<CefRuntime>,
+    handle: &AppHandle<CefRuntime>,
 ) -> Result<PathBuf> {
     let settings = load_settings()?;
     match kind {
         LibraryFolder::Projects => match settings.projects_folder {
             Some(path) => Ok(path),
             None => ProjectLibrary::default_root().or_else(|_| Ok(library.root().to_owned())),
+        },
+        LibraryFolder::Models => match settings.models_folder {
+            Some(path) => Ok(path),
+            None => default_models_folder(handle),
         },
     }
 }
@@ -70,6 +92,7 @@ pub(crate) async fn choose_library_folder(
     let mut settings = config.write()?;
     match kind {
         LibraryFolder::Projects => settings.projects_folder = Some(path),
+        LibraryFolder::Models => settings.models_folder = Some(path),
     }
     let saved = settings.clone();
     settings.save()?;
@@ -85,6 +108,7 @@ pub(crate) fn reset_library_folder(
     let mut settings = config.write()?;
     match kind {
         LibraryFolder::Projects => settings.projects_folder = None,
+        LibraryFolder::Models => settings.models_folder = None,
     }
     let saved = settings.clone();
     settings.save()?;

@@ -6,6 +6,7 @@ export function mockWo13() {
   vi.spyOn(commands, 'getLibrarySettings').mockResolvedValue({
     export_name_pattern: '{index}_{page}',
     projects_folder: null,
+    models_folder: null,
   })
   vi.spyOn(commands, 'saveLibrarySettings').mockImplementation(async (settings) => settings)
   vi.spyOn(commands, 'exportSelectedPages').mockResolvedValue(null)
@@ -15,11 +16,14 @@ export function mockWo13() {
   vi.spyOn(commands, 'getLibraryPaths').mockResolvedValue({
     projects_folder: 'C:\\Projects',
     default_projects_folder: 'C:\\Projects',
+    models_folder: 'C:\\Models',
+    default_models_folder: 'C:\\Models',
   })
   vi.spyOn(commands, 'chooseLibraryFolder').mockResolvedValue(null)
   vi.spyOn(commands, 'resetLibraryFolder').mockResolvedValue({
     export_name_pattern: '{index}_{page}',
     projects_folder: null,
+    models_folder: null,
   })
   vi.spyOn(commands, 'openLibraryFolder').mockResolvedValue(null)
   vi.spyOn(commands, 'renameProject').mockResolvedValue(null)
