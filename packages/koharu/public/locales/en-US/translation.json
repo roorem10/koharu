@@ -1224,7 +1224,28 @@
     }
   },
   "richText": {
-    "title": "Edit text on the page"
+    "title": "Edit text on the page",
+    "toolbar": "Word styles",
+    "font": "Font",
+    "smaller": "Smaller",
+    "bigger": "Bigger",
+    "size": "Word size (px)",
+    "mixed": "Mixed",
+    "bold": "Bold (Ctrl+B)",
+    "italic": "Italic (Ctrl+I)",
+    "color": "Word colour",
+    "mixedColor": "Word colour: Mixed",
+    "emphasis": "Emphasis",
+    "clear": "Clear",
+    "done": "Done",
+    "autoFitBigger": "Scale words up",
+    "autoFitSmaller": "Scale words down",
+    "autoFitSizeUnavailable": "Pixel size is unavailable while this box uses auto-fit.",
+    "projectChanged": "The project changed before the text could be saved.",
+    "saveFailed": "The edit could not be completed. Your draft is kept here.",
+    "retry": "Retry and finish",
+    "typingPreview": "Typing preview",
+    "loading": "Loading text positions…"
   },
   "richTextPanel": {
     "title": "Word styles"
