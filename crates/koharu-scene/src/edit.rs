@@ -375,6 +375,26 @@ impl Edit {
         Ok(())
     }
 
+    /// Explicitly relinquishes a manual style after translation replaces its
+    /// text. Ordinary `set` stamps User; pipeline edits cannot relinquish it.
+    pub fn reset_typography(
+        &mut self,
+        entity: EntityId,
+        typography: &crate::Typography,
+    ) -> Result<()> {
+        if self.generation.is_some() || !matches!(typography.origin, Origin::Generated(_)) {
+            return Err(Error::Authorship(
+                "reset typography requires a user edit and a generated style".into(),
+            ));
+        }
+        let owner = ComponentOwner::Entity(entity);
+        let component_key = key::<crate::Typography>()?;
+        self.observe_component(owner, component_key.clone())?;
+        self.replace_component(owner, component_key, Some(self.encode_value(typography)?))?;
+        self.validate_entities.insert(entity);
+        Ok(())
+    }
+
     pub fn set_project<T: Component>(&mut self, value: &T) -> Result<()> {
         if matches!(
             T::KIND,

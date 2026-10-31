@@ -9,7 +9,7 @@ mod assets;
 mod groups;
 mod layers;
 mod provenance;
-mod rich_text;
+pub mod rich_text;
 mod spatial;
 mod structure;
 mod text;

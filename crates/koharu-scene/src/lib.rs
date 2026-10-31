@@ -23,6 +23,7 @@ pub use change::{
     Change, ComponentChange, ComponentOwner, EntityChange, RelationChange, ValueChangeKind,
 };
 pub use component::{Component, ValidationContext};
+pub use components::rich_text;
 pub use components::{
     Asset, AssetInput, AssetMetadata, AssetRole, Authored, DetectionAnalysis, DetectionLabel,
     EntityOrigin, FillGradient, FontStyle, Generation, Geometry, GradientKind, GradientStop, Group,
