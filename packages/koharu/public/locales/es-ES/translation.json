@@ -587,7 +587,34 @@
     "add": "Add",
     "delete": "Delete",
     "detectOcr": "Detect + OCR",
-    "translateCleanup": "Translate + clean up"
+    "translateCleanup": "Translate + clean up",
+    "batchTitle": "Batch chapters…",
+    "batchDescription": "Import each chapter as a project and process them in order.",
+    "closeFirst": "Close “{{project}}” before starting the batch?",
+    "closeAndStart": "Close project and start",
+    "cancel": "Cancel",
+    "pickFolder": "Pick a folder",
+    "scanning": "Counting chapter pages…",
+    "batchProgress": "Chapter progress",
+    "batchSummary": "{{done}} of {{total}} chapters processed ({{problems}} with problems); {{failed}} failed.",
+    "batchStoppedSummary": "Stopped: {{done}} of {{total}} chapters processed ({{problems}} with problems); {{failed}} failed.",
+    "chapters": "Chapters",
+    "pageCount": "{{count}} pages",
+    "noChapters": "No supported chapters were found.",
+    "batchPreset": "Batch preset",
+    "choosePreset": "Choose a preset",
+    "stoppingAfterPage": "Stopping after current page…",
+    "stopBatch": "Stop",
+    "close": "Close",
+    "startBatch": "Start",
+    "chapterStates": {
+      "waiting": "Waiting",
+      "running": "Running",
+      "done": "Done",
+      "done_with_problems": "Done with problems",
+      "failed": "Failed",
+      "stopped": "Stopped"
+    }
   },
   "settings": {
     "appearance": {

@@ -125,6 +125,9 @@ impl<'a> Execution<'a> {
             }
 
             let Some(completion) = running.next().await else {
+                if self.stop.finishing() {
+                    self.stop.stop();
+                }
                 break;
             };
             self.busy_stages.remove(&completion.stage);
@@ -137,6 +140,9 @@ impl<'a> Execution<'a> {
             let stage = completion.stage;
             if let Err(error) = self.apply_completion(completion).await {
                 self.failure = Some(error);
+            }
+            if self.stop.finishing() {
+                self.stop.stop();
             }
             if self.policy.order == crate::RunOrder::StageAtATime
                 && self.scheduler.stage_finished(stage)
@@ -152,7 +158,7 @@ impl<'a> Execution<'a> {
     }
 
     fn take_ready_job(&mut self) -> Option<StageJob> {
-        if self.stopped() || self.failure.is_some() {
+        if self.stopped() || self.stop.finishing() || self.failure.is_some() {
             return None;
         }
         let (page, stage) = self.scheduler.start_next(&self.busy_stages)?;

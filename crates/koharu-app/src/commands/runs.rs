@@ -145,6 +145,9 @@ pub(crate) async fn retry_failed_pages(
     .await?)
 }
 
+mod batch;
+pub(crate) use batch::*;
+
 fn require(condition: bool, message: &str) -> Result<()> {
     anyhow::ensure!(condition, "{message}");
     Ok(())

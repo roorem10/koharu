@@ -311,3 +311,51 @@ async fn a_failed_page_does_not_block_other_pages_but_stop_run_does() {
         }
     }
 }
+
+#[tokio::test]
+async fn a_graceful_stop_finishes_the_current_page_item_before_stopping() {
+    let pipeline = pipeline(TranslationConfig {
+        model: koharu_translator::ModelSelection {
+            provider: koharu_translator::Provider::OpenAi,
+            model: Some("test".into()),
+            quantization: None,
+            vision: false,
+            reasoning: false,
+        },
+        ..Default::default()
+    });
+    let mut session = koharu_scene::Session::memory().await.unwrap();
+    let patch = session
+        .snapshot()
+        .patch(|edit| {
+            for name in ["one", "two"] {
+                edit.add_page(
+                    koharu_scene::PageDraft::new(name, 1.0, 1.0),
+                    koharu_scene::At::End,
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    session.commit(patch).await.unwrap();
+    let stop = StopToken::default();
+    let requested = stop.clone();
+    let request = Request {
+        operation: Operation::Only {
+            stage: Stage::Translation,
+        },
+        stop,
+        progress: Some(std::sync::Arc::new(move |event| {
+            if matches!(event, Progress::Skipped { .. }) {
+                requested.finish_current_page();
+            }
+        })),
+        ..Default::default()
+    };
+    let report = pipeline
+        .execute(session.snapshot(), request, &mut RejectCommitter)
+        .await
+        .unwrap();
+    assert_eq!(report.status, RunStatus::Stopped);
+    assert_eq!(report.completed, 1);
+}

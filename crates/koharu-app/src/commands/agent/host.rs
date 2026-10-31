@@ -285,6 +285,13 @@ impl KoharuHost {
         {
             let processing = self.handle.state::<Processing>();
             let mut stops = processing.stops.lock();
+            anyhow::ensure!(
+                !self
+                    .handle
+                    .state::<super::super::runs::BatchState>()
+                    .active(),
+                "a chapter batch is running"
+            );
             if !stops.is_empty() {
                 bail!("another pipeline process is already running");
             }

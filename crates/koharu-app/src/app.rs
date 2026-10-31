@@ -163,6 +163,7 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
             // Batch 1: each WO adds its own `manage(...)` or startup lines below its marker.
             // WO-13 (files and export)
             // WO-14 (runs and retries)
+            application.manage(crate::commands::runs::BatchState::default());
             // WO-21 (MCP server)
 
             let window_config = application

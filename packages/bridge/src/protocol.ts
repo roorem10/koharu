@@ -105,6 +105,9 @@ export const commands = {
 	getRunSettings: () => __TAURI_INVOKE<RunSettings>("get_run_settings"),
 	saveRunSettings: (settings: RunSettings) => __TAURI_INVOKE<RunSettings>("save_run_settings", { settings }),
 	retryFailedPages: (job: JobId) => __TAURI_INVOKE<JobId>("retry_failed_pages", { job }),
+	previewChapterBatch: () => __TAURI_INVOKE<BatchPlan | null>("preview_chapter_batch"),
+	runChapterBatch: (plan: string, chapters: string[], preset: number, closeProject: string | null, onProgress: Channel<BatchProgress>) => __TAURI_INVOKE<null>("run_chapter_batch", { plan, chapters, preset, closeProject, onProgress }),
+	stopChapterBatch: () => __TAURI_INVOKE<null>("stop_chapter_batch"),
 };
 
 /* Types */
@@ -140,6 +143,32 @@ export type AnalysisRegion = {
 	geometry: Geometry,
 	kind: string,
 	label: string | null,
+};
+
+export type BatchChapter = {
+	id: string,
+	name: string,
+	pages: number,
+	error: string | null,
+};
+
+export type BatchChapterProgress = {
+	chapter: BatchChapter,
+	state: ChapterStatus,
+	failures: PageFailure[],
+	error: string | null,
+};
+
+export type BatchPlan = {
+	id: string,
+	chapters: BatchChapter[],
+};
+
+export type BatchProgress = {
+	chapters: BatchChapterProgress[],
+	running: boolean,
+	stopped: boolean,
+	finish_sound: boolean,
 };
 
 export type Bounds = {
@@ -211,6 +240,8 @@ export type ChapterState = {
 	series: Series | null,
 	supports_tasks: boolean,
 };
+
+export type ChapterStatus = "waiting" | "running" | "done" | "done_with_problems" | "failed" | "stopped";
 
 export type Character = {
 	id?: string,

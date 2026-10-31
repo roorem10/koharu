@@ -168,6 +168,9 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             runs::get_run_settings,
             runs::save_run_settings,
             runs::retry_failed_pages,
+            runs::preview_chapter_batch,
+            runs::run_chapter_batch,
+            runs::stop_chapter_batch,
             // WO-06 (text style extras and box notes) commands go here.
             // WO-21 (MCP server) commands go here.
         ])

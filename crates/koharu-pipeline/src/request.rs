@@ -124,9 +124,17 @@ impl Default for Request {
 }
 
 #[derive(Clone, Default)]
-pub struct StopToken(Arc<AtomicBool>);
+pub struct StopToken(Arc<AtomicBool>, Arc<AtomicBool>);
 
 impl StopToken {
+    pub fn finish_current_page(&self) {
+        self.1.store(true, Ordering::Release);
+    }
+
+    pub(crate) fn finishing(&self) -> bool {
+        self.1.load(Ordering::Acquire)
+    }
+
     pub fn stop(&self) {
         self.0.store(true, Ordering::Release);
     }

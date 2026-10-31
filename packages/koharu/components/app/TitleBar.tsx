@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AboutDialog } from '@/components/app/AboutDialog'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
+import { BatchChaptersDialog } from '@/components/runs/BatchChaptersDialog'
 import {
   currentRunScope,
   presetLabel,
@@ -46,6 +47,7 @@ import { cn } from '@koharu/ui/lib/utils'
 
 export function TitleBar() {
   const { t } = useTranslation()
+  const [batchOpen, setBatchOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const macOS = useMacOS()
   const project = useProject().data
@@ -278,7 +280,12 @@ export function TitleBar() {
                   })}
                 </MenubarItem>
               ))}
+              <MenubarSeparator />
+              <MenubarItem disabled={running} onClick={() => setBatchOpen(true)}>
+                {t('runs.batchTitle')}
+              </MenubarItem>
             </MenubarContent>
+            <BatchChaptersDialog open={batchOpen} onOpenChange={setBatchOpen} />
           </MenubarMenu>
 
           <MenubarMenu>
