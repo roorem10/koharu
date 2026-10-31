@@ -1833,6 +1833,7 @@ async fn source_reset_preserves_translation_and_language_and_requires_a_user_edi
             .value,
         "manual translation"
     );
+}
 
 #[test]
 fn text_layout_revision_two_decodes_without_warp_and_revision_three_round_trips() {
