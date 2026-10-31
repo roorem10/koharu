@@ -86,7 +86,9 @@ pub struct LayoutRun<'a> {
 }
 
 impl LayoutRun<'_> {
-    /// The base size remains the auto-fit control; readability uses actual glyph sizes.
+    /// The smallest shaped glyph size. The renderer's readability check uses the
+    /// painter's run-aware version, so this stays a test helper.
+    #[cfg(test)]
     pub(crate) fn smallest_font_size(&self) -> f32 {
         self.lines
             .iter()

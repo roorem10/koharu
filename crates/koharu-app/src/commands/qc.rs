@@ -810,7 +810,8 @@ mod tests {
         let context = project.load_context().unwrap();
         let settings = QcSettings::default();
         let mut signatures = Vec::new();
-        for scale in [0.8, 0.2] {
+        // 0.25 is the smallest scale word-style validation accepts.
+        for scale in [0.8, 0.3] {
             let snapshot = project.snapshot();
             let patch = snapshot
                 .patch(|edit| {

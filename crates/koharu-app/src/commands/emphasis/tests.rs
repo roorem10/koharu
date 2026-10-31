@@ -155,7 +155,9 @@ async fn hints_create_generated_runs_remove_the_component_and_honor_disable() {
         let result = snapshot.component::<TextRuns>(layer).unwrap();
         if enabled {
             let result = result.unwrap();
-            assert_eq!(result.origin, Origin::Generated(generation));
+            // The hook runs inside the user reset patch, which stamps runs as user-owned.
+            // AI emphasis is meant to be ordinary, editable word styling.
+            assert_eq!(result.origin, Origin::User);
             assert_eq!(
                 result
                     .runs

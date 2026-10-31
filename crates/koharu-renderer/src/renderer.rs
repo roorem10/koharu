@@ -1411,16 +1411,11 @@ fn font_requests(pending: &[(usize, NodeDescriptor)]) -> Vec<FontRequest> {
             continue;
         };
         let primary = text.preferred_font.as_ref().or(text.font_families.first());
+        // Word fonts are prepared separately by `word_font_requests`, where a
+        // missing face falls back to the box font instead of failing the render.
         let candidates = primary
             .map(|family| (family, text.font_weight, text.font_style))
-            .into_iter()
-            .chain(text.runs.iter().filter_map(|run| {
-                Some((
-                    run.style.font.as_ref().or(primary)?,
-                    run.style.font_weight.or(text.font_weight),
-                    run.style.font_style.map(Into::into).or(text.font_style),
-                ))
-            }));
+            .into_iter();
         for (family, weight, style) in candidates {
             let style_id = match style.unwrap_or(FontStyle::Normal) {
                 FontStyle::Normal => 0,
@@ -2768,13 +2763,16 @@ mod tests {
                 },
             ],
         };
-        let requests = font_requests(&[(0, NodeDescriptor::Text(Box::new(text)))]);
-        assert_eq!(requests.len(), 3);
-        assert_eq!(requests[1].family, "WordFont");
-        assert_eq!(requests[1].weight, Some(700));
-        assert_eq!(requests[1].style, Some(FontStyle::Italic));
-        assert_eq!(requests[2].family, "BoxFont");
-        assert_eq!(requests[2].weight, Some(900));
-        assert_eq!(requests[2].style, Some(FontStyle::Normal));
+        let pending = [(0, NodeDescriptor::Text(Box::new(text)))];
+        // Only the box face is a hard requirement; word faces are optional.
+        assert_eq!(font_requests(&pending).len(), 1);
+        let requests = word_font_requests(&pending);
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].family, "WordFont");
+        assert_eq!(requests[0].weight, Some(700));
+        assert_eq!(requests[0].style, Some(FontStyle::Italic));
+        assert_eq!(requests[1].family, "BoxFont");
+        assert_eq!(requests[1].weight, Some(900));
+        assert_eq!(requests[1].style, Some(FontStyle::Normal));
     }
 }

@@ -34,10 +34,9 @@ fn typography() -> Typography {
 #[tokio::test]
 async fn word_effects_reset_with_box_effects_in_one_undo_step() {
     let mut session = Session::memory().await.unwrap();
+    // A user patch stamps word styles as user-owned, so the fixture starts that way.
     let styled = TextRuns {
-        origin: Origin::Generated(koharu_scene::Generation::new(
-            "dev.booharu.test".parse().unwrap(),
-        )),
+        origin: Origin::User,
         runs: vec![
             StyleRun {
                 start: 0,
@@ -79,6 +78,16 @@ async fn word_effects_reset_with_box_effects_in_one_undo_step() {
             let page = edit.add_page(PageDraft::new("page", 100.0, 100.0), At::End)?;
             for (index, runs) in originals.iter().enumerate() {
                 let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &koharu_scene::SourceText {
+                        text: koharu_scene::Authored {
+                            origin: Origin::User,
+                            value: "単語".into(),
+                        },
+                        language: None,
+                    },
+                )?;
                 edit.set(
                     content,
                     &koharu_scene::Translation {

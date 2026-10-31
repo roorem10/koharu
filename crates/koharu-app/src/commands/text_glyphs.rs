@@ -50,10 +50,9 @@ pub(crate) async fn get_text_glyph_boxes(
     // A late result must not install positions from an older edit in the on-page editor.
     let projects = project.project.lock().await;
     let current = projects.as_ref().context("no project is open")?.snapshot();
-    anyhow::ensure!(
-        current.project_id() == snapshot.project_id() && current.revision() == snapshot.revision(),
-        "project changed while reading glyph boxes"
-    );
+    if current.project_id() != snapshot.project_id() || current.revision() != snapshot.revision() {
+        return Err(anyhow::anyhow!("project changed while reading glyph boxes").into());
+    }
     Ok(boxes
         .into_iter()
         .map(|glyph| GlyphBox {
