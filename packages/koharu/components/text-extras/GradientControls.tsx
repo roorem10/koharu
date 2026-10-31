@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ColorWell } from '@/components/controls/ColorWell'
+import { Field, NumericControl, SelectControl } from '@/components/redesign/Controls'
+import { isMixed } from '@/components/redesign/useTypography'
 import { hexToRgba, rgbaToHex } from '@/lib/color'
 import type { FillGradient, Typography } from '@koharu/bridge/protocol'
-import { NumberField, NumberFieldGroup, NumberFieldInput } from '@koharu/ui/components/number-field'
 import {
   Select,
   SelectContent,
@@ -17,7 +17,7 @@ import {
 
 import type { ApplyTypography } from './SpacingControls'
 
-function gradientFor(value: Typography): FillGradient {
+export function gradientFor(value: Typography): FillGradient {
   return (
     value.fill_gradient ?? {
       kind: 'Linear',
@@ -32,25 +32,25 @@ function gradientFor(value: Typography): FillGradient {
 
 export function GradientControls({
   typography,
+  values = [typography],
   disabled,
   apply,
 }: {
   typography: Typography
+  values?: Typography[]
   disabled: boolean
   apply: ApplyTypography
 }) {
   const { t } = useTranslation()
-  const angleId = useId()
   const gradient = typography.fill_gradient
-  const [angle, setAngle] = useState<number | null>(gradient?.angle_degrees ?? 0)
-  useEffect(() => setAngle(gradient?.angle_degrees ?? 0), [gradient?.angle_degrees])
+  const mixedMode = isMixed(values, (value) => !!value.fill_gradient)
   const update = (change: (value: FillGradient) => FillGradient) =>
     apply((value) => ({ ...value, fill_gradient: change(gradientFor(value)) }))
   return (
     <div className='grid min-w-0 gap-1.5'>
       <Select
         disabled={disabled}
-        value={gradient ? 'gradient' : 'color'}
+        value={mixedMode ? '__mixed__' : gradient ? 'gradient' : 'color'}
         onValueChange={(mode) => {
           if (mode === 'gradient')
             apply((value) => ({ ...value, fill_gradient: gradientFor(value) }))
@@ -58,73 +58,80 @@ export function GradientControls({
         }}
       >
         <SelectTrigger size='sm' aria-label={t('textExtras.fill')} className='w-full min-w-0'>
-          <SelectValue>{t(gradient ? 'textExtras.gradient' : 'textExtras.color')}</SelectValue>
+          <SelectValue>
+            {t(
+              mixedMode ? 'redesign.mixed' : gradient ? 'textExtras.gradient' : 'textExtras.color',
+            )}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
+          {mixedMode && (
+            <SelectItem value='__mixed__' disabled>
+              {t('redesign.mixed')}
+            </SelectItem>
+          )}
           <SelectItem value='color'>{t('textExtras.color')}</SelectItem>
           <SelectItem value='gradient'>{t('textExtras.gradient')}</SelectItem>
+          <SelectItem value='screentone' disabled>
+            {t('redesign.screentoneLater')}
+          </SelectItem>
         </SelectContent>
       </Select>
-      {gradient && (
+      {gradient && !mixedMode ? (
         <>
           <div className='grid min-w-0 grid-cols-2 gap-1.5'>
-            <Select
-              disabled={disabled}
-              value={gradient.kind}
-              onValueChange={(kind) => {
-                if (kind === 'Linear' || kind === 'Radial') update((value) => ({ ...value, kind }))
-              }}
-            >
-              <SelectTrigger
-                size='sm'
-                aria-label={t('textExtras.gradientKind')}
-                className='w-full min-w-0'
-              >
-                <SelectValue>
-                  {t(gradient.kind === 'Linear' ? 'textExtras.linear' : 'textExtras.radial')}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='Linear'>{t('textExtras.linear')}</SelectItem>
-                <SelectItem value='Radial'>{t('textExtras.radial')}</SelectItem>
-              </SelectContent>
-            </Select>
-            {gradient.kind === 'Linear' && (
-              <NumberField
-                id={angleId}
-                value={angle}
-                min={-360}
-                max={360}
-                step={1}
+            <Field label={t('textExtras.gradientKind')}>
+              <SelectControl
+                label={t('textExtras.gradientKind')}
                 disabled={disabled}
-                onValueChange={setAngle}
-                onValueCommitted={(next) => {
-                  if (next !== null && Number.isFinite(next) && next !== gradient.angle_degrees)
-                    update((value) => ({ ...value, angle_degrees: next }))
-                  else setAngle(gradient.angle_degrees)
+                value={isMixed(values, (value) => value.fill_gradient?.kind) ? null : gradient.kind}
+                options={[
+                  ['Linear', t('textExtras.linear')],
+                  ['Radial', t('textExtras.radial')],
+                ]}
+                onChange={(kind) => {
+                  if (kind === 'Linear' || kind === 'Radial')
+                    update((value) => ({ ...value, kind }))
                 }}
-              >
-                <NumberFieldGroup>
-                  <NumberFieldInput
-                    aria-label={t('textExtras.angle')}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') event.currentTarget.blur()
-                    }}
-                  />
-                </NumberFieldGroup>
-              </NumberField>
+              />
+            </Field>
+            {values.every((value) => value.fill_gradient?.kind === 'Linear') && (
+              <Field label={t('textExtras.angle')}>
+                <NumericControl
+                  label={t('textExtras.angle')}
+                  value={
+                    isMixed(values, (value) => value.fill_gradient?.angle_degrees)
+                      ? null
+                      : gradient.angle_degrees
+                  }
+                  disabled={disabled}
+                  min={-360}
+                  max={360}
+                  step={1}
+                  onCommit={(angle_degrees) => update((value) => ({ ...value, angle_degrees }))}
+                />
+              </Field>
             )}
           </div>
-          <div className='flex min-w-0 flex-wrap gap-3'>
+          <div className='grid min-w-0 grid-cols-2 gap-1.5'>
             {(['start', 'end'] as const).map((end) => {
-              const stop = gradient.stops[end === 'start' ? 0 : gradient.stops.length - 1]
+              const stop = end === 'start' ? gradient.stops[0] : gradient.stops.at(-1)
+              const select = (value: Typography) =>
+                end === 'start'
+                  ? value.fill_gradient?.stops[0]?.color
+                  : value.fill_gradient?.stops.at(-1)?.color
               return (
-                <div key={end} className='flex min-w-0 items-center gap-1'>
+                <Field
+                  key={end}
+                  label={
+                    isMixed(values, select) ? t('redesign.mixed') : t(`textExtras.${end}Color`)
+                  }
+                >
                   <ColorWell
-                    size='sm'
-                    disabled={disabled}
                     label={t(`textExtras.${end}Color`)}
-                    value={rgbaToHex(stop.color)}
+                    disabled={disabled}
+                    size='sm'
+                    value={rgbaToHex(stop?.color ?? [0, 0, 0, 255])}
                     onChange={(color) =>
                       update((value) => ({
                         ...value,
@@ -144,14 +151,15 @@ export function GradientControls({
                       }))
                     }
                   />
-                  <span className='min-w-0 text-[9px] text-muted-foreground'>
-                    {t(`textExtras.${end}Color`)}
-                  </span>
-                </div>
+                </Field>
               )
             })}
           </div>
         </>
+      ) : (
+        <p className='text-[10px] text-muted-foreground'>
+          {t(mixedMode ? 'redesign.mixedFillHint' : 'redesign.flatFillHint')}
+        </p>
       )}
     </div>
   )

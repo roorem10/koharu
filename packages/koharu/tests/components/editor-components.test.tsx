@@ -458,6 +458,8 @@ describe('greenfield editor', () => {
         <Inspector />
       </TooltipProvider>,
     )
+    await userEvent.click(screen.getByRole('button', { name: 'Box details for Hello' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Why it looks like this' }))
     const line = await screen.findByText('Bubble shape: Spiky')
     Object.defineProperty(line, 'getBoundingClientRect', {
       value: () => ({
@@ -507,6 +509,7 @@ describe('greenfield editor', () => {
     useKoharuStore.setState({ selectedLayers: ['element', 'second'] })
     const update = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
     render(<Inspector />)
+    await userEvent.click(screen.getByRole('tab', { name: 'Outline' }))
     fireEvent.click(screen.getByRole('button', { name: 'Swap fill and outline colors' }))
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
     expect(update.mock.calls[0]![0]).toEqual([
@@ -583,8 +586,9 @@ describe('greenfield editor', () => {
     })
     const update = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
     render(<Inspector />)
-    const user = userEvent.setup()
     expect(screen.getByRole('button', { name: 'Text color' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('tab', { name: 'Fill' }))
+    const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Start color' }))
     fireEvent.change(await screen.findByRole('textbox', { name: 'Hex color code' }), {
       target: { value: '#ABCDEF' },
@@ -612,13 +616,28 @@ describe('greenfield editor', () => {
         },
       },
     }
+    const second = {
+      ...secondLayer,
+      typography: {
+        ...secondLayer.typography!,
+        fill_gradient: {
+          kind: 'Linear' as const,
+          angle_degrees: 0,
+          stops: [
+            { offset: 0, color: secondLayer.typography!.color! },
+            { offset: 1, color: [255, 255, 255, 255] as [number, number, number, number] },
+          ],
+        },
+      },
+    }
     queryClient.setQueryData(pageKey, {
       ...queryClient.getQueryData<Awaited<ReturnType<typeof commands.getPage>>>(pageKey),
-      layers: [first, secondLayer],
+      layers: [first, second],
     })
     useKoharuStore.setState({ selectedLayers: ['element', 'second'] })
     const update = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
     render(<Inspector />)
+    await userEvent.click(screen.getByRole('tab', { name: 'Fill' }))
     const user = userEvent.setup()
     await user.click(screen.getByRole('combobox', { name: 'Gradient kind' }))
     await user.click(await screen.findByRole('option', { name: 'Radial' }))
@@ -1163,6 +1182,7 @@ describe('greenfield editor', () => {
     installProject()
     const setTypography = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
     render(<Inspector />)
+    await userEvent.click(screen.getByRole('tab', { name: 'Outline' }))
 
     expect(screen.queryByRole('button', { name: 'Enable text border' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Border color' }))
@@ -1201,6 +1221,7 @@ describe('greenfield editor', () => {
     installProject()
     const setTypography = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
     render(<Inspector />)
+    await userEvent.click(screen.getByRole('tab', { name: 'Outline' }))
 
     expect(screen.getByRole('button', { name: 'Second border color' })).toBeDisabled()
     expect(screen.getByRole('textbox', { name: 'Second border width' })).toBeDisabled()
@@ -1244,6 +1265,7 @@ describe('greenfield editor', () => {
     })
     const setTypography = vi.spyOn(commands, 'setTypography').mockResolvedValue(null)
     render(<Inspector />)
+    await userEvent.click(screen.getByRole('tab', { name: 'Outline' }))
 
     await user.click(screen.getByRole('button', { name: 'Second border color' }))
     fireEvent.change(screen.getByRole('textbox', { name: 'Hex color code' }), {
@@ -1324,9 +1346,8 @@ describe('greenfield editor', () => {
 
     unmount()
     render(<Inspector />)
-    fireEvent.click(screen.getByRole('combobox', { name: 'Font style' }))
-    expect(screen.getByRole('option', { name: 'Regular' })).toBeInTheDocument()
-    await user.click(screen.getByRole('option', { name: 'Italic' }))
+    expect(screen.getByRole('button', { name: 'Italic' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Italic' }))
     await waitFor(() =>
       expect(setTypography).toHaveBeenCalledWith([
         expect.objectContaining({
@@ -1337,19 +1358,18 @@ describe('greenfield editor', () => {
     )
   })
 
-  it('debounces layer text editing and flushes it when focus leaves the field', async () => {
+  it('debounces translation editing in Box details and keeps source read-only', async () => {
     installProject()
-    const save = vi.spyOn(commands, 'setSourceText').mockResolvedValue(null)
+    const save = vi.spyOn(commands, 'setTranslation').mockResolvedValue(null)
     render(<Inspector />)
-    const layer = screen.getByRole('button', { name: 'Edit Hello' })
-    expect(screen.getByTestId('edit-source-element')).toBeInTheDocument()
-    fireEvent.click(layer)
     expect(screen.queryByTestId('edit-source-element')).not.toBeInTheDocument()
-    fireEvent.click(layer)
-    const source = screen.getByTestId('edit-source-element')
-    fireEvent.change(source, { target: { value: 'corrected OCR' } })
-    fireEvent.blur(source)
-    await waitFor(() => expect(save).toHaveBeenCalledWith('element', 'corrected OCR'))
+    await userEvent.click(screen.getByRole('button', { name: 'Box details for Hello' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Source & translation' }))
+    expect(screen.getByRole('textbox', { name: 'Source text' })).toHaveAttribute('readonly')
+    const translation = screen.getByTestId('edit-translation-element')
+    fireEvent.change(translation, { target: { value: 'Corrected translation' } })
+    fireEvent.blur(translation)
+    await waitFor(() => expect(save).toHaveBeenCalledWith('element', 'Corrected translation'))
   })
 
   it('shows actual layers with only the useful text-role distinction', () => {
@@ -2365,11 +2385,30 @@ describe('greenfield editor', () => {
     await waitFor(() => expect(button).toBeEnabled())
     expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'success' }))
     await user.click(button)
-    await waitFor(() => expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'info' })))
-    act(() => useKoharuStore.setState({ jobs: {
-      job: { id: 'job', retry: null, failures: [], project: null, operation: null, finish_sound: false, state: 'running', completed: 0, total: 1, page: null,
-        stage: null, model: null, error: null },
-    } }))
+    await waitFor(() =>
+      expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'info' })),
+    )
+    act(() =>
+      useKoharuStore.setState({
+        jobs: {
+          job: {
+            id: 'job',
+            retry: null,
+            failures: [],
+            project: null,
+            operation: null,
+            finish_sound: false,
+            state: 'running',
+            completed: 0,
+            total: 1,
+            page: null,
+            stage: null,
+            model: null,
+            error: null,
+          },
+        },
+      }),
+    )
     expect(button).toBeDisabled()
     await user.click(button)
     expect(unload).toHaveBeenCalledTimes(2)
@@ -2418,7 +2457,12 @@ describe('greenfield editor', () => {
       jobs: {
         job: {
           state: 'running',
-          id: 'job', retry: null, failures: [], project: null, operation: null, finish_sound: false,
+          id: 'job',
+          retry: null,
+          failures: [],
+          project: null,
+          operation: null,
+          finish_sound: false,
           completed: 1,
           total: 4,
           page: 'page',
