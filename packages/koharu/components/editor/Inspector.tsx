@@ -210,7 +210,7 @@ function TypeInspector() {
   const strokeColor = typography.stroke_color ?? defaultTypography.stroke_color!
   const strokeEnabled = strokeWidth > 0 && strokeColor[3] > 0
   const displayedStrokeWidth = strokeWidth > 0 ? strokeWidth : 1.5
-  const strokeMethod = typography.stroke_method ?? 'expansion'
+  const strokeMethod = typography.stroke_method ?? 'contour'
   const strokePosition = typography.stroke_position ?? 'outside'
   const strokeJoin = typography.stroke_join ?? 'round'
   const outerWidth = typography.outer_stroke_width ?? 0

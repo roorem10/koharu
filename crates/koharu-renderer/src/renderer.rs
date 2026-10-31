@@ -1474,7 +1474,7 @@ fn resolve_stroke(typography: Option<&Typography>) -> Option<StrokeOptions> {
         width_px,
         method: typography
             .stroke_method
-            .unwrap_or(koharu_scene::StrokeMethod::Expansion),
+            .unwrap_or(koharu_scene::StrokeMethod::Contour),
         position: typography
             .stroke_position
             .unwrap_or(koharu_scene::StrokePosition::Outside),
