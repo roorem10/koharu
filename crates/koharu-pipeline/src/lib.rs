@@ -26,7 +26,9 @@ pub use hints::{GlossaryTerm, TranslationHints, page_glossary, previous_context,
 pub use pipeline::Pipeline;
 pub use progress::{Progress, ProgressSink};
 pub use report::{Committer, Report, RunStatus, StageOutput};
-pub use request::{InpaintingMask, Operation, Request, StopToken};
+pub use request::{
+    InpaintingMask, OnPageFailure, Operation, Request, RunOrder, RunPolicy, StopToken,
+};
 pub use resources::{DeviceResources, ResourceSnapshot};
 pub use scope::{Bounds, Scope};
 pub use stage::Stage;

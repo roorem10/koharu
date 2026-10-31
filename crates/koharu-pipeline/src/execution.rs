@@ -38,6 +38,7 @@ pub(crate) struct Execution<'a> {
     inpainting_mask: Option<crate::InpaintingMask>,
     translation_hints: Arc<crate::TranslationHints>,
     redetect: bool,
+    policy: crate::RunPolicy,
 }
 
 impl<'a> Execution<'a> {
@@ -92,6 +93,7 @@ impl<'a> Execution<'a> {
             inpainting_mask: request.inpainting_mask,
             translation_hints: request.translation_hints,
             redetect: request.redetect,
+            policy: request.policy,
         })
     }
 
@@ -153,6 +155,7 @@ impl<'a> Execution<'a> {
             .with_redetect(self.redetect),
             self.stop.clone(),
             self.progress.clone(),
+            self.policy.retries,
         ))
     }
 

@@ -61,6 +61,39 @@ impl Operation {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum OnPageFailure {
+    #[default]
+    ContinueWithOtherPages,
+    StopRun,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum RunOrder {
+    #[default]
+    Overlapped,
+    StageAtATime,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct RunPolicy {
+    pub retries: u8,
+    pub on_page_failure: OnPageFailure,
+    pub order: RunOrder,
+}
+
+impl Default for RunPolicy {
+    fn default() -> Self {
+        Self {
+            retries: 2,
+            on_page_failure: OnPageFailure::default(),
+            order: RunOrder::default(),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Request {
     pub operation: Operation,
@@ -72,6 +105,7 @@ pub struct Request {
     /// Detect pages again even when they already have detected text (WO-20's "Detect again").
     /// Generated regions are replaced; hand-made boxes are kept.
     pub redetect: bool,
+    pub policy: RunPolicy,
 }
 
 impl Default for Request {
@@ -84,6 +118,7 @@ impl Default for Request {
             inpainting_mask: None,
             translation_hints: Arc::default(),
             redetect: false,
+            policy: RunPolicy::default(),
         }
     }
 }

@@ -308,6 +308,7 @@ impl KoharuHost {
             inpainting_mask: None,
             translation_hints,
             redetect: false,
+            policy: super::super::runs::RunSettings::load()?.policy(),
         };
         let mut request = request;
         let result = async {

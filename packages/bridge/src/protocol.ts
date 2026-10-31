@@ -102,6 +102,8 @@ export const commands = {
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
+	getRunSettings: () => __TAURI_INVOKE<RunSettings>("get_run_settings"),
+	saveRunSettings: (settings: RunSettings) => __TAURI_INVOKE<RunSettings>("save_run_settings", { settings }),
 };
 
 /* Types */
@@ -413,6 +415,7 @@ export type Job = {
 	stage: Stage | null,
 	model: string | null,
 	error: string | null,
+	retry: RetryProgress | null,
 };
 
 export type JobId = string;
@@ -516,6 +519,8 @@ export type ModelSelection = {
 };
 
 export type OcrModel = { model: "paddleocr-vl-1.6" } | { model: "manga-ocr" } | { model: "baberu-ocr" } | { model: "hayai-ocr" };
+
+export type OnPageFailure = "continue_with_other_pages" | "stop_run";
 
 export type OpenAiCompatibleConfig = {
 	base_url?: string | null,
@@ -653,6 +658,11 @@ export type ReadWhen = "missing" | "always" | "never";
 
 export type Reasoning = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 
+export type RetryProgress = {
+	attempt: number,
+	attempts: number,
+};
+
 export type Revision = number;
 
 export type RoremMixedConfig = {
@@ -661,6 +671,21 @@ export type RoremMixedConfig = {
 };
 
 export type RunId = string;
+
+export type RunOrder = "overlapped" | "stage_at_a_time";
+
+export type RunPreset = {
+	name: string,
+	stages: Stage[],
+};
+
+export type RunSettings = {
+	retries?: number,
+	on_page_failure?: OnPageFailure,
+	order?: RunOrder,
+	finish_sound?: boolean,
+	presets?: RunPreset[],
+};
 
 export type Scope = { scope: "project" } | { scope: "pages"; value: EntityId[] } | { scope: "region"; value: {
 	page: EntityId,

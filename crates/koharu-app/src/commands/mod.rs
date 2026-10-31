@@ -165,6 +165,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             // WO-12 (QC list) commands go here.
             // WO-13 (files and export) commands go here.
             // WO-14 (runs and retries) commands go here.
+            runs::get_run_settings,
+            runs::save_run_settings,
             // WO-06 (text style extras and box notes) commands go here.
             // WO-21 (MCP server) commands go here.
         ])

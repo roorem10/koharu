@@ -85,7 +85,24 @@ impl StageRunner {
         let started = Instant::now();
         let page = job.input.page();
         let model = self.stages.model(job.stage).to_owned();
-        let outcome = self.run_with_recovery(&job, &model).await;
+        let outcome = retry_stage(
+            job.retries,
+            &job.stop,
+            || self.run_with_recovery(&job, &model),
+            |retry, attempts| {
+                progress::emit(
+                    job.progress.as_ref(),
+                    Progress::Retrying {
+                        page,
+                        stage: job.stage,
+                        attempt: retry + 1,
+                        attempts,
+                    },
+                );
+                retry_wait(retry, &job.stop)
+            },
+        )
+        .await;
         StageCompletion {
             page,
             stage: job.stage,
@@ -215,6 +232,7 @@ pub(crate) struct StageJob {
     input: StageInput,
     stop: StopToken,
     progress: Option<ProgressSink>,
+    retries: u8,
 }
 
 impl StageJob {
@@ -223,12 +241,14 @@ impl StageJob {
         input: StageInput,
         stop: StopToken,
         progress: Option<ProgressSink>,
+        retries: u8,
     ) -> Self {
         Self {
             stage,
             input,
             stop,
             progress,
+            retries,
         }
     }
 }
@@ -245,4 +265,128 @@ pub(crate) struct StageCompletion {
     pub(crate) model: String,
     pub(crate) elapsed: Duration,
     pub(crate) outcome: std::result::Result<StageOutcome, PipelineError>,
+}
+
+async fn retry_stage<F, Fut, W, Wait>(
+    retries: u8,
+    stop: &StopToken,
+    mut attempt: F,
+    mut wait: W,
+) -> std::result::Result<StageOutcome, PipelineError>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = std::result::Result<StageOutcome, PipelineError>>,
+    W: FnMut(u8, u8) -> Wait,
+    Wait: std::future::Future<Output = ()>,
+{
+    let retries = retries.min(5);
+    for retry in 0..=retries {
+        if stop.stopped() {
+            return Ok(StageOutcome::Stopped);
+        }
+        match attempt().await {
+            Err(error)
+                if !matches!(error.kind, ErrorKind::InvalidInput | ErrorKind::Commit)
+                    && retry < retries
+                    && !stop.stopped() =>
+            {
+                wait(retry + 1, retries + 1).await;
+            }
+            result => return result,
+        }
+    }
+    unreachable!("the last attempt always returns")
+}
+
+async fn retry_wait(retry: u8, stop: &StopToken) {
+    let delay = match retry {
+        1 => 20,
+        2 => 50,
+        _ => 100,
+    };
+    // Release the accelerator between attempts; cancellation stays responsive during backoff.
+    for _ in 0..delay {
+        if stop.stopped() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU8, Ordering};
+
+    async fn fake_stage(failures: u8, kind: ErrorKind, retries: u8) -> (u8, Vec<(u8, u8)>, bool) {
+        let calls = AtomicU8::new(0);
+        let mut waits = Vec::new();
+        let result = retry_stage(
+            retries,
+            &StopToken::default(),
+            || {
+                let call = calls.fetch_add(1, Ordering::Relaxed);
+                std::future::ready(if call < failures {
+                    Err(PipelineError::new(
+                        kind,
+                        Some(Stage::Translation),
+                        anyhow::anyhow!("returned 1 segments; expected 2"),
+                    ))
+                } else {
+                    Ok(StageOutcome::Skipped)
+                })
+            },
+            |retry, attempts| {
+                waits.push((retry, attempts));
+                std::future::ready(())
+            },
+        )
+        .await;
+        (calls.load(Ordering::Relaxed), waits, result.is_ok())
+    }
+
+    #[tokio::test]
+    async fn retries_a_fake_stage_until_success_or_exhaustion() {
+        assert_eq!(
+            fake_stage(2, ErrorKind::Processing, 2).await,
+            (3, vec![(1, 3), (2, 3)], true)
+        );
+        assert_eq!(
+            fake_stage(10, ErrorKind::Processing, 2).await,
+            (3, vec![(1, 3), (2, 3)], false)
+        );
+        assert_eq!(
+            fake_stage(10, ErrorKind::ModelLoad, 0).await,
+            (1, vec![], false)
+        );
+        for kind in [ErrorKind::InvalidInput, ErrorKind::Commit] {
+            assert_eq!(fake_stage(2, kind, 2).await, (1, vec![], false));
+        }
+    }
+
+    #[tokio::test]
+    async fn stopping_during_backoff_does_not_start_another_attempt() {
+        let stop = StopToken::default();
+        let calls = AtomicU8::new(0);
+        let result = retry_stage(
+            2,
+            &stop,
+            || {
+                calls.fetch_add(1, Ordering::Relaxed);
+                std::future::ready(Err(PipelineError::new(
+                    ErrorKind::Processing,
+                    Some(Stage::Ocr),
+                    anyhow::anyhow!("timeout"),
+                )))
+            },
+            |_, _| {
+                stop.stop();
+                std::future::ready(())
+            },
+        )
+        .await
+        .unwrap();
+        assert!(matches!(result, StageOutcome::Stopped));
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
+    }
 }

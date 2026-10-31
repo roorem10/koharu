@@ -19,6 +19,12 @@ pub enum Progress {
         stage: Stage,
         model: String,
     },
+    Retrying {
+        page: EntityId,
+        stage: Stage,
+        attempt: u8,
+        attempts: u8,
+    },
     Finished {
         page: EntityId,
         stage: Stage,

@@ -48,6 +48,13 @@ pub struct Job {
     pub stage: Option<koharu_pipeline::Stage>,
     pub model: Option<String>,
     pub error: Option<String>,
+    pub retry: Option<RetryProgress>,
+}
+
+#[derive(Clone, Debug, Serialize, Type)]
+pub struct RetryProgress {
+    pub attempt: u8,
+    pub attempts: u8,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Type)]
@@ -106,6 +113,7 @@ pub(crate) async fn start_job(
     processing: &Processing,
     job_channel: &JobChannel,
 ) -> Result<JobId> {
+    let settings = super::runs::RunSettings::load()?;
     let translation_hints = {
         let project = project.project.lock().await;
         let project = project.as_ref().context("no project is open")?;
@@ -131,6 +139,7 @@ pub(crate) async fn start_job(
         stage: None,
         model: None,
         error: None,
+        retry: None,
     };
     processing.jobs.lock().insert(id, job.clone());
     job_channel.channel.publish(job);
@@ -149,6 +158,7 @@ pub(crate) async fn start_job(
             inpainting_mask,
             translation_hints,
             redetect,
+            policy: settings.policy(),
         };
         request.progress = Some(Arc::new(move |event| {
             let update = match event {
@@ -173,6 +183,27 @@ pub(crate) async fn start_job(
                     progress.0 = progress.0.saturating_add(1).min(progress.1);
                     Some((progress.0, progress.1, Some(page), Some(stage), None))
                 }
+                Progress::Retrying {
+                    page,
+                    stage,
+                    attempt,
+                    attempts,
+                } => {
+                    let processing = progress_handle.state::<Processing>();
+                    let job = {
+                        let mut jobs = processing.jobs.lock();
+                        jobs.get_mut(&id).map(|job| {
+                            job.page = Some(page);
+                            job.stage = Some(stage);
+                            job.retry = Some(RetryProgress { attempt, attempts });
+                            job.clone()
+                        })
+                    };
+                    if let Some(job) = job {
+                        progress_handle.state::<JobChannel>().channel.publish(job);
+                    }
+                    None
+                }
                 Progress::Running { .. } => None,
             };
             if let Some((completed, total, page, stage, model)) = update {
@@ -180,6 +211,7 @@ pub(crate) async fn start_job(
                     let processing = progress_handle.state::<Processing>();
                     let mut jobs = processing.jobs.lock();
                     jobs.get_mut(&id).map(|job| {
+                        job.retry = None;
                         job.completed = completed;
                         job.total = total;
                         job.page = page;
@@ -260,6 +292,7 @@ pub(crate) async fn start_job(
                 (false, Some(format!("{error:#}")))
             }
         };
+        let stopped = stopped || stop.stopped();
         task_handle.state::<Processing>().stops.lock().remove(&id);
         let job = task_handle
             .state::<Processing>()
