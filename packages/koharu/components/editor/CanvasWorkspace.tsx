@@ -18,6 +18,7 @@ import { useCanvas } from '@/components/editor/useCanvas'
 import { WarpHandles } from '@/components/editor/WarpHandles'
 import { originalVisible, useCompareStore } from '@/components/qc/compare'
 import { OriginalOverlay } from '@/components/qc/OriginalOverlay'
+import { useRichTextEditor } from '@/components/rich-text-editor/useRichTextEditor'
 import { call } from '@/lib/backend'
 import { expandLayerSelection } from '@/lib/document'
 import {
@@ -122,6 +123,7 @@ export function CanvasWorkspace() {
   const ocrBoxTool = useOcrBoxTool()
   const removeAreaTool = useRemoveAreaTool()
   const contextMenu = useCanvasContextMenu()
+  const richTextEditor = useRichTextEditor()
   const previousPageIndex = useRef<number | null>(null)
   const spaceHeld = useRef(false)
   const compareKey = useRef<string | null>(null)
@@ -850,6 +852,15 @@ export function CanvasWorkspace() {
             if (originalVisible() || !page) return
             contextMenu.open(event.nativeEvent, clientPagePoint(event.clientX, event.clientY))
           }}
+          onDoubleClick={(event) => {
+            if (originalVisible() || !page || tool !== 'select' || event.button !== 0) return
+            if (event.target instanceof Element && event.target.closest('[data-canvas-control]'))
+              return
+            const point = clientPagePoint(event.clientX, event.clientY)
+            const layer = hitTestLayers(page.layers, point, layerFrames)
+            if (layer?.type !== 'text') return
+            if (richTextEditor.open(layer.id, point, event.nativeEvent)) event.preventDefault()
+          }}
           onPointerDown={(event) => {
             if (
               originalVisible() ||
@@ -1147,6 +1158,7 @@ export function CanvasWorkspace() {
             )}
           {page && !showingOriginal && <CleanupQueueBar />}
           {page && !showingOriginal && contextMenu.menu}
+          {page && !showingOriginal && richTextEditor.overlay}
           {page && showingOriginal && <OriginalOverlay key={page.id} page={page} />}
           {page && !showingOriginal && canvasState.status === 'error' && (
             <div

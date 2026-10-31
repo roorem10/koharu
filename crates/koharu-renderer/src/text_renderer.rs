@@ -59,6 +59,9 @@ pub(crate) struct TextNodeDescriptor {
     pub(crate) word_spacing: f32,
     pub(crate) text_inset: [f32; 4],
     pub(crate) point_text: bool,
+    /// Word styles over `text`, in `char` offsets (see `koharu_scene::TextRuns`).
+    /// The foundation fills this; WO-11B lays it out and WO-11C paints it.
+    pub(crate) runs: Vec<koharu_scene::StyleRun>,
 }
 
 pub(crate) struct RenderedTextNode {
@@ -1552,6 +1555,7 @@ mod tests {
             word_spacing: 0.0,
             text_inset: [4.0; 4],
             point_text: false,
+            runs: Vec::new(),
         };
         let fonts = Fonts::new();
         fonts
@@ -1593,6 +1597,7 @@ mod tests {
             word_spacing: 0.0,
             text_inset: [0.0; 4],
             point_text: false,
+            runs: Vec::new(),
         };
         let bounds = LayoutBox {
             x: 0.0,

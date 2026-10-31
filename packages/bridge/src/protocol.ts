@@ -161,6 +161,30 @@ export const commands = {
 	getReadingModel: () => __TAURI_INVOKE<ReadModelInfo>("get_reading_model"),
 	getReadingModels: () => __TAURI_INVOKE<Model[]>("get_reading_models"),
 	getLastReadModel: () => __TAURI_INVOKE<string | null>("get_last_read_model"),
+	/**  Sets or clears styles on `start..end` of one box, as one undo step. */
+	setWordStyle: (layer: EntityId, start: number, end: number, patch: RunStylePatch) => __TAURI_INVOKE<null>("set_word_style", { layer, start, end, patch }),
+	/**
+	 *  Removes word styles: on `start..end` of each box when given, otherwise
+	 *  all of them ("Clear all word styles"). One undo step for all boxes.
+	 */
+	clearWordStyles: (layers: EntityId[], range: [number, number] | null) => __TAURI_INVOKE<null>("clear_word_styles", { layers, range }),
+	/**
+	 *  Replaces `start..end` of the box's shown text with `insert` (typing on the
+	 *  page), keeping word styles on their characters. Typed text takes the style
+	 *  of the character before it. One undo step.
+	 */
+	replaceTextRange: (layer: EntityId, start: number, end: number, insert: string) => __TAURI_INVOKE<null>("replace_text_range", { layer, start, end, insert }),
+	/**
+	 *  The box's word styles (empty when it has none), for the editor's and the
+	 *  panel's mixed values. WO-11A fills it.
+	 */
+	getWordStyles: (layer: EntityId) => __TAURI_INVOKE<StyleRun[]>("get_word_styles", { layer }),
+	getTextGlyphBoxes: (layer: EntityId) => __TAURI_INVOKE<GlyphBox[]>("get_text_glyph_boxes", { layer }),
+	/**
+	 *  Applies the box's lettering-category Emphasis style to `start..end`, as
+	 *  ordinary word styles (one undo step). Used by the ★ button.
+	 */
+	applyEmphasis: (layer: EntityId, start: number, end: number) => __TAURI_INVOKE<null>("apply_emphasis", { layer, start, end }),
 };
 
 /* Types */
@@ -498,6 +522,23 @@ export type GlossaryEntry = {
 	locked?: boolean,
 };
 
+/**
+ *  The drawn box of one character (or of one cluster, when several `char`s
+ *  form one glyph: then `end - start > 1`).
+ */
+export type GlyphBox = {
+	start: number,
+	end: number,
+	/**  Line number, from 0, in reading order. */
+	line: number,
+	/**
+	 *  Corners in page coordinates, after rotation and skew/perspective:
+	 *  top-left, top-right, bottom-right, bottom-left in the glyph's own
+	 *  reading direction.
+	 */
+	quad: [([number, number]), ([number, number]), ([number, number]), ([number, number])],
+};
+
 export type GoogleCloudConfig = Record<string, never>;
 
 export type GradientKind = "Linear" | "Radial";
@@ -571,7 +612,9 @@ export type LanguageChoice = {
 	name: string,
 };
 
-export type Layer = { type: "group"; id: EntityId; parent: EntityId | null; visibility: LayerVisibility; name: string; role: GroupRole | null } | { type: "text"; id: EntityId; parent: EntityId | null; geometry: Geometry | null; angle_degrees: number | null; visibility: LayerVisibility; content: TextContent; typography: Typography | null; layout: TextLayoutKind; automatic_region: EntityId | null } | { type: "raster"; id: EntityId; parent: EntityId | null; visibility: LayerVisibility; image: string | null; name: string; kind: RasterLayerKind } | { type: "image"; id: EntityId; parent: EntityId | null; geometry: Geometry; visibility: LayerVisibility; image: string } | { type: "artwork"; id: EntityId; parent: EntityId | null; geometry: Geometry; visibility: LayerVisibility; image: string };
+export type Layer = { type: "group"; id: EntityId; parent: EntityId | null; visibility: LayerVisibility; name: string; role: GroupRole | null } | { type: "text"; id: EntityId; parent: EntityId | null; geometry: Geometry | null; angle_degrees: number | null; visibility: LayerVisibility; content: TextContent; typography: Typography | null; layout: TextLayoutKind; automatic_region: EntityId | null; 
+/**  Present only when the box has word styles (batch 3, rich text). */
+word_styles?: WordStyles | null } | { type: "raster"; id: EntityId; parent: EntityId | null; visibility: LayerVisibility; image: string | null; name: string; kind: RasterLayerKind } | { type: "image"; id: EntityId; parent: EntityId | null; geometry: Geometry; visibility: LayerVisibility; image: string } | { type: "artwork"; id: EntityId; parent: EntityId | null; geometry: Geometry; visibility: LayerVisibility; image: string };
 
 export type LayerCommit = {
 	revision: Revision,
@@ -964,6 +1007,39 @@ export type RunSettings = {
 	presets?: RunPreset[],
 };
 
+/**
+ *  Overrides for one run of characters. Every field is optional: an empty
+ *  field uses the box's `Typography`, which stays the base style.
+ */
+export type RunStyle = {
+	font: string | null,
+	font_weight: number | null,
+	font_style: FontStyle | null,
+	/**
+	 *  Size as a multiple of the box's laid-out size (1.15 = 15% bigger), so
+	 *  auto-fit keeps working. The UI shows and accepts pixels and converts.
+	 */
+	size_scale: number | null,
+	color: [number, number, number, number] | null,
+	fill_gradient: FillGradient | null,
+	stroke_color: [number, number, number, number] | null,
+	stroke_width: number | null,
+	outer_stroke_color: [number, number, number, number] | null,
+	outer_stroke_width: number | null,
+};
+
+/**  One field of [`RunStyle`], for clearing it on a range. */
+export type RunStyleField = "font" | "font_weight" | "font_style" | "size_scale" | "color" | "fill_gradient" | "stroke_color" | "stroke_width" | "outer_stroke_color" | "outer_stroke_width";
+
+/**
+ *  A change to the word styles of a range: fields in `set` that are `Some`
+ *  are set, fields listed in `clear` go back to the box's own style.
+ */
+export type RunStylePatch = {
+	set: RunStyle,
+	clear: RunStyleField[],
+};
+
 export type Scope = { scope: "project" } | { scope: "pages"; value: EntityId[] } | { scope: "region"; value: {
 	page: EntityId,
 	bounds: Bounds,
@@ -1041,6 +1117,17 @@ export type StyleApplyResult = {
 	changed: number,
 	skipped: number,
 	kept_manual: number,
+};
+
+/**
+ *  One styled range. `start` and `end` count Unicode scalar values (Rust
+ *  `char`s) of the text the box shows: its translation, or its source when it
+ *  has no translation. `start < end`.
+ */
+export type StyleRun = {
+	start: number,
+	end: number,
+	style: RunStyle,
 };
 
 export type StyleScope = ({ layers: EntityId[] }) & { page?: never } | ({ page: EntityId }) & { layers?: never } | "project";
@@ -1148,6 +1235,15 @@ export type TypographyUpdate = {
 };
 
 export type WheelZoom = "ctrl" | "wheel";
+
+/**  Summary of a text box's word styles for the layer list and the fx tag. */
+export type WordStyles = {
+	/**
+	 *  Some word has its own outline, 2nd outline or gradient (counts as an
+	 *  effect for the fx tag, like WO-23's whole-box effects).
+	 */
+	effects: boolean,
+};
 
 export type WritingMode = "Horizontal" | "Vertical";
 

@@ -7,7 +7,7 @@
 use crate::{
     BubbleRegion, DetectionAnalysis, EntityId, EntityOrigin, Error, Geometry, Group, OcrAnalysis,
     Page, Project, RasterLayer, Region, RegionSpec, Relation, Result, SourceText, TextContent,
-    TextGroup, TextLayout, TextRegion, TextRole, Translation, Typography, Visibility,
+    TextGroup, TextLayout, TextRegion, TextRole, TextRuns, Translation, Typography, Visibility,
     component::{Component, ComponentRecord, ValidationContext, decode, key},
     components::Assets,
     state::{Components, State},
@@ -60,6 +60,7 @@ component_schema! {
     DETECTION_ANALYSIS = 15 => DetectionAnalysis,
     ASSETS = 16 => Assets,
     ENTITY_ORIGIN = 17 => EntityOrigin,
+    TEXT_RUNS = 18 => TextRuns,
 }
 
 pub(crate) fn validate_components(
@@ -174,6 +175,10 @@ pub(crate) fn validate_entity(state: &State, id: EntityId) -> Result<()> {
     } else if has_typography && !has_layout {
         Err(Error::invalid(format!(
             "entity {id} has typography but is not a text layer"
+        )))
+    } else if has(TEXT_RUNS) && !has_layout {
+        Err(Error::invalid(format!(
+            "entity {id} has word styles but is not a text layer"
         )))
     } else if (has_detection || has_ocr) && !has_region {
         Err(Error::invalid(format!(

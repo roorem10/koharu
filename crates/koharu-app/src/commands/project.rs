@@ -90,6 +90,10 @@ pub enum Layer {
         typography: Option<Typography>,
         layout: TextLayoutKind,
         automatic_region: Option<EntityId>,
+        /// Present only when the box has word styles (batch 3, rich text).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[specta(optional)]
+        word_styles: Option<WordStyles>,
     },
     Raster {
         id: EntityId,
@@ -113,6 +117,32 @@ pub enum Layer {
         visibility: LayerVisibility,
         image: String,
     },
+}
+
+/// Summary of a text box's word styles for the layer list and the fx tag.
+#[derive(Clone, Copy, Debug, Serialize, Type)]
+pub struct WordStyles {
+    /// Some word has its own outline, 2nd outline or gradient (counts as an
+    /// effect for the fx tag, like WO-23's whole-box effects).
+    pub effects: bool,
+}
+
+impl WordStyles {
+    fn of(runs: &koharu_scene::TextRuns) -> Option<Self> {
+        if runs.runs.is_empty() {
+            return None;
+        }
+        Some(Self {
+            effects: runs.runs.iter().any(|run| {
+                let style = &run.style;
+                style.fill_gradient.is_some()
+                    || style.stroke_color.is_some()
+                    || style.stroke_width.is_some()
+                    || style.outer_stroke_color.is_some()
+                    || style.outer_stroke_width.is_some()
+            }),
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Type)]
@@ -678,10 +708,16 @@ impl Project {
             edit.set(
                 content,
                 &SceneSourceText {
-                    text: Authored::user(text),
+                    text: Authored::user(text.clone()),
                     language,
                 },
-            )
+            )?;
+            // WO-11A keeps word styles on their characters.
+            let shown = match snapshot.component::<SceneTranslation>(content)? {
+                Some(translation) => translation.text.value,
+                None => text,
+            };
+            super::rich_text::on_text_edit(edit, &snapshot, layer, &shown)
         })?;
         self.commit(patch).await
     }
@@ -699,16 +735,27 @@ impl Project {
         let patch = snapshot.patch(|edit| {
             edit.promote_entity_to_user(layer)?;
             edit.promote_entity_to_user(content)?;
-            match text {
-                Some(text) => edit.set(
-                    content,
-                    &SceneTranslation {
-                        text: Authored::user(text),
-                        language,
-                    },
-                ),
-                None => edit.remove::<SceneTranslation>(content),
-            }
+            let shown = match text {
+                Some(text) => {
+                    edit.set(
+                        content,
+                        &SceneTranslation {
+                            text: Authored::user(text.clone()),
+                            language,
+                        },
+                    )?;
+                    text
+                }
+                None => {
+                    edit.remove::<SceneTranslation>(content)?;
+                    snapshot
+                        .component::<SceneSourceText>(content)?
+                        .map(|source| source.text.value)
+                        .unwrap_or_default()
+                }
+            };
+            // WO-11A keeps word styles on their characters.
+            super::rich_text::on_text_edit(edit, &snapshot, layer, &shown)
         })?;
         self.commit(patch).await
     }
@@ -1368,6 +1415,10 @@ impl Project {
                 typography,
                 layout: layout.kind,
                 automatic_region,
+                word_styles: snapshot
+                    .component::<koharu_scene::TextRuns>(layer)?
+                    .as_ref()
+                    .and_then(WordStyles::of),
             });
         }
         if let Some(raster) = snapshot.component::<SceneRasterLayer>(layer)? {

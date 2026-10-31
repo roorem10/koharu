@@ -1221,5 +1221,14 @@
       "spiky": "Spiky (shouting)",
       "free": "No bubble (free text)"
     }
+  },
+  "richText": {
+    "title": "Edit text on the page"
+  },
+  "richTextPanel": {
+    "title": "Word styles"
+  },
+  "emphasis": {
+    "title": "Emphasis"
   }
 }

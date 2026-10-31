@@ -29,6 +29,10 @@ pub struct PositionedGlyph<'a> {
     /// How much the glyph moves on the Y-axis before drawing it, this should
     /// not affect how much the line advances.
     pub y_offset: f32,
+    /// Size this glyph was shaped at. Equal to the layout's size until word
+    /// styles (WO-11B) give runs their own size. WO-11C paints from it.
+    #[allow(dead_code)]
+    pub font_size: f32,
 }
 
 /// A shaped run of text, containing positioned glyphs and overall advance.
@@ -103,6 +107,7 @@ impl TextShaper {
                 y_offset: (pos.y_offset as f32) * scale,
                 x_advance: (pos.x_advance as f32) * scale,
                 y_advance: (pos.y_advance as f32) * scale,
+                font_size: options.font_size,
             });
         }
 

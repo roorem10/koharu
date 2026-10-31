@@ -79,7 +79,7 @@ pub(crate) async fn reset_box_effects(
     Ok(())
 }
 
-struct EffectResolver<'a> {
+pub(crate) struct EffectResolver<'a> {
     styles: &'a TextStyles,
     detect_colors: bool,
     category: Option<(
@@ -89,7 +89,11 @@ struct EffectResolver<'a> {
 }
 
 impl<'a> EffectResolver<'a> {
-    fn new(project: &Project, styles: &'a TextStyles, detect_colors: bool) -> anyhow::Result<Self> {
+    pub(crate) fn new(
+        project: &Project,
+        styles: &'a TextStyles,
+        detect_colors: bool,
+    ) -> anyhow::Result<Self> {
         let category = if styles.shape_styles.enabled {
             Some((
                 project.load_context()?,
@@ -105,7 +109,7 @@ impl<'a> EffectResolver<'a> {
         })
     }
 
-    fn resolve(
+    pub(crate) fn resolve(
         &self,
         snapshot: &Snapshot,
         layer: EntityId,
