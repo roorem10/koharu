@@ -740,7 +740,8 @@ impl Fonts {
             && let Some(catalog) = self.catalog.get()
         {
             if let Some(face) = catalog.select(family, attributes) {
-                self.cache.lock().get(&face.post_script_name)
+                let loaded = self.cache.lock().get(&face.post_script_name);
+                loaded.map(|font| self.synthesized(&face, font, attributes))
             } else {
                 None
             }
@@ -794,6 +795,45 @@ impl Fonts {
             )
             .cloned()
             .collect()
+    }
+
+    /// A bundled face is loaded with its own attributes. When the request asks for
+    /// a weight or slant the face lacks, re-query it so the renderer draws
+    /// synthetic bold or italic, as it already does for system fonts.
+    fn synthesized(&self, face: &BundledFace, font: Font, attributes: Attributes) -> Font {
+        let face_style = FontStyle::from(face.style);
+        let heavy = |weight: f32| weight >= 600.0;
+        let weight_differs = face.weight_range.is_none()
+            && heavy(attributes.weight.value()) != heavy(f32::from(face.weight));
+        let range_differs = face.weight_range.is_some_and(|_| {
+            axis_distance(attributes.weight.value(), face.weight, face.weight_range) > 0
+        });
+        if face_style == attributes.style && !weight_differs && !range_differs {
+            return font;
+        }
+        let style_id = match attributes.style {
+            FontStyle::Normal => 0,
+            FontStyle::Italic => 1,
+            FontStyle::Oblique(_) => 2,
+        };
+        let key = format!(
+            "{}#{}#{style_id}",
+            face.post_script_name,
+            attributes.weight.value().round()
+        );
+        if let Some(styled) = self.cache.lock().get(&key) {
+            return styled;
+        }
+        match font_from_blob(font.data.clone(), face, attributes) {
+            Ok(styled) => {
+                self.cache.lock().insert(key, styled.clone());
+                styled
+            }
+            Err(error) => {
+                tracing::warn!(%error, "could not synthesize a bundled font style");
+                font
+            }
+        }
     }
 
     pub(crate) async fn preview(&self, family_name: &str) -> Result<FontPreview> {
@@ -1027,13 +1067,31 @@ impl FontCatalog {
             .faces
             .iter()
             .min_by_key(|face| {
-                let style = if fontique::FontStyle::from(face.style) == attributes.style {
+                // A missing slant or weight can be synthesized from a plain face, but
+                // a slanted or bold face can't be made plain. So a regular italic
+                // request takes the regular face (synthetic slant) over Bold Italic,
+                // and a bold request takes the regular face (synthetic bold) over an
+                // italic one. B and I stay independent.
+                let face_style = fontique::FontStyle::from(face.style);
+                let style = if face_style == attributes.style {
                     0
-                } else {
+                } else if face_style == fontique::FontStyle::Normal {
                     2_000
+                } else {
+                    10_000
                 };
                 let weight =
                     axis_distance(attributes.weight.value(), face.weight, face.weight_range);
+                let requested_heavy = attributes.weight.value() >= 600.0;
+                let side = if face.weight_range.is_some() || (face.weight >= 600) == requested_heavy
+                {
+                    0
+                } else if requested_heavy {
+                    2_000
+                } else {
+                    10_000
+                };
+                let weight = weight + side;
                 let stretch = axis_distance(
                     attributes.width.percentage(),
                     face.stretch,
@@ -1421,6 +1479,80 @@ mod tests {
                 maximum: 100
             })
         );
+    }
+
+    #[test]
+    fn regular_italic_request_prefers_the_regular_face_over_bold_italic() {
+        // CC Wild Words style: a regular face and a bold italic face, no regular italic.
+        let index = serde_json::from_str::<CatalogIndex>(
+            r#"{
+                "schema_version": 3,
+                "families": [{
+                    "family_name": "Comic",
+                    "weights": [
+                        { "weight": 400, "fonts": [{ "file_name": "Comic-Regular.ttf",
+                          "font_name": "Comic Regular", "postscript_name": "Comic-Regular",
+                          "style": "normal", "width": 1.0, "preview": { "file": "a.webp" } }] },
+                        { "weight": 700, "fonts": [{ "file_name": "Comic-BoldItalic.ttf",
+                          "font_name": "Comic Bold Italic", "postscript_name": "Comic-BoldItalic",
+                          "style": "italic", "width": 1.0, "preview": { "file": "b.webp" } }] }
+                    ]
+                }]
+            }"#,
+        )
+        .expect("the index fixture must deserialize");
+        let catalog = FontCatalog::from_index(index);
+        let pick = |weight: f32, style: FontStyle| {
+            catalog
+                .select(
+                    "Comic",
+                    Attributes {
+                        weight: fontique::FontWeight::new(weight),
+                        style,
+                        ..Attributes::default()
+                    },
+                )
+                .unwrap()
+                .post_script_name
+                .clone()
+        };
+        assert_eq!(pick(400.0, FontStyle::Italic), "Comic-Regular");
+        assert_eq!(pick(700.0, FontStyle::Italic), "Comic-BoldItalic");
+        assert_eq!(pick(700.0, FontStyle::Normal), "Comic-Regular");
+    }
+
+    #[test]
+    fn bundled_faces_get_synthetic_slant_and_bold_for_missing_styles() {
+        let fonts = Fonts::new();
+        let face = BundledFace {
+            family_name: "Layout Fixture".into(),
+            file_name: "fixture.otf".into(),
+            post_script_name: layout_fixture_font().post_script_name().to_owned(),
+            weight: 400,
+            weight_range: None,
+            stretch: 100,
+            stretch_range: None,
+            style: CatalogStyle::Normal,
+            preview_file: String::new(),
+            load: AsyncMutex::new(()),
+        };
+        let request = |weight: f32, style: FontStyle| Attributes {
+            weight: fontique::FontWeight::new(weight),
+            style,
+            ..Attributes::default()
+        };
+        let plain = fonts.synthesized(
+            &face,
+            layout_fixture_font(),
+            request(400.0, FontStyle::Normal),
+        );
+        assert!(plain.synthetic_skew().is_none());
+        let italic = fonts.synthesized(
+            &face,
+            layout_fixture_font(),
+            request(400.0, FontStyle::Italic),
+        );
+        assert!(italic.synthetic_skew().is_some());
     }
 
     #[tokio::test]
