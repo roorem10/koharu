@@ -63,146 +63,150 @@ export function MiniToolbar({
       data-canvas-control
       role='toolbar'
       aria-label={t('richText.toolbar')}
-      className='flex max-w-[calc(100vw-2rem)] flex-wrap items-center gap-1 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg'
+      className='flex max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg'
     >
-      <div className='w-36' data-canvas-control>
-        <FontPicker
-          size='sm'
-          ariaLabel={t('richText.font')}
-          value={values.font ?? ''}
-          placeholder={t('richText.mixed')}
-          families={fonts}
+      {/* Two short rows instead of one long strip: font and size, then style and actions. */}
+      <div data-canvas-control className='flex items-center gap-1'>
+        <div className='w-36' data-canvas-control>
+          <FontPicker
+            size='sm'
+            ariaLabel={t('richText.font')}
+            value={values.font ?? ''}
+            placeholder={t('richText.mixed')}
+            families={fonts}
+            disabled={busy}
+            onChange={(font) => apply(stylePatch({ font }))}
+          />
+        </div>
+        <Button
+          data-canvas-control
+          size='icon-xs'
+          variant='ghost'
           disabled={busy}
-          onChange={(font) => apply(stylePatch({ font }))}
+          aria-label={t('richText.smaller')}
+          title={baseSize === null ? t('richText.autoFitSmaller') : t('richText.smaller')}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => resize(-1)}
+        >
+          A−
+        </Button>
+        <Input
+          data-canvas-control
+          type='number'
+          min={0.1}
+          step={1}
+          className='h-6 w-16 px-1 text-center text-[11px]'
+          aria-label={t('richText.size')}
+          title={baseSize === null ? t('richText.autoFitSizeUnavailable') : t('richText.size')}
+          placeholder={baseSize === null ? '—' : t('richText.mixed')}
+          disabled={busy || baseSize === null}
+          value={draft ?? px ?? ''}
+          onChange={(event) => setDraft(event.currentTarget.value)}
+          onBlur={commitSize}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              commitSize()
+            }
+            if (event.key === 'Escape') setDraft(null)
+          }}
         />
+        <Button
+          data-canvas-control
+          size='icon-xs'
+          variant='ghost'
+          disabled={busy}
+          aria-label={t('richText.bigger')}
+          title={baseSize === null ? t('richText.autoFitBigger') : t('richText.bigger')}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => resize(1)}
+        >
+          A+
+        </Button>
       </div>
-      <Button
-        data-canvas-control
-        size='icon-xs'
-        variant='ghost'
-        disabled={busy}
-        aria-label={t('richText.smaller')}
-        title={baseSize === null ? t('richText.autoFitSmaller') : t('richText.smaller')}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => resize(-1)}
-      >
-        A−
-      </Button>
-      <Input
-        data-canvas-control
-        type='number'
-        min={0.1}
-        step={1}
-        className='h-6 w-16 px-1 text-center text-[11px]'
-        aria-label={t('richText.size')}
-        title={baseSize === null ? t('richText.autoFitSizeUnavailable') : t('richText.size')}
-        placeholder={baseSize === null ? '—' : t('richText.mixed')}
-        disabled={busy || baseSize === null}
-        value={draft ?? px ?? ''}
-        onChange={(event) => setDraft(event.currentTarget.value)}
-        onBlur={commitSize}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault()
-            commitSize()
+      <div data-canvas-control className='flex items-center gap-1'>
+        <Button
+          data-canvas-control
+          size='icon-xs'
+          variant='ghost'
+          disabled={busy}
+          className='font-bold aria-pressed:bg-primary aria-pressed:text-primary-foreground'
+          aria-label={t('richText.bold')}
+          aria-pressed={values.weight === null ? 'mixed' : values.weight >= 600}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() =>
+            apply(
+              values.weight !== null && values.weight >= 600
+                ? stylePatch({}, ['font_weight'])
+                : stylePatch({ font_weight: 700 }),
+            )
           }
-          if (event.key === 'Escape') setDraft(null)
-        }}
-      />
-      <Button
-        data-canvas-control
-        size='icon-xs'
-        variant='ghost'
-        disabled={busy}
-        aria-label={t('richText.bigger')}
-        title={baseSize === null ? t('richText.autoFitBigger') : t('richText.bigger')}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => resize(1)}
-      >
-        A+
-      </Button>
-      <span data-canvas-control aria-hidden className='mx-0.5 h-4 border-l border-border' />
-      <Button
-        data-canvas-control
-        size='icon-xs'
-        variant='ghost'
-        disabled={busy}
-        className='font-bold aria-pressed:bg-primary aria-pressed:text-primary-foreground'
-        aria-label={t('richText.bold')}
-        aria-pressed={values.weight === null ? 'mixed' : values.weight >= 600}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() =>
-          apply(
-            values.weight !== null && values.weight >= 600
-              ? stylePatch({}, ['font_weight'])
-              : stylePatch({ font_weight: 700 }),
-          )
-        }
-      >
-        B
-      </Button>
-      <Button
-        data-canvas-control
-        size='icon-xs'
-        variant='ghost'
-        disabled={busy}
-        className='font-serif italic aria-pressed:bg-primary aria-pressed:text-primary-foreground'
-        aria-label={t('richText.italic')}
-        aria-pressed={values.italic === null ? 'mixed' : values.italic === 'italic'}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() =>
-          apply(
-            values.italic === 'italic'
-              ? stylePatch({}, ['font_style'])
-              : stylePatch({ font_style: 'italic' }),
-          )
-        }
-      >
-        I
-      </Button>
-      <div
-        data-canvas-control
-        title={values.color === null ? t('richText.mixed') : t('richText.color')}
-      >
-        <ColorWell
-          size='sm'
-          label={values.color === null ? t('richText.mixedColor') : t('richText.color')}
+        >
+          B
+        </Button>
+        <Button
+          data-canvas-control
+          size='icon-xs'
+          variant='ghost'
           disabled={busy}
-          value={rgbaToHex((values.color ?? [0, 0, 0, 255]) as [number, number, number, number])}
-          onChange={(color) => apply(stylePatch({ color: hexToRgba(color) }))}
-        />
+          className='font-serif italic aria-pressed:bg-primary aria-pressed:text-primary-foreground'
+          aria-label={t('richText.italic')}
+          aria-pressed={values.italic === null ? 'mixed' : values.italic === 'italic'}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() =>
+            apply(
+              values.italic === 'italic'
+                ? stylePatch({}, ['font_style'])
+                : stylePatch({ font_style: 'italic' }),
+            )
+          }
+        >
+          I
+        </Button>
+        <div
+          data-canvas-control
+          title={values.color === null ? t('richText.mixed') : t('richText.color')}
+        >
+          <ColorWell
+            size='sm'
+            label={values.color === null ? t('richText.mixedColor') : t('richText.color')}
+            disabled={busy}
+            value={rgbaToHex((values.color ?? [0, 0, 0, 255]) as [number, number, number, number])}
+            onChange={(color) => apply(stylePatch({ color: hexToRgba(color) }))}
+          />
+        </div>
+        <Button
+          data-canvas-control
+          size='icon-xs'
+          variant='ghost'
+          disabled={busy}
+          aria-label={t('richText.emphasis')}
+          title={t('richText.emphasis')}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={emphasis}
+        >
+          ★
+        </Button>
+        <Button
+          data-canvas-control
+          size='xs'
+          variant='ghost'
+          disabled={busy}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={clear}
+        >
+          {t('richText.clear')}
+        </Button>
+        <Button
+          data-canvas-control
+          size='xs'
+          variant='secondary'
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={done}
+        >
+          {t('richText.done')}
+        </Button>
       </div>
-      <Button
-        data-canvas-control
-        size='icon-xs'
-        variant='ghost'
-        disabled={busy}
-        aria-label={t('richText.emphasis')}
-        title={t('richText.emphasis')}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={emphasis}
-      >
-        ★
-      </Button>
-      <Button
-        data-canvas-control
-        size='xs'
-        variant='ghost'
-        disabled={busy}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={clear}
-      >
-        {t('richText.clear')}
-      </Button>
-      <Button
-        data-canvas-control
-        size='xs'
-        variant='secondary'
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={done}
-      >
-        {t('richText.done')}
-      </Button>
     </div>
   )
 }

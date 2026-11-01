@@ -702,7 +702,7 @@ export function useRichTextEditor(): {
           className='pointer-events-auto absolute max-w-full'
           style={{
             left,
-            ...(top >= 52 ? { top: top - 8, transform: 'translateY(-100%)' } : { top: bottom + 8 }),
+            ...(top >= 80 ? { top: top - 8, transform: 'translateY(-100%)' } : { top: bottom + 8 }),
           }}
         >
           <MiniToolbar
@@ -733,7 +733,7 @@ export function useRichTextEditor(): {
           data-canvas-control
           role='status'
           className='pointer-events-auto absolute max-h-40 max-w-sm overflow-auto rounded-md border border-border bg-popover p-2 text-xs text-popover-foreground shadow'
-          style={{ left, top: bottom + (start < end && top < 52 ? 52 : 8) }}
+          style={{ left, top: bottom + (start < end && top < 80 ? 80 : 8) }}
         >
           {s.error ? t('richText.saveFailed') : t('richText.loading')}
           {s.error && (
