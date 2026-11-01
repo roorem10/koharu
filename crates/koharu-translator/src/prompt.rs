@@ -171,7 +171,7 @@ fn translation_system_prompt(request: &TranslationRequest) -> String {
     .to_owned();
 
     if request.emphasis {
-        prompt.push_str("\n- Include `emphasis`: an array of exact words or phrases as they appear in the translated text. Stress shouting, explicitly stressed source words, or SFX-like words sparingly; return [] when nothing needs stress. Keep text plain, without markup.");
+        prompt.push_str("\n- Include `emphasis`: an array of exact words or phrases as they appear in the translated text. This is a first-draft lettering suggestion that the editor reviews. Mark a word only when a native letterer of the target language would stress it there: shouting, a word the source clearly stresses (bold, larger, or set apart in the art), or an SFX-like word. Do not add emphasis just because it is available; most segments need none, so return []. Keep text plain, without markup.");
     }
 
     if !request.glossary.is_empty() {
