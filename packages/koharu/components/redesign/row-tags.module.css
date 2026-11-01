@@ -4,17 +4,26 @@
     opacity: 1;
   }
   50% {
-    opacity: 0.45;
+    opacity: 0.35;
   }
 }
 
+/* The whole tag turns yellow and blinks slowly so a box with QC issues stands out. */
 .issue {
-  color: var(--warning, #dba54a);
+  background-color: var(--warning, #dba54a);
+  color: #000;
+  font-weight: 600;
   animation: issue-pulse 1.6s ease-in-out infinite;
 }
 
+/*
+ * Windows turns on reduced motion when "Animation effects" is off, which also
+ * stopped this blink. It is the only signal for a box with issues, so keep a
+ * slower blink; the global reduced-motion rule would otherwise cut it to one frame.
+ */
 @media (prefers-reduced-motion: reduce) {
   .issue {
-    animation: none;
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
   }
 }
