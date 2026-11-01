@@ -33,7 +33,6 @@ import {
   stepOffset,
   stylePatch,
   textChange,
-  wordAtPoint,
   type XY,
 } from './model'
 
@@ -56,7 +55,13 @@ type Session = {
   request: number
   timer: ReturnType<typeof setTimeout> | null
   error: boolean
+  /** Groups this session's typing commits into one undo step. */
+  group: number
 }
+let editingSessions = 0
+const nextEditingSession = () => (editingSessions = (editingSessions + 1) % 2 ** 31)
+/** Typing is saved this soon after a keystroke so the page shows it almost live. */
+const TYPING_SAVE_MS = 60
 const shownText = (layer: TextLayer) =>
   layer.content.translation?.text ?? layer.content.source?.text ?? ''
 
@@ -146,7 +151,14 @@ export function useRichTextEditor(): {
       if (text === s.saved) return
       if (s.project !== current.current.project) throw new Error(t('richText.projectChanged'))
       const change = textChange(s.saved, text)
-      await call(commands.replaceTextRange, s.layer.id, change.start, change.end, change.insert)
+      await call(
+        commands.replaceTextRange,
+        s.layer.id,
+        change.start,
+        change.end,
+        change.insert,
+        s.group,
+      )
       s.saved = text
       s.error = false
       await refresh(projectKey, pagesKey, pageKey)
@@ -200,7 +212,7 @@ export function useRichTextEditor(): {
     if (!s.composing)
       s.timer = setTimeout(() => {
         void flush(s).catch(() => update())
-      }, 400)
+      }, TYPING_SAVE_MS)
   }
   const insert = (s: Session, text: string, start = range(s)[0], end = range(s)[1]) => {
     const draft =
@@ -284,6 +296,7 @@ export function useRichTextEditor(): {
       request: 0,
       timer: null,
       error: false,
+      group: nextEditingSession(),
     }
     session.current = s
     state.selectLayers([id])
@@ -292,10 +305,13 @@ export function useRichTextEditor(): {
     void readGeometry(s)
       .then(() => {
         if (!active(s)) return
-        select(
-          s,
-          ...wordAtPoint(s.draft, s.glyphs, point, s.layer.typography?.writing_mode === 'Vertical'),
+        // Entering the editor only places the caret; words are picked by dragging.
+        const offset = nearestOffset(
+          s.glyphs,
+          point,
+          s.layer.typography?.writing_mode === 'Vertical',
         )
+        select(s, offset, offset)
         focusInput()
       })
       .catch(() => {
@@ -314,8 +330,10 @@ export function useRichTextEditor(): {
   useEffect(() => {
     mounted.current = true
     const outside = (event: PointerEvent) => {
-      // Portal events still bubble through React's overlay. Let them mark the event first.
-      queueMicrotask(() => {
+      // Portal events still bubble through React's overlay. Let them mark the event
+      // first: a microtask would run between native listeners, before React sees the
+      // event, and close the editor under a toolbar click.
+      setTimeout(() => {
         const s = session.current
         if (!s || handled.current.has(event)) return
         if (event.target instanceof Element && event.target.closest('aside')) {
@@ -421,7 +439,6 @@ export function useRichTextEditor(): {
   const top = Math.min(...boundary.map(([, y]) => y))
   const bottom = Math.max(...boundary.map(([, y]) => y))
   const caretScreen = caret ? screen(caret[0]) : [left, Math.max(0, top)]
-  const typing = s.draft !== s.glyphText
   const baseSize =
     s.layer.typography && !s.layer.typography.auto_fit ? s.layer.typography.size : null
   const keyboard = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -575,8 +592,8 @@ export function useRichTextEditor(): {
               drag.current = null
             }}
             onDoubleClick={(event) => {
+              // Words are picked by dragging, so a double-click keeps the caret where it is.
               event.preventDefault()
-              select(s, ...wordAtPoint(s.draft, s.glyphs, local(event), vertical))
               focusInput()
             }}
           >
@@ -711,23 +728,14 @@ export function useRichTextEditor(): {
           />
         </div>
       )}
-      {(typing || s.error || s.loading) && (
+      {(s.error || s.loading) && (
         <div
           data-canvas-control
           role='status'
           className='pointer-events-auto absolute max-h-40 max-w-sm overflow-auto rounded-md border border-border bg-popover p-2 text-xs text-popover-foreground shadow'
           style={{ left, top: bottom + (start < end && top < 52 ? 52 : 8) }}
         >
-          {s.error
-            ? t('richText.saveFailed')
-            : typing
-              ? t('richText.typingPreview')
-              : t('richText.loading')}
-          {typing && (
-            <div data-canvas-control className='mt-1 whitespace-pre-wrap'>
-              {s.draft}
-            </div>
-          )}
+          {s.error ? t('richText.saveFailed') : t('richText.loading')}
           {s.error && (
             <button
               data-canvas-control

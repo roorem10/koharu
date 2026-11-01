@@ -81,11 +81,14 @@ pub(crate) async fn clear_word_styles(
 
 #[tauri::command]
 #[specta::specta]
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn replace_text_range(
     layer: EntityId,
     start: u32,
     end: u32,
     insert: String,
+    // On-page typing passes its editing session so the session's chunks undo together.
+    typing: Option<u32>,
     desktop: State<'_, Desktop>,
     project: State<'_, CurrentProject>,
     canvas_channel: State<'_, CanvasChannel>,
@@ -97,7 +100,7 @@ pub(crate) async fn replace_text_range(
             .replace_text_range(layer, start, end, insert)
             .await?;
         if let Some(commit) = &commit {
-            project.record_commit(commit);
+            project.record_typing(layer, typing, commit);
         }
         (commit, project.active_page())
     };

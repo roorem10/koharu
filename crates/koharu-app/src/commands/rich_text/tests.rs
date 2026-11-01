@@ -800,3 +800,39 @@ async fn translation_reset_uses_the_lettering_category_default() {
     assert!(!actual.auto_fit);
     assert!(matches!(actual.origin, Origin::Generated(_)));
 }
+
+#[tokio::test]
+async fn typing_chunks_in_one_editing_session_undo_together() {
+    let (mut project, [layer, _]) = fixture(true).await;
+    project
+        .set_translation(layer, Some("ab".into()))
+        .await
+        .unwrap();
+    let before = project.undo.len();
+    for (offset, letter, group) in [(2, "c", 7), (3, "d", 7), (4, "e", 8)] {
+        let commit = project
+            .replace_text_range(layer, offset, offset, letter.into())
+            .await
+            .unwrap()
+            .unwrap();
+        project.record_typing(layer, Some(group), &commit);
+    }
+    assert_eq!(shown_text(&project.snapshot(), layer).unwrap(), "abcde");
+    // Session 7 made one step; session 8 started a new one.
+    assert_eq!(project.undo.len(), before + 2);
+    project.undo().await.unwrap();
+    assert_eq!(shown_text(&project.snapshot(), layer).unwrap(), "abcd");
+    project.undo().await.unwrap();
+    assert_eq!(shown_text(&project.snapshot(), layer).unwrap(), "ab");
+    project.redo().await.unwrap();
+    assert_eq!(shown_text(&project.snapshot(), layer).unwrap(), "abcd");
+    // After an undo/redo, the next chunk of the same session starts a new step.
+    let commit = project
+        .replace_text_range(layer, 4, 4, "f".into())
+        .await
+        .unwrap()
+        .unwrap();
+    project.record_typing(layer, Some(7), &commit);
+    project.undo().await.unwrap();
+    assert_eq!(shown_text(&project.snapshot(), layer).unwrap(), "abcd");
+}

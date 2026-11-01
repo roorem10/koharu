@@ -1244,7 +1244,6 @@
     "projectChanged": "The project changed before the text could be saved.",
     "saveFailed": "The edit could not be completed. Your draft is kept here.",
     "retry": "Retry and finish",
-    "typingPreview": "Typing preview",
     "loading": "Loading text positions…"
   },
   "richTextPanel": {

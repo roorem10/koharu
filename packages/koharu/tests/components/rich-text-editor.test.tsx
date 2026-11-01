@@ -163,11 +163,16 @@ const mount = () =>
       <Harness />
     </QueryClientProvider>,
   )
-async function open(x = 55) {
+/** Opens the editor (a caret only) and, unless `word` is false, selects "beta" (3..7). */
+async function open(x = 55, word = true) {
   fireEvent.doubleClick(screen.getByTestId('box'), { button: 0, clientX: x, clientY: 70 })
   const area = (await screen.findByRole('textbox', {
     name: 'Edit text on the page',
   })) as HTMLTextAreaElement
+  await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
+  if (!word) return area
+  fireEvent.keyDown(area, { key: 'End', ctrlKey: true })
+  for (let i = 0; i < 4; i++) fireEvent.keyDown(area, { key: 'ArrowLeft', shiftKey: true })
   await waitFor(() => expect(screen.getByRole('button', { name: 'Bold (Ctrl+B)' })).toBeEnabled())
   return area
 }
@@ -245,11 +250,12 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('on-page editor', () => {
-  it('opens from a text double click, selects the word in char offsets, and keeps the box selected', async () => {
+  it('opens from a text double click with only a caret, and keeps the box selected', async () => {
     mount()
-    await open()
+    await open(55, false)
     expect(screen.getByTestId('rich-text-frame')).toBeInTheDocument()
-    expect(useRichTextSelection.getState().selection).toEqual({ layer: 'box', start: 3, end: 7 })
+    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+    expect(useRichTextSelection.getState().selection).toBeNull()
     expect(useKoharuStore.getState().selectedLayers).toEqual(['box'])
   })
 
@@ -276,19 +282,24 @@ describe('on-page editor', () => {
       mount()
       const area = await open()
       change(area, 'A😀 betaz', 4, 8)
-      expect(screen.getByRole('status')).toHaveTextContent('A😀 betaz')
       if (method === 'Escape') fireEvent.keyDown(area, { key: 'Escape' })
       else if (method === 'Done') fireEvent.click(screen.getByRole('button', { name: 'Done' }))
       else fireEvent.pointerDown(screen.getByRole('button', { name: 'Outside' }))
       await waitFor(() => expect(screen.queryByRole('textbox')).not.toBeInTheDocument())
-      expect(commands.replaceTextRange).toHaveBeenCalledExactlyOnceWith('box', 7, 7, 'z')
+      expect(commands.replaceTextRange).toHaveBeenCalledExactlyOnceWith(
+        'box',
+        7,
+        7,
+        'z',
+        expect.any(Number),
+      )
       expect(useRichTextSelection.getState().selection).toBeNull()
     },
   )
 
   it('keeps the toolbar hidden for a caret and uses character offsets for emoji selection', async () => {
     mount()
-    const area = await open(30)
+    const area = await open(30, false)
     fireEvent.keyDown(area, { key: 'ArrowRight' })
     expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
     expect(useRichTextSelection.getState().selection).toBeNull()
@@ -466,7 +477,13 @@ describe('on-page editor', () => {
     change(area, 'A😀 beta!')
     change(area, 'A😀 beta!!')
     await waitFor(() =>
-      expect(commands.replaceTextRange).toHaveBeenCalledExactlyOnceWith('box', 7, 7, '!!'),
+      expect(commands.replaceTextRange).toHaveBeenCalledExactlyOnceWith(
+        'box',
+        7,
+        7,
+        '!!',
+        expect.any(Number),
+      ),
     )
     const reads = vi.mocked(commands.getTextGlyphBoxes).mock.calls.length
     act(() => useKoharuStore.setState({ canvasGeneration: 4 }))
@@ -492,7 +509,13 @@ describe('on-page editor', () => {
     })
     fireEvent.keyDown(area, { key: 'Escape' })
     await waitFor(() =>
-      expect(commands.replaceTextRange).toHaveBeenCalledExactlyOnceWith('box', 1, 7, '🎉 日本'),
+      expect(commands.replaceTextRange).toHaveBeenCalledExactlyOnceWith(
+        'box',
+        1,
+        7,
+        '🎉 日本',
+        expect.any(Number),
+      ),
     )
   })
 
@@ -503,7 +526,13 @@ describe('on-page editor', () => {
     fireEvent.keyDown(area, { key, ctrlKey: true })
     const command = key === 'z' ? commands.undo : commands.redo
     await waitFor(() => expect(command).toHaveBeenCalledOnce())
-    expect(commands.replaceTextRange).toHaveBeenCalledExactlyOnceWith('box', 7, 7, '!')
+    expect(commands.replaceTextRange).toHaveBeenCalledExactlyOnceWith(
+      'box',
+      7,
+      7,
+      '!',
+      expect.any(Number),
+    )
     expect(vi.mocked(commands.replaceTextRange).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(command).mock.invocationCallOrder[0],
     )
@@ -521,7 +550,13 @@ describe('on-page editor', () => {
         if (what === 'original') useCompareStore.getState().setHeld(true)
       })
       await waitFor(() => expect(screen.queryByRole('textbox')).not.toBeInTheDocument())
-      expect(commands.replaceTextRange).toHaveBeenCalledExactlyOnceWith('box', 7, 7, '!')
+      expect(commands.replaceTextRange).toHaveBeenCalledExactlyOnceWith(
+        'box',
+        7,
+        7,
+        '!',
+        expect.any(Number),
+      )
       expect(useRichTextSelection.getState().selection).toBeNull()
     },
   )
@@ -556,8 +591,25 @@ describe('on-page editor', () => {
     fireEvent.keyDown(area, { key: 'Escape' })
     await act(async () => release())
     await waitFor(() => expect(screen.queryByRole('textbox')).not.toBeInTheDocument())
-    expect(commands.replaceTextRange).toHaveBeenNthCalledWith(1, 'box', 7, 7, '!')
-    expect(commands.replaceTextRange).toHaveBeenNthCalledWith(2, 'box', 8, 8, '!')
+    expect(commands.replaceTextRange).toHaveBeenNthCalledWith(
+      1,
+      'box',
+      7,
+      7,
+      '!',
+      expect.any(Number),
+    )
+    expect(commands.replaceTextRange).toHaveBeenNthCalledWith(
+      2,
+      'box',
+      8,
+      8,
+      '!',
+      expect.any(Number),
+    )
+    const [first, second] = vi.mocked(commands.replaceTextRange).mock.calls
+    // Chunks typed in one editing session become one undo step.
+    expect(second![4]).toBe(first![4])
     expect(text()).toBe('A😀 beta!!')
   })
 })

@@ -407,6 +407,9 @@ pub(crate) struct Project {
     pub(crate) active_page: Option<EntityId>,
     pub(crate) undo: Vec<Vec<Revision>>,
     pub(crate) redo: Vec<Vec<Revision>>,
+    /// The last on-page typing commit (layer, editing session, revision), so a run
+    /// of typing in one session is undone as one step.
+    pub(crate) typing: Option<(EntityId, u32, Revision)>,
     /// The project folder on disk; `None` for in-memory test projects.
     pub(crate) directory: Option<PathBuf>,
 }
@@ -434,6 +437,7 @@ impl Project {
             active_page,
             undo: Vec::new(),
             redo: Vec::new(),
+            typing: None,
             directory: None,
         }
     }
@@ -1272,6 +1276,28 @@ impl Project {
             self.undo.push(revisions);
             self.redo.clear();
         }
+    }
+
+    /// Records an on-page typing commit. Consecutive commits from the same editing
+    /// session on the same box join the previous undo step while nothing else was
+    /// recorded in between.
+    pub(crate) fn record_typing(&mut self, layer: EntityId, group: Option<u32>, commit: &Commit) {
+        if commit.changes.to == commit.changes.from {
+            return;
+        }
+        let joins = matches!(
+            (group, self.typing),
+            (Some(group), Some((previous_layer, previous_group, revision)))
+                if previous_layer == layer
+                    && previous_group == group
+                    && self.redo.is_empty()
+                    && self.undo.last().and_then(|entry| entry.last()) == Some(&revision)
+        );
+        match self.undo.last_mut() {
+            Some(entry) if joins => entry.push(commit.revision),
+            _ => self.record(vec![commit.revision]),
+        }
+        self.typing = group.map(|group| (layer, group, commit.revision));
     }
 
     pub(crate) fn record_commit(&mut self, commit: &Commit) {
