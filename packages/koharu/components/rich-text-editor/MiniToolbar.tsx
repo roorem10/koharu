@@ -130,7 +130,7 @@ export function MiniToolbar({
           size='icon-xs'
           variant='ghost'
           disabled={busy}
-          className='font-bold aria-pressed:bg-primary aria-pressed:text-primary-foreground'
+          className='font-bold aria-pressed:bg-primary! aria-pressed:text-primary-foreground!'
           aria-label={t('richText.bold')}
           aria-pressed={values.weight === null ? 'mixed' : values.weight >= 600}
           onMouseDown={(event) => event.preventDefault()}
@@ -149,7 +149,7 @@ export function MiniToolbar({
           size='icon-xs'
           variant='ghost'
           disabled={busy}
-          className='font-serif italic aria-pressed:bg-primary aria-pressed:text-primary-foreground'
+          className='font-serif italic aria-pressed:bg-primary! aria-pressed:text-primary-foreground!'
           aria-label={t('richText.italic')}
           aria-pressed={values.italic === null ? 'mixed' : values.italic === 'italic'}
           onMouseDown={(event) => event.preventDefault()}
