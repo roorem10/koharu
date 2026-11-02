@@ -155,15 +155,19 @@ pub(super) fn includes_translation(operation: &koharu_pipeline::Operation) -> bo
     }
 }
 
-pub(crate) async fn auto_read(
+/// Whether automatic Read chapter would read now: it's on, a series is linked, more
+/// than one page is in scope, there's no brief yet and the model can see pages.
+pub(crate) async fn wants_auto_read(handle: &AppHandle<CefRuntime>, scope: &Scope) -> Result<bool> {
+    Ok(auto_read_model(handle, scope).await?.is_some())
+}
+
+async fn auto_read_model(
     handle: &AppHandle<CefRuntime>,
     scope: &Scope,
-    stop: &StopToken,
-    job: JobId,
-) -> Result<()> {
+) -> Result<Option<(Snapshot, ModelSelection)>> {
     let settings = settings::load()?;
     if settings.read_when == settings::ReadWhen::Never {
-        return Ok(());
+        return Ok(None);
     }
     let (snapshot, has_brief, linked) = {
         let projects = handle.state::<CurrentProject>();
@@ -180,17 +184,52 @@ pub(crate) async fn auto_read(
         )
     };
     if !linked || scoped_pages(&snapshot, scope)?.len() <= 1 || has_brief {
-        return Ok(());
+        return Ok(None);
     }
     let config = koharu_pipeline::PipelineConfig::load()?;
     let translation_model = config.read()?.translation.model.clone();
-    let selection = match reading_model(settings.read_model, translation_model) {
-        Ok(selection) => selection,
+    match reading_model(settings.read_model, translation_model) {
+        Ok(selection) => Ok(Some((snapshot, selection))),
         Err(error) => {
             tracing::info!(%error, "Read chapter skipped: selected model cannot see page images");
-            return Ok(());
+            Ok(None)
         }
+    }
+}
+
+/// True when some page in scope has an OCR line to read.
+pub(super) fn has_source_lines(snapshot: &Snapshot, scope: &Scope) -> Result<bool> {
+    for (page, _) in scoped_pages(snapshot, scope)? {
+        if let Some(group) = snapshot.page(page)?.text_group()? {
+            for layer in group.text_layers()? {
+                if layer
+                    .content()?
+                    .source()?
+                    .is_some_and(|source| !source.text.value.trim().is_empty())
+                {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+    Ok(false)
+}
+
+pub(crate) async fn auto_read(
+    handle: &AppHandle<CefRuntime>,
+    scope: &Scope,
+    stop: &StopToken,
+    job: JobId,
+) -> Result<()> {
+    let Some((snapshot, selection)) = auto_read_model(handle, scope).await? else {
+        return Ok(());
     };
+    // Without OCR lines the reader can label nothing, and the brief it saved would
+    // stop the real read later (#55). Wait until the chapter has been read by OCR.
+    if !has_source_lines(&snapshot, scope)? {
+        tracing::info!("automatic Read chapter waits: no OCR lines yet");
+        return Ok(());
+    }
     publish_reading(handle, job);
     read(handle, scope, selection, snapshot.project_id(), stop).await
 }
@@ -521,5 +560,93 @@ mod tests {
         assert_eq!(context.suggestions.len(), 1);
         assert_eq!(context.lines.len(), 1);
         assert_eq!(context.lines[&layer].note.as_deref(), Some("pun"));
+    }
+
+    #[test]
+    fn runs_that_find_text_and_translate_split_around_reading() {
+        use koharu_pipeline::{Operation, Stage};
+        let split = |operation| super::super::split_for_reading(&operation);
+        let stages = |stages: &[Stage]| Operation::Stages {
+            stages: stages.to_vec(),
+        };
+        assert_eq!(
+            split(Operation::Full),
+            Some((
+                stages(&[Stage::Detection, Stage::Ocr]),
+                stages(&[Stage::Translation, Stage::Inpainting]),
+            ))
+        );
+        assert_eq!(
+            split(Operation::Through {
+                stage: Stage::Translation
+            }),
+            Some((
+                stages(&[Stage::Detection, Stage::Ocr]),
+                stages(&[Stage::Translation]),
+            ))
+        );
+        assert_eq!(
+            split(stages(&[Stage::Ocr, Stage::Translation])),
+            Some((stages(&[Stage::Ocr]), stages(&[Stage::Translation])))
+        );
+        for operation in [
+            Operation::Only {
+                stage: Stage::Translation,
+            },
+            Operation::Through { stage: Stage::Ocr },
+            Operation::Through {
+                stage: Stage::Inpainting,
+            },
+        ] {
+            assert_eq!(split(operation.clone()), None, "{operation:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn pages_without_ocr_lines_have_nothing_to_read() {
+        use koharu_scene::{
+            At, Authored, PageDraft, Session, SourceText, TextLayout, TextLayoutKind,
+        };
+        let mut session = Session::memory().await.unwrap();
+        let mut first = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                first = Some(edit.add_page(PageDraft::new("one", 100.0, 100.0), At::End)?);
+                edit.add_page(PageDraft::new("two", 100.0, 100.0), At::End)?;
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        // A freshly imported chapter: pages but no OCR lines yet.
+        assert!(!has_source_lines(&session.snapshot(), &Scope::Project).unwrap());
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = first.unwrap();
+                let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &SourceText {
+                        text: Authored::user("変わりたいんだ".into()),
+                        language: None,
+                    },
+                )?;
+                edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &TextLayout {
+                        origin: koharu_scene::Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                        warp: None,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        assert!(has_source_lines(&session.snapshot(), &Scope::Project).unwrap());
     }
 }

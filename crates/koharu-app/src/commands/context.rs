@@ -9,7 +9,7 @@ pub(crate) mod series;
 pub(crate) mod settings;
 
 pub(crate) use lines::refresh_flags;
-pub(crate) use reading::auto_read;
+pub(crate) use reading::{auto_read, wants_auto_read};
 pub(crate) use settings::get_context_settings;
 
 use super::{Error, project::CurrentProject};
@@ -172,6 +172,24 @@ pub(crate) async fn accept_suggestion(
 
 pub(crate) fn operation_translates(operation: &koharu_pipeline::Operation) -> bool {
     reading::includes_translation(operation)
+}
+
+/// Splits a run that both finds text (detection or OCR) and translates into the
+/// text-finding part and the rest, so Read chapter can run in between (#55).
+pub(crate) fn split_for_reading(
+    operation: &koharu_pipeline::Operation,
+) -> Option<(koharu_pipeline::Operation, koharu_pipeline::Operation)> {
+    use koharu_pipeline::{Operation, Stage};
+    let stages = operation.stages().ok()?;
+    let finds = |stage: &Stage| matches!(stage, Stage::Detection | Stage::Ocr);
+    if !stages.contains(&Stage::Translation) || !stages.iter().any(finds) {
+        return None;
+    }
+    let (first, rest): (Vec<_>, Vec<_>) = stages.into_iter().partition(finds);
+    Some((
+        Operation::Stages { stages: first },
+        Operation::Stages { stages: rest },
+    ))
 }
 
 pub(crate) fn linked_series(context: &ProjectContext) -> Result<Option<booharu_context::Series>> {

@@ -237,9 +237,13 @@ async fn start_job_inner(
         request.progress = Some(Arc::new(move |event| {
             let update = match event {
                 Progress::Started { pages, stages } => {
+                    // A run split around Read chapter starts twice; keep counting.
                     let mut progress = progress.lock();
-                    *progress = (0, pages.len().saturating_mul(stages.len()));
-                    Some((0, progress.1, None, None, None))
+                    let total = progress
+                        .0
+                        .saturating_add(pages.len().saturating_mul(stages.len()));
+                    *progress = (progress.0, total);
+                    Some((progress.0, progress.1, None, None, None))
                 }
                 Progress::Loading { page, stage, model } => {
                     let progress = progress.lock();
@@ -376,34 +380,67 @@ async fn start_job_inner(
             handle: task_handle.clone(),
             project: run_project,
         };
-        // A failed chapter read must not block translation; the page requests
-        // simply go out without the new brief.
-        if super::context::operation_translates(&request.operation)
-            && let Err(error) =
-                super::context::auto_read(&task_handle, &request.scope, &stop, id).await
-        {
-            tracing::warn!(%error, "automatic Read chapter failed");
-        }
-        let result = async {
-            let snapshot = {
-                let projects = task_handle.state::<CurrentProject>();
-                let projects = projects.project.lock().await;
-                let project = projects.as_ref().context("no project is open")?;
-                let snapshot = project.snapshot();
-                anyhow::ensure!(
-                    snapshot.project_id() == run_project,
-                    "the project changed during processing"
-                );
-                request.translation_hints = Arc::new(super::context::translation_hints(
-                    &project.load_context()?,
-                    &snapshot,
-                )?);
-                snapshot
-            };
-            pipeline
-                .execute(snapshot, request, &mut committer)
-                .await
-                .map_err(anyhow::Error::from)
+        // A run that finds text and translates is split around Read chapter, so the
+        // reader sees the OCR lines and can label them (#55). Other runs read first
+        // (a no-op when there's nothing to read) and keep one overlapped pass.
+        let split = if super::context::operation_translates(&request.operation) {
+            match super::context::split_for_reading(&request.operation) {
+                Some(parts) => {
+                    match super::context::wants_auto_read(&task_handle, &request.scope).await {
+                        Ok(true) => Some(parts),
+                        Ok(false) => None,
+                        Err(error) => {
+                            tracing::warn!(%error, "automatic Read chapter check failed");
+                            None
+                        }
+                    }
+                }
+                None => None,
+            }
+        } else {
+            None
+        };
+        let result: Result<koharu_pipeline::Report> = async {
+            let mut first_report = None;
+            if let Some((finding, rest)) = split {
+                let finding_request = koharu_pipeline::Request {
+                    operation: finding,
+                    ..request.clone()
+                };
+                let report = run_pass(
+                    &task_handle,
+                    &pipeline,
+                    run_project,
+                    finding_request,
+                    &mut committer,
+                )
+                .await?;
+                if report.status == RunStatus::Stopped || stop.stopped() {
+                    return Ok(report);
+                }
+                first_report = Some(report);
+                request.operation = rest;
+            }
+            // A failed chapter read must not block translation; the page requests
+            // simply go out without the new brief.
+            if super::context::operation_translates(&request.operation)
+                && let Err(error) =
+                    super::context::auto_read(&task_handle, &request.scope, &stop, id).await
+            {
+                tracing::warn!(%error, "automatic Read chapter failed");
+            }
+            let report = run_pass(
+                &task_handle,
+                &pipeline,
+                run_project,
+                request,
+                &mut committer,
+            )
+            .await?;
+            Ok(match first_report {
+                Some(first) => merge_reports(first, report),
+                None => report,
+            })
         }
         .await;
         let (stopped, error) = match result {
@@ -439,6 +476,62 @@ async fn start_job_inner(
         }
     }));
     Ok(id)
+}
+
+/// Runs one pipeline pass on the current snapshot with fresh translation hints.
+async fn run_pass(
+    handle: &AppHandle<CefRuntime>,
+    pipeline: &koharu_pipeline::Pipeline,
+    run_project: koharu_scene::ProjectId,
+    mut request: koharu_pipeline::Request,
+    committer: &mut (dyn Committer + Send),
+) -> Result<koharu_pipeline::Report> {
+    let snapshot = {
+        let projects = handle.state::<CurrentProject>();
+        let projects = projects.project.lock().await;
+        let project = projects.as_ref().context("no project is open")?;
+        let snapshot = project.snapshot();
+        anyhow::ensure!(
+            snapshot.project_id() == run_project,
+            "the project changed during processing"
+        );
+        request.translation_hints = Arc::new(super::context::translation_hints(
+            &project.load_context()?,
+            &snapshot,
+        )?);
+        snapshot
+    };
+    pipeline
+        .execute(snapshot, request, committer)
+        .await
+        .map_err(anyhow::Error::from)
+}
+
+/// One report for a run that went through the pipeline in two passes.
+fn merge_reports(
+    first: koharu_pipeline::Report,
+    second: koharu_pipeline::Report,
+) -> koharu_pipeline::Report {
+    let status = if second.status == RunStatus::Stopped {
+        RunStatus::Stopped
+    } else if first.status == RunStatus::CompletedWithProblems
+        || second.status == RunStatus::CompletedWithProblems
+    {
+        RunStatus::CompletedWithProblems
+    } else {
+        second.status
+    };
+    let mut failures = first.failures;
+    failures.extend(second.failures);
+    koharu_pipeline::Report {
+        status,
+        base: first.base,
+        final_revision: second.final_revision,
+        completed: first.completed + second.completed,
+        total: first.total + second.total,
+        elapsed: first.elapsed + second.elapsed,
+        failures,
+    }
 }
 
 #[tauri::command]

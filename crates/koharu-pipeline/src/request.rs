@@ -33,7 +33,7 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub(crate) fn stages(&self) -> Result<Vec<Stage>> {
+    pub fn stages(&self) -> Result<Vec<Stage>> {
         let stages = match self {
             Self::Full => Stage::ALL.to_vec(),
             Self::Through {
