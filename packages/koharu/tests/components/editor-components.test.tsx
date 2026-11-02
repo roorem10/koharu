@@ -6,6 +6,7 @@ import {
   renderHook,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ThemeProvider } from 'next-themes'
@@ -35,6 +36,7 @@ import {
   queryClient,
   useCommand,
 } from '@/lib/queries'
+import { useRichTextSelection } from '@/lib/richTextSelection'
 import { useKoharuStore } from '@/lib/store'
 import { emptyTextStyle, emptyShapeStyles, emptyCategoryStyles } from '@/lib/text-styles'
 import * as canvasRuntime from '@koharu/bridge/canvas'
@@ -1376,6 +1378,39 @@ describe('greenfield editor', () => {
     fireEvent.change(translationField, { target: { value: 'Fixed line' } })
     fireEvent.blur(translationField)
     await waitFor(() => expect(translation).toHaveBeenCalledWith('element', 'Fixed line'))
+  })
+
+  it('styles words highlighted in the layer row translation box', async () => {
+    installProject()
+    vi.spyOn(commands, 'getWordStyles').mockResolvedValue([])
+    const style = vi.spyOn(commands, 'setWordStyle').mockResolvedValue(null)
+    render(<Inspector />)
+    const field = screen.getByTestId('row-translation-element') as HTMLTextAreaElement
+    field.setSelectionRange(1, 4)
+    fireEvent.select(field)
+    expect(useRichTextSelection.getState().selection).toEqual({
+      layer: 'element',
+      start: 1,
+      end: 4,
+    })
+    const toolbar = await screen.findByTestId('row-word-toolbar-element')
+    await waitFor(() =>
+      expect(within(toolbar).getByRole('button', { name: 'Bold (Ctrl+B)' })).toBeEnabled(),
+    )
+    fireEvent.click(within(toolbar).getByRole('button', { name: 'Bold (Ctrl+B)' }))
+    await waitFor(() =>
+      expect(style).toHaveBeenCalledWith('element', 1, 4, {
+        set: expect.objectContaining({ font_weight: 700 }),
+        clear: [],
+      }),
+    )
+    // Collapsing the highlight closes the toolbar and releases the words.
+    field.setSelectionRange(2, 2)
+    fireEvent.select(field)
+    await waitFor(() =>
+      expect(screen.queryByTestId('row-word-toolbar-element')).not.toBeInTheDocument(),
+    )
+    expect(useRichTextSelection.getState().selection).toBeNull()
   })
 
   it('debounces translation editing in Box details and keeps source read-only', async () => {

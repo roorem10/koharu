@@ -28,6 +28,7 @@ import { RowTags } from '@/components/redesign/RowTags'
 import { TextLayerKind } from '@/components/redesign/TextLayerKind'
 import { TypeInspector } from '@/components/redesign/TypeControls'
 import { usePageEffects } from '@/components/redesign/usePageEffects'
+import { useRowWordToolbar } from '@/components/rich-text-editor/useRowWordToolbar'
 import { call } from '@/lib/backend'
 import { isGroupLayer, isLockedLayer, isTextLayer, layerChildren } from '@/lib/document'
 import { pageKey, projectKey, queryClient, refresh, usePage } from '@/lib/queries'
@@ -647,23 +648,41 @@ function LayerEditor({ layer, onDelete }: { layer: Layer; onDelete?: () => void 
               source={layer.content.source?.text ?? ''}
               translation={layer.content.translation?.text ?? ''}
             >
-              <CommitTextarea
-                data-testid={`row-translation-${layer.id}`}
-                aria-label={t('layers.translationLabel', { name })}
-                wrap='soft'
-                className='max-h-16 min-h-9 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md border-primary/25 bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
-                value={layer.content.translation?.text ?? ''}
-                onCommit={(text) =>
-                  void call(commands.setTranslation, layer.id, text.trim() ? text : null)
-                    .then(() => refresh(projectKey, pageKey))
-                    .catch(() => undefined)
-                }
-              />
+              <RowTranslation layer={layer} label={t('layers.translationLabel', { name })} />
             </GlossaryTextMenu>
           </InspectorField>
         </>
       )}
     </div>
+  )
+}
+
+/** The row's Translation box; highlighted words get the same word toolbar as the page. */
+function RowTranslation({
+  layer,
+  label,
+}: {
+  layer: Extract<Layer, { type: 'text' }>
+  label: string
+}) {
+  const words = useRowWordToolbar(layer)
+  return (
+    <>
+      <CommitTextarea
+        data-testid={`row-translation-${layer.id}`}
+        aria-label={label}
+        wrap='soft'
+        className='max-h-16 min-h-9 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md border-primary/25 bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
+        value={layer.content.translation?.text ?? ''}
+        onCommit={(text) =>
+          void call(commands.setTranslation, layer.id, text.trim() ? text : null)
+            .then(() => refresh(projectKey, pageKey))
+            .catch(() => undefined)
+        }
+        {...words.textareaProps}
+      />
+      {words.toolbar}
+    </>
   )
 }
 
