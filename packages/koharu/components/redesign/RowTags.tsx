@@ -45,7 +45,7 @@ export function RowTags({
       )}
       <button
         type='button'
-        className={`${button} ${issues > 0 ? styles.issue : 'text-muted-foreground'}`}
+        className={`${button} ${issues > 0 ? `${styles.issue} qc-issue-blink` : 'text-muted-foreground'}`}
         data-state={issues > 0 ? 'blink' : 'idle'}
         aria-label={
           issues > 0

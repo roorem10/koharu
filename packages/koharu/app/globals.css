@@ -134,6 +134,11 @@
   .animate-spin {
     animation: var(--animate-spin) !important;
   }
+
+  /* A box with QC issues blinks its ? tag; it's the only signal, so it is exempt too. */
+  .qc-issue-blink {
+    animation: qc-issue-blink 1.6s ease-in-out infinite !important;
+  }
 }
 
 @layer components {
@@ -211,5 +216,15 @@
     .animate-spin {
       animation: none !important;
     }
+  }
+}
+
+@keyframes qc-issue-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
   }
 }

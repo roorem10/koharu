@@ -479,6 +479,25 @@ impl FontSystem {
                 });
             }
 
+            // fontique matches style before weight, so a regular italic request on a
+            // family with only Regular and Bold Italic (CC Wild Words) gets Bold Italic
+            // and B then changes nothing. Re-pick each requested family's face the way
+            // bundled faces are picked: prefer a face the missing style can be
+            // synthesized onto.
+            let picks: Vec<_> = families
+                .iter()
+                .filter_map(|family| self.pick_family_face(family, attributes))
+                .collect();
+            let candidates: Vec<_> = candidates
+                .into_iter()
+                .map(|candidate| {
+                    picks
+                        .iter()
+                        .find(|pick| pick.family.0 == candidate.family.0)
+                        .cloned()
+                        .unwrap_or(candidate)
+                })
+                .collect();
             for candidate in candidates {
                 if !seen.insert((candidate.blob.id(), candidate.index)) {
                     continue;
@@ -509,6 +528,33 @@ impl FontSystem {
         }
         self.resolved.insert(key, resolved.clone());
         Ok(resolved)
+    }
+
+    /// The face of a named family that keeps bold and italic independent: an exact
+    /// style match first, then a plain face to slant, never a slanted face for an
+    /// upright request; likewise for weight. Missing styles are synthesized.
+    fn pick_family_face(&mut self, family: &str, attributes: Attributes) -> Option<QueryFont> {
+        let family = self.collection.family_by_name(family)?;
+        let (index, info) = family.fonts().iter().enumerate().min_by_key(|(_, info)| {
+            face_score(
+                FaceTraits {
+                    style: info.style(),
+                    weight: info.weight().value(),
+                    width: info.width().percentage(),
+                    weight_axis: info.has_weight_axis(),
+                    slant_axis: info.has_slant_axis() || info.has_italic_axis(),
+                },
+                attributes,
+            )
+        })?;
+        let blob = info.load(Some(&mut self.sources))?;
+        Some(QueryFont {
+            family: (family.id(), index),
+            blob,
+            index: info.index(),
+            synthesis: info.synthesis(attributes.width, attributes.style, attributes.weight),
+            charmap_index: info.charmap_index(),
+        })
     }
 
     pub fn query_family(&mut self, family: &str) -> Result<Font> {
@@ -592,6 +638,44 @@ impl Default for FontSystem {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[derive(Clone, Copy)]
+struct FaceTraits {
+    style: FontStyle,
+    weight: f32,
+    width: f32,
+    weight_axis: bool,
+    slant_axis: bool,
+}
+
+/// Lower is better. A missing slant or weight can be synthesized onto a plain face,
+/// but a slanted or bold face can't be made plain, so B and I stay independent.
+fn face_score(face: FaceTraits, attributes: Attributes) -> u32 {
+    let style = if face.style == attributes.style
+        || (attributes.style != FontStyle::Normal && face.slant_axis)
+    {
+        0
+    } else if face.style == FontStyle::Normal {
+        2_000
+    } else {
+        10_000
+    };
+    let requested_heavy = attributes.weight.value() >= 600.0;
+    let side = if face.weight_axis || (face.weight >= 600.0) == requested_heavy {
+        0
+    } else if requested_heavy {
+        2_000
+    } else {
+        10_000
+    };
+    let distance = if face.weight_axis {
+        0
+    } else {
+        (face.weight - attributes.weight.value()).abs().round() as u32
+    };
+    let width = (face.width - attributes.width.percentage()).abs().round() as u32;
+    style + side + distance + width
 }
 
 pub(crate) struct Fonts {
@@ -1478,6 +1562,48 @@ mod tests {
                 minimum: 75,
                 maximum: 100
             })
+        );
+    }
+
+    #[test]
+    fn installed_families_keep_bold_and_italic_independent() {
+        // CC Wild Words installed on Windows: Regular and Bold Italic, no Italic.
+        let face = |style, weight| FaceTraits {
+            style,
+            weight,
+            width: 100.0,
+            weight_axis: false,
+            slant_axis: false,
+        };
+        let faces = [
+            face(FontStyle::Normal, 400.0),
+            face(FontStyle::Italic, 700.0),
+        ];
+        let pick = |weight: f32, style: FontStyle| {
+            let request = Attributes {
+                weight: fontique::FontWeight::new(weight),
+                style,
+                ..Attributes::default()
+            };
+            (0..faces.len())
+                .min_by_key(|&index| face_score(faces[index], request))
+                .unwrap()
+        };
+        assert_eq!(pick(400.0, FontStyle::Normal), 0);
+        assert_eq!(
+            pick(400.0, FontStyle::Italic),
+            0,
+            "I alone is a slanted regular"
+        );
+        assert_eq!(
+            pick(700.0, FontStyle::Normal),
+            0,
+            "B alone is an emboldened regular"
+        );
+        assert_eq!(
+            pick(700.0, FontStyle::Italic),
+            1,
+            "B and I use the real Bold Italic"
         );
     }
 
