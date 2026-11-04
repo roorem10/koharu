@@ -37,7 +37,13 @@ export interface ShortcutPreferencesHandle {
   canLeave: () => boolean
 }
 
-const canvasActions: readonly ShortcutAction[] = ['fit', 'zoom_in', 'zoom_out', 'zoom_actual']
+const canvasActions: readonly ShortcutAction[] = [
+  'fit',
+  'zoom_in',
+  'zoom_out',
+  'zoom_actual',
+  'compare',
+]
 
 export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(
   function ShortcutPreferences(_, ref) {

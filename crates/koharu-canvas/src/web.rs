@@ -119,7 +119,7 @@ enum StrokeCommitDto {
     Erase {
         page: String,
         revision: u64,
-        layer: String,
+        layer: Option<String>,
         diameter: f32,
         points: Vec<Point>,
     },
@@ -1542,12 +1542,13 @@ impl WebCanvas {
         };
         let layer = layer.as_deref().map(parse_layer_id).transpose()?;
         if kind == StrokeKind::Erase {
-            let layer = layer.ok_or_else(|| js_message("erase requires a raster layer"))?;
-            let target = frame
-                .layer(layer)
-                .ok_or_else(|| js_message("erase target is not in the prepared frame"))?;
-            if target.kind() != LayerKind::Raster {
-                return Err(js_message("erase target is not a raster layer"));
+            if let Some(layer) = layer {
+                let target = frame
+                    .layer(layer)
+                    .ok_or_else(|| js_message("erase target is not in the prepared frame"))?;
+                if target.kind() != LayerKind::Raster {
+                    return Err(js_message("erase target is not a raster layer"));
+                }
             }
         } else if kind == StrokeKind::Paint {
             if let Some(layer) = layer {
@@ -1563,7 +1564,7 @@ impl WebCanvas {
         }
         let preview_color = match kind {
             StrokeKind::Erase => [0, 0, 0, 255],
-            StrokeKind::Inpaint => [168, 85, 247, 255],
+            StrokeKind::Inpaint => [239, 68, 68, 255],
             StrokeKind::Paint => [color[0], color[1], color[2], 255],
         };
         let mut preview = Scene::new();
@@ -1618,7 +1619,7 @@ impl WebCanvas {
             }
             let preview_color = match stroke.kind {
                 StrokeKind::Erase => [0, 0, 0, 255],
-                StrokeKind::Inpaint => [168, 85, 247, 255],
+                StrokeKind::Inpaint => [239, 68, 68, 255],
                 StrokeKind::Paint => [stroke.color[0], stroke.color[1], stroke.color[2], 255],
             };
             draw_segment(
@@ -1662,7 +1663,7 @@ impl WebCanvas {
             StrokeKind::Erase => StrokeCommitDto::Erase {
                 page,
                 revision,
-                layer: format_layer_id(stroke.layer.expect("erase target validated")),
+                layer: stroke.layer.map(format_layer_id),
                 diameter: stroke.diameter,
                 points: stroke.points.clone(),
             },

@@ -414,7 +414,7 @@ async fn import_paths(
         Ok((import::import(selection.paths)?, selection.skipped))
     })
     .await?;
-    let (commit, page) = {
+    let (commit, page, imported) = {
         let project = handle.state::<CurrentProject>();
         let mut project = project.project.lock().await;
         let project = project.as_mut().context("no project is open")?;
@@ -426,16 +426,28 @@ async fn import_paths(
             processing.stops.lock().is_empty(),
             "pages cannot be imported while processing is running"
         );
+        let existing = project
+            .snapshot()
+            .pages()
+            .map(|page| page.id())
+            .collect::<std::collections::HashSet<_>>();
         let commit = project.import_pages(pages).await?;
         project.record_commit(&commit);
         project.reconcile_page();
         let page = project.active_page();
-        (commit, page)
+        let imported = commit
+            .snapshot
+            .pages()
+            .map(|page| page.id())
+            .filter(|page| !existing.contains(page))
+            .collect::<Vec<_>>();
+        (commit, page, imported)
     };
     let desktop = handle.state::<Desktop>();
     desktop.synchronize(&commit.snapshot, page, &commit).await?;
     let canvas = desktop.canvas_state();
     handle.state::<CanvasChannel>().channel.publish(canvas);
+    super::raw_prep::after_import(handle, imported).await;
     Ok(skipped)
 }
 

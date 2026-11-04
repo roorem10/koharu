@@ -22,7 +22,8 @@ use super::{
     project::{CurrentProject, Project},
     styles::StyleScope,
 };
-use settings::{LetteringSettings, SfxMode};
+pub(super) use settings::LetteringSettings;
+use settings::SfxMode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "snake_case")]
@@ -75,7 +76,7 @@ fn effective_category(
     }
 }
 
-fn resolve_category(
+pub(super) fn resolve_category(
     context: &ProjectContext,
     snapshot: &Snapshot,
     layer: EntityId,

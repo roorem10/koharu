@@ -4,14 +4,16 @@ import { useMutationState } from '@tanstack/react-query'
 import { CircleAlert, Download, LoaderCircle, Square, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { openFailedPage, retryFailedPages } from '@/components/runs/data'
 import { call } from '@/lib/backend'
-import { usePages } from '@/lib/queries'
+import { usePages, useProject } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type Download as DownloadState, type Job } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 
 export function ActivityCenter() {
   const { t } = useTranslation()
+  const project = useProject().data
   const jobs = useKoharuStore((state) => state.jobs)
   const downloads = useKoharuStore((state) => state.downloads)
   const activities = useMutationState({
@@ -24,7 +26,9 @@ export function ActivityCenter() {
     (activity): activity is { id: number; label: string } => typeof activity.label === 'string',
   )
   const visibleJobs = Object.values(jobs).filter(
-    (job) => job.state === 'running' || job.state === 'failed',
+    (job) =>
+      (job.project == null || job.project === project?.name) &&
+      (job.state === 'running' || job.state === 'failed' || job.state === 'finished_with_problems'),
   )
   const runningDownloads = Object.values(downloads).filter(
     (download) => download.state === 'running',
@@ -114,6 +118,9 @@ function JobItem({ job }: { job: Job }) {
   const pageLabel = page
     ? t('activity.pageLabel', { number: pageIndex + 1, label: page.label })
     : undefined
+  if (job.failures?.length && job.state !== 'running') {
+    return <FailedPages job={job} />
+  }
   if (job.state === 'failed') {
     return (
       <Failure
@@ -151,6 +158,11 @@ function JobItem({ job }: { job: Job }) {
             {pageLabel}
           </p>
         ) : null}
+        {job.retry ? (
+          <p role='status' className='col-start-2 col-end-5 text-[10px] text-muted-foreground'>
+            {t('runs.retrying', job.retry)}
+          </p>
+        ) : null}
         {job.model ? (
           <p className='col-start-2 col-end-4 truncate text-[10px] text-muted-foreground'>
             {job.model === 'chapter_context_reading' ? t('chapterContext.reading') : job.model}
@@ -160,6 +172,54 @@ function JobItem({ job }: { job: Job }) {
           <Progress value={percent} />
         </div>
       </div>
+    </div>
+  )
+}
+
+function FailedPages({ job }: { job: Job }) {
+  const { t } = useTranslation()
+  const dismiss = useKoharuStore((state) => state.dismissJob)
+  const running = useKoharuStore((state) =>
+    Object.values(state.jobs).some((job) => job.state === 'running'),
+  )
+  return (
+    <div className='grid gap-2 border-b p-3 text-[11px] last:border-b-0'>
+      <div className='flex items-center justify-between gap-2'>
+        <span className='font-medium'>
+          {t(job.state === 'failed' ? 'runs.failed' : 'runs.finishedWithProblems')}
+        </span>
+        <Button
+          size='icon-xs'
+          variant='ghost'
+          aria-label={t('activity.dismiss')}
+          onClick={() => dismiss(job.id)}
+        >
+          <X />
+        </Button>
+      </div>
+      <ul className='grid max-h-48 gap-2 overflow-auto'>
+        {job.failures.map((failure) => (
+          <li key={failure.page} className='min-w-0'>
+            <button
+              className='max-w-full text-left break-words text-primary underline'
+              onClick={() => void openFailedPage(failure.page).catch(() => undefined)}
+            >
+              {failure.label}
+            </button>
+            <p className='line-clamp-2 break-words text-muted-foreground' title={failure.error}>
+              {t(`phase.${failure.stage}`)}: {failure.error}
+            </p>
+          </li>
+        ))}
+      </ul>
+      <Button
+        size='sm'
+        variant='outline'
+        disabled={running}
+        onClick={() => void retryFailedPages(job).catch(() => undefined)}
+      >
+        {t('runs.retryFailedPages')}
+      </Button>
     </div>
   )
 }

@@ -40,11 +40,14 @@ fn set_flags(
         .retain(|flag| !matches!(flag, Flag::Glossary { .. }));
     let failures: Vec<_> = terms
         .iter()
+        // Every series term is checked, not only locked ones: most names come in unlocked
+        // (new terms and accepted suggestions), and a misspelled name is what QC must catch.
         .filter(|term| {
-            term.locked
+            let target = term.target.trim().to_lowercase();
+            !target.is_empty()
                 && koharu_pipeline::term_occurs(&row.source, &term.source)
                 && !row.translation.trim().is_empty()
-                && !row.translation.contains(term.target.trim())
+                && !row.translation.to_lowercase().contains(&target)
         })
         .map(|term| term.source.clone())
         .collect();
@@ -57,6 +60,16 @@ fn set_flags(
             });
         }
     }
+    let current: Vec<_> = line.flags.iter().map(flag_acknowledgement).collect();
+    line.qc_ok
+        .retain(|id| !id.starts_with("flag:") || current.contains(id));
+}
+
+pub(crate) fn flag_acknowledgement(flag: &Flag) -> String {
+    format!(
+        "flag:{}",
+        serde_json::to_string(flag).expect("serializable flag")
+    )
 }
 
 struct Row {
@@ -259,12 +272,41 @@ mod tests {
         line.dismissed.push("魔王".into());
         set_flags(&mut line, &row, &terms);
         assert_eq!(line.flags.len(), 1);
+        let glossary = Flag::Glossary {
+            term: "魔王".into(),
+            page: 2,
+        };
+        line.qc_ok.push(flag_acknowledgement(&glossary));
         row.translation = "The Demon King".into();
         set_flags(&mut line, &row, &terms);
         assert_eq!(line.flags.len(), 1);
         assert!(line.dismissed.is_empty());
+        assert!(line.qc_ok.is_empty());
         row.translation = "The king".into();
         set_flags(&mut line, &row, &terms);
         assert_eq!(line.flags.len(), 2);
+    }
+
+    #[test]
+    fn unlocked_terms_flag_misspelled_names_and_case_does_not_matter() {
+        let terms = vec![booharu_context::GlossaryEntry {
+            source: "リムル".into(),
+            target: "Rimuru".into(),
+            ..Default::default()
+        }];
+        let mut row = Row {
+            layer: EntityId::new(),
+            page: EntityId::new(),
+            number: 1,
+            source: "リムル様！".into(),
+            translation: "Lord Rimiru!".into(),
+            user: false,
+        };
+        let mut line = booharu_context::LineContext::default();
+        set_flags(&mut line, &row, &terms);
+        assert_eq!(line.flags.len(), 1);
+        row.translation = "LORD RIMURU!".into();
+        set_flags(&mut line, &row, &terms);
+        assert!(line.flags.is_empty());
     }
 }

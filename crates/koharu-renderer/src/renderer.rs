@@ -13,8 +13,8 @@ use koharu_scene::{
     Asset, AssetRole, BlobId, Change, Component, ComponentOwner, EntityChange, EntityId, FitsTo,
     FlowsIn, Geometry, Group, OcrAnalysis, Origin, Page, Presents, RasterLayer, RasterLayerKind,
     RecognizedFrom, Region, RelationChange, RelationId, RelationSpec, Revision, Snapshot,
-    TextAlignment, TextDirection, TextLayout as SceneTextLayout, TextLayoutKind, Translation,
-    Typography, Visibility,
+    TextAlignment, TextDirection, TextLayout as SceneTextLayout, TextLayoutKind, TextRuns,
+    Translation, Typography, Visibility,
 };
 use parking_lot::Mutex;
 use rayon::prelude::*;
@@ -287,6 +287,11 @@ impl Renderer {
             .prepare(&font_requests)
             .await
             .map_err(Error::FontResource)?;
+        for request in word_font_requests(&pending) {
+            if let Err(error) = self.inner.fonts.prepare(&[request]).await {
+                tracing::warn!(%error, "word font unavailable; using the box font");
+            }
+        }
         let image_ids = pending
             .iter()
             .filter_map(|(_, descriptor)| match descriptor {
@@ -660,6 +665,7 @@ impl Traversal<'_> {
             if let Some(layout) = self.snapshot.component::<SceneTextLayout>(entity)? {
                 common.insert(component_dependency::<SceneTextLayout>(entity));
                 common.insert(component_dependency::<Typography>(entity));
+                common.insert(component_dependency::<TextRuns>(entity));
                 common.insert(component_dependency::<Geometry>(entity));
                 for kind in [Presents::KIND, FitsTo::KIND, FlowsIn::KIND] {
                     common.insert(RenderDependency::RelationQuery {
@@ -800,6 +806,7 @@ impl Traversal<'_> {
             language: translation.language.clone(),
             width: frame.bounds.width,
             height: frame.bounds.height,
+            warp: layout.warp.clone(),
             balloon_contour,
             preferred_font,
             font_families,
@@ -817,13 +824,33 @@ impl Traversal<'_> {
                 .as_ref()
                 .and_then(|value| value.color)
                 .unwrap_or([0, 0, 0, 255]),
+            fill_gradient: typography
+                .as_ref()
+                .and_then(|value| value.fill_gradient.clone()),
             stroke: resolve_stroke(typography.as_ref()),
-            line_height: 1.2,
-            letter_spacing: 0.0,
+            line_height: typography
+                .as_ref()
+                .and_then(|value| value.line_spacing)
+                .unwrap_or(1.2),
+            letter_spacing: typography
+                .as_ref()
+                .and_then(|value| value.letter_spacing)
+                .unwrap_or(0.0),
             word_spacing: 0.0,
             text_inset: [4.0; 4],
             point_text: !is_bubble && layout.kind == TextLayoutKind::Point,
+            // Word styles (batch 3). Empty for every box without them.
+            runs: self
+                .snapshot
+                .component::<TextRuns>(entity)?
+                .map(|runs| runs.runs)
+                .unwrap_or_default(),
         };
+        for run in &descriptor.runs {
+            if let Some(family) = &run.style.font {
+                dependencies.insert(RenderDependency::Font(family.clone()));
+            }
+        }
         Ok(Some(LayerDraft {
             entity,
             geometry,
@@ -1154,6 +1181,8 @@ fn build_node(
                     width: decoded.width as f32,
                     height: decoded.height as f32,
                 },
+                unwarped: None,
+                editable: None,
                 image: Some(raster),
                 text: None,
                 diagnostics: Arc::from([]),
@@ -1164,15 +1193,23 @@ fn build_node(
             Ok(RetainedNode {
                 descriptor,
                 scene: rendered.scene,
+                unwarped: rendered.unwarped,
+                editable: rendered.editable,
                 resources: rendered.resources,
                 local_bounds: rendered.local_bounds,
                 image: None,
                 text: Some(LocalTextMetadata {
+                    glyph_boxes: rendered.metadata.glyph_boxes,
+                    style_runs: rendered.metadata.style_runs,
+                    smallest_font_size: rendered.metadata.smallest_font_size,
+                    word_effects: rendered.metadata.word_effects,
                     rendered_bounds: rendered.metadata.rendered_bounds,
                     layout_bounds: rendered.metadata.layout_bounds,
                     post_script_fonts: rendered.metadata.post_script_fonts,
                     font_size: rendered.metadata.font_size,
                     color: rendered.metadata.color,
+                    line_spacing: rendered.metadata.line_spacing,
+                    letter_spacing: rendered.metadata.letter_spacing,
                 }),
                 diagnostics: rendered.diagnostics.into(),
             })
@@ -1190,6 +1227,11 @@ fn assemble_frame(
     for (draft, node) in compiled.layers.into_iter().zip(nodes) {
         let placement = placement(&draft, &node);
         let bounds = transform_bounds(node.local_bounds, placement);
+        let layout_placement = if matches!(draft.descriptor, NodeDescriptor::Text(_)) {
+            crate::warp::text_placement(draft.frame)
+        } else {
+            placement
+        };
         let kind = match draft.metadata {
             DraftMetadata::Image(metadata) => LayerKind::Image(metadata),
             DraftMetadata::Text {
@@ -1204,13 +1246,18 @@ fn assemble_frame(
                     .as_ref()
                     .expect("text descriptor must build text metadata");
                 LayerKind::Text(TextMetadata {
+                    style_runs: metadata.style_runs.clone(),
+                    smallest_font_size: metadata.smallest_font_size,
+                    word_effects: metadata.word_effects,
                     text,
                     language,
-                    rendered_bounds: transform_bounds(metadata.rendered_bounds, placement),
-                    layout_bounds: transform_bounds(metadata.layout_bounds, placement),
+                    rendered_bounds: transform_bounds(metadata.rendered_bounds, layout_placement),
+                    layout_bounds: transform_bounds(metadata.layout_bounds, layout_placement),
                     post_script_fonts: metadata.post_script_fonts.clone(),
                     font_size: metadata.font_size,
                     color: metadata.color,
+                    line_spacing: metadata.line_spacing,
+                    letter_spacing: metadata.letter_spacing,
                     alignment,
                     writing_mode,
                     angle_degrees,
@@ -1221,7 +1268,7 @@ fn assemble_frame(
             node.diagnostics
                 .iter()
                 .cloned()
-                .map(|diagnostic| transform_diagnostic(diagnostic, placement)),
+                .map(|diagnostic| transform_diagnostic(diagnostic, layout_placement)),
         );
         layers.push(Layer(Arc::new(LayerData {
             entity: draft.entity,
@@ -1276,16 +1323,9 @@ fn placement(draft: &LayerDraft, node: &RetainedNode) -> Affine {
             f64::from(draft.frame.bounds.x),
             f64::from(draft.frame.bounds.y),
         )),
-        NodeDescriptor::Text(_) => {
-            let frame = draft.frame.bounds;
-            Affine::translate((
-                f64::from(frame.x + frame.width * 0.5),
-                f64::from(frame.y + frame.height * 0.5),
-            )) * Affine::rotate(f64::from(draft.frame.angle_degrees).to_radians())
-                * Affine::translate((
-                    -f64::from(frame.width * 0.5),
-                    -f64::from(frame.height * 0.5),
-                ))
+        NodeDescriptor::Text(ref text) => {
+            crate::warp::text_placement(draft.frame)
+                * crate::warp::skew(text.warp.as_ref(), text.width, text.height)
         }
     }
 }
@@ -1324,6 +1364,45 @@ fn transform_diagnostic(diagnostic: RenderDiagnostic, transform: Affine) -> Rend
     }
 }
 
+fn word_font_requests(pending: &[(usize, NodeDescriptor)]) -> Vec<FontRequest> {
+    let mut seen = BTreeSet::new();
+    let mut requests = Vec::new();
+    for (_, descriptor) in pending {
+        let NodeDescriptor::Text(text) = descriptor else {
+            continue;
+        };
+        for run in &text.runs {
+            if run.style.font.is_none()
+                && run.style.font_weight.is_none()
+                && run.style.font_style.is_none()
+            {
+                continue;
+            }
+            let family = run
+                .style
+                .font
+                .as_ref()
+                .or(text.preferred_font.as_ref())
+                .or(text.font_families.first());
+            let Some(family) = family else { continue };
+            let weight = run.style.font_weight.or(text.font_weight);
+            let style = run
+                .style
+                .font_style
+                .map(FontStyle::from)
+                .or(text.font_style);
+            if seen.insert((family.to_ascii_lowercase(), weight, style)) {
+                requests.push(FontRequest {
+                    family: family.clone(),
+                    weight,
+                    style,
+                });
+            }
+        }
+    }
+    requests
+}
+
 fn font_requests(pending: &[(usize, NodeDescriptor)]) -> Vec<FontRequest> {
     let mut seen = BTreeSet::new();
     let mut requests = Vec::new();
@@ -1331,22 +1410,23 @@ fn font_requests(pending: &[(usize, NodeDescriptor)]) -> Vec<FontRequest> {
         let NodeDescriptor::Text(text) = descriptor else {
             continue;
         };
-        for family in text
-            .preferred_font
-            .iter()
-            .chain(text.font_families.first())
-            .take(1)
-        {
-            let style = match text.font_style.unwrap_or(FontStyle::Normal) {
+        let primary = text.preferred_font.as_ref().or(text.font_families.first());
+        // Word fonts are prepared separately by `word_font_requests`, where a
+        // missing face falls back to the box font instead of failing the render.
+        let candidates = primary
+            .map(|family| (family, text.font_weight, text.font_style))
+            .into_iter();
+        for (family, weight, style) in candidates {
+            let style_id = match style.unwrap_or(FontStyle::Normal) {
                 FontStyle::Normal => 0,
                 FontStyle::Italic => 1,
                 FontStyle::Oblique => 2,
             };
-            if seen.insert((family.to_ascii_lowercase(), text.font_weight, style)) {
+            if seen.insert((family.to_ascii_lowercase(), weight, style_id)) {
                 requests.push(FontRequest {
                     family: family.clone(),
-                    weight: text.font_weight,
-                    style: text.font_style,
+                    weight,
+                    style,
                 });
             }
         }
@@ -1461,7 +1541,7 @@ fn resolve_stroke(typography: Option<&Typography>) -> Option<StrokeOptions> {
         width_px,
         method: typography
             .stroke_method
-            .unwrap_or(koharu_scene::StrokeMethod::Expansion),
+            .unwrap_or(koharu_scene::StrokeMethod::Contour),
         position: typography
             .stroke_position
             .unwrap_or(koharu_scene::StrokePosition::Outside),
@@ -1740,6 +1820,9 @@ mod tests {
             stroke_join: None,
             outer_stroke_color: None,
             outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
             alignment: None,
             writing_mode: Some(koharu_scene::WritingMode::Vertical),
             extensions: BTreeMap::new(),
@@ -1781,6 +1864,9 @@ mod tests {
             stroke_join: None,
             outer_stroke_color: None,
             outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
             alignment: None,
             writing_mode: Some(koharu_scene::WritingMode::Vertical),
             extensions: BTreeMap::new(),
@@ -1856,6 +1942,7 @@ mod tests {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: Some(0.0),
+                        warp: None,
                     },
                 )?;
                 edit.set(text, &Geometry::rectangle(10.0, 10.0, 80.0, 40.0))?;
@@ -1949,6 +2036,7 @@ mod tests {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: Some(0.0),
+                        warp: None,
                     },
                 )?;
                 edit.set(first, &Geometry::rectangle(10.0, 10.0, 80.0, 40.0))?;
@@ -1975,6 +2063,7 @@ mod tests {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
                         angle_degrees: Some(0.0),
+                        warp: None,
                     },
                 )?;
                 edit.set(second, &Geometry::rectangle(100.0, 10.0, 80.0, 40.0))?;
@@ -2087,6 +2176,7 @@ mod tests {
                                 origin: Origin::User,
                                 kind: TextLayoutKind::Paragraph,
                                 angle_degrees: None,
+                                warp: None,
                             },
                         )?;
                         edit.relate::<FlowsIn>(layer, bubble)?;
@@ -2215,6 +2305,7 @@ mod tests {
                             origin: Origin::User,
                             kind: TextLayoutKind::Paragraph,
                             angle_degrees: None,
+                            warp: None,
                         },
                     )?;
                     edit.relate::<RecognizedFrom>(content, region)?;
@@ -2488,5 +2579,200 @@ mod tests {
             .await
             .unwrap_err();
         assert!(error.to_string().contains("not contiguous"));
+    }
+    #[tokio::test]
+    async fn warps_preserve_layout_diagnostics_and_unwarped_pixels_through_incremental_updates() {
+        use koharu_scene::TextWarp;
+        let mut session = Session::memory().await.unwrap();
+        let mut ids = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 512.0, 300.0), At::End)?;
+                let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &SourceText {
+                        text: Authored::user("HHHHHHHH".to_owned()),
+                        language: None,
+                    },
+                )?;
+                edit.set(
+                    content,
+                    &Translation {
+                        text: Authored::user("HHHHHHHH".to_owned()),
+                        language: None,
+                    },
+                )?;
+                let layer = edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &SceneTextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: Some(0.0),
+                        warp: None,
+                    },
+                )?;
+                edit.set(layer, &Geometry::rectangle(100.0, 80.0, 240.0, 120.0))?;
+                ids = Some((page, layer));
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let (page, layer) = ids.unwrap();
+        let renderer = Renderer::default();
+        let original = renderer.render(&snapshot, page).await.unwrap();
+        let rasterizer = Rasterizer::new().unwrap();
+        let raster = |frame: &Frame| {
+            rasterizer
+                .rasterize(&frame.raster_frame().unwrap(), RasterOptions::default())
+                .unwrap()
+                .image
+        };
+        let golden = raster(&original);
+        let golden_crop = original.cropped(layer).unwrap().unwrap();
+        let golden_pixels = raster(&golden_crop);
+        let mut previous = original.clone();
+        for warp in [
+            TextWarp::Skew {
+                x_degrees: 30.0,
+                y_degrees: 0.0,
+            },
+            TextWarp::Perspective {
+                corners: [[0.25, 0.0], [0.75, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            },
+        ] {
+            let snapshot = session.snapshot();
+            let mut layout = snapshot.text_layer(layer).unwrap().layout().unwrap();
+            layout.warp = Some(warp.clone());
+            let patch = snapshot.patch(|edit| edit.set(layer, &layout)).unwrap();
+            let commit = session.commit(patch).await.unwrap();
+            let incremental = renderer
+                .update(&previous, &commit.snapshot, &commit.changes)
+                .await
+                .unwrap();
+            let full = renderer.render(&commit.snapshot, page).await.unwrap();
+            assert_eq!(raster(&incremental), raster(&full));
+            assert_eq!(incremental.diagnostics(), original.diagnostics());
+            assert_eq!(
+                incremental.layer(layer).unwrap().kind(),
+                original.layer(layer).unwrap().kind()
+            );
+            assert_eq!(
+                incremental
+                    .layer(layer)
+                    .unwrap()
+                    .element_frame()
+                    .unwrap()
+                    .width,
+                240.0
+            );
+            let unwarped = incremental.cropped_unwarped_text(layer).unwrap().unwrap();
+            assert_eq!(unwarped.origin(), golden_crop.origin());
+            assert_eq!(raster(&unwarped), golden_pixels);
+            if matches!(warp, TextWarp::Skew { .. }) {
+                let pixels = raster(&incremental);
+                let ys = pixels
+                    .enumerate_pixels()
+                    .filter(|(_, _, p)| p[3] > 200)
+                    .map(|(_, y, _)| y)
+                    .collect::<Vec<_>>();
+                let top = *ys.iter().min().unwrap();
+                let bottom = *ys.iter().max().unwrap();
+                let mean = |upper: bool| {
+                    let xs = pixels
+                        .enumerate_pixels()
+                        .filter(|(_, y, p)| {
+                            p[3] > 200
+                                && if upper {
+                                    *y <= top + (bottom - top) / 5
+                                } else {
+                                    *y >= bottom - (bottom - top) / 5
+                                }
+                        })
+                        .map(|(x, _, _)| f64::from(x))
+                        .collect::<Vec<_>>();
+                    xs.iter().sum::<f64>() / xs.len() as f64
+                };
+                assert!(mean(false) - mean(true) > 5.0);
+            }
+            previous = incremental;
+        }
+        let snapshot = session.snapshot();
+        let mut layout = snapshot.text_layer(layer).unwrap().layout().unwrap();
+        layout.warp = None;
+        let patch = snapshot.patch(|edit| edit.set(layer, &layout)).unwrap();
+        let commit = session.commit(patch).await.unwrap();
+        let reset = renderer
+            .update(&previous, &commit.snapshot, &commit.changes)
+            .await
+            .unwrap();
+        assert_eq!(raster(&reset).as_raw(), golden.as_raw());
+        assert_eq!(
+            reset.layer(layer).unwrap().0.node.scene,
+            original.layer(layer).unwrap().0.node.scene
+        );
+    }
+    #[test]
+    fn word_font_requests_prepare_faces_and_inherit_box_attributes() {
+        let text = TextNodeDescriptor {
+            entity: EntityId::new(),
+            text: "ABCD".into(),
+            language: None,
+            width: 200.0,
+            height: 80.0,
+            warp: None,
+            balloon_contour: None,
+            preferred_font: Some("BoxFont".into()),
+            font_families: Vec::new(),
+            font_weight: Some(400),
+            font_style: Some(FontStyle::Normal),
+            font_size: Some(30.0),
+            minimum_font_size: 9.0,
+            auto_fit: false,
+            alignment: TextAlign::Left,
+            writing_mode: WritingMode::Horizontal,
+            foreground_color: [0, 0, 0, 255],
+            fill_gradient: None,
+            stroke: None,
+            line_height: 1.2,
+            letter_spacing: 0.0,
+            word_spacing: 0.0,
+            text_inset: [0.0; 4],
+            point_text: true,
+            runs: vec![
+                koharu_scene::StyleRun {
+                    start: 0,
+                    end: 1,
+                    style: koharu_scene::RunStyle {
+                        font: Some("WordFont".into()),
+                        font_weight: Some(700),
+                        font_style: Some(koharu_scene::FontStyle::Italic),
+                        ..Default::default()
+                    },
+                },
+                koharu_scene::StyleRun {
+                    start: 2,
+                    end: 3,
+                    style: koharu_scene::RunStyle {
+                        font_weight: Some(900),
+                        ..Default::default()
+                    },
+                },
+            ],
+        };
+        let pending = [(0, NodeDescriptor::Text(Box::new(text)))];
+        // Only the box face is a hard requirement; word faces are optional.
+        assert_eq!(font_requests(&pending).len(), 1);
+        let requests = word_font_requests(&pending);
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].family, "WordFont");
+        assert_eq!(requests[0].weight, Some(700));
+        assert_eq!(requests[0].style, Some(FontStyle::Italic));
+        assert_eq!(requests[1].family, "BoxFont");
+        assert_eq!(requests[1].weight, Some(900));
+        assert_eq!(requests[1].style, Some(FontStyle::Normal));
     }
 }

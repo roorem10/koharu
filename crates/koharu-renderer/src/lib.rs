@@ -13,6 +13,7 @@ mod segment;
 mod shape;
 mod text_renderer;
 mod types;
+mod warp;
 
 pub use config::{
     AlignmentPart, CategoryStyles, FontPart, OuterPart, OutlinePart, ShapeStyles, SizePart,
@@ -21,7 +22,7 @@ pub use config::{
 pub use error::{Error, Result};
 pub use frame::{
     Frame, ImageKind, ImageMetadata, Layer, LayerKind, Presentation, RasterImage, RenderBounds,
-    RenderDependency, RenderDiagnostic, RetentionStats, TextMetadata,
+    RenderDependency, RenderDiagnostic, RetentionStats, TextGlyphBox, TextMetadata, TextStyleRun,
 };
 pub use layout::WritingMode;
 pub use renderer::Renderer;

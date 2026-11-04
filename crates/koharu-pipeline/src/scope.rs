@@ -4,9 +4,7 @@ use std::{
 };
 
 use anyhow::{Result, bail};
-use koharu_scene::{
-    EntityId, FitsTo, FlowsIn, Geometry, Inside, Presents, RecognizedFrom, RelationSpec, Snapshot,
-};
+use koharu_scene::{EntityId, FitsTo, Geometry, Presents, RecognizedFrom, RelationSpec, Snapshot};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -154,6 +152,7 @@ impl NormalizedScope {
     }
 }
 
+// Bubble and containment links describe layout, not which boxes the user selected.
 fn semantic_closure(snapshot: &Snapshot, mut entities: BTreeSet<EntityId>) -> BTreeSet<EntityId> {
     let mut pending = entities.iter().copied().collect::<VecDeque<_>>();
     while let Some(entity) = pending.pop_front() {
@@ -162,14 +161,7 @@ fn semantic_closure(snapshot: &Snapshot, mut entities: BTreeSet<EntityId>) -> BT
             .chain(snapshot.relations_to(entity, None))
         {
             let value = relation.value();
-            if ![
-                Presents::KIND,
-                RecognizedFrom::KIND,
-                FitsTo::KIND,
-                FlowsIn::KIND,
-                Inside::KIND,
-            ]
-            .contains(&value.kind.as_str())
+            if ![Presents::KIND, RecognizedFrom::KIND, FitsTo::KIND].contains(&value.kind.as_str())
             {
                 continue;
             }
@@ -228,4 +220,76 @@ pub(crate) fn geometry_extents(geometry: &Geometry) -> Option<(f64, f64, f64, f6
         max_y = max_y.max(point.y);
     }
     Some((min_x, min_y, max_x, max_y))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Operation;
+    use koharu_scene::{
+        At, BubbleRegion, FlowsIn, Inside, Origin, PageDraft, Session, TextLayout, TextLayoutKind,
+        TextRegion,
+    };
+
+    #[tokio::test]
+    async fn entity_scope_does_not_expand_to_other_boxes_in_the_same_bubble() {
+        let mut session = Session::memory().await.unwrap();
+        let mut boxes = Vec::new();
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 100., 100.), At::End)?;
+                let bubble = edit.add_analysis_region::<BubbleRegion>(
+                    page,
+                    At::End,
+                    &Geometry::rectangle(0., 0., 100., 100.),
+                    None,
+                )?;
+                for column in 0..3 {
+                    let region = edit.add_analysis_region::<TextRegion>(
+                        page,
+                        At::End,
+                        &Geometry::rectangle(10. + column as f64 * 20., 10., 10., 50.),
+                        None,
+                    )?;
+                    let content = edit.add_text_content(page, At::End)?;
+                    let layer = edit.add_text_layer(
+                        page,
+                        At::End,
+                        content,
+                        &TextLayout {
+                            origin: Origin::User,
+                            kind: TextLayoutKind::Paragraph,
+                            angle_degrees: None,
+                            warp: None,
+                        },
+                    )?;
+                    edit.relate::<RecognizedFrom>(content, region)?;
+                    edit.relate::<FlowsIn>(layer, bubble)?;
+                    edit.relate::<Inside>(region, bubble)?;
+                    boxes.push([layer, content, region]);
+                }
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let stages = Operation::Stages {
+            stages: vec![Stage::Ocr, Stage::Translation],
+        }
+        .stages()
+        .unwrap();
+        let scope = NormalizedScope::new(
+            &snapshot,
+            &Scope::Entities(vec![boxes[0][0], boxes[1][0]]),
+            &stages,
+        )
+        .unwrap();
+        let selected = scope.entities().unwrap();
+        for id in boxes[0].into_iter().chain(boxes[1]) {
+            assert!(selected.contains(&id));
+        }
+        for id in boxes[2] {
+            assert!(!selected.contains(&id));
+        }
+    }
 }

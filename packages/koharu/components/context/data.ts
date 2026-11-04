@@ -8,11 +8,18 @@ import { pageKey, projectKey, queryClient, refresh, useProject } from '@/lib/que
 import { useKoharuStore } from '@/lib/store'
 import { commands, type EntityId, type Flag } from '@koharu/bridge/protocol'
 
-import type { ChapterState, Series } from './types'
+import type { ChapterState, Series, ContextSettings } from './types'
 
 export const contextKey = ['chapter-context'] as const
 export const seriesKey = ['context-series'] as const
 export const contextSettingsKey = ['context-settings'] as const
+
+export function useContextSettings() {
+  return useQuery({
+    queryKey: contextSettingsKey,
+    queryFn: async () => (await call(commands.getContextSettings)) as ContextSettings,
+  })
+}
 
 export function useChapterContext() {
   const project = useProject().data

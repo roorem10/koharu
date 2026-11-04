@@ -57,7 +57,7 @@ impl LocalTranslator {
         &self,
         request: TranslationRequest,
         generation: GenerationConfig,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<crate::TranslatedSegment>> {
         let expected = request.segments.len();
         if expected == 0 {
             return Ok(Vec::new());
@@ -75,7 +75,12 @@ impl LocalTranslator {
 
         let task = TaskRequest::translation(&request)?;
         let output = self.run_task(task, generation).await?;
-        Ok(prompt::translations("local", &output, &request.segments)?)
+        Ok(prompt::translations(
+            "local",
+            &output,
+            &request.segments,
+            request.emphasis,
+        )?)
     }
 
     pub(crate) async fn run_task(

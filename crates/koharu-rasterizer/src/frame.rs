@@ -5,7 +5,7 @@ use std::{collections::HashMap, sync::Arc};
 use vello::{
     FontEmbolden, Glyph, Scene,
     kurbo::{Affine, BezPath, Diagonal2, Join, Rect, Shape, Stroke},
-    peniko::{Blob, Color, Compose, Fill, FontData, Mix},
+    peniko::{Blob, Color, Compose, Fill, FontData, Gradient, Mix},
 };
 
 use crate::{
@@ -506,6 +506,36 @@ fn compile_scene(
                 );
             }
             PreparedSceneCommand::StrokePath(prepared) => draw_stroke(&mut scene, prepared),
+            PreparedSceneCommand::GradientPath {
+                path,
+                radial,
+                start,
+                end,
+                stops,
+            } => {
+                let start = vello::kurbo::Point::new(start[0], start[1]);
+                let end = vello::kurbo::Point::new(end[0], end[1]);
+                let stops: Vec<_> = stops
+                    .iter()
+                    .map(|(offset, color)| (*offset, rgba(*color)))
+                    .collect();
+                let gradient = if *radial {
+                    Gradient::new_radial(start, start.distance(end) as f32)
+                } else {
+                    Gradient::new_linear(start, end)
+                }
+                .with_stops(stops.as_slice());
+                scene.fill(
+                    match path.fill {
+                        FillRule::NonZero => Fill::NonZero,
+                        FillRule::EvenOdd => Fill::EvenOdd,
+                    },
+                    Affine::new(path.transform),
+                    &gradient,
+                    None,
+                    &compile_path(path),
+                );
+            }
         }
     }
     Ok(scene)

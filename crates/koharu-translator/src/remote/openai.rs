@@ -263,7 +263,7 @@ mod tests {
                 json_schema: JsonSchema {
                     name: "manga_translation",
                     strict: true,
-                    schema: prompt::output_schema(2),
+                    schema: prompt::output_schema(2, true),
                 },
             },
         };

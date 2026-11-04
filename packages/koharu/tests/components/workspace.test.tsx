@@ -568,6 +568,7 @@ describe('canvas interaction adapter', () => {
     expect(canvas.finishStroke).toHaveBeenCalledOnce()
     expect(commit).toHaveBeenCalledWith(1, null, expect.arrayContaining([{ x: 45, y: 45 }]), {
       diameter: 48,
+      hardness: 100,
       color: [255, 255, 255, 255],
     })
   })
@@ -865,6 +866,38 @@ describe('canvas interaction adapter', () => {
     )
   })
 
+  it('moves a tiny text box from its centre while resize targets stay outside', async () => {
+    installNudgeProject()
+    const original = { x: 30, y: 40, width: 20, height: 12, angle_degrees: 0 }
+    useKoharuStore.setState({ layerFrames: { element: original } })
+    const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(2)
+    const surface = renderWorkspace()
+    const east = document.querySelector<HTMLElement>('[data-resize-handle="e"]')!
+    const west = document.querySelector<HTMLElement>('[data-resize-handle="w"]')!
+    expect(east.style.transform).toBe('translate(0%, -50%)')
+    expect(west.style.transform).toBe('translate(-100%, -50%)')
+
+    fireEvent.pointerDown(surface, { button: 0, pointerId: 19, clientX: 50, clientY: 66 })
+    fireEvent.pointerMove(surface, { pointerId: 19, clientX: 60, clientY: 81 })
+    fireEvent.pointerUp(surface, { pointerId: 19, clientX: 60, clientY: 81 })
+
+    await waitFor(() => expect(commit).toHaveBeenCalledOnce())
+    expect(commit).toHaveBeenCalledWith(
+      1,
+      [
+        {
+          element: 'element',
+          frame: {
+            ...original,
+            x: 40,
+            y: 55,
+          },
+        },
+      ],
+      false,
+    )
+  })
+
   it('resizes a selected layer through Koharu selection controls', async () => {
     installProject()
     useKoharuStore.setState({ selectedLayers: ['element'] })
@@ -981,14 +1014,26 @@ describe('canvas interaction adapter', () => {
       point: { x: 20, y: 20 },
       diameter: 48,
     })
-    expect(commit).toHaveBeenCalledWith(1, 'paint', expect.arrayContaining([{ x: 20, y: 20 }]), 48)
+    expect(commit).toHaveBeenCalledWith(
+      1,
+      'paint',
+      expect.arrayContaining([{ x: 20, y: 20 }]),
+      48,
+      100,
+    )
   })
 
-  it('maps the Remove tool to an inpainting mask gesture', async () => {
+  it('maps Immediate Remove to an inpainting mask gesture', async () => {
     installProject()
+    vi.mocked(commands.getCleanupSettings).mockResolvedValue({
+      remove_mode: 'immediate',
+      paint_target: 'cleanup',
+      grow_px: 2,
+    })
     useKoharuStore.setState({ tool: 'remove' })
     const commit = vi.spyOn(commands, 'commitInpaint').mockResolvedValue('job')
     const surface = renderWorkspace()
+    await waitFor(() => expect(queryClient.getQueryData(['cleanup-settings'])).toBeDefined())
 
     fireEvent.pointerDown(surface, { button: 0, pointerId: 12, clientX: 30, clientY: 40 })
     fireEvent.pointerUp(surface, { pointerId: 12, clientX: 30, clientY: 40 })
@@ -1000,7 +1045,7 @@ describe('canvas interaction adapter', () => {
       point: { x: 20, y: 20 },
       diameter: 48,
     })
-    expect(commit).toHaveBeenCalledWith(1, expect.arrayContaining([{ x: 20, y: 20 }]), 48)
+    expect(commit).toHaveBeenCalledWith(1, expect.arrayContaining([{ x: 20, y: 20 }]), 48, 100)
   })
 
   it('creates point text on click and paragraph text on drag', async () => {

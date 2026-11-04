@@ -33,10 +33,15 @@ pub(crate) struct Execution<'a> {
     busy_stages: BTreeSet<Stage>,
     completed: usize,
     failure: Option<PipelineError>,
+    failures: Vec<crate::PageFailure>,
+    failed_pages: BTreeSet<EntityId>,
     base: koharu_scene::Revision,
     started: Instant,
     inpainting_mask: Option<crate::InpaintingMask>,
     translation_hints: Arc<crate::TranslationHints>,
+    redetect: bool,
+    policy: crate::RunPolicy,
+    resume: bool,
 }
 
 impl<'a> Execution<'a> {
@@ -80,16 +85,24 @@ impl<'a> Execution<'a> {
             stop: request.stop,
             progress: request.progress,
             scope,
-            scheduler: Scheduler::new(&pages, &stages),
+            scheduler: Scheduler::new(&pages, &stages).with_order(request.policy.order),
             scene: snapshot,
             images: BTreeMap::new(),
             busy_stages: BTreeSet::new(),
             completed: 0,
             failure: None,
+            failures: Vec::new(),
+            failed_pages: BTreeSet::new(),
             base,
             started,
             inpainting_mask: request.inpainting_mask,
             translation_hints: request.translation_hints,
+            redetect: request.redetect,
+            policy: request.policy,
+            resume: matches!(
+                request.operation,
+                crate::Operation::Full | crate::Operation::Through { .. }
+            ),
         })
     }
 
@@ -98,6 +111,9 @@ impl<'a> Execution<'a> {
             return Ok(self.report(RunStatus::Stopped));
         }
 
+        if self.policy.order == crate::RunOrder::StageAtATime {
+            self.runner.unload_models();
+        }
         self.resources.start();
         self.resources.wait_for_sample().await;
 
@@ -109,22 +125,40 @@ impl<'a> Execution<'a> {
             }
 
             let Some(completion) = running.next().await else {
+                if self.stop.finishing() {
+                    self.stop.stop();
+                }
                 break;
             };
             self.busy_stages.remove(&completion.stage);
-            if self.stopped() || self.failure.is_some() {
+            if self.stopped()
+                || self.failure.is_some()
+                || self.failed_pages.contains(&completion.page)
+            {
                 continue;
             }
+            let stage = completion.stage;
             if let Err(error) = self.apply_completion(completion).await {
                 self.failure = Some(error);
             }
+            if self.stop.finishing() {
+                self.stop.stop();
+            }
+            if self.policy.order == crate::RunOrder::StageAtATime
+                && self.scheduler.stage_finished(stage)
+            {
+                self.runner.unload_stage(stage);
+            }
         }
 
+        if self.policy.order == crate::RunOrder::StageAtATime {
+            self.runner.unload_models();
+        }
         self.finalize()
     }
 
     fn take_ready_job(&mut self) -> Option<StageJob> {
-        if self.stopped() || self.failure.is_some() {
+        if self.stopped() || self.stop.finishing() || self.failure.is_some() {
             return None;
         }
         let (page, stage) = self.scheduler.start_next(&self.busy_stages)?;
@@ -147,9 +181,12 @@ impl<'a> Execution<'a> {
                     .filter(|mask| stage == Stage::Inpainting && mask.page == page)
                     .cloned(),
             )
-            .with_translation_hints(self.translation_hints.clone()),
+            .with_translation_hints(self.translation_hints.clone())
+            .with_redetect(self.redetect)
+            .with_resume(self.resume),
             self.stop.clone(),
             self.progress.clone(),
+            self.policy.retries,
         ))
     }
 
@@ -164,14 +201,34 @@ impl<'a> Execution<'a> {
             elapsed,
             outcome,
         } = completion;
-        match outcome? {
+        let outcome = match outcome {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                self.record_failure(page, stage, &error);
+                return if self.policy.on_page_failure == crate::OnPageFailure::StopRun
+                    || matches!(error.kind, ErrorKind::InvalidInput | ErrorKind::Commit)
+                {
+                    Err(error)
+                } else {
+                    Ok(())
+                };
+            }
+        };
+        match outcome {
             StageOutcome::Stopped => {}
             StageOutcome::Skipped => {
                 self.mark_complete(page, stage);
                 progress::emit(self.progress.as_ref(), Progress::Skipped { page, stage });
             }
             StageOutcome::Patch(patch) => {
-                if !self.commit_patch(page, stage, patch).await? {
+                let committed = match self.commit_patch(page, stage, patch).await {
+                    Ok(committed) => committed,
+                    Err(error) => {
+                        self.record_failure(page, stage, &error);
+                        return Err(error);
+                    }
+                };
+                if !committed {
                     return Ok(());
                 }
                 self.mark_complete(page, stage);
@@ -187,6 +244,29 @@ impl<'a> Execution<'a> {
             }
         }
         Ok(())
+    }
+
+    fn record_failure(&mut self, page: EntityId, stage: Stage, error: &PipelineError) {
+        let failure = crate::PageFailure {
+            page,
+            label: self
+                .scene
+                .page(page)
+                .and_then(|page| page.page())
+                .map(|page| page.label)
+                .unwrap_or_else(|_| page.to_string()),
+            stage,
+            error: format!("{error:#}"),
+        };
+        self.failed_pages.insert(page);
+        let settled = self.scheduler.fail_page(page);
+        self.completed += settled;
+        self.images.remove(&page);
+        self.failures.push(failure.clone());
+        progress::emit(
+            self.progress.as_ref(),
+            Progress::PageFailed { failure, settled },
+        );
     }
 
     async fn commit_patch(
@@ -248,7 +328,11 @@ impl<'a> Execution<'a> {
         let status = if self.stopped() {
             RunStatus::Stopped
         } else {
-            RunStatus::Completed
+            if self.failures.is_empty() {
+                RunStatus::Completed
+            } else {
+                RunStatus::CompletedWithProblems
+            }
         };
         Ok(self.report(status))
     }
@@ -261,6 +345,7 @@ impl<'a> Execution<'a> {
             completed: self.completed,
             total: self.scheduler.total(),
             elapsed: self.started.elapsed(),
+            failures: self.failures.clone(),
         }
     }
 }

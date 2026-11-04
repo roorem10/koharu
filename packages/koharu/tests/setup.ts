@@ -6,6 +6,25 @@ import { defaultShortcuts, useKoharuStore } from '@/lib/store'
 import { emptyTextStyle, emptyShapeStyles, emptyCategoryStyles } from '@/lib/text-styles'
 import { commands } from '@koharu/bridge/protocol'
 
+import { mockWo06 } from './mocks/wo06'
+import { mockWo07 } from './mocks/wo07'
+import { mockWo10 } from './mocks/wo10'
+import { mockWo11a } from './mocks/wo11a'
+import { mockWo11b } from './mocks/wo11b'
+import { mockWo11c } from './mocks/wo11c'
+import { mockWo11d } from './mocks/wo11d'
+import { mockWo11e } from './mocks/wo11e'
+import { mockWo11f } from './mocks/wo11f'
+import { mockWo12 } from './mocks/wo12'
+import { mockWo13 } from './mocks/wo13'
+import { mockWo14 } from './mocks/wo14'
+import { mockWo15 } from './mocks/wo15'
+import { mockWo17 } from './mocks/wo17'
+import { mockWo20 } from './mocks/wo20'
+import { mockWo21 } from './mocks/wo21'
+import { mockWo23 } from './mocks/wo23'
+import { mockWo24 } from './mocks/wo24'
+
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
   const { createInstance } = await import('i18next')
@@ -99,6 +118,24 @@ beforeEach(() => {
     model_confidence: 0.6,
     small_text_threshold: 0.012,
   })
+  mockWo20()
+  mockWo12()
+  mockWo13()
+  mockWo14()
+  mockWo06()
+  mockWo21()
+  mockWo07()
+  mockWo15()
+  mockWo10()
+  mockWo17()
+  mockWo23()
+  mockWo24()
+  mockWo11a()
+  mockWo11b()
+  mockWo11c()
+  mockWo11d()
+  mockWo11e()
+  mockWo11f()
   queryClient.clear()
   useKoharuStore.setState({
     ...initial,

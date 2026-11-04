@@ -208,10 +208,13 @@ fn luni_body(name: &str) -> Vec<u8> {
 
 fn tysh_body(text: &TextMetadata) -> Result<Vec<u8>, PsdExportError> {
     let engine_data = encode_engine_data(&TextEngineSpec {
+        runs: text.runs.clone(),
         text: text.text.clone(),
         font_index: text.font_index,
         font_set: text.font_set.clone(),
         font_size: text.font_size,
+        line_spacing: text.line_spacing,
+        letter_spacing: text.letter_spacing,
         color: text.color,
         faux_bold: false,
         faux_italic: false,
@@ -452,6 +455,7 @@ mod tests {
     #[test]
     fn editable_layer_writes_gimp_readable_text_resources() {
         let text = TextMetadata {
+            runs: Vec::new(),
             index: 1,
             text: "Hello".to_owned(),
             bounds: [2.0, 3.0, 12.0, 11.0],
@@ -461,6 +465,8 @@ mod tests {
             font_index: 0,
             font_set: vec!["ArialMT".to_owned()],
             font_size: 12.0,
+            line_spacing: None,
+            letter_spacing: 0.0,
             color: [0, 0, 0, 255],
             box_width: 10.0,
             box_height: 8.0,

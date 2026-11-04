@@ -131,18 +131,31 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
     };
     builder
         .setup(move |application| {
-            if let Some(root) = &preview_root {
-                koharu_runtime::Store::configure(root.join("packages"))?;
-            }
-            #[cfg(all(target_os = "windows", not(debug_assertions)))]
-            if preview_root.is_none() {
-                koharu_runtime::Store::configure(
-                    application
-                        .path()
-                        .resource_dir()
-                        .context("failed to locate Koharu's installation directory")?
-                        .join("store"),
-                )?;
+            let models_folder = koharu_config::load::<crate::commands::files::LibrarySettings>("library")
+                .and_then(|settings| Ok(settings.read()?.models_folder.clone()));
+            let custom_store = match models_folder {
+                Ok(Some(root)) => match crate::commands::files::prepare_folder(&root)
+                    .and_then(|()| koharu_runtime::Store::configure(root)) {
+                    Ok(()) => true,
+                    Err(error) => { tracing::warn!(%error, "could not use configured models folder; using default"); false }
+                },
+                Ok(None) => false,
+                Err(error) => { tracing::warn!(%error, "could not read library settings; using default models folder"); false }
+            };
+            if !custom_store {
+                if let Some(root) = &preview_root {
+                    koharu_runtime::Store::configure(root.join("packages"))?;
+                }
+                #[cfg(all(target_os = "windows", not(debug_assertions)))]
+                if preview_root.is_none() {
+                    koharu_runtime::Store::configure(
+                        application
+                            .path()
+                            .resource_dir()
+                            .context("failed to locate Koharu's installation directory")?
+                            .join("store"),
+                    )?;
+                }
             }
 
             application.manage(CurrentProject {
@@ -160,6 +173,25 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
             let handle = application.handle().clone();
             application.manage(koharu_desktop::Desktop::new()?);
             application.manage(AgentState::new(handle.clone())?);
+            // Batch 1: each WO adds its own `manage(...)` or startup lines below its marker.
+            // WO-13 (files and export)
+            // WO-14 (runs and retries)
+            application.manage(crate::commands::runs::BatchState::default());
+            // WO-21 (MCP server)
+            let mcp = std::sync::Arc::new(crate::commands::mcp::McpState::new(
+                std::sync::Arc::new(crate::commands::agent::host::KoharuHost::new(
+                    handle.clone(),
+                )),
+                // Report the Booharu release (e.g. "0.1.0"), not the upstream Koharu version.
+                include_str!("../../../FORK_VERSION")
+                    .trim()
+                    .trim_start_matches("Booharu ")
+                    .to_owned(),
+            )?);
+            application.manage(mcp.clone());
+            drop(tauri::async_runtime::spawn(
+                async move { mcp.start().await },
+            ));
 
             let window_config = application
                 .config()
@@ -268,6 +300,9 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
                 processing.stops.lock().clear();
                 processing.jobs.lock().clear();
                 window.state::<AgentState>().cancel_all();
+                window
+                    .state::<std::sync::Arc<crate::commands::mcp::McpState>>()
+                    .cancel();
             }
         })
         .run(context)?;

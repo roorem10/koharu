@@ -96,6 +96,28 @@ impl Frame {
     }
 
     #[must_use]
+    /// Cached character-cluster boxes in page pixels, including a zero-width (zero-height
+    /// for vertical text) `start == end` caret at each line end. No layout is rebuilt.
+    pub fn text_glyph_boxes(&self, entity: EntityId) -> Option<Vec<TextGlyphBox>> {
+        let layer = self.layer(entity)?;
+        let metadata = layer.0.node.text.as_ref()?;
+        Some(
+            metadata
+                .glyph_boxes
+                .iter()
+                .cloned()
+                .map(|mut glyph| {
+                    for corner in &mut glyph.quad {
+                        let point = layer.0.placement
+                            * vello::kurbo::Point::new(f64::from(corner[0]), f64::from(corner[1]));
+                        *corner = [point.x as f32, point.y as f32];
+                    }
+                    glyph
+                })
+                .collect(),
+        )
+    }
+
     pub fn stats(&self) -> RetentionStats {
         self.0.stats
     }
@@ -129,6 +151,55 @@ impl Frame {
         let Some(layer) = self.layer(entity).cloned() else {
             return Ok(None);
         };
+        self.crop_layer(layer).map(Some)
+    }
+
+    /// The same laid-out text before warping and per-word paint effects, for an editable PSD preview.
+    /// Reuses the original recorded drawing instead of laying out or shaping the text again.
+    pub fn cropped_unwarped_text(&self, entity: EntityId) -> Result<Option<Self>> {
+        let Some(layer) = self.layer(entity) else {
+            return Ok(None);
+        };
+        let LayerKind::Text(metadata) = layer.kind() else {
+            return Ok(None);
+        };
+        let Some(frame) =
+            crate::bubble::geometry_frame(layer.geometry(), Some(metadata.angle_degrees))
+        else {
+            return Err(Error::invalid("text layer has no unwarped frame"));
+        };
+        let mut node = layer.0.node.as_ref().clone();
+        if let Some(original) = node.editable.take().or_else(|| node.unwarped.take()) {
+            node.scene = original.scene;
+            node.resources = original.resources;
+            node.local_bounds = original.local_bounds;
+        }
+        if let NodeDescriptor::Text(text) = &mut node.descriptor {
+            text.warp = None;
+        }
+        let placement = crate::warp::text_placement(frame);
+        let bounds = placement.transform_rect_bbox(vello::kurbo::Rect::new(
+            f64::from(node.local_bounds.x),
+            f64::from(node.local_bounds.y),
+            f64::from(node.local_bounds.x + node.local_bounds.width),
+            f64::from(node.local_bounds.y + node.local_bounds.height),
+        ));
+        self.crop_layer(Layer(Arc::new(LayerData {
+            bounds: RenderBounds {
+                x: bounds.x0 as f32,
+                y: bounds.y0 as f32,
+                width: bounds.width() as f32,
+                height: bounds.height() as f32,
+            },
+            placement,
+            node: Arc::new(node),
+            ..layer.0.clone_for_frame()
+        })))
+        .map(Some)
+    }
+
+    fn crop_layer(&self, layer: Layer) -> Result<Self> {
+        let entity = layer.entity();
         let bounds = layer.bounds();
         if ![bounds.x, bounds.y, bounds.width, bounds.height]
             .into_iter()
@@ -181,7 +252,7 @@ impl Frame {
             Affine::translate((-f64::from(left), -f64::from(top))),
             &layers,
         )?;
-        Ok(Some(Self(Arc::new(FrameData {
+        Ok(Self(Arc::new(FrameData {
             revision: self.revision(),
             page: self.page(),
             width,
@@ -194,7 +265,7 @@ impl Frame {
             diagnostics: self.0.diagnostics.clone(),
             stats: self.0.stats,
             prepared: Arc::new(prepared),
-        }))))
+        })))
     }
 
     pub(crate) fn at_revision(&self, revision: Revision, stats: RetentionStats) -> Self {
@@ -368,6 +439,9 @@ impl RasterImage {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextMetadata {
+    pub style_runs: Vec<TextStyleRun>,
+    pub smallest_font_size: f32,
+    pub word_effects: bool,
     pub text: String,
     pub language: Option<LanguageTag>,
     pub rendered_bounds: RenderBounds,
@@ -375,9 +449,31 @@ pub struct TextMetadata {
     pub post_script_fonts: Vec<String>,
     pub font_size: f32,
     pub color: [u8; 4],
+    pub line_spacing: Option<f32>,
+    pub letter_spacing: f32,
     pub alignment: TextAlign,
     pub writing_mode: WritingMode,
     pub angle_degrees: f32,
+}
+
+/// Resolved plain styles for editable text export. Offsets count Unicode scalar values.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextStyleRun {
+    pub start: u32,
+    pub end: u32,
+    pub post_script_font: String,
+    pub font_size: f32,
+    pub color: [u8; 4],
+    pub faux_bold: bool,
+    pub faux_italic: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextGlyphBox {
+    pub start: u32,
+    pub end: u32,
+    pub line: u32,
+    pub quad: [[f32; 2]; 4],
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
@@ -452,11 +548,14 @@ pub(crate) struct ImageNodeDescriptor {
     pub(crate) require_size: Option<(u32, u32)>,
 }
 
+#[derive(Clone)]
 pub(crate) struct RetainedNode {
     pub(crate) descriptor: NodeDescriptor,
     pub(crate) scene: Arc<koharu_rasterizer::PreparedScene>,
     pub(crate) resources: Arc<[PreparedResource]>,
     pub(crate) local_bounds: RenderBounds,
+    pub(crate) unwarped: Option<crate::text_renderer::UnwarpedText>,
+    pub(crate) editable: Option<crate::text_renderer::UnwarpedText>,
     pub(crate) image: Option<RasterImage>,
     pub(crate) text: Option<LocalTextMetadata>,
     pub(crate) diagnostics: Arc<[RenderDiagnostic]>,
@@ -464,11 +563,17 @@ pub(crate) struct RetainedNode {
 
 #[derive(Clone)]
 pub(crate) struct LocalTextMetadata {
+    pub(crate) glyph_boxes: Arc<[TextGlyphBox]>,
+    pub(crate) style_runs: Vec<TextStyleRun>,
+    pub(crate) smallest_font_size: f32,
+    pub(crate) word_effects: bool,
     pub(crate) rendered_bounds: RenderBounds,
     pub(crate) layout_bounds: RenderBounds,
     pub(crate) post_script_fonts: Vec<String>,
     pub(crate) font_size: f32,
     pub(crate) color: [u8; 4],
+    pub(crate) line_spacing: Option<f32>,
+    pub(crate) letter_spacing: f32,
 }
 
 pub(crate) fn prepare_frame(
@@ -603,6 +708,19 @@ fn element_frame(layer: &Layer) -> Option<PreparedElementFrame> {
     let LayerKind::Text(text) = layer.kind() else {
         return None;
     };
+    if let NodeDescriptor::Text(descriptor) = &layer.0.node.descriptor
+        && descriptor.warp.is_some()
+        && let Some(frame) =
+            crate::bubble::geometry_frame(layer.geometry(), Some(text.angle_degrees))
+    {
+        return Some(PreparedElementFrame {
+            x: frame.bounds.x,
+            y: frame.bounds.y,
+            width: frame.bounds.width,
+            height: frame.bounds.height,
+            angle_degrees: frame.angle_degrees,
+        });
+    }
     let bounds = text.rendered_bounds;
     if bounds.width > 0.0 && bounds.height > 0.0 {
         return Some(PreparedElementFrame {

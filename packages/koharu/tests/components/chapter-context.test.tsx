@@ -51,7 +51,10 @@ describe('chapter context', () => {
         <ContextPanel />
       </QueryClientProvider>,
     )
-    expect(await screen.findByLabelText('Chapter brief')).toHaveValue('A quiet reunion.')
+    fireEvent.click(await screen.findByRole('button', { name: 'View' }))
+    expect(await screen.findByRole('textbox', { name: 'Chapter brief' })).toHaveValue(
+      'A quiet reunion.',
+    )
     expect(screen.getByText(/ヒナ → Hina/)).toBeInTheDocument()
   })
 

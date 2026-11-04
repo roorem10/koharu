@@ -1,0 +1,10 @@
+/*
+ * The whole tag turns yellow so a box with QC issues stands out. The blink is the
+ * global .qc-issue-blink class: the app's still-interface rule (animation: none in
+ * the base layer) would override an animation declared here.
+ */
+.issue {
+  background-color: var(--warning, #dba54a);
+  color: #000;
+  font-weight: 600;
+}

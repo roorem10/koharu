@@ -7,10 +7,11 @@ import { useTranslation } from 'react-i18next'
 import { PreferenceRow, PreferenceSection } from '@/components/preferences/PreferenceFields'
 import { call } from '@/lib/backend'
 import { queryClient } from '@/lib/queries'
-import { commands, type ReadWhen } from '@koharu/bridge/protocol'
+import { commands } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 import { Checkbox } from '@koharu/ui/components/checkbox'
 import { Input } from '@koharu/ui/components/input'
+import { Popover, PopoverTrigger, PopoverContent } from '@koharu/ui/components/popover'
 import {
   Select,
   SelectContent,
@@ -21,12 +22,14 @@ import {
 
 import { contextSettingsKey, useChapterContext } from './data'
 import { GlossaryDialog } from './GlossaryDialog'
+import { ReadingModelPicker } from './ReadingModelPicker'
 import type { ContextSettings } from './types'
 
 export function ContextPreferences() {
   const { t } = useTranslation()
   const chapter = useChapterContext().data
   const [open, setOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const settings = useQuery({
     queryKey: contextSettingsKey,
     queryFn: async () => (await call(commands.getContextSettings)) as ContextSettings,
@@ -43,42 +46,76 @@ export function ContextPreferences() {
     >
       {settings && (
         <>
-          <PreferenceRow title={t('chapterContext.readWhen')}>
+          <PreferenceRow title={t('chapterContext.automaticReading')}>
             <Select
-              value={settings.read_when}
-              items={Object.fromEntries(
-                (['missing', 'always', 'never'] as const).map((mode) => [
-                  mode,
-                  t(`chapterContext.readModes.${mode}`),
-                ]),
-              )}
+              value={settings.read_when === 'never' ? 'no' : 'yes'}
+              items={{ yes: t('chapterContext.yes'), no: t('chapterContext.no') }}
               disabled={mutation.isPending}
               onValueChange={(value) =>
-                value && save({ ...settings, read_when: value as ReadWhen })
+                value && save({ ...settings, read_when: value === 'yes' ? 'missing' : 'never' })
               }
             >
-              <SelectTrigger aria-label={t('chapterContext.readWhen')}>
+              <SelectTrigger aria-label={t('chapterContext.automaticReading')}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(['missing', 'always', 'never'] as const).map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {t(`chapterContext.readModes.${value}`)}
-                  </SelectItem>
-                ))}
+                <SelectItem value='yes'>{t('chapterContext.yes')}</SelectItem>
+                <SelectItem value='no'>{t('chapterContext.no')}</SelectItem>
               </SelectContent>
             </Select>
           </PreferenceRow>
-          <PreferenceRow
-            title={t('chapterContext.sendImages')}
-            description={t('chapterContext.sendImagesHint')}
-          >
+          <PreferenceRow title={t('chapterContext.askBeforeReading')}>
             <Checkbox
-              aria-label={t('chapterContext.sendImages')}
-              checked={settings.send_images}
+              aria-label={t('chapterContext.askBeforeReading')}
+              checked={settings.ask_before_reading}
               disabled={mutation.isPending}
-              onCheckedChange={(checked) => save({ ...settings, send_images: checked })}
+              onCheckedChange={(checked) =>
+                save({ ...settings, ask_before_reading: checked === true })
+              }
             />
+          </PreferenceRow>
+          <PreferenceRow
+            title={t('chapterContext.readingModel')}
+            description={t('chapterContext.readerDownload')}
+          >
+            <div className='grid min-w-0 gap-2'>
+              <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      disabled={mutation.isPending}
+                      className='w-full min-w-0 justify-start'
+                    />
+                  }
+                >
+                  <span className='truncate'>
+                    {settings.read_model?.model ?? t('chapterContext.sameModel')}
+                  </span>
+                </PopoverTrigger>
+                <PopoverContent className='w-80 max-w-[90vw]'>
+                  <ReadingModelPicker
+                    value={settings.read_model}
+                    onBack={() => setPickerOpen(false)}
+                    onSelect={(model) => {
+                      save({ ...settings, read_model: model })
+                      setPickerOpen(false)
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+              {settings.read_model && (
+                <Button
+                  size='sm'
+                  variant='ghost'
+                  disabled={mutation.isPending}
+                  onClick={() => save({ ...settings, read_model: null })}
+                >
+                  {t('chapterContext.sameModel')}
+                </Button>
+              )}
+            </div>
           </PreferenceRow>
           {(['pages_per_request', 'previous_pages', 'agent_messages'] as const).map((key) => (
             <PreferenceRow key={key} title={t(`chapterContext.settings.${key}`)}>

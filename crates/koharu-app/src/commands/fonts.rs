@@ -50,6 +50,7 @@ pub(crate) async fn set_font_favorite(
 #[derive(Clone, Debug, Serialize, Type)]
 pub struct FontFamily {
     pub name: String,
+    pub local_names: Vec<String>,
     pub metadata: FontMetadata,
     pub sources: Vec<FontSource>,
     pub faces: Vec<FontFace>,
@@ -114,6 +115,7 @@ impl From<RenderFontFamily> for FontFamily {
     fn from(family: RenderFontFamily) -> Self {
         Self {
             name: family.name,
+            local_names: family.local_names,
             metadata: FontMetadata {
                 primary_script: family.metadata.primary_script,
                 scripts: family.metadata.scripts,

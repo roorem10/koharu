@@ -9,6 +9,7 @@ mod assets;
 mod groups;
 mod layers;
 mod provenance;
+pub mod rich_text;
 mod spatial;
 mod structure;
 mod text;
@@ -20,10 +21,12 @@ pub(crate) use assets::Assets;
 pub use assets::{Asset, AssetInput, AssetMetadata, AssetRole};
 pub use groups::{Group, TextGroup};
 pub use layers::{
-    FontStyle, RasterLayer, RasterLayerKind, StrokeJoin, StrokeMethod, StrokePosition,
-    TextAlignment, TextLayout, TextLayoutKind, Typography, WritingMode,
+    FillGradient, FontStyle, GradientKind, GradientStop, RasterLayer, RasterLayerKind, StrokeJoin,
+    StrokeMethod, StrokePosition, TextAlignment, TextLayout, TextLayoutKind, TextWarp, Typography,
+    WritingMode,
 };
 pub use provenance::{Authored, Generation, Origin};
+pub use rich_text::{RunStyle, StyleRun, TextRuns, char_range_to_byte_range};
 pub use spatial::{Geometry, Point, Visibility};
 pub use structure::{EntityOrigin, Page, PageDraft, Project, Relation, RelationKind};
 pub use text::{LanguageTag, SourceText, TextContent, TextRole, Translation};

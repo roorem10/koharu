@@ -346,6 +346,7 @@ pub(crate) fn font_key(font: &Font) -> usize {
 #[derive(Clone, Debug)]
 struct SystemFace {
     pub(crate) family_name: String,
+    pub(crate) local_names: Vec<String>,
     pub(crate) post_script_name: String,
     pub(crate) weight: u16,
     pub(crate) style: PublicFontStyle,
@@ -478,6 +479,25 @@ impl FontSystem {
                 });
             }
 
+            // fontique matches style before weight, so a regular italic request on a
+            // family with only Regular and Bold Italic (CC Wild Words) gets Bold Italic
+            // and B then changes nothing. Re-pick each requested family's face the way
+            // bundled faces are picked: prefer a face the missing style can be
+            // synthesized onto.
+            let picks: Vec<_> = families
+                .iter()
+                .filter_map(|family| self.pick_family_face(family, attributes))
+                .collect();
+            let candidates: Vec<_> = candidates
+                .into_iter()
+                .map(|candidate| {
+                    picks
+                        .iter()
+                        .find(|pick| pick.family.0 == candidate.family.0)
+                        .cloned()
+                        .unwrap_or(candidate)
+                })
+                .collect();
             for candidate in candidates {
                 if !seen.insert((candidate.blob.id(), candidate.index)) {
                     continue;
@@ -508,6 +528,33 @@ impl FontSystem {
         }
         self.resolved.insert(key, resolved.clone());
         Ok(resolved)
+    }
+
+    /// The face of a named family that keeps bold and italic independent: an exact
+    /// style match first, then a plain face to slant, never a slanted face for an
+    /// upright request; likewise for weight. Missing styles are synthesized.
+    fn pick_family_face(&mut self, family: &str, attributes: Attributes) -> Option<QueryFont> {
+        let family = self.collection.family_by_name(family)?;
+        let (index, info) = family.fonts().iter().enumerate().min_by_key(|(_, info)| {
+            face_score(
+                FaceTraits {
+                    style: info.style(),
+                    weight: info.weight().value(),
+                    width: info.width().percentage(),
+                    weight_axis: info.has_weight_axis(),
+                    slant_axis: info.has_slant_axis() || info.has_italic_axis(),
+                },
+                attributes,
+            )
+        })?;
+        let blob = info.load(Some(&mut self.sources))?;
+        Some(QueryFont {
+            family: (family.id(), index),
+            blob,
+            index: info.index(),
+            synthesis: info.synthesis(attributes.width, attributes.style, attributes.weight),
+            charmap_index: info.charmap_index(),
+        })
     }
 
     pub fn query_family(&mut self, family: &str) -> Result<Font> {
@@ -569,6 +616,10 @@ impl FontSystem {
                 };
                 faces.push(SystemFace {
                     family_name: family_name.clone(),
+                    local_names: font
+                        .skrifa_ref()
+                        .map(|font| local_family_names(&font, &family_name))
+                        .unwrap_or_default(),
                     post_script_name: font.post_script_name,
                     weight: info.weight().value().round().clamp(1.0, 1000.0) as u16,
                     style: match info.style() {
@@ -587,6 +638,44 @@ impl Default for FontSystem {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[derive(Clone, Copy)]
+struct FaceTraits {
+    style: FontStyle,
+    weight: f32,
+    width: f32,
+    weight_axis: bool,
+    slant_axis: bool,
+}
+
+/// Lower is better. A missing slant or weight can be synthesized onto a plain face,
+/// but a slanted or bold face can't be made plain, so B and I stay independent.
+fn face_score(face: FaceTraits, attributes: Attributes) -> u32 {
+    let style = if face.style == attributes.style
+        || (attributes.style != FontStyle::Normal && face.slant_axis)
+    {
+        0
+    } else if face.style == FontStyle::Normal {
+        2_000
+    } else {
+        10_000
+    };
+    let requested_heavy = attributes.weight.value() >= 600.0;
+    let side = if face.weight_axis || (face.weight >= 600.0) == requested_heavy {
+        0
+    } else if requested_heavy {
+        2_000
+    } else {
+        10_000
+    };
+    let distance = if face.weight_axis {
+        0
+    } else {
+        (face.weight - attributes.weight.value()).abs().round() as u32
+    };
+    let width = (face.width - attributes.width.percentage()).abs().round() as u32;
+    style + side + distance + width
 }
 
 pub(crate) struct Fonts {
@@ -631,10 +720,12 @@ impl Fonts {
             let key = normalize(&face.family_name);
             let family = families.entry(key).or_insert_with(|| FontFamily {
                 name: face.family_name.clone(),
+                local_names: Vec::new(),
                 metadata: FontMetadata::default(),
                 sources: vec![FontSource::System],
                 faces: Vec::new(),
             });
+            append_local_names(&mut family.local_names, face.local_names);
             family.faces.push(FontFace {
                 post_script_name: face.post_script_name,
                 weight: face.weight,
@@ -646,6 +737,10 @@ impl Fonts {
         for bundled in &catalog.families {
             let key = normalize(&bundled.family_name);
             let family = families.entry(key).or_insert_with(|| bundled.info());
+            append_local_names(
+                &mut family.local_names,
+                bundled.cached_local_names().await.clone(),
+            );
             if family.metadata.primary_script.is_none() {
                 family.metadata.clone_from(&bundled.metadata);
             }
@@ -729,7 +824,8 @@ impl Fonts {
             && let Some(catalog) = self.catalog.get()
         {
             if let Some(face) = catalog.select(family, attributes) {
-                self.cache.lock().get(&face.post_script_name)
+                let loaded = self.cache.lock().get(&face.post_script_name);
+                loaded.map(|font| self.synthesized(&face, font, attributes))
             } else {
                 None
             }
@@ -751,6 +847,77 @@ impl Fonts {
             resolved.insert(0, font);
         }
         Ok(resolved)
+    }
+
+    pub(crate) fn resolve_word_font(
+        &self,
+        request: &FontRequest,
+        box_fonts: &[Font],
+        text: &str,
+        language: Option<&str>,
+    ) -> Vec<Font> {
+        let candidates = self
+            .resolve(
+                Some(&request.family),
+                request.weight,
+                request.style,
+                &[],
+                text,
+                language,
+            )
+            .unwrap_or_default();
+        // An unavailable family must keep the box face, rather than replace it
+        // with the resolver's generic fallback. Missing glyphs try the box next.
+        candidates
+            .iter()
+            .filter(|font| font.family_name().eq_ignore_ascii_case(&request.family))
+            .chain(box_fonts)
+            .chain(
+                candidates
+                    .iter()
+                    .filter(|font| !font.family_name().eq_ignore_ascii_case(&request.family)),
+            )
+            .cloned()
+            .collect()
+    }
+
+    /// A bundled face is loaded with its own attributes. When the request asks for
+    /// a weight or slant the face lacks, re-query it so the renderer draws
+    /// synthetic bold or italic, as it already does for system fonts.
+    fn synthesized(&self, face: &BundledFace, font: Font, attributes: Attributes) -> Font {
+        let face_style = FontStyle::from(face.style);
+        let heavy = |weight: f32| weight >= 600.0;
+        let weight_differs = face.weight_range.is_none()
+            && heavy(attributes.weight.value()) != heavy(f32::from(face.weight));
+        let range_differs = face.weight_range.is_some_and(|_| {
+            axis_distance(attributes.weight.value(), face.weight, face.weight_range) > 0
+        });
+        if face_style == attributes.style && !weight_differs && !range_differs {
+            return font;
+        }
+        let style_id = match attributes.style {
+            FontStyle::Normal => 0,
+            FontStyle::Italic => 1,
+            FontStyle::Oblique(_) => 2,
+        };
+        let key = format!(
+            "{}#{}#{style_id}",
+            face.post_script_name,
+            attributes.weight.value().round()
+        );
+        if let Some(styled) = self.cache.lock().get(&key) {
+            return styled;
+        }
+        match font_from_blob(font.data.clone(), face, attributes) {
+            Ok(styled) => {
+                self.cache.lock().insert(key, styled.clone());
+                styled
+            }
+            Err(error) => {
+                tracing::warn!(%error, "could not synthesize a bundled font style");
+                font
+            }
+        }
     }
 
     pub(crate) async fn preview(&self, family_name: &str) -> Result<FontPreview> {
@@ -954,6 +1121,7 @@ impl FontCatalog {
             }
             let family = Arc::new(BundledFamily {
                 family_name: family.family_name,
+                local_names: OnceCell::new(),
                 metadata: FontMetadata {
                     primary_script: family.primary_script,
                     scripts: family.scripts,
@@ -983,13 +1151,31 @@ impl FontCatalog {
             .faces
             .iter()
             .min_by_key(|face| {
-                let style = if fontique::FontStyle::from(face.style) == attributes.style {
+                // A missing slant or weight can be synthesized from a plain face, but
+                // a slanted or bold face can't be made plain. So a regular italic
+                // request takes the regular face (synthetic slant) over Bold Italic,
+                // and a bold request takes the regular face (synthetic bold) over an
+                // italic one. B and I stay independent.
+                let face_style = fontique::FontStyle::from(face.style);
+                let style = if face_style == attributes.style {
                     0
-                } else {
+                } else if face_style == fontique::FontStyle::Normal {
                     2_000
+                } else {
+                    10_000
                 };
                 let weight =
                     axis_distance(attributes.weight.value(), face.weight, face.weight_range);
+                let requested_heavy = attributes.weight.value() >= 600.0;
+                let side = if face.weight_range.is_some() || (face.weight >= 600) == requested_heavy
+                {
+                    0
+                } else if requested_heavy {
+                    2_000
+                } else {
+                    10_000
+                };
+                let weight = weight + side;
                 let stretch = axis_distance(
                     attributes.width.percentage(),
                     face.stretch,
@@ -1003,17 +1189,81 @@ impl FontCatalog {
 
 struct BundledFamily {
     family_name: String,
+    local_names: OnceCell<Vec<String>>,
     metadata: FontMetadata,
     faces: Vec<Arc<BundledFace>>,
 }
 
 impl BundledFamily {
+    async fn cached_local_names(&self) -> &Vec<String> {
+        self.local_names
+            .get_or_init(|| async {
+                let mut names = Vec::new();
+                // Listing fonts must not download every face in the bundled catalog.
+                for face in &self.faces {
+                    let file = HuggingFaceFile::pinned_dataset(
+                        FONT_REPOSITORY,
+                        FONT_REVISION,
+                        &face.file_name,
+                    );
+                    if !file.exists() {
+                        continue;
+                    }
+                    let Ok(path) = file.resolve().await else {
+                        continue;
+                    };
+                    let Ok(bytes) = tokio::fs::read(path).await else {
+                        continue;
+                    };
+                    if let Ok(font) = skrifa::FontRef::from_index(&bytes, 0) {
+                        append_local_names(
+                            &mut names,
+                            local_family_names(&font, &self.family_name),
+                        );
+                    }
+                }
+                names
+            })
+            .await
+    }
+
     fn info(&self) -> FontFamily {
         FontFamily {
             name: self.family_name.clone(),
+            local_names: Vec::new(),
             metadata: self.metadata.clone(),
             sources: vec![FontSource::Bundled],
             faces: self.faces.iter().map(|face| face.info()).collect(),
+        }
+    }
+}
+
+fn local_family_names(font: &skrifa::FontRef<'_>, canonical: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for id in [16, 1] {
+        for record in font.localized_strings(StringId::new(id)) {
+            if record
+                .language()
+                .is_some_and(|language| language == "en" || language.starts_with("en-"))
+            {
+                continue;
+            }
+            let name = record.to_string().trim_matches('\0').trim().to_owned();
+            if !name.is_empty() && normalize(&name) != normalize(canonical) {
+                append_local_names(&mut names, [name]);
+            }
+        }
+    }
+    names
+}
+
+fn append_local_names(names: &mut Vec<String>, additional: impl IntoIterator<Item = String>) {
+    for name in additional {
+        if !names
+            .iter()
+            .any(|known| normalize(known) == normalize(&name))
+        {
+            names.push(name);
         }
     }
 }
@@ -1220,6 +1470,40 @@ fn axis_distance(value: f32, default: u16, range: Option<FontRange>) -> u32 {
 }
 
 #[cfg(test)]
+pub(crate) fn layout_fixture_font() -> Font {
+    static FONT: OnceLock<Font> = OnceLock::new();
+    FONT.get_or_init(|| {
+        let mut collection = Collection::new(CollectionOptions {
+            shared: false,
+            system_fonts: false,
+        });
+        collection.register_fonts(
+            Blob::from(
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../packages/koharu/app/fonts/NotoSansCJK-VF.otf"
+                ))
+                .to_vec(),
+            ),
+            Some(FontInfoOverride {
+                family_name: Some("Layout Fixture"),
+                ..FontInfoOverride::default()
+            }),
+        );
+        let mut sources = SourceCache::new(Default::default());
+        let mut query = collection.query(&mut sources);
+        query.set_families([QueryFamily::Named("Layout Fixture")]);
+        let mut result = None;
+        query.matches_with(|font| {
+            result = Some(Font::from_query(font.clone(), "Layout Fixture".into()).unwrap());
+            QueryStatus::Stop
+        });
+        result.expect("embedded layout font must resolve")
+    })
+    .clone()
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -1278,6 +1562,159 @@ mod tests {
                 minimum: 75,
                 maximum: 100
             })
+        );
+    }
+
+    #[test]
+    fn installed_families_keep_bold_and_italic_independent() {
+        // CC Wild Words installed on Windows: Regular and Bold Italic, no Italic.
+        let face = |style, weight| FaceTraits {
+            style,
+            weight,
+            width: 100.0,
+            weight_axis: false,
+            slant_axis: false,
+        };
+        let faces = [
+            face(FontStyle::Normal, 400.0),
+            face(FontStyle::Italic, 700.0),
+        ];
+        let pick = |weight: f32, style: FontStyle| {
+            let request = Attributes {
+                weight: fontique::FontWeight::new(weight),
+                style,
+                ..Attributes::default()
+            };
+            (0..faces.len())
+                .min_by_key(|&index| face_score(faces[index], request))
+                .unwrap()
+        };
+        assert_eq!(pick(400.0, FontStyle::Normal), 0);
+        assert_eq!(
+            pick(400.0, FontStyle::Italic),
+            0,
+            "I alone is a slanted regular"
+        );
+        assert_eq!(
+            pick(700.0, FontStyle::Normal),
+            0,
+            "B alone is an emboldened regular"
+        );
+        assert_eq!(
+            pick(700.0, FontStyle::Italic),
+            1,
+            "B and I use the real Bold Italic"
+        );
+    }
+
+    #[test]
+    fn regular_italic_request_prefers_the_regular_face_over_bold_italic() {
+        // CC Wild Words style: a regular face and a bold italic face, no regular italic.
+        let index = serde_json::from_str::<CatalogIndex>(
+            r#"{
+                "schema_version": 3,
+                "families": [{
+                    "family_name": "Comic",
+                    "weights": [
+                        { "weight": 400, "fonts": [{ "file_name": "Comic-Regular.ttf",
+                          "font_name": "Comic Regular", "postscript_name": "Comic-Regular",
+                          "style": "normal", "width": 1.0, "preview": { "file": "a.webp" } }] },
+                        { "weight": 700, "fonts": [{ "file_name": "Comic-BoldItalic.ttf",
+                          "font_name": "Comic Bold Italic", "postscript_name": "Comic-BoldItalic",
+                          "style": "italic", "width": 1.0, "preview": { "file": "b.webp" } }] }
+                    ]
+                }]
+            }"#,
+        )
+        .expect("the index fixture must deserialize");
+        let catalog = FontCatalog::from_index(index);
+        let pick = |weight: f32, style: FontStyle| {
+            catalog
+                .select(
+                    "Comic",
+                    Attributes {
+                        weight: fontique::FontWeight::new(weight),
+                        style,
+                        ..Attributes::default()
+                    },
+                )
+                .unwrap()
+                .post_script_name
+                .clone()
+        };
+        assert_eq!(pick(400.0, FontStyle::Italic), "Comic-Regular");
+        assert_eq!(pick(700.0, FontStyle::Italic), "Comic-BoldItalic");
+        assert_eq!(pick(700.0, FontStyle::Normal), "Comic-Regular");
+    }
+
+    #[test]
+    fn bundled_faces_get_synthetic_slant_and_bold_for_missing_styles() {
+        let fonts = Fonts::new();
+        let face = BundledFace {
+            family_name: "Layout Fixture".into(),
+            file_name: "fixture.otf".into(),
+            post_script_name: layout_fixture_font().post_script_name().to_owned(),
+            weight: 400,
+            weight_range: None,
+            stretch: 100,
+            stretch_range: None,
+            style: CatalogStyle::Normal,
+            preview_file: String::new(),
+            load: AsyncMutex::new(()),
+        };
+        let request = |weight: f32, style: FontStyle| Attributes {
+            weight: fontique::FontWeight::new(weight),
+            style,
+            ..Attributes::default()
+        };
+        let plain = fonts.synthesized(
+            &face,
+            layout_fixture_font(),
+            request(400.0, FontStyle::Normal),
+        );
+        assert!(plain.synthetic_skew().is_none());
+        let italic = fonts.synthesized(
+            &face,
+            layout_fixture_font(),
+            request(400.0, FontStyle::Italic),
+        );
+        assert!(italic.synthetic_skew().is_some());
+    }
+
+    #[tokio::test]
+    async fn word_font_missing_family_keeps_box_face_before_normal_fallbacks() {
+        let fonts = Fonts::new();
+        fonts.ensure_system().await;
+        let box_font = layout_fixture_font();
+        let request = FontRequest {
+            family: "A missing word font for layout testing".into(),
+            weight: Some(700),
+            style: Some(PublicFontStyle::Italic),
+        };
+        let resolved =
+            fonts.resolve_word_font(&request, std::slice::from_ref(&box_font), "ABC", None);
+        assert_eq!(resolved[0].post_script_name(), box_font.post_script_name());
+        assert_eq!(resolved[0].data(), box_font.data());
+    }
+
+    #[tokio::test]
+    async fn word_font_resolves_weight_and_italic_before_box_fallback() {
+        let fonts = Fonts::new();
+        fonts.ensure_system().await;
+        let box_font = FontSystem::new().first_font().unwrap();
+        let request = FontRequest {
+            family: box_font.family_name().to_owned(),
+            weight: Some(700),
+            style: Some(PublicFontStyle::Italic),
+        };
+        let resolved =
+            fonts.resolve_word_font(&request, std::slice::from_ref(&box_font), "ABC", None);
+        assert_eq!(resolved[0].family_name(), box_font.family_name());
+        assert!(
+            resolved[0].post_script_name() != box_font.post_script_name()
+                || resolved[0].synthetic_bold()
+                || resolved[0].synthetic_skew().is_some()
+                || resolved[0].location().coords() != box_font.location().coords()
         );
     }
 }

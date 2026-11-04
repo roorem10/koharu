@@ -84,6 +84,7 @@ impl TextStyle {
         }
         if let Some(fill) = self.fill {
             typography.color = Some(fill);
+            typography.fill_gradient = None;
         }
         if let Some(part) = &self.outline {
             typography.stroke_width = part.stroke_width;
@@ -457,6 +458,9 @@ mod text_style_tests {
             stroke_join: Some(StrokeJoin::Round),
             outer_stroke_color: None,
             outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
             alignment: Some(TextAlignment::Center),
             writing_mode: Some(WritingMode::Horizontal),
             extensions: [("dev.booharu.test".into(), "kept".into())].into(),

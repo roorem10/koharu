@@ -69,7 +69,7 @@ export const commands = {
 	dismissLineFlag: (layer: EntityId, index: number) => __TAURI_INVOKE<null>("dismiss_line_flag", { layer, index }),
 	glossaryUsage: (source: string) => __TAURI_INVOKE<TermUsage>("glossary_usage", { source }),
 	explainLine: (layer: EntityId) => __TAURI_INVOKE<LineExplanation>("explain_line", { layer }),
-	readChapter: (scope: Scope, textOnly: boolean) => __TAURI_INVOKE<JobId>("read_chapter", { scope, textOnly }),
+	readChapter: (scope: Scope, model: ModelSelection | null) => __TAURI_INVOKE<JobId>("read_chapter", { scope, model }),
 	listSeries: () => __TAURI_INVOKE<Series[]>("list_series"),
 	createSeries: (name: string) => __TAURI_INVOKE<Series>("create_series", { name }),
 	getSeries: (id: string) => __TAURI_INVOKE<Series>("get_series", { id }),
@@ -96,12 +96,79 @@ export const commands = {
 	addPointText: (point: Point) => __TAURI_INVOKE<LayerCommit>("add_point_text", { point }),
 	addTextBox: (frame: Frame) => __TAURI_INVOKE<LayerCommit>("add_text_box", { frame }),
 	commitPaint: (expectedRevision: Revision, layer: EntityId | null, points: Point[], brush: PaintBrush) => __TAURI_INVOKE<LayerCommit>("commit_paint", { expectedRevision, layer, points, brush }),
-	commitErase: (expectedRevision: Revision, layer: EntityId, points: Point[], diameter: number) => __TAURI_INVOKE<LayerCommit>("commit_erase", { expectedRevision, layer, points, diameter }),
+	commitErase: (expectedRevision: Revision, layer: EntityId | null, points: Point[], diameter: number, hardness: number) => __TAURI_INVOKE<LayerCommit>("commit_erase", { expectedRevision, layer, points, diameter, hardness }),
 	commitTransform: (expectedRevision: Revision, elements: TransformFrame[], persistUnchanged: boolean) => __TAURI_INVOKE<Revision | null>("commit_transform", { expectedRevision, elements, persistUnchanged }),
-	commitInpaint: (expectedRevision: Revision, points: Point[], diameter: number) => __TAURI_INVOKE<JobId | null>("commit_inpaint", { expectedRevision, points, diameter }),
+	commitInpaint: (expectedRevision: Revision, points: Point[], diameter: number, hardness: number) => __TAURI_INVOKE<JobId | null>("commit_inpaint", { expectedRevision, points, diameter, hardness }),
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
+	getBoxSettings: () => __TAURI_INVOKE<BoxSettings>("get_box_settings"),
+	saveBoxSettings: (settings: BoxSettings) => __TAURI_INVOKE<BoxSettings>("save_box_settings", { settings }),
+	redetectPage: (page: EntityId) => __TAURI_INVOKE<JobId>("redetect_page", { page }),
+	getBoxActions: (layer: EntityId) => __TAURI_INVOKE<BoxActionInfo>("get_box_actions", { layer }),
+	joinBubbleBoxes: (layer: EntityId) => __TAURI_INVOKE<EntityId>("join_bubble_boxes", { layer }),
+	joinPageBubbles: (page: EntityId) => __TAURI_INVOKE<number>("join_page_bubbles", { page }),
+	splitBox: (layer: EntityId) => __TAURI_INVOKE<EntityId[]>("split_box", { layer }),
+	runQc: (scope: QcScope, onProgress: Channel<QcProgress>, automatic: boolean | null) => __TAURI_INVOKE<QcReport>("run_qc", { scope, onProgress, automatic }),
+	markQcOk: (layer: EntityId, check: QcCheck, ok: boolean) => __TAURI_INVOKE<null>("mark_qc_ok", { layer, check, ok }),
+	getQcSettings: () => __TAURI_INVOKE<QcSettings>("get_qc_settings"),
+	saveQcSettings: (settings: QcSettings) => __TAURI_INVOKE<QcSettings>("save_qc_settings", { settings }),
+	getPageSource: (page: EntityId) => __TAURI_INVOKE<SourceBytes>("get_page_source", { page }),
+	getLibrarySettings: () => __TAURI_INVOKE<LibrarySettings>("get_library_settings"),
+	saveLibrarySettings: (settings: LibrarySettings) => __TAURI_INVOKE<LibrarySettings>("save_library_settings", { settings }),
+	exportSelectedPages: (format: ExportFormat, pages: EntityId[]) => __TAURI_INVOKE<null>("export_selected_pages", { format, pages }),
+	exportScript: () => __TAURI_INVOKE<null>("export_script"),
+	previewScriptImport: () => __TAURI_INVOKE<ScriptPreview | null>("preview_script_import"),
+	applyScriptImport: (preview: ScriptPreview) => __TAURI_INVOKE<null>("apply_script_import", { preview }),
+	getLibraryPaths: () => __TAURI_INVOKE<LibraryPaths>("get_library_paths"),
+	chooseLibraryFolder: (kind: LibraryFolder) => __TAURI_INVOKE<LibrarySettings | null>("choose_library_folder", { kind }),
+	resetLibraryFolder: (kind: LibraryFolder) => __TAURI_INVOKE<LibrarySettings>("reset_library_folder", { kind }),
+	openLibraryFolder: (kind: LibraryFolder) => __TAURI_INVOKE<null>("open_library_folder", { kind }),
+	renameProject: (name: string, newName: string) => __TAURI_INVOKE<null>("rename_project", { name, newName }),
+	duplicateProject: (name: string) => __TAURI_INVOKE<string>("duplicate_project", { name }),
+	getRunSettings: () => __TAURI_INVOKE<RunSettings>("get_run_settings"),
+	saveRunSettings: (settings: RunSettings) => __TAURI_INVOKE<RunSettings>("save_run_settings", { settings }),
+	retryFailedPages: (job: JobId) => __TAURI_INVOKE<JobId>("retry_failed_pages", { job }),
+	previewChapterBatch: () => __TAURI_INVOKE<BatchPlan | null>("preview_chapter_batch"),
+	runChapterBatch: (plan: string, chapters: string[], preset: number, closeProject: string | null, onProgress: Channel<BatchProgress>) => __TAURI_INVOKE<null>("run_chapter_batch", { plan, chapters, preset, closeProject, onProgress }),
+	stopChapterBatch: () => __TAURI_INVOKE<null>("stop_chapter_batch"),
+	getBoxNote: (layer: EntityId) => __TAURI_INVOKE<string | null>("get_box_note", { layer }),
+	setBoxNote: (layer: EntityId, note: string | null) => __TAURI_INVOKE<null>("set_box_note", { layer, note }),
+	getMcpStatus: () => __TAURI_INVOKE<McpStatus>("get_mcp_status"),
+	saveMcpSettings: (options: McpOptions) => __TAURI_INVOKE<McpStatus>("save_mcp_settings", { options }),
+	newMcpToken: () => __TAURI_INVOKE<McpStatus>("new_mcp_token"),
+	getOcrBoxSettings: () => __TAURI_INVOKE<OcrBoxSettings>("get_ocr_box_settings"),
+	saveOcrBoxSettings: (settings: OcrBoxSettings) => __TAURI_INVOKE<OcrBoxSettings>("save_ocr_box_settings", { settings }),
+	addOcrBox: (page: EntityId, rect: Bounds, mode: OcrBoxMode) => __TAURI_INVOKE<EntityId>("add_ocr_box", { page, rect, mode }),
+	getOcrRedoInfo: (layers: EntityId[]) => __TAURI_INVOKE<RedoInfo>("get_ocr_redo_info", { layers }),
+	redoOcrBoxes: (layers: EntityId[], action: RedoAction, overwrite: boolean) => __TAURI_INVOKE<JobId[]>("redo_ocr_boxes", { layers, action, overwrite }),
+	addSfxSubtitle: (layer: EntityId) => __TAURI_INVOKE<EntityId>("add_sfx_subtitle", { layer }),
+	getCleanupSettings: () => __TAURI_INVOKE<CleanupSettings>("get_cleanup_settings"),
+	saveCleanupSettings: (settings: CleanupSettings) => __TAURI_INVOKE<CleanupSettings>("save_cleanup_settings", { settings }),
+	cleanAreas: (page: EntityId, strokes: CleanupStroke[], rects: CleanupRect[]) => __TAURI_INVOKE<JobId>("clean_areas", { page, strokes, rects }),
+	getTextWarp: (layers: EntityId[]) => __TAURI_INVOKE<(TextWarp | null)[]>("get_text_warp", { layers }),
+	setTextWarp: (layers: EntityId[], warp: TextWarp | null) => __TAURI_INVOKE<null>("set_text_warp", { layers, warp }),
+	getRawPrepSettings: () => __TAURI_INVOKE<RawPrepSettings>("get_raw_prep_settings"),
+	saveRawPrepSettings: (settings: RawPrepSettings) => __TAURI_INVOKE<RawPrepSettings>("save_raw_prep_settings", { settings }),
+	getPrepPageStatus: (pages: EntityId[]) => __TAURI_INVOKE<PrepPageStatus[]>("get_prep_page_status", { pages }),
+	preparePages: (pages: EntityId[], options: RawPrepOptions) => __TAURI_INVOKE<PrepResult>("prepare_pages", { pages, options }),
+	restoreOriginalPages: (pages: EntityId[]) => __TAURI_INVOKE<PrepResult>("restore_original_pages", { pages }),
+	previewPrep: (page: EntityId, options: RawPrepOptions) => __TAURI_INVOKE<PrepPreview>("preview_prep", { page, options }),
+	getBoxEffects: (layers: EntityId[]) => __TAURI_INVOKE<boolean[]>("get_box_effects", { layers }),
+	resetBoxEffects: (layers: EntityId[]) => __TAURI_INVOKE<null>("reset_box_effects", { layers }),
+	getQcResults: () => __TAURI_INVOKE<QcReport>("get_qc_results"),
+	markQcFinding: (layer: EntityId, check: QcCheck, flag: Flag | null, ok: boolean) => __TAURI_INVOKE<null>("mark_qc_finding", { layer, check, flag, ok }),
+	getReadingModel: () => __TAURI_INVOKE<ReadModelInfo>("get_reading_model"),
+	getReadingModels: () => __TAURI_INVOKE<Model[]>("get_reading_models"),
+	getLastReadModel: () => __TAURI_INVOKE<string | null>("get_last_read_model"),
+	setWordStyle: (layer: EntityId, start: number, end: number, patch: RunStylePatch) => __TAURI_INVOKE<null>("set_word_style", { layer, start, end, patch }),
+	clearWordStyles: (layers: EntityId[], range: [number, number] | null) => __TAURI_INVOKE<null>("clear_word_styles", { layers, range }),
+	replaceTextRange: (layer: EntityId, start: number, end: number, insert: string, typing: number | null) => __TAURI_INVOKE<null>("replace_text_range", { layer, start, end, insert, typing }),
+	getWordStyles: (layer: EntityId) => __TAURI_INVOKE<StyleRun[]>("get_word_styles", { layer }),
+	getTextGlyphBoxes: (layer: EntityId) => __TAURI_INVOKE<GlyphBox[]>("get_text_glyph_boxes", { layer }),
+	applyEmphasis: (layer: EntityId, start: number, end: number) => __TAURI_INVOKE<null>("apply_emphasis", { layer, start, end }),
+	getEmphasisSettings: () => __TAURI_INVOKE<EmphasisPreferences>("get_emphasis_settings"),
+	saveEmphasisSettings: (settings: EmphasisPreferences) => __TAURI_INVOKE<EmphasisPreferences>("save_emphasis_settings", { settings }),
 };
 
 /* Types */
@@ -139,11 +206,46 @@ export type AnalysisRegion = {
 	label: string | null,
 };
 
+export type BatchChapter = {
+	id: string,
+	name: string,
+	pages: number,
+	error: string | null,
+};
+
+export type BatchChapterProgress = {
+	chapter: BatchChapter,
+	state: ChapterStatus,
+	failures: PageFailure[],
+	error: string | null,
+};
+
+export type BatchPlan = {
+	id: string,
+	chapters: BatchChapter[],
+};
+
+export type BatchProgress = {
+	chapters: BatchChapterProgress[],
+	running: boolean,
+	stopped: boolean,
+	finish_sound: boolean,
+};
+
 export type Bounds = {
 	x: number,
 	y: number,
 	width: number,
 	height: number,
+};
+
+export type BoxActionInfo = {
+	can_split: boolean,
+	bubble_boxes: number,
+};
+
+export type BoxSettings = {
+	join_in_bubble?: boolean,
 };
 
 export type BubbleShape = "rectangle" | "round" | "spiky";
@@ -209,6 +311,8 @@ export type ChapterState = {
 	supports_tasks: boolean,
 };
 
+export type ChapterStatus = "waiting" | "running" | "done" | "done_with_problems" | "failed" | "stopped";
+
 export type Character = {
 	id?: string,
 	name?: string,
@@ -217,6 +321,25 @@ export type Character = {
 };
 
 export type ClaudeConfig = Record<string, never>;
+
+export type CleanupRect = {
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+};
+
+export type CleanupSettings = {
+	remove_mode?: RemoveMode,
+	paint_target?: PaintTarget,
+	grow_px?: number,
+};
+
+export type CleanupStroke = {
+	points: Point[],
+	diameter: number,
+	hardness: number,
+};
 
 export type CodexModel = {
 	id: string,
@@ -232,6 +355,8 @@ export type Config = {
 export type ContextSettings = {
 	read_when?: ReadWhen,
 	send_images?: boolean,
+	ask_before_reading?: boolean,
+	read_model?: ModelSelection | null,
 	pages_per_request?: number,
 	previous_pages?: number,
 	agent_messages?: number,
@@ -261,6 +386,8 @@ export type DeviceResources = {
 	utilization: number | null,
 };
 
+export type DocumentId = string;
+
 export type Download = {
 	id: number,
 	state: DownloadState,
@@ -277,6 +404,16 @@ export type EffectiveCategory = {
 	reason: CategoryReason,
 };
 
+/**
+ *  IPC always includes the preset, while persisted configuration may omit its
+ *  baseline table to preserve cleared fields across config-default merging.
+ */
+export type EmphasisPreferences = {
+	enabled_for_ai: boolean,
+	default: RunStyle,
+	categories: { [key in string]: RunStyle },
+};
+
 export type EntityId = string;
 
 export type Error = string;
@@ -284,6 +421,12 @@ export type Error = string;
 export type Event = { type: "started"; run: RunId } | { type: "text_delta"; run: RunId; delta: string } | { type: "reasoning_delta"; run: RunId; delta: string } | { type: "tool_started"; run: RunId; call_id: string; name: string } | { type: "tool_finished"; run: RunId; call_id: string; name: string; changed: boolean; output: string } | { type: "completed"; run: RunId; message: string } | { type: "failed"; run: RunId; message: string } | { type: "cancelled"; run: RunId };
 
 export type ExportFormat = "png" | "psd" | "cbz";
+
+export type FillGradient = {
+	kind: GradientKind,
+	angle_degrees: number,
+	stops: GradientStop[],
+};
 
 export type Flag = { kind: "glossary"; term: string; page: number } | { kind: "review"; message: string; page: number };
 
@@ -300,6 +443,7 @@ export type FontFace = {
 
 export type FontFamily = {
 	name: string,
+	local_names: string[],
 	metadata: FontMetadata,
 	sources: FontSource[],
 	faces: FontFace[],
@@ -372,7 +516,32 @@ export type GlossaryEntry = {
 	locked?: boolean,
 };
 
+/**
+ *  The drawn box of one character (or of one cluster, when several `char`s
+ *  form one glyph: then `end - start > 1`). Each line also ends with a
+ *  `start == end` caret box: zero width horizontally, zero height vertically.
+ */
+export type GlyphBox = {
+	start: number,
+	end: number,
+	/**  Line number, from 0, in reading order. */
+	line: number,
+	/**
+	 *  Corners in page coordinates, after rotation and skew/perspective:
+	 *  top-left, top-right, bottom-right, bottom-left in the glyph's own
+	 *  reading direction.
+	 */
+	quad: [([number, number]), ([number, number]), ([number, number]), ([number, number])],
+};
+
 export type GoogleCloudConfig = Record<string, never>;
+
+export type GradientKind = "Linear" | "Radial";
+
+export type GradientStop = {
+	offset: number,
+	color: [number, number, number, number],
+};
 
 export type GrokConfig = Record<string, never>;
 
@@ -413,11 +582,16 @@ export type Job = {
 	stage: Stage | null,
 	model: string | null,
 	error: string | null,
+	retry: RetryProgress | null,
+	failures: PageFailure[],
+	project: string | null,
+	operation: Operation | null,
+	finish_sound: boolean,
 };
 
 export type JobId = string;
 
-export type JobState = "running" | "finished" | "failed" | "stopped";
+export type JobState = "running" | "finished" | "finished_with_problems" | "failed" | "stopped";
 
 export type KoharuLayoutRFDetrSeg2XLConfig = {
 	text_threshold?: number | null,
@@ -433,7 +607,9 @@ export type LanguageChoice = {
 	name: string,
 };
 
-export type Layer = { type: "group"; id: EntityId; parent: EntityId | null; visibility: LayerVisibility; name: string; role: GroupRole | null } | { type: "text"; id: EntityId; parent: EntityId | null; geometry: Geometry | null; angle_degrees: number | null; visibility: LayerVisibility; content: TextContent; typography: Typography | null; layout: TextLayoutKind; automatic_region: EntityId | null } | { type: "raster"; id: EntityId; parent: EntityId | null; visibility: LayerVisibility; image: string | null; name: string; kind: RasterLayerKind } | { type: "image"; id: EntityId; parent: EntityId | null; geometry: Geometry; visibility: LayerVisibility; image: string } | { type: "artwork"; id: EntityId; parent: EntityId | null; geometry: Geometry; visibility: LayerVisibility; image: string };
+export type Layer = { type: "group"; id: EntityId; parent: EntityId | null; visibility: LayerVisibility; name: string; role: GroupRole | null } | { type: "text"; id: EntityId; parent: EntityId | null; geometry: Geometry | null; angle_degrees: number | null; visibility: LayerVisibility; content: TextContent; typography: Typography | null; layout: TextLayoutKind; automatic_region: EntityId | null; 
+/**  Present only when the box has word styles (batch 3, rich text). */
+word_styles?: WordStyles | null } | { type: "raster"; id: EntityId; parent: EntityId | null; visibility: LayerVisibility; image: string | null; name: string; kind: RasterLayerKind } | { type: "image"; id: EntityId; parent: EntityId | null; geometry: Geometry; visibility: LayerVisibility; image: string } | { type: "artwork"; id: EntityId; parent: EntityId | null; geometry: Geometry; visibility: LayerVisibility; image: string };
 
 export type LayerCommit = {
 	revision: Revision,
@@ -458,6 +634,21 @@ export type LetteringSettings = {
 	small_text_threshold?: number,
 };
 
+export type LibraryFolder = "projects" | "models";
+
+export type LibraryPaths = {
+	projects_folder: string,
+	default_projects_folder: string,
+	models_folder: string,
+	default_models_folder: string,
+};
+
+export type LibrarySettings = {
+	export_name_pattern?: string,
+	projects_folder?: string | null,
+	models_folder?: string | null,
+};
+
 export type LineCategory = {
 	value: LetteringCategory,
 	source: LabelSource,
@@ -470,6 +661,10 @@ export type LineContext = {
 	note?: string | null,
 	flags?: Flag[],
 	dismissed?: string[],
+	/**  QC checks (WO-12) the user marked OK for this line, by check id. */
+	qc_ok?: string[],
+	/**  The user's own note on the box (WO-06). `note` is the chapter reader's. */
+	box_note?: string | null,
 };
 
 export type LineExplanation = {
@@ -484,6 +679,26 @@ export type LmStudioConfig = {
 export type LocalConfig = Record<string, never>;
 
 export type LoginEvent = { type: "progress"; message: string } | { type: "device_code"; verification_url: string; user_code: string };
+
+export type McpOptions = {
+	enabled: boolean,
+	port: number,
+	allow_edits: boolean,
+};
+
+export type McpSettings = {
+	enabled?: boolean,
+	port?: number,
+	token?: string,
+	allow_edits?: boolean,
+};
+
+export type McpStatus = {
+	settings: McpSettings,
+	running: boolean,
+	endpoint: string,
+	error: string | null,
+};
 
 export type MiniMaxConfig = Record<string, never>;
 
@@ -511,7 +726,19 @@ export type ModelSelection = {
 	reasoning?: boolean,
 };
 
+export type OcrBoxMode = "read" | "read_translate" | "read_translate_clean";
+
+export type OcrBoxSettings = {
+	default_mode?: OcrBoxMode,
+	subtitle_font_family?: string | null,
+	subtitle_size?: number,
+	subtitle_fill?: [number, number, number, number],
+	subtitle_outline?: [number, number, number, number],
+};
+
 export type OcrModel = { model: "paddleocr-vl-1.6" } | { model: "manga-ocr" } | { model: "baberu-ocr" } | { model: "hayai-ocr" };
+
+export type OnPageFailure = "continue_with_other_pages" | "stop_run";
 
 export type OpenAiCompatibleConfig = {
 	base_url?: string | null,
@@ -544,6 +771,13 @@ export type Page = {
 	regions: AnalysisRegion[],
 };
 
+export type PageFailure = {
+	page: EntityId,
+	label: string,
+	stage: Stage,
+	error: string,
+};
+
 export type PageImportSource = "files" | "folder";
 
 export type PageSelection = {
@@ -566,8 +800,11 @@ export type PageSummary = {
 
 export type PaintBrush = {
 	diameter: number,
+	hardness: number,
 	color: [number, number, number, number],
 };
+
+export type PaintTarget = "cleanup" | "paint_layer";
 
 export type PipelineConfig = {
 	detect_text_color: boolean,
@@ -595,6 +832,32 @@ export type Preferences = {
 	languages: LanguageChoice[],
 };
 
+export type PrepPageStatus = {
+	page: EntityId,
+	has_original: boolean,
+	has_cleanup: boolean,
+};
+
+export type PrepPreview = {
+	before: number[],
+	after: number[],
+	black: number,
+	white: number,
+};
+
+export type PrepResult = {
+	changed: number,
+	skipped: PrepSkipped[],
+};
+
+export type PrepSkipReason = "cleanup" | "missing_source" | "no_original" | "unchanged";
+
+export type PrepSkipped = {
+	page: EntityId,
+	label: string,
+	reason: PrepSkipReason,
+};
+
 export type ProcessorConfig = {
 	"koharu-layout-rfdetr-seg-2xl"?: KoharuLayoutRFDetrSeg2XLConfig | null,
 	"flux2-klein"?: Flux2KleinConfig | null,
@@ -610,6 +873,8 @@ export type ProjectContext = {
 	/**  Keyed by text layer id, the id the Inspector selects. */
 	lines?: { [key in EntityId]: LineContext },
 };
+
+export type ProjectId = DocumentId;
 
 export type ProjectInfo = {
 	name: string,
@@ -637,6 +902,37 @@ export type ProviderPreferences = {
 	entries: ProviderPreference[],
 };
 
+export type QcCheck = "overflow" | "too_small" | "missing_translation" | "empty_source" | "leftover_source" | "odd_font" | "flag";
+
+export type QcFinding = {
+	page: EntityId,
+	page_label: string,
+	layer: EntityId,
+	check: QcCheck,
+	/**  A measurement, font name, or the reviewer's message; labels are localized in the UI. */
+	detail: string,
+	translation: string,
+	flag: Flag | null,
+};
+
+export type QcProgress = {
+	completed: number,
+	total: number,
+};
+
+export type QcReport = {
+	revision: Revision,
+	findings: QcFinding[],
+	hidden: QcFinding[],
+	pages_checked: number,
+};
+
+export type QcScope = { scope: "page"; page: EntityId } | { scope: "project" };
+
+export type QcSettings = {
+	min_font_size?: number,
+};
+
 export type Quantization = {
 	id: string,
 	name: string,
@@ -645,9 +941,42 @@ export type Quantization = {
 
 export type RasterLayerKind = "cleanup" | "paint";
 
+export type RawPrepOptions = {
+	levels?: boolean,
+	clip_percent?: number,
+	whiten?: boolean,
+	threshold?: number,
+};
+
+export type RawPrepSettings = {
+	options?: RawPrepOptions,
+	fix_on_import?: boolean,
+};
+
+export type ReadModelInfo = {
+	selection: ModelSelection,
+	vision: boolean,
+	local: boolean,
+	label: string,
+};
+
 export type ReadWhen = "missing" | "always" | "never";
 
 export type Reasoning = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
+
+export type RedoAction = "read" | "translate" | "clean";
+
+export type RedoInfo = {
+	user_sources: number,
+	user_translations: number,
+};
+
+export type RemoveMode = "immediate" | "queue";
+
+export type RetryProgress = {
+	attempt: number,
+	attempts: number,
+};
 
 export type Revision = number;
 
@@ -658,10 +987,76 @@ export type RoremMixedConfig = {
 
 export type RunId = string;
 
+export type RunOrder = "overlapped" | "stage_at_a_time";
+
+export type RunPreset = {
+	name: string,
+	stages: Stage[],
+};
+
+export type RunSettings = {
+	retries?: number,
+	on_page_failure?: OnPageFailure,
+	order?: RunOrder,
+	finish_sound?: boolean,
+	presets?: RunPreset[],
+};
+
+/**
+ *  Overrides for one run of characters. Every field is optional: an empty
+ *  field uses the box's `Typography`, which stays the base style.
+ */
+export type RunStyle = {
+	font: string | null,
+	font_weight: number | null,
+	font_style: FontStyle | null,
+	/**
+	 *  Size as a multiple of the box's laid-out size (1.15 = 15% bigger), so
+	 *  auto-fit keeps working. The UI shows and accepts pixels and converts.
+	 */
+	size_scale: number | null,
+	color: [number, number, number, number] | null,
+	fill_gradient: FillGradient | null,
+	stroke_color: [number, number, number, number] | null,
+	stroke_width: number | null,
+	outer_stroke_color: [number, number, number, number] | null,
+	outer_stroke_width: number | null,
+};
+
+/**
+ *  A field to return to the box's inherited style. This is an edit intent,
+ *  not part of the persisted component.
+ */
+export type RunStyleField = "font" | "font_weight" | "font_style" | "size_scale" | "color" | "fill_gradient" | "stroke_color" | "stroke_width" | "outer_stroke_color" | "outer_stroke_width";
+
+/**  Fields in `clear` return to the box's style, including when also in `set`. */
+export type RunStylePatch = {
+	set: RunStyle,
+	clear: RunStyleField[],
+};
+
 export type Scope = { scope: "project" } | { scope: "pages"; value: EntityId[] } | { scope: "region"; value: {
 	page: EntityId,
 	bounds: Bounds,
 } } | { scope: "entities"; value: EntityId[] };
+
+export type ScriptChange = {
+	layer: EntityId,
+	page: number,
+	page_label: string,
+	box_number: number,
+	old_text: string,
+	new_text: string,
+};
+
+export type ScriptPreview = {
+	project: ProjectId,
+	project_name: string,
+	revision: Revision,
+	changes: ScriptChange[],
+	unchanged: number,
+	not_found: number,
+};
 
 export type Series = {
 	id?: string,
@@ -692,6 +1087,8 @@ export type SizePart = {
 	size: number | null,
 };
 
+export type SourceBytes = number[];
+
 export type SourceText = {
 	text: string,
 	language: string | null,
@@ -715,6 +1112,17 @@ export type StyleApplyResult = {
 	changed: number,
 	skipped: number,
 	kept_manual: number,
+};
+
+/**
+ *  One styled range. `start` and `end` count Unicode scalar values (Rust
+ *  `char`s) of the text the box shows: its translation, or its source when it
+ *  has no translation. `start < end`.
+ */
+export type StyleRun = {
+	start: number,
+	end: number,
+	style: RunStyle,
 };
 
 export type StyleScope = ({ layers: EntityId[] }) & { page?: never } | ({ page: EntityId }) & { layers?: never } | "project";
@@ -762,6 +1170,16 @@ export type TextStyles = {
 	legacy_color_migrated?: boolean,
 };
 
+/**  Skew or perspective applied to the laid-out text of a box. */
+export type TextWarp = 
+/**  Horizontal and vertical shear in degrees. */
+{ kind: "skew"; x_degrees: number; y_degrees: number } | 
+/**
+ *  Where the frame's corners go in frame-local units, clockwise from the top-left;
+ *  the unit square leaves the text unchanged.
+ */
+{ kind: "perspective"; corners: [([number, number]), ([number, number]), ([number, number]), ([number, number])] };
+
 export type ThumbnailBytes = number[];
 
 export type TransformFrame = {
@@ -799,6 +1217,9 @@ export type Typography = {
 	stroke_join: StrokeJoin | null,
 	outer_stroke_color: [number, number, number, number] | null,
 	outer_stroke_width: number | null,
+	line_spacing: number | null,
+	letter_spacing: number | null,
+	fill_gradient: FillGradient | null,
 	alignment: TextAlignment | null,
 	writing_mode: WritingMode | null,
 };
@@ -809,6 +1230,15 @@ export type TypographyUpdate = {
 };
 
 export type WheelZoom = "ctrl" | "wheel";
+
+/**  Summary of a text box's word styles for the layer list and the fx tag. */
+export type WordStyles = {
+	/**
+	 *  Some word has its own outline, 2nd outline or gradient (counts as an
+	 *  effect for the fx tag, like WO-23's whole-box effects).
+	 */
+	effects: boolean,
+};
 
 export type WritingMode = "Horizontal" | "Vertical";
 

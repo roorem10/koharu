@@ -305,6 +305,45 @@ impl Edit {
         Ok(())
     }
 
+    /// Relinquish a source to an explicitly requested generator without removing
+    /// the source record required by an existing translation. Only user edits
+    /// can clear manual authorship; the next generator must have this producer.
+    pub fn reset_source_text(
+        &mut self,
+        entity: EntityId,
+        producer: crate::ProducerId,
+    ) -> Result<()> {
+        if self.generation.is_some() {
+            return Err(Error::Authorship(
+                "pipeline edits cannot reset source ownership".into(),
+            ));
+        }
+        if !self.state.contains_entity(entity) {
+            return Err(Error::EntityNotFound(entity));
+        }
+        let owner = ComponentOwner::Entity(entity);
+        let component_key = key::<crate::SourceText>()?;
+        let previous = self
+            .component(owner, &component_key)?
+            .map(|record| {
+                let record_exists = |id| self.state.contains_entity(id);
+                let blob_exists = |_id| true;
+                decode::<crate::SourceText>(
+                    record,
+                    &ValidationContext::new(&record_exists, &blob_exists),
+                )
+            })
+            .transpose()?;
+        let value = crate::SourceText {
+            text: crate::Authored::generated(String::new(), Generation::new(producer)),
+            language: previous.and_then(|source| source.language),
+        };
+        self.observe_component(owner, component_key.clone())?;
+        self.replace_component(owner, component_key, Some(self.encode_value(&value)?))?;
+        self.validate_entities.insert(entity);
+        Ok(())
+    }
+
     /// Automatic restyling changes presentation without claiming a manual edit.
     /// Preserve the existing component owner; pipeline edits must use `set`.
     pub fn set_typography_preserving_origin(
@@ -332,6 +371,26 @@ impl Edit {
         let mut value = typography.clone();
         value.origin = original.origin;
         self.replace_component(owner, component_key, Some(self.encode_value(&value)?))?;
+        self.validate_entities.insert(entity);
+        Ok(())
+    }
+
+    /// Explicitly relinquishes a manual style after translation replaces its
+    /// text. Ordinary `set` stamps User; pipeline edits cannot relinquish it.
+    pub fn reset_typography(
+        &mut self,
+        entity: EntityId,
+        typography: &crate::Typography,
+    ) -> Result<()> {
+        if self.generation.is_some() || !matches!(typography.origin, Origin::Generated(_)) {
+            return Err(Error::Authorship(
+                "reset typography requires a user edit and a generated style".into(),
+            ));
+        }
+        let owner = ComponentOwner::Entity(entity);
+        let component_key = key::<crate::Typography>()?;
+        self.observe_component(owner, component_key.clone())?;
+        self.replace_component(owner, component_key, Some(self.encode_value(typography)?))?;
         self.validate_entities.insert(entity);
         Ok(())
     }

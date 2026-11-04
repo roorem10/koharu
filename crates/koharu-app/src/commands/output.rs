@@ -46,14 +46,66 @@ pub(crate) async fn export(
     project: State<'_, CurrentProject>,
     desktop: State<'_, Desktop>,
 ) -> std::result::Result<(), Error> {
+    Ok(export_selection(window, format, None, &project, &desktop).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn export_selected_pages(
+    window: WebviewWindow<CefRuntime>,
+    format: ExportFormat,
+    pages: Vec<EntityId>,
+    project: State<'_, CurrentProject>,
+    desktop: State<'_, Desktop>,
+) -> std::result::Result<(), Error> {
+    Ok(export_selection(window, format, Some(pages), &project, &desktop).await?)
+}
+
+async fn export_selection(
+    window: WebviewWindow<CefRuntime>,
+    format: ExportFormat,
+    selected: Option<Vec<EntityId>>,
+    project: &CurrentProject,
+    desktop: &Desktop,
+) -> Result<()> {
     let (name, snapshot) = {
         let project = project.project.lock().await;
         let project = project.as_ref().context("no project is open")?;
         (project.name.clone(), project.snapshot())
     };
-    let pages = snapshot.pages().map(|page| page.id()).collect::<Vec<_>>();
+    let all_pages = snapshot.pages().map(|page| page.id()).collect::<Vec<_>>();
+    if let Some(selected) = &selected {
+        anyhow::ensure!(
+            selected.iter().all(|page| all_pages.contains(page)),
+            "a selected page no longer exists"
+        );
+    }
+    let extension = match format {
+        ExportFormat::Png | ExportFormat::Cbz => "png",
+        ExportFormat::Psd => "psd",
+    };
+    let labels = all_pages
+        .iter()
+        .map(|&id| Ok(snapshot.page(id)?.page()?.label.clone()))
+        .collect::<Result<Vec<_>>>()?;
+    let settings = super::files::load_settings()?;
+    let all_names = super::files::names::export_names(
+        &settings.export_name_pattern,
+        &name,
+        &labels.iter().map(String::as_str).collect::<Vec<_>>(),
+        extension,
+    )?;
+    let (pages, names): (Vec<_>, Vec<_>) = all_pages
+        .into_iter()
+        .zip(all_names)
+        .filter(|(page, _)| {
+            selected
+                .as_ref()
+                .is_none_or(|selected| selected.contains(page))
+        })
+        .unzip();
     if pages.is_empty() {
-        return Err(anyhow::anyhow!("there are no pages to export").into());
+        return Err(anyhow::anyhow!("there are no pages to export"));
     }
     let dialog = rfd::AsyncFileDialog::new().set_parent(&window);
     let destination = match format {
@@ -71,31 +123,6 @@ pub(crate) async fn export(
     };
     let renderer = desktop.renderer();
     let rasterizer = desktop.rasterizer().await?;
-    let extension = match format {
-        ExportFormat::Png | ExportFormat::Cbz => "png",
-        ExportFormat::Psd => "psd",
-    };
-    let width = pages.len().to_string().len().max(4);
-    let names = pages
-        .iter()
-        .enumerate()
-        .map(|(index, &page_id)| -> Result<String> {
-            let page = snapshot.page(page_id)?.page()?;
-            let name = page
-                .label
-                .trim()
-                .trim_end_matches(|character: char| character == '.' || character.is_whitespace());
-            let name = name
-                .rsplit_once('.')
-                .map_or(name, |(stem, _)| stem)
-                .replace(['<', '>', ':', '"', '/', '\\', '|', '?', '*'], "_");
-            Ok(format!(
-                "{:0width$}_{}.{extension}",
-                index + 1,
-                if name.is_empty() { "page" } else { &name }
-            ))
-        })
-        .collect::<Result<Vec<_>>>()?;
     let mut archive = if matches!(format, ExportFormat::Cbz) {
         let directory = destination.parent().context("archive path has no parent")?;
         Some(zip::ZipWriter::new(tempfile::NamedTempFile::new_in(
@@ -111,6 +138,21 @@ pub(crate) async fn export(
     for (batch, chunk) in pages.chunks(EXPORT_BATCH_PAGES).enumerate() {
         let frames =
             try_join_all(chunk.iter().map(|&page| renderer.render(&snapshot, page))).await?;
+        let psd_reports = if matches!(format, ExportFormat::Psd) {
+            frames
+                .iter()
+                .map(|frame| {
+                    let notices = koharu_psd::export_notices(frame);
+                    if notices.is_empty() {
+                        Ok(None)
+                    } else {
+                        serde_json::to_vec_pretty(&notices).map(Some)
+                    }
+                })
+                .collect::<std::result::Result<Vec<_>, _>>()?
+        } else {
+            vec![None; frames.len()]
+        };
         let images = match format {
             ExportFormat::Png | ExportFormat::Cbz => {
                 let rasterizer = Arc::clone(&rasterizer);
@@ -133,7 +175,7 @@ pub(crate) async fn export(
         let batch_names = names[start..start + images.len()].to_vec();
         let directory = destination.clone();
         archive = tokio_rayon::spawn(move || -> Result<_> {
-            for (name, bytes) in batch_names.into_iter().zip(images) {
+            for ((name, bytes), report) in batch_names.into_iter().zip(images).zip(psd_reports) {
                 if let Some(archive) = &mut archive {
                     // PNG data is already compressed.
                     let options = zip::write::SimpleFileOptions::default()
@@ -141,7 +183,19 @@ pub(crate) async fn export(
                     archive.start_file(name, options)?;
                     archive.write_all(&bytes)?;
                 } else {
-                    std::fs::write(directory.join(name), bytes)?;
+                    std::fs::write(directory.join(&name), bytes)?;
+                    if matches!(format, ExportFormat::Psd) {
+                        let path = directory.join(format!("{name}.report.json"));
+                        if let Some(report) = report {
+                            std::fs::write(path, report)?;
+                        } else {
+                            match std::fs::remove_file(path) {
+                                Ok(()) => {}
+                                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                                Err(error) => return Err(error.into()),
+                            }
+                        }
+                    }
                 }
             }
             Ok(archive)

@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     io::Cursor,
     sync::{Arc, Mutex},
 };
@@ -32,6 +32,40 @@ use super::{StageInput, StageProcessor, finish, generation};
 use crate::{InpaintingModel, ModelCell};
 
 const PRODUCER: &str = "dev.koharu.pipeline.inpainting";
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum RemoveMode {
+    Immediate,
+    #[default]
+    Queue,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum PaintTarget {
+    #[default]
+    Cleanup,
+    PaintLayer,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Type)]
+#[serde(default)]
+pub struct CleanupSettings {
+    pub remove_mode: RemoveMode,
+    pub paint_target: PaintTarget,
+    pub grow_px: u8,
+}
+
+impl Default for CleanupSettings {
+    fn default() -> Self {
+        Self {
+            remove_mode: RemoveMode::Queue,
+            paint_target: PaintTarget::Cleanup,
+            grow_px: 2,
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(default)]
@@ -184,6 +218,12 @@ impl Model {
             return finish(input.scene.edit());
         }
         let mask = prepared.mask.clone();
+        // Models infer the entire feathered area; coverage is applied once at compositing.
+        if input.inpainting_mask.is_some() {
+            for value in prepared.mask.iter_mut() {
+                *value = u8::from(*value != 0) * 255;
+            }
+        }
         let original = prepared.original.clone();
         let cleanup = prepared.cleanup.take();
         let cleanup_entity = prepared.cleanup_entity;
@@ -313,6 +353,10 @@ impl Model {
             RgbaImage::new(image.width(), image.height())
         };
         for (x, y, target) in overlay.enumerate_pixels_mut() {
+            if manual {
+                blend_cleanup_pixel(target, image.get_pixel(x, y), mask.get_pixel(x, y)[0]);
+                continue;
+            }
             if mask.get_pixel(x, y)[0] < 127 {
                 continue;
             }
@@ -508,6 +552,14 @@ async fn prepare(input: &StageInput) -> Result<InpaintInput> {
             }
         }
     }
+    if input.inpainting_mask.is_some() {
+        let grow_px = koharu_config::load::<CleanupSettings>("cleanup")?
+            .read()?
+            .grow_px
+            .min(16);
+        // Grow after clipping, otherwise a tight Region scope would trim the new edge away.
+        mask = tokio_rayon::spawn(move || grow_user_mask(&mask, grow_px)).await;
+    }
     let flat_fill_regions = flat_fill_regions(input, source.width(), source.height())?;
     Ok(InpaintInput {
         image: source,
@@ -518,6 +570,76 @@ async fn prepare(input: &StageInput) -> Result<InpaintInput> {
         text_mask,
         flat_fill_regions,
     })
+}
+
+fn blend_cleanup_pixel(target: &mut Rgba<u8>, generated: &Rgba<u8>, coverage: u8) {
+    if coverage == 0 {
+        return;
+    }
+    let source_alpha = f32::from(coverage) / 255.0;
+    let destination_alpha = f32::from(target[3]) / 255.0;
+    let alpha = source_alpha + destination_alpha * (1.0 - source_alpha);
+    for channel in 0..3 {
+        target[channel] = ((f32::from(generated[channel]) * source_alpha
+            + f32::from(target[channel]) * destination_alpha * (1.0 - source_alpha))
+            / alpha)
+            .round() as u8;
+    }
+    target[3] = (alpha * 255.0).round() as u8;
+}
+
+fn grow_user_mask(mask: &GrayImage, radius: u8) -> GrayImage {
+    let radius = u32::from(radius.min(16));
+    if radius == 0 {
+        return mask.clone();
+    }
+    let (width, height) = mask.dimensions();
+    let mut horizontal = GrayImage::new(width, height);
+    let mut output = GrayImage::new(width, height);
+    // A separable maximum filter preserves grey edges and stays linear in page size.
+    for y in 0..height {
+        let mut window = VecDeque::<(u32, u8)>::new();
+        let mut next = 0;
+        for x in 0..width {
+            while next < width && next <= x.saturating_add(radius) {
+                let value = mask.get_pixel(next, y)[0];
+                while window.back().is_some_and(|(_, old)| *old <= value) {
+                    window.pop_back();
+                }
+                window.push_back((next, value));
+                next += 1;
+            }
+            while window
+                .front()
+                .is_some_and(|(position, _)| *position < x.saturating_sub(radius))
+            {
+                window.pop_front();
+            }
+            horizontal.put_pixel(x, y, Luma([window.front().map_or(0, |(_, value)| *value)]));
+        }
+    }
+    for x in 0..width {
+        let mut window = VecDeque::<(u32, u8)>::new();
+        let mut next = 0;
+        for y in 0..height {
+            while next < height && next <= y.saturating_add(radius) {
+                let value = horizontal.get_pixel(x, next)[0];
+                while window.back().is_some_and(|(_, old)| *old <= value) {
+                    window.pop_back();
+                }
+                window.push_back((next, value));
+                next += 1;
+            }
+            while window
+                .front()
+                .is_some_and(|(position, _)| *position < y.saturating_sub(radius))
+            {
+                window.pop_front();
+            }
+            output.put_pixel(x, y, Luma([window.front().map_or(0, |(_, value)| *value)]));
+        }
+    }
+    output
 }
 
 const TILE_SIZE: u32 = 512;
@@ -1168,6 +1290,30 @@ fn composite_generated(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn user_mask_growth_expands_a_dot_to_five_by_five_and_preserves_grey() {
+        let mut mask = GrayImage::new(9, 9);
+        mask.put_pixel(4, 4, Luma([255]));
+        let grown = grow_user_mask(&mask, 2);
+        assert_eq!(grown.pixels().filter(|p| p[0] == 255).count(), 25);
+        assert_eq!(grown.get_pixel(2, 2)[0], 255);
+        assert_eq!(grown.get_pixel(1, 4)[0], 0);
+        assert_eq!(grow_user_mask(&mask, 0), mask);
+        mask.put_pixel(4, 4, Luma([70]));
+        assert_eq!(grow_user_mask(&mask, 2).get_pixel(2, 2)[0], 70);
+    }
+
+    #[test]
+    fn feathered_user_masks_blend_over_existing_cleanup() {
+        let generated = Rgba([240, 240, 240, 255]);
+        let mut transparent = Rgba([0; 4]);
+        blend_cleanup_pixel(&mut transparent, &generated, 64);
+        assert_eq!(transparent.0, [240, 240, 240, 64]);
+        let mut opaque = Rgba([0, 0, 0, 255]);
+        blend_cleanup_pixel(&mut opaque, &generated, 128);
+        assert_eq!(opaque.0, [120, 120, 120, 255]);
+    }
 
     #[tokio::test]
     async fn transient_inpainting_mask_replaces_persistent_page_masks() {

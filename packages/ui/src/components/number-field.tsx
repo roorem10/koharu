@@ -5,7 +5,76 @@ import * as React from 'react'
 
 import { cn } from '@koharu/ui/lib/utils'
 
-const NumberField = NumberFieldPrimitive.Root
+const NumberField = React.forwardRef<HTMLDivElement, NumberFieldPrimitive.Root.Props>(
+  function NumberField(
+    { value, defaultValue = null, step = 1, largeStep, onValueChange, onValueCommitted, ...props },
+    ref,
+  ) {
+    const [uncontrolled, setUncontrolled] = React.useState(defaultValue)
+    const [wheelValue, setWheelValue] = React.useState<{ value: number | null } | null>(null)
+    const pending = React.useRef<{
+      value: number | null
+      change: NumberFieldPrimitive.Root.ChangeEventDetails
+      commit?: NumberFieldPrimitive.Root.CommitEventDetails
+      onChange: typeof onValueChange
+      onCommit: typeof onValueCommitted
+    } | null>(null)
+    const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    const flush = React.useCallback(() => {
+      if (timer.current !== null) clearTimeout(timer.current)
+      timer.current = null
+      const next = pending.current
+      pending.current = null
+      if (!next) return
+      next.onChange?.(next.value, next.change)
+      if (next.commit) next.onCommit?.(next.value, next.commit)
+    }, [])
+
+    React.useEffect(() => () => flush(), [flush])
+    React.useEffect(() => setWheelValue(null), [value])
+
+    return (
+      <NumberFieldPrimitive.Root
+        {...props}
+        ref={ref}
+        value={wheelValue ? wheelValue.value : value === undefined ? uncontrolled : value}
+        step={step}
+        largeStep={largeStep ?? (typeof step === 'number' ? step * 5 : 5)}
+        allowWheelScrub
+        onValueChange={(next, details) => {
+          if (details.reason !== 'wheel') {
+            flush()
+            setWheelValue(null)
+            setUncontrolled(next)
+            onValueChange?.(next, details)
+            return
+          }
+          // Keep ticks local: expensive consumers see only the settled value.
+          setWheelValue({ value: next })
+          setUncontrolled(next)
+          pending.current = {
+            value: next,
+            change: details,
+            onChange: onValueChange,
+            onCommit: onValueCommitted,
+          }
+          if (timer.current !== null) clearTimeout(timer.current)
+          timer.current = setTimeout(flush, 300)
+        }}
+        onValueCommitted={(next, details) => {
+          if (details.reason === 'wheel') {
+            if (pending.current) pending.current.commit = details
+          } else {
+            const wheel = pending.current
+            flush()
+            if (!wheel || wheel.value !== next) onValueCommitted?.(next, details)
+          }
+        }}
+      />
+    )
+  },
+)
 
 function NumberFieldGroup({ className, ...props }: NumberFieldPrimitive.Group.Props) {
   return (

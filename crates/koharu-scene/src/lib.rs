@@ -23,13 +23,15 @@ pub use change::{
     Change, ComponentChange, ComponentOwner, EntityChange, RelationChange, ValueChangeKind,
 };
 pub use component::{Component, ValidationContext};
+pub use components::rich_text;
 pub use components::{
     Asset, AssetInput, AssetMetadata, AssetRole, Authored, DetectionAnalysis, DetectionLabel,
-    EntityOrigin, FontStyle, Generation, Geometry, Group, LanguageTag, OcrAnalysis, Origin, Page,
-    PageDraft, Point, Project, RasterLayer, RasterLayerKind, Region, RegionKind, Relation,
-    RelationKind, SourceText, StrokeJoin, StrokeMethod, StrokePosition, TextAlignment, TextContent,
-    TextDirection, TextGroup, TextLayout, TextLayoutKind, TextRole, Translation, Typography,
-    Visibility, WritingMode,
+    EntityOrigin, FillGradient, FontStyle, Generation, Geometry, GradientKind, GradientStop, Group,
+    LanguageTag, OcrAnalysis, Origin, Page, PageDraft, Point, Project, RasterLayer,
+    RasterLayerKind, Region, RegionKind, Relation, RelationKind, RunStyle, SourceText, StrokeJoin,
+    StrokeMethod, StrokePosition, StyleRun, TextAlignment, TextContent, TextDirection, TextGroup,
+    TextLayout, TextLayoutKind, TextRole, TextRuns, TextWarp, Translation, Typography, Visibility,
+    WritingMode, char_range_to_byte_range,
 };
 pub use document::{AnalysisRegionRef, GroupRef, TextContentRef, TextLayerRef};
 pub use edit::{At, Edit, RemovePolicy};
