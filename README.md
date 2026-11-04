@@ -13,7 +13,10 @@
 > [!IMPORTANT]
 > Booharu is maintained by roorem10 and is **not an official Koharu release**. Please report problems you see in Booharu on [this fork's issues](https://github.com/roorem10/koharu/issues), not to the Koharu project, unless you can reproduce them in official Koharu too.
 
-Booharu 0.0.1 is based on Koharu 0.83.5. It keeps everything Koharu does and adds the typesetting and editing changes listed below. The app's About page shows both the Koharu version and the Booharu version.
+Booharu 0.0.3 is based on Koharu 0.83.5. It keeps everything Koharu does and adds the typesetting, editing and translation changes listed below. The app's About page shows both the Koharu version and the Booharu version.
+
+> [!WARNING]
+> Projects saved by Booharu 0.0.3 can't be opened in 0.0.2 or earlier. Keep a copy of any project you still need in an older version.
 
 Koharu introduces a local-first workflow for manga translation, utilizing the power of ML to automate the process. It combines the capabilities of object detection, OCR, inpainting, and LLMs to create a seamless translation experience.
 
@@ -24,36 +27,86 @@ Koharu introduces a local-first workflow for manga translation, utilizing the po
 
 ![screenshot](packages/docs/screenshot.png)
 
+## Where Booharu is going
+
+The goal is **one button that turns a chapter into a passable scanlation**: add a chapter, press one button, and get pages that are cleaned, translated and lettered with fitting fonts and effects, without touching anything. The result stays fully editable, and hand edits always win.
+
+Booharu also stays a tool for people who work by hand. Every step works on its own (only cleanup, only faster typesetting, and so on), and nobody has to use the one-button run. Plans are tracked in the [roadmap issue](https://github.com/roorem10/koharu/issues/6).
+
 ## What Booharu changes
 
-**Text and outlines**
+**Word styling (rich text)**
 
-- Contour outline method that follows the glyph shapes, with Outside, Center and Inside placement and Round, Sharp and Bevel corners
-- Double outline: a second outline around the first
+- Style single words inside a box: font, size, bold, italic, color, outline, second outline and gradient
+- Double-click a box on the page to edit it in place. Text changes live as you type, and a small toolbar styles the words you drag across
+- The same toolbar appears when you highlight words in a layer row's Translation box
+- AI emphasis: translation can bold and enlarge a few stressed words, with a style per lettering category (Settings > Typesetting > Emphasis), or turn it off
+- PSD export keeps plain word styles as editable text
+
+**Text, outlines and effects**
+
+- Contour outline that follows the glyph shapes, with Outside, Center and Inside placement and Round, Sharp and Bevel corners
+- Double outline, gradient fills, letter and line spacing
+- Skew and perspective with corner handles, in the FX popup
+- B and I work on every font, including fonts without a real bold or italic
+- One app-wide default text style, applied to a selection, page or whole project in one step; one click swaps fill and outline colors
+
+**Lettering categories and fonts**
+
+- 15 manga lettering categories (thoughts, whisper, shout, SFX, narration, title, phone text and more), each with its own font, bold and italic
+- Category and font picked automatically from the chapter read or the bubble shape; boxes you styled by hand are left alone
+- "Suggest fonts" fills empty categories with fonts you have installed; localized font family names in the font picker
+- Sound effects: skip, translate only those inside bubbles, or translate all, with optional SFX subtitles
+
+**Chapter context and translation**
+
+- Per-series glossary, character list and notes, with export and import
+- "Read chapter" writes a short chapter brief, and each page is translated with the brief and the previous page
+- Context tab beside Properties and Agent; "Explain this line" with alternatives
+- Locked terms are checked, misspellings included, and a term can be fixed everywhere it's used
+
+**Editor**
+
+- Redesigned text panel with Text, Outline and Fill tabs, an FX popup and fx / ? tags on layer rows
+- Right-click a box on the page for FX, Box details, Split and Join with bubble
+- Compare with the original page (hold or toggle)
+- Drag layer rows to reorder; reviewer notes on boxes
+- Arrow keys nudge the selected box by one pixel, Shift+arrow by ten
+- Font picker keyboard navigation, favorite fonts and a Favorites filter
+- Zoom with editable keyboard shortcuts, key-combination recording, and a choice of wheel or Ctrl+wheel to zoom
 - Typed font size applies when you press Enter
 
-**Editing**
+**OCR, cleanup and pages**
 
-- Arrow keys nudge the selected text box by one pixel, Shift+arrow by ten
-- Font picker keyboard navigation, favorite fonts and a Favorites filter
-- Zoom with editable keyboard shortcuts, shortcut recording for key combinations, and a choice of mouse wheel or Ctrl+wheel to zoom
-- Fix all text boxes in a bubble in place
-
-**Pipeline and models**
-
-- Option to turn off automatic text color detection
-- Unload all models at once to free GPU memory
+- O tool: draw a box to read text there; read, translate or clean a single box again
+- Cleanup brushes with hardness and opacity, plus a queue of areas to remove
+- Page levels: automatic levels and paper whitening, with the original kept and restorable
+- Detections in the same bubble are joined; boxes can be split and joined; fewer duplicate boxes
 - Inpainting on large pages no longer leaves smears or crosses into nearby line art ([koharu#731](https://github.com/koharu-rs/koharu/issues/731))
+
+**Quality checks**
+
+- QC runs automatically; a box with issues gets a blinking yellow ? tag
+- Glossary, small-word and flagged-line checks, with page numbers
+
+**Runs, files and setup**
+
+- Run presets, one stage at a time, retries, per-page failures with retry, resume and a finish chime
+- Process whole chapter folders in one batch
+- Export scripts, import translations, choose page names and export selected pages
+- Choose where projects and models are stored; rename and duplicate projects
+- Unload all models at once to free GPU memory; option to turn off automatic text color detection
+- MCP server so outside AI agents can work on a project
+- Interface translated into all 11 languages
 
 **Windows**
 
 - Drag and drop files and folders from Explorer to import them
-- Loading spinner fix (from NeKoharu)
-- Windows startup fixes
-- Settings, projects and downloaded models live in a `PreviewData` folder next to the app, separate from an official Koharu install
+- Windows startup and loading spinner fixes
+- Settings live in a `PreviewData` folder next to the app, separate from an official Koharu install
 - About page shows the Booharu version and build commit
 
-Booharu also turns off Koharu's updater and Sentry crash reporting.
+Booharu also turns off Koharu's updater and Sentry crash reporting. See the [releases page](https://github.com/roorem10/koharu/releases) for what changed in each version.
 
 ## Koharu features
 
@@ -229,7 +282,7 @@ Booharu exists because of Koharu. If it is useful in your workflow, consider spo
 
 ## Contributors ❤️
 
-Thanks to all the contributors who have helped make Koharu better! Booharu also includes a fix from NeKoharu.
+Thanks to all the contributors who have helped make Koharu better! Booharu also includes work from nekojin116 (NeKoharu) and kylelkw (arrow-key nudge, upstream PR #1209).
 
 <a href="https://github.com/koharu-rs/koharu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=koharu-rs/koharu" />
