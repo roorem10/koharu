@@ -245,6 +245,30 @@ interface BuiltInShortcut {
 
 export const builtInShortcuts: readonly BuiltInShortcut[] = [
   {
+    id: 'copyTextBoxes',
+    group: 'edit',
+    labelKey: 'textClipboard.copy',
+    keys: ['Ctrl + C'],
+    checked: true,
+    bindings: ['ctrl+c'],
+  },
+  {
+    id: 'cutTextBoxes',
+    group: 'edit',
+    labelKey: 'textClipboard.cut',
+    keys: ['Ctrl + X'],
+    checked: true,
+    bindings: ['ctrl+x'],
+  },
+  {
+    id: 'pasteTextBoxes',
+    group: 'edit',
+    labelKey: 'textClipboard.paste',
+    keys: ['Ctrl + V'],
+    checked: true,
+    bindings: ['ctrl+v'],
+  },
+  {
     id: 'undo',
     group: 'edit',
     labelKey: 'menu.undo',

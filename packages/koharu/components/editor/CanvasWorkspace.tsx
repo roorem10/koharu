@@ -15,12 +15,13 @@ import { CleanupQueueBar } from '@/components/editor/CleanupQueueBar'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { useCanvas } from '@/components/editor/useCanvas'
+import { useTextClipboard } from '@/components/editor/useTextClipboard'
 import { WarpHandles } from '@/components/editor/WarpHandles'
 import { originalVisible, useCompareStore } from '@/components/qc/compare'
 import { OriginalOverlay } from '@/components/qc/OriginalOverlay'
 import { useRichTextEditor } from '@/components/rich-text-editor/useRichTextEditor'
 import { call } from '@/lib/backend'
-import { expandLayerSelection } from '@/lib/document'
+import { expandLayerSelection, isTextLayer } from '@/lib/document'
 import {
   controlFrame,
   draftFrame,
@@ -124,6 +125,7 @@ export function CanvasWorkspace() {
   const removeAreaTool = useRemoveAreaTool()
   const contextMenu = useCanvasContextMenu()
   const richTextEditor = useRichTextEditor()
+  const { run: clipboardAction, canPaste } = useTextClipboard()
   const previousPageIndex = useRef<number | null>(null)
   const spaceHeld = useRef(false)
   const compareKey = useRef<string | null>(null)
@@ -433,7 +435,9 @@ export function CanvasWorkspace() {
       (target instanceof HTMLInputElement && textEntryTypes.has(target.type)) ||
       target instanceof HTMLTextAreaElement ||
       target instanceof HTMLSelectElement ||
-      (target instanceof HTMLElement && target.isContentEditable)
+      (target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          !!target.closest('[contenteditable]:not([contenteditable="false"])')))
 
     const runShortcut = (event: KeyboardEvent, next: ShortcutAction | undefined) => {
       if (!next) return
@@ -512,6 +516,32 @@ export function CanvasWorkspace() {
         return
       }
       const state = useKoharuStore.getState()
+      if (page && !state.settingsOpen && !richTextEditor.editing && !event.repeat) {
+        const copying = matchesBinding(event, 'ctrl+c')
+        const cutting = matchesBinding(event, 'ctrl+x')
+        if (copying || cutting) {
+          const selected = expandLayerSelection(page.layers, state.selectedLayers)
+          const layers = page.layers
+            .filter(isTextLayer)
+            .filter((layer) => selected.includes(layer.id))
+          if (layers.length) {
+            event.preventDefault()
+            clipboardAction({
+              action: copying ? 'copy' : 'cut',
+              page: page.id,
+              layers: layers.map((layer) => layer.id),
+            })
+          }
+          return
+        }
+        if (matchesBinding(event, 'ctrl+v')) {
+          if (canPaste()) {
+            event.preventDefault()
+            clipboardAction({ action: 'paste', page: page.id })
+          }
+          return
+        }
+      }
       if (event.code === 'Space') {
         spaceHeld.current = true
         event.preventDefault()
@@ -585,10 +615,13 @@ export function CanvasWorkspace() {
     }
   }, [
     cancelGesture,
+    canPaste,
+    clipboardAction,
     colorSampling,
     finishTransform,
     page,
     requestCanvasFit,
+    richTextEditor.editing,
     selectLayers,
     setTool,
     setZoom,

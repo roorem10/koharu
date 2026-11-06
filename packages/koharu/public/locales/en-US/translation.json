@@ -66,6 +66,11 @@
     "redetectConfirmation": "Generated boxes on this page, including their OCR text and translations, will be replaced. Hand-made and hand-edited boxes are kept.",
     "cancel": "Cancel"
   },
+  "textClipboard": {
+    "copy": "Copy text boxes",
+    "cut": "Cut text boxes",
+    "paste": "Paste text boxes"
+  },
   "canvas": {
     "empty": "Select a page to begin.",
     "fit": "Fit Window",

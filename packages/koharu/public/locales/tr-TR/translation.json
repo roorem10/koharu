@@ -66,6 +66,11 @@
     "redetectConfirmation": "Bu sayfadaki otomatik oluşturulan kutular, OCR metinleri ve çevirileriyle birlikte değiştirilecek. Elle oluşturulan ve elle düzenlenen kutular korunur.",
     "cancel": "İptal"
   },
+  "textClipboard": {
+    "copy": "Metin kutularını kopyala",
+    "cut": "Metin kutularını kes",
+    "paste": "Metin kutularını yapıştır"
+  },
   "canvas": {
     "empty": "Başlamak için bir sayfa seçin.",
     "fit": "Pencereye Sığdır",

@@ -67,6 +67,11 @@
     "redetectConfirmation": "Se reemplazarán los cuadros generados de esta página, incluidos sus textos de OCR y sus traducciones. Se conservarán los cuadros creados o editados a mano.",
     "cancel": "Cancelar"
   },
+  "textClipboard": {
+    "copy": "Copiar cuadros de texto",
+    "cut": "Cortar cuadros de texto",
+    "paste": "Pegar cuadros de texto"
+  },
   "canvas": {
     "empty": "Selecciona una página para empezar.",
     "fit": "Ajustar a la ventana",

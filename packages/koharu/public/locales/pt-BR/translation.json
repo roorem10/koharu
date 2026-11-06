@@ -66,6 +66,11 @@
     "redetectConfirmation": "As caixas geradas nesta página, incluindo o texto do OCR e as traduções, serão substituídas. Caixas criadas ou editadas à mão serão mantidas.",
     "cancel": "Cancelar"
   },
+  "textClipboard": {
+    "copy": "Copiar caixas de texto",
+    "cut": "Recortar caixas de texto",
+    "paste": "Colar caixas de texto"
+  },
   "canvas": {
     "empty": "Selecione uma página para começar.",
     "fit": "Ajustar à janela",

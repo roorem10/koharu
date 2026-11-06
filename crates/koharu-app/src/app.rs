@@ -164,6 +164,7 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
             application.manage(ProjectLibrary::new()?);
             application.manage(Processing::default());
             application.manage(CanvasChannel::default());
+            application.manage(crate::commands::text_clipboard::TextClipboard::default());
             application.manage(JobChannel::default());
             application.manage(DownloadChannel::default());
             application.manage(ResourceChannel::default());

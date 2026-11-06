@@ -66,6 +66,11 @@
     "redetectConfirmation": "此頁上自動產生的文字框及其 OCR 原文和譯文將被取代。手動建立和編輯過的文字框將保留。",
     "cancel": "取消"
   },
+  "textClipboard": {
+    "copy": "複製文字方塊",
+    "cut": "剪下文字方塊",
+    "paste": "貼上文字方塊"
+  },
   "canvas": {
     "empty": "請選擇頁面以開始。",
     "fit": "適應視窗",

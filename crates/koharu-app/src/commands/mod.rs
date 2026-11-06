@@ -24,6 +24,7 @@ pub(crate) mod redesign;
 pub(crate) mod rich_text;
 pub(crate) mod runs;
 pub(crate) mod styles;
+pub(crate) mod text_clipboard;
 pub(crate) mod text_glyphs;
 pub(crate) mod warp;
 
@@ -254,6 +255,10 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             emphasis::apply_emphasis,
             emphasis::get_emphasis_settings,
             emphasis::save_emphasis_settings,
+            text_clipboard::get_text_clipboard_available,
+            text_clipboard::copy_text_boxes,
+            text_clipboard::cut_text_boxes,
+            text_clipboard::paste_text_boxes,
         ])
         .disable_serde_phases()
         .error_handling(ErrorHandlingMode::Throw)

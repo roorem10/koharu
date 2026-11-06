@@ -66,6 +66,11 @@
     "redetectConfirmation": "此页上自动生成的文本框及其 OCR 原文和译文将被替换。手动创建和编辑过的文本框将保留。",
     "cancel": "取消"
   },
+  "textClipboard": {
+    "copy": "复制文本框",
+    "cut": "剪切文本框",
+    "paste": "粘贴文本框"
+  },
   "canvas": {
     "empty": "请选择页面以开始。",
     "fit": "适应窗口",

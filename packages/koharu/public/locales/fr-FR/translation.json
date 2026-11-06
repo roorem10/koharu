@@ -67,6 +67,11 @@
     "redetectConfirmation": "Les zones de texte générées sur cette page seront remplacées, y compris leur texte OCR et leurs traductions. Les zones créées ou modifiées à la main seront conservées.",
     "cancel": "Annuler"
   },
+  "textClipboard": {
+    "copy": "Copier les zones de texte",
+    "cut": "Couper les zones de texte",
+    "paste": "Coller les zones de texte"
+  },
   "canvas": {
     "empty": "Sélectionnez une page pour commencer.",
     "fit": "Ajuster à la fenêtre",

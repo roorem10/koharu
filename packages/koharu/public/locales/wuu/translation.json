@@ -66,6 +66,11 @@
     "redetectConfirmation": "箇页浪自动生成个文字框，连里向个 OCR 文本搭译文，侪会被替换。手动建个搭手动改过个文字框会保留。",
     "cancel": "取消"
   },
+  "textClipboard": {
+    "copy": "复制文字框",
+    "cut": "剪切文字框",
+    "paste": "粘贴文字框"
+  },
   "canvas": {
     "empty": "先选一页，就好开始。",
     "fit": "适应窗口",

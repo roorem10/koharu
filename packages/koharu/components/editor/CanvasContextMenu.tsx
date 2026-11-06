@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useBoxActionInfo, useBoxEdits, useBoxesBusy } from '@/components/boxes/queries'
+import { useTextClipboard } from '@/components/editor/useTextClipboard'
 import { originalVisible, useCompareStore } from '@/components/qc/compare'
 import { useRedesignStore } from '@/components/redesign/state'
 import { expandLayerSelection, isTextLayer } from '@/lib/document'
@@ -12,9 +13,20 @@ import { hitTestLayers } from '@/lib/geometry'
 import { usePage, useProject } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import type { EntityId, Point } from '@koharu/bridge/protocol'
-import { DropdownMenu, DropdownMenuItem } from '@koharu/ui/components/dropdown-menu'
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+} from '@koharu/ui/components/dropdown-menu'
 
-type MenuTarget = { x: number; y: number; layer: EntityId; targets: EntityId[]; page: EntityId }
+type MenuTarget = {
+  x: number
+  y: number
+  layer: EntityId | null
+  targets: EntityId[]
+  page: EntityId
+}
 
 export function useCanvasContextMenu(): {
   open: (event: MouseEvent, point: Point) => void
@@ -83,7 +95,10 @@ export function useCanvasContextMenu(): {
         return
       const state = useKoharuStore.getState()
       const layer = hitTestLayers(page.layers, point, state.layerFrames)
-      if (!layer || !isTextLayer(layer)) return
+      if (!layer || !isTextLayer(layer)) {
+        setTarget({ x: event.clientX, y: event.clientY, layer: null, targets: [], page: page.id })
+        return
+      }
       const expanded = expandLayerSelection(page.layers, state.selectedLayers)
       if (!expanded.includes(layer.id)) state.selectLayers([layer.id])
       const selection = expanded.includes(layer.id) ? expanded : [layer.id]
@@ -102,11 +117,7 @@ export function useCanvasContextMenu(): {
 
 function CanvasMenu({ target, close }: { target: MenuTarget; close: () => void }) {
   const { t } = useTranslation()
-  const info = useBoxActionInfo(target.layer).data
-  const edit = useBoxEdits()
-  const running = useBoxesBusy()
-  const openFx = useRedesignStore((state) => state.openFx)
-  const openDetails = useRedesignStore((state) => state.openDetails)
+  const clipboard = useTextClipboard()
   const action = (run: () => void) => {
     close()
     run()
@@ -129,31 +140,87 @@ function CanvasMenu({ target, close }: { target: MenuTarget; close: () => void }
             className='min-w-48 rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none'
             aria-label={t('redesign.boxMenu')}
           >
-            <DropdownMenuItem onClick={() => action(() => openFx(target.targets))}>
-              {t('redesign.fxMenu')}
+            <DropdownMenuItem
+              disabled={!target.targets.length || clipboard.busy}
+              onClick={() =>
+                action(() =>
+                  clipboard.run({ action: 'copy', page: target.page, layers: target.targets }),
+                )
+              }
+            >
+              {t('textClipboard.copy')}
+              <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => action(() => openDetails(target.layer))}>
-              {t('redesign.boxDetails')}
+            <DropdownMenuItem
+              disabled={!target.targets.length || clipboard.busy}
+              onClick={() =>
+                action(() =>
+                  clipboard.run({ action: 'cut', page: target.page, layers: target.targets }),
+                )
+              }
+            >
+              {t('textClipboard.cut')}
+              <DropdownMenuShortcut>Ctrl+X</DropdownMenuShortcut>
             </DropdownMenuItem>
-            {info?.can_split && (
-              <DropdownMenuItem
-                disabled={running || edit.isPending}
-                onClick={() => action(() => edit.mutate({ action: 'split', layer: target.layer }))}
-              >
-                {t('boxes.split')}
-              </DropdownMenuItem>
-            )}
-            {(info?.bubble_boxes ?? 0) > 1 && (
-              <DropdownMenuItem
-                disabled={running || edit.isPending}
-                onClick={() => action(() => edit.mutate({ action: 'join', layer: target.layer }))}
-              >
-                {t('boxes.joinWithBubble')}
-              </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!clipboard.available || clipboard.busy}
+              onClick={() => action(() => clipboard.run({ action: 'paste', page: target.page }))}
+            >
+              {t('textClipboard.paste')}
+              <DropdownMenuShortcut>Ctrl+V</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            {target.layer && (
+              <>
+                <DropdownMenuSeparator />
+                <TextBoxMenuItems layer={target.layer} targets={target.targets} action={action} />
+              </>
             )}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>
     </DropdownMenu>
+  )
+}
+
+function TextBoxMenuItems({
+  layer,
+  targets,
+  action,
+}: {
+  layer: EntityId
+  targets: EntityId[]
+  action: (run: () => void) => void
+}) {
+  const { t } = useTranslation()
+  const info = useBoxActionInfo(layer).data
+  const edit = useBoxEdits()
+  const running = useBoxesBusy()
+  const openFx = useRedesignStore((state) => state.openFx)
+  const openDetails = useRedesignStore((state) => state.openDetails)
+  return (
+    <>
+      <DropdownMenuItem onClick={() => action(() => openFx(targets))}>
+        {t('redesign.fxMenu')}
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => action(() => openDetails(layer))}>
+        {t('redesign.boxDetails')}
+      </DropdownMenuItem>
+      {info?.can_split && (
+        <DropdownMenuItem
+          disabled={running || edit.isPending}
+          onClick={() => action(() => edit.mutate({ action: 'split', layer }))}
+        >
+          {t('boxes.split')}
+        </DropdownMenuItem>
+      )}
+      {(info?.bubble_boxes ?? 0) > 1 && (
+        <DropdownMenuItem
+          disabled={running || edit.isPending}
+          onClick={() => action(() => edit.mutate({ action: 'join', layer }))}
+        >
+          {t('boxes.joinWithBubble')}
+        </DropdownMenuItem>
+      )}
+    </>
   )
 }

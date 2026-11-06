@@ -380,6 +380,10 @@ impl Host for KoharuHost {
                     definition::<MovePage>("move_page", "Move a page to a zero-based project index."),
                     definition::<DeletePages>("delete_pages", "Delete pages and their contents."),
                     definition::<AddTextBox>("add_text_box", "Add a paragraph text box to a page."),
+                    definition::<CopyTextBoxes>(
+                        "copy_text_boxes",
+                        "Copy source text layers to a destination page in one undoable edit. Preserves source text, translation, word styles, effects, and geometry. Copies become hand-made boxes, detached from source bubbles. Same-page copies are offset slightly; positions are clamped to the destination page. Returns the new layer IDs.",
+                    ),
                     definition::<SetText>("set_source_text", "Replace an element's source text."),
                     definition::<SetTranslation>(
                         "set_translation",
@@ -510,6 +514,21 @@ impl Host for KoharuHost {
                     Box::pin(async move {
                         let (commit, element) = project.add_text_box(page, frame).await?;
                         Ok((commit, json!({ "page": page, "element": element })))
+                    })
+                })
+                .await
+            }
+            "copy_text_boxes" => {
+                let arguments: CopyTextBoxes = arguments(&call)?;
+                let layers = entities(&arguments.source_layers)?;
+                let page = entity(&arguments.destination_page)?;
+                let renderer = self.handle.state::<Desktop>().renderer();
+                self.mutate(|project| {
+                    Box::pin(async move {
+                        let (commit, layers) = project
+                            .copy_text_boxes(&layers, page, &renderer)
+                            .await?;
+                        Ok((commit, json!({ "page": page, "layers": layers })))
                     })
                 })
                 .await
@@ -878,6 +897,12 @@ struct AddTextBox {
     height: f32,
     #[serde(default)]
     angle_degrees: f32,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct CopyTextBoxes {
+    source_layers: Vec<String>,
+    destination_page: String,
 }
 
 #[derive(Deserialize, JsonSchema)]

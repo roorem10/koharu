@@ -169,6 +169,10 @@ export const commands = {
 	applyEmphasis: (layer: EntityId, start: number, end: number) => __TAURI_INVOKE<null>("apply_emphasis", { layer, start, end }),
 	getEmphasisSettings: () => __TAURI_INVOKE<EmphasisPreferences>("get_emphasis_settings"),
 	saveEmphasisSettings: (settings: EmphasisPreferences) => __TAURI_INVOKE<EmphasisPreferences>("save_emphasis_settings", { settings }),
+	getTextClipboardAvailable: () => __TAURI_INVOKE<boolean>("get_text_clipboard_available"),
+	copyTextBoxes: (layers: EntityId[]) => __TAURI_INVOKE<null>("copy_text_boxes", { layers }),
+	cutTextBoxes: (layers: EntityId[]) => __TAURI_INVOKE<null>("cut_text_boxes", { layers }),
+	pasteTextBoxes: (page: EntityId) => __TAURI_INVOKE<TextBoxesCommit>("paste_text_boxes", { page }),
 };
 
 /* Types */
@@ -1140,6 +1144,11 @@ export type TermUsage = {
 };
 
 export type TextAlignment = "Start" | "Center" | "End" | "Justify";
+
+export type TextBoxesCommit = {
+	revision: Revision,
+	layers: EntityId[],
+};
 
 export type TextContent = {
 	id: EntityId,

@@ -16,6 +16,7 @@ import {
 import { fontsKey, pageKey, projectKey, queryClient } from '@/lib/queries'
 import { useRichTextSelection } from '@/lib/richTextSelection'
 import { useKoharuStore } from '@/lib/store'
+import translations from '@/public/locales/en-US/translation.json'
 import { commands, type Layer, type Page, type Typography } from '@koharu/bridge/protocol'
 
 const issues = vi.hoisted(() => new Map<string, number>())
@@ -666,7 +667,7 @@ describe('text panel redesign', () => {
     fireEvent.contextMenu(screen.getByTestId('surface'), { button: 2, clientX: 110, clientY: 30 })
     expect(useKoharuStore.getState().selectedLayers).toEqual(['two'])
     const menu = await screen.findByRole('menu')
-    await waitFor(() => expect(within(menu).getAllByRole('menuitem')).toHaveLength(4))
+    await waitFor(() => expect(within(menu).getAllByRole('menuitem')).toHaveLength(7))
     expect(within(menu).getByRole('menuitem', { name: 'Join with bubble' })).toBeInTheDocument()
     fireEvent.keyDown(window, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
@@ -678,7 +679,7 @@ describe('text panel redesign', () => {
     editor(true)
     fireEvent.contextMenu(screen.getByTestId('surface'), { button: 2, clientX: 20, clientY: 30 })
     const menu = await screen.findByRole('menu')
-    await waitFor(() => expect(within(menu).getAllByRole('menuitem')).toHaveLength(3))
+    await waitFor(() => expect(within(menu).getAllByRole('menuitem')).toHaveLength(6))
     expect(
       within(menu).queryByRole('menuitem', { name: 'Join with bubble' }),
     ).not.toBeInTheDocument()
@@ -688,7 +689,7 @@ describe('text panel redesign', () => {
     expect(commands.resetBoxEffects).toHaveBeenCalledWith(['one', 'two'])
   })
 
-  it('blocks compare and active gestures, ignores empty space and middle clicks, and closes on wheel', async () => {
+  it('blocks compare and active gestures, ignores middle clicks, and closes on wheel', async () => {
     install()
     editor(true)
     const surface = screen.getByTestId('surface')
@@ -711,5 +712,37 @@ describe('text panel redesign', () => {
     await screen.findByRole('menu')
     await userEvent.click(document.body)
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+  })
+
+  it('copies selected text boxes and pastes from the empty canvas menu', async () => {
+    install(undefined, ['one', 'two'])
+    const copy = vi.spyOn(commands, 'copyTextBoxes').mockResolvedValue(null)
+    const paste = vi
+      .spyOn(commands, 'pasteTextBoxes')
+      .mockResolvedValue({ revision: 2, layers: ['pasted'] })
+    editor(true)
+    const surface = screen.getByTestId('surface')
+    fireEvent.contextMenu(surface, { button: 2, clientX: 20, clientY: 30 })
+    await userEvent.click(
+      await screen.findByRole('menuitem', {
+        name: (name) => name.startsWith(translations.textClipboard.copy),
+      }),
+    )
+    await waitFor(() => expect(copy).toHaveBeenCalledWith(['one', 'two']))
+    await waitFor(() => expect(queryClient.isMutating({ mutationKey: ['text-clipboard'] })).toBe(0))
+    fireEvent.contextMenu(surface, { button: 2, clientX: 250, clientY: 150 })
+    const menu = await screen.findByRole('menu')
+    expect(
+      within(menu).getByRole('menuitem', {
+        name: (name) => name.startsWith(translations.textClipboard.cut),
+      }),
+    ).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(
+      within(menu).getByRole('menuitem', {
+        name: (name) => name.startsWith(translations.textClipboard.paste),
+      }),
+    )
+    await waitFor(() => expect(paste).toHaveBeenCalledWith('page'))
+    await waitFor(() => expect(useKoharuStore.getState().selectedLayers).toEqual(['pasted']))
   })
 })

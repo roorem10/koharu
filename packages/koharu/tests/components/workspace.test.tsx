@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CanvasWorkspace, MIN_ZOOM, MAX_ZOOM } from '@/components/editor/CanvasWorkspace'
 import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { commands, type Layer } from '@koharu/bridge/protocol'
+import { commands, type Layer, type Page, type TextBoxesCommit } from '@koharu/bridge/protocol'
 import { Slider } from '@koharu/ui/components/slider'
 import { TooltipProvider } from '@koharu/ui/components/tooltip'
 
@@ -514,6 +514,125 @@ describe('canvas interaction adapter', () => {
     handled.preventDefault()
     fireEvent(window, handled)
     expect(useKoharuStore.getState().tool).toBe('select')
+  })
+
+  it('leaves clipboard keys to focused inputs and contenteditable descendants', async () => {
+    installNudgeProject()
+    queryClient.setQueryData(['text-clipboard'], true)
+    const copy = vi.spyOn(commands, 'copyTextBoxes').mockResolvedValue(null)
+    const cut = vi.spyOn(commands, 'cutTextBoxes').mockResolvedValue(null)
+    const paste = vi
+      .spyOn(commands, 'pasteTextBoxes')
+      .mockResolvedValue({ revision: 2, layers: ['new'] })
+    renderWorkspace()
+    for (const tag of ['input', 'textarea', 'select', 'div']) {
+      const control = document.createElement(tag)
+      let target: HTMLElement = control
+      if (tag === 'div') {
+        control.setAttribute('contenteditable', 'true')
+        target = document.createElement('span')
+        control.append(target)
+      }
+      document.body.append(control)
+      control.focus()
+      for (const key of ['c', 'x', 'v']) {
+        const event = new KeyboardEvent('keydown', {
+          key,
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+        fireEvent(target, event)
+        expect(event.defaultPrevented).toBe(false)
+      }
+      control.remove()
+    }
+    await act(async () => undefined)
+    expect(copy).not.toHaveBeenCalled()
+    expect(cut).not.toHaveBeenCalled()
+    expect(paste).not.toHaveBeenCalled()
+  })
+
+  it('queues a quick copy and paste, copies only text, and selects the pasted layers', async () => {
+    installNudgeProject()
+    const page = queryClient.getQueryData<Page>(pageKey)!
+    queryClient.setQueryData(pageKey, { ...page, layers: [...page.layers, paintLayer] })
+    useKoharuStore.setState({ selectedLayers: ['element', 'paint'] })
+    let finishCopy!: (value: null) => void
+    const copy = vi.spyOn(commands, 'copyTextBoxes').mockImplementation(
+      () =>
+        new Promise<null>((resolve) => {
+          finishCopy = resolve
+        }),
+    )
+    const paste = vi
+      .spyOn(commands, 'pasteTextBoxes')
+      .mockResolvedValue({ revision: 2, layers: ['new-one', 'new-two'] })
+    vi.spyOn(commands, 'getPage').mockResolvedValue(page)
+    vi.spyOn(commands, 'getProject').mockResolvedValue(null)
+    renderWorkspace()
+    fireEvent.keyDown(window, { key: 'c', ctrlKey: true })
+    await waitFor(() => expect(copy).toHaveBeenCalledWith(['element']))
+    fireEvent.keyDown(window, { key: 'v', ctrlKey: true })
+    expect(paste).not.toHaveBeenCalled()
+    await act(async () => finishCopy(null))
+    await waitFor(() => expect(paste).toHaveBeenCalledWith('page'))
+    await waitFor(() =>
+      expect(useKoharuStore.getState().selectedLayers).toEqual(['new-one', 'new-two']),
+    )
+  })
+
+  it('leaves clipboard keys with the on-page text editor', async () => {
+    installNudgeProject()
+    queryClient.setQueryData(['text-clipboard'], true)
+    const copy = vi.spyOn(commands, 'copyTextBoxes').mockResolvedValue(null)
+    const cut = vi.spyOn(commands, 'cutTextBoxes').mockResolvedValue(null)
+    const paste = vi
+      .spyOn(commands, 'pasteTextBoxes')
+      .mockResolvedValue({ revision: 2, layers: ['new'] })
+    const surface = renderWorkspace()
+    fireEvent.doubleClick(surface, { button: 0, clientX: 50, clientY: 70 })
+    const editor = await screen.findByRole('textbox')
+    expect(editor.tagName).toBe('TEXTAREA')
+    for (const key of ['c', 'x', 'v']) {
+      const event = new KeyboardEvent('keydown', {
+        key,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      fireEvent(editor, event)
+      expect(event.defaultPrevented).toBe(false)
+    }
+    await act(async () => undefined)
+    expect(copy).not.toHaveBeenCalled()
+    expect(cut).not.toHaveBeenCalled()
+    expect(paste).not.toHaveBeenCalled()
+  })
+
+  it('keeps the new page selection when a pending paste finishes on the previous page', async () => {
+    installNudgeProject()
+    queryClient.setQueryData(['text-clipboard'], true)
+    let finishPaste!: (result: TextBoxesCommit) => void
+    const paste = vi.spyOn(commands, 'pasteTextBoxes').mockImplementation(
+      () =>
+        new Promise<TextBoxesCommit>((resolve) => {
+          finishPaste = resolve
+        }),
+    )
+    renderWorkspace()
+    fireEvent.keyDown(window, { key: 'v', ctrlKey: true })
+    await waitFor(() => expect(paste).toHaveBeenCalledWith('page'))
+    const next = { ...queryClient.getQueryData<Page>(pageKey)!, id: 'next-page' }
+    vi.spyOn(commands, 'getPage').mockResolvedValue(next)
+    vi.spyOn(commands, 'getProject').mockResolvedValue(null)
+    act(() => {
+      queryClient.setQueryData(pageKey, next)
+      useKoharuStore.setState({ selectedLayers: ['next-layer'] })
+    })
+    await act(async () => finishPaste({ revision: 2, layers: ['new'] }))
+    await waitFor(() => expect(queryClient.isMutating({ mutationKey: ['text-clipboard'] })).toBe(0))
+    expect(useKoharuStore.getState().selectedLayers).toEqual(['next-layer'])
   })
 
   it('matches modified and alternate tool bindings from a focused slider', () => {

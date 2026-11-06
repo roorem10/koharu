@@ -104,6 +104,7 @@ impl Host for FakeHost {
             "inspect_project",
             "view_page",
             "set_translation",
+            "copy_text_boxes",
             "run_pipeline",
             "fails",
         ]
@@ -126,7 +127,7 @@ impl Host for FakeHost {
                 control.cancelled().await;
                 Err(anyhow!("pipeline processing was cancelled"))
             }
-            "set_translation" => {
+            "set_translation" | "copy_text_boxes" => {
                 self.edits.fetch_add(1, Ordering::SeqCst);
                 Invocation::changed(json!({ "changed": true }))
             }
@@ -322,7 +323,7 @@ async fn http_initialization_tools_images_errors_and_session_deletion() {
         .unwrap();
     assert_eq!(
         rpc(list).await["result"]["tools"].as_array().unwrap().len(),
-        6
+        7
     );
     let inspected = rpc(server.call(&session, 2, "inspect_project").await).await;
     let value: Value =
@@ -368,6 +369,10 @@ async fn edits_are_refused_even_when_called_directly() {
     let session = server.initialize().await;
     assert_eq!(
         rpc(server.call(&session, 1, "set_translation").await).await["result"]["isError"],
+        true
+    );
+    assert_eq!(
+        rpc(server.call(&session, 2, "copy_text_boxes").await).await["result"]["isError"],
         true
     );
     assert_eq!(host.edits.load(Ordering::SeqCst), 0);
