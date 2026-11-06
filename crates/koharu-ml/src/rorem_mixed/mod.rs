@@ -39,6 +39,14 @@ pub struct RoremMixed {
     model: Model,
 }
 
+pub const MODEL_FILES: &[koharu_runtime::HuggingFaceFile<'static>] = &[
+    DIFFUSION_MODEL,
+    SDXL_VERSION_MARKER,
+    VAE_MODEL,
+    CLIP_L_MODEL,
+    CLIP_G_MODEL,
+];
+
 impl RoremMixed {
     pub async fn load(device: crate::Device) -> Result<Self> {
         let (diffusion_model, version_marker, vae, clip_l, clip_g) = tokio::try_join!(

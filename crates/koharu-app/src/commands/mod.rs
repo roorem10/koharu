@@ -20,6 +20,7 @@ pub(crate) mod processing;
 pub(crate) mod project;
 pub(crate) mod qc;
 pub(crate) mod raw_prep;
+pub(crate) mod ready_check;
 pub(crate) mod redesign;
 pub(crate) mod rich_text;
 pub(crate) mod runs;
@@ -116,6 +117,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             fonts::set_font_favorite,
             preferences::save_preferences,
             preferences::get_preferences,
+            ready_check::get_ready_check,
+            ready_check::download_ready_models,
             preferences::get_translation_models,
             preferences::get_shortcuts,
             preferences::save_shortcuts,
@@ -137,6 +140,7 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             context::lines::explain_line,
             context::reading::read_chapter,
             context::series::list_series,
+            context::series::get_last_series,
             context::series::create_series,
             context::series::get_series,
             context::series::save_series,

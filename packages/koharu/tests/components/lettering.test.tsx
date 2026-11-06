@@ -173,7 +173,8 @@ describe('Lettering font preferences', () => {
     await user.click(screen.getByRole('button', { name: 'Suggest fonts' }))
     await waitFor(() => expect(save).toHaveBeenCalledOnce())
     const saved = save.mock.lastCall![0]
-    expect(saved.shape_styles).toEqual(original.shape_styles)
+    expect(saved.shape_styles?.round).toEqual(original.shape_styles.round)
+    expect(saved.shape_styles?.rectangle).toEqual(original.shape_styles.rectangle)
     expect(saved.category_styles?.thoughts?.font).toEqual({
       preferred_font: 'ANIMEACE2.0BB',
       font_style: 'italic',

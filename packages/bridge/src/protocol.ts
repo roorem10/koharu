@@ -17,7 +17,7 @@ export const commands = {
 	getPages: () => __TAURI_INVOKE<PageSummary[]>("get_pages"),
 	getPage: () => __TAURI_INVOKE<Page | null>("get_page"),
 	listProjects: () => __TAURI_INVOKE<ProjectSummary[]>("list_projects"),
-	createProject: (name: string) => __TAURI_INVOKE<null>("create_project", { name }),
+	createProject: (name: string, series: string | null) => __TAURI_INVOKE<null>("create_project", { name, series }),
 	openProject: (name: string) => __TAURI_INVOKE<null>("open_project", { name }),
 	deleteProject: (name: string) => __TAURI_INVOKE<null>("delete_project", { name }),
 	closeProject: () => __TAURI_INVOKE<null>("close_project"),
@@ -47,6 +47,8 @@ export const commands = {
 	setFontFavorite: (familyName: string, favorite: boolean) => __TAURI_INVOKE<string[]>("set_font_favorite", { familyName, favorite }),
 	savePreferences: (pipeline: PipelineConfig, providers: ProviderPreferences, typesetting: TypesettingConfig) => __TAURI_INVOKE<Preferences>("save_preferences", { pipeline, providers, typesetting }),
 	getPreferences: () => __TAURI_INVOKE<Preferences>("get_preferences"),
+	getReadyCheck: () => __TAURI_INVOKE<ReadyCheckItem[]>("get_ready_check"),
+	downloadReadyModels: () => __TAURI_INVOKE<null>("download_ready_models"),
 	getTranslationModels: () => __TAURI_INVOKE<Model[]>("get_translation_models"),
 	getShortcuts: () => __TAURI_INVOKE<{ [key in string]: string }>("get_shortcuts"),
 	saveShortcuts: (shortcuts: { [key in string]: string }) => __TAURI_INVOKE<{ [key in string]: string }>("save_shortcuts", { shortcuts }),
@@ -71,6 +73,7 @@ export const commands = {
 	explainLine: (layer: EntityId) => __TAURI_INVOKE<LineExplanation>("explain_line", { layer }),
 	readChapter: (scope: Scope, model: ModelSelection | null) => __TAURI_INVOKE<JobId>("read_chapter", { scope, model }),
 	listSeries: () => __TAURI_INVOKE<Series[]>("list_series"),
+	getLastSeries: () => __TAURI_INVOKE<Series | null>("get_last_series"),
 	createSeries: (name: string) => __TAURI_INVOKE<Series>("create_series", { name }),
 	getSeries: (id: string) => __TAURI_INVOKE<Series>("get_series", { id }),
 	saveSeries: (series: Series) => __TAURI_INVOKE<Series>("save_series", { series }),
@@ -130,7 +133,7 @@ export const commands = {
 	saveRunSettings: (settings: RunSettings) => __TAURI_INVOKE<RunSettings>("save_run_settings", { settings }),
 	retryFailedPages: (job: JobId) => __TAURI_INVOKE<JobId>("retry_failed_pages", { job }),
 	previewChapterBatch: () => __TAURI_INVOKE<BatchPlan | null>("preview_chapter_batch"),
-	runChapterBatch: (plan: string, chapters: string[], preset: number, closeProject: string | null, onProgress: Channel<BatchProgress>) => __TAURI_INVOKE<null>("run_chapter_batch", { plan, chapters, preset, closeProject, onProgress }),
+	runChapterBatch: (plan: string, chapters: string[], preset: number, series: string | null, closeProject: string | null, onProgress: Channel<BatchProgress>) => __TAURI_INVOKE<null>("run_chapter_batch", { plan, chapters, preset, series, closeProject, onProgress }),
 	stopChapterBatch: () => __TAURI_INVOKE<null>("stop_chapter_batch"),
 	getBoxNote: (layer: EntityId) => __TAURI_INVOKE<string | null>("get_box_note", { layer }),
 	setBoxNote: (layer: EntityId, note: string | null) => __TAURI_INVOKE<null>("set_box_note", { layer, note }),
@@ -977,6 +980,33 @@ export type RetryProgress = {
 	attempt: number,
 	attempts: number,
 };
+
+export type ReadyCheckItem = {
+	status: ReadyStatus,
+	reason: ReadyReason,
+	data: ReadyData,
+};
+
+export type ReadyData = { kind: "translation"; model: ModelSelection; vision: boolean; reading_model: ModelSelection; reading_vision: boolean; reading_enabled: boolean; provider_configured: boolean; reading_provider_configured: boolean } | { kind: "target_language"; language: string } | { kind: "series"; project_name: string | null; series_id: string | null; series_name: string | null } | { kind: "fonts"; categories: ReadyFont[] } | { kind: "models"; models: ReadyModel[] } | { kind: "export"; enabled: boolean; format: ExportFormat | null; folder: string | null; available: boolean };
+
+export type ReadyFont = {
+	category: LetteringCategory,
+	font: string | null,
+	own_font: boolean,
+	fallback_to_dialogue: boolean,
+};
+
+export type ReadyModel = {
+	stage: Stage,
+	name: string,
+	downloaded: boolean,
+	size_bytes: number | null,
+	cached_bytes: number,
+};
+
+export type ReadyReason = "translation_ready" | "translation_unset" | "reading_model_unset" | "reading_needs_vision" | "target_language_ready" | "target_language_unset" | "project_closed" | "series_unset" | "series_ready" | "fonts_ready" | "fonts_fallback" | "models_ready" | "models_missing" | "export_unavailable";
+
+export type ReadyStatus = "ready" | "warning" | "missing";
 
 export type Revision = number;
 

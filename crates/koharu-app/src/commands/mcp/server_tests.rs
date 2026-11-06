@@ -102,7 +102,9 @@ impl Host for FakeHost {
     fn tools(&self) -> Vec<AgentTool> {
         [
             "inspect_project",
+            "ready_check",
             "view_page",
+            "download_ready_models",
             "set_translation",
             "run_pipeline",
             "fails",
@@ -278,7 +280,14 @@ async fn rpc(response: reqwest::Response) -> Value {
 
 #[tokio::test]
 async fn http_initialization_tools_images_errors_and_session_deletion() {
-    let server = Server::start(bridge(Arc::new(FakeHost::default()), true)).await;
+    let host = Arc::new(FakeHost::default());
+    let expected_tools = host
+        .tools()
+        .into_iter()
+        .map(|tool| tool.name)
+        .chain(std::iter::once("get_project_summary".to_owned()))
+        .collect::<Vec<_>>();
+    let server = Server::start(bridge(host, true)).await;
     assert_eq!(
         server
             .client
@@ -320,10 +329,14 @@ async fn http_initialization_tools_images_errors_and_session_deletion() {
         .send()
         .await
         .unwrap();
-    assert_eq!(
-        rpc(list).await["result"]["tools"].as_array().unwrap().len(),
-        6
-    );
+    let listed = rpc(list).await;
+    let names = listed["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(names, expected_tools);
     let inspected = rpc(server.call(&session, 2, "inspect_project").await).await;
     let value: Value =
         serde_json::from_str(inspected["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
@@ -371,6 +384,14 @@ async fn edits_are_refused_even_when_called_directly() {
         true
     );
     assert_eq!(host.edits.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        rpc(server.call(&session, 2, "download_ready_models").await).await["result"]["isError"],
+        true
+    );
+    assert_eq!(
+        rpc(server.call(&session, 3, "ready_check").await).await["result"]["isError"],
+        false
+    );
     server.stop().await;
 }
 

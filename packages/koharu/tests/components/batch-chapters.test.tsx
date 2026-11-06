@@ -25,6 +25,14 @@ function show(children: React.ReactNode) {
   return render(<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>)
 }
 it('previews chapters, allows exclusions, and explicitly closes the open project before starting', async () => {
+  vi.spyOn(commands, 'listSeries').mockResolvedValue([
+    { id: 'previous', name: 'Previous series' },
+    { id: 'chosen', name: 'Chosen series' },
+  ])
+  vi.spyOn(commands, 'getLastSeries').mockResolvedValue({
+    id: 'previous',
+    name: 'Previous series',
+  })
   vi.spyOn(commands, 'previewChapterBatch').mockResolvedValue({
     id: 'plan',
     chapters: [
@@ -38,13 +46,22 @@ it('previews chapters, allows exclusions, and explicitly closes the open project
   await user.click(screen.getByRole('button', { name: 'Pick a folder' }))
   const second = await screen.findByRole('checkbox', { name: /Chapter 2/ })
   await user.click(second)
+  await user.click(screen.getByRole('combobox', { name: 'Series for every chapter' }))
+  await user.click(await screen.findByRole('option', { name: 'Chosen series' }))
   await user.click(screen.getByRole('button', { name: 'Start' }))
   expect(run).not.toHaveBeenCalled()
   await user.click(screen.getByRole('button', { name: 'Close project and start' }))
   await waitFor(() => expect(run).toHaveBeenCalledOnce())
-  expect(run.mock.lastCall?.slice(0, 5)).toEqual(['plan', ['one'], 0, 'chapter', expect.anything()])
+  expect(run.mock.lastCall?.slice(0, 6)).toEqual([
+    'plan',
+    ['one'],
+    0,
+    'chosen',
+    'chapter',
+    expect.anything(),
+  ])
   act(() =>
-    run.mock.lastCall?.[4].onmessage({
+    run.mock.lastCall?.[5].onmessage({
       chapters: [],
       running: false,
       stopped: false,

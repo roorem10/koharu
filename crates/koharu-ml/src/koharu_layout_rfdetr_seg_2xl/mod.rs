@@ -37,6 +37,8 @@ pub struct KoharuLayoutRFDetrSeg2XL {
     processor: KoharuLayoutRFDetrImageProcessor,
 }
 
+pub const MODEL_FILES: &[koharu_runtime::HuggingFaceFile<'static>] = &[CONFIG, WEIGHTS];
+
 impl KoharuLayoutRFDetrSeg2XL {
     pub async fn load(device: crate::Device) -> Result<Self> {
         let device: Device = device.try_into_device()?;

@@ -14,6 +14,8 @@ import { RedetectPageMenuItem, RedetectPageDialog } from '@/components/boxes/Pag
 import { PageJoinMenuItem } from '@/components/boxes/PageJoinMenuItem'
 import { useScriptFiles } from '@/components/files/ScriptImport'
 import { useCompareStore } from '@/components/qc/compare'
+import { useReadyCheckDialog } from '@/components/ready-check/data'
+import { ReadyCheckDialog, ReadyCheckIndicator } from '@/components/ready-check/ReadyCheckDialog'
 import { BatchChaptersDialog } from '@/components/runs/BatchChaptersDialog'
 import {
   currentRunScope,
@@ -56,6 +58,7 @@ export function TitleBar() {
   const pinned = useCompareStore((state) => state.pinned)
   const toggleOriginal = useCompareStore((state) => state.toggle)
   const [batchOpen, setBatchOpen] = useState(false)
+  const openReadyCheck = useReadyCheckDialog((state) => state.open)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [redetectPage, setRedetectPage] = useState<string | null>(null)
   const scripts = useScriptFiles()
@@ -334,6 +337,7 @@ export function TitleBar() {
               <MenubarItem disabled={running} onClick={() => setBatchOpen(true)}>
                 {t('runs.batchTitle')}
               </MenubarItem>
+              <MenubarItem onClick={openReadyCheck}>{t('readyCheck.title')}</MenubarItem>
               <ProcessPrepItems />
             </MenubarContent>
             <BatchChaptersDialog open={batchOpen} onOpenChange={setBatchOpen} />
@@ -390,9 +394,11 @@ export function TitleBar() {
           )}
         </div>
 
+        <ReadyCheckIndicator />
         {!macOS && <WindowControls />}
       </header>
       <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
+      <ReadyCheckDialog />
       {scripts.dialog}
     </>
   )

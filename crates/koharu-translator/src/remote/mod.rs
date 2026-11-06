@@ -151,6 +151,41 @@ pub(crate) async fn models(client: &Client, providers: &ProvidersConfig) -> Vec<
     models
 }
 
+pub(crate) fn configuration_issue(
+    selection: &ModelSelection,
+) -> anyhow::Result<Option<crate::ModelConfigurationIssue>> {
+    use crate::ModelConfigurationIssue;
+    use koharu_secrets::ExposeSecret as _;
+
+    if crate::Translator::supports_tasks(selection)
+        && selection
+            .model
+            .as_deref()
+            .is_none_or(|model| model.trim().is_empty())
+    {
+        return Ok(Some(ModelConfigurationIssue::Model));
+    }
+    // These providers allow an unauthenticated local server and supply their own default URL.
+    if matches!(
+        selection.provider,
+        Provider::LmStudio | Provider::OpenAiCompatible
+    ) {
+        let providers = ProvidersConfig::load()?;
+        let providers = providers.read()?;
+        let endpoint = match selection.provider {
+            Provider::LmStudio => providers.lm_studio.base_url.as_ref(),
+            _ => providers.openai_compatible.base_url.as_ref(),
+        };
+        return Ok(endpoint
+            .is_some_and(|url| !matches!(url.scheme(), "http" | "https"))
+            .then_some(ModelConfigurationIssue::Provider));
+    }
+    let key: &'static str = selection.provider.into();
+    let configured = koharu_secrets::get(key)?
+        .is_some_and(|secret| !secret.expose_secret().trim().is_empty());
+    Ok((!configured).then_some(ModelConfigurationIssue::Provider))
+}
+
 fn append_models(models: &mut Vec<Model>, result: Result<Vec<Model>>) {
     match result {
         Ok(mut provider_models) => models.append(&mut provider_models),

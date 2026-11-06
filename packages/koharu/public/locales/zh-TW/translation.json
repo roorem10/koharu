@@ -184,7 +184,8 @@
     "run": "Run",
     "view": "檢視",
     "lastReadWith": "上次於 {{time}} 使用 {{model}} 閱讀",
-    "unknownModel": "先前使用的模型"
+    "unknownModel": "先前使用的模型",
+    "noSeries": "無系列"
   },
   "cleanup": {
     "title": "清理",
@@ -912,7 +913,8 @@
       "done_with_problems": "已完成，但有問題",
       "failed": "失敗",
       "stopped": "已停止"
-    }
+    },
+    "batchSeries": "所有章節所屬的系列"
   },
   "settings": {
     "appearance": {
@@ -1292,6 +1294,72 @@
       "shy": "害羞／遲疑",
       "crying": "哭泣／顫抖",
       "menacing": "威嚇／陰森"
+    }
+  },
+  "readyCheck": {
+    "title": "就緒檢查",
+    "description": "檢查自動執行所用的設定和下載狀態。",
+    "refresh": "重新整理",
+    "loadError": "無法檢查就緒狀態，請重試。",
+    "attention": "下次執行前，有些設定需要檢查。",
+    "fix": "修正",
+    "fixItem": "修正{{item}}",
+    "vision": "支援影像辨識",
+    "noVision": "不支援影像辨識",
+    "readingModel": "章節閱讀模型：{{model}}",
+    "readingOff": "自動閱讀章節已關閉。",
+    "defaultFont": "預設字型",
+    "dialogueFallback": "使用對白樣式",
+    "defaultFallback": "使用預設字型設定",
+    "notSet": "未設定",
+    "sizeUnknown": "總大小未知，已快取 {{size}}",
+    "downloadError": "下載失敗，可以按「全部下載」重試。",
+    "downloading": "正在下載…",
+    "downloadAll": "全部下載",
+    "createSeries": "建立系列「{{name}}」",
+    "status": {
+      "ready": "已就緒",
+      "warning": "警告",
+      "missing": "缺少"
+    },
+    "items": {
+      "translation": "翻譯與章節閱讀",
+      "target_language": "目標語言",
+      "series": "專案所屬系列",
+      "fonts": "文字類別字型",
+      "models": "處理模型",
+      "export": "完成後匯出"
+    },
+    "reasons": {
+      "translation_ready": "翻譯模型已設定。",
+      "translation_unset": "請選擇翻譯模型並設定提供者憑證。",
+      "reading_needs_vision": "閱讀章節需要支援影像辨識的模型，請在「譯文」設定中選擇。",
+      "reading_model_unset": "章節閱讀模型的設定不完整，請檢查模型及其提供者憑證。",
+      "target_language_ready": "已選擇目標語言。",
+      "target_language_unset": "請選擇翻譯的目標語言。",
+      "project_closed": "請開啟專案以檢查其所屬系列。",
+      "series_unset": "請關聯系列，以便閱讀章節時使用章節脈絡。",
+      "series_ready": "專案已關聯系列。",
+      "fonts_ready": "每個文字類別都有自己的字型。",
+      "fonts_fallback": "部分文字類別使用對白或預設字型設定。",
+      "models_ready": "所選的偵測、OCR 和清理模型已下載。",
+      "models_missing": "部分所選模型仍需下載才能開始處理。",
+      "export_unavailable": "完成後匯出已關閉。此版本支援透過「檔案」→「匯出」手動匯出；尚未設定自動匯出的格式或資料夾。"
+    },
+    "fontSetup": {
+      "title": "字型設定助手",
+      "description": "根據已安裝字型的名稱提供建議。選擇字型即可將其儲存至對應類別，其他樣式設定保持不變。",
+      "noMatch": "沒有符合的已安裝字型，請在「排版」設定中選擇字型。",
+      "preview": "下一章開始了！",
+      "useFont": "為{{category}}使用{{font}}",
+      "current": "目前：{{font}}",
+      "matchComic": "漫畫類名稱",
+      "matchHandwriting": "手寫類名稱",
+      "matchBold": "粗體或重體類名稱",
+      "matchDisplay": "標題類名稱",
+      "matchPlain": "一般或螢幕字型名稱",
+      "matchItalic": "斜體類名稱",
+      "matchCategory": "類別專用名稱"
     }
   }
 }

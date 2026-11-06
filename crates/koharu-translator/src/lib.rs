@@ -26,6 +26,12 @@ pub use model::{GenerationConfig, Model, ModelSelection, Quantization};
 pub(crate) use model::{ModelGeneration, QuantizationDefinition, display_name};
 pub use provider::{Provider, ProviderConfig, ProvidersConfig};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelConfigurationIssue {
+    Model,
+    Provider,
+}
+
 #[derive(Clone)]
 pub struct Translator {
     providers: koharu_config::Config<ProvidersConfig>,
@@ -151,6 +157,17 @@ impl Translator {
         )
     }
 
+    /// Checks saved configuration without contacting a provider or loading weights.
+    pub fn configuration_issue(
+        selection: &ModelSelection,
+    ) -> anyhow::Result<Option<ModelConfigurationIssue>> {
+        if selection.provider == Provider::Local {
+            Ok((!local::configured(selection)).then_some(ModelConfigurationIssue::Model))
+        } else {
+            remote::configuration_issue(selection)
+        }
+    }
+
     pub async fn run_task(
         &self,
         selection: &ModelSelection,
@@ -262,5 +279,28 @@ mod tests {
                 ..GenerationConfig::default()
             }
         ));
+    }
+
+    #[test]
+    fn readiness_rejects_removed_models_and_invalid_quantizations_without_loading() {
+        let mut selection = ModelSelection::default();
+        assert_eq!(Translator::configuration_issue(&selection).unwrap(), None);
+        selection.quantization = Some("not-a-quantization".into());
+        assert_eq!(
+            Translator::configuration_issue(&selection).unwrap(),
+            Some(ModelConfigurationIssue::Model)
+        );
+        selection.quantization = None;
+        assert_eq!(Translator::configuration_issue(&selection).unwrap(), None);
+        selection.model = Some("removed-model".into());
+        assert_eq!(
+            Translator::configuration_issue(&selection).unwrap(),
+            Some(ModelConfigurationIssue::Model)
+        );
+        selection.model = None;
+        assert_eq!(
+            Translator::configuration_issue(&selection).unwrap(),
+            Some(ModelConfigurationIssue::Model)
+        );
     }
 }

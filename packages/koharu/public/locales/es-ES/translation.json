@@ -185,7 +185,8 @@
     "run": "Run",
     "view": "Ver",
     "lastReadWith": "Última lectura: {{time}} con {{model}}",
-    "unknownModel": "un modelo anterior"
+    "unknownModel": "un modelo anterior",
+    "noSeries": "Sin serie"
   },
   "cleanup": {
     "title": "Limpieza",
@@ -924,7 +925,8 @@
       "done_with_problems": "Terminado con problemas",
       "failed": "Error",
       "stopped": "Detenido"
-    }
+    },
+    "batchSeries": "Serie para todos los capítulos"
   },
   "settings": {
     "appearance": {
@@ -1305,6 +1307,72 @@
       "shy": "Timidez / vacilación",
       "crying": "Llanto / temblor",
       "menacing": "Amenazante / siniestro"
+    }
+  },
+  "readyCheck": {
+    "title": "Comprobación de preparación",
+    "description": "Revisa los ajustes y las descargas que usa el procesamiento automático.",
+    "refresh": "Actualizar",
+    "loadError": "No se pudo comprobar la preparación. Inténtalo de nuevo.",
+    "attention": "Algunos ajustes requieren atención antes del próximo procesamiento.",
+    "fix": "Corregir",
+    "fixItem": "Corregir {{item}}",
+    "vision": "Puede ver imágenes",
+    "noVision": "No puede ver imágenes",
+    "readingModel": "Modelo para leer el capítulo: {{model}}",
+    "readingOff": "La lectura automática del capítulo está desactivada.",
+    "defaultFont": "Fuente predeterminada",
+    "dialogueFallback": "Usa el estilo de diálogo",
+    "defaultFallback": "Usa los ajustes de fuente predeterminados",
+    "notSet": "Sin configurar",
+    "sizeUnknown": "Tamaño total desconocido; {{size}} en caché",
+    "downloadError": "La descarga falló. Puedes volver a pulsar Descargar todo.",
+    "downloading": "Descargando…",
+    "downloadAll": "Descargar todo",
+    "createSeries": "Crear serie «{{name}}»",
+    "status": {
+      "ready": "Listo",
+      "warning": "Advertencia",
+      "missing": "Falta"
+    },
+    "items": {
+      "translation": "Traducción y lectura del capítulo",
+      "target_language": "Idioma de destino",
+      "series": "Serie del proyecto",
+      "fonts": "Fuentes de rotulación",
+      "models": "Modelos de procesamiento",
+      "export": "Exportar al terminar"
+    },
+    "reasons": {
+      "translation_ready": "El modelo de traducción está configurado.",
+      "translation_unset": "Elige un modelo de traducción y configura las credenciales de su proveedor.",
+      "reading_needs_vision": "Leer capítulo necesita un modelo que pueda ver imágenes. Elige uno en los ajustes de Traducción.",
+      "reading_model_unset": "El modelo para leer el capítulo no está completamente configurado. Revisa el modelo y las credenciales de su proveedor.",
+      "target_language_ready": "Hay un idioma de destino seleccionado.",
+      "target_language_unset": "Elige el idioma al que traducir.",
+      "project_closed": "Abre un proyecto para comprobar su serie.",
+      "series_unset": "Vincula una serie para que Leer capítulo pueda usar el contexto del capítulo.",
+      "series_ready": "El proyecto está vinculado a una serie.",
+      "fonts_ready": "Cada categoría de rotulación tiene su propia fuente.",
+      "fonts_fallback": "Algunas categorías usan los ajustes de fuente del diálogo o los predeterminados.",
+      "models_ready": "Los modelos seleccionados de detección, OCR y limpieza están descargados.",
+      "models_missing": "Algunos modelos seleccionados deben descargarse antes de procesar.",
+      "export_unavailable": "La exportación al terminar está desactivada. Esta versión permite exportar manualmente desde Archivo → Exportar; no hay ningún formato ni carpeta de exportación automática configurados."
+    },
+    "fontSetup": {
+      "title": "Configuración de fuentes",
+      "description": "Las sugerencias se basan en los nombres de las fuentes instaladas. Elige una fuente para guardarla en esa categoría; los demás ajustes de estilo se conservan.",
+      "noMatch": "No hay fuentes instaladas que coincidan. Elige una fuente en los ajustes de Composición.",
+      "preview": "¡Comienza el próximo capítulo!",
+      "useFont": "Usar {{font}} para {{category}}",
+      "current": "Actual: {{font}}",
+      "matchComic": "Nombre de cómic o manga",
+      "matchHandwriting": "Nombre de escritura a mano",
+      "matchBold": "Nombre de negrita o trazo grueso",
+      "matchDisplay": "Nombre de fuente de títulos",
+      "matchPlain": "Nombre de fuente sencilla o de pantalla",
+      "matchItalic": "Nombre de cursiva",
+      "matchCategory": "Nombre específico de la categoría"
     }
   }
 }

@@ -185,7 +185,8 @@
     "run": "Run",
     "view": "Voir",
     "lastReadWith": "Dernière lecture {{time}} avec {{model}}",
-    "unknownModel": "un modèle précédent"
+    "unknownModel": "un modèle précédent",
+    "noSeries": "Aucune série"
   },
   "cleanup": {
     "title": "Nettoyage",
@@ -924,7 +925,8 @@
       "done_with_problems": "Terminé avec des problèmes",
       "failed": "Échec",
       "stopped": "Arrêté"
-    }
+    },
+    "batchSeries": "Série pour tous les chapitres"
   },
   "settings": {
     "appearance": {
@@ -1305,6 +1307,72 @@
       "shy": "Timidité / hésitation",
       "crying": "Pleurs / tremblements",
       "menacing": "Menaçant / sinistre"
+    }
+  },
+  "readyCheck": {
+    "title": "Vérification de préparation",
+    "description": "Vérifiez les réglages et les téléchargements utilisés par le traitement automatique.",
+    "refresh": "Actualiser",
+    "loadError": "Impossible de vérifier la préparation. Réessayez.",
+    "attention": "Certains réglages demandent votre attention avant le prochain traitement.",
+    "fix": "Corriger",
+    "fixItem": "Corriger {{item}}",
+    "vision": "Peut voir les images",
+    "noVision": "Ne peut pas voir les images",
+    "readingModel": "Modèle de lecture du chapitre : {{model}}",
+    "readingOff": "La lecture automatique du chapitre est désactivée.",
+    "defaultFont": "Police par défaut",
+    "dialogueFallback": "Utilise le style des dialogues",
+    "defaultFallback": "Utilise les réglages de police par défaut",
+    "notSet": "Non défini",
+    "sizeUnknown": "Taille totale inconnue ; {{size}} en cache",
+    "downloadError": "Le téléchargement a échoué. Vous pouvez réessayer avec Tout télécharger.",
+    "downloading": "Téléchargement…",
+    "downloadAll": "Tout télécharger",
+    "createSeries": "Créer la série « {{name}} »",
+    "status": {
+      "ready": "Prêt",
+      "warning": "Avertissement",
+      "missing": "Manquant"
+    },
+    "items": {
+      "translation": "Traduction et lecture du chapitre",
+      "target_language": "Langue cible",
+      "series": "Série du projet",
+      "fonts": "Polices de lettrage",
+      "models": "Modèles de traitement",
+      "export": "Exporter à la fin"
+    },
+    "reasons": {
+      "translation_ready": "Le modèle de traduction est configuré.",
+      "translation_unset": "Choisissez un modèle de traduction et configurez les identifiants de son fournisseur.",
+      "reading_needs_vision": "Lire le chapitre nécessite un modèle capable de voir les images. Choisissez-en un dans les réglages de Traduction.",
+      "reading_model_unset": "Le modèle de lecture du chapitre est incomplet. Vérifiez le modèle et les identifiants de son fournisseur.",
+      "target_language_ready": "Une langue cible est sélectionnée.",
+      "target_language_unset": "Choisissez la langue de traduction.",
+      "project_closed": "Ouvrez un projet pour vérifier sa série.",
+      "series_unset": "Associez une série pour que Lire le chapitre puisse utiliser le contexte du chapitre.",
+      "series_ready": "Le projet est associé à une série.",
+      "fonts_ready": "Chaque catégorie de lettrage possède sa propre police.",
+      "fonts_fallback": "Certaines catégories utilisent les réglages de police des dialogues ou ceux par défaut.",
+      "models_ready": "Les modèles sélectionnés de détection, d’OCR et de nettoyage sont téléchargés.",
+      "models_missing": "Certains modèles sélectionnés doivent encore être téléchargés avant le traitement.",
+      "export_unavailable": "L’export à la fin est désactivé. Cette version permet l’export manuel via Fichier → Exporter ; aucun format ni dossier d’export automatique n’est configuré."
+    },
+    "fontSetup": {
+      "title": "Configuration des polices",
+      "description": "Les suggestions reposent sur les noms des polices installées. Choisissez une police pour l’enregistrer dans cette catégorie ; les autres réglages de style sont conservés.",
+      "noMatch": "Aucune police installée ne correspond. Choisissez une police dans les réglages de Lettrage.",
+      "preview": "Le prochain chapitre commence !",
+      "useFont": "Utiliser {{font}} pour {{category}}",
+      "current": "Actuelle : {{font}}",
+      "matchComic": "Nom de bande dessinée ou de manga",
+      "matchHandwriting": "Nom d’écriture manuscrite",
+      "matchBold": "Nom de police grasse ou épaisse",
+      "matchDisplay": "Nom de police de titrage",
+      "matchPlain": "Nom de police simple ou d’écran",
+      "matchItalic": "Nom de police italique",
+      "matchCategory": "Nom propre à cette catégorie"
     }
   }
 }

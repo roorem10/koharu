@@ -35,6 +35,9 @@ pub struct Flux2Klein {
     model: Model,
 }
 
+pub const MODEL_FILES: &[koharu_runtime::HuggingFaceFile<'static>] =
+    &[TRANSFORMER_WEIGHTS, VAE_WEIGHTS, TEXT_ENCODER_WEIGHTS];
+
 impl Flux2Klein {
     pub async fn load(device: crate::Device) -> Result<Self> {
         let (transformer, text_encoder, vae) = tokio::try_join!(

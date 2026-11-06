@@ -159,3 +159,12 @@ pub(crate) fn supports_vision(selection: &ModelSelection) -> bool {
             .is_some_and(|descriptor| descriptor.projector.is_some())
     })
 }
+
+pub(crate) fn configured(selection: &ModelSelection) -> bool {
+    catalog::MODELS.iter().any(|model| {
+        Some(model.id) == selection.model.as_deref()
+            && selection.quantization.as_deref().is_none_or(|selected| {
+                model.quantizations.iter().any(|value| value.id == selected)
+            })
+    })
+}

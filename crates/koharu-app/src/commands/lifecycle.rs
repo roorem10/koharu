@@ -261,11 +261,21 @@ pub(crate) async fn list_projects(
 #[specta::specta]
 pub(crate) async fn create_project(
     name: String,
+    series: Option<String>,
     handle: AppHandle<CefRuntime>,
 ) -> std::result::Result<(), Error> {
+    if let Some(id) = &series {
+        super::context::series::get_series(id.clone())?;
+    }
     let library = handle.state::<ProjectLibrary>().inner().clone();
     let opened = library.create(&name).await?;
+    if let Some(id) = &series {
+        opened.update_context(|context| context.series = Some(id.clone()))?;
+    }
     replace_project(&handle, opened).await?;
+    if let Some(id) = series {
+        super::context::series::remember(&id)?;
+    }
     Ok(())
 }
 
@@ -277,7 +287,11 @@ pub(crate) async fn open_project(
 ) -> std::result::Result<(), Error> {
     let library = handle.state::<ProjectLibrary>().inner().clone();
     let opened = library.open(&name).await?;
+    let series = super::context::linked_series(&opened.load_context()?)?;
     replace_project(&handle, opened).await?;
+    if let Some(series) = series {
+        super::context::series::remember(&series.id)?;
+    }
     Ok(())
 }
 

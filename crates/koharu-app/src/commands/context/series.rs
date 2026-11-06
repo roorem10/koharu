@@ -2,11 +2,51 @@ use anyhow::Context as _;
 use booharu_context::{
     GlossaryEntry, InstructionTerm, Series, SeriesStore, TermKind, instruction_terms,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
 
 use super::super::{Error, project::CurrentProject};
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(default)]
+struct SeriesPreferences {
+    last_used: Option<String>,
+}
+
+pub(crate) fn remember(id: &str) -> anyhow::Result<()> {
+    let config = koharu_config::load::<SeriesPreferences>("series")?;
+    let mut preferences = config.write()?;
+    preferences.last_used = Some(id.to_owned());
+    preferences.save()
+}
+
+fn last_series(store: &SeriesStore, id: Option<&str>) -> anyhow::Result<Option<Series>> {
+    let Some(id) = id else {
+        return Ok(None);
+    };
+    match store.get(id) {
+        Ok(series) => Ok(Some(series)),
+        Err(error)
+            if error
+                .downcast_ref::<std::io::Error>()
+                .is_some_and(|error| error.kind() == std::io::ErrorKind::NotFound) =>
+        {
+            Ok(None)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn get_last_series() -> Result<Option<Series>, Error> {
+    let id = koharu_config::load::<SeriesPreferences>("series")?
+        .read()?
+        .last_used
+        .clone();
+    Ok(last_series(&store()?, id.as_deref())?)
+}
 
 pub(super) fn store() -> anyhow::Result<SeriesStore> {
     let config = koharu_config::path()?;
@@ -72,8 +112,11 @@ pub(crate) async fn set_project_series(
     let projects = project.project.lock().await;
     let project = projects.as_ref().context("no project is open")?;
     project.update_context(|context| {
-        context.series = id;
+        context.series = id.clone();
     })?;
+    if let Some(id) = id {
+        remember(&id)?;
+    }
     Ok(())
 }
 
@@ -194,4 +237,29 @@ pub(crate) fn import_instruction_glossary(
         config.save()?;
     }
     Ok(series)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remembered_series_ignores_deletion_but_not_corrupt_data() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = SeriesStore::new(directory.path().to_owned());
+        let series = Series::new("A series".into()).unwrap();
+        store.save(&series).unwrap();
+        assert_eq!(
+            last_series(&store, Some(&series.id)).unwrap(),
+            Some(series.clone())
+        );
+        store.delete(&series.id).unwrap();
+        assert_eq!(last_series(&store, Some(&series.id)).unwrap(), None);
+        std::fs::write(
+            directory.path().join(format!("{}.json", series.id)),
+            b"invalid",
+        )
+        .unwrap();
+        assert!(last_series(&store, Some(&series.id)).is_err());
+    }
 }

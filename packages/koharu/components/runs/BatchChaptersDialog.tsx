@@ -4,6 +4,7 @@ import { Channel } from '@tauri-apps/api/core'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { NewChapterSeries, useNewChapterSeries } from '@/components/context/NewChapterSeries'
 import { presetLabel, useRunSettings } from '@/components/runs/data'
 import { playFinishSound, prepareFinishSound } from '@/components/runs/sound'
 import { call } from '@/lib/backend'
@@ -38,6 +39,7 @@ export function BatchChaptersDialog({
   const { t } = useTranslation()
   const settings = useRunSettings()
   const project = useProject().data
+  const series = useNewChapterSeries(open)
   const [plan, setPlan] = useState<BatchPlan | null>(null)
   const [selected, setSelected] = useState<string[]>([])
   const [preset, setPreset] = useState('0')
@@ -87,7 +89,15 @@ export function BatchChaptersDialog({
     }
     channel.current = updates
     try {
-      await call(commands.runChapterBatch, plan.id, selected, Number(preset), closeProject, updates)
+      await call(
+        commands.runChapterBatch,
+        plan.id,
+        selected,
+        Number(preset),
+        series.value,
+        closeProject,
+        updates,
+      )
     } finally {
       setBusy(false)
     }
@@ -194,6 +204,11 @@ export function BatchChaptersDialog({
                     ))}
                   </ul>
                   {plan.chapters.length === 0 && <p>{t('runs.noChapters')}</p>}
+                  <NewChapterSeries
+                    choice={series}
+                    disabled={running}
+                    label={t('runs.batchSeries')}
+                  />
                   <Select
                     value={preset}
                     disabled={running}
@@ -238,6 +253,7 @@ export function BatchChaptersDialog({
                     <Button
                       disabled={
                         running ||
+                        series.loading ||
                         !plan ||
                         selected.length === 0 ||
                         !settings.data?.presets[Number(preset)]

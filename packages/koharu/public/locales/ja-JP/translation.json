@@ -184,7 +184,8 @@
     "run": "Run",
     "view": "表示",
     "lastReadWith": "最終読み込み：{{time}}、使用モデル：{{model}}",
-    "unknownModel": "以前のモデル"
+    "unknownModel": "以前のモデル",
+    "noSeries": "シリーズなし"
   },
   "cleanup": {
     "title": "クリーンアップ",
@@ -912,7 +913,8 @@
       "done_with_problems": "問題ありで完了",
       "failed": "失敗",
       "stopped": "停止済み"
-    }
+    },
+    "batchSeries": "すべての章に紐付けるシリーズ"
   },
   "settings": {
     "appearance": {
@@ -1292,6 +1294,72 @@
       "shy": "照れ・ためらい",
       "crying": "泣き声・震え声",
       "menacing": "威圧・不気味"
+    }
+  },
+  "readyCheck": {
+    "title": "準備チェック",
+    "description": "自動実行で使う設定とダウンロード状況を確認します。",
+    "refresh": "更新",
+    "loadError": "準備状況を確認できませんでした。もう一度お試しください。",
+    "attention": "次の実行前に確認が必要な設定があります。",
+    "fix": "修正",
+    "fixItem": "{{item}}を修正",
+    "vision": "画像を認識できます",
+    "noVision": "画像を認識できません",
+    "readingModel": "章の読み取りモデル：{{model}}",
+    "readingOff": "章の自動読み取りはオフです。",
+    "defaultFont": "既定のフォント",
+    "dialogueFallback": "台詞のスタイルを使用",
+    "defaultFallback": "既定のフォント設定を使用",
+    "notSet": "未設定",
+    "sizeUnknown": "合計サイズ不明・キャッシュ済み {{size}}",
+    "downloadError": "ダウンロードに失敗しました。「すべてダウンロード」で再試行できます。",
+    "downloading": "ダウンロード中…",
+    "downloadAll": "すべてダウンロード",
+    "createSeries": "シリーズ「{{name}}」を作成",
+    "status": {
+      "ready": "準備完了",
+      "warning": "注意",
+      "missing": "不足"
+    },
+    "items": {
+      "translation": "翻訳と章の読み取り",
+      "target_language": "翻訳先の言語",
+      "series": "プロジェクトのシリーズ",
+      "fonts": "文字カテゴリのフォント",
+      "models": "処理用モデル",
+      "export": "完了時にエクスポート"
+    },
+    "reasons": {
+      "translation_ready": "翻訳モデルは設定済みです。",
+      "translation_unset": "翻訳モデルを選び、プロバイダーの認証情報を設定してください。",
+      "reading_needs_vision": "章の読み取りには画像を認識できるモデルが必要です。「翻訳」設定で選択してください。",
+      "reading_model_unset": "章の読み取りモデルの設定が不完全です。モデルとプロバイダーの認証情報を確認してください。",
+      "target_language_ready": "翻訳先の言語は選択済みです。",
+      "target_language_unset": "翻訳先の言語を選択してください。",
+      "project_closed": "シリーズを確認するにはプロジェクトを開いてください。",
+      "series_unset": "章の読み取りで文脈を利用できるように、シリーズを紐付けてください。",
+      "series_ready": "プロジェクトはシリーズに紐付けられています。",
+      "fonts_ready": "すべての文字カテゴリに専用のフォントが設定されています。",
+      "fonts_fallback": "一部の文字カテゴリは台詞または既定のフォント設定を使用しています。",
+      "models_ready": "選択した検出・OCR・除去モデルはダウンロード済みです。",
+      "models_missing": "処理前にダウンロードが必要なモデルがあります。",
+      "export_unavailable": "完了時のエクスポートはオフです。このビルドでは「ファイル」→「エクスポート」から手動で出力できます。自動出力の形式とフォルダーは設定されていません。"
+    },
+    "fontSetup": {
+      "title": "フォントの設定",
+      "description": "インストール済みフォントの名前から候補を選んでいます。フォントを選択すると、そのカテゴリに保存されます。他のスタイル設定は維持されます。",
+      "noMatch": "一致するインストール済みフォントがありません。「組版」設定でフォントを選択してください。",
+      "preview": "次の章が始まる！",
+      "useFont": "{{category}}に{{font}}を使用",
+      "current": "現在：{{font}}",
+      "matchComic": "コミック・漫画向けの名前",
+      "matchHandwriting": "手書き向けの名前",
+      "matchBold": "太字・極太を示す名前",
+      "matchDisplay": "見出し向けの名前",
+      "matchPlain": "標準・画面表示向けの名前",
+      "matchItalic": "斜体を示す名前",
+      "matchCategory": "カテゴリに合う名前"
     }
   }
 }

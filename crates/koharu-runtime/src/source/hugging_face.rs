@@ -59,6 +59,16 @@ impl<'a> HuggingFaceFile<'a> {
         self.path().is_file()
     }
 
+    /// Size of the published snapshot only; an in-progress download is not cached.
+    pub fn cached_size(self) -> anyhow::Result<Option<u64>> {
+        match std::fs::metadata(self.path()) {
+            Ok(metadata) if metadata.is_file() => Ok(Some(metadata.len())),
+            Ok(_) => Ok(None),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+
     #[tracing::instrument(skip_all)]
     pub async fn resolve(self) -> anyhow::Result<PathBuf> {
         Store::file(self.path(), move |stage| async move {

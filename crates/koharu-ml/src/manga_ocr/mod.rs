@@ -27,6 +27,9 @@ pub struct MangaOcr {
     tokenizer: Tokenizer,
 }
 
+pub const MODEL_FILES: &[koharu_runtime::HuggingFaceFile<'static>] =
+    &[CONFIG, WEIGHTS, PROCESSOR, VOCABULARY];
+
 impl MangaOcr {
     pub async fn load(device: crate::Device) -> Result<Self> {
         let device: Device = device.try_into_device()?;

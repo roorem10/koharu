@@ -21,6 +21,8 @@ pub struct AotInpainting {
     processor: Processor,
 }
 
+pub const MODEL_FILES: &[koharu_runtime::HuggingFaceFile<'static>] = &[WEIGHTS];
+
 impl AotInpainting {
     pub async fn load(device: crate::Device) -> Result<Self> {
         let device: Device = device.try_into_device()?;

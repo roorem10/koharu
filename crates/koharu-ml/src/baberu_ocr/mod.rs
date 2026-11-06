@@ -35,6 +35,15 @@ pub struct BaberuOcr {
     generation: BaberuGenerationConfig,
 }
 
+pub const MODEL_FILES: &[koharu_runtime::HuggingFaceFile<'static>] = &[
+    CONFIG,
+    GENERATION_CONFIG,
+    WEIGHTS,
+    VOCABULARY,
+    VISION_CONFIG,
+    VISION_PROCESSOR,
+];
+
 impl BaberuOcr {
     pub async fn load(device: crate::Device) -> Result<Self> {
         let device: Device = device.try_into_device()?;

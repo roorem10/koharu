@@ -9,7 +9,7 @@ use koharu_rasterizer::{Raster, RasterOptions, Rasterizer};
 use koharu_renderer::{Frame, Renderer};
 use koharu_scene::{AssetRole, EntityId, Snapshot};
 use rayon::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::{io::Write as _, sync::Arc};
 use tauri::{State, WebviewWindow, ipc::IpcResponse};
@@ -30,7 +30,7 @@ impl IpcResponse for ThumbnailBytes {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Type)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportFormat {
     Png,

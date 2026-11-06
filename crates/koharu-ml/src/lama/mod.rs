@@ -23,6 +23,8 @@ pub struct LaMa {
     processor: InpaintModel,
 }
 
+pub const MODEL_FILES: &[koharu_runtime::HuggingFaceFile<'static>] = &[WEIGHTS];
+
 impl LaMa {
     pub async fn load(device: crate::Device) -> Result<Self> {
         let device: Device = device.try_into_device()?;

@@ -184,7 +184,8 @@
     "run": "Run",
     "view": "查看",
     "lastReadWith": "上趟阅读：{{time}}，用个模型：{{model}}",
-    "unknownModel": "之前用过个模型"
+    "unknownModel": "之前用过个模型",
+    "noSeries": "呒没系列"
   },
   "cleanup": {
     "title": "清理",
@@ -912,7 +913,8 @@
       "done_with_problems": "完成哉，不过有问题",
       "failed": "失败哉",
       "stopped": "停止哉"
-    }
+    },
+    "batchSeries": "全部章节所属个系列"
   },
   "settings": {
     "appearance": {
@@ -1292,6 +1294,72 @@
       "shy": "害羞／犹豫",
       "crying": "哭泣／发抖",
       "menacing": "威吓／阴森"
+    }
+  },
+  "readyCheck": {
+    "title": "就绪检查",
+    "description": "检查自动运行要用个设置搭下载情况。",
+    "refresh": "刷新",
+    "loadError": "就绪状态检查勿成功，请再试一趟。",
+    "attention": "下趟运行之前，有眼设置要检查。",
+    "fix": "修好",
+    "fixItem": "修好{{item}}",
+    "vision": "看得懂图片",
+    "noVision": "看勿懂图片",
+    "readingModel": "读章节个模型：{{model}}",
+    "readingOff": "自动读章节关脱了。",
+    "defaultFont": "默认字体",
+    "dialogueFallback": "用对白个样式",
+    "defaultFallback": "用默认字体设置",
+    "notSet": "还呒没设置",
+    "sizeUnknown": "总大小勿晓得，缓存里有 {{size}}",
+    "downloadError": "下载失败，可以点“全部下载”再试一趟。",
+    "downloading": "下载当中…",
+    "downloadAll": "全部下载",
+    "createSeries": "新建系列“{{name}}”",
+    "status": {
+      "ready": "准备好了",
+      "warning": "提醒",
+      "missing": "缺少"
+    },
+    "items": {
+      "translation": "翻译搭读章节",
+      "target_language": "目标语言",
+      "series": "项目所属个系列",
+      "fonts": "文字类别个字体",
+      "models": "处理模型",
+      "export": "完成仔导出"
+    },
+    "reasons": {
+      "translation_ready": "翻译模型设置好了。",
+      "translation_unset": "请拣一个翻译模型，再设置提供商个凭据。",
+      "reading_needs_vision": "读章节要用看得懂图片个模型，请到“译文”设置里拣。",
+      "reading_model_unset": "读章节个模型还呒没设全，请检查模型搭提供商个凭据。",
+      "target_language_ready": "目标语言拣好了。",
+      "target_language_unset": "请拣要译成个语言。",
+      "project_closed": "请打开项目，再检查伊所属个系列。",
+      "series_unset": "请关联一个系列，读章节辰光好用章节上下文。",
+      "series_ready": "项目已经关联系列了。",
+      "fonts_ready": "每个文字类别侪有自家个字体。",
+      "fonts_fallback": "有眼文字类别用个是对白或者默认字体设置。",
+      "models_ready": "拣好个检测、OCR 搭清理模型侪下载好了。",
+      "models_missing": "有眼拣好个模型还要下载，下载好再处理。",
+      "export_unavailable": "完成仔导出关脱了。箇个版本可以从“文件”→“导出”手动导出；自动导出个格式搭文件夹还呒没设置。"
+    },
+    "fontSetup": {
+      "title": "字体设置帮手",
+      "description": "照已安装字体个名字推荐。拣一个字体就保存到箇个类别，别个样式设置勿改。",
+      "noMatch": "呒没匹配个已安装字体，请到“排版”设置里拣字体。",
+      "preview": "下个章节开始了！",
+      "useFont": "{{category}}用{{font}}",
+      "current": "眼下：{{font}}",
+      "matchComic": "漫画类个名字",
+      "matchHandwriting": "手写类个名字",
+      "matchBold": "粗体或者重体类个名字",
+      "matchDisplay": "标题类个名字",
+      "matchPlain": "常规或者屏幕字体个名字",
+      "matchItalic": "斜体类个名字",
+      "matchCategory": "箇个类别专用个名字"
     }
   }
 }
