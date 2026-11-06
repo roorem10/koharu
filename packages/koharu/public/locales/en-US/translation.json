@@ -184,7 +184,8 @@
     "run": "Run",
     "view": "View",
     "lastReadWith": "Last read {{time}} with {{model}}",
-    "unknownModel": "an earlier model"
+    "unknownModel": "an earlier model",
+    "noSeries": "No series"
   },
   "cleanup": {
     "title": "Cleanup",
@@ -912,7 +913,8 @@
       "done_with_problems": "Done with problems",
       "failed": "Failed",
       "stopped": "Stopped"
-    }
+    },
+    "batchSeries": "Series for every chapter"
   },
   "settings": {
     "appearance": {
@@ -1337,6 +1339,72 @@
       "hand_edited": "Hand edits preserved",
       "prerequisite_failed": "A prerequisite failed",
       "export_not_configured": "Automatic export is unavailable: saved format and destination settings are not implemented yet."
+    }
+  },
+  "readyCheck": {
+    "title": "Ready check",
+    "description": "Check the settings and downloads used by the automatic run.",
+    "refresh": "Refresh",
+    "loadError": "Could not check readiness. Try again.",
+    "attention": "Some settings need attention before the next run.",
+    "fix": "Fix",
+    "fixItem": "Fix {{item}}",
+    "vision": "Can see images",
+    "noVision": "Cannot see images",
+    "readingModel": "Read chapter model: {{model}}",
+    "readingOff": "Automatic chapter reading is off.",
+    "defaultFont": "Default font",
+    "dialogueFallback": "Uses dialogue style",
+    "defaultFallback": "Uses default font settings",
+    "notSet": "Not set",
+    "sizeUnknown": "Total size unknown; {{size}} cached",
+    "downloadError": "The download failed. You can retry Download all.",
+    "downloading": "Downloading…",
+    "downloadAll": "Download all",
+    "createSeries": "Create series “{{name}}”",
+    "status": {
+      "ready": "Ready",
+      "warning": "Warning",
+      "missing": "Missing"
+    },
+    "items": {
+      "translation": "Translation and chapter reading",
+      "target_language": "Target language",
+      "series": "Project series",
+      "fonts": "Lettering fonts",
+      "models": "Processing models",
+      "export": "Export when finished"
+    },
+    "reasons": {
+      "translation_ready": "The translation model is configured.",
+      "translation_unset": "Choose a translation model and configure its provider credentials.",
+      "reading_needs_vision": "Read chapter needs a model that can see images. Choose one in Translation settings.",
+      "reading_model_unset": "The Read chapter model is not fully configured. Check its model and provider credentials.",
+      "target_language_ready": "A target language is selected.",
+      "target_language_unset": "Choose the language to translate into.",
+      "project_closed": "Open a project to check its series.",
+      "series_unset": "Link a series so Read chapter can use chapter context.",
+      "series_ready": "The project is linked to a series.",
+      "fonts_ready": "Every lettering category has its own font.",
+      "fonts_fallback": "Some lettering categories use dialogue or default font settings.",
+      "models_ready": "The selected detection, OCR, and cleanup models are downloaded.",
+      "models_missing": "Some selected models still need downloading before processing.",
+      "export_unavailable": "Export when finished is off. This build supports manual export from File → Export; no automatic format or folder is configured."
+    },
+    "fontSetup": {
+      "title": "Font setup",
+      "description": "Suggestions match installed font names. Choose a font to save it for that category; other style settings stay as they are.",
+      "noMatch": "No matching installed fonts. Choose a font in Typesetting settings.",
+      "preview": "The next chapter begins!",
+      "useFont": "Use {{font}} for {{category}}",
+      "current": "Current: {{font}}",
+      "matchComic": "Comic or manga name",
+      "matchHandwriting": "Handwriting name",
+      "matchBold": "Bold or heavy name",
+      "matchDisplay": "Display name",
+      "matchPlain": "Plain or screen name",
+      "matchItalic": "Italic name",
+      "matchCategory": "Category-specific name"
     }
   }
 }

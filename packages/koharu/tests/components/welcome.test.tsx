@@ -48,7 +48,7 @@ describe('StartView', () => {
     const createButton = screen.getByRole('button', { name: 'Create' })
     await waitFor(() => expect(createButton).toBeEnabled())
     fireEvent.click(createButton)
-    await waitFor(() => expect(create).toHaveBeenCalledWith('Volume 1'))
+    await waitFor(() => expect(create).toHaveBeenCalledWith('Volume 1', null))
     expect(await screen.findByText('Opened Volume 1')).toBeInTheDocument()
   })
 
@@ -81,12 +81,35 @@ describe('StartView', () => {
     expect(await screen.findByText('Opened Blue Archive')).toBeInTheDocument()
   })
 
+  it('includes the offered series when creating a new chapter', async () => {
+    vi.spyOn(commands, 'listProjects').mockResolvedValue([])
+    vi.spyOn(commands, 'listSeries').mockResolvedValue([{ id: 'series', name: 'A series' }])
+    vi.spyOn(commands, 'getLastSeries').mockResolvedValue({ id: 'series', name: 'A series' })
+    const create = vi.spyOn(commands, 'createProject').mockResolvedValue(null)
+    render(
+      <QueryClientProvider client={queryClient}>
+        <StartView />
+      </QueryClientProvider>,
+    )
+    fireEvent.change(screen.getByRole('textbox', { name: 'Project name' }), {
+      target: { value: 'Chapter 2' },
+    })
+    const button = screen.getByRole('button', { name: 'Create' })
+    await waitFor(() => expect(button).toBeEnabled())
+    fireEvent.click(button)
+    await waitFor(() => expect(create).toHaveBeenCalledWith('Chapter 2', 'series'))
+  })
+
   it('confirms before deleting a managed project', async () => {
     vi.spyOn(commands, 'listProjects')
       .mockResolvedValueOnce([{ name: 'Blue Archive' }])
       .mockResolvedValueOnce([])
     const remove = vi.spyOn(commands, 'deleteProject').mockResolvedValue(null)
-    render(<StartView />)
+    render(
+      <QueryClientProvider client={queryClient}>
+        <StartView />
+      </QueryClientProvider>,
+    )
 
     const deleteButton = await screen.findByRole('button', { name: 'Delete Blue Archive' })
     await waitFor(() => expect(deleteButton).toBeEnabled())

@@ -184,7 +184,8 @@
     "run": "Run",
     "view": "Görüntüle",
     "lastReadWith": "Son okuma: {{time}}, model: {{model}}",
-    "unknownModel": "önceki bir model"
+    "unknownModel": "önceki bir model",
+    "noSeries": "Seri yok"
   },
   "cleanup": {
     "title": "Temizleme",
@@ -912,7 +913,8 @@
       "done_with_problems": "Sorunlarla tamamlandı",
       "failed": "Başarısız",
       "stopped": "Durduruldu"
-    }
+    },
+    "batchSeries": "Tüm bölümler için seri"
   },
   "settings": {
     "appearance": {
@@ -1337,6 +1339,72 @@
       "hand_edited": "Elle yapılan düzenlemeler korundu",
       "prerequisite_failed": "Gerekli önceki adım başarısız oldu",
       "export_not_configured": "Otomatik dışa aktarma kullanılamıyor: biçim ve hedefi kaydetme ayarları henüz uygulanmadı."
+    }
+  },
+  "readyCheck": {
+    "title": "Hazırlık kontrolü",
+    "description": "Otomatik çalıştırmada kullanılan ayarları ve indirmeleri kontrol edin.",
+    "refresh": "Yenile",
+    "loadError": "Hazırlık durumu kontrol edilemedi. Tekrar deneyin.",
+    "attention": "Sonraki çalıştırmadan önce bazı ayarları gözden geçirmeniz gerekiyor.",
+    "fix": "Düzelt",
+    "fixItem": "{{item}} ayarını düzelt",
+    "vision": "Görüntüleri görebilir",
+    "noVision": "Görüntüleri göremez",
+    "readingModel": "Bölüm okuma modeli: {{model}}",
+    "readingOff": "Otomatik bölüm okuma kapalı.",
+    "defaultFont": "Varsayılan yazı tipi",
+    "dialogueFallback": "Diyalog stilini kullanır",
+    "defaultFallback": "Varsayılan yazı tipi ayarlarını kullanır",
+    "notSet": "Ayarlanmadı",
+    "sizeUnknown": "Toplam boyut bilinmiyor; {{size}} önbellekte",
+    "downloadError": "İndirme başarısız oldu. Tümünü indir ile tekrar deneyebilirsiniz.",
+    "downloading": "İndiriliyor…",
+    "downloadAll": "Tümünü indir",
+    "createSeries": "“{{name}}” serisini oluştur",
+    "status": {
+      "ready": "Hazır",
+      "warning": "Uyarı",
+      "missing": "Eksik"
+    },
+    "items": {
+      "translation": "Çeviri ve bölüm okuma",
+      "target_language": "Hedef dil",
+      "series": "Projenin serisi",
+      "fonts": "Yazı kategorilerinin yazı tipleri",
+      "models": "İşleme modelleri",
+      "export": "Bitince dışa aktar"
+    },
+    "reasons": {
+      "translation_ready": "Çeviri modeli yapılandırılmış.",
+      "translation_unset": "Bir çeviri modeli seçin ve sağlayıcısının kimlik bilgilerini yapılandırın.",
+      "reading_needs_vision": "Bölüm okuma, görüntüleri görebilen bir model gerektirir. Çeviri ayarlarından bir model seçin.",
+      "reading_model_unset": "Bölüm okuma modeli tam olarak yapılandırılmamış. Modeli ve sağlayıcısının kimlik bilgilerini kontrol edin.",
+      "target_language_ready": "Hedef dil seçilmiş.",
+      "target_language_unset": "Çeviri yapılacak dili seçin.",
+      "project_closed": "Serisini kontrol etmek için bir proje açın.",
+      "series_unset": "Bölüm okumanın bölüm bağlamını kullanabilmesi için bir seri bağlayın.",
+      "series_ready": "Proje bir seriye bağlı.",
+      "fonts_ready": "Her yazı kategorisinin kendi yazı tipi var.",
+      "fonts_fallback": "Bazı yazı kategorileri diyalog veya varsayılan yazı tipi ayarlarını kullanıyor.",
+      "models_ready": "Seçilen algılama, OCR ve temizleme modelleri indirilmiş.",
+      "models_missing": "İşlemeden önce seçilen bazı modellerin indirilmesi gerekiyor.",
+      "export_unavailable": "Bitince dışa aktarma kapalı. Bu sürümde Dosya → Dışa aktar yoluyla elle dışa aktarılabilir; otomatik dışa aktarma biçimi veya klasörü yapılandırılmamış."
+    },
+    "fontSetup": {
+      "title": "Yazı tipi kurulumu",
+      "description": "Öneriler yüklü yazı tiplerinin adlarına dayanır. Bir yazı tipini seçerek o kategori için kaydedin; diğer stil ayarları korunur.",
+      "noMatch": "Eşleşen yüklü yazı tipi yok. Dizgi ayarlarından bir yazı tipi seçin.",
+      "preview": "Yeni bölüm başlıyor!",
+      "useFont": "{{category}} için {{font}} kullan",
+      "current": "Geçerli: {{font}}",
+      "matchComic": "Çizgi roman veya manga adı",
+      "matchHandwriting": "El yazısı adı",
+      "matchBold": "Kalın veya ağır yazı tipi adı",
+      "matchDisplay": "Başlık yazı tipi adı",
+      "matchPlain": "Sade veya ekran yazı tipi adı",
+      "matchItalic": "İtalik yazı tipi adı",
+      "matchCategory": "Kategoriye özgü ad"
     }
   }
 }

@@ -2,6 +2,7 @@
 
 import {
   ArrowLeft,
+  ClipboardCheck,
   Cpu,
   KeyRound,
   Keyboard,
@@ -29,6 +30,8 @@ import {
 } from '@/components/preferences/ShortcutPreferences'
 import { TranslationPreferences } from '@/components/preferences/TranslationPreferences'
 import { TypesettingPreferences } from '@/components/preferences/TypesettingPreferences'
+import { useReadySettings } from '@/components/ready-check/data'
+import { ReadyCheckPanel } from '@/components/ready-check/ReadyCheckPanel'
 import { refreshPreferences, refreshTranslationModels, savePreferences } from '@/lib/backend'
 import { supportedLanguages } from '@/lib/i18n'
 import { receivePreferences, useKoharuStore } from '@/lib/store'
@@ -50,6 +53,7 @@ import {
 
 const tabs = [
   ['appearance', Palette],
+  ['readyCheck', ClipboardCheck],
   ['pipeline', Cpu],
   ['providers', KeyRound],
   ['translation', Languages],
@@ -65,6 +69,7 @@ export function SettingsPage() {
   const preferences = useKoharuStore((state) => state.preferences)
   const translationModels = useKoharuStore((state) => state.translationModels)
   const [tab, setTab] = useState<Tab>('appearance')
+  const readyTarget = useReadySettings((state) => state.target)
   const shortcutPreferences = useRef<ShortcutPreferencesHandle>(null)
   const [pipeline, setPipeline] = useState<PipelineConfig | null>(preferences?.pipeline ?? null)
   const [providers, setProviders] = useState<ProviderSettings | null>(
@@ -123,6 +128,10 @@ export function SettingsPage() {
     },
     [],
   )
+
+  useEffect(() => {
+    if (readyTarget && shortcutPreferences.current?.canLeave() !== false) setTab(readyTarget.tab)
+  }, [readyTarget])
 
   useEffect(() => {
     if (!open) return
@@ -194,7 +203,8 @@ export function SettingsPage() {
                 setTab(id)
               }}
             >
-              <Icon className='size-4' /> {t(`settings.tabs.${id}`)}
+              <Icon className='size-4' />{' '}
+              {t(id === 'readyCheck' ? 'readyCheck.title' : `settings.tabs.${id}`)}
             </Button>
           ))}
         </div>
@@ -206,6 +216,7 @@ export function SettingsPage() {
         <ScrollArea className='min-h-0 flex-1'>
           <div className='mx-auto w-full max-w-4xl px-10 py-10'>
             {tab === 'appearance' && <AppearancePreferences />}
+            {tab === 'readyCheck' && <ReadyCheckPanel />}
             {tab === 'pipeline' &&
               (pipeline ? (
                 <PipelinePreferences

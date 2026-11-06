@@ -184,7 +184,8 @@
     "run": "Run",
     "view": "查看",
     "lastReadWith": "上次于 {{time}} 使用 {{model}} 阅读",
-    "unknownModel": "先前使用的模型"
+    "unknownModel": "先前使用的模型",
+    "noSeries": "无系列"
   },
   "cleanup": {
     "title": "清理",
@@ -912,7 +913,8 @@
       "done_with_problems": "已完成，但存在问题",
       "failed": "失败",
       "stopped": "已停止"
-    }
+    },
+    "batchSeries": "所有章节所属的系列"
   },
   "settings": {
     "appearance": {
@@ -1337,6 +1339,72 @@
       "hand_edited": "保留手动编辑",
       "prerequisite_failed": "前置步骤失败",
       "export_not_configured": "自动导出暂不可用：尚未实现保存格式和目标位置的设置。"
+    }
+  },
+  "readyCheck": {
+    "title": "就绪检查",
+    "description": "检查自动运行所用的设置和下载状态。",
+    "refresh": "刷新",
+    "loadError": "无法检查就绪状态，请重试。",
+    "attention": "下次运行前，有些设置需要检查。",
+    "fix": "修复",
+    "fixItem": "修复{{item}}",
+    "vision": "支持图像识别",
+    "noVision": "不支持图像识别",
+    "readingModel": "章节阅读模型：{{model}}",
+    "readingOff": "自动阅读章节已关闭。",
+    "defaultFont": "默认字体",
+    "dialogueFallback": "使用对白样式",
+    "defaultFallback": "使用默认字体设置",
+    "notSet": "未设置",
+    "sizeUnknown": "总大小未知，已缓存 {{size}}",
+    "downloadError": "下载失败，可以点击“全部下载”重试。",
+    "downloading": "正在下载…",
+    "downloadAll": "全部下载",
+    "createSeries": "创建系列“{{name}}”",
+    "status": {
+      "ready": "已就绪",
+      "warning": "警告",
+      "missing": "缺失"
+    },
+    "items": {
+      "translation": "翻译与章节阅读",
+      "target_language": "目标语言",
+      "series": "项目所属系列",
+      "fonts": "文字类别字体",
+      "models": "处理模型",
+      "export": "完成后导出"
+    },
+    "reasons": {
+      "translation_ready": "翻译模型已配置。",
+      "translation_unset": "请选择翻译模型并配置提供商凭据。",
+      "reading_needs_vision": "阅读章节需要支持图像识别的模型，请在“译文”设置中选择。",
+      "reading_model_unset": "章节阅读模型的配置不完整，请检查模型及其提供商凭据。",
+      "target_language_ready": "已选择目标语言。",
+      "target_language_unset": "请选择翻译的目标语言。",
+      "project_closed": "请打开项目以检查其所属系列。",
+      "series_unset": "请关联系列，以便阅读章节时使用章节上下文。",
+      "series_ready": "项目已关联系列。",
+      "fonts_ready": "每个文字类别都有自己的字体。",
+      "fonts_fallback": "部分文字类别使用对白或默认字体设置。",
+      "models_ready": "所选的检测、OCR 和清理模型已下载。",
+      "models_missing": "部分所选模型仍需下载才能开始处理。",
+      "export_unavailable": "完成后导出已关闭。此版本支持通过“文件”→“导出”手动导出；尚未配置自动导出的格式或文件夹。"
+    },
+    "fontSetup": {
+      "title": "字体设置助手",
+      "description": "根据已安装字体的名称提供建议。选择字体即可将其保存到对应类别，其他样式设置保持不变。",
+      "noMatch": "没有匹配的已安装字体，请在“排版”设置中选择字体。",
+      "preview": "下一章开始了！",
+      "useFont": "为{{category}}使用{{font}}",
+      "current": "当前：{{font}}",
+      "matchComic": "漫画类名称",
+      "matchHandwriting": "手写类名称",
+      "matchBold": "粗体或重体类名称",
+      "matchDisplay": "标题类名称",
+      "matchPlain": "常规或屏幕字体名称",
+      "matchItalic": "斜体类名称",
+      "matchCategory": "类别专用名称"
     }
   }
 }

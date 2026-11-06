@@ -257,10 +257,14 @@ pub(crate) async fn run_chapter_batch(
     plan: Uuid,
     chapters: Vec<Uuid>,
     recipe: BatchRecipe,
+    series: Option<String>,
     close_project: Option<String>,
     on_progress: Channel<BatchProgress>,
     handle: AppHandle<CefRuntime>,
 ) -> std::result::Result<(), Error> {
+    if let Some(id) = &series {
+        crate::commands::context::series::get_series(id.clone())?;
+    }
     let settings = RunSettings::load()?;
     let recipe = match recipe {
         BatchRecipe::Preset { preset } => ChapterRecipe::Stages(
@@ -350,7 +354,7 @@ pub(crate) async fn run_chapter_batch(
                 }
                 progress.chapters[index].state = ChapterStatus::Running;
                 let _ = on_progress.send(progress.clone());
-                let result = run_chapter(&handle, input, &control, &recipe).await;
+                let result = run_chapter(&handle, input, &control, &recipe, series.clone()).await;
                 let chapter = &mut progress.chapters[index];
                 match result {
                     Ok((name, job)) => {
@@ -392,6 +396,7 @@ async fn run_chapter(
     input: ChapterInput,
     control: &BatchControl,
     recipe: &ChapterRecipe,
+    series: Option<String>,
 ) -> Result<(String, super::super::processing::Job)> {
     let current = handle.state::<CurrentProject>();
     if current.project.lock().await.is_some() {
@@ -405,7 +410,7 @@ async fn run_chapter(
         .map(|project| project.name.to_lowercase())
         .collect();
     let name = unique_name(&input.chapter.name, &mut used);
-    lifecycle::create_project(name.clone(), handle.clone())
+    lifecycle::create_project(name.clone(), series, handle.clone())
         .await
         .map_err(|error| anyhow::anyhow!("{error:?}"))?;
     let expected = current

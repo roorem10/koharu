@@ -184,7 +184,8 @@
     "run": "Run",
     "view": "보기",
     "lastReadWith": "마지막 읽기: {{time}}, 사용 모델: {{model}}",
-    "unknownModel": "이전 모델"
+    "unknownModel": "이전 모델",
+    "noSeries": "시리즈 없음"
   },
   "cleanup": {
     "title": "정리",
@@ -912,7 +913,8 @@
       "done_with_problems": "문제가 있는 상태로 완료됨",
       "failed": "실패",
       "stopped": "중지됨"
-    }
+    },
+    "batchSeries": "모든 챕터에 연결할 시리즈"
   },
   "settings": {
     "appearance": {
@@ -1337,6 +1339,72 @@
       "hand_edited": "수동 수정 유지",
       "prerequisite_failed": "선행 작업 실패",
       "export_not_configured": "자동 내보내기를 사용할 수 없습니다. 형식과 저장 위치를 저장하는 설정이 아직 구현되지 않았습니다."
+    }
+  },
+  "readyCheck": {
+    "title": "준비 상태 확인",
+    "description": "자동 실행에 사용할 설정과 다운로드 상태를 확인합니다.",
+    "refresh": "새로 고침",
+    "loadError": "준비 상태를 확인하지 못했습니다. 다시 시도하세요.",
+    "attention": "다음 실행 전에 확인이 필요한 설정이 있습니다.",
+    "fix": "수정",
+    "fixItem": "{{item}} 수정",
+    "vision": "이미지 인식 가능",
+    "noVision": "이미지 인식 불가",
+    "readingModel": "챕터 읽기 모델: {{model}}",
+    "readingOff": "자동 챕터 읽기가 꺼져 있습니다.",
+    "defaultFont": "기본 글꼴",
+    "dialogueFallback": "대사 스타일 사용",
+    "defaultFallback": "기본 글꼴 설정 사용",
+    "notSet": "설정되지 않음",
+    "sizeUnknown": "전체 크기 알 수 없음 · 캐시됨 {{size}}",
+    "downloadError": "다운로드에 실패했습니다. 모두 다운로드를 눌러 다시 시도할 수 있습니다.",
+    "downloading": "다운로드 중…",
+    "downloadAll": "모두 다운로드",
+    "createSeries": "“{{name}}” 시리즈 만들기",
+    "status": {
+      "ready": "준비됨",
+      "warning": "주의",
+      "missing": "누락됨"
+    },
+    "items": {
+      "translation": "번역 및 챕터 읽기",
+      "target_language": "대상 언어",
+      "series": "프로젝트 시리즈",
+      "fonts": "레터링 글꼴",
+      "models": "처리 모델",
+      "export": "완료 후 내보내기"
+    },
+    "reasons": {
+      "translation_ready": "번역 모델이 설정되어 있습니다.",
+      "translation_unset": "번역 모델을 선택하고 제공자의 인증 정보를 설정하세요.",
+      "reading_needs_vision": "챕터 읽기에는 이미지를 인식하는 모델이 필요합니다. 번역 설정에서 선택하세요.",
+      "reading_model_unset": "챕터 읽기 모델의 설정이 완료되지 않았습니다. 모델과 제공자의 인증 정보를 확인하세요.",
+      "target_language_ready": "대상 언어가 선택되어 있습니다.",
+      "target_language_unset": "번역할 대상 언어를 선택하세요.",
+      "project_closed": "시리즈를 확인하려면 프로젝트를 여세요.",
+      "series_unset": "챕터 읽기가 챕터 문맥을 활용할 수 있도록 시리즈를 연결하세요.",
+      "series_ready": "프로젝트가 시리즈에 연결되어 있습니다.",
+      "fonts_ready": "모든 레터링 범주에 고유한 글꼴이 설정되어 있습니다.",
+      "fonts_fallback": "일부 레터링 범주는 대사 또는 기본 글꼴 설정을 사용합니다.",
+      "models_ready": "선택한 감지, OCR, 지우기 모델이 다운로드되어 있습니다.",
+      "models_missing": "처리 전에 다운로드해야 하는 모델이 있습니다.",
+      "export_unavailable": "완료 후 내보내기가 꺼져 있습니다. 이 빌드에서는 파일 → 내보내기로 직접 내보낼 수 있으며, 자동 내보내기의 형식이나 폴더는 설정되어 있지 않습니다."
+    },
+    "fontSetup": {
+      "title": "글꼴 설정",
+      "description": "설치된 글꼴 이름을 바탕으로 추천합니다. 글꼴을 선택하면 해당 범주에 저장되며 다른 스타일 설정은 유지됩니다.",
+      "noMatch": "일치하는 설치된 글꼴이 없습니다. 조판 설정에서 글꼴을 선택하세요.",
+      "preview": "다음 챕터가 시작된다!",
+      "useFont": "{{category}}에 {{font}} 사용",
+      "current": "현재: {{font}}",
+      "matchComic": "코믹 또는 만화 이름",
+      "matchHandwriting": "손글씨 이름",
+      "matchBold": "굵거나 두꺼운 글꼴 이름",
+      "matchDisplay": "제목용 글꼴 이름",
+      "matchPlain": "일반 또는 화면용 글꼴 이름",
+      "matchItalic": "기울임 글꼴 이름",
+      "matchCategory": "범주에 맞는 이름"
     }
   }
 }

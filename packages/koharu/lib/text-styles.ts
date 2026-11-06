@@ -1,3 +1,4 @@
+import { rankCategoryFonts } from '@/components/ready-check/font-ranking'
 import { LETTERING_CATEGORIES } from '@/lib/line-labels'
 import type {
   CategoryStyles,
@@ -74,35 +75,18 @@ export function isEmptyStyle(style: TextStyle): boolean {
   return Object.values(style).every((group) => group === null || group === undefined)
 }
 
-const suggestions: Partial<Record<LetteringCategory, { names: string[]; italic?: boolean }>> = {
-  normal_dialogue: { names: ['CC Wild Words', 'New Wild Words', 'CC New Wild Words'] },
-  thoughts: { names: ['Anime Ace 2.0 BB'], italic: true },
-  floating: { names: ['Hogfish Demo'] },
-  small_text: { names: ['Mangamaster Pro BB'] },
-  narration_box: { names: ['CCTallTales'] },
-  shout: { names: ['Palooka BB', 'Badaboom BB'] },
-  sfx: { names: ['Carton Six', 'Darumadrop One'] },
-  moan: { names: ['CDX Amraam'] },
-  title: { names: ['BarberChop'] },
-  phone_text: { names: ['CC Ultimatum'] },
-}
-
 export function suggestCategoryFonts(styles: TextStyles, families: FontFamily[]): TextStyles {
-  const normalize = (name: string) => name.normalize('NFKC').replace(/\s+/g, '').toLowerCase()
   let next = styles
   for (const category of LETTERING_CATEGORIES) {
-    const suggestion = suggestions[category]
-    if (!suggestion || !isEmptyStyle(categoryStyle(next, category))) continue
-    const family = suggestion.names
-      .map((name) => families.find((family) => normalize(family.name) === normalize(name)))
-      .find((family) => family !== undefined)
+    if (!isEmptyStyle(categoryStyle(next, category))) continue
+    const family = rankCategoryFonts(category, families)[0]?.family
     if (!family) continue
     next = withCategoryStyle(next, category, {
       ...categoryStyle(next, category),
       font: {
         preferred_font: family.name,
         font_weight: null,
-        font_style: suggestion.italic ? 'italic' : null,
+        font_style: category === 'thoughts' ? 'italic' : null,
       },
     })
   }

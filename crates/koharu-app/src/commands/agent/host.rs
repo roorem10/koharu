@@ -416,6 +416,14 @@ impl Host for KoharuHost {
                         "inspect_project",
                         "Read the latest complete semantic project state after edits. This does not include page images.",
                     ),
+                    definition::<InspectProject>(
+                        "ready_check",
+                        "Read auto-run readiness: translation and reading models, target language, linked series, category fonts, cached model sizes, and export availability. Does not change settings or download files.",
+                    ),
+                    definition::<InspectProject>(
+                        "download_ready_models",
+                        "Download the configured detection, OCR, and cleanup model assets through the shared cache. Does not load inference models or edit the project. Only use when the user asks to download models.",
+                    ),
                     definition::<ViewPage>(
                         "view_page",
                         "Render and inspect one page image. Call this only for pages whose visual appearance matters to the request.",
@@ -478,6 +486,19 @@ impl Host for KoharuHost {
 
     async fn invoke(&self, call: ToolCall, control: &Control) -> Result<Invocation> {
         match call.name.as_str() {
+            "ready_check" => {
+                let _: InspectProject = arguments(&call)?;
+                Invocation::read(
+                    super::super::ready_check::inspect(&self.handle.state::<CurrentProject>()).await?,
+                )
+            }
+            "download_ready_models" => {
+                let _: InspectProject = arguments(&call)?;
+                super::super::ready_check::download_models().await?;
+                Invocation::read(
+                    super::super::ready_check::inspect(&self.handle.state::<CurrentProject>()).await?,
+                )
+            }
             "inspect_project" => {
                 let _: InspectProject = arguments(&call)?;
                 Invocation::read(self.project_context().await?)
@@ -797,7 +818,11 @@ fn agent_pages(snapshot: &Snapshot) -> Result<Vec<Value>> {
 }
 
 fn text_styles_context(styles: &koharu_renderer::TextStyles) -> Value {
-    json!({ "default_style": styles.default_style, "shape_styles": styles.shape_styles })
+    json!({
+        "default_style": styles.default_style,
+        "shape_styles": styles.shape_styles,
+        "category_styles": styles.category_styles,
+    })
 }
 
 #[derive(Deserialize, JsonSchema)]

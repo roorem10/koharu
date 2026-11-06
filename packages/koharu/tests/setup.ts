@@ -107,6 +107,7 @@ beforeEach(() => {
     agent_messages: 20,
   })
   vi.spyOn(commands, 'listSeries').mockResolvedValue([])
+  vi.spyOn(commands, 'getLastSeries').mockResolvedValue(null)
   vi.spyOn(commands, 'getAgentHistory').mockResolvedValue({ messages: [], running: null })
   vi.spyOn(commands, 'getLineCategory').mockResolvedValue(null)
   vi.spyOn(commands, 'getEffectiveCategory').mockResolvedValue({

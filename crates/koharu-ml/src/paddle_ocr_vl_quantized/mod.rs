@@ -20,6 +20,8 @@ pub struct PaddleOCRVLQuantized {
     model: Llm,
 }
 
+pub const MODEL_FILES: &[koharu_runtime::HuggingFaceFile<'static>] = &[MODEL, PROJECTOR];
+
 impl PaddleOCRVLQuantized {
     pub async fn load(device: Device) -> Result<Self> {
         let (model_path, projector_path) =

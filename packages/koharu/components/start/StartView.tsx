@@ -4,6 +4,7 @@ import { Copy, Folder, FolderPlus, Pencil, Plus, Settings, Trash2 } from 'lucide
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { NewChapterSeries, useNewChapterSeries } from '@/components/context/NewChapterSeries'
 import { call } from '@/lib/backend'
 import { pageKey, pagesKey, projectKey, refresh } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
@@ -39,6 +40,7 @@ export function StartView() {
   const [busy, setBusy] = useState<string | null>('list')
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<{ name: string; value: string } | null>(null)
+  const series = useNewChapterSeries()
 
   const reload = useCallback(async () => {
     setBusy('list')
@@ -56,10 +58,10 @@ export function StartView() {
   const createProject = async (event: FormEvent) => {
     event.preventDefault()
     const projectName = name.trim()
-    if (!projectName || busy) return
+    if (!projectName || busy || series.loading) return
     setBusy('create')
     try {
-      await call(commands.createProject, projectName)
+      await call(commands.createProject, projectName, series.value)
       await refresh(projectKey, pagesKey, pageKey)
       setName('')
     } finally {
@@ -182,11 +184,12 @@ export function StartView() {
                     disabled={busy !== null}
                     className='h-9 bg-background text-[11px]'
                   />
+                  <NewChapterSeries choice={series} disabled={busy !== null} />
                   <Button
                     type='submit'
                     size='sm'
                     className='h-9 justify-center gap-1.5 text-[11px]'
-                    disabled={!name.trim() || busy !== null}
+                    disabled={!name.trim() || busy !== null || series.loading}
                   >
                     <Plus className='size-3.5' />
                     {t('start.create')}

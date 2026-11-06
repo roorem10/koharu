@@ -33,6 +33,8 @@ pub struct HayaiOcr {
     device: Device,
 }
 
+pub const MODEL_FILES: &[koharu_runtime::HuggingFaceFile<'static>] = &[CONFIG, WEIGHTS, TOKENIZER];
+
 impl HayaiOcr {
     pub async fn load(device: crate::Device) -> Result<Self> {
         let device: Device = device.try_into_device()?;
