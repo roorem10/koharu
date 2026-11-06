@@ -16,6 +16,7 @@ import {
 import { fontsKey, pageKey, projectKey, queryClient } from '@/lib/queries'
 import { useRichTextSelection } from '@/lib/richTextSelection'
 import { useKoharuStore } from '@/lib/store'
+import translations from '@/public/locales/en-US/translation.json'
 import { commands, type Layer, type Page, type Typography } from '@koharu/bridge/protocol'
 
 const issues = vi.hoisted(() => new Map<string, number>())
@@ -66,7 +67,11 @@ function text(
   }
 }
 
-function install(layers = [text('one', 10), text('two', 100)], selected = ['one']) {
+function install(
+  layers = [text('one', 10), text('two', 100)],
+  selected = ['one'],
+  regions: Page['regions'] = [],
+) {
   issues.clear()
   useCompareStore.getState().reset()
   let page: Page = {
@@ -74,7 +79,7 @@ function install(layers = [text('one', 10), text('two', 100)], selected = ['one'
     label: 'Page',
     size: { width: 300, height: 200 },
     layers,
-    regions: [],
+    regions,
   }
   let project = {
     name: 'chapter',
@@ -670,6 +675,39 @@ describe('text panel redesign', () => {
     expect(within(menu).getByRole('menuitem', { name: 'Join with bubble' })).toBeInTheDocument()
     fireEvent.keyDown(window, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+  })
+
+  it('centers the selected text boxes through one revision-bound command', async () => {
+    install(
+      [text('one', 10), text('two', 100)].map((layer) => ({
+        ...layer,
+        automatic_region: 'bubble',
+      })),
+      ['one', 'two'],
+      [
+        {
+          id: 'bubble',
+          parent: 'page',
+          kind: 'dev.koharu.region.bubble',
+          label: null,
+          geometry: {
+            points: [
+              { x: 0, y: 0 },
+              { x: 200, y: 100 },
+            ],
+          },
+        },
+      ],
+    )
+    const center = vi.spyOn(commands, 'centerInBubble').mockResolvedValue(2)
+    editor(true)
+    fireEvent.contextMenu(screen.getByTestId('surface'), { button: 2, clientX: 20, clientY: 30 })
+    const menu = await screen.findByRole('menu')
+    await userEvent.click(
+      within(menu).getByRole('menuitem', { name: translations.canvasAids.centerInBubble }),
+    )
+    await waitFor(() => expect(center).toHaveBeenCalledExactlyOnceWith(1, ['one', 'two']))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('keeps a multi-selection for canvas FX, resets all targets, and hides disallowed Join', async () => {

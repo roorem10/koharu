@@ -1,4 +1,5 @@
 pub(crate) mod agent;
+pub(crate) mod alignment;
 pub(crate) mod boxes;
 pub(crate) mod canvas;
 pub(crate) mod cleanup;
@@ -100,6 +101,7 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             editing::set_translation,
             editing::set_typography,
             editing::set_geometry,
+            alignment::center_in_bubble,
             editing::set_visibility,
             editing::delete_layers,
             editing::move_layer,

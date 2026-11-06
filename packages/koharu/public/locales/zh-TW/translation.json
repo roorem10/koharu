@@ -1293,5 +1293,20 @@
       "crying": "哭泣／顫抖",
       "menacing": "威嚇／陰森"
     }
+  },
+  "canvasAids": {
+    "rulers": "尺規",
+    "grid": "格線",
+    "gridSize": "格線間距（頁面像素）",
+    "gridSizeHint": "以頁面像素為單位設定格線之間的距離。",
+    "snapping": "吸附",
+    "bypassHint": "拖曳時按住 Ctrl 可暫時停用吸附。旋轉時按住 Shift 可每次旋轉 15°。",
+    "clearGuides": "清除參考線",
+    "centerInBubble": "在對話框中置中",
+    "verticalGuide": "垂直參考線",
+    "horizontalGuide": "水平參考線",
+    "createGuideHint": "拖曳到頁面上以建立參考線。",
+    "moveGuideHint": "拖曳以移動；拖出畫布以刪除。",
+    "pixelUnit": "像素"
   }
 }

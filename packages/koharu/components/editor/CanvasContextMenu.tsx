@@ -5,8 +5,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useBoxActionInfo, useBoxEdits, useBoxesBusy } from '@/components/boxes/queries'
+import { useCenterInBubble } from '@/components/editor/useCenterInBubble'
 import { originalVisible, useCompareStore } from '@/components/qc/compare'
 import { useRedesignStore } from '@/components/redesign/state'
+import { bubbleCenter } from '@/lib/bubbleCenter'
 import { expandLayerSelection, isTextLayer } from '@/lib/document'
 import { hitTestLayers } from '@/lib/geometry'
 import { usePage, useProject } from '@/lib/queries'
@@ -104,6 +106,11 @@ function CanvasMenu({ target, close }: { target: MenuTarget; close: () => void }
   const { t } = useTranslation()
   const info = useBoxActionInfo(target.layer).data
   const edit = useBoxEdits()
+  const center = useCenterInBubble()
+  const page = usePage().data
+  const canCenter = page?.layers.some(
+    (layer) => target.targets.includes(layer.id) && bubbleCenter(page, layer),
+  )
   const running = useBoxesBusy()
   const openFx = useRedesignStore((state) => state.openFx)
   const openDetails = useRedesignStore((state) => state.openDetails)
@@ -135,6 +142,14 @@ function CanvasMenu({ target, close }: { target: MenuTarget; close: () => void }
             <DropdownMenuItem onClick={() => action(() => openDetails(target.layer))}>
               {t('redesign.boxDetails')}
             </DropdownMenuItem>
+            {canCenter && (
+              <DropdownMenuItem
+                disabled={running || center.isPending}
+                onClick={() => action(() => center.mutate(target.targets))}
+              >
+                {t('canvasAids.centerInBubble')}
+              </DropdownMenuItem>
+            )}
             {info?.can_split && (
               <DropdownMenuItem
                 disabled={running || edit.isPending}

@@ -3,9 +3,10 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CanvasWorkspace, MIN_ZOOM, MAX_ZOOM } from '@/components/editor/CanvasWorkspace'
+import { useCanvasViewStore } from '@/components/editor/viewAids'
 import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { commands, type Layer } from '@koharu/bridge/protocol'
+import { commands, type Layer, type Page } from '@koharu/bridge/protocol'
 import { Slider } from '@koharu/ui/components/slider'
 import { TooltipProvider } from '@koharu/ui/components/tooltip'
 
@@ -78,6 +79,13 @@ let nextAnimationFrame = 1
 let animationFrames = new Map<number, FrameRequestCallback>()
 
 beforeEach(() => {
+  useCanvasViewStore.setState({
+    rulers: false,
+    grid: false,
+    gridSize: 32,
+    snapping: true,
+    guides: [],
+  })
   nextAnimationFrame = 1
   animationFrames = new Map()
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
@@ -175,6 +183,119 @@ function renderWorkspace() {
 }
 
 describe('canvas interaction adapter', () => {
+  it('snaps a text drag to its bubble, shows alignment, and Ctrl bypasses on drop', async () => {
+    installNudgeProject()
+    queryClient.setQueryData<Page>(pageKey, (page) => ({
+      ...page!,
+      layers: page!.layers.map((layer) =>
+        layer.type === 'text' ? { ...layer, automatic_region: 'bubble' } : layer,
+      ),
+      regions: [
+        {
+          id: 'bubble',
+          parent: 'page',
+          kind: 'dev.koharu.region.bubble',
+          label: null,
+          geometry: {
+            points: [
+              { x: 0, y: 0 },
+              { x: 120, y: 100 },
+            ],
+          },
+        },
+      ],
+    }))
+    const commit = vi.spyOn(commands, 'commitTransform').mockResolvedValue(2)
+    const surface = renderWorkspace()
+    fireEvent.pointerDown(surface, { button: 0, pointerId: 29, clientX: 50, clientY: 65 })
+    fireEvent.pointerMove(surface, { pointerId: 29, clientX: 53, clientY: 67 })
+    const preview = document.querySelector<HTMLElement>('[data-element="element"]')!
+    expect(preview.style.left).toBe('35px')
+    expect(preview.style.top).toBe('40px')
+    expect(screen.getAllByTestId('snap-line')).toHaveLength(2)
+    fireEvent.pointerUp(surface, { pointerId: 29, clientX: 53, clientY: 67, ctrlKey: true })
+    await waitFor(() => expect(commit).toHaveBeenCalledOnce())
+    expect(commit).toHaveBeenCalledWith(
+      1,
+      [
+        {
+          element: 'element',
+          frame: {
+            x: 33,
+            y: 42,
+            width: 50,
+            height: 20,
+            angle_degrees: 0,
+          },
+        },
+      ],
+      false,
+    )
+    expect(screen.queryByTestId('snap-line')).not.toBeInTheDocument()
+  })
+
+  it('snaps text resizing to a guide and cancels without a commit', () => {
+    installNudgeProject()
+    useCanvasViewStore.setState({ guides: [{ id: 'guide', axis: 'x', position: 100 }] })
+    const commit = vi.spyOn(commands, 'commitTransform')
+    renderWorkspace()
+    Object.defineProperty(screen.getByTestId('canvas-overlay'), 'getBoundingClientRect', {
+      value: () => ({ x: 10, y: 20, width: 800, height: 600 }),
+    })
+    const handle = document.querySelector<HTMLElement>('[data-resize-handle="e"]')!
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 30, clientX: 90, clientY: 70 })
+    fireEvent.pointerMove(handle, { pointerId: 30, clientX: 108, clientY: 70 })
+    expect(document.querySelector<HTMLElement>('[data-element="element"]')!.style.width).toBe(
+      '70px',
+    )
+    fireEvent.pointerCancel(handle, { pointerId: 30 })
+    expect(canvas.cancelTransform).toHaveBeenCalledOnce()
+    expect(commit).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('snap-line')).not.toBeInTheDocument()
+  })
+
+  it('does not move or snap text on selection clicks or handle clicks', () => {
+    installNudgeProject()
+    useCanvasViewStore.setState({ grid: true, gridSize: 32 })
+    const commit = vi.spyOn(commands, 'commitTransform')
+    const surface = renderWorkspace()
+    fireEvent.pointerDown(surface, { button: 0, pointerId: 31, clientX: 50, clientY: 65 })
+    fireEvent.pointerUp(surface, { pointerId: 31, clientX: 50, clientY: 65 })
+    Object.defineProperty(screen.getByTestId('canvas-overlay'), 'getBoundingClientRect', {
+      value: () => ({ x: 10, y: 20, width: 800, height: 600 }),
+    })
+    const handle = document.querySelector<HTMLElement>('[data-resize-handle="e"]')!
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 32, clientX: 88, clientY: 65 })
+    fireEvent.pointerUp(handle, { pointerId: 32, clientX: 88, clientY: 65 })
+    expect(canvas.updateTransform).not.toHaveBeenCalled()
+    expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('toggles snapping using its configured shortcut without taking keys from focused controls', () => {
+    installProject()
+    const surface = renderWorkspace()
+    useKoharuStore.setState({
+      shortcuts: { ...useKoharuStore.getState().shortcuts, snapping: 'alt+s' },
+    })
+    fireEvent.keyDown(surface, { key: 's', code: 'KeyS', altKey: true })
+    expect(useCanvasViewStore.getState().snapping).toBe(false)
+    for (const tag of ['input', 'textarea', 'select', 'button']) {
+      const control = document.createElement(tag)
+      document.body.append(control)
+      const event = new KeyboardEvent('keydown', {
+        key: 's',
+        code: 'KeyS',
+        altKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      control.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(false)
+      expect(useCanvasViewStore.getState().snapping).toBe(false)
+      control.remove()
+    }
+  })
+
   it('prefetches only after the authoritative canvas page and generation are active', async () => {
     installProject()
     queryClient.setQueryData(pagesKey, [

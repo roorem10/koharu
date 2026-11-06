@@ -401,6 +401,10 @@ impl Host for KoharuHost {
                         "set_geometry",
                         "Replace an element's page-space polygon geometry.",
                     ),
+                    definition::<CenterInBubble>(
+                        "center_in_bubble",
+                        "Center chosen text boxes in their associated bubbles, preserving their size, rotation and styles in one undoable edit. Boxes without a bubble are unchanged.",
+                    ),
                     definition::<SetVisibility>(
                         "set_visibility",
                         "Change visibility and/or opacity for elements.",
@@ -634,6 +638,22 @@ impl Host for KoharuHost {
                                 .await?,
                             json!({ "element": element }),
                         ))
+                    })
+                })
+                .await
+            }
+            "center_in_bubble" => {
+                let arguments: CenterInBubble = arguments(&call)?;
+                let elements = entities(&arguments.elements)?;
+                let renderer = self.handle.state::<Desktop>().renderer();
+                self.mutate_optional(|project| {
+                    Box::pin(async move {
+                        let revision = project.snapshot().revision();
+                        let commit = project
+                            .center_in_bubble(revision, elements.clone(), &renderer)
+                            .await?;
+                        let changed = commit.is_some();
+                        Ok((commit, json!({ "elements": elements, "changed": changed })))
                     })
                 })
                 .await
@@ -1021,6 +1041,11 @@ struct AgentGradientStop {
 struct SetGeometry {
     element: String,
     points: Vec<AgentPoint>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct CenterInBubble {
+    elements: Vec<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]

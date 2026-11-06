@@ -14,6 +14,7 @@ export const shortcutActions: readonly ShortcutAction[] = [
   'zoom_out',
   'zoom_actual',
   'compare',
+  'snapping',
   'brush_smaller',
   'brush_larger',
 ]
@@ -31,6 +32,7 @@ export const shortcutLabels: Record<ShortcutAction, string> = {
   zoom_out: 'settings.shortcuts.zoomOut',
   zoom_actual: 'settings.shortcuts.zoomActual',
   compare: 'qc.compareShortcut',
+  snapping: 'canvasAids.snapping',
   ocr_box: 'tools.ocr_box',
   brush_smaller: 'cleanup.brushSmaller',
   brush_larger: 'cleanup.brushLarger',

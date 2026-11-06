@@ -1293,5 +1293,20 @@
       "crying": "泣き声・震え声",
       "menacing": "威圧・不気味"
     }
+  },
+  "canvasAids": {
+    "rulers": "ルーラー",
+    "grid": "グリッド",
+    "gridSize": "グリッド間隔（ページのピクセル）",
+    "gridSizeHint": "グリッド線の間隔をページのピクセル単位で設定します。",
+    "snapping": "スナップ",
+    "bypassHint": "ドラッグ中に Ctrl を押すと、スナップを一時的に無効にします。回転中に Shift を押すと、15°刻みで回転します。",
+    "clearGuides": "ガイドをすべて削除",
+    "centerInBubble": "吹き出しの中央に配置",
+    "verticalGuide": "垂直ガイド",
+    "horizontalGuide": "水平ガイド",
+    "createGuideHint": "ページ上にドラッグしてガイドを作成します。",
+    "moveGuideHint": "ドラッグで移動し、キャンバスの外にドラッグすると削除します。",
+    "pixelUnit": "px"
   }
 }

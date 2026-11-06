@@ -1293,5 +1293,20 @@
       "crying": "Choro / tremor",
       "menacing": "Ameaça / sinistro"
     }
+  },
+  "canvasAids": {
+    "rulers": "Réguas",
+    "grid": "Grade",
+    "gridSize": "Espaçamento da grade (pixels da página)",
+    "gridSizeHint": "Escolha a distância entre as linhas da grade, em pixels da página.",
+    "snapping": "Encaixe",
+    "bypassHint": "Segure Ctrl ao arrastar para desativar temporariamente o encaixe. Segure Shift ao girar para usar passos de 15°.",
+    "clearGuides": "Limpar guias",
+    "centerInBubble": "Centralizar no balão",
+    "verticalGuide": "Guia vertical",
+    "horizontalGuide": "Guia horizontal",
+    "createGuideHint": "Arraste para a página para criar uma guia.",
+    "moveGuideHint": "Arraste para mover; arraste para fora da tela para excluir.",
+    "pixelUnit": "px"
   }
 }

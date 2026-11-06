@@ -12,6 +12,7 @@ import { ProcessRedoItems } from '@/components/app/ProcessRedoItems'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
 import { RedetectPageMenuItem, RedetectPageDialog } from '@/components/boxes/PageBoxActions'
 import { PageJoinMenuItem } from '@/components/boxes/PageJoinMenuItem'
+import { CanvasGridSettingsDialog, CanvasViewMenuItems } from '@/components/editor/CanvasViewMenu'
 import { useScriptFiles } from '@/components/files/ScriptImport'
 import { useCompareStore } from '@/components/qc/compare'
 import { BatchChaptersDialog } from '@/components/runs/BatchChaptersDialog'
@@ -57,6 +58,7 @@ export function TitleBar() {
   const toggleOriginal = useCompareStore((state) => state.toggle)
   const [batchOpen, setBatchOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [gridSettingsOpen, setGridSettingsOpen] = useState(false)
   const [redetectPage, setRedetectPage] = useState<string | null>(null)
   const scripts = useScriptFiles()
   const macOS = useMacOS()
@@ -349,6 +351,7 @@ export function TitleBar() {
                 {t('qc.showOriginal')}
                 <MenubarShortcut>{pinned ? t('qc.on') : t('qc.off')}</MenubarShortcut>
               </MenubarItem>
+              <CanvasViewMenuItems onGridSize={() => setGridSettingsOpen(true)} />
             </MenubarContent>
           </MenubarMenu>
 
@@ -393,6 +396,7 @@ export function TitleBar() {
         {!macOS && <WindowControls />}
       </header>
       <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
+      <CanvasGridSettingsDialog open={gridSettingsOpen} onOpenChange={setGridSettingsOpen} />
       {scripts.dialog}
     </>
   )

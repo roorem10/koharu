@@ -2,9 +2,11 @@
 
 import { useMemo, useRef } from 'react'
 
+import { CanvasViewAids } from '@/components/editor/CanvasViewAids'
 import { SelectionControls } from '@/components/editor/SelectionControls'
 import { effectiveLayerVisibility, expandLayerSelection, isTextLayer } from '@/lib/document'
 import { controlFrame, cssFrame, selectableLayer, type Camera } from '@/lib/geometry'
+import type { SnapLine } from '@/lib/snapping'
 import { useKoharuStore } from '@/lib/store'
 import type {
   EntityId,
@@ -28,6 +30,10 @@ interface CanvasOverlayProps {
   onTransformStart: (elements: TransformFrame[]) => void
   onTransformFrame: (elements: TransformFrame[]) => void
   onTransformEnd: () => void
+  onTransformCancel: () => void
+  snappingAllowed: boolean
+  snapLines: SnapLine[]
+  onSnapLines: (lines: SnapLine[]) => void
 }
 
 export function CanvasOverlay({
@@ -43,6 +49,10 @@ export function CanvasOverlay({
   onTransformStart,
   onTransformFrame,
   onTransformEnd,
+  onTransformCancel,
+  snappingAllowed,
+  snapLines,
+  onSnapLines,
 }: CanvasOverlayProps) {
   const root = useRef<HTMLDivElement>(null)
   // Subscribed here so a camera change re-renders the overlay alone, not the whole workspace.
@@ -133,11 +143,15 @@ export function CanvasOverlay({
           frame={selectionControl.frame}
           camera={camera}
           edgesOnly={Boolean(selectedTextLayer)}
+          snappingAllowed={snappingAllowed && Boolean(selectedTextLayer)}
+          onSnapLines={onSnapLines}
           onTransformStart={onTransformStart}
           onTransformFrame={onTransformFrame}
           onTransformEnd={onTransformEnd}
+          onTransformCancel={onTransformCancel}
         />
       )}
+      <CanvasViewAids size={page.size} disabled={!snappingAllowed} snapLines={snapLines} />
     </div>
   )
 }

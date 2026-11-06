@@ -43,6 +43,7 @@ const canvasActions: readonly ShortcutAction[] = [
   'zoom_out',
   'zoom_actual',
   'compare',
+  'snapping',
 ]
 
 export const ShortcutPreferences = forwardRef<ShortcutPreferencesHandle>(

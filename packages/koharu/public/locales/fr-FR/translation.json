@@ -1306,5 +1306,20 @@
       "crying": "Pleurs / tremblements",
       "menacing": "Menaçant / sinistre"
     }
+  },
+  "canvasAids": {
+    "rulers": "Règles",
+    "grid": "Grille",
+    "gridSize": "Pas de la grille (pixels de la page)",
+    "gridSizeHint": "Choisissez la distance entre les lignes de la grille, en pixels de la page.",
+    "snapping": "Magnétisme",
+    "bypassHint": "Maintenez Ctrl pendant le déplacement pour désactiver temporairement le magnétisme. Maintenez Maj pendant la rotation pour des pas de 15°.",
+    "clearGuides": "Effacer les repères",
+    "centerInBubble": "Centrer dans la bulle",
+    "verticalGuide": "Repère vertical",
+    "horizontalGuide": "Repère horizontal",
+    "createGuideHint": "Faites glisser sur la page pour créer un repère.",
+    "moveGuideHint": "Faites glisser pour déplacer ; faites glisser hors du canevas pour supprimer.",
+    "pixelUnit": "px"
   }
 }

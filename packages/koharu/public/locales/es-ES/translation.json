@@ -1306,5 +1306,20 @@
       "crying": "Llanto / temblor",
       "menacing": "Amenazante / siniestro"
     }
+  },
+  "canvasAids": {
+    "rulers": "Reglas",
+    "grid": "Cuadrícula",
+    "gridSize": "Tamaño de cuadrícula (píxeles de la página)",
+    "gridSizeHint": "Elige la distancia entre las líneas de la cuadrícula, en píxeles de la página.",
+    "snapping": "Ajuste",
+    "bypassHint": "Mantén Ctrl al arrastrar para desactivar temporalmente el ajuste. Mantén Mayús al girar para usar incrementos de 15°.",
+    "clearGuides": "Borrar guías",
+    "centerInBubble": "Centrar en el bocadillo",
+    "verticalGuide": "Guía vertical",
+    "horizontalGuide": "Guía horizontal",
+    "createGuideHint": "Arrastra sobre la página para crear una guía.",
+    "moveGuideHint": "Arrastra para mover; arrastra fuera del lienzo para eliminar.",
+    "pixelUnit": "px"
   }
 }

@@ -1293,5 +1293,20 @@
       "crying": "Ağlama / titreme",
       "menacing": "Tehditkâr / tekinsiz"
     }
+  },
+  "canvasAids": {
+    "rulers": "Cetveller",
+    "grid": "Izgara",
+    "gridSize": "Izgara aralığı (sayfa pikseli)",
+    "gridSizeHint": "Izgara çizgileri arasındaki mesafeyi sayfa pikseli cinsinden seçin.",
+    "snapping": "Yapışma",
+    "bypassHint": "Yapışmayı geçici olarak devre dışı bırakmak için sürüklerken Ctrl tuşunu basılı tutun. 15° adımlarla döndürmek için döndürürken Shift tuşunu basılı tutun.",
+    "clearGuides": "Kılavuzları temizle",
+    "centerInBubble": "Balonun ortasına hizala",
+    "verticalGuide": "Dikey kılavuz",
+    "horizontalGuide": "Yatay kılavuz",
+    "createGuideHint": "Kılavuz oluşturmak için sayfaya sürükleyin.",
+    "moveGuideHint": "Taşımak için sürükleyin; silmek için tuvalin dışına sürükleyin.",
+    "pixelUnit": "px"
   }
 }

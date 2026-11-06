@@ -1,15 +1,10 @@
 'use client'
 
-import { useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 
-import {
-  cssFrame,
-  pagePoint,
-  resizeFrame,
-  rotateFrame,
-  type Camera,
-  type ResizeHandle,
-} from '@/lib/geometry'
+import { useCanvasViewStore } from '@/components/editor/viewAids'
+import { cssFrame, pagePoint, rotateFrame, type Camera, type ResizeHandle } from '@/lib/geometry'
+import { snapResizeFrame, snapRotation, type SnapLine } from '@/lib/snapping'
 import type { EntityId, Frame, Point, TransformFrame } from '@koharu/bridge/protocol'
 
 interface SelectionControlsProps {
@@ -18,14 +13,24 @@ interface SelectionControlsProps {
   frame: Frame
   camera: Camera
   edgesOnly: boolean
+  snappingAllowed: boolean
+  onSnapLines: (lines: SnapLine[]) => void
   onTransformStart: (elements: TransformFrame[]) => void
   onTransformFrame: (elements: TransformFrame[]) => void
   onTransformEnd: () => void
+  onTransformCancel: () => void
 }
 
 type ControlGesture =
-  | { kind: 'resize'; pointer: number; original: Frame; handle: ResizeHandle }
-  | { kind: 'rotate'; pointer: number; original: Frame; start: Point }
+  | {
+      kind: 'resize'
+      pointer: number
+      original: Frame
+      handle: ResizeHandle
+      start: Point
+      dragging: boolean
+    }
+  | { kind: 'rotate'; pointer: number; original: Frame; start: Point; dragging: boolean }
 
 const handles: Array<{
   handle: ResizeHandle
@@ -49,13 +54,34 @@ export function SelectionControls({
   frame,
   camera,
   edgesOnly,
+  snappingAllowed,
+  onSnapLines,
   onTransformStart,
   onTransformFrame,
   onTransformEnd,
+  onTransformCancel,
 }: SelectionControlsProps) {
   const gesture = useRef<ControlGesture | null>(null)
   const position = cssFrame(frame, camera)
   const outside = position.width < 40 || position.height < 40
+
+  useEffect(() => {
+    const cancel = () => {
+      if (!gesture.current) return
+      gesture.current = null
+      onTransformCancel()
+    }
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cancel()
+    }
+    window.addEventListener('keydown', key)
+    window.addEventListener('blur', cancel)
+    return () => {
+      window.removeEventListener('keydown', key)
+      window.removeEventListener('blur', cancel)
+      cancel()
+    }
+  }, [onTransformCancel])
 
   const eventPoint = (event: ReactPointerEvent<HTMLDivElement>): Point | null => {
     const bounds = container.current?.getBoundingClientRect()
@@ -70,8 +96,17 @@ export function SelectionControls({
 
   const startResize = (handle: ResizeHandle) => (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || gesture.current) return
+    const start = eventPoint(event)
+    if (!start) return
     capture(event)
-    gesture.current = { kind: 'resize', pointer: event.pointerId, original: frame, handle }
+    gesture.current = {
+      kind: 'resize',
+      pointer: event.pointerId,
+      original: frame,
+      handle,
+      start,
+      dragging: false,
+    }
     onTransformStart([{ element, frame }])
   }
 
@@ -80,7 +115,13 @@ export function SelectionControls({
     const start = eventPoint(event)
     if (!start) return
     capture(event)
-    gesture.current = { kind: 'rotate', pointer: event.pointerId, original: frame, start }
+    gesture.current = {
+      kind: 'rotate',
+      pointer: event.pointerId,
+      original: frame,
+      start,
+      dragging: false,
+    }
     onTransformStart([{ element, frame }])
   }
 
@@ -91,15 +132,43 @@ export function SelectionControls({
     event.stopPropagation()
     const point = eventPoint(event)
     if (!point) return
-    const next =
-      current.kind === 'resize'
-        ? resizeFrame(
-            current.original,
-            current.handle,
-            point,
-            window.devicePixelRatio / camera.zoom,
-          )
-        : rotateFrame(current.original, current.start, point)
+    if (
+      !current.dragging &&
+      (Math.hypot(point.x - current.start.x, point.y - current.start.y) * camera.zoom) /
+        window.devicePixelRatio <
+        3
+    )
+      return
+    current.dragging = true
+    const aids = useCanvasViewStore.getState()
+    const bypass = event.ctrlKey || event.metaKey
+    let next: Frame
+    if (current.kind === 'resize') {
+      const snapped = snapResizeFrame(
+        current.original,
+        current.handle,
+        point,
+        window.devicePixelRatio / camera.zoom,
+        {
+          zoom: camera.zoom / window.devicePixelRatio,
+          enabled: snappingAllowed && aids.snapping,
+          bypass,
+          gridSize: aids.grid ? aids.gridSize : null,
+          guides: aids.guides,
+        },
+      )
+      next = snapped.frame
+      onSnapLines(snapped.lines)
+    } else {
+      next = rotateFrame(current.original, current.start, point)
+      if (snappingAllowed)
+        next.angle_degrees = snapRotation(next.angle_degrees, {
+          enabled: aids.snapping,
+          shift: event.shiftKey,
+          bypass,
+        })
+      onSnapLines([])
+    }
     onTransformFrame([{ element, frame: next }])
   }
 
@@ -108,24 +177,27 @@ export function SelectionControls({
     if (!current || current.pointer !== event.pointerId) return
     event.preventDefault()
     event.stopPropagation()
+    update(event)
     gesture.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
-    onTransformEnd()
+    if (current.dragging) onTransformEnd()
+    else onTransformCancel()
   }
 
   const lostCapture = (event: ReactPointerEvent<HTMLDivElement>) => {
     const current = gesture.current
     if (!current || current.pointer !== event.pointerId) return
+    event.stopPropagation()
     gesture.current = null
-    onTransformEnd()
+    onTransformCancel()
   }
 
   const pointerEvents = {
     onPointerMove: update,
     onPointerUp: finish,
-    onPointerCancel: finish,
+    onPointerCancel: lostCapture,
     onLostPointerCapture: lostCapture,
   }
 

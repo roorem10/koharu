@@ -1293,5 +1293,20 @@
       "crying": "울음 / 떨림",
       "menacing": "위협적 / 음산함"
     }
+  },
+  "canvasAids": {
+    "rulers": "눈금자",
+    "grid": "격자",
+    "gridSize": "격자 간격(페이지 픽셀)",
+    "gridSizeHint": "격자선 사이의 간격을 페이지 픽셀 단위로 설정합니다.",
+    "snapping": "스냅",
+    "bypassHint": "드래그하는 동안 Ctrl을 누르면 스냅을 일시적으로 해제합니다. 회전하는 동안 Shift를 누르면 15° 단위로 회전합니다.",
+    "clearGuides": "안내선 모두 지우기",
+    "centerInBubble": "말풍선 가운데 정렬",
+    "verticalGuide": "세로 안내선",
+    "horizontalGuide": "가로 안내선",
+    "createGuideHint": "페이지로 드래그하여 안내선을 만듭니다.",
+    "moveGuideHint": "드래그하여 이동하고 캔버스 밖으로 드래그하여 삭제합니다.",
+    "pixelUnit": "px"
   }
 }

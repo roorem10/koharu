@@ -15,11 +15,13 @@ import { CleanupQueueBar } from '@/components/editor/CleanupQueueBar'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { useCanvas } from '@/components/editor/useCanvas'
+import { useCanvasViewStore } from '@/components/editor/viewAids'
 import { WarpHandles } from '@/components/editor/WarpHandles'
 import { originalVisible, useCompareStore } from '@/components/qc/compare'
 import { OriginalOverlay } from '@/components/qc/OriginalOverlay'
 import { useRichTextEditor } from '@/components/rich-text-editor/useRichTextEditor'
 import { call } from '@/lib/backend'
+import { bubbleCenter } from '@/lib/bubbleCenter'
 import { expandLayerSelection } from '@/lib/document'
 import {
   controlFrame,
@@ -50,6 +52,7 @@ import {
   builtInShortcuts,
   matchesBinding,
 } from '@/lib/shortcuts'
+import { snapMoveFrames, type SnapLine } from '@/lib/snapping'
 import {
   isBrushTool,
   maxBrushDiameter,
@@ -88,7 +91,7 @@ type Gesture =
       current: Point
       additive: boolean
     }
-  | { kind: 'move'; pointer: number; start: Point; originals: TransformFrame[] }
+  | { kind: 'move'; pointer: number; start: Point; originals: TransformFrame[]; dragging: boolean }
   | { kind: 'text'; pointer: number; start: Point; frame: Frame }
   | { kind: 'tool'; pointer: number; handler: CanvasToolHandler }
   | StrokeGesture
@@ -137,6 +140,7 @@ export function CanvasWorkspace() {
   const commitPending = useRef(false)
   const commandQueue = useRef<Promise<void>>(Promise.resolve())
   const [previews, setPreviews] = useState<Record<string, Frame>>({})
+  const [snapLines, setSnapLines] = useState<SnapLine[]>([])
   const [selectionRect, setSelectionRect] = useState<Frame | null>(null)
   const [draft, setDraft] = useState<Frame | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
@@ -238,6 +242,7 @@ export function CanvasWorkspace() {
   }, [updateTransform])
 
   const finishTransform = useCallback(() => {
+    setSnapLines([])
     if (nudgeTimer.current !== null) window.clearTimeout(nudgeTimer.current)
     nudgeTimer.current = null
     heldArrows.current.clear()
@@ -271,6 +276,7 @@ export function CanvasWorkspace() {
   }, [canvas, enqueue, transformUpdates])
 
   const cancelGesture = useCallback(() => {
+    setSnapLines([])
     if (nudgeTimer.current !== null) window.clearTimeout(nudgeTimer.current)
     nudgeTimer.current = null
     heldArrows.current.clear()
@@ -437,6 +443,11 @@ export function CanvasWorkspace() {
 
     const runShortcut = (event: KeyboardEvent, next: ShortcutAction | undefined) => {
       if (!next) return
+      if (next === 'snapping') {
+        event.preventDefault()
+        if (!event.repeat) useCanvasViewStore.getState().toggleSnapping()
+        return
+      }
       if (next === 'brush_smaller' || next === 'brush_larger') {
         event.preventDefault()
         stepBrush(next === 'brush_smaller' ? -1 : 1)
@@ -475,6 +486,19 @@ export function CanvasWorkspace() {
 
     const down = (event: KeyboardEvent) => {
       const action = findShortcut(event, useKoharuStore.getState().shortcuts)
+      if (
+        action === 'snapping' &&
+        (event.defaultPrevented ||
+          event.isComposing ||
+          useKoharuStore.getState().settingsOpen ||
+          (event.target instanceof Element &&
+            Boolean(
+              event.target.closest(
+                'input, textarea, select, button, [contenteditable], [role="slider"], [role="combobox"], [role^="menuitem"], [role="checkbox"], [role="switch"], [role="spinbutton"], [role="listbox"], [role="radio"], [role="textbox"]',
+              ),
+            )))
+      )
+        return
       if (
         originalVisible() &&
         action !== 'compare' &&
@@ -614,7 +638,7 @@ export function CanvasWorkspace() {
 
   const moveGesture = (
     pointer: number,
-    samples: ReadonlyArray<{ clientX: number; clientY: number }>,
+    samples: ReadonlyArray<Pick<PointerEvent, 'clientX' | 'clientY' | 'ctrlKey' | 'metaKey'>>,
   ) => {
     const current = gesture.current
     const sample = samples.at(-1)
@@ -673,11 +697,47 @@ export function CanvasWorkspace() {
         angle_degrees: 0,
       })
     } else if (current.kind === 'move') {
-      updateTransform(
-        translateFrames(current.originals, {
-          x: point.x - current.start.x,
-          y: point.y - current.start.y,
+      const scale = useKoharuStore.getState().camera.zoom / window.devicePixelRatio
+      if (
+        !current.dragging &&
+        Math.hypot(point.x - current.start.x, point.y - current.start.y) * scale < 3
+      )
+        return
+      current.dragging = true
+      const moved = translateFrames(current.originals, {
+        x: point.x - current.start.x,
+        y: point.y - current.start.y,
+      })
+      const textFrames = moved.filter(({ element }) =>
+        page.layers.some((layer) => layer.id === element && layer.type === 'text'),
+      )
+      const aids = useCanvasViewStore.getState()
+      const centers = Object.fromEntries(
+        page.layers.flatMap((layer) => {
+          const center = bubbleCenter(page, layer)
+          return center ? [[layer.id, center]] : []
         }),
+      )
+      const snapped = snapMoveFrames(
+        textFrames,
+        {
+          zoom: useKoharuStore.getState().camera.zoom / window.devicePixelRatio,
+          enabled: aids.snapping && !richTextEditor.editing,
+          bypass: sample.ctrlKey || sample.metaKey,
+          gridSize: aids.grid ? aids.gridSize : null,
+          guides: aids.guides,
+        },
+        centers,
+      )
+      setSnapLines(snapped.lines)
+      const first = snapped.frames[0]
+      updateTransform(
+        first
+          ? translateFrames(moved, {
+              x: first.frame.x - textFrames[0].frame.x,
+              y: first.frame.y - textFrames[0].frame.y,
+            })
+          : moved,
       )
     } else if (current.kind === 'text') {
       current.frame = draftFrame(current.start, point)
@@ -716,7 +776,8 @@ export function CanvasWorkspace() {
       )
       setSelectionRect(null)
     } else if (current.kind === 'move') {
-      finishTransform()
+      if (current.dragging) finishTransform()
+      else cancelGesture()
     } else if (current.kind === 'text') {
       const { zoom } = useKoharuStore.getState().camera
       const pointText = current.frame.width < 4 / zoom && current.frame.height < 4 / zoom
@@ -932,7 +993,13 @@ export function CanvasWorkspace() {
               if (!next.includes(target.id)) return
               const originals = framesFor(next)
               if (!originals.length) return
-              gesture.current = { kind: 'move', pointer: event.pointerId, start: point, originals }
+              gesture.current = {
+                kind: 'move',
+                pointer: event.pointerId,
+                start: point,
+                originals,
+                dragging: false,
+              }
               beginTransform(originals)
             } else if (tool === 'text') {
               const frame = draftFrame(point, point)
@@ -1057,6 +1124,9 @@ export function CanvasWorkspace() {
             }
           }}
           onPointerCancel={() => cancelGesture()}
+          onLostPointerCapture={(event) => {
+            if (gesture.current?.pointer === event.pointerId) cancelGesture()
+          }}
           onPointerLeave={(event) => {
             if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
               setHovered(null)
@@ -1147,6 +1217,10 @@ export function CanvasWorkspace() {
               onTransformStart={beginTransform}
               onTransformFrame={updateTransform}
               onTransformEnd={finishTransform}
+              onTransformCancel={cancelGesture}
+              snappingAllowed={!richTextEditor.editing}
+              snapLines={snapLines}
+              onSnapLines={setSnapLines}
             />
           )}
           {page &&

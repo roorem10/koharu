@@ -1293,5 +1293,20 @@
       "crying": "哭泣／发抖",
       "menacing": "威吓／阴森"
     }
+  },
+  "canvasAids": {
+    "rulers": "标尺",
+    "grid": "网格",
+    "gridSize": "网格间距（页面像素）",
+    "gridSizeHint": "拿页面像素做单位，设置网格线之间个距离。",
+    "snapping": "吸附",
+    "bypassHint": "拖动个辰光按牢 Ctrl，可以暂时关脱吸附。旋转个辰光按牢 Shift，可以照 15° 一格旋转。",
+    "clearGuides": "清除参考线",
+    "centerInBubble": "摆到气泡正当中",
+    "verticalGuide": "竖直参考线",
+    "horizontalGuide": "水平参考线",
+    "createGuideHint": "拖到页面浪来创建参考线。",
+    "moveGuideHint": "拖动来移动；拖出画布就删除。",
+    "pixelUnit": "像素"
   }
 }

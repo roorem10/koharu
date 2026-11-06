@@ -1293,5 +1293,20 @@
       "crying": "Crying / Trembling",
       "menacing": "Menacing / Sinister"
     }
+  },
+  "canvasAids": {
+    "rulers": "Rulers",
+    "grid": "Grid",
+    "gridSize": "Grid size (page pixels)",
+    "gridSizeHint": "Choose the distance between grid lines, in page pixels.",
+    "snapping": "Snapping",
+    "bypassHint": "Hold Ctrl while dragging to bypass snapping. Hold Shift while rotating for 15° steps.",
+    "clearGuides": "Clear guides",
+    "centerInBubble": "Center in bubble",
+    "verticalGuide": "Vertical guide",
+    "horizontalGuide": "Horizontal guide",
+    "createGuideHint": "Drag onto the page to create a guide.",
+    "moveGuideHint": "Drag to move; drag off the canvas to delete.",
+    "pixelUnit": "px"
   }
 }
