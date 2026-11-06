@@ -16,16 +16,18 @@ use tauri_runtime_cef::CefRuntime;
 use crate::commands::{
     ChannelExt as _,
     canvas::{CanvasChannel, Point},
+    cleanup,
     editing::{GeometryUpdate, TypographyUpdate},
-    output,
+    notes, ocr_box, output,
     preferences::Preferences,
     processing::{JobId, Processing},
     project::{CurrentProject, Project, Typography},
+    raw_prep, redesign, warp,
 };
 
 #[derive(Clone)]
 pub(crate) struct KoharuHost {
-    handle: AppHandle<CefRuntime>,
+    pub(crate) handle: AppHandle<CefRuntime>,
 }
 
 impl KoharuHost {
@@ -110,7 +112,7 @@ impl KoharuHost {
         }))
     }
 
-    async fn mutate<T>(
+    pub(crate) async fn mutate<T>(
         &self,
         mutation: impl for<'project> FnOnce(
             &'project mut Project,
@@ -131,7 +133,7 @@ impl KoharuHost {
         .await
     }
 
-    async fn mutate_optional<T>(
+    pub(crate) async fn mutate_optional<T>(
         &self,
         mutation: impl for<'project> FnOnce(
             &'project mut Project,
@@ -147,7 +149,7 @@ impl KoharuHost {
             let mut current = current.project.lock().await;
             let project = current.as_mut().context("no project is open")?;
             let (commit, value) = mutation(project).await?;
-            let Some(commit) = commit else {
+            let Some(commit) = commit.filter(|commit| commit.changes.to != commit.changes.from) else {
                 return Invocation::read(value);
             };
             project.record_commit(&commit);
@@ -423,12 +425,30 @@ impl Host for KoharuHost {
                         "join_bubble_boxes",
                         "Join all boxes in the selected text layer's bubble in reading order, preserving their text in one undoable edit. Report the split bubbles first unless the user asked to fix them.",
                     ),
+                    definition::<warp::agent::GetTextWarp>("get_text_warp", "Read skew or perspective for text layers."),
+                    definition::<warp::agent::SetTextWarp>("set_text_warp", "Set skew or perspective; null clears warp."),
+                    definition::<notes::agent::GetBoxNote>("get_box_note", "Read a text box's note."),
+                    definition::<notes::agent::SetBoxNote>("set_box_note", "Set a text box's note; null clears it."),
+                    definition::<redesign::agent::BoxEffects>("get_box_effects", "Compare effects with automatic lettering defaults."),
+                    definition::<redesign::agent::BoxEffects>("reset_box_effects", "Reset lettering effects in one undo step."),
+                    definition::<ocr_box::agent::AddOcrBox>("add_ocr_box", "Add a page-space box and start OCR using its reading mode."),
+                    definition::<ocr_box::agent::OcrLayers>("get_ocr_redo_info", "Count hand-edited sources and translations before redo."),
+                    definition::<ocr_box::agent::RedoOcrBoxes>("redo_ocr_boxes", "Start reading, translation, or cleanup again for selected boxes."),
+                    definition::<ocr_box::agent::AddSfxSubtitle>("add_sfx_subtitle", "Add an SFX subtitle; translate it if needed."),
+                    definition::<cleanup::agent::CleanAreas>("clean_areas", "Start cleanup for queued page-space strokes and rectangles; returns a job ID."),
+                    definition::<cleanup::agent::PaintCleanup>("paint_cleanup", "Paint a page-space stroke with RGBA bytes; omit layer for the configured target."),
+                    definition::<cleanup::agent::EraseCleanup>("erase_cleanup", "Erase a page-space stroke; omit layer for the configured cleanup target."),
+                    definition::<raw_prep::agent::PrepPages>("get_prep_page_status", "Check originals and cleanup before preparing page levels."),
+                    definition::<raw_prep::agent::PreviewPrep>("preview_prep", "Preview page levels and paper whitening without editing."),
+                    definition::<raw_prep::agent::PreparePages>("prepare_pages", "Apply page levels and paper whitening; skip existing cleanup."),
+                    definition::<raw_prep::agent::PrepPages>("restore_original_pages", "Restore page originals; skip existing cleanup."),
                 ]
             })
             .clone()
     }
 
     async fn invoke(&self, call: ToolCall, control: &Control) -> Result<Invocation> {
+        anyhow::ensure!(!control.is_cancelled(), "tool call cancelled");
         match call.name.as_str() {
             "inspect_project" => {
                 let _: InspectProject = arguments(&call)?;
@@ -708,6 +728,23 @@ impl Host for KoharuHost {
                 })
                 .await
             }
+            "get_text_warp" => self.get_text_warp(arguments(&call)?).await,
+            "set_text_warp" => self.set_text_warp(arguments(&call)?).await,
+            "get_box_note" => self.get_box_note(arguments(&call)?).await,
+            "set_box_note" => self.set_box_note(arguments(&call)?).await,
+            "get_box_effects" => self.get_box_effects(arguments(&call)?).await,
+            "reset_box_effects" => self.reset_box_effects(arguments(&call)?).await,
+            "add_ocr_box" => self.agent_add_ocr_box(arguments(&call)?).await,
+            "get_ocr_redo_info" => self.agent_get_ocr_redo_info(arguments(&call)?).await,
+            "redo_ocr_boxes" => self.agent_redo_ocr_boxes(arguments(&call)?).await,
+            "add_sfx_subtitle" => self.agent_add_sfx_subtitle(arguments(&call)?).await,
+            "clean_areas" => self.clean_areas_tool(&call).await,
+            "paint_cleanup" => self.paint_cleanup_tool(&call).await,
+            "erase_cleanup" => self.erase_cleanup_tool(&call).await,
+            "get_prep_page_status" => self.agent_get_prep_page_status(arguments(&call)?).await,
+            "preview_prep" => self.agent_preview_prep(arguments(&call)?).await,
+            "prepare_pages" => self.agent_prepare_pages(arguments(&call)?).await,
+            "restore_original_pages" => self.agent_restore_original_pages(arguments(&call)?).await,
             name => bail!("unknown Koharu tool {name}"),
         }
     }
@@ -830,17 +867,17 @@ fn definition<T: JsonSchema>(name: &str, description: &str) -> Tool {
     )
 }
 
-fn arguments<T: for<'de> Deserialize<'de>>(call: &ToolCall) -> Result<T> {
+pub(crate) fn arguments<T: for<'de> Deserialize<'de>>(call: &ToolCall) -> Result<T> {
     serde_json::from_str(&call.arguments)
         .with_context(|| format!("invalid arguments for {}", call.name))
 }
 
-fn entity(value: &str) -> Result<EntityId> {
+pub(crate) fn entity(value: &str) -> Result<EntityId> {
     serde_json::from_value(Value::String(value.to_owned()))
         .with_context(|| format!("invalid entity ID {value}"))
 }
 
-fn entities(values: &[String]) -> Result<Vec<EntityId>> {
+pub(crate) fn entities(values: &[String]) -> Result<Vec<EntityId>> {
     values.iter().map(|value| entity(value)).collect()
 }
 

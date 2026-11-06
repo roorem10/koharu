@@ -1,5 +1,6 @@
 //! WO-23: box effects and the panels and popups of the redesigned editor.
 
+pub(crate) mod agent;
 mod effects;
 #[cfg(test)]
 mod tests;

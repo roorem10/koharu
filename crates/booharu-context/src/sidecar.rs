@@ -58,8 +58,6 @@ pub struct LineContext {
     pub dismissed: Vec<String>,
     /// QC checks (WO-12) the user marked OK for this line, by check id.
     pub qc_ok: Vec<String>,
-    /// The user's own note on the box (WO-06). `note` is the chapter reader's.
-    pub box_note: Option<String>,
     #[serde(flatten)]
     #[specta(skip)]
     pub other: Map<String, Value>,
@@ -72,7 +70,6 @@ impl LineContext {
             && self.flags.is_empty()
             && self.dismissed.is_empty()
             && self.qc_ok.is_empty()
-            && self.box_note.is_none()
             && self.other.is_empty()
     }
 }

@@ -1,4 +1,5 @@
 //! Levels replace only page source assets; existing cleanup is never invalidated.
+pub(crate) mod agent;
 mod images;
 mod operations;
 mod settings;

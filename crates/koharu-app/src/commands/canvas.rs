@@ -18,7 +18,7 @@ use super::{
     project::{CurrentProject, Page, Project, RasterStrokeMode},
 };
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, Type)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, schemars::JsonSchema, Type)]
 pub struct Point {
     pub x: f64,
     pub y: f64,

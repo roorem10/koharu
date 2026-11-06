@@ -5,7 +5,7 @@
 //! relation endpoints.
 
 use crate::{
-    BubbleRegion, DetectionAnalysis, EntityId, EntityOrigin, Error, Geometry, Group, OcrAnalysis,
+    BoxNote, BubbleRegion, DetectionAnalysis, EntityId, EntityOrigin, Error, Geometry, Group, OcrAnalysis,
     Page, Project, RasterLayer, Region, RegionSpec, Relation, Result, SourceText, TextContent,
     TextGroup, TextLayout, TextRegion, TextRole, TextRuns, Translation, Typography, Visibility,
     component::{Component, ComponentRecord, ValidationContext, decode, key},
@@ -61,6 +61,7 @@ component_schema! {
     ASSETS = 16 => Assets,
     ENTITY_ORIGIN = 17 => EntityOrigin,
     TEXT_RUNS = 18 => TextRuns,
+    BOX_NOTE = 19 => BoxNote,
 }
 
 pub(crate) fn validate_components(
@@ -103,7 +104,11 @@ pub(crate) fn validate_entity(state: &State, id: EntityId) -> Result<()> {
         })
     });
 
-    if (has_source || has_translation || has(TEXT_ROLE)) && !has_content {
+    if has(BOX_NOTE) && !has_layout {
+        Err(Error::invalid(format!(
+            "entity {id} has a box note but is not a text layer"
+        )))
+    } else if (has_source || has_translation || has(TEXT_ROLE)) && !has_content {
         Err(Error::invalid(format!(
             "entity {id} carries text content data but is not text content"
         )))

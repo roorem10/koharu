@@ -1,5 +1,6 @@
 //! Targeted reading, translation and cleanup for text boxes.
 
+pub(crate) mod agent;
 mod geometry;
 mod operations;
 pub(crate) mod settings;
@@ -13,6 +14,7 @@ use image::GrayImage;
 use koharu_desktop::Desktop;
 use koharu_pipeline::{Bounds, Operation, Scope, Stage};
 use koharu_scene::{Commit, EntityId, ProjectId, Snapshot};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Manager as _, State};
@@ -28,7 +30,7 @@ use geometry::{rectangle, text_mask, union_mask};
 use operations::{box_geometry, page_of, redo_info, unique_layers};
 use settings::{OcrBoxMode, OcrBoxSettings};
 
-#[derive(Clone, Copy, Debug, Deserialize, Type)]
+#[derive(Clone, Copy, Debug, Deserialize, JsonSchema, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum RedoAction {
     Read,

@@ -161,7 +161,7 @@ fn read_only_list_preserves_the_host_schemas_and_descriptions() {
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names, READ_TOOLS);
+    assert_eq!(names, ["inspect_project", "view_page", "get_project_summary"]);
     assert_eq!(tools["tools"][0]["inputSchema"], host.tools()[0].parameters);
     assert_eq!(
         tools["tools"][0]["description"],
@@ -423,35 +423,76 @@ async fn disconnect_cancels_the_control_and_releases_the_call_lane() {
 }
 
 #[tokio::test]
-async fn word_styles_are_hidden_and_refused_when_mcp_edits_are_disabled() {
-    struct WordHost;
+async fn editing_features_are_hidden_and_refused_when_mcp_edits_are_disabled() {
+    const EDIT_TOOLS: &[&str] = &[
+        "style_words",
+        "set_text_warp",
+        "set_box_note",
+        "reset_box_effects",
+        "add_ocr_box",
+        "redo_ocr_boxes",
+        "add_sfx_subtitle",
+        "clean_areas",
+        "paint_cleanup",
+        "erase_cleanup",
+        "prepare_pages",
+        "restore_original_pages",
+    ];
+    const READ_FEATURE_TOOLS: &[&str] = &[
+        "get_text_warp",
+        "get_box_note",
+        "get_box_effects",
+        "get_ocr_redo_info",
+        "get_prep_page_status",
+        "preview_prep",
+    ];
+    #[derive(Default)]
+    struct EditingHost {
+        edits: AtomicUsize,
+        reads: AtomicUsize,
+    }
     #[async_trait]
-    impl Host for WordHost {
+    impl Host for EditingHost {
         async fn context(&self) -> Result<Value> {
             Ok(json!({}))
         }
         fn tools(&self) -> Vec<AgentTool> {
-            vec![AgentTool::new(
-                "style_words",
-                "Style selected words",
-                json!({"type":"object"}),
-            )]
+            EDIT_TOOLS
+                .iter()
+                .chain(READ_FEATURE_TOOLS)
+                .map(|name| AgentTool::new(*name, "Feature tool", json!({"type":"object"})))
+                .collect()
         }
-        async fn invoke(&self, _: ToolCall, _: &Control) -> Result<Invocation> {
-            panic!("a read-only MCP client reached the word-style write tool")
+        async fn invoke(&self, call: ToolCall, _: &Control) -> Result<Invocation> {
+            if EDIT_TOOLS.contains(&call.name.as_str()) {
+                self.edits.fetch_add(1, Ordering::SeqCst);
+                Invocation::changed(json!({ "tool": call.name }))
+            } else {
+                self.reads.fetch_add(1, Ordering::SeqCst);
+                Invocation::read(json!({ "tool": call.name }))
+            }
         }
     }
-    let bridge = bridge(Arc::new(WordHost), false);
-    assert!(
-        bridge
-            .tools()
-            .unwrap()
-            .iter()
-            .all(|tool| tool.name != "style_words")
-    );
+    let host = Arc::new(EditingHost::default());
+    let bridge = bridge(host.clone(), false);
+    let tools = bridge.tools().unwrap();
+    for name in EDIT_TOOLS {
+        assert!(tools.iter().all(|tool| tool.name.as_ref() != *name));
+    }
+    for name in READ_FEATURE_TOOLS {
+        assert!(tools.iter().any(|tool| tool.name.as_ref() == *name));
+    }
     let server = Server::start(bridge).await;
     let session = server.initialize().await;
-    let result = rpc(server.call(&session, 1, "style_words").await).await;
-    assert_eq!(result["result"]["isError"], true);
+    for (id, name) in EDIT_TOOLS.iter().chain(READ_FEATURE_TOOLS).enumerate() {
+        let result = rpc(server.call(&session, id as i32 + 1, name).await).await;
+        assert_eq!(
+            result["result"]["isError"],
+            EDIT_TOOLS.contains(name),
+            "{name}"
+        );
+    }
+    assert_eq!(host.edits.load(Ordering::SeqCst), 0);
+    assert_eq!(host.reads.load(Ordering::SeqCst), READ_FEATURE_TOOLS.len());
     server.stop().await;
 }

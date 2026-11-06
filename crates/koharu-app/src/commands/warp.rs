@@ -1,5 +1,7 @@
 //! Skew and perspective edits share the ordinary project undo and canvas publication path.
 
+pub(crate) mod agent;
+
 use anyhow::Context as _;
 use koharu_desktop::Desktop;
 use koharu_scene::{EntityId, Origin, TextLayout, TextWarp};

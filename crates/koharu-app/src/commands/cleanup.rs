@@ -16,18 +16,19 @@ use super::{
     project::CurrentProject,
 };
 
+pub(crate) mod agent;
 pub(crate) mod stroke;
 #[cfg(test)]
 mod tests;
 
-#[derive(Clone, Debug, serde::Deserialize, specta::Type)]
+#[derive(Clone, Debug, serde::Deserialize, schemars::JsonSchema, specta::Type)]
 pub struct CleanupStroke {
     pub points: Vec<Point>,
     pub diameter: f32,
     pub hardness: f32,
 }
 
-#[derive(Clone, Copy, Debug, serde::Deserialize, specta::Type)]
+#[derive(Clone, Copy, Debug, serde::Deserialize, schemars::JsonSchema, specta::Type)]
 pub struct CleanupRect {
     pub x: f64,
     pub y: f64,

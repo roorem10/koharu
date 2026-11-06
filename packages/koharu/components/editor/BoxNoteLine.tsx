@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { call } from '@/lib/backend'
-import { queryClient, useProject } from '@/lib/queries'
+import { projectKey, queryClient, refresh, useProject } from '@/lib/queries'
+import { useKoharuStore } from '@/lib/store'
 import type { EntityId } from '@koharu/bridge/protocol'
 import { commands } from '@koharu/bridge/protocol'
 import { Textarea } from '@koharu/ui/components/textarea'
@@ -32,7 +33,8 @@ function NoteEditor({
   expanded: boolean
 }) {
   const { t } = useTranslation()
-  const queryKey = ['box-note', project, layer]
+  const revision = useKoharuStore((state) => state.canvasRevision)
+  const queryKey = ['box-note', project, layer, revision]
   const note = useQuery({
     queryKey,
     queryFn: () => call(commands.getBoxNote, layer),
@@ -62,6 +64,7 @@ function NoteEditor({
       .then(() => {
         queryClient.setQueryData(queryKey, next)
         setDraft(null)
+        void refresh(projectKey)
       })
       .catch(() => setFailed(true))
       .finally(() => setSaving(false))

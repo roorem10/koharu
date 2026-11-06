@@ -1,8 +1,9 @@
 use anyhow::{Result, ensure};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, Type)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, JsonSchema, Type)]
 #[serde(default)]
 pub(crate) struct RawPrepOptions {
     pub levels: bool,
