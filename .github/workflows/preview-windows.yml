@@ -80,7 +80,30 @@ jobs:
         shell: pwsh
         env:
           KOHARU_FORK_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview-windows.ps1
+        run: |
+          # Test branch only: publish compile errors as annotations, readable without signing in.
+          $ErrorActionPreference = 'Continue'
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview-windows.ps1 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath build.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $lines = Get-Content build.log
+            $picked = New-Object System.Collections.Generic.List[string]
+            $inside = $false
+            foreach ($line in $lines) {
+              if ($line -match '^\s*error(\[|:)|error TS\d+|^\s*Error:|ELIFECYCLE|Type error') { $inside = $true }
+              elseif ($line -match '^\s*$' -or $line -match '^\s*(warning|Compiling|Finished|Fresh)') { $inside = $false }
+              if ($inside) { $picked.Add($line) }
+            }
+            if ($picked.Count -eq 0) { $picked.AddRange([string[]]($lines | Select-Object -Last 60)) }
+            $text = $picked -join "`n"
+            $chunk = 3200
+            for ($i = 0; $i -lt [Math]::Min(10, [Math]::Ceiling($text.Length / $chunk)); $i++) {
+              $part = $text.Substring($i * $chunk, [Math]::Min($chunk, $text.Length - $i * $chunk))
+              $part = $part.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
+              Write-Output "::error title=build $($i + 1)::$part"
+            }
+            exit $code
+          }
 
       - name: Check package layout
         shell: pwsh
