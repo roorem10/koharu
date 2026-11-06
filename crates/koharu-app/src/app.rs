@@ -164,7 +164,7 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
                         application
                             .path()
                             .resource_dir()
-                            .context("failed to locate Koharu's installation directory")?
+                            .context("failed to locate Booharu's installation directory")?
                             .join("store"),
                     )?;
                 }

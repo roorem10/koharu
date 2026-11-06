@@ -413,7 +413,7 @@ impl Host for KoharuHost {
                     ),
                     definition::<RunPipeline>(
                         "run_pipeline",
-                        "Run Koharu's configured processing pipeline for the whole project, selected pages, or selected text elements.",
+                        "Run Booharu's configured processing pipeline for the whole project, selected pages, or selected text elements.",
                     ),
                     // WO-20 (one box per bubble) tool definitions go here.
                     definition::<crate::commands::boxes::FindSplitBubblesArgs>(
@@ -709,7 +709,7 @@ impl Host for KoharuHost {
                 })
                 .await
             }
-            name => bail!("unknown Koharu tool {name}"),
+            name => bail!("unknown Booharu tool {name}"),
         }
     }
 }
