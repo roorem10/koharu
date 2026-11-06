@@ -10,6 +10,7 @@ export const defaultCleanupSettings: Required<CleanupSettings> = {
   remove_mode: 'queue',
   paint_target: 'cleanup',
   grow_px: 2,
+  second_try_model: null,
 }
 
 export function useCleanupSettings() {

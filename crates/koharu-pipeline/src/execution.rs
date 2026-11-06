@@ -43,6 +43,7 @@ pub(crate) struct Execution<'a> {
     policy: crate::RunPolicy,
     resume: bool,
     refresh: BTreeSet<(Stage, EntityId)>,
+    check_cleanup: bool,
 }
 
 impl<'a> Execution<'a> {
@@ -55,6 +56,15 @@ impl<'a> Execution<'a> {
     ) -> std::result::Result<Self, PipelineError> {
         let started = Instant::now();
         let base = snapshot.revision();
+        if matches!(request.operation, crate::Operation::CheckCleanup)
+            && !matches!(request.scope, crate::Scope::Project | crate::Scope::Pages(_))
+        {
+            return Err(PipelineError::new(
+                ErrorKind::InvalidInput,
+                Some(Stage::Inpainting),
+                anyhow::anyhow!("cleanup checks require page or project scope"),
+            ));
+        }
         let stages = request
             .operation
             .stages()
@@ -106,6 +116,7 @@ impl<'a> Execution<'a> {
                     crate::Operation::Full | crate::Operation::Through { .. }
                 ),
             refresh: request.refresh,
+            check_cleanup: matches!(request.operation, crate::Operation::CheckCleanup),
         })
     }
 
@@ -187,7 +198,8 @@ impl<'a> Execution<'a> {
             .with_translation_hints(self.translation_hints.clone())
             .with_redetect(self.redetect)
             .with_refresh(self.refresh.contains(&(stage, page)))
-            .with_resume(self.resume && !self.refresh.contains(&(stage, page))),
+            .with_resume(self.resume && !self.refresh.contains(&(stage, page)))
+            .with_cleanup_check(self.check_cleanup),
             self.stop.clone(),
             self.progress.clone(),
             self.policy.retries,
@@ -283,7 +295,11 @@ impl<'a> Execution<'a> {
             .rebase_on(&self.scene)
             .and_then(|patch| {
                 patch.validate_on(&self.scene)?;
-                Ok(patch.with_label(format!("Pipeline {stage} for page {page}")))
+                Ok(if self.check_cleanup {
+                    patch
+                } else {
+                    patch.with_label(format!("Pipeline {stage} for page {page}"))
+                })
             })
             .context("failed to rebase stage output onto the latest scene")
             .map_err(|error| PipelineError::new(ErrorKind::InvalidOutput, Some(stage), error))?;

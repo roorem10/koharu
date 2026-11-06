@@ -174,6 +174,8 @@ function JobItem({ job }: { job: Job }) {
           <span className='block truncate text-[12px] font-medium capitalize'>
             {job.auto_run?.step
               ? t(`autoRun.steps.${job.auto_run.step}`)
+              : job.operation?.operation === 'check_cleanup'
+                ? t('cleanup.check')
               : job.stage
                 ? t(`phase.${job.stage}`, { defaultValue: job.stage })
                 : t('activity.processing')}

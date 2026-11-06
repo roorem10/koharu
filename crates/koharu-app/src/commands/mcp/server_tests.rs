@@ -108,6 +108,8 @@ impl Host for FakeHost {
             "read_qc",
             "run_qc_fixes",
             "mark_qc_item_ok",
+            "get_cleanup_check_results",
+            "check_cleanup",
             "set_translation",
             "run_pipeline",
             "fails",
@@ -131,7 +133,7 @@ impl Host for FakeHost {
                 control.cancelled().await;
                 Err(anyhow!("pipeline processing was cancelled"))
             }
-            "set_translation" | "run_qc_fixes" | "mark_qc_item_ok" => {
+            "set_translation" | "run_qc_fixes" | "mark_qc_item_ok" | "check_cleanup" => {
                 self.edits.fetch_add(1, Ordering::SeqCst);
                 Invocation::changed(json!({ "changed": true }))
             }
@@ -402,6 +404,15 @@ async fn edits_are_refused_even_when_called_directly() {
     );
     assert_eq!(
         rpc(server.call(&session, 3, "ready_check").await).await["result"]["isError"],
+        false
+    );
+    assert_eq!(
+        rpc(server.call(&session, 4, "check_cleanup").await).await["result"]["isError"],
+        true
+    );
+    assert_eq!(host.edits.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        rpc(server.call(&session, 5, "get_cleanup_check_results").await).await["result"]["isError"],
         false
     );
     server.stop().await;

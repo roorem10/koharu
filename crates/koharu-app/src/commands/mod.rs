@@ -229,6 +229,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             cleanup::get_cleanup_settings,
             cleanup::save_cleanup_settings,
             cleanup::clean_areas,
+            cleanup::check::check_cleanup,
+            cleanup::check::get_cleanup_check_results,
             // WO-10 (skew and perspective) commands go here.
             warp::get_text_warp,
             warp::set_text_warp,

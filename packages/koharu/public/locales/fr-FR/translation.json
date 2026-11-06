@@ -189,6 +189,16 @@
     "noSeries": "Aucune série"
   },
   "cleanup": {
+    "check": "Vérifier le nettoyage",
+    "checkPage": "Vérifier cette page",
+    "checkAll": "Vérifier toutes les pages",
+    "secondTryModel": "Modèle du deuxième essai",
+    "sameModel": "Identique au nettoyage habituel",
+    "secondTryHelp": "Si du texte reste dans une zone nettoyée, la nettoyer une seconde fois avec ce modèle. Les retouches manuelles sont conservées.",
+    "checkResults": "Résultats de la vérification",
+    "retryReason": "Deuxième essai : le texte restant chevauche une zone nettoyée.",
+    "protectedReason": "Nouvel essai automatique ignoré : le calque de nettoyage contient des retouches manuelles ou non suivies.",
+    "clearResult": "Aucun texte restant détecté.",
     "title": "Nettoyage",
     "removeHint": "Faites glisser avec Shift pour sélectionner un rectangle. Enter : nettoyer les zones en attente. Esc : effacer.",
     "queued_one": "{{count}} zone en attente",
@@ -729,6 +739,7 @@
     "settingsFailed": "Impossible de charger les paramètres QC.",
     "retry": "Réessayer",
     "checks": {
+      "leftover_cleanup": "Texte restant après nettoyage",
       "overflow": "Le texte déborde de la zone",
       "too_small": "Texte trop petit : {{detail}} px",
       "missing_translation": "Traduction manquante",

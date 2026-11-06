@@ -42,6 +42,8 @@ pub(super) const READ_TOOLS: &[&str] = &[
     "view_page",
     "view_page",
     "read_qc",
+    "view_page",
+    "get_cleanup_check_results",
     "get_project_summary",
 ];
 type HttpResponse = Response<BoxBody<Bytes, Infallible>>;

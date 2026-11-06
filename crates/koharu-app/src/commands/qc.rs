@@ -37,6 +37,7 @@ pub(crate) enum QcCheck {
     MissingTranslation,
     EmptySource,
     LeftoverSource,
+    LeftoverCleanup,
     OddFont,
     Flag,
     AutoFixed,
@@ -51,6 +52,7 @@ impl QcCheck {
             Self::MissingTranslation => "missing_translation",
             Self::EmptySource => "empty_source",
             Self::LeftoverSource => "leftover_source",
+            Self::LeftoverCleanup => "leftover_cleanup",
             Self::OddFont => "odd_font",
             Self::Flag => "flag",
             Self::AutoFixed => "auto_fixed",
@@ -69,6 +71,9 @@ pub(crate) struct QcFinding {
     pub detail: String,
     pub translation: String,
     pub flag: Option<Flag>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    pub bounds: Option<koharu_pipeline::Bounds>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Type)]
@@ -377,7 +382,7 @@ pub(crate) async fn run_checks(
             );
             cache.report(&snapshot, &context)
         },
-    );
+    )?;
     review::append_hidden(&snapshot, &context, &mut report)?;
     Ok(report)
 }
@@ -528,7 +533,7 @@ pub(crate) async fn get_qc_results(
     let context = project.load_context()?;
     let mut report = cache::with_cache(&snapshot, project.directory(), |cache| {
         cache.report(&snapshot, &context)
-    });
+    })?;
     review::append_hidden(&snapshot, &context, &mut report)?;
     Ok(report)
 }
@@ -607,6 +612,7 @@ fn push_finding(
         detail,
         translation: row.translation.clone(),
         flag,
+        bounds: None,
     };
     if finding_hidden(context, &finding) {
         report.hidden.push(finding);

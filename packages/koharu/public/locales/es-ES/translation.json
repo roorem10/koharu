@@ -189,6 +189,16 @@
     "noSeries": "Sin serie"
   },
   "cleanup": {
+    "check": "Comprobar limpieza",
+    "checkPage": "Comprobar esta página",
+    "checkAll": "Comprobar todas las páginas",
+    "secondTryModel": "Modelo para el segundo intento",
+    "sameModel": "El mismo que en la limpieza normal",
+    "secondTryHelp": "Si queda texto en un área limpiada, vuelve a limpiarla una vez con este modelo. Se conservan los retoques a mano.",
+    "checkResults": "Resultados de la comprobación",
+    "retryReason": "Segundo intento: el texto restante se superpone a un área limpiada.",
+    "protectedReason": "Se omitió el reintento automático: la capa de limpieza tiene retoques manuales o sin seguimiento.",
+    "clearResult": "No se encontró texto restante.",
     "title": "Limpieza",
     "removeHint": "Arrastra con Shift para seleccionar un rectángulo. Enter: limpiar áreas en cola. Esc: borrar.",
     "queued_one": "{{count}} área en cola",
@@ -729,6 +739,7 @@
     "settingsFailed": "No se han podido cargar los ajustes de QC.",
     "retry": "Intentar de nuevo",
     "checks": {
+      "leftover_cleanup": "Texto restante en la limpieza",
       "overflow": "El texto desborda el cuadro",
       "too_small": "Texto pequeño: {{detail}} px",
       "missing_translation": "Falta la traducción",

@@ -188,6 +188,16 @@
     "noSeries": "無系列"
   },
   "cleanup": {
+    "check": "檢查清理結果",
+    "checkPage": "檢查目前頁面",
+    "checkAll": "檢查全部頁面",
+    "secondTryModel": "第二次嘗試使用的模型",
+    "sameModel": "與一般清理相同",
+    "secondTryHelp": "如果已清理的區域仍有文字，使用此模型再清理一次。手繪修改會被保留。",
+    "checkResults": "清理檢查結果",
+    "retryReason": "第二次嘗試：殘留文字與已清理區域重疊。",
+    "protectedReason": "已略過自動重試：清理圖層含有手動修改或未記錄的修改。",
+    "clearResult": "未發現殘留文字。",
     "title": "清理",
     "removeHint": "按住 Shift 拖曳以選取矩形區域。Enter：清理佇列中的區域。Esc：清空。",
     "queued_one": "{{count}} 個區域已加入佇列",
@@ -721,6 +731,7 @@
     "settingsFailed": "無法載入 QC 設定。",
     "retry": "再試一次",
     "checks": {
+      "leftover_cleanup": "清理後的殘留文字",
       "overflow": "文字超出文字框",
       "too_small": "字級過小：{{detail}} px",
       "missing_translation": "缺少譯文",

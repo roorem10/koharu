@@ -153,6 +153,8 @@ export const commands = {
 	getCleanupSettings: () => __TAURI_INVOKE<CleanupSettings>("get_cleanup_settings"),
 	saveCleanupSettings: (settings: CleanupSettings) => __TAURI_INVOKE<CleanupSettings>("save_cleanup_settings", { settings }),
 	cleanAreas: (page: EntityId, strokes: CleanupStroke[], rects: CleanupRect[]) => __TAURI_INVOKE<JobId>("clean_areas", { page, strokes, rects }),
+	checkCleanup: (pages: EntityId[] | null) => __TAURI_INVOKE<JobId>("check_cleanup", { pages }),
+	getCleanupCheckResults: () => __TAURI_INVOKE<CleanupCheckResult[]>("get_cleanup_check_results"),
 	getTextWarp: (layers: EntityId[]) => __TAURI_INVOKE<(TextWarp | null)[]>("get_text_warp", { layers }),
 	setTextWarp: (layers: EntityId[], warp: TextWarp | null) => __TAURI_INVOKE<null>("set_text_warp", { layers, warp }),
 	getRawPrepSettings: () => __TAURI_INVOKE<RawPrepSettings>("get_raw_prep_settings"),
@@ -374,6 +376,14 @@ export type Character = {
 
 export type ClaudeConfig = Record<string, never>;
 
+export type CleanupCheckResult = {
+	page: EntityId,
+	layer: EntityId,
+	findings: Bounds[],
+	retried: boolean,
+	protected: boolean,
+};
+
 export type CleanupRect = {
 	x: number,
 	y: number,
@@ -385,6 +395,7 @@ export type CleanupSettings = {
 	remove_mode?: RemoveMode,
 	paint_target?: PaintTarget,
 	grow_px?: number,
+	second_try_model?: InpaintingModel | null,
 };
 
 export type CleanupStroke = {
@@ -801,7 +812,7 @@ export type OpenAiConfig = Record<string, never>;
 
 export type OpenRouterConfig = Record<string, never>;
 
-export type Operation = { operation: "full" } | { operation: "through"; stage: Stage } | { operation: "only"; stage: Stage } | { operation: "stages"; stages: Stage[] };
+export type Operation = { operation: "full" } | { operation: "check_cleanup" } | { operation: "through"; stage: Stage } | { operation: "only"; stage: Stage } | { operation: "stages"; stages: Stage[] };
 
 export type OuterPart = {
 	outer_stroke_width: number | null,
@@ -956,6 +967,7 @@ export type ProviderPreferences = {
 };
 
 export type QcCheck = "overflow" | "too_small" | "missing_translation" | "empty_source" | "leftover_source" | "odd_font" | "flag" | "auto_fixed" | "lettering_unsure";
+export type QcCheck = "overflow" | "too_small" | "missing_translation" | "empty_source" | "leftover_source" | "leftover_cleanup" | "odd_font" | "flag";
 
 export type QcFinding = {
 	page: EntityId,
@@ -966,6 +978,7 @@ export type QcFinding = {
 	detail: string,
 	translation: string,
 	flag: Flag | null,
+	bounds?: Bounds | null,
 };
 
 export type QcFixAction = "tighten_layout" | "shorten_translation" | "translate_missing" | "translate_leftover" | "translate_glossary" | "apply_category_style" | "read_again" | "hide_empty";

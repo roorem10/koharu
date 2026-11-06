@@ -1,6 +1,6 @@
 pub mod bubble_shape;
 mod detection;
-mod inpainting;
+pub(crate) mod inpainting;
 mod ocr;
 mod translation;
 
@@ -21,16 +21,18 @@ const EMPTY_MASK: &str = "dev.koharu.mask.empty";
 
 #[derive(Clone)]
 pub(crate) struct StageInput {
-    scene: koharu_scene::Snapshot,
-    page: EntityId,
+    pub(crate) scene: koharu_scene::Snapshot,
+    pub(crate) page: EntityId,
     entities: Option<Arc<BTreeSet<EntityId>>>,
     region: Option<Bounds>,
-    images: Arc<ImageCache>,
+    pub(crate) images: Arc<ImageCache>,
     inpainting_mask: Option<InpaintingMask>,
     translation_hints: Arc<TranslationHints>,
     redetect: bool,
     resume: bool,
     refresh: bool,
+    pub(crate) cleanup_check: bool,
+    cleanup_retry: bool,
 }
 
 impl StageInput {
@@ -53,6 +55,8 @@ impl StageInput {
             redetect: false,
             resume: false,
             refresh: false,
+            cleanup_check: false,
+            cleanup_retry: false,
         }
     }
 
@@ -84,6 +88,16 @@ impl StageInput {
         self.page
     }
 
+    pub(crate) fn with_cleanup_check(mut self, value: bool) -> Self {
+        self.cleanup_check = value;
+        self
+    }
+
+    pub(crate) fn with_cleanup_retry(mut self) -> Self {
+        self.cleanup_retry = true;
+        self
+    }
+
     fn contains_entity(&self, entity: EntityId) -> Result<bool> {
         crate::scope::contains_entity(
             &self.scene,
@@ -96,7 +110,7 @@ impl StageInput {
 }
 
 #[async_trait]
-trait StageProcessor: Send + Sync {
+pub(crate) trait StageProcessor: Send + Sync {
     fn model(&self) -> &'static str;
     fn skip(&self, _input: &StageInput) -> Result<bool> {
         Ok(false)
@@ -114,6 +128,14 @@ pub(crate) struct Stages {
 }
 
 impl Stages {
+    pub(crate) async fn detect_image(
+        &self,
+        image: Arc<image::DynamicImage>,
+    ) -> Result<koharu_ml::koharu_layout_rfdetr_seg_2xl::KoharuLayoutDetections> {
+        self.detection.load().await?;
+        self.detection.detect_image(image).await
+    }
+
     pub(crate) fn new(
         config: &PipelineConfig,
         translator: koharu_translator::Translator,

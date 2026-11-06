@@ -188,6 +188,16 @@
     "noSeries": "シリーズなし"
   },
   "cleanup": {
+    "check": "クリーニングを確認",
+    "checkPage": "このページを確認",
+    "checkAll": "全ページを確認",
+    "secondTryModel": "再試行に使うモデル",
+    "sameModel": "通常のクリーニングと同じ",
+    "secondTryHelp": "クリーニング済みの領域に文字が残っている場合、このモデルでもう一度だけ処理します。手描きの修正は保持されます。",
+    "checkResults": "クリーニングの確認結果",
+    "retryReason": "再試行：残った文字がクリーニング済みの領域と重なっています。",
+    "protectedReason": "自動再試行をスキップ：クリーニングレイヤーに手動または履歴不明の修正があります。",
+    "clearResult": "残った文字は見つかりませんでした。",
     "title": "クリーンアップ",
     "removeHint": "Shiftを押しながらドラッグで長方形を選択。Enter：待機中の領域をクリーンアップ。Esc：クリア。",
     "queued_one": "{{count}}個の領域が待機中",
@@ -721,6 +731,7 @@
     "settingsFailed": "QC設定を読み込めませんでした。",
     "retry": "再試行",
     "checks": {
+      "leftover_cleanup": "クリーニング後に残った文字",
       "overflow": "テキストがボックスからはみ出しています",
       "too_small": "文字が小さい：{{detail}} px",
       "missing_translation": "翻訳がありません",

@@ -188,6 +188,16 @@
     "noSeries": "Seri yok"
   },
   "cleanup": {
+    "check": "Temizliği kontrol et",
+    "checkPage": "Bu sayfayı kontrol et",
+    "checkAll": "Tüm sayfaları kontrol et",
+    "secondTryModel": "İkinci deneme modeli",
+    "sameModel": "Normal temizlikle aynı",
+    "secondTryHelp": "Temizlenen alanda metin kalırsa bu modelle bir kez daha temizlenir. Elle yapılan rötuşlar korunur.",
+    "checkResults": "Temizlik kontrolü sonuçları",
+    "retryReason": "İkinci deneme: kalan metin temizlenmiş bir alanla örtüşüyor.",
+    "protectedReason": "Otomatik yeniden deneme atlandı: Temizlik katmanında elle yapılmış veya kaydı olmayan düzenlemeler var.",
+    "clearResult": "Kalan metin bulunamadı.",
     "title": "Temizleme",
     "removeHint": "Dikdörtgen seçmek için Shift basılıyken sürükleyin. Enter: kuyruktaki alanları temizle. Esc: sıfırla.",
     "queued_one": "Kuyrukta {{count}} alan",
@@ -721,6 +731,7 @@
     "settingsFailed": "Kalite denetimi ayarları yüklenemedi.",
     "retry": "Tekrar dene",
     "checks": {
+      "leftover_cleanup": "Temizlikten sonra kalan metin",
       "overflow": "Metin kutudan taşıyor",
       "too_small": "Küçük metin: {{detail}} px",
       "missing_translation": "Eksik çeviri",

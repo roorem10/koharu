@@ -56,7 +56,7 @@ impl Cache {
             .unwrap_or_else(|| Self::empty(snapshot))
     }
 
-    pub fn report(&self, snapshot: &Snapshot, context: &ProjectContext) -> QcReport {
+    pub fn report(&self, snapshot: &Snapshot, context: &ProjectContext) -> anyhow::Result<QcReport> {
         let mut report = QcReport {
             revision: snapshot.revision(),
             findings: Vec::new(),
@@ -78,7 +78,27 @@ impl Cache {
                 }
             }
         }
-        report
+        // Cleanup checks have their own observed-image dependencies. Read them from
+        // the snapshot so they appear immediately and disappear after repainting.
+        for result in koharu_pipeline::cleanup_check::results(snapshot)? {
+            if !self.pages.contains_key(&result.page) {
+                report.pages_checked += 1;
+            }
+            let label = snapshot.page(result.page)?.page()?.label;
+            for bounds in result.findings {
+                report.findings.push(QcFinding {
+                    page: result.page,
+                    page_label: label.clone(),
+                    layer: result.layer,
+                    check: super::QcCheck::LeftoverCleanup,
+                    detail: String::new(),
+                    translation: String::new(),
+                    flag: None,
+                    bounds: Some(bounds),
+                });
+            }
+        }
+        Ok(report)
     }
 
     pub fn save(&mut self, directory: Option<&Path>, snapshot: &Snapshot, complete: bool) {
@@ -156,6 +176,7 @@ mod tests {
                 detail: "Review this line".into(),
                 translation: "Hello".into(),
                 flag: Some(flag.clone()),
+                bounds: None,
             });
         cache.save(Some(directory.path()), &snapshot, true);
         assert_eq!(

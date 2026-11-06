@@ -8,9 +8,15 @@ import {
   defaultCleanupSettings,
   useCleanupSettings,
 } from '@/components/cleanup/settings'
+import {
+  defaultModel,
+  modelNames,
+  modelOptions,
+  type ModelName,
+} from '@/components/preferences/models'
 import { call } from '@/lib/backend'
 import { queryClient } from '@/lib/queries'
-import { commands, type CleanupSettings } from '@koharu/bridge/protocol'
+import { commands, type CleanupSettings, type InpaintingModel } from '@koharu/bridge/protocol'
 import {
   Select,
   SelectContent,
@@ -33,6 +39,36 @@ export function CleanupPreferences() {
   const disabled = !settings.data || save.isPending
   return (
     <PreferenceSection title={t('cleanup.title')}>
+      <PreferenceRow title={t('cleanup.secondTryModel')} description={t('cleanup.secondTryHelp')}>
+        <Select
+          value={value.second_try_model?.model ?? 'same'}
+          disabled={disabled}
+          items={{
+            same: t('cleanup.sameModel'),
+            ...Object.fromEntries(modelOptions.inpainting.map((name) => [name, modelNames[name]])),
+          }}
+          onValueChange={(name) => {
+            if (name)
+              save.mutate({
+                ...value,
+                second_try_model:
+                  name === 'same' ? null : (defaultModel(name as ModelName) as InpaintingModel),
+              })
+          }}
+        >
+          <SelectTrigger aria-label={t('cleanup.secondTryModel')} className='h-8 min-w-0 text-xs'>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='same'>{t('cleanup.sameModel')}</SelectItem>
+            {modelOptions.inpainting.map((name) => (
+              <SelectItem key={name} value={name}>
+                {modelNames[name]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </PreferenceRow>
       <PreferenceRow title={t('cleanup.removeMode')} description={t('cleanup.queueHelp')}>
         <Select
           value={value.remove_mode}

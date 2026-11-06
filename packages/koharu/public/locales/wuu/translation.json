@@ -188,6 +188,16 @@
     "noSeries": "呒没系列"
   },
   "cleanup": {
+    "check": "检查清理结果",
+    "checkPage": "检查搿页",
+    "checkAll": "检查全部页面",
+    "secondTryModel": "第二趟试个模型",
+    "sameModel": "搭平常清理一样",
+    "secondTryHelp": "清理过个地方要是还有字，就用搿只模型再清理一趟。手工涂改个内容会保留。",
+    "checkResults": "清理检查结果",
+    "retryReason": "第二趟试：剩下来个字搭清理过个地方重叠。",
+    "protectedReason": "跳过自动重试：清理图层里有手工修改，或是来历呒没记录个修改。",
+    "clearResult": "呒没寻着剩下来个字。",
     "title": "清理",
     "removeHint": "按牢 Shift 拖动来选矩形。Enter：清理队列里向个区域。Esc：清空。",
     "queued_one": "{{count}} 个区域来勒排队",
@@ -721,6 +731,7 @@
     "settingsFailed": "质检设置加载失败哉。",
     "retry": "再试一趟",
     "checks": {
+      "leftover_cleanup": "清理后剩下来个字",
       "overflow": "文字超出文字框哉",
       "too_small": "字太小：{{detail}} px",
       "missing_translation": "缺少译文",

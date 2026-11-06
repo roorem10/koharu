@@ -133,6 +133,31 @@ impl Pipeline {
             .await
     }
 
+    /// Check pages or a whole project, retry each unchanged cleanup at most
+    /// once, and commit through the normal stoppable pipeline job lifecycle.
+    #[tracing::instrument(skip_all)]
+    pub async fn check_cleanup(
+        &self,
+        snapshot: Snapshot,
+        scope: crate::Scope,
+        stop: crate::StopToken,
+        progress: Option<crate::ProgressSink>,
+        committer: &mut dyn Committer,
+    ) -> std::result::Result<Report, PipelineError> {
+        self.execute(
+            snapshot,
+            Request {
+                operation: crate::Operation::CheckCleanup,
+                scope,
+                stop,
+                progress,
+                ..Request::default()
+            },
+            committer,
+        )
+        .await
+    }
+
     #[tracing::instrument(skip_all)]
     pub async fn execute(
         &self,

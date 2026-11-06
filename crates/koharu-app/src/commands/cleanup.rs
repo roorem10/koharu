@@ -16,6 +16,7 @@ use super::{
     project::CurrentProject,
 };
 
+pub(crate) mod check;
 pub(crate) mod stroke;
 #[cfg(test)]
 mod tests;
