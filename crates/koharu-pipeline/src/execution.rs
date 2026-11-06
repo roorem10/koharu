@@ -313,7 +313,7 @@ impl<'a> Execution<'a> {
             .await
             .with_context(|| format!("failed to commit {stage} output for page {page}"))
             .map_err(|error| PipelineError::new(ErrorKind::Commit, Some(stage), error))?;
-        validate_commit(&self.scene, &next)
+        validate_commit(&self.scene, &next, self.committer.publishes())
             .map_err(|error| PipelineError::new(ErrorKind::Commit, Some(stage), error))?;
         self.scene = next;
         Ok(true)
@@ -370,13 +370,13 @@ impl<'a> Execution<'a> {
     }
 }
 
-fn validate_commit(previous: &Snapshot, next: &Snapshot) -> Result<()> {
+fn validate_commit(previous: &Snapshot, next: &Snapshot, published: bool) -> Result<()> {
     ensure!(
         previous.project_id() == next.project_id(),
         "committer returned a snapshot from another project"
     );
     ensure!(
-        next.revision() > previous.revision(),
+        !published || next.revision() > previous.revision(),
         "committer did not advance the scene revision"
     );
     Ok(())
