@@ -8,9 +8,9 @@ use koharu_pipeline::{
 };
 use koharu_renderer::TextStyles;
 use koharu_scene::{
-    At, Authored, BubbleRegion, Commit, EntityId, Geometry, OcrAnalysis, Origin, Region,
-    RegionSpec as _, Snapshot, SourceText, StrokeMethod, TextAlignment, TextDirection, TextLayout,
-    TextLayoutKind, TextRegion, TextRole, Translation, Typography, WritingMode,
+    At, Authored, BubbleRegion, Commit, EntityId, Geometry, OcrAnalysis, Origin, RecognizedFrom,
+    Region, RegionSpec as _, Snapshot, SourceText, StrokeMethod, TextAlignment, TextDirection,
+    TextLayout, TextLayoutKind, TextRegion, TextRole, Translation, Typography, WritingMode,
 };
 
 use super::{
@@ -22,6 +22,8 @@ use crate::commands::{
     boxes::create::{BoxDraft, add_detected_style_box},
     project::Project,
 };
+
+pub(crate) const SFX_SUBTITLE_SOURCE: &str = "dev.booharu.sfx-source";
 
 pub(super) fn page_of(snapshot: &Snapshot, mut id: EntityId) -> Result<EntityId> {
     while let Some(parent) = snapshot.parent(id)? {
@@ -228,7 +230,7 @@ impl Project {
         layer: EntityId,
         settings: &OcrBoxSettings,
         styles: &TextStyles,
-    ) -> Result<(Commit, EntityId, bool)> {
+    ) -> Result<(Option<Commit>, EntityId, bool)> {
         let snapshot = self.snapshot();
         ensure!(
             self.load_context()?
@@ -236,6 +238,15 @@ impl Project {
                 .is_some_and(|label| label.value == LetteringCategory::Sfx),
             "select an SFX box to add a subtitle"
         );
+        let page = page_of(&snapshot, layer)?;
+        let source_id = layer.to_string();
+        for candidate in snapshot.page(page)?.text_layers()? {
+            if candidate.typography()?.is_some_and(|typography| {
+                typography.extensions.get(SFX_SUBTITLE_SOURCE) == Some(&source_id)
+            }) {
+                return Ok((None, candidate.id(), false));
+            }
+        }
         let text = snapshot.text_layer(layer)?;
         let content = text.content()?;
         let source = content.source()?;
@@ -243,9 +254,16 @@ impl Project {
             .translation()?
             .filter(|text| !text.text.value.trim().is_empty());
         let needs_translation = translation.is_none();
-        let page = page_of(&snapshot, layer)?;
+        ensure!(
+            !needs_translation
+                || source
+                    .as_ref()
+                    .is_some_and(|text| !text.text.value.trim().is_empty()),
+            "read or enter the SFX text before adding its subtitle"
+        );
         let size = snapshot.page(page)?.page()?;
         let geometry = box_geometry(&snapshot, layer, false)?;
+        let source_geometry = box_geometry(&snapshot, layer, true)?;
         let bounds = extents(&geometry)?;
         let direction = if let Some(region) = content.source_region()? {
             snapshot
@@ -286,9 +304,22 @@ impl Project {
         typography.outer_stroke_width = None;
         typography.writing_mode = Some(WritingMode::Horizontal);
         typography.alignment = Some(TextAlignment::Start);
+        typography
+            .extensions
+            .insert(SFX_SUBTITLE_SOURCE.into(), source_id);
         let mut created = None;
         let patch = snapshot.patch(|edit| {
             let content = edit.add_text_content(page, At::End)?;
+            // Give rereading and cleanup their own copy of the original crop. Sharing
+            // the SFX region would pull the original into entity-scoped pipeline runs.
+            // Content owns this private region so deleting the subtitle removes both.
+            let region = edit.add_analysis_region::<TextRegion>(
+                content,
+                At::End,
+                &source_geometry,
+                None,
+            )?;
+            edit.relate::<RecognizedFrom>(content, region)?;
             let mut source = source.unwrap_or(SourceText {
                 text: Authored::user(String::new()),
                 language: None,
@@ -326,6 +357,6 @@ impl Project {
                 return Err(error);
             }
         };
-        Ok((commit, added, needs_translation))
+        Ok((Some(commit), added, needs_translation))
     }
 }

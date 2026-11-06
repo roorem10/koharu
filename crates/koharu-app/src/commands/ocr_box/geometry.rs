@@ -130,17 +130,27 @@ pub(super) fn subtitle_rect(
 ) -> Bounds {
     let subtitle_width = (f64::from(size) * 12.).min(width);
     let subtitle_height = (f64::from(size) * 2.8).min(height);
+    let left = source.x - subtitle_width - 6.;
+    let right = source.x + source.width + 6.;
+    let below = source.y + source.height + 6.;
+    let above = source.y - subtitle_height - 6.;
     Bounds {
         x: (if vertical {
-            source.x - subtitle_width - 6.
+            if left < 0. && right + subtitle_width <= width {
+                right
+            } else {
+                left
+            }
         } else {
             source.x
         })
         .clamp(0., width - subtitle_width),
         y: (if vertical {
             source.y
+        } else if below + subtitle_height > height && above >= 0. {
+            above
         } else {
-            source.y + source.height + 6.
+            below
         })
         .clamp(0., height - subtitle_height),
         width: subtitle_width,
@@ -405,6 +415,36 @@ mod tests {
         };
         assert!(subtitle_rect(source, true, 18., 500., 500.).x < source.x);
         assert!(subtitle_rect(source, false, 18., 500., 500.).y > source.y);
+    }
+
+    #[test]
+    fn subtitles_use_the_other_side_when_the_preferred_side_has_no_room() {
+        let vertical = Bounds {
+            x: 0.,
+            y: 20.,
+            width: 30.,
+            height: 100.,
+        };
+        let beside = subtitle_rect(vertical, true, 18., 500., 500.);
+        assert!(beside.x >= vertical.x + vertical.width);
+        let horizontal = Bounds {
+            x: 20.,
+            y: 470.,
+            width: 100.,
+            height: 30.,
+        };
+        let above = subtitle_rect(horizontal, false, 18., 500., 500.);
+        assert!(above.y + above.height <= horizontal.y);
+        let oversized = subtitle_rect(horizontal, false, 4096., 500., 500.);
+        assert_eq!(
+            oversized,
+            Bounds {
+                x: 0.,
+                y: 0.,
+                width: 500.,
+                height: 500.,
+            }
+        );
     }
 
     #[test]

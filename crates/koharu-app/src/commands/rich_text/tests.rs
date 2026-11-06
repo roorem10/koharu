@@ -654,7 +654,74 @@ async fn translation_reset_clears_runs_manual_typography_and_warp_but_leaves_ski
 }
 
 #[tokio::test]
-async fn new_translation_hints_can_write_runs_in_the_same_reset_commit() {
+async fn subtitle_translation_keeps_its_style_without_a_spurious_reset_commit() {
+    for has_word_styles in [false, true] {
+        let (mut project, [layer, source]) = fixture(false).await;
+        let mut typography = changed_typography();
+        typography.size = Some(18.);
+        typography.auto_fit = false;
+        typography.writing_mode = Some(WritingMode::Horizontal);
+        typography.extensions.insert(
+            crate::commands::ocr_box::SFX_SUBTITLE_SOURCE.into(),
+            source.to_string(),
+        );
+        let layout = TextLayout {
+            origin: Origin::User,
+            kind: TextLayoutKind::Paragraph,
+            angle_degrees: Some(15.),
+            warp: Some(TextWarp::Skew {
+                x_degrees: 10.,
+                y_degrees: 2.,
+            }),
+        };
+        let patch = project
+            .snapshot()
+            .patch(|edit| {
+                edit.set(layer, &typography)?;
+                edit.set(layer, &layout)?;
+                if has_word_styles {
+                    edit.set(layer, &runs(6, 11))?;
+                }
+                Ok(())
+            })
+            .unwrap();
+        project.commit(patch).await.unwrap();
+        let stage = machine_translation(&mut project, &[layer]).await;
+        project.record_commit(&stage);
+        let revision = project.revision();
+        let reset = reset_translation_styles(
+            &mut project,
+            &stage,
+            &TextStyles::default(),
+            false,
+            |_, _, layers| {
+                assert_eq!(layers, &[layer]);
+                Ok(())
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(reset.is_some(), has_word_styles);
+        if !has_word_styles {
+            assert_eq!(project.revision(), revision);
+            assert_eq!(project.undo.len(), 1);
+        }
+        let snapshot = project.snapshot();
+        assert_eq!(
+            snapshot.component::<Typography>(layer).unwrap(),
+            Some(typography)
+        );
+        assert_eq!(
+            snapshot.component::<TextLayout>(layer).unwrap(),
+            Some(layout)
+        );
+        assert!(snapshot.component::<TextRuns>(layer).unwrap().is_none());
+        assert_eq!(shown_text(&snapshot, layer).unwrap(), "new words");
+    }
+}
+
+#[tokio::test]
+async fn translation_and_fresh_word_styles_undo_and_redo_as_one_stage() {
     let (mut project, [layer, _]) = fixture(true).await;
     project
         .set_word_style(layer, 6, 11, style_patch(bold()))
@@ -675,14 +742,20 @@ async fn new_translation_hints_can_write_runs_in_the_same_reset_commit() {
     .await
     .unwrap()
     .unwrap();
-    project.record_commit(&commit);
+    project.record(vec![stage.revision, commit.revision]);
+    assert_eq!(project.undo.len(), 1);
     assert_eq!(project.word_styles(layer).unwrap(), runs(0, 3).runs);
     project.undo().await.unwrap();
     assert_eq!(
         project.snapshot().component::<TextRuns>(layer).unwrap(),
         Some(runs(6, 11))
     );
-    assert_eq!(project.word_styles(layer).unwrap(), runs(6, 9).runs);
+    assert_eq!(shown_text(&project.snapshot(), layer).unwrap(), "hello magic!");
+    assert_eq!(project.word_styles(layer).unwrap(), runs(6, 11).runs);
+    assert!(project.undo.is_empty());
+    project.redo().await.unwrap();
+    assert_eq!(shown_text(&project.snapshot(), layer).unwrap(), "new words");
+    assert_eq!(project.word_styles(layer).unwrap(), runs(0, 3).runs);
 }
 
 #[tokio::test]

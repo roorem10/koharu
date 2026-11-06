@@ -440,6 +440,142 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn subtitle_read_uses_its_own_source_crop_without_reading_the_original_sfx() {
+        let (mut session, page, boxes) = manual_boxes().await;
+        let (original, original_content) = boxes[0];
+        let (subtitle, subtitle_content) = boxes[1];
+        let source_geometry = Geometry::rectangle(10., 20., 20., 30.);
+        let display_geometry = Geometry::rectangle(60., 65., 35., 15.);
+        let mut regions = Vec::new();
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                for (content, parent) in [
+                    (original_content, page),
+                    (subtitle_content, subtitle_content),
+                ] {
+                    let region = edit.add_analysis_region::<TextRegion>(
+                        parent,
+                        At::End,
+                        &source_geometry,
+                        None,
+                    )?;
+                    edit.relate::<RecognizedFrom>(content, region)?;
+                    regions.push(region);
+                }
+                edit.set(subtitle, &display_geometry)?;
+                edit.set(
+                    subtitle_content,
+                    &SourceText {
+                        text: Authored::user("copied SFX".into()),
+                        language: None,
+                    },
+                )
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let source = DynamicImage::ImageRgba8(image::RgbaImage::from_fn(100, 100, |x, y| {
+            image::Rgba([x as u8, y as u8, 0, 255])
+        }));
+        let scope = crate::scope::NormalizedScope::new(
+            &snapshot,
+            &crate::Scope::Entities(vec![subtitle]),
+            &[crate::Stage::Ocr],
+        )
+        .unwrap();
+        let input = StageInput::new(
+            snapshot,
+            page,
+            scope.entities(),
+            None,
+            Arc::new(crate::ImageCache::default()),
+            None,
+        );
+        assert!(collect_targets(&input, &source).unwrap().is_empty());
+
+        let reset = session
+            .snapshot()
+            .patch(|edit| {
+                edit.reset_source_text(
+                    subtitle_content,
+                    koharu_scene::ProducerId::new(PRODUCER)?,
+                )
+            })
+            .unwrap();
+        let snapshot = session.commit(reset).await.unwrap().snapshot;
+        let scope = crate::scope::NormalizedScope::new(
+            &snapshot,
+            &crate::Scope::Entities(vec![subtitle]),
+            &[crate::Stage::Ocr],
+        )
+        .unwrap();
+        let selected = scope.entities().unwrap();
+        assert_eq!(selected.len(), 3);
+        for entity in [subtitle, subtitle_content, regions[1]] {
+            assert!(selected.contains(&entity));
+        }
+        for entity in [original, original_content, regions[0]] {
+            assert!(!selected.contains(&entity));
+        }
+        let input = StageInput::new(
+            snapshot,
+            page,
+            scope.entities(),
+            None,
+            Arc::new(crate::ImageCache::default()),
+            None,
+        );
+        let targets = collect_targets(&input, &source).unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].content, subtitle_content);
+        assert_eq!(targets[0].frame, regions[1]);
+        assert!(targets[0].detected);
+        assert_eq!(targets[0].geometry, source_geometry);
+        assert_eq!(
+            targets[0].image.to_rgba8(),
+            source.crop_imm(10, 20, 20, 30).to_rgba8()
+        );
+        let results = infer_text(Arc::new(Mutex::new(())), targets, |_, _| {
+            Ok("reread SFX".into())
+        })
+        .await
+        .unwrap();
+        let patch = ocr_patch(&input, results, "test").unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let content = snapshot.text_layer(subtitle).unwrap().content().unwrap();
+        assert_eq!(content.source().unwrap().unwrap().text.value, "reread SFX");
+        assert_eq!(
+            content.translation().unwrap().unwrap().text.value,
+            "Keep my translation"
+        );
+        assert_eq!(
+            snapshot.component::<Geometry>(subtitle).unwrap().unwrap(),
+            display_geometry
+        );
+        assert!(
+            snapshot
+                .component::<OcrAnalysis>(regions[1])
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            snapshot
+                .component::<OcrAnalysis>(regions[0])
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            snapshot
+                .component::<SourceText>(original_content)
+                .unwrap()
+                .unwrap()
+                .text
+                .value,
+            ""
+        );
+    }
+
+    #[tokio::test]
     async fn skips_a_hand_edited_source_in_a_regionless_layer_even_when_empty() {
         let (mut session, page, boxes) = manual_boxes().await;
         let patch = session

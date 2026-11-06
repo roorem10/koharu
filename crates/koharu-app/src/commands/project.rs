@@ -805,7 +805,10 @@ impl Project {
                         fill_gradient: update.typography.fill_gradient,
                         alignment: update.typography.alignment,
                         writing_mode: update.typography.writing_mode,
-                        extensions: Default::default(),
+                        extensions: snapshot
+                            .component::<SceneTypography>(update.layer)?
+                            .map(|typography| typography.extensions)
+                            .unwrap_or_default(),
                     },
                 )?;
             }

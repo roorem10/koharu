@@ -352,17 +352,21 @@ async fn start_job_inner(
                     let Some(mut commit) = project.commit_rebased(output.patch).await? else {
                         return Ok(project.snapshot());
                     };
-                    project.record_commit(&commit);
                     if output.stage == koharu_pipeline::Stage::Translation {
-                        // WO-11A: a new translation wipes word styles and resets
-                        // the box style (decision 4).
-                        if let Some(reset) =
-                            super::rich_text::after_translation(project, &commit).await?
-                        {
-                            project.record_commit(&reset);
+                        let reset = super::rich_text::after_translation(project, &commit).await;
+                        let mut revisions = vec![commit.revision];
+                        if let Ok(Some(reset)) = &reset {
+                            revisions.push(reset.revision);
+                        }
+                        // Text and its postprocessing are one stage result. Keep
+                        // the committed text undoable even if postprocessing fails.
+                        project.record(revisions);
+                        if let Some(reset) = reset? {
                             commit = reset;
                         }
                         super::context::refresh_flags(project)?;
+                    } else {
+                        project.record_commit(&commit);
                     }
                     let page = project.active_page();
                     (commit, page)

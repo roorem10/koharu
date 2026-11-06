@@ -264,17 +264,27 @@ async fn sfx_subtitle_copies_text_is_small_text_and_undoes_as_one_creation() {
         .create_sfx_subtitle(layer, &OcrBoxSettings::default(), &TextStyles::default())
         .await
         .unwrap();
-    project.record_commit(&commit);
+    project.record_commit(&commit.unwrap());
     assert!(!translate);
     let snapshot = project.snapshot();
     let subtitle = snapshot.text_layer(added).unwrap();
-    assert!(
-        subtitle
-            .content()
-            .unwrap()
-            .source_region()
-            .unwrap()
-            .is_none()
+    let source_region = snapshot
+        .text_layer(layer)
+        .unwrap()
+        .content()
+        .unwrap()
+        .source_region()
+        .unwrap()
+        .unwrap();
+    let subtitle_region = subtitle.content().unwrap().source_region().unwrap().unwrap();
+    assert_ne!(subtitle_region.id(), source_region.id());
+    assert_eq!(
+        subtitle_region.geometry().unwrap(),
+        source_region.geometry().unwrap()
+    );
+    assert_eq!(
+        snapshot.parent(subtitle_region.id()).unwrap(),
+        Some(subtitle.content().unwrap().id())
     );
     assert_eq!(
         subtitle
@@ -316,15 +326,248 @@ async fn sfx_subtitle_copies_text_is_small_text_and_undoes_as_one_creation() {
     assert!(!style.auto_fit);
     assert_eq!(style.color, Some([0, 0, 0, 255]));
     assert_eq!(style.stroke_color, Some([255; 4]));
+    assert_eq!(
+        subtitle
+            .content()
+            .unwrap()
+            .translation()
+            .unwrap()
+            .unwrap()
+            .text
+            .origin,
+        Origin::User
+    );
+    assert!(subtitle.balloon_target().unwrap().is_none());
+    assert!(subtitle.fit_target().unwrap().is_none());
+    assert!(!project.box_action_info(added).unwrap().can_split);
+    assert!(project.split_box(added).await.is_err());
     assert!(
         snapshot
             .asset(page, &koharu_scene::AssetRole::new("text-mask").unwrap())
             .unwrap()
             .is_none()
     );
+    let revision = project.revision();
+    let (duplicate, existing, translate) = project
+        .create_sfx_subtitle(layer, &OcrBoxSettings::default(), &TextStyles::default())
+        .await
+        .unwrap();
+    assert!(duplicate.is_none());
+    assert_eq!(existing, added);
+    assert!(!translate);
+    assert_eq!(project.revision(), revision);
+    assert_eq!(project.undo.len(), 1);
     project.undo().await.unwrap();
     assert!(project.snapshot().text_layer(added).is_err());
+    assert!(project.snapshot().entity(subtitle_region.id()).is_err());
     assert!(project.snapshot().text_layer(layer).is_ok());
+    project.redo().await.unwrap();
+    let (duplicate, existing, translate) = project
+        .create_sfx_subtitle(layer, &OcrBoxSettings::default(), &TextStyles::default())
+        .await
+        .unwrap();
+    assert!(duplicate.is_none());
+    assert_eq!(existing, added);
+    assert!(!translate);
+}
+
+#[tokio::test]
+async fn subtitle_link_survives_style_edits_and_duplicate_requests_preserve_hand_edits() {
+    use crate::commands::{editing::TypographyUpdate, project::Layer};
+    let (mut project, page) = project().await;
+    let directory = tempfile::tempdir().unwrap();
+    project.directory = Some(directory.path().to_owned());
+    let (_, source) = project
+        .create_ocr_box(
+            page,
+            Bounds {
+                x: 10.,
+                y: 20.,
+                width: 80.,
+                height: 30.,
+            },
+            &TextStyles::default(),
+        )
+        .await
+        .unwrap();
+    project.set_source_text(source, "SFX".into()).await.unwrap();
+    project
+        .update_context(|context| context.set_user_category(source, Some(LetteringCategory::Sfx)))
+        .unwrap();
+    let (_, added, _) = project
+        .create_sfx_subtitle(source, &OcrBoxSettings::default(), &TextStyles::default())
+        .await
+        .unwrap();
+    let mut typography = Project::page(&project.snapshot(), page)
+        .unwrap()
+        .layers
+        .into_iter()
+        .find_map(|layer| match layer {
+            Layer::Text { id, typography, .. } if id == added => typography,
+            _ => None,
+        })
+        .unwrap();
+    typography.size = Some(27.);
+    project
+        .set_typography(vec![TypographyUpdate {
+            layer: added,
+            typography,
+        }])
+        .await
+        .unwrap();
+    project
+        .set_translation(added, Some("My subtitle".into()))
+        .await
+        .unwrap();
+    let frame = Geometry::rectangle(100., 200., 200., 60.);
+    project
+        .set_geometries([(added, frame.clone(), 0.)])
+        .await
+        .unwrap();
+    let revision = project.revision();
+    let (commit, existing, translate) = project
+        .create_sfx_subtitle(source, &OcrBoxSettings::default(), &TextStyles::default())
+        .await
+        .unwrap();
+    assert!(commit.is_none());
+    assert_eq!(existing, added);
+    assert!(!translate);
+    assert_eq!(project.revision(), revision);
+    let snapshot = project.snapshot();
+    let subtitle = snapshot.text_layer(added).unwrap();
+    let region = subtitle
+        .content()
+        .unwrap()
+        .source_region()
+        .unwrap()
+        .unwrap()
+        .id();
+    assert_eq!(subtitle.typography().unwrap().unwrap().size, Some(27.));
+    assert_eq!(subtitle.frame().unwrap().unwrap(), frame);
+    assert_eq!(
+        subtitle
+            .content()
+            .unwrap()
+            .translation()
+            .unwrap()
+            .unwrap()
+            .text
+            .value,
+        "My subtitle"
+    );
+
+    let deletion = project.delete_layers(vec![added]).await.unwrap();
+    project.record_commit(&deletion);
+    assert!(project.snapshot().entity(region).is_err());
+    project.undo().await.unwrap();
+    assert!(project.snapshot().entity(region).is_ok());
+    assert_eq!(
+        project
+            .create_sfx_subtitle(source, &OcrBoxSettings::default(), &TextStyles::default())
+            .await
+            .unwrap()
+            .1,
+        added
+    );
+    project.redo().await.unwrap();
+    let (commit, replacement, _) = project
+        .create_sfx_subtitle(source, &OcrBoxSettings::default(), &TextStyles::default())
+        .await
+        .unwrap();
+    assert!(commit.is_some());
+    assert_ne!(replacement, added);
+}
+
+#[tokio::test]
+async fn subtitle_cleanup_uses_original_artwork_after_the_sfx_moves_or_is_deleted() {
+    let (mut project, page) = project().await;
+    let directory = tempfile::tempdir().unwrap();
+    project.directory = Some(directory.path().to_owned());
+    let (_, source) = project
+        .create_ocr_box(
+            page,
+            Bounds {
+                x: 10.,
+                y: 20.,
+                width: 80.,
+                height: 30.,
+            },
+            &TextStyles::default(),
+        )
+        .await
+        .unwrap();
+    project.set_source_text(source, "SFX".into()).await.unwrap();
+    project
+        .update_context(|context| context.set_user_category(source, Some(LetteringCategory::Sfx)))
+        .unwrap();
+    let (_, added, _) = project
+        .create_sfx_subtitle(source, &OcrBoxSettings::default(), &TextStyles::default())
+        .await
+        .unwrap();
+    let subtitle_frame = project
+        .snapshot()
+        .text_layer(added)
+        .unwrap()
+        .frame()
+        .unwrap()
+        .unwrap();
+    let original = Geometry::rectangle(10., 20., 80., 30.);
+    project
+        .set_geometries([(source, Geometry::rectangle(300., 300., 80., 30.), 0.)])
+        .await
+        .unwrap();
+    assert_eq!(box_geometry(&project.snapshot(), added, true).unwrap(), original);
+    assert_eq!(
+        box_geometry(&project.snapshot(), added, false).unwrap(),
+        subtitle_frame
+    );
+    let commit = project.delete_layers(vec![source]).await.unwrap();
+    project.record_commit(&commit);
+    assert!(project.snapshot().text_layer(added).is_ok());
+    assert_eq!(box_geometry(&project.snapshot(), added, true).unwrap(), original);
+    project.undo().await.unwrap();
+    assert_eq!(box_geometry(&project.snapshot(), added, true).unwrap(), original);
+}
+
+#[tokio::test]
+async fn empty_untranslated_sfx_does_not_create_an_invisible_subtitle() {
+    let (mut project, page) = project().await;
+    let directory = tempfile::tempdir().unwrap();
+    project.directory = Some(directory.path().to_owned());
+    let (_, source) = project
+        .create_ocr_box(
+            page,
+            Bounds {
+                x: 10.,
+                y: 20.,
+                width: 80.,
+                height: 30.,
+            },
+            &TextStyles::default(),
+        )
+        .await
+        .unwrap();
+    project
+        .update_context(|context| context.set_user_category(source, Some(LetteringCategory::Sfx)))
+        .unwrap();
+    let revision = project.revision();
+    assert!(
+        project
+            .create_sfx_subtitle(source, &OcrBoxSettings::default(), &TextStyles::default())
+            .await
+            .is_err()
+    );
+    assert_eq!(project.revision(), revision);
+    assert_eq!(
+        project
+            .snapshot()
+            .page(page)
+            .unwrap()
+            .text_layers()
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[tokio::test]
@@ -365,4 +608,13 @@ async fn untranslated_sfx_subtitle_requests_its_own_translation() {
             .unwrap()
             .is_none()
     );
+    let revision = project.revision();
+    let (duplicate, existing, translate) = project
+        .create_sfx_subtitle(layer, &OcrBoxSettings::default(), &TextStyles::default())
+        .await
+        .unwrap();
+    assert!(duplicate.is_none());
+    assert_eq!(existing, added);
+    assert!(!translate);
+    assert_eq!(project.revision(), revision);
 }

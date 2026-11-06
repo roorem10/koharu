@@ -380,6 +380,10 @@ impl Host for KoharuHost {
                     definition::<MovePage>("move_page", "Move a page to a zero-based project index."),
                     definition::<DeletePages>("delete_pages", "Delete pages and their contents."),
                     definition::<AddTextBox>("add_text_box", "Add a paragraph text box to a page."),
+                    definition::<AddSfxSubtitle>(
+                        "add_sfx_subtitle",
+                        "Add an SFX subtitle using its configured style, or return the existing subtitle. The element must be an SFX text layer. Missing translation starts the normal translation job.",
+                    ),
                     definition::<SetText>("set_source_text", "Replace an element's source text."),
                     definition::<SetTranslation>(
                         "set_translation",
@@ -513,6 +517,21 @@ impl Host for KoharuHost {
                     })
                 })
                 .await
+            }
+            "add_sfx_subtitle" => {
+                let arguments: AddSfxSubtitle = arguments(&call)?;
+                let element = entity(&arguments.element)?;
+                let (subtitle, changed) = crate::commands::ocr_box::add_subtitle(
+                    self.handle.clone(),
+                    element,
+                )
+                .await?;
+                let value = json!({ "element": subtitle });
+                if changed {
+                    Invocation::changed(value)
+                } else {
+                    Invocation::read(value)
+                }
             }
             "set_source_text" => {
                 let arguments: SetText = arguments(&call)?;
@@ -846,6 +865,11 @@ fn entities(values: &[String]) -> Result<Vec<EntityId>> {
 
 #[derive(Deserialize, JsonSchema)]
 struct InspectProject {}
+
+#[derive(Deserialize, JsonSchema)]
+struct AddSfxSubtitle {
+    element: String,
+}
 
 #[derive(Deserialize, JsonSchema)]
 struct ViewPage {

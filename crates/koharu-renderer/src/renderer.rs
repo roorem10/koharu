@@ -2120,6 +2120,194 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn fixed_subtitle_keeps_its_frame_and_style_through_updates_and_undo() {
+        let mut session = Session::memory().await.unwrap();
+        let mut ids = None;
+        let create = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 300.0, 200.0), At::End)?;
+                let bubble = edit.add_analysis_region::<BubbleRegion>(
+                    page,
+                    At::End,
+                    &Geometry::rectangle(20.0, 20.0, 260.0, 160.0),
+                    None,
+                )?;
+                let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &SourceText {
+                        text: Authored::user("source SFX".to_owned()),
+                        language: None,
+                    },
+                )?;
+                edit.set(
+                    content,
+                    &Translation {
+                        text: Authored::user("SFX".to_owned()),
+                        language: None,
+                    },
+                )?;
+                let layer = edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &SceneTextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                        warp: None,
+                    },
+                )?;
+                edit.relate::<FlowsIn>(layer, bubble)?;
+                ids = Some((page, layer));
+                Ok(())
+            })
+            .unwrap();
+        let base = session.commit(create).await.unwrap().snapshot;
+        let (page, source) = ids.unwrap();
+        let font = crate::fonts::FontSystem::new().first_font().unwrap();
+        let renderer = Renderer::with_typesetting(TypesettingConfig {
+            font_families: vec![font.family_name().to_owned()],
+        });
+        let original = renderer.render(&base, page).await.unwrap();
+        let geometry = Geometry::rectangle(30.0, 100.0, 216.0, 50.4);
+        let mut typography = Typography {
+            origin: Origin::User,
+            preferred_font: Some(font.family_name().to_owned()),
+            font_weight: None,
+            font_style: None,
+            size: Some(18.0),
+            auto_fit: false,
+            color: Some([0, 0, 0, 255]),
+            stroke_color: Some([255; 4]),
+            stroke_width: Some(2.0),
+            stroke_method: None,
+            stroke_position: None,
+            stroke_join: None,
+            outer_stroke_color: None,
+            outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
+            alignment: Some(TextAlignment::Start),
+            writing_mode: Some(koharu_scene::WritingMode::Horizontal),
+            extensions: BTreeMap::new(),
+        };
+        let mut subtitle = None;
+        let add = base
+            .patch(|edit| {
+                let content = edit.add_text_content(page, At::End)?;
+                let source_region = edit.add_analysis_region::<koharu_scene::TextRegion>(
+                    content,
+                    At::End,
+                    &Geometry::rectangle(140.0, 40.0, 30.0, 50.0),
+                    None,
+                )?;
+                edit.relate::<RecognizedFrom>(content, source_region)?;
+                edit.set(
+                    content,
+                    &SourceText {
+                        text: Authored::user("source SFX".to_owned()),
+                        language: None,
+                    },
+                )?;
+                edit.set(
+                    content,
+                    &Translation {
+                        text: Authored::user("Thud".to_owned()),
+                        language: None,
+                    },
+                )?;
+                let layer = edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &SceneTextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                        warp: None,
+                    },
+                )?;
+                edit.set(layer, &geometry)?;
+                edit.set(layer, &typography)?;
+                subtitle = Some(layer);
+                Ok(())
+            })
+            .unwrap();
+        let added = session.commit(add).await.unwrap();
+        let subtitle = subtitle.unwrap();
+        let with_subtitle = renderer
+            .update(&original, &added.snapshot, &added.changes)
+            .await
+            .unwrap();
+        assert!(Arc::ptr_eq(
+            &original.layer(source).unwrap().0.node,
+            &with_subtitle.layer(source).unwrap().0.node
+        ));
+        assert_eq!(with_subtitle.layer(subtitle).unwrap().geometry(), &geometry);
+        let LayerKind::Text(text) = with_subtitle.layer(subtitle).unwrap().kind() else {
+            panic!("expected subtitle text");
+        };
+        assert_eq!(text.font_size, 18.0);
+        assert_eq!(text.writing_mode, WritingMode::Horizontal);
+        let NodeDescriptor::Text(descriptor) = &with_subtitle.layer(subtitle).unwrap().0.node.descriptor
+        else {
+            panic!("expected subtitle descriptor");
+        };
+        assert!(descriptor.balloon_contour.is_none());
+
+        typography.size = Some(20.0);
+        typography.color = Some([220, 30, 40, 255]);
+        let restyle = added
+            .snapshot
+            .patch(|edit| edit.set(subtitle, &typography))
+            .unwrap();
+        let styled = session.commit(restyle).await.unwrap();
+        let incremental = renderer
+            .update(&with_subtitle, &styled.snapshot, &styled.changes)
+            .await
+            .unwrap();
+        let full = renderer.render(&styled.snapshot, page).await.unwrap();
+        let rasterizer = Rasterizer::new().unwrap();
+        let raster = |frame: &Frame| {
+            rasterizer
+                .rasterize(&frame.raster_frame().unwrap(), RasterOptions::default())
+                .unwrap()
+                .image
+        };
+        assert_eq!(raster(&incremental), raster(&full));
+        assert_ne!(raster(&incremental), raster(&with_subtitle));
+        assert_eq!(incremental.stats().rebuilt_layers, 1);
+        let LayerKind::Text(text) = incremental.layer(subtitle).unwrap().kind() else {
+            panic!("expected styled subtitle text");
+        };
+        assert_eq!(text.font_size, 20.0);
+        assert_eq!(text.color, [220, 30, 40, 255]);
+
+        let undo_style = session.undo(styled.revision).await.unwrap();
+        let restored = renderer
+            .update(&incremental, &undo_style.snapshot, &undo_style.changes)
+            .await
+            .unwrap();
+        assert_eq!(raster(&restored), raster(&with_subtitle));
+        let undo_add = session.undo(added.revision).await.unwrap();
+        let removed = renderer
+            .update(&restored, &undo_add.snapshot, &undo_add.changes)
+            .await
+            .unwrap();
+        assert!(removed.layer(subtitle).is_none());
+        assert_eq!(raster(&removed), raster(&original));
+        let redo_add = session.undo(undo_add.revision).await.unwrap();
+        let redone = renderer
+            .update(&removed, &redo_add.snapshot, &redo_add.changes)
+            .await
+            .unwrap();
+        assert_eq!(raster(&redone), raster(&with_subtitle));
+    }
+
+    #[tokio::test]
     async fn fixing_all_balloon_flows_preserves_pixels_and_rotation() {
         let font = crate::fonts::FontSystem::new().first_font().unwrap();
         let renderer = Renderer::with_typesetting(TypesettingConfig {

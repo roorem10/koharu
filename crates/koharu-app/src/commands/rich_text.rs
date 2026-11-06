@@ -429,6 +429,21 @@ async fn reset_translation_styles(
             .translation()?
             .context("translation was removed")?;
         let current = snapshot.component::<Typography>(layer)?;
+        if let Some(typography) = current.as_ref().filter(|typography| {
+            typography
+                .extensions
+                .contains_key(super::ocr_box::SFX_SUBTITLE_SOURCE)
+        }) {
+            // Subtitle settings and subsequent hand edits own this presentation;
+            // translating its text must not replace them with a lettering preset.
+            updates.push((
+                layer,
+                typography.clone(),
+                snapshot.text_layer(layer)?.layout()?,
+                false,
+            ));
+            continue;
+        }
         let baseline = default_typography(current.as_ref(), &translation, detect_colors);
         let typography = resolver.resolve(&snapshot, layer, &baseline)?;
         let mut layout = snapshot.text_layer(layer)?.layout()?;
@@ -461,7 +476,8 @@ async fn reset_translation_styles(
 /// Called by the processing committer right after a Translation stage commit
 /// (normal runs and Translate again). For every box whose translation that
 /// commit rewrote, removes its word styles and resets its style to the lettering
-/// default (decision 4), then applies fresh emphasis hints in the same patch.
+/// default (decision 4), preserving subtitle presentation, then applies fresh
+/// emphasis hints in the same patch.
 pub(crate) async fn after_translation(
     project: &mut Project,
     commit: &Commit,

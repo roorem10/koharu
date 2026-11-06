@@ -25,6 +25,7 @@ use super::{
     project::CurrentProject,
 };
 use geometry::{rectangle, text_mask, union_mask};
+pub(crate) use operations::SFX_SUBTITLE_SOURCE;
 use operations::{box_geometry, page_of, redo_info, unique_layers};
 use settings::{OcrBoxMode, OcrBoxSettings};
 
@@ -296,6 +297,13 @@ pub(crate) async fn add_sfx_subtitle(
     handle: AppHandle<CefRuntime>,
     layer: EntityId,
 ) -> Result<EntityId, Error> {
+    Ok(add_subtitle(handle, layer).await?.0)
+}
+
+pub(crate) async fn add_subtitle(
+    handle: AppHandle<CefRuntime>,
+    layer: EntityId,
+) -> Result<(EntityId, bool)> {
     ensure_idle(&handle)?;
     let settings = OcrBoxSettings::load()?;
     let styles = super::styles::load_text_styles()?.read()?.clone();
@@ -306,8 +314,13 @@ pub(crate) async fn add_sfx_subtitle(
         let (commit, added, translate) = project
             .create_sfx_subtitle(layer, &settings, &styles)
             .await?;
-        project.record_commit(&commit);
+        if let Some(commit) = &commit {
+            project.record_commit(commit);
+        }
         (commit, added, translate, project.active_page())
+    };
+    let Some(commit) = commit else {
+        return Ok((added, false));
     };
     synchronize(&handle, &commit, active).await?;
     if translate {
@@ -321,5 +334,5 @@ pub(crate) async fn add_sfx_subtitle(
         )
         .await?;
     }
-    Ok(added)
+    Ok((added, true))
 }

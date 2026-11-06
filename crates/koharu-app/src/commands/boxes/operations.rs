@@ -49,6 +49,13 @@ struct TextBox {
 impl TextBox {
     fn read(snapshot: &Snapshot, layer: EntityId) -> Result<Self> {
         let text = snapshot.text_layer(layer)?;
+        if text.typography()?.is_some_and(|typography| {
+            typography
+                .extensions
+                .contains_key(crate::commands::ocr_box::SFX_SUBTITLE_SOURCE)
+        }) {
+            bail!("an SFX subtitle cannot be joined or split as a detected box");
+        }
         let content = text.content()?;
         let region = content
             .source_region()?
@@ -323,7 +330,12 @@ impl Project {
             .map(|bubble| snapshot.relations_to_as::<FlowsIn>(bubble.id()).count())
             .unwrap_or(0);
         Ok(BoxActionInfo {
-            can_split: text.content()?.source_region()?.is_some(),
+            can_split: text.content()?.source_region()?.is_some()
+                && !text.typography()?.is_some_and(|typography| {
+                    typography
+                        .extensions
+                        .contains_key(crate::commands::ocr_box::SFX_SUBTITLE_SOURCE)
+                }),
             bubble_boxes: count as u32,
         })
     }

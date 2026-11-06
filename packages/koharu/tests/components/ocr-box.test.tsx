@@ -9,9 +9,15 @@ import { BoxRedoSection } from '@/components/ocr-box/BoxRedoSection'
 import { ocrBoxSettingsKey } from '@/components/ocr-box/queries'
 import { OcrBoxPreferences } from '@/components/preferences/OcrBoxPreferences'
 import { useCompareStore } from '@/components/qc/compare'
-import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
+import { pageKey, pagesKey, projectKey, queryClient, usePage } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { commands, type Layer, type OcrBoxMode, type OcrBoxSettings } from '@koharu/bridge/protocol'
+import {
+  commands,
+  type Layer,
+  type OcrBoxMode,
+  type OcrBoxSettings,
+  type Page,
+} from '@koharu/bridge/protocol'
 import { Menubar, MenubarContent, MenubarMenu, MenubarTrigger } from '@koharu/ui/components/menubar'
 
 const settings: OcrBoxSettings = {
@@ -212,11 +218,113 @@ describe('box redo controls', () => {
       source: 'user',
       confidence: null,
     })
+    vi.spyOn(commands, 'getPage').mockResolvedValue({
+      ...page,
+      layers: [textLayer, { ...textLayer, id: 'subtitle' }],
+    })
+    renderHook(() => usePage(), { wrapper })
     const user = userEvent.setup()
     render(<BoxRedoSection layers={['box']} />, { wrapper })
     await user.click(await screen.findByRole('button', { name: 'Add SFX subtitle' }))
     await waitFor(() => expect(commands.addSfxSubtitle).toHaveBeenCalledWith('box'))
     await waitFor(() => expect(useKoharuStore.getState().selectedLayers).toEqual(['subtitle']))
+  })
+
+  it('keeps the source selected until the refreshed page contains the subtitle', async () => {
+    useKoharuStore.getState().selectLayers(['box'])
+    vi.spyOn(commands, 'getLineCategory').mockResolvedValue({
+      value: 'sfx',
+      source: 'user',
+      confidence: null,
+    })
+    const refreshed = Promise.withResolvers<Page>()
+    vi.spyOn(commands, 'getPage').mockReturnValue(refreshed.promise)
+    renderHook(() => usePage(), { wrapper })
+    const user = userEvent.setup()
+    render(<BoxRedoSection layers={['box']} />, { wrapper })
+    const button = await screen.findByRole('button', { name: 'Add SFX subtitle' })
+    await user.click(button)
+    await waitFor(() => expect(commands.getPage).toHaveBeenCalled())
+    expect(useKoharuStore.getState().selectedLayers).toEqual(['box'])
+    expect(button).toBeDisabled()
+    await user.click(button)
+    expect(commands.addSfxSubtitle).toHaveBeenCalledTimes(1)
+    const subtitle: Layer = { ...textLayer, id: 'subtitle' }
+    await act(async () => refreshed.resolve({ ...page, layers: [textLayer, subtitle] }))
+    await waitFor(() => expect(useKoharuStore.getState().selectedLayers).toEqual(['subtitle']))
+    expect(queryClient.getQueryData<Page>(pageKey)?.layers).toContainEqual(subtitle)
+  })
+
+  it('does not select a subtitle that was undone before the page refresh', async () => {
+    useKoharuStore.getState().selectLayers(['box'])
+    vi.spyOn(commands, 'getLineCategory').mockResolvedValue({
+      value: 'sfx',
+      source: 'user',
+      confidence: null,
+    })
+    const refreshed = Promise.withResolvers<Page>()
+    vi.spyOn(commands, 'getPage').mockReturnValue(refreshed.promise)
+    renderHook(() => usePage(), { wrapper })
+    const user = userEvent.setup()
+    render(<BoxRedoSection layers={['box']} />, { wrapper })
+    const button = await screen.findByRole('button', { name: 'Add SFX subtitle' })
+    await user.click(button)
+    await waitFor(() => expect(commands.getPage).toHaveBeenCalled())
+    await act(async () => refreshed.resolve(page))
+    await waitFor(() => expect(button).toBeEnabled())
+    expect(useKoharuStore.getState().selectedLayers).toEqual(['box'])
+  })
+
+  it.each(['command', 'refresh'] as const)(
+    'preserves a newer selection while the subtitle %s is pending',
+    async (pending) => {
+      useKoharuStore.getState().selectLayers(['box'])
+      vi.spyOn(commands, 'getLineCategory').mockResolvedValue({
+        value: 'sfx',
+        source: 'user',
+        confidence: null,
+      })
+      const added = Promise.withResolvers<string>()
+      const refreshed = Promise.withResolvers<Page>()
+      vi.spyOn(commands, 'addSfxSubtitle').mockReturnValue(added.promise)
+      vi.spyOn(commands, 'getPage').mockReturnValue(refreshed.promise)
+      renderHook(() => usePage(), { wrapper })
+      const user = userEvent.setup()
+      render(<BoxRedoSection layers={['box']} />, { wrapper })
+      const button = await screen.findByRole('button', { name: 'Add SFX subtitle' })
+      await user.click(button)
+      if (pending === 'refresh') {
+        await act(async () => added.resolve('subtitle'))
+        await waitFor(() => expect(commands.getPage).toHaveBeenCalled())
+      }
+      act(() => useKoharuStore.getState().selectLayers(['different-box']))
+      await act(async () => added.resolve('subtitle'))
+      await act(async () =>
+        refreshed.resolve({ ...page, layers: [textLayer, { ...textLayer, id: 'subtitle' }] }),
+      )
+      await waitFor(() => expect(button).toBeEnabled())
+      expect(useKoharuStore.getState().selectedLayers).toEqual(['different-box'])
+    },
+  )
+
+  it('does not select an old-page subtitle while the canvas still presents that page', async () => {
+    useKoharuStore.getState().selectLayers(['box'])
+    vi.spyOn(commands, 'getLineCategory').mockResolvedValue({
+      value: 'sfx',
+      source: 'user',
+      confidence: null,
+    })
+    const added = Promise.withResolvers<string>()
+    vi.spyOn(commands, 'addSfxSubtitle').mockReturnValue(added.promise)
+    const user = userEvent.setup()
+    render(<BoxRedoSection layers={['box']} />, { wrapper })
+    const button = await screen.findByRole('button', { name: 'Add SFX subtitle' })
+    await user.click(button)
+    act(() => queryClient.setQueryData(pageKey, { ...page, id: 'next-page' }))
+    await act(async () => added.resolve('subtitle'))
+    await waitFor(() => expect(button).toBeEnabled())
+    expect(useKoharuStore.getState().canvasPage).toBe('page')
+    expect(useKoharuStore.getState().selectedLayers).toEqual(['box'])
   })
 
   it('keeps a Process-menu overwrite dialog mounted after choosing its item', async () => {

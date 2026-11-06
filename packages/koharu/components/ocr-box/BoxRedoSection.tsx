@@ -5,8 +5,9 @@ import { useTranslation } from 'react-i18next'
 
 import { call } from '@/lib/backend'
 import { useLineCategory } from '@/lib/line-labels'
+import { pageKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { commands, type EntityId } from '@koharu/bridge/protocol'
+import { commands, type EntityId, type Page } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 
 import { ocrBoxEditKey, refreshOcrBoxes, useRedoActions } from './queries'
@@ -19,13 +20,26 @@ export function BoxRedoSection({ layers }: { layers: EntityId[] }) {
   const subtitle = useMutation({
     mutationKey: ocrBoxEditKey,
     mutationFn: async (layer: EntityId) => {
-      const page = useKoharuStore.getState().canvasPage
+      const page = queryClient.getQueryData<Page | null>(pageKey)?.id
+      const selection = useKoharuStore.getState().selectedLayers
       const added = await call(commands.addSfxSubtitle, layer)
-      if (useKoharuStore.getState().canvasPage === page) {
-        useKoharuStore.getState().selectLayers([added])
+      return { added, page, selection }
+    },
+    onSettled: async (result) => {
+      await refreshOcrBoxes()
+      if (!result) return
+      const state = useKoharuStore.getState()
+      const page = queryClient.getQueryData<Page | null>(pageKey)
+      // The inspector needs the new layer before selection changes; newer user intent wins.
+      if (
+        state.canvasPage === result.page &&
+        page?.id === result.page &&
+        page?.layers.some((layer) => layer.id === result.added) &&
+        state.selectedLayers === result.selection
+      ) {
+        state.selectLayers([result.added])
       }
     },
-    onSettled: refreshOcrBoxes,
   })
   return (
     <>
