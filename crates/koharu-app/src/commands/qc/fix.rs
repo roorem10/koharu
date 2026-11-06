@@ -797,6 +797,10 @@ impl Committer for CollectedOutput {
         self.patch = Some(output.patch);
         Ok(preview)
     }
+
+    fn publishes(&self) -> bool {
+        false
+    }
 }
 
 async fn model_fix(

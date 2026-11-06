@@ -41,4 +41,10 @@ pub struct StageOutput {
 #[async_trait]
 pub trait Committer: Send {
     async fn commit(&mut self, output: StageOutput) -> Result<koharu_scene::Snapshot>;
+
+    /// A committer that only collects the patch returns an unpublished preview,
+    /// which keeps the current revision. It owns publishing the result itself.
+    fn publishes(&self) -> bool {
+        true
+    }
 }
