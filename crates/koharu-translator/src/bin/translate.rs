@@ -11,7 +11,7 @@ use koharu_translator::{
 use url::Url;
 
 #[derive(Debug, Parser)]
-#[command(about = "Run Koharu's configured translator")]
+#[command(about = "Run Booharu's configured translator")]
 struct Args {
     #[arg(long)]
     provider: String,

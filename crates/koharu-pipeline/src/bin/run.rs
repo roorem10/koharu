@@ -20,7 +20,7 @@ use koharu_scene::{AssetInput, AssetMetadata, AssetRole, At, PageDraft, Session}
 use koharu_translator::{GenerationConfig, Language, ModelSelection, Provider, ProvidersConfig};
 
 #[derive(Debug, Parser)]
-#[command(version, about = "Run Koharu's complete in-process pipeline")]
+#[command(version, about = "Run Booharu's complete in-process pipeline")]
 struct Arguments {
     #[arg(short, long, value_name = "INPUT")]
     input: PathBuf,

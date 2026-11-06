@@ -24,9 +24,9 @@ pub fn install() {
 
         rfd::MessageDialog::new()
             .set_level(rfd::MessageLevel::Error)
-            .set_title("Koharu has stopped")
+            .set_title("Booharu has stopped")
             .set_description(format!(
-                "Something went wrong and Koharu needs to close.\n\n{msg}\n\nat {location}"
+                "Something went wrong and Booharu needs to close.\n\n{msg}\n\nat {location}"
             ))
             .set_buttons(rfd::MessageButtons::Ok)
             .show();

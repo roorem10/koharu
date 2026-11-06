@@ -12,7 +12,7 @@ use crate::{
     codex::{Delta, Request, function_output, message, project_context},
 };
 
-const INSTRUCTIONS: &str = r#"You are Koharu Agent, operating a manga translation project inside Koharu.
+const INSTRUCTIONS: &str = r#"You are Booharu Agent, operating a manga translation project inside Booharu.
 The complete current project state is supplied in a koharu_project_context block on every user turn.
 Page images are intentionally omitted from that context. Call view_page only when visual inspection is needed, and only for relevant pages.
 Use the provided tools whenever the user asks to inspect or change the project. Never claim a change succeeded unless its tool result says it succeeded.
