@@ -489,6 +489,7 @@
     "loading": "Yükleniyor…",
     "loadError": "Dizgi ayarları veya kategorisi yüklenemedi.",
     "reasons": {
+      "subtitle": "ses efekti altyazısı",
       "user": "elle ayarlandı",
       "model": "bölüm okumasından",
       "small_text": "küçük orijinal yazı"
@@ -508,16 +509,25 @@
     },
     "sfxTitle": "Ses efektleri",
     "sfxDescription": "Çeviride hangi ses efekti kutularının işleneceğini belirleyin.",
-    "sfxMode": "SFX çevirisi",
-    "sfxModes": {
+    "sfxInside": "Balon içindeki ses efektleri",
+    "sfxInsideHelp": "Balon içindeki ses efektlerini yerinde çevirin veya orijinali olduğu gibi bırakın.",
+    "sfxOutside": "Balon dışındaki ses efektleri",
+    "sfxOutsideHelp": "Altyazılar orijinal ses efektinin yanına yerleştirilir. Değiştir, orijinali yalnızca çeviri başarılı olduğunda temizler.",
+    "sfxImportantOnly": "Balon dışında yalnızca önemli ses efektleri",
+    "sfxImportantHelp": "Balon dışı işlemi yalnızca Bölümü oku tarafından hikâye için gerekli görülen seslere uygulayın; örneğin birinin karşılık verdiği kapı sesi. Diğer ses efektleri atlanır.",
+    "sfxHandling": "Ses efekti işlemi",
+    "sfxHandlingHelp": "Bir sonraki çeviri çalıştırmasında kullanılır.",
+    "sfxActions": {
       "skip": "Atla",
-      "inside_bubbles": "Yalnızca balon içindekiler",
-      "translate_all": "Tümünü çevir"
+      "subtitle": "Altyazı ekle",
+      "translate": "Çevir",
+      "replace": "Değiştir"
     },
-    "sfxHelp": {
-      "skip": "Tüm SFX kutularını çevirmeden ve dizmeden bırak.",
-      "inside_bubbles": "Balon içindeki SFX'leri çevir; diğer SFX'lere dokunma.",
-      "translate_all": "Balon içindeki ve dışındaki tüm SFX'leri çevir."
+    "sfxReasons": {
+      "user": "elle ayarlandı",
+      "inside_bubble": "balon içinde",
+      "outside_bubble": "balon dışında",
+      "unimportant": "Bölümü oku tarafından önemli işaretlenmedi"
     }
   },
   "mcp": {

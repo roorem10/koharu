@@ -403,7 +403,15 @@ fn default_typography(
         fill_gradient: None,
         alignment: None,
         writing_mode: current.and_then(|value| value.writing_mode),
-        extensions: Default::default(),
+        // SFX policy and source links are workflow metadata, not text effects.
+        extensions: current
+            .map(|style| {
+                style.extensions.iter()
+                    .filter(|(key, _)| key.starts_with("dev.booharu.sfx."))
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect()
+            })
+            .unwrap_or_default(),
     }
 }
 
@@ -415,7 +423,13 @@ async fn reset_translation_styles(
     apply_hints: impl FnOnce(&mut Edit, &Snapshot, &[EntityId]) -> koharu_scene::Result<()>,
 ) -> anyhow::Result<Option<Commit>> {
     let snapshot = project.snapshot();
-    let layers = translated_layers(&snapshot, commit)?;
+    let mut layers = Vec::new();
+    for layer in translated_layers(&snapshot, commit)? {
+        // Subtitle typography and hand edits belong to the subtitle command.
+        if super::lettering::sfx::subtitle_source(&snapshot, layer)?.is_none() {
+            layers.push(layer);
+        }
+    }
     if layers.is_empty() {
         return Ok(None);
     }

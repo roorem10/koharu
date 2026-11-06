@@ -489,6 +489,7 @@
     "loading": "正在加载…",
     "loadError": "无法加载排字设置或类别。",
     "reasons": {
+      "subtitle": "音效字幕",
       "user": "手动设置",
       "model": "来自章节阅读结果",
       "small_text": "原文为小字"
@@ -508,16 +509,25 @@
     },
     "sfxTitle": "音效",
     "sfxDescription": "控制翻译时处理哪些音效框。",
-    "sfxMode": "音效（SFX）翻译",
-    "sfxModes": {
+    "sfxInside": "气泡内的音效",
+    "sfxInsideHelp": "原地翻译气泡内的音效，或保留原文不变。",
+    "sfxOutside": "气泡外的音效",
+    "sfxOutsideHelp": "字幕放在原音效旁。替换仅在翻译成功后擦除原文。",
+    "sfxImportantOnly": "气泡外仅处理重要音效",
+    "sfxImportantHelp": "仅当“阅读章节”将声音标记为情节所必需时才应用气泡外的处理方式，例如有人回应的敲门声。其余音效将跳过。",
+    "sfxHandling": "音效处理",
+    "sfxHandlingHelp": "在下次运行翻译时应用。",
+    "sfxActions": {
       "skip": "跳过",
-      "inside_bubbles": "仅气泡内",
-      "translate_all": "全部翻译"
+      "subtitle": "字幕",
+      "translate": "翻译",
+      "replace": "替换"
     },
-    "sfxHelp": {
-      "skip": "所有 SFX 框均不翻译、不排字。",
-      "inside_bubbles": "翻译气泡内的 SFX；其余 SFX 保持不变。",
-      "translate_all": "翻译气泡内外的所有 SFX。"
+    "sfxReasons": {
+      "user": "手动设置",
+      "inside_bubble": "位于气泡内",
+      "outside_bubble": "位于气泡外",
+      "unimportant": "“阅读章节”未标记为重要"
     }
   },
   "mcp": {

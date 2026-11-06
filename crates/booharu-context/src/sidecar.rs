@@ -53,6 +53,9 @@ impl Default for ProjectContext {
 #[serde(default)]
 pub struct LineContext {
     pub category: Option<LineCategory>,
+    /// Whether the chapter reader found that understanding this sound matters to the story.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sfx_important: Option<bool>,
     pub note: Option<String>,
     pub flags: Vec<Flag>,
     pub dismissed: Vec<String>,
@@ -68,6 +71,7 @@ pub struct LineContext {
 impl LineContext {
     fn is_empty(&self) -> bool {
         self.category.is_none()
+            && self.sfx_important.is_none()
             && self.note.is_none()
             && self.flags.is_empty()
             && self.dismissed.is_empty()
@@ -288,5 +292,22 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         ProjectContext::update(directory.path(), |_| ()).unwrap();
         assert!(!directory.path().join(CONTEXT_FILE).exists());
+    }
+
+    #[test]
+    fn importance_survives_sidecar_storage_and_layer_retention() {
+        let directory = tempfile::tempdir().unwrap();
+        let layer = EntityId::new();
+        let mut context = ProjectContext::default();
+        context.lines.entry(layer).or_default().sfx_important = Some(false);
+        context.retain_layers(&BTreeSet::from([layer]));
+        context.save(directory.path()).unwrap();
+        let restored = ProjectContext::load(directory.path()).unwrap();
+        assert_eq!(restored.lines[&layer].sfx_important, Some(false));
+        assert!(
+            serde_json::to_value(LineContext::default()).unwrap()
+                .get("sfx_important")
+                .is_none()
+        );
     }
 }

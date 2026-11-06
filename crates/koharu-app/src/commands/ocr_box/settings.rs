@@ -50,7 +50,7 @@ impl OcrBoxSettings {
         Ok(())
     }
 
-    pub(super) fn load() -> Result<Self> {
+    pub(crate) fn load() -> Result<Self> {
         let settings = koharu_config::load::<Self>("ocr_box")?.read()?.clone();
         settings.validate()?;
         Ok(settings)

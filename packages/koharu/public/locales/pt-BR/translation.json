@@ -489,6 +489,7 @@
     "loading": "Carregando…",
     "loadError": "Não foi possível carregar as configurações ou a categoria de letreiramento.",
     "reasons": {
+      "subtitle": "legenda de SFX",
       "user": "definida à mão",
       "model": "obtida na leitura do capítulo",
       "small_text": "letras pequenas no original"
@@ -508,16 +509,25 @@
     },
     "sfxTitle": "Efeitos sonoros",
     "sfxDescription": "Controle quais caixas de efeitos sonoros serão processadas na tradução.",
-    "sfxMode": "Tradução de SFX",
-    "sfxModes": {
+    "sfxInside": "SFX dentro dos balões",
+    "sfxInsideHelp": "Traduza os SFX dos balões no próprio local ou deixe o original intacto.",
+    "sfxOutside": "SFX fora dos balões",
+    "sfxOutsideHelp": "As legendas ficam ao lado do SFX original. Substituir apaga o original somente após uma tradução bem-sucedida.",
+    "sfxImportantOnly": "Apenas SFX importantes fora dos balões",
+    "sfxImportantHelp": "Aplique a ação fora dos balões apenas quando Ler capítulo marcar o som como necessário à história, como uma batida na porta que alguém atende. Os outros SFX são ignorados.",
+    "sfxHandling": "Tratamento do SFX",
+    "sfxHandlingHelp": "Será usado na próxima execução da tradução.",
+    "sfxActions": {
       "skip": "Ignorar",
-      "inside_bubbles": "Somente dentro dos balões",
-      "translate_all": "Traduzir todos"
+      "subtitle": "Legendar",
+      "translate": "Traduzir",
+      "replace": "Substituir"
     },
-    "sfxHelp": {
-      "skip": "Deixa todas as caixas de SFX sem tradução e sem letreiramento.",
-      "inside_bubbles": "Traduz os SFX dentro dos balões e mantém os demais intactos.",
-      "translate_all": "Traduz os SFX dentro e fora dos balões."
+    "sfxReasons": {
+      "user": "definido manualmente",
+      "inside_bubble": "dentro de um balão",
+      "outside_bubble": "fora de um balão",
+      "unimportant": "não marcado como importante por Ler capítulo"
     }
   },
   "mcp": {

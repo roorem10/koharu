@@ -375,6 +375,39 @@ impl Edit {
         Ok(())
     }
 
+    /// App-owned presentation policy may change automatic visibility without
+    /// claiming a hand edit. Explicit user visibility remains authoritative.
+    pub fn set_automatic_visibility(
+        &mut self,
+        entity: EntityId,
+        visibility: &Visibility,
+    ) -> Result<()> {
+        if self.generation.is_some() || !matches!(visibility.origin, Origin::Generated(_)) {
+            return Err(Error::Authorship(
+                "automatic visibility requires a user edit and a generated owner".into(),
+            ));
+        }
+        let owner = ComponentOwner::Entity(entity);
+        let component_key = key::<Visibility>()?;
+        if let Some(record) = self.component(owner, &component_key)? {
+            let record_exists = |id| self.state.contains_entity(id);
+            let blob_exists = |_id| true;
+            let current = decode::<Visibility>(
+                record,
+                &ValidationContext::new(&record_exists, &blob_exists),
+            )?;
+            if current.origin == Origin::User {
+                return Err(Error::Authorship(
+                    "automatic visibility cannot overwrite a user visibility edit".into(),
+                ));
+            }
+        }
+        self.observe_component(owner, component_key.clone())?;
+        self.replace_component(owner, component_key, Some(self.encode_value(visibility)?))?;
+        self.validate_entities.insert(entity);
+        Ok(())
+    }
+
     /// Explicitly relinquishes a manual style after translation replaces its
     /// text. Ordinary `set` stamps User; pipeline edits cannot relinquish it.
     pub fn reset_typography(

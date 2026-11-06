@@ -114,7 +114,9 @@ beforeEach(() => {
     reason: 'bubble_shape',
   })
   vi.spyOn(commands, 'getLetteringSettings').mockResolvedValue({
-    sfx: 'skip',
+    sfx_inside: 'translate',
+    sfx_outside: 'skip',
+    sfx_important_only: false,
     model_confidence: 0.6,
     small_text_threshold: 0.012,
   })

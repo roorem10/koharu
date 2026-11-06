@@ -23,7 +23,7 @@ use koharu_ml::{
 };
 use koharu_scene::{
     AssetInput, AssetMetadata, AssetRole, At, BubbleRegion, EntityOrigin, Geometry, Origin,
-    RasterLayer, RasterLayerKind, Region, RegionSpec,
+    RasterLayer, RasterLayerKind, Region, RegionSpec, RemovePolicy, Typography, Visibility,
 };
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -144,6 +144,7 @@ impl StageProcessor for Processor {
         if input.inpainting_mask.is_some() {
             return Ok(false);
         }
+        let has_sfx = crate::sfx::page_has_sfx(&input.scene, input.page)?;
         let source = AssetRole::new("source")?;
         for entity in input.scene.children(input.page)? {
             if input
@@ -152,7 +153,9 @@ impl StageProcessor for Processor {
                 .is_some_and(|layer| layer.kind == RasterLayerKind::Cleanup)
                 && input.scene.asset(entity, &source)?.is_some()
             {
-                return Ok(true);
+                // Rebuild generated cleanup against the current SFX decisions;
+                // hand-painted cleanup remains an explicit user edit.
+                return Ok(!has_sfx || !generated_cleanup(&input.scene, entity)?);
             }
         }
         Ok(false)
@@ -215,7 +218,7 @@ impl Model {
     async fn run(&self, input: StageInput) -> Result<koharu_scene::Patch> {
         let mut prepared = prepare(&input).await?;
         if prepared.mask.as_raw().iter().all(|value| *value == 0) {
-            return finish(input.scene.edit());
+            return empty_cleanup_patch(&input, prepared.cleanup_entity, prepared.observes_sfx);
         }
         let mask = prepared.mask.clone();
         // Models infer the entire feathered area; coverage is applied once at compositing.
@@ -227,6 +230,7 @@ impl Model {
         let original = prepared.original.clone();
         let cleanup = prepared.cleanup.take();
         let cleanup_entity = prepared.cleanup_entity;
+        let observes_sfx = prepared.observes_sfx;
         let (model_name, image) = match self {
             Self::LaMa(model) => {
                 let model = model.clone();
@@ -339,6 +343,24 @@ impl Model {
             input.scene.edit_as(generation(PRODUCER, model_name)?)
         };
         edit.observe_assets(page)?;
+        if !manual && let Some(group) = input.scene.page(page)?.text_group()? {
+            for layer in group.text_layers()? {
+                // A newly chosen SFX policy can hide a layer while inference is
+                // running, including on pages that had no SFX when it started.
+                edit.observe::<Visibility>(layer.id())?;
+                if layer
+                    .visibility()?
+                    .is_some_and(|visibility| visibility.origin == Origin::User)
+                {
+                    edit.observe::<Typography>(layer.id())?;
+                }
+            }
+        }
+        if observes_sfx {
+            // SFX policy, source relationships and replacement text all determine
+            // which original ink survives. Reject a result if any changed.
+            edit.observe_subtree(page)?;
+        }
         if let Some(entity) = cleanup_entity {
             edit.observe::<RasterLayer>(entity)?;
             edit.observe_assets(entity)?;
@@ -416,6 +438,37 @@ impl Model {
     }
 }
 
+fn generated_cleanup(
+    snapshot: &koharu_scene::Snapshot,
+    entity: koharu_scene::EntityId,
+) -> Result<bool> {
+    Ok(snapshot
+        .component::<RasterLayer>(entity)?
+        .is_some_and(|layer| layer.origin != Origin::User)
+        || snapshot
+            .component::<EntityOrigin>(entity)?
+            .is_some_and(|origin| origin.origin != Origin::User))
+}
+
+fn empty_cleanup_patch(
+    input: &StageInput,
+    cleanup: Option<koharu_scene::EntityId>,
+    observes_sfx: bool,
+) -> Result<koharu_scene::Patch> {
+    let mut edit = input.scene.edit();
+    if observes_sfx
+        && input.inpainting_mask.is_none()
+        && let Some(entity) = cleanup
+        && generated_cleanup(&input.scene, entity)?
+    {
+        // All original ink is now protected. Keeping the previous generated
+        // overlay would still erase it even though the new mask is empty.
+        edit.observe_subtree(input.page)?;
+        edit.remove_entity(entity, RemovePolicy::RejectNonEmpty)?;
+    }
+    finish(edit)
+}
+
 #[derive(Clone, Debug)]
 struct FlatFillRegion {
     bounds: [u32; 4],
@@ -473,6 +526,7 @@ struct InpaintInput {
     mask: GrayImage,
     text_mask: GrayImage,
     flat_fill_regions: Vec<FlatFillRegion>,
+    observes_sfx: bool,
 }
 
 async fn prepare(input: &StageInput) -> Result<InpaintInput> {
@@ -560,6 +614,8 @@ async fn prepare(input: &StageInput) -> Result<InpaintInput> {
         // Grow after clipping, otherwise a tight Region scope would trim the new edge away.
         mask = tokio_rayon::spawn(move || grow_user_mask(&mask, grow_px)).await;
     }
+    let observes_sfx = input.inpainting_mask.is_none()
+        && crate::sfx::protect_masks(&input.scene, page, &mut mask, &mut text_mask)?;
     let flat_fill_regions = flat_fill_regions(input, source.width(), source.height())?;
     Ok(InpaintInput {
         image: source,
@@ -569,6 +625,7 @@ async fn prepare(input: &StageInput) -> Result<InpaintInput> {
         mask,
         text_mask,
         flat_fill_regions,
+        observes_sfx,
     })
 }
 
@@ -1436,6 +1493,72 @@ mod tests {
 
         assert!(processor.skip(&automatic).unwrap());
         assert!(!processor.skip(&manual).unwrap());
+    }
+
+    #[tokio::test]
+    async fn protecting_all_sfx_removes_old_generated_cleanup_but_keeps_hand_cleanup() {
+        let mut session = koharu_scene::Session::memory().await.unwrap();
+        let mut ids = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(
+                    koharu_scene::PageDraft::new("page", 8.0, 8.0),
+                    At::End,
+                )?;
+                let cleanup = edit.add_entity(page, At::Start)?;
+                edit.set(
+                    cleanup,
+                    &RasterLayer {
+                        origin: Origin::Generated(generation(PRODUCER, "test").unwrap()),
+                        name: "Cleanup".into(),
+                        kind: RasterLayerKind::Cleanup,
+                    },
+                )?;
+                ids = Some((page, cleanup));
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let (page, cleanup) = ids.unwrap();
+        let mut input = StageInput::new(
+            snapshot,
+            page,
+            None,
+            None,
+            Arc::new(crate::ImageCache::default()),
+            None,
+        );
+        assert!(
+            empty_cleanup_patch(&input, Some(cleanup), false)
+                .unwrap()
+                .is_empty()
+        );
+        let patch = empty_cleanup_patch(&input, Some(cleanup), true).unwrap();
+        let commit = session.commit(patch).await.unwrap();
+        assert!(commit.snapshot.entity(cleanup).is_err());
+        session.undo(commit.revision).await.unwrap();
+        assert!(session.snapshot().entity(cleanup).is_ok());
+
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                edit.set(
+                    cleanup,
+                    &RasterLayer {
+                        origin: Origin::User,
+                        name: "Cleanup".into(),
+                        kind: RasterLayerKind::Cleanup,
+                    },
+                )
+            })
+            .unwrap();
+        input.scene = session.commit(patch).await.unwrap().snapshot;
+        assert!(
+            empty_cleanup_patch(&input, Some(cleanup), true)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     fn rectangle_region([left, top, right, bottom]: [u32; 4]) -> FlatFillRegion {

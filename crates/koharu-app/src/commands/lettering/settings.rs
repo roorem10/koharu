@@ -4,17 +4,27 @@ use specta::Type;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize, Type)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum SfxMode {
+pub(crate) enum SfxInsideMode {
+    #[default]
+    Translate,
+    Skip,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SfxOutsideMode {
     #[default]
     Skip,
-    InsideBubbles,
-    TranslateAll,
+    Subtitle,
+    Replace,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Type)]
 #[serde(default)]
 pub(crate) struct LetteringSettings {
-    pub sfx: SfxMode,
+    pub sfx_inside: SfxInsideMode,
+    pub sfx_outside: SfxOutsideMode,
+    pub sfx_important_only: bool,
     pub model_confidence: f32,
     /// Estimated source glyph size as a fraction of page height.
     pub small_text_threshold: f32,
@@ -23,7 +33,9 @@ pub(crate) struct LetteringSettings {
 impl Default for LetteringSettings {
     fn default() -> Self {
         Self {
-            sfx: SfxMode::Skip,
+            sfx_inside: SfxInsideMode::Translate,
+            sfx_outside: SfxOutsideMode::Skip,
+            sfx_important_only: false,
             model_confidence: 0.6,
             // 24px on a 2000px page, between the synthetic aside and dialogue sizes.
             small_text_threshold: 0.012,

@@ -533,7 +533,8 @@ fn changed_typography() -> Typography {
 #[tokio::test]
 async fn translation_reset_clears_runs_manual_typography_and_warp_but_leaves_skipped_box_alone() {
     let (mut project, [layer, skipped]) = fixture(true).await;
-    let original = changed_typography();
+    let mut original = changed_typography();
+    original.extensions.insert(koharu_pipeline::SFX_ACTION_KEY.into(), "translate".into());
     let patch = project
         .snapshot()
         .patch(|edit| {
@@ -619,7 +620,7 @@ async fn translation_reset_clears_runs_manual_typography_and_warp_but_leaves_ski
     assert!(actual.fill_gradient.is_none());
     assert!(actual.line_spacing.is_none());
     assert!(actual.letter_spacing.is_none());
-    assert!(actual.extensions.is_empty());
+    assert_eq!(actual.extensions, [(koharu_pipeline::SFX_ACTION_KEY.into(), "translate".into())].into());
     assert!(matches!(actual.origin, Origin::Generated(_)));
     let layout = project
         .snapshot()
@@ -651,6 +652,55 @@ async fn translation_reset_clears_runs_manual_typography_and_warp_but_leaves_ski
     );
     assert_eq!(shown_text(&project.snapshot(), layer).unwrap(), "new words");
     assert!(project.undo.is_empty());
+}
+
+#[tokio::test]
+async fn translation_reset_preserves_subtitle_presentation_and_excludes_it_from_hints() {
+    let (mut project, [subtitle, ordinary]) = fixture(true).await;
+    let mut typography = changed_typography();
+    typography.extensions.insert(
+        koharu_pipeline::SFX_SUBTITLE_SOURCE_KEY.into(),
+        ordinary.to_string(),
+    );
+    let layout = TextLayout {
+        origin: Origin::User,
+        kind: TextLayoutKind::Paragraph,
+        angle_degrees: Some(12.0),
+        warp: Some(TextWarp::Skew {
+            x_degrees: 8.0,
+            y_degrees: 2.0,
+        }),
+    };
+    let word_runs = runs(0, 3);
+    let patch = project
+        .snapshot()
+        .patch(|edit| {
+            edit.set(subtitle, &typography)?;
+            edit.set(subtitle, &layout)?;
+            edit.set(subtitle, &word_runs)
+        })
+        .unwrap();
+    project.commit(patch).await.unwrap();
+    let stage = machine_translation(&mut project, &[subtitle, ordinary]).await;
+    let mut hinted = Vec::new();
+    reset_translation_styles(
+        &mut project,
+        &stage,
+        &TextStyles::default(),
+        false,
+        |_, _, layers| {
+            hinted = layers.to_vec();
+            Ok(())
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(hinted, vec![ordinary]);
+    let snapshot = project.snapshot();
+    assert_eq!(shown_text(&snapshot, subtitle).unwrap(), "new words");
+    assert_eq!(snapshot.component::<Typography>(subtitle).unwrap(), Some(typography));
+    assert_eq!(snapshot.component::<TextLayout>(subtitle).unwrap(), Some(layout));
+    assert_eq!(snapshot.component::<TextRuns>(subtitle).unwrap(), Some(word_runs));
 }
 
 #[tokio::test]

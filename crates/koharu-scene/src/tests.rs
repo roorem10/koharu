@@ -1778,6 +1778,70 @@ fn typography_rejects_invalid_spacing_and_gradient() {
 }
 
 #[tokio::test]
+async fn automatic_visibility_preserves_ownership_observes_edits_and_undoes() {
+    let mut session = Session::memory().await.unwrap();
+    let detection = Generation::new(ProducerId::new("dev.koharu.test.detection").unwrap());
+    let policy = Generation::new(ProducerId::new("dev.koharu.test.policy").unwrap());
+    let mut edit = session.snapshot().edit_as(detection.clone());
+    let id = edit.add_page(page(), At::End).unwrap();
+    let initial = Visibility {
+        origin: Origin::Generated(detection.clone()),
+        visible: true,
+        opacity: 0.8,
+    };
+    edit.set(id, &initial).unwrap();
+    let snapshot = session
+        .commit(edit.finish().unwrap())
+        .await
+        .unwrap()
+        .snapshot;
+    let hidden = Visibility {
+        origin: Origin::Generated(policy.clone()),
+        visible: false,
+        opacity: 0.8,
+    };
+    let mut generated = snapshot.edit_as(policy);
+    assert!(matches!(
+        generated.set_automatic_visibility(id, &hidden),
+        Err(Error::Authorship(_))
+    ));
+    let mut edit = snapshot.edit();
+    let manual = Visibility {
+        origin: Origin::User,
+        visible: false,
+        opacity: 0.5,
+    };
+    assert!(matches!(
+        edit.set_automatic_visibility(id, &manual),
+        Err(Error::Authorship(_))
+    ));
+    edit.set_automatic_visibility(id, &hidden).unwrap();
+    let pending = edit.finish().unwrap();
+    let commit = session.commit(pending.clone()).await.unwrap();
+    assert_eq!(
+        commit.snapshot.component::<Visibility>(id).unwrap().unwrap(),
+        hidden
+    );
+    let restored = session.undo(commit.revision).await.unwrap().snapshot;
+    assert_eq!(restored.component::<Visibility>(id).unwrap().unwrap(), initial);
+
+    let mut edit = restored.edit();
+    edit.set(id, &manual).unwrap();
+    let snapshot = session
+        .commit(edit.finish().unwrap())
+        .await
+        .unwrap()
+        .snapshot;
+    assert!(pending.rebase_on(&snapshot).is_err());
+    let mut edit = snapshot.edit();
+    assert!(matches!(
+        edit.set_automatic_visibility(id, &hidden),
+        Err(Error::Authorship(_))
+    ));
+    assert!(edit.finish().unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn source_reset_preserves_translation_and_language_and_requires_a_user_edit() {
     let mut session = Session::memory().await.unwrap();
     let mut content = None;

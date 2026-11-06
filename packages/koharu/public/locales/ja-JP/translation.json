@@ -489,6 +489,7 @@
     "loading": "読み込み中…",
     "loadError": "写植設定またはカテゴリを読み込めませんでした。",
     "reasons": {
+      "subtitle": "効果音の字幕",
       "user": "手動で設定",
       "model": "章の読み込み結果",
       "small_text": "原文の文字が小さい"
@@ -508,16 +509,25 @@
     },
     "sfxTitle": "効果音・擬音",
     "sfxDescription": "翻訳処理の対象となる効果音ボックスを設定します。",
-    "sfxMode": "効果音の翻訳",
-    "sfxModes": {
+    "sfxInside": "吹き出し内の効果音",
+    "sfxInsideHelp": "吹き出し内の効果音をその場で翻訳するか、原文をそのまま残します。",
+    "sfxOutside": "吹き出し外の効果音",
+    "sfxOutsideHelp": "字幕は元の効果音の横に配置します。「置換」では翻訳に成功した場合のみ原文を消去します。",
+    "sfxImportantOnly": "吹き出し外は重要な効果音のみ",
+    "sfxImportantHelp": "「章を読む」で物語に必要と判断された音だけに、吹き出し外の処理を適用します（誰かが応答するノックなど）。その他の効果音はスキップします。",
+    "sfxHandling": "効果音の処理",
+    "sfxHandlingHelp": "次回の翻訳実行時に適用します。",
+    "sfxActions": {
       "skip": "スキップ",
-      "inside_bubbles": "吹き出し内のみ",
-      "translate_all": "すべて翻訳"
+      "subtitle": "字幕",
+      "translate": "翻訳",
+      "replace": "置換"
     },
-    "sfxHelp": {
-      "skip": "すべての効果音ボックスを翻訳・写植せずに残します。",
-      "inside_bubbles": "吹き出し内の効果音を翻訳し、それ以外の効果音は変更しません。",
-      "translate_all": "吹き出しの内外の効果音を翻訳します。"
+    "sfxReasons": {
+      "user": "手動設定",
+      "inside_bubble": "吹き出し内",
+      "outside_bubble": "吹き出し外",
+      "unimportant": "「章を読む」で重要と判定されていません"
     }
   },
   "mcp": {

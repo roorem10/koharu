@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { SfxHandlingLine } from '@/components/editor/SfxHandlingLine'
 import { useEffectiveCategory } from '@/components/lettering/queries'
 import { call } from '@/lib/backend'
 import { LETTERING_CATEGORIES, useLineCategory, useSetLineCategory } from '@/lib/line-labels'
@@ -98,6 +99,7 @@ export function LetteringCategoryLine({
       <span className='text-[10px] leading-4 text-muted-foreground'>
         {effective.isError ? t('lettering.loadError') : reason}
       </span>
+      {effective.data?.category === 'sfx' && <SfxHandlingLine layer={layer} />}
     </div>
   )
 }

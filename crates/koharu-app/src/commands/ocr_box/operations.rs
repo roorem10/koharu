@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
 use anyhow::{Context as _, Result, ensure};
-use booharu_context::LetteringCategory;
 use koharu_pipeline::{
     Bounds,
     bubble_shape::{ShapeThresholds, classify, measure, style_for_shape},
@@ -228,104 +227,114 @@ impl Project {
         layer: EntityId,
         settings: &OcrBoxSettings,
         styles: &TextStyles,
-    ) -> Result<(Commit, EntityId, bool)> {
-        let snapshot = self.snapshot();
-        ensure!(
-            self.load_context()?
-                .category(layer)
-                .is_some_and(|label| label.value == LetteringCategory::Sfx),
-            "select an SFX box to add a subtitle"
-        );
-        let text = snapshot.text_layer(layer)?;
-        let content = text.content()?;
-        let source = content.source()?;
-        let translation = content
+    ) -> Result<(Option<Commit>, EntityId, bool)> {
+        let lettering = crate::commands::lettering::LetteringSettings::load()?
+            .read()?
+            .clone();
+        let (commit, added) = crate::commands::lettering::sfx::apply(
+            self,
+            layer,
+            Some(Some(crate::commands::lettering::sfx::SfxAction::Subtitle)),
+            true,
+            settings,
+            styles,
+            &lettering,
+        )
+        .await?;
+        let added = added.context("subtitle was not created")?;
+        let needs_translation = self
+            .snapshot()
+            .text_layer(added)?
+            .content()?
             .translation()?
-            .filter(|text| !text.text.value.trim().is_empty());
-        let needs_translation = translation.is_none();
-        let page = page_of(&snapshot, layer)?;
-        let size = snapshot.page(page)?.page()?;
-        let geometry = box_geometry(&snapshot, layer, false)?;
-        let bounds = extents(&geometry)?;
-        let direction = if let Some(region) = content.source_region()? {
-            snapshot
-                .component::<OcrAnalysis>(region.id())?
-                .map(|analysis| analysis.direction)
-        } else {
-            None
-        };
-        let vertical = match direction {
-            Some(TextDirection::Vertical) => true,
-            Some(TextDirection::Horizontal) => false,
-            _ => text
-                .typography()?
-                .and_then(|t| t.writing_mode)
-                .map(|m| m == WritingMode::Vertical)
-                .unwrap_or(bounds.height >= bounds.width * 1.15),
-        };
-        let frame = rectangle(subtitle_rect(
-            bounds,
-            vertical,
-            settings.subtitle_size,
-            size.width,
-            size.height,
-        ));
-        let mut typography = typography();
-        styles.default_style.apply_to(&mut typography);
-        typography.preferred_font = settings
-            .subtitle_font_family
-            .clone()
-            .or(typography.preferred_font);
-        typography.size = Some(settings.subtitle_size);
-        typography.auto_fit = false;
-        typography.color = Some(settings.subtitle_fill);
-        typography.fill_gradient = None;
-        typography.stroke_color = Some(settings.subtitle_outline);
-        typography.stroke_width = Some(2.);
-        typography.outer_stroke_color = None;
-        typography.outer_stroke_width = None;
-        typography.writing_mode = Some(WritingMode::Horizontal);
-        typography.alignment = Some(TextAlignment::Start);
-        let mut created = None;
-        let patch = snapshot.patch(|edit| {
-            let content = edit.add_text_content(page, At::End)?;
-            let mut source = source.unwrap_or(SourceText {
-                text: Authored::user(String::new()),
-                language: None,
-            });
-            source.text = Authored::user(source.text.value);
-            edit.set(content, &source)?;
-            if let Some(translation) = translation {
-                edit.set(content, &translation)?;
-            }
-            let added = edit.add_text_layer(
-                page,
-                At::End,
-                content,
-                &TextLayout {
-                    origin: Origin::User,
-                    kind: TextLayoutKind::Paragraph,
-                    angle_degrees: None,
-                    warp: None,
-                },
-            )?;
-            edit.set(added, &frame)?;
-            edit.set(added, &typography)?;
-            created = Some(added);
-            Ok(())
-        })?;
-        let added = created.context("subtitle was not created")?;
-        // Save the label before any translation request takes its hints snapshot.
-        self.update_context(|context| {
-            context.set_user_category(added, Some(LetteringCategory::SmallText))
-        })?;
-        let commit = match self.commit(patch).await {
-            Ok(commit) => commit,
-            Err(error) => {
-                let _ = self.update_context(|context| context.set_user_category(added, None));
-                return Err(error);
-            }
-        };
+            .is_none_or(|translation| translation.text.value.trim().is_empty());
         Ok((commit, added, needs_translation))
     }
+}
+
+pub(crate) fn add_subtitle(
+    snapshot: &Snapshot,
+    edit: &mut koharu_scene::Edit,
+    layer: EntityId,
+    settings: &OcrBoxSettings,
+    styles: &TextStyles,
+) -> Result<(EntityId, bool)> {
+    let text = snapshot.text_layer(layer)?;
+    let content = text.content()?;
+    let source = content.source()?;
+    let translation = content
+        .translation()?
+        .filter(|text| !text.text.value.trim().is_empty());
+    let needs_translation = translation.is_none();
+    let page = page_of(snapshot, layer)?;
+    let size = snapshot.page(page)?.page()?;
+    let geometry = box_geometry(snapshot, layer, false)?;
+    let bounds = extents(&geometry)?;
+    let direction = if let Some(region) = content.source_region()? {
+        snapshot
+            .component::<OcrAnalysis>(region.id())?
+            .map(|analysis| analysis.direction)
+    } else {
+        None
+    };
+    let vertical = match direction {
+        Some(TextDirection::Vertical) => true,
+        Some(TextDirection::Horizontal) => false,
+        _ => text
+            .typography()?
+            .and_then(|t| t.writing_mode)
+            .map(|m| m == WritingMode::Vertical)
+            .unwrap_or(bounds.height >= bounds.width * 1.15),
+    };
+    let frame = rectangle(subtitle_rect(
+        bounds,
+        vertical,
+        settings.subtitle_size,
+        size.width,
+        size.height,
+    ));
+    let mut typography = typography();
+    styles.default_style.apply_to(&mut typography);
+    typography.preferred_font = settings
+        .subtitle_font_family
+        .clone()
+        .or(typography.preferred_font);
+    typography.size = Some(settings.subtitle_size);
+    typography.auto_fit = false;
+    typography.color = Some(settings.subtitle_fill);
+    typography.fill_gradient = None;
+    typography.stroke_color = Some(settings.subtitle_outline);
+    typography.stroke_width = Some(2.);
+    typography.outer_stroke_color = None;
+    typography.outer_stroke_width = None;
+    typography.writing_mode = Some(WritingMode::Horizontal);
+    typography.alignment = Some(TextAlignment::Start);
+    typography.extensions.insert(
+        koharu_pipeline::SFX_SUBTITLE_SOURCE_KEY.into(),
+        layer.to_string(),
+    );
+    let content = edit.add_text_content(page, At::End)?;
+    let mut source = source.unwrap_or(SourceText {
+        text: Authored::user(String::new()),
+        language: None,
+    });
+    source.text = Authored::user(source.text.value);
+    edit.set(content, &source)?;
+    if let Some(translation) = translation {
+        edit.set(content, &translation)?;
+    }
+    let added = edit.add_text_layer(
+        page,
+        At::End,
+        content,
+        &TextLayout {
+            origin: Origin::User,
+            kind: TextLayoutKind::Paragraph,
+            angle_degrees: None,
+            warp: None,
+        },
+    )?;
+    edit.set(added, &frame)?;
+    edit.set(added, &typography)?;
+    Ok((added, needs_translation))
 }

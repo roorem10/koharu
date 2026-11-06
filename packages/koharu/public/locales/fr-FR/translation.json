@@ -495,6 +495,7 @@
     "loading": "Chargement…",
     "loadError": "Impossible de charger les paramètres ou la catégorie de lettrage.",
     "reasons": {
+      "subtitle": "sous-titre de SFX",
       "user": "défini à la main",
       "model": "issu de la lecture du chapitre",
       "small_text": "petit lettrage d’origine"
@@ -514,16 +515,25 @@
     },
     "sfxTitle": "Effets sonores",
     "sfxDescription": "Choisissez les zones d’effets sonores à traiter lors de la traduction.",
-    "sfxMode": "Traduction des SFX",
-    "sfxModes": {
+    "sfxInside": "SFX dans les bulles",
+    "sfxInsideHelp": "Traduisez les SFX dans les bulles sur place ou conservez l’original intact.",
+    "sfxOutside": "SFX hors des bulles",
+    "sfxOutsideHelp": "Les sous-titres sont placés à côté du SFX original. Remplacer efface l’original uniquement après une traduction réussie.",
+    "sfxImportantOnly": "Uniquement les SFX importants hors des bulles",
+    "sfxImportantHelp": "Appliquez l’action hors des bulles uniquement lorsque Lire le chapitre juge le son nécessaire à l’histoire, comme un coup frappé à une porte auquel quelqu’un répond. Les autres SFX sont ignorés.",
+    "sfxHandling": "Traitement du SFX",
+    "sfxHandlingHelp": "Ce choix sera utilisé lors de la prochaine traduction.",
+    "sfxActions": {
       "skip": "Ignorer",
-      "inside_bubbles": "Uniquement dans les bulles",
-      "translate_all": "Tout traduire"
+      "subtitle": "Sous-titrer",
+      "translate": "Traduire",
+      "replace": "Remplacer"
     },
-    "sfxHelp": {
-      "skip": "Laisser toutes les zones de SFX sans traduction ni lettrage.",
-      "inside_bubbles": "Traduire les SFX dans les bulles ; laisser les autres intacts.",
-      "translate_all": "Traduire les SFX à l’intérieur comme à l’extérieur des bulles."
+    "sfxReasons": {
+      "user": "défini manuellement",
+      "inside_bubble": "dans une bulle",
+      "outside_bubble": "hors d’une bulle",
+      "unimportant": "non signalé comme important par Lire le chapitre"
     }
   },
   "mcp": {

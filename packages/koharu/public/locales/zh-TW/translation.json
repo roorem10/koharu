@@ -489,6 +489,7 @@
     "loading": "正在載入…",
     "loadError": "無法載入排字設定或類別。",
     "reasons": {
+      "subtitle": "音效字幕",
       "user": "手動設定",
       "model": "來自章節閱讀結果",
       "small_text": "原文為小字"
@@ -508,16 +509,25 @@
     },
     "sfxTitle": "音效",
     "sfxDescription": "控制翻譯時處理哪些音效框。",
-    "sfxMode": "音效（SFX）翻譯",
-    "sfxModes": {
+    "sfxInside": "對話框內的音效",
+    "sfxInsideHelp": "在原處翻譯對話框內的音效，或保留原文不變。",
+    "sfxOutside": "對話框外的音效",
+    "sfxOutsideHelp": "字幕放在原音效旁。取代僅在翻譯成功後清除原文。",
+    "sfxImportantOnly": "對話框外僅處理重要音效",
+    "sfxImportantHelp": "僅當「閱讀章節」將聲音標記為情節所必需時才套用對話框外的處理方式，例如有人回應的敲門聲。其餘音效將略過。",
+    "sfxHandling": "音效處理",
+    "sfxHandlingHelp": "在下次執行翻譯時套用。",
+    "sfxActions": {
       "skip": "略過",
-      "inside_bubbles": "僅對話框內",
-      "translate_all": "全部翻譯"
+      "subtitle": "字幕",
+      "translate": "翻譯",
+      "replace": "取代"
     },
-    "sfxHelp": {
-      "skip": "所有 SFX 框均不翻譯、不排字。",
-      "inside_bubbles": "翻譯對話框內的 SFX；其餘 SFX 保持不變。",
-      "translate_all": "翻譯對話框內外的所有 SFX。"
+    "sfxReasons": {
+      "user": "手動設定",
+      "inside_bubble": "位於對話框內",
+      "outside_bubble": "位於對話框外",
+      "unimportant": "「閱讀章節」未標記為重要"
     }
   },
   "mcp": {

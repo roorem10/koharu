@@ -264,6 +264,7 @@ async fn sfx_subtitle_copies_text_is_small_text_and_undoes_as_one_creation() {
         .create_sfx_subtitle(layer, &OcrBoxSettings::default(), &TextStyles::default())
         .await
         .unwrap();
+    let commit = commit.unwrap();
     project.record_commit(&commit);
     assert!(!translate);
     let snapshot = project.snapshot();
@@ -298,15 +299,7 @@ async fn sfx_subtitle_copies_text_is_small_text_and_undoes_as_one_creation() {
             .value,
         "THUD"
     );
-    assert_eq!(
-        project
-            .load_context()
-            .unwrap()
-            .category(added)
-            .unwrap()
-            .value,
-        LetteringCategory::SmallText
-    );
+    assert_eq!(crate::commands::lettering::sfx::subtitle_source(&snapshot, added).unwrap(), Some(layer));
     let skip =
         crate::commands::lettering::translation_skip(&project.load_context().unwrap(), &snapshot)
             .unwrap();

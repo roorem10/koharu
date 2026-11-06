@@ -101,6 +101,8 @@ export const commands = {
 	commitInpaint: (expectedRevision: Revision, points: Point[], diameter: number, hardness: number) => __TAURI_INVOKE<JobId | null>("commit_inpaint", { expectedRevision, points, diameter, hardness }),
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
+	getSfxHandling: (layer: EntityId) => __TAURI_INVOKE<EffectiveSfx | null>("get_sfx_handling", { layer }),
+	setSfxHandling: (layer: EntityId, action: SfxAction | null) => __TAURI_INVOKE<EffectiveSfx>("set_sfx_handling", { layer, action }),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
 	getBoxSettings: () => __TAURI_INVOKE<BoxSettings>("get_box_settings"),
 	saveBoxSettings: (settings: BoxSettings) => __TAURI_INVOKE<BoxSettings>("save_box_settings", { settings }),
@@ -276,7 +278,7 @@ export type CanvasState = {
 	element_frames: TransformFrame[],
 };
 
-export type CategoryReason = "user" | "model" | "small_text" | "bubble_shape";
+export type CategoryReason = "user" | "model" | "small_text" | "bubble_shape" | "subtitle";
 
 export type CategoryStyles = {
 	thoughts?: TextStyle,
@@ -398,6 +400,12 @@ export type Download = {
 };
 
 export type DownloadState = "running" | "finished" | "failed";
+
+export type EffectiveSfx = {
+	action: SfxAction,
+	reason: SfxReason,
+	automatic: boolean,
+};
 
 export type EffectiveCategory = {
 	category: LetteringCategory,
@@ -628,7 +636,9 @@ export type LayerVisibility = {
 export type LetteringCategory = "normal_dialogue" | "thoughts" | "floating" | "small_text" | "narration_box" | "shout" | "weak_shout" | "sfx" | "moan" | "title" | "phone_text" | "whisper" | "shy" | "crying" | "menacing";
 
 export type LetteringSettings = {
-	sfx?: SfxMode,
+	sfx_inside?: SfxInsideMode,
+	sfx_outside?: SfxOutsideMode,
+	sfx_important_only?: boolean,
 	model_confidence?: number,
 	/**  Estimated source glyph size as a fraction of page height. */
 	small_text_threshold?: number,
@@ -658,6 +668,8 @@ export type LineCategory = {
 
 export type LineContext = {
 	category?: LineCategory | null,
+	/**  Whether the chapter reader found that understanding this sound matters to the story. */
+	sfx_important?: boolean | null,
 	note?: string | null,
 	flags?: Flag[],
 	dismissed?: string[],
@@ -1066,7 +1078,13 @@ export type Series = {
 	characters?: Character[],
 };
 
-export type SfxMode = "skip" | "inside_bubbles" | "translate_all";
+export type SfxAction = "skip" | "subtitle" | "translate";
+
+export type SfxInsideMode = "translate" | "skip";
+
+export type SfxOutsideMode = "skip" | "subtitle" | "replace";
+
+export type SfxReason = "user" | "inside_bubble" | "outside_bubble" | "unimportant";
 
 export type ShapeMeasures = {
 	rectangularity: number,

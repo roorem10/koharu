@@ -25,6 +25,7 @@ use super::{
     project::CurrentProject,
 };
 use geometry::{rectangle, text_mask, union_mask};
+pub(crate) use operations::add_subtitle;
 use operations::{box_geometry, page_of, redo_info, unique_layers};
 use settings::{OcrBoxMode, OcrBoxSettings};
 
@@ -299,19 +300,29 @@ pub(crate) async fn add_sfx_subtitle(
     ensure_idle(&handle)?;
     let settings = OcrBoxSettings::load()?;
     let styles = super::styles::load_text_styles()?.read()?.clone();
-    let (commit, added, translate, active) = {
+    let (commit, added, translate, active, expected) = {
         let projects = handle.state::<CurrentProject>();
         let mut projects = projects.project.lock().await;
         let project = projects.as_mut().context("no project is open")?;
         let (commit, added, translate) = project
             .create_sfx_subtitle(layer, &settings, &styles)
             .await?;
-        project.record_commit(&commit);
-        (commit, added, translate, project.active_page())
+        if let Some(commit) = &commit {
+            project.record_commit(commit);
+        }
+        (
+            commit,
+            added,
+            translate,
+            project.active_page(),
+            project.snapshot().project_id(),
+        )
     };
-    synchronize(&handle, &commit, active).await?;
+    if let Some(commit) = &commit {
+        synchronize(&handle, commit, active).await?;
+    }
     if translate {
-        check_project(&handle, commit.snapshot.project_id()).await?;
+        check_project(&handle, expected).await?;
         run_text(
             &handle,
             vec![added],

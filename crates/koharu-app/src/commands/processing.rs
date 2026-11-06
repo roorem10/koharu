@@ -336,6 +336,8 @@ async fn start_job_inner(
         struct PipelineCommitter {
             handle: AppHandle<CefRuntime>,
             project: koharu_scene::ProjectId,
+            automatic_cleanup: bool,
+            cleanup_bounds: Option<koharu_pipeline::Bounds>,
         }
 
         #[async_trait::async_trait]
@@ -349,6 +351,15 @@ async fn start_job_inner(
                         project.snapshot().project_id() == self.project,
                         "the project changed during processing"
                     );
+                    if self.automatic_cleanup
+                        && output.stage == koharu_pipeline::Stage::Inpainting
+                        && !super::lettering::sfx::cleanup_policy_current(
+                            project, output.page, self.cleanup_bounds,
+                        )?
+                    {
+                        tracing::debug!("cleanup was superseded by an SFX policy change");
+                        return Ok(project.snapshot());
+                    }
                     let Some(mut commit) = project.commit_rebased(output.patch).await? else {
                         return Ok(project.snapshot());
                     };
@@ -379,69 +390,20 @@ async fn start_job_inner(
         let mut committer = PipelineCommitter {
             handle: task_handle.clone(),
             project: run_project,
+            automatic_cleanup: request.inpainting_mask.is_none(),
+            cleanup_bounds: match &request.scope {
+                koharu_pipeline::Scope::Region { bounds, .. } => Some(*bounds),
+                _ => None,
+            },
         };
-        // A run that finds text and translates is split around Read chapter, so the
-        // reader sees the OCR lines and can label them (#55). Other runs read first
-        // (a no-op when there's nothing to read) and keep one overlapped pass.
-        let split = if super::context::operation_translates(&request.operation) {
-            match super::context::split_for_reading(&request.operation) {
-                Some(parts) => {
-                    match super::context::wants_auto_read(&task_handle, &request.scope).await {
-                        Ok(true) => Some(parts),
-                        Ok(false) => None,
-                        Err(error) => {
-                            tracing::warn!(%error, "automatic Read chapter check failed");
-                            None
-                        }
-                    }
-                }
-                None => None,
-            }
-        } else {
-            None
-        };
-        let result: Result<koharu_pipeline::Report> = async {
-            let mut first_report = None;
-            if let Some((finding, rest)) = split {
-                let finding_request = koharu_pipeline::Request {
-                    operation: finding,
-                    ..request.clone()
-                };
-                let report = run_pass(
-                    &task_handle,
-                    &pipeline,
-                    run_project,
-                    finding_request,
-                    &mut committer,
-                )
-                .await?;
-                if report.status == RunStatus::Stopped || stop.stopped() {
-                    return Ok(report);
-                }
-                first_report = Some(report);
-                request.operation = rest;
-            }
-            // A failed chapter read must not block translation; the page requests
-            // simply go out without the new brief.
-            if super::context::operation_translates(&request.operation)
-                && let Err(error) =
-                    super::context::auto_read(&task_handle, &request.scope, &stop, id).await
-            {
-                tracing::warn!(%error, "automatic Read chapter failed");
-            }
-            let report = run_pass(
-                &task_handle,
-                &pipeline,
-                run_project,
-                request,
-                &mut committer,
-            )
-            .await?;
-            Ok(match first_report {
-                Some(first) => merge_reports(first, report),
-                None => report,
-            })
-        }
+        let result = run_with_reading(
+            &task_handle,
+            &pipeline,
+            run_project,
+            request,
+            &mut committer,
+            id,
+        )
         .await;
         let (stopped, error) = match result {
             Ok(report) => (report.status == RunStatus::Stopped, None),
@@ -478,6 +440,80 @@ async fn start_job_inner(
     Ok(id)
 }
 
+pub(crate) async fn run_with_reading(
+    handle: &AppHandle<CefRuntime>,
+    pipeline: &koharu_pipeline::Pipeline,
+    run_project: koharu_scene::ProjectId,
+    mut request: koharu_pipeline::Request,
+    committer: &mut (dyn Committer + Send),
+    id: JobId,
+) -> Result<koharu_pipeline::Report> {
+    let stop = request.stop.clone();
+    // A run that finds text and translates is split around Read chapter, so the
+    // reader sees the OCR lines and can label them (#55). Other runs read first
+    // (a no-op when there's nothing to read) and keep one overlapped pass.
+    let split = if super::context::operation_translates(&request.operation) {
+        match super::context::split_for_reading(&request.operation) {
+            Some(parts) => {
+                match super::context::wants_auto_read(handle, &request.scope).await {
+                    Ok(true) => Some(parts),
+                    Ok(false) => None,
+                    Err(error) => {
+                        tracing::warn!(%error, "automatic Read chapter check failed");
+                        None
+                    }
+                }
+            }
+            None => None,
+        }
+    } else {
+        None
+    };
+    async {
+        let mut first_report = None;
+        if let Some((finding, rest)) = split {
+            let finding_request = koharu_pipeline::Request {
+                operation: finding,
+                ..request.clone()
+            };
+            let report = run_pass(
+                handle,
+                pipeline,
+                run_project,
+                finding_request,
+                committer,
+            )
+            .await?;
+            if report.status == RunStatus::Stopped || stop.stopped() {
+                return Ok(report);
+            }
+            first_report = Some(report);
+            request.operation = rest;
+        }
+        // A failed chapter read must not block translation; the page requests
+        // simply go out without the new brief.
+        if super::context::operation_translates(&request.operation)
+            && let Err(error) =
+                super::context::auto_read(handle, &request.scope, &stop, id).await
+        {
+            tracing::warn!(%error, "automatic Read chapter failed");
+        }
+        let report = run_pass(
+            handle,
+            pipeline,
+            run_project,
+            request,
+            committer,
+        )
+        .await?;
+        Ok(match first_report {
+            Some(first) => merge_reports(first, report),
+            None => report,
+        })
+    }
+    .await
+}
+
 /// Runs one pipeline pass on the current snapshot with fresh translation hints.
 async fn run_pass(
     handle: &AppHandle<CefRuntime>,
@@ -486,6 +522,7 @@ async fn run_pass(
     mut request: koharu_pipeline::Request,
     committer: &mut (dyn Committer + Send),
 ) -> Result<koharu_pipeline::Report> {
+    super::lettering::sfx::prepare(handle, run_project, &mut request).await?;
     let snapshot = {
         let projects = handle.state::<CurrentProject>();
         let projects = projects.project.lock().await;

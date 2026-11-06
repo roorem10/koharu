@@ -61,6 +61,8 @@ impl<'a> Execution<'a> {
         let scope = NormalizedScope::new(&snapshot, &request.scope, &stages)
             .map_err(|error| PipelineError::new(ErrorKind::InvalidInput, None, error))?;
         let pages = scope.pages().to_vec();
+        let cleanup_after_text_pages = crate::sfx::pages_requiring_text_before_cleanup(&snapshot)
+            .map_err(|error| PipelineError::new(ErrorKind::InvalidInput, None, error))?;
         if let Some(mask) = request.inpainting_mask.as_ref()
             && (!pages.contains(&mask.page) || !stages.contains(&Stage::Inpainting))
         {
@@ -85,7 +87,9 @@ impl<'a> Execution<'a> {
             stop: request.stop,
             progress: request.progress,
             scope,
-            scheduler: Scheduler::new(&pages, &stages).with_order(request.policy.order),
+            scheduler: Scheduler::new(&pages, &stages)
+                .with_order(request.policy.order)
+                .with_cleanup_after_text_pages(&cleanup_after_text_pages),
             scene: snapshot,
             images: BTreeMap::new(),
             busy_stages: BTreeSet::new(),

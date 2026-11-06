@@ -60,6 +60,9 @@ impl KoharuHost {
                 for layer in layers {
                     if let Ok(id) = serde_json::from_value::<EntityId>(layer["id"].clone()) {
                         layer["lettering_category"] = serde_json::to_value(context.category(id))?;
+                        layer["sfx_important"] = serde_json::to_value(
+                            context.lines.get(&id).and_then(|line| line.sfx_important),
+                        )?;
                         layer["flags"] = serde_json::to_value(
                             context
                                 .lines
@@ -271,14 +274,11 @@ impl KoharuHost {
     async fn run_pipeline(&self, arguments: RunPipeline, control: &Control) -> Result<Invocation> {
         let scope = arguments.scope()?;
         let operation = arguments.operation.into();
-        let translation_hints = {
+        let run_project = {
             let projects = self.handle.state::<CurrentProject>();
             let project = projects.project.lock().await;
             let project = project.as_ref().context("no project is open")?;
-            let snapshot = project.snapshot();
-            let hints =
-                super::super::context::translation_hints(&project.load_context()?, &snapshot)?;
-            std::sync::Arc::new(hints)
+            project.snapshot().project_id()
         };
         let job = JobId::new();
         let stop = StopToken::default();
@@ -306,39 +306,31 @@ impl KoharuHost {
                 stop.stop();
             }
         });
-        let mut committer = AgentCommitter { host: self.clone() };
+        let mut committer = AgentCommitter {
+            host: self.clone(),
+            cleanup_bounds: match &scope {
+                Scope::Region { bounds, .. } => Some(*bounds),
+                _ => None,
+            },
+        };
         let request = koharu_pipeline::Request {
             operation,
             scope,
             stop,
             progress: None,
             inpainting_mask: None,
-            translation_hints,
+            translation_hints: std::sync::Arc::default(),
             redetect: false,
             policy: super::super::runs::RunSettings::load()?.policy(),
         };
-        let mut request = request;
-        let result = async {
-            if super::super::context::operation_translates(&request.operation) {
-                super::super::context::auto_read(&self.handle, &request.scope, &request.stop, job)
-                    .await?;
-            }
-            let snapshot = {
-                let projects = self.handle.state::<CurrentProject>();
-                let projects = projects.project.lock().await;
-                let project = projects.as_ref().context("no project is open")?;
-                let snapshot = project.snapshot();
-                request.translation_hints = std::sync::Arc::new(
-                    super::super::context::translation_hints(&project.load_context()?, &snapshot)?,
-                );
-                snapshot
-            };
-            self.handle
-                .state::<koharu_pipeline::Pipeline>()
-                .execute(snapshot, request, &mut committer)
-                .await
-                .map_err(anyhow::Error::from)
-        }
+        let result = super::super::processing::run_with_reading(
+            &self.handle,
+            &self.handle.state::<koharu_pipeline::Pipeline>(),
+            run_project,
+            request,
+            &mut committer,
+            job,
+        )
         .await;
         watcher.abort();
         self.handle.state::<Processing>().stops.lock().remove(&job);
@@ -396,6 +388,7 @@ impl Host for KoharuHost {
                     ),
                     definition::<AddGlossaryEntry>("add_glossary_entry", "Suggest a glossary term for this chapter without replacing an existing series term."),
                     definition::<SetLineCategory>("set_line_category", "Set a model lettering category for a text layer. A user label always wins."),
+                    definition::<SetSfxHandling>("set_sfx_handling", "Set one SFX box to skip, subtitle, or translate. This undoable per-box choice overrides Settings on future runs. Pass null to return to automatic handling."),
                     definition::<FlagLine>("flag_line", "Mark a text layer for human review with a short message."),
                     definition::<SetGeometry>(
                         "set_geometry",
@@ -688,6 +681,17 @@ impl Host for KoharuHost {
                 self.context_tool(&call).await
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
+            "set_sfx_handling" => {
+                let arguments: SetSfxHandling = arguments(&call)?;
+                let layer = entity(&arguments.element)?;
+                self.mutate_optional(|project| {
+                    Box::pin(async move {
+                        super::super::lettering::sfx::set_choice(project, layer, arguments.action)
+                            .await
+                    })
+                })
+                .await
+            }
             // WO-20 (one box per bubble) tool calls go here.
             "find_split_bubbles" => {
                 let arguments: crate::commands::boxes::FindSplitBubblesArgs = arguments(&call)?;
@@ -798,6 +802,7 @@ async fn apply_agent_text_style(
 
 struct AgentCommitter {
     host: KoharuHost,
+    cleanup_bounds: Option<koharu_pipeline::Bounds>,
 }
 
 #[async_trait]
@@ -807,6 +812,14 @@ impl Committer for AgentCommitter {
             let current = self.host.handle.state::<CurrentProject>();
             let mut current = current.project.lock().await;
             let project = current.as_mut().context("no project is open")?;
+            if output.stage == Stage::Inpainting
+                && !super::super::lettering::sfx::cleanup_policy_current(
+                    project, output.page, self.cleanup_bounds,
+                )?
+            {
+                tracing::debug!("cleanup was superseded by an SFX policy change");
+                return Ok(project.snapshot());
+            }
             let Some(commit) = project.commit_rebased(output.patch).await? else {
                 return Ok(project.snapshot());
             };
@@ -846,6 +859,12 @@ fn entities(values: &[String]) -> Result<Vec<EntityId>> {
 
 #[derive(Deserialize, JsonSchema)]
 struct InspectProject {}
+
+#[derive(Deserialize, JsonSchema)]
+struct SetSfxHandling {
+    element: String,
+    action: Option<super::super::lettering::sfx::SfxAction>,
+}
 
 #[derive(Deserialize, JsonSchema)]
 struct ViewPage {

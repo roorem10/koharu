@@ -489,6 +489,7 @@
     "loading": "来勒加载…",
     "loadError": "文字排版设置或者类别加载失败哉。",
     "reasons": {
+      "subtitle": "音效字幕",
       "user": "手动设置个",
       "model": "阅读章节得出个",
       "small_text": "原文字小"
@@ -508,16 +509,25 @@
     },
     "sfxTitle": "音效",
     "sfxDescription": "设置翻译辰光要处理哪眼音效框。",
-    "sfxMode": "SFX 翻译",
-    "sfxModes": {
+    "sfxInside": "对话框里向个音效",
+    "sfxInsideHelp": "对话框里向个音效原地翻译，或者原样保留。",
+    "sfxOutside": "对话框外头个音效",
+    "sfxOutsideHelp": "字幕放勒原音效旁边。“替换”只勒翻译成功以后擦脱原文。",
+    "sfxImportantOnly": "框外只处理要紧个音效",
+    "sfxImportantHelp": "只有“读章节”认定声音对情节要紧辰光，才用框外处理方式，譬如有人应门个敲门声。别个音效跳过。",
+    "sfxHandling": "音效处理",
+    "sfxHandlingHelp": "下趟翻译辰光用这个选项。",
+    "sfxActions": {
       "skip": "跳过",
-      "inside_bubbles": "光翻气泡里向个",
-      "translate_all": "全部翻译"
+      "subtitle": "加字幕",
+      "translate": "翻译",
+      "replace": "替换"
     },
-    "sfxHelp": {
-      "skip": "所有 SFX 框侪弗翻译，也弗排字。",
-      "inside_bubbles": "翻译气泡里向个 SFX，其他 SFX 保持勿动。",
-      "translate_all": "气泡里向搭外头个 SFX 侪翻译。"
+    "sfxReasons": {
+      "user": "手动设定",
+      "inside_bubble": "勒对话框里向",
+      "outside_bubble": "勒对话框外头",
+      "unimportant": "“读章节”呒没标成要紧"
     }
   },
   "mcp": {

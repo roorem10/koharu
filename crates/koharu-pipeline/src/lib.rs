@@ -15,6 +15,7 @@ mod request;
 mod resources;
 mod scheduler;
 mod scope;
+mod sfx;
 mod stage;
 mod stage_runner;
 mod stages;
@@ -33,6 +34,7 @@ pub use request::{
 };
 pub use resources::{DeviceResources, ResourceSnapshot};
 pub use scope::{Bounds, Scope};
+pub use sfx::{SFX_ACTION_KEY, SFX_SUBTITLE_SOURCE_KEY};
 pub use stage::Stage;
 pub use stages::bubble_shape;
 pub use stages::{

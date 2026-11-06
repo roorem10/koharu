@@ -168,6 +168,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             // WO-19 (lettering categories) commands go here.
             lettering::get_effective_category,
             lettering::get_lettering_settings,
+            lettering::sfx::get_sfx_handling,
+            lettering::sfx::set_sfx_handling,
             lettering::save_lettering_settings,
             // WO-20 (one box per bubble) commands go here.
             boxes::get_box_settings,

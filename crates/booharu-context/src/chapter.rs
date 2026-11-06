@@ -83,6 +83,8 @@ pub struct ReadLine {
     pub id: String,
     pub category: Option<String>,
     pub confidence: Option<f32>,
+    #[serde(default)]
+    pub sfx_important: Option<bool>,
     pub note: Option<String>,
 }
 
@@ -148,6 +150,17 @@ impl ProjectContext {
                 && self.set_model_category(id, category, line.confidence)
             {
                 changed.insert(id);
+            }
+            // The effective category includes hand edits; a model's SFX claim must
+            // not attach importance to a line the user classified differently.
+            let sfx_important = self
+                .category(id)
+                .filter(|category| category.value == LetteringCategory::Sfx)
+                .and(line.sfx_important);
+            if self.lines.get(&id).and_then(|line| line.sfx_important) != sfx_important {
+                // The returned IDs trigger restyling; importance alone must not
+                // replace typography on a hand-classified SFX box.
+                self.lines.entry(id).or_default().sfx_important = sfx_important;
             }
             if let Some(note) = line.note.filter(|text| !text.trim().is_empty()) {
                 self.lines.entry(id).or_default().note = Some(note);
@@ -255,5 +268,102 @@ mod tests {
         assert_eq!(context.suggestions.len(), 1);
         assert_eq!(context.lines.len(), 1);
         assert_eq!(series[0].target, "Hina");
+    }
+
+    #[test]
+    fn sfx_importance_follows_the_effective_category_and_current_reading() {
+        let important = EntityId::new();
+        let incidental = EntityId::new();
+        let manual_dialogue = EntityId::new();
+        let manual_sfx = EntityId::new();
+        let valid = BTreeSet::from([important, incidental, manual_dialogue, manual_sfx]);
+        let mut context = ProjectContext::default();
+        context.set_user_category(manual_dialogue, Some(LetteringCategory::NormalDialogue));
+        context.set_user_category(manual_sfx, Some(LetteringCategory::Sfx));
+        let reading = |lines| {
+            serde_json::from_value(serde_json::json!({
+                "summary": "", "characters": [], "glossary": [], "lines": lines,
+            }))
+            .unwrap()
+        };
+        let changed = context.merge_reading(
+            reading(serde_json::json!([
+                {"id": important, "category": "sfx", "sfx_important": true},
+                {"id": incidental, "category": "sfx", "sfx_important": false},
+                {"id": manual_dialogue, "category": "sfx", "sfx_important": true},
+                {"id": manual_sfx, "category": "shout", "sfx_important": true},
+                {"id": "unknown", "category": "sfx", "sfx_important": true},
+            ])),
+            &valid,
+            &[],
+            "first".into(),
+        );
+        assert_eq!(
+            changed.into_iter().collect::<BTreeSet<_>>(),
+            BTreeSet::from([important, incidental])
+        );
+        assert_eq!(context.lines[&important].sfx_important, Some(true));
+        assert_eq!(context.lines[&incidental].sfx_important, Some(false));
+        assert_eq!(context.lines[&manual_dialogue].sfx_important, None);
+        assert_eq!(context.lines[&manual_sfx].sfx_important, Some(true));
+        assert_eq!(context.lines.len(), 4);
+        assert_eq!(
+            context.category(manual_dialogue).unwrap().value,
+            LetteringCategory::NormalDialogue
+        );
+        assert_eq!(
+            context.category(manual_sfx).unwrap().source,
+            crate::LabelSource::User
+        );
+
+        context.merge_reading(
+            reading(serde_json::json!([
+                {"id": important, "category": "sfx", "sfx_important": null},
+                {"id": incidental, "category": "title", "sfx_important": true},
+            ])),
+            &valid,
+            &[],
+            "second".into(),
+        );
+        assert_eq!(context.lines[&important].sfx_important, None);
+        assert_eq!(context.lines[&incidental].sfx_important, None);
+    }
+
+    #[test]
+    fn reading_importance_is_optional_but_must_be_boolean() {
+        for value in [
+            serde_json::json!({"id": "box"}),
+            serde_json::json!({"id": "box", "sfx_important": null}),
+        ] {
+            let line: ReadLine = serde_json::from_value(value).unwrap();
+            assert_eq!(line.sfx_important, None);
+        }
+        assert!(
+            serde_json::from_value::<ReadLine>(serde_json::json!({
+                "id": "box", "sfx_important": "true",
+            }))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn importance_updates_do_not_restyle_a_hand_classified_sfx() {
+        let layer = EntityId::new();
+        let mut context = ProjectContext::default();
+        context.set_user_category(layer, Some(LetteringCategory::Sfx));
+        for important in [Some(true), Some(false), None] {
+            let reading = serde_json::from_value(serde_json::json!({
+                "summary": "", "characters": [], "glossary": [],
+                "lines": [{"id": layer, "category": "sfx", "sfx_important": important}],
+            }))
+            .unwrap();
+            assert!(
+                context
+                    .merge_reading(reading, &BTreeSet::from([layer]), &[], "now".into())
+                    .is_empty()
+            );
+            assert_eq!(context.lines[&layer].sfx_important, important);
+            assert_eq!(context.category(layer).unwrap().source, crate::LabelSource::User);
+        }
     }
 }

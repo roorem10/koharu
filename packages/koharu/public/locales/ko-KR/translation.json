@@ -489,6 +489,7 @@
     "loading": "불러오는 중…",
     "loadError": "레터링 설정이나 범주를 불러오지 못했습니다.",
     "reasons": {
+      "subtitle": "효과음 자막",
       "user": "직접 설정됨",
       "model": "챕터 읽기 결과",
       "small_text": "원문의 작은 글씨"
@@ -508,16 +509,25 @@
     },
     "sfxTitle": "효과음",
     "sfxDescription": "번역 시 처리할 효과음 상자를 설정합니다.",
-    "sfxMode": "효과음 번역",
-    "sfxModes": {
+    "sfxInside": "말풍선 안의 효과음",
+    "sfxInsideHelp": "말풍선 안의 효과음을 제자리에서 번역하거나 원본을 그대로 둡니다.",
+    "sfxOutside": "말풍선 밖의 효과음",
+    "sfxOutsideHelp": "자막은 원본 효과음 옆에 배치됩니다. 바꾸기는 번역이 성공한 경우에만 원본을 지웁니다.",
+    "sfxImportantOnly": "말풍선 밖에서는 중요한 효과음만",
+    "sfxImportantHelp": "챕터 읽기가 이야기 전개에 필요하다고 판단한 소리에만 말풍선 밖 동작을 적용합니다. 누군가 응답하는 노크 등이 해당하며, 나머지 효과음은 건너뜁니다.",
+    "sfxHandling": "효과음 처리",
+    "sfxHandlingHelp": "다음 번역 실행에 적용됩니다.",
+    "sfxActions": {
       "skip": "건너뛰기",
-      "inside_bubbles": "말풍선 안만",
-      "translate_all": "모두 번역"
+      "subtitle": "자막",
+      "translate": "번역",
+      "replace": "바꾸기"
     },
-    "sfxHelp": {
-      "skip": "모든 효과음 상자에 번역과 식자를 적용하지 않습니다.",
-      "inside_bubbles": "말풍선 안의 효과음만 번역하고 나머지는 그대로 둡니다.",
-      "translate_all": "말풍선 안팎의 효과음을 모두 번역합니다."
+    "sfxReasons": {
+      "user": "직접 설정",
+      "inside_bubble": "말풍선 안",
+      "outside_bubble": "말풍선 밖",
+      "unimportant": "챕터 읽기에서 중요하다고 표시하지 않음"
     }
   },
   "mcp": {

@@ -1,6 +1,7 @@
 //! Resolve line categories without changing the scene's text or save format.
 
 mod settings;
+pub(crate) mod sfx;
 #[cfg(test)]
 mod tests;
 
@@ -23,7 +24,6 @@ use super::{
     styles::StyleScope,
 };
 pub(super) use settings::LetteringSettings;
-use settings::SfxMode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "snake_case")]
@@ -32,6 +32,7 @@ pub(crate) enum CategoryReason {
     Model,
     SmallText,
     BubbleShape,
+    Subtitle,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
@@ -84,6 +85,14 @@ pub(super) fn resolve_category(
     settings: &LetteringSettings,
 ) -> Result<EffectiveCategory> {
     let label = context.category(layer);
+    if sfx::subtitle_source(snapshot, layer)?.is_some()
+        && label.is_none_or(|label| label.source != LabelSource::User)
+    {
+        return Ok(EffectiveCategory {
+            category: LetteringCategory::SmallText,
+            reason: CategoryReason::Subtitle,
+        });
+    }
     let winner = winning_label(label, settings);
     let small = winner.is_none()
         && original_glyph_fraction(snapshot, layer)?
@@ -133,19 +142,18 @@ fn translation_skip_with(
     snapshot: &Snapshot,
     settings: &LetteringSettings,
 ) -> Result<BTreeSet<EntityId>> {
-    if settings.sfx == SfxMode::TranslateAll {
-        return Ok(BTreeSet::new());
-    }
     let mut skip = BTreeSet::new();
     for layer in snapshot.text_layers()? {
-        // SFX is a presentation label, so size and shape cannot override it.
-        if winning_label(context.category(layer.id()), settings)
-            .is_none_or(|label| label.value != LetteringCategory::Sfx)
+        if sfx::effective(context, snapshot, layer.id(), settings)?
+            .is_some_and(|decision| decision.action != sfx::SfxAction::Translate)
         {
-            continue;
+            skip.insert(layer.id());
         }
-        let info = text_bubble_shape(snapshot, layer.id())?;
-        if settings.sfx == SfxMode::Skip || info.bubble.is_none() {
+        if let Some(source) = sfx::subtitle_source(snapshot, layer.id())?
+            && snapshot.text_layer(source).is_ok()
+            && sfx::effective(context, snapshot, source, settings)?
+                .is_none_or(|decision| decision.action != sfx::SfxAction::Subtitle)
+        {
             skip.insert(layer.id());
         }
     }

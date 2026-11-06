@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use koharu_scene::{Authored, LanguageTag, Origin, SourceText, Translation};
+use koharu_scene::{Authored, EntityId, LanguageTag, Origin, SourceText, Translation, Typography};
 use koharu_translator::{TranslationRequest, Translator};
 
 use crate::TranslationConfig;
@@ -32,7 +32,7 @@ impl StageProcessor for Processor {
         }
         if let Some(group) = input.scene.page(input.page)?.text_group()? {
             for layer in group.text_layers()? {
-                if input.contains_entity(layer.id())?
+                if includes_translation_layer(input, layer.id())?
                     && !input.translation_hints.skip.contains(&layer.id())
                     && !layer.content()?.translation()?.is_some_and(|translation| {
                         !translation.text.value.trim().is_empty()
@@ -58,7 +58,7 @@ impl StageProcessor for Processor {
         let mut targets = Vec::new();
         if let Some(group) = input.scene.page(input.page)?.text_group()? {
             for layer in group.text_layers()? {
-                if !input.contains_entity(layer.id())?
+                if !includes_translation_layer(&input, layer.id())?
                     || input.translation_hints.skip.contains(&layer.id())
                 {
                     continue;
@@ -120,6 +120,26 @@ impl StageProcessor for Processor {
     }
 }
 
+fn includes_translation_layer(input: &StageInput, layer: EntityId) -> Result<bool> {
+    let source = input
+        .scene
+        .component::<Typography>(layer)?
+        .and_then(|style| style.extensions.get(crate::SFX_SUBTITLE_SOURCE_KEY).cloned())
+        .map(|value| serde_json::from_value::<EntityId>(serde_json::Value::String(value)))
+        .transpose()?;
+    if input.contains_entity(layer)? {
+        return Ok(true);
+    }
+    // Subtitles sit beside the original ink and can fall outside a tight region.
+    // An independently selected subtitle also works after its source is deleted.
+    if let Some(source) = source
+        && input.scene.text_layer(source).is_ok()
+    {
+        return input.contains_entity(source);
+    }
+    Ok(false)
+}
+
 fn write_translation(
     edit: &mut koharu_scene::Edit,
     layer: koharu_scene::EntityId,
@@ -153,6 +173,123 @@ fn write_translation(
 mod tests {
     use super::*;
     use koharu_scene::{At, PageDraft, Session, TextLayout, TextLayoutKind};
+
+    #[tokio::test]
+    async fn scoped_translation_includes_adjacent_subtitles_only_for_selected_sources() {
+        use std::sync::Arc;
+
+        use koharu_scene::{Geometry, RemovePolicy};
+
+        let mut session = Session::memory().await.unwrap();
+        let mut ids = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 100.0, 100.0), At::End)?;
+                let mut layers = Vec::new();
+                for (x, y) in [(10.0, 10.0), (70.0, 10.0), (70.0, 60.0), (70.0, 85.0)] {
+                    let content = edit.add_text_content(page, At::End)?;
+                    let layer = edit.add_text_layer(
+                        page,
+                        At::End,
+                        content,
+                        &TextLayout {
+                            origin: Origin::User,
+                            kind: TextLayoutKind::Paragraph,
+                            angle_degrees: None,
+                            warp: None,
+                        },
+                    )?;
+                    edit.set(layer, &Geometry::rectangle(x, y, 20.0, 10.0))?;
+                    layers.push(layer);
+                }
+                for (source, subtitle) in [(layers[0], layers[1]), (layers[2], layers[3])] {
+                    edit.set(
+                        subtitle,
+                        &Typography {
+                            origin: Origin::User,
+                            preferred_font: None,
+                            font_weight: None,
+                            font_style: None,
+                            size: None,
+                            auto_fit: true,
+                            color: None,
+                            stroke_color: None,
+                            stroke_width: None,
+                            alignment: None,
+                            writing_mode: None,
+                            extensions: [(
+                                crate::SFX_SUBTITLE_SOURCE_KEY.into(),
+                                source.to_string(),
+                            )]
+                            .into(),
+                            stroke_method: None,
+                            stroke_position: None,
+                            stroke_join: None,
+                            outer_stroke_color: None,
+                            outer_stroke_width: None,
+                            line_spacing: None,
+                            letter_spacing: None,
+                            fill_gradient: None,
+                        },
+                    )?;
+                }
+                ids = Some((page, layers));
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let (page, layers) = ids.unwrap();
+        let region = crate::Bounds {
+            x: 8.0,
+            y: 8.0,
+            width: 25.0,
+            height: 25.0,
+        };
+        let mut input = StageInput::new(
+            snapshot,
+            page,
+            None,
+            Some(region),
+            Arc::new(crate::ImageCache::default()),
+            None,
+        );
+        assert!(!input.contains_entity(layers[1]).unwrap());
+        assert!(includes_translation_layer(&input, layers[0]).unwrap());
+        assert!(includes_translation_layer(&input, layers[1]).unwrap());
+        assert!(!includes_translation_layer(&input, layers[2]).unwrap());
+        assert!(!includes_translation_layer(&input, layers[3]).unwrap());
+        input.region = None;
+        input.entities = Some(Arc::new([layers[0]].into()));
+        assert!(includes_translation_layer(&input, layers[1]).unwrap());
+        assert!(!includes_translation_layer(&input, layers[3]).unwrap());
+        input.entities = Some(Arc::new([layers[1]].into()));
+        assert!(includes_translation_layer(&input, layers[1]).unwrap());
+        assert!(!includes_translation_layer(&input, layers[0]).unwrap());
+
+        let patch = session
+            .snapshot()
+            .patch(|edit| edit.remove_entity(layers[0], RemovePolicy::Cascade))
+            .unwrap();
+        input.scene = session.commit(patch).await.unwrap().snapshot;
+        assert!(includes_translation_layer(&input, layers[1]).unwrap());
+        input.entities = None;
+        input.region = Some(region);
+        assert!(!includes_translation_layer(&input, layers[1]).unwrap());
+
+        let patch = input
+            .scene
+            .patch(|edit| {
+                let mut style = input.scene.component::<Typography>(layers[1])?.unwrap();
+                style
+                    .extensions
+                    .insert(crate::SFX_SUBTITLE_SOURCE_KEY.into(), "invalid".into());
+                edit.set(layers[1], &style)
+            })
+            .unwrap();
+        input.scene = session.commit(patch).await.unwrap().snapshot;
+        assert!(includes_translation_layer(&input, layers[1]).is_err());
+    }
 
     #[tokio::test]
     async fn translation_and_hints_commit_together_and_empty_hints_replace_old_ones() {

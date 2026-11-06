@@ -489,6 +489,7 @@
     "loading": "Loading…",
     "loadError": "Could not load lettering settings or category.",
     "reasons": {
+      "subtitle": "SFX subtitle",
       "user": "set by hand",
       "model": "from chapter read",
       "small_text": "small original lettering"
@@ -508,16 +509,25 @@
     },
     "sfxTitle": "Sound effects",
     "sfxDescription": "Control which sound-effect boxes translation processes.",
-    "sfxMode": "SFX translation",
-    "sfxModes": {
+    "sfxInside": "SFX inside bubbles",
+    "sfxInsideHelp": "Translate bubble SFX in place, or leave the original untouched.",
+    "sfxOutside": "SFX outside bubbles",
+    "sfxOutsideHelp": "Subtitles sit beside the original SFX. Replace cleans the original only after translation succeeds.",
+    "sfxImportantOnly": "Only important SFX outside bubbles",
+    "sfxImportantHelp": "Apply the outside-bubble action only when Read chapter marks the sound as necessary to the story, such as a knock someone answers. Other SFX are skipped.",
+    "sfxHandling": "SFX handling",
+    "sfxHandlingHelp": "Used by the next translation run.",
+    "sfxActions": {
       "skip": "Skip",
-      "inside_bubbles": "Inside bubbles only",
-      "translate_all": "Translate all"
+      "subtitle": "Subtitle",
+      "translate": "Translate",
+      "replace": "Replace"
     },
-    "sfxHelp": {
-      "skip": "Leave all SFX boxes untranslated and untypeset.",
-      "inside_bubbles": "Translate SFX inside a bubble; leave other SFX untouched.",
-      "translate_all": "Translate SFX both inside and outside bubbles."
+    "sfxReasons": {
+      "user": "set by hand",
+      "inside_bubble": "inside a bubble",
+      "outside_bubble": "outside a bubble",
+      "unimportant": "not marked important by Read chapter"
     }
   },
   "mcp": {

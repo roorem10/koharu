@@ -5,6 +5,7 @@ import { type ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { LetteringCategoryLine } from '@/components/editor/LetteringCategoryLine'
+import { SfxHandlingLine } from '@/components/editor/SfxHandlingLine'
 import { SfxPreferences } from '@/components/preferences/SfxPreferences'
 import { ShapeStylePreferences } from '@/components/preferences/ShapeStylePreferences'
 import { fontsKey, projectKey, queryClient } from '@/lib/queries'
@@ -15,6 +16,7 @@ import {
   emptyCategoryStyles,
   suggestCategoryFonts,
 } from '@/lib/text-styles'
+import translations from '@/public/locales/en-US/translation.json'
 import {
   commands,
   type FontFamily,
@@ -193,23 +195,93 @@ describe('Lettering font preferences', () => {
 })
 
 describe('SFX preferences', () => {
-  it('saves the selected mode without changing other lettering settings', async () => {
+  it('saves inside, outside and importance choices independently without changing other settings', async () => {
     const save = vi
       .spyOn(commands, 'saveLetteringSettings')
       .mockImplementation(async (settings) => settings)
     render(<SfxPreferences />)
     const user = userEvent.setup()
-    const picker = screen.getByRole('combobox', { name: 'SFX translation' })
+    const picker = screen.getByRole('combobox', { name: translations.lettering.sfxOutside })
     await waitFor(() => expect(picker).toBeEnabled())
     await user.click(picker)
-    await user.click(await screen.findByRole('option', { name: /^Translate all/ }))
+    await user.click(
+      await screen.findByRole('option', { name: translations.lettering.sfxActions.subtitle }),
+    )
     await waitFor(() =>
       expect(save).toHaveBeenLastCalledWith({
-        sfx: 'translate_all',
+        sfx_inside: 'translate',
+        sfx_outside: 'subtitle',
+        sfx_important_only: false,
         model_confidence: 0.6,
         small_text_threshold: 0.012,
       }),
     )
-    await waitFor(() => expect(picker).toHaveTextContent('Translate all'))
+    const inside = screen.getByRole('combobox', { name: translations.lettering.sfxInside })
+    await user.click(inside)
+    await user.click(
+      await screen.findByRole('option', { name: translations.lettering.sfxActions.skip }),
+    )
+    await waitFor(() => expect(save.mock.lastCall?.[0].sfx_inside).toBe('skip'))
+    await user.click(
+      screen.getByRole('checkbox', { name: translations.lettering.sfxImportantOnly }),
+    )
+    await waitFor(() =>
+      expect(save).toHaveBeenLastCalledWith({
+        sfx_inside: 'skip',
+        sfx_outside: 'subtitle',
+        sfx_important_only: true,
+        model_confidence: 0.6,
+        small_text_threshold: 0.012,
+      }),
+    )
+  })
+
+  it('disables edits when settings cannot load', async () => {
+    vi.mocked(commands.getLetteringSettings).mockRejectedValue(new Error('unavailable'))
+    const save = vi.spyOn(commands, 'saveLetteringSettings')
+    render(<SfxPreferences />)
+    await screen.findByRole('alert')
+    for (const control of screen.getAllByRole('combobox')) expect(control).toBeDisabled()
+    await userEvent.setup().click(screen.getByRole('checkbox'))
+    expect(save).not.toHaveBeenCalled()
+  })
+})
+
+describe('Per-box SFX handling', () => {
+  it('sets an explicit choice and clears it with Automatic, then refetches the current reason', async () => {
+    let action: 'subtitle' | null = null
+    vi.spyOn(commands, 'getSfxHandling').mockImplementation(async () => ({
+      action: action ?? 'skip',
+      reason: action ? 'user' : 'unimportant',
+      automatic: action === null,
+    }))
+    const save = vi.spyOn(commands, 'setSfxHandling').mockImplementation(async (_layer, next) => {
+      action = next as 'subtitle' | null
+      return {
+        action: action ?? 'skip',
+        reason: action ? 'user' : 'unimportant',
+        automatic: action === null,
+      }
+    })
+    render(<SfxHandlingLine layer='line' />)
+    const user = userEvent.setup()
+    const picker = screen.getByRole('combobox', { name: translations.lettering.sfxHandling })
+    await waitFor(() => expect(picker).toBeEnabled())
+    await user.click(picker)
+    await user.click(
+      await screen.findByRole('option', { name: translations.lettering.sfxActions.subtitle }),
+    )
+    await waitFor(() => expect(save).toHaveBeenLastCalledWith('line', 'subtitle'))
+    await screen.findByText(translations.lettering.sfxReasons.user)
+    await user.click(picker)
+    await user.click(await screen.findByRole('option', { name: translations.lettering.automatic }))
+    await waitFor(() => expect(save).toHaveBeenLastCalledWith('line', null))
+    await screen.findByText(translations.lettering.sfxReasons.unimportant)
+  })
+
+  it('does not offer an SFX choice for a non-SFX box', async () => {
+    vi.spyOn(commands, 'getSfxHandling').mockResolvedValue(null)
+    render(<SfxHandlingLine layer='dialogue' />)
+    await waitFor(() => expect(screen.queryByRole('combobox')).not.toBeInTheDocument())
   })
 })

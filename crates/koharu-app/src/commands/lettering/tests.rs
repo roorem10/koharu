@@ -142,7 +142,7 @@ fn small_text_precedes_every_shape_and_settings_reject_invalid_numbers() {
     );
 }
 
-async fn project_fixture() -> (tempfile::TempDir, Project, Vec<EntityId>) {
+pub(super) async fn project_fixture() -> (tempfile::TempDir, Project, Vec<EntityId>) {
     let directory = tempfile::tempdir().unwrap();
     let mut project = Project::create("lettering".into(), directory.path().join("chapter.khrproj"))
         .await
@@ -352,21 +352,23 @@ async fn sfx_modes_filter_effective_categories_and_bubble_membership() {
     let mut settings = LetteringSettings::default();
     assert_eq!(
         translation_skip_with(&context, &project.snapshot(), &settings).unwrap(),
-        [layers[0], layers[2]].into()
-    );
-    settings.sfx = SfxMode::InsideBubbles;
-    assert_eq!(
-        translation_skip_with(&context, &project.snapshot(), &settings).unwrap(),
         [layers[2]].into()
     );
-    settings.sfx = SfxMode::TranslateAll;
+    settings.sfx_inside = settings::SfxInsideMode::Skip;
+    assert_eq!(
+        translation_skip_with(&context, &project.snapshot(), &settings).unwrap(),
+        [layers[0], layers[2]].into()
+    );
+    settings.sfx_inside = settings::SfxInsideMode::Translate;
+    settings.sfx_outside = settings::SfxOutsideMode::Replace;
     assert!(
         translation_skip_with(&context, &project.snapshot(), &settings)
             .unwrap()
             .is_empty()
     );
     context.set_user_category(layers[0], Some(LetteringCategory::Whisper));
-    settings.sfx = SfxMode::Skip;
+    settings.sfx_inside = settings::SfxInsideMode::Skip;
+    settings.sfx_outside = settings::SfxOutsideMode::Skip;
     assert_eq!(
         translation_skip_with(&context, &project.snapshot(), &settings).unwrap(),
         [layers[2]].into()

@@ -495,6 +495,7 @@
     "loading": "Cargando…",
     "loadError": "No se han podido cargar los ajustes o la categoría de rotulación.",
     "reasons": {
+      "subtitle": "subtítulo de SFX",
       "user": "definido a mano",
       "model": "de la lectura del capítulo",
       "small_text": "rotulación original pequeña"
@@ -514,16 +515,25 @@
     },
     "sfxTitle": "Efectos de sonido",
     "sfxDescription": "Controla qué cuadros de efectos de sonido se procesan al traducir.",
-    "sfxMode": "Traducción de SFX",
-    "sfxModes": {
+    "sfxInside": "SFX dentro de bocadillos",
+    "sfxInsideHelp": "Traduce los SFX del bocadillo en su lugar o deja el original intacto.",
+    "sfxOutside": "SFX fuera de bocadillos",
+    "sfxOutsideHelp": "Los subtítulos se colocan junto al SFX original. Reemplazar limpia el original solo cuando la traducción se completa correctamente.",
+    "sfxImportantOnly": "Solo SFX importantes fuera de bocadillos",
+    "sfxImportantHelp": "Aplica la acción fuera de bocadillos solo cuando Leer capítulo marca el sonido como necesario para la historia, como una llamada a la puerta que alguien atiende. Los demás SFX se omiten.",
+    "sfxHandling": "Tratamiento del SFX",
+    "sfxHandlingHelp": "Se usará en la próxima ejecución de traducción.",
+    "sfxActions": {
       "skip": "Omitir",
-      "inside_bubbles": "Solo dentro de los bocadillos",
-      "translate_all": "Traducir todo"
+      "subtitle": "Subtitular",
+      "translate": "Traducir",
+      "replace": "Reemplazar"
     },
-    "sfxHelp": {
-      "skip": "Deja todos los cuadros de SFX sin traducir ni rotular.",
-      "inside_bubbles": "Traduce los SFX dentro de un bocadillo; deja los demás intactos.",
-      "translate_all": "Traduce los SFX tanto dentro como fuera de los bocadillos."
+    "sfxReasons": {
+      "user": "definido a mano",
+      "inside_bubble": "dentro de un bocadillo",
+      "outside_bubble": "fuera de un bocadillo",
+      "unimportant": "Leer capítulo no lo marcó como importante"
     }
   },
   "mcp": {

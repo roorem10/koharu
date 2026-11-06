@@ -19,6 +19,7 @@ struct StageWork {
 struct PageWork {
     page: EntityId,
     stages: Vec<StageWork>,
+    cleanup_after_text: bool,
 }
 
 impl PageWork {
@@ -35,6 +36,15 @@ impl PageWork {
     }
 
     fn ready(&self, index: usize) -> bool {
+        if self.cleanup_after_text
+            && self.stages[index].stage == Stage::Inpainting
+            && self.stages.iter().any(|work| {
+                matches!(work.stage, Stage::Ocr | Stage::Translation)
+                    && work.state != WorkState::Finished
+            })
+        {
+            return false;
+        }
         let Some(prerequisite) = prerequisite(self.stages[index].stage) else {
             return true;
         };
@@ -61,6 +71,7 @@ impl Scheduler {
             .iter()
             .map(|page| PageWork {
                 page: *page,
+                cleanup_after_text: false,
                 stages: stages
                     .iter()
                     .map(|stage| StageWork {
@@ -88,6 +99,13 @@ impl Scheduler {
 
     pub(crate) fn with_order(mut self, order: crate::RunOrder) -> Self {
         self.order = order;
+        self
+    }
+
+    pub(crate) fn with_cleanup_after_text_pages(mut self, pages: &BTreeSet<EntityId>) -> Self {
+        for page in &mut self.pages {
+            page.cleanup_after_text = pages.contains(&page.page);
+        }
         self
     }
 
@@ -212,6 +230,49 @@ mod tests {
 
     fn pages(count: usize) -> Vec<EntityId> {
         (0..count).map(|_| EntityId::new()).collect()
+    }
+
+    #[test]
+    fn sfx_cleanup_waits_for_replacement_while_other_pages_keep_running() {
+        let pages = pages(2);
+        let mut scheduler =
+            Scheduler::new(&pages, &Stage::ALL).with_cleanup_after_text_pages(&[pages[0]].into());
+        let mut busy = BTreeSet::new();
+        assert_eq!(
+            scheduler.start_next(&busy),
+            Some((pages[0], Stage::Detection))
+        );
+        scheduler.complete_stage(pages[0], Stage::Detection);
+        assert_eq!(scheduler.start_next(&busy), Some((pages[0], Stage::Ocr)));
+        busy.insert(Stage::Ocr);
+        assert_eq!(
+            scheduler.start_next(&busy),
+            Some((pages[1], Stage::Detection))
+        );
+        busy.insert(Stage::Detection);
+        assert!(scheduler.start_next(&busy).is_none());
+        scheduler.complete_stage(pages[0], Stage::Ocr);
+        busy.remove(&Stage::Ocr);
+        assert_eq!(
+            scheduler.start_next(&busy),
+            Some((pages[0], Stage::Translation))
+        );
+        busy.insert(Stage::Translation);
+        assert!(scheduler.start_next(&busy).is_none());
+        scheduler.complete_stage(pages[0], Stage::Translation);
+        busy.remove(&Stage::Translation);
+        assert_eq!(
+            scheduler.start_next(&busy),
+            Some((pages[0], Stage::Inpainting))
+        );
+
+        let mut standalone =
+            Scheduler::new(&pages, &[Stage::Inpainting])
+                .with_cleanup_after_text_pages(&[pages[0]].into());
+        assert_eq!(
+            standalone.start_next(&BTreeSet::new()),
+            Some((pages[0], Stage::Inpainting))
+        );
     }
 
     #[test]
