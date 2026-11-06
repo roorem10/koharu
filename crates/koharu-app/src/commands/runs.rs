@@ -18,6 +18,9 @@ pub struct RunSettings {
     pub on_page_failure: OnPageFailure,
     pub order: RunOrder,
     pub finish_sound: bool,
+    pub auto_run_quality: super::auto_run::QualityLevel,
+    pub auto_run_fix_levels: bool,
+    pub auto_run_export: bool,
     pub presets: Vec<RunPreset>,
 }
 
@@ -28,6 +31,9 @@ impl Default for RunSettings {
             on_page_failure: OnPageFailure::ContinueWithOtherPages,
             order: RunOrder::Overlapped,
             finish_sound: true,
+            auto_run_quality: super::auto_run::QualityLevel::Balanced,
+            auto_run_fix_levels: false,
+            auto_run_export: false,
             presets: vec![
                 RunPreset {
                     name: "Detect + OCR".into(),
@@ -132,6 +138,11 @@ pub(crate) async fn retry_failed_pages(
         )?;
     }
     let pages = previous.failed;
+    if let Some(quality) = previous.auto_run {
+        return Ok(super::processing::start_auto_job(
+            handle.clone(), koharu_pipeline::Scope::Pages(pages), quality, false,
+        ).await?);
+    }
     let operation = previous.operation;
     Ok(super::processing::start_job(
         handle.clone(),

@@ -38,6 +38,7 @@ export function useQcSettings() {
 export function useAutomaticQc() {
   const project = useProject().data
   const jobs = useKoharuStore((state) => state.jobs)
+  const autoRunning = Object.values(jobs).some((job) => job.state === 'running' && job.auto_run)
   const styles = useKoharuStore((state) => state.textStyles)
   const chapter = useChapterContext().data
   const settings = useQcSettings().data
@@ -59,7 +60,8 @@ export function useAutomaticQc() {
     return () => window.removeEventListener(historyChangedEvent, ended)
   }, [])
   useEffect(() => {
-    if (!name || minimum === undefined) return
+    // The native recipe owns QC ordering while Auto run is active.
+    if (!name || minimum === undefined || autoRunning) return
     let cancelled = false
     let updateSequence = 0
     const update = async () => {
@@ -104,6 +106,7 @@ export function useAutomaticQc() {
     project?.revision,
     project?.active_page,
     completed,
+    autoRunning,
     agentCompleted,
     context,
     minimum,

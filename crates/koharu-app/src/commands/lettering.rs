@@ -12,7 +12,7 @@ use koharu_pipeline::bubble_shape::{
     BubbleShape, BubbleShapeInfo, original_glyph_fraction, text_bubble_shape,
 };
 use koharu_renderer::{TextStyle, TextStyles};
-use koharu_scene::{Commit, EntityId, Origin, Snapshot, Typography};
+use koharu_scene::{Commit, EntityId, Snapshot};
 use serde::Serialize;
 use specta::Type;
 use tauri::State;
@@ -181,11 +181,7 @@ async fn restyle_labels(
         let model_change = context
             .category(layer)
             .is_some_and(|label| label.source == LabelSource::Model);
-        if model_change
-            && snapshot
-                .component::<Typography>(layer)?
-                .is_some_and(|t| t.origin == Origin::User)
-        {
+        if model_change && super::rich_text::has_manual_style(&snapshot, layer)? {
             continue;
         }
         // No label is an explicit return to Automatic, including for a manual box.

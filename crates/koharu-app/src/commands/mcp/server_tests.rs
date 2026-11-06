@@ -423,7 +423,7 @@ async fn disconnect_cancels_the_control_and_releases_the_call_lane() {
 }
 
 #[tokio::test]
-async fn word_styles_are_hidden_and_refused_when_mcp_edits_are_disabled() {
+async fn word_styles_and_auto_run_are_hidden_and_refused_when_mcp_edits_are_disabled() {
     struct WordHost;
     #[async_trait]
     impl Host for WordHost {
@@ -431,14 +431,13 @@ async fn word_styles_are_hidden_and_refused_when_mcp_edits_are_disabled() {
             Ok(json!({}))
         }
         fn tools(&self) -> Vec<AgentTool> {
-            vec![AgentTool::new(
-                "style_words",
-                "Style selected words",
-                json!({"type":"object"}),
-            )]
+            ["style_words", "auto_run"]
+                .into_iter()
+                .map(|name| AgentTool::new(name, "Edit the project", json!({"type":"object"})))
+                .collect()
         }
         async fn invoke(&self, _: ToolCall, _: &Control) -> Result<Invocation> {
-            panic!("a read-only MCP client reached the word-style write tool")
+            panic!("a read-only MCP client reached a write tool")
         }
     }
     let bridge = bridge(Arc::new(WordHost), false);
@@ -447,11 +446,13 @@ async fn word_styles_are_hidden_and_refused_when_mcp_edits_are_disabled() {
             .tools()
             .unwrap()
             .iter()
-            .all(|tool| tool.name != "style_words")
+            .all(|tool| tool.name != "style_words" && tool.name != "auto_run")
     );
     let server = Server::start(bridge).await;
     let session = server.initialize().await;
-    let result = rpc(server.call(&session, 1, "style_words").await).await;
-    assert_eq!(result["result"]["isError"], true);
+    for (index, name) in ["style_words", "auto_run"].into_iter().enumerate() {
+        let result = rpc(server.call(&session, index as i32 + 1, name).await).await;
+        assert_eq!(result["result"]["isError"], true);
+    }
     server.stop().await;
 }

@@ -1,4 +1,5 @@
 pub(crate) mod agent;
+pub(crate) mod auto_run;
 pub(crate) mod boxes;
 pub(crate) mod canvas;
 pub(crate) mod cleanup;
@@ -203,6 +204,9 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             runs::preview_chapter_batch,
             runs::run_chapter_batch,
             runs::stop_chapter_batch,
+            auto_run::preview_auto_run,
+            auto_run::auto_run,
+            runs::preview_batch_auto_run,
             // WO-06 (text style extras and box notes) commands go here.
             notes::get_box_note,
             notes::set_box_note,

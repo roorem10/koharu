@@ -1293,5 +1293,50 @@
       "crying": "哭泣／颤抖",
       "menacing": "威吓／阴森"
     }
+  },
+  "autoRun": {
+    "title": "自动运行",
+    "button": "自动运行 · {{quality}}",
+    "confirm": "开始前请检查本章的处理步骤。现有手动编辑会保留。",
+    "start": "开始自动运行",
+    "quality": "自动运行质量",
+    "qualityHelp": "快速除了翻译外不增加语言模型请求。均衡增加阅读章节。最佳目前与均衡相同。",
+    "levelsHelp": "需要时在检测前调整页面色阶。默认关闭。",
+    "visionYes": "阅读模型可以识别页面图像。",
+    "visionNo": "阅读模型无法识别页面图像。",
+    "estimate": "{{pages}} 页 · 约 {{requests}} 次模型请求（重试前；不含本地检测、OCR 和清理）。",
+    "summary": "{{pages}} 页 · {{failures}} 次失败 · {{seconds}} 秒",
+    "qualities": {
+      "fast": "快速",
+      "balanced": "均衡",
+      "best": "最佳"
+    },
+    "steps": {
+      "fix_levels": "调整页面色阶",
+      "detection": "检测文字并合并同一气泡内的框",
+      "ocr": "OCR",
+      "read_chapter": "阅读章节",
+      "translation": "结合上下文翻译",
+      "cleanup": "清理",
+      "typeset": "排字",
+      "qc": "质量检查",
+      "export": "导出"
+    },
+    "status": {
+      "ran": "已运行",
+      "skipped": "已跳过",
+      "failed": "失败"
+    },
+    "reasons": {
+      "disabled": "已在设置中关闭",
+      "quality": "此质量级别不包含",
+      "no_series": "未关联系列",
+      "no_vision": "阅读模型无法识别图像",
+      "up_to_date": "已是最新",
+      "no_source": "没有原文",
+      "hand_edited": "保留手动编辑",
+      "prerequisite_failed": "前置步骤失败",
+      "export_not_configured": "自动导出暂不可用：尚未实现保存格式和目标位置的设置。"
+    }
   }
 }

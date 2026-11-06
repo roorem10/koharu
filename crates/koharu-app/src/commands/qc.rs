@@ -10,6 +10,7 @@ use std::{
 use anyhow::{Context as _, Result};
 use booharu_context::{Flag, LetteringCategory, ProjectContext};
 use koharu_desktop::Desktop;
+use koharu_pipeline::StopToken;
 use koharu_renderer::{LayerKind, RenderDiagnostic};
 use koharu_scene::{AssetRole, EntityId, OcrAnalysis, Origin, Snapshot};
 use serde::{Deserialize, Serialize};
@@ -193,6 +194,7 @@ pub(crate) async fn run_qc(
         automatic.unwrap_or(false),
         &project,
         &desktop,
+        None,
     )
     .await
 }
@@ -203,6 +205,7 @@ async fn run_checks(
     automatic: bool,
     project: &CurrentProject,
     desktop: &Desktop,
+    stop: Option<&StopToken>,
 ) -> std::result::Result<QcReport, Error> {
     let _checking = cache::CHECK.lock().await;
     let (snapshot, context, directory) = {
@@ -231,6 +234,9 @@ async fn run_checks(
     let renderer = desktop.renderer();
     for_progress(&on_progress, 0, total);
     for (index, page) in pages.into_iter().enumerate() {
+        if stop.is_some_and(StopToken::stopped) {
+            break;
+        }
         let qualified = !automatic || qualifies(&snapshot, page, &rows, &skip)?;
         let signature = signature(&snapshot, &context, page, &settings, &majorities, &skip)?;
         let unchanged = cache::with_cache(&snapshot, directory.as_deref(), |cache| {
@@ -304,6 +310,9 @@ async fn run_checks(
             }
         }
         drop(frame);
+        if stop.is_some_and(StopToken::stopped) {
+            break;
+        }
         {
             let projects = project.project.lock().await;
             let current = projects.as_ref().context("no project is open")?;
@@ -352,10 +361,82 @@ async fn run_checks(
         &snapshot,
         directory.as_deref(),
         |cache| {
-            cache.save(directory.as_deref(), &snapshot, complete);
+            cache.save(
+                directory.as_deref(),
+                &snapshot,
+                complete && !stop.is_some_and(StopToken::stopped),
+            );
             cache.report(&snapshot, &context)
         },
     ))
+}
+
+pub(crate) async fn auto_check(
+    handle: &tauri::AppHandle<tauri_runtime_cef::CefRuntime>,
+    pages: &[EntityId],
+    expected: koharu_scene::ProjectId,
+    stop: &StopToken,
+) -> Result<bool> {
+    use tauri::Manager as _;
+    let project = handle.state::<CurrentProject>();
+    let desktop = handle.state::<Desktop>();
+    let mut checked = false;
+    for &page in pages {
+        if stop.stopped() {
+            break;
+        }
+        let needed = auto_needed(handle, &[page], expected).await?;
+        if needed {
+            run_checks(
+                QcScope::Page { page },
+                None,
+                true,
+                &project,
+                &desktop,
+                Some(stop),
+            )
+            .await
+            .map_err(|error| anyhow::anyhow!("{error:?}"))?;
+            checked = !stop.stopped() || checked;
+        }
+    }
+    Ok(checked)
+}
+
+pub(crate) async fn auto_needed(
+    handle: &tauri::AppHandle<tauri_runtime_cef::CefRuntime>,
+    pages: &[EntityId],
+    expected: koharu_scene::ProjectId,
+) -> Result<bool> {
+    use tauri::Manager as _;
+    let projects = handle.state::<CurrentProject>();
+    let projects = projects.project.lock().await;
+    let project = projects.as_ref().context("no project is open")?;
+    let snapshot = project.snapshot();
+    anyhow::ensure!(
+        snapshot.project_id() == expected,
+        "the project changed during Auto run"
+    );
+    super::context::refresh_flags(project)?;
+    let context = project.load_context()?;
+    let settings = koharu_config::load::<QcSettings>("qc")?.read()?.clone();
+    let rows = rows(&snapshot, &context)?;
+    let majorities = font_majorities(&rows);
+    let skip = super::lettering::translation_skip(&context, &snapshot)?;
+    for &page in pages {
+        let signature = signature(&snapshot, &context, page, &settings, &majorities, &skip)?;
+        if qualifies(&snapshot, page, &rows, &skip)?
+            && cache::with_cache(&snapshot, project.directory(), |cache| {
+                cache
+                    .pages
+                    .get(&page)
+                    .is_none_or(|entry| entry.signature != signature)
+            })
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn small_text_detail(size: Option<f32>, base: Option<f32>, minimum: f32) -> Option<String> {
@@ -741,7 +822,7 @@ mod tests {
             project: tokio::sync::Mutex::new(Some(project)),
         };
         let desktop = Desktop::new().unwrap();
-        let report = run_checks(QcScope::Project, None, true, &current, &desktop)
+        let report = run_checks(QcScope::Project, None, true, &current, &desktop, None)
             .await
             .unwrap();
         let finding = report.findings.iter().find(|finding| matches!(&finding.flag, Some(Flag::Glossary { term, .. }) if term == "魔王")).unwrap();
@@ -761,7 +842,7 @@ mod tests {
                 })
                 .unwrap();
         }
-        let hidden = run_checks(QcScope::Project, None, true, &current, &desktop)
+        let hidden = run_checks(QcScope::Project, None, true, &current, &desktop, None)
             .await
             .unwrap();
         assert!(hidden.hidden.iter().any(|finding| finding.flag.is_some()));
@@ -780,7 +861,7 @@ mod tests {
                 })
                 .unwrap();
         }
-        let restored = run_checks(QcScope::Project, None, true, &current, &desktop)
+        let restored = run_checks(QcScope::Project, None, true, &current, &desktop, None)
             .await
             .unwrap();
         assert!(

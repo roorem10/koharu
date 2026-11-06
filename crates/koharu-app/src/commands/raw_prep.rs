@@ -7,7 +7,8 @@ mod tests;
 
 use anyhow::{Context as _, Result, ensure};
 use koharu_desktop::Desktop;
-use koharu_scene::{AssetRole, EntityId};
+use koharu_pipeline::StopToken;
+use koharu_scene::{AssetRole, EntityId, ProjectId, Snapshot};
 use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Manager as _, State};
@@ -188,5 +189,120 @@ pub(crate) async fn after_import(handle: &AppHandle<CefRuntime>, pages: Vec<Enti
     };
     if let Err(error) = prepare.await {
         tracing::warn!(%error, "could not apply page levels on import");
+    }
+}
+
+fn needs_auto_prep(
+    has_source: bool,
+    has_original: bool,
+    has_cleanup: bool,
+    has_analysis: bool,
+) -> bool {
+    has_source && !has_original && !has_cleanup && !has_analysis
+}
+
+pub(crate) fn auto_needed(snapshot: &Snapshot, page: EntityId) -> Result<bool> {
+    snapshot.page(page)?;
+    let mut has_analysis = snapshot.page(page)?.text_layers()?.next().is_some();
+    for entity in snapshot.descendants(page)? {
+        has_analysis |= snapshot
+            .component::<koharu_scene::Region>(entity.id())?
+            .is_some();
+    }
+    Ok(needs_auto_prep(
+        snapshot.asset(page, &AssetRole::new("source")?)?.is_some(),
+        snapshot
+            .asset(page, &AssetRole::new("original_source")?)?
+            .is_some(),
+        operations::has_cleanup(snapshot, page)?,
+        has_analysis,
+    ))
+}
+
+/// Auto run shares the job's stop token and only prepares untouched source images.
+pub(crate) async fn auto_prepare(
+    handle: &AppHandle<CefRuntime>,
+    pages: &[EntityId],
+    expected: ProjectId,
+    stop: &StopToken,
+) -> Result<PrepResult> {
+    let options = settings::load()?.options;
+    let current = handle.state::<CurrentProject>();
+    let mut result = PrepResult::default();
+    for &page in pages {
+        if stop.stopped() {
+            break;
+        }
+        let snapshot = {
+            let project = current.project.lock().await;
+            let project = project.as_ref().context("no project is open")?;
+            ensure!(
+                project.snapshot().project_id() == expected,
+                "the project changed during Auto run"
+            );
+            project.snapshot()
+        };
+        if !auto_needed(&snapshot, page)? {
+            result.skipped.push(PrepSkipped {
+                page,
+                label: snapshot.page(page)?.page()?.label,
+                reason: if operations::has_cleanup(&snapshot, page)? {
+                    PrepSkipReason::Cleanup
+                } else if snapshot
+                    .asset(page, &AssetRole::new("source")?)?
+                    .is_none()
+                {
+                    PrepSkipReason::MissingSource
+                } else {
+                    PrepSkipReason::Unchanged
+                },
+            });
+            continue;
+        }
+        let (patch, prepared) = operations::prepare_patch(&snapshot, vec![page], options).await?;
+        if stop.stopped() {
+            break;
+        }
+        if !patch.is_empty() {
+            let (commit, active) = {
+                let mut project = current.project.lock().await;
+                let project = project.as_mut().context("no project is open")?;
+                ensure!(
+                    project.snapshot().project_id() == expected
+                        && project.revision() == snapshot.revision(),
+                    "the project changed while preparing pages; try again"
+                );
+                if stop.stopped() {
+                    break;
+                }
+                let commit = project.commit(patch).await?;
+                project.record_commit(&commit);
+                (commit, project.active_page())
+            };
+            let desktop = handle.state::<Desktop>();
+            desktop.synchronize(&commit.snapshot, active, &commit).await?;
+            handle
+                .state::<CanvasChannel>()
+                .channel
+                .publish(desktop.canvas_state());
+        }
+        result.changed += prepared.changed;
+        result.skipped.extend(prepared.skipped);
+    }
+    Ok(result)
+}
+
+#[cfg(test)]
+mod auto_tests {
+    use super::needs_auto_prep;
+
+    #[test]
+    fn automatic_levels_preserve_prepared_images_and_cleanup() {
+        assert!(needs_auto_prep(true, false, false, false));
+        assert!(!needs_auto_prep(false, false, false, false));
+        assert!(!needs_auto_prep(true, true, false, false));
+        assert!(!needs_auto_prep(true, false, true, false));
+        assert!(!needs_auto_prep(true, true, true, false));
+        assert!(!needs_auto_prep(true, false, false, true));
     }
 }

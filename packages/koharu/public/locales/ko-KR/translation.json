@@ -1293,5 +1293,50 @@
       "crying": "울음 / 떨림",
       "menacing": "위협적 / 음산함"
     }
+  },
+  "autoRun": {
+    "title": "자동 실행",
+    "button": "자동 실행 · {{quality}}",
+    "confirm": "시작하기 전에 이 챕터의 작업 순서를 확인하세요. 수동 수정은 유지됩니다.",
+    "start": "자동 실행 시작",
+    "quality": "자동 실행 품질",
+    "qualityHelp": "빠름은 번역 외의 추가 언어 모델 요청을 하지 않습니다. 균형은 챕터 읽기를 추가합니다. 최고는 현재 균형과 같습니다.",
+    "levelsHelp": "필요할 때 감지 전에 페이지 레벨을 보정합니다. 기본적으로 꺼져 있습니다.",
+    "visionYes": "읽기 모델이 페이지 이미지를 볼 수 있습니다.",
+    "visionNo": "읽기 모델이 페이지 이미지를 볼 수 없습니다.",
+    "estimate": "{{pages}}페이지 · 모델 요청 약 {{requests}}회 (재시도 전; 로컬 감지, OCR, 정리 제외).",
+    "summary": "{{pages}}페이지 · 실패 {{failures}}건 · {{seconds}}초",
+    "qualities": {
+      "fast": "빠름",
+      "balanced": "균형",
+      "best": "최고"
+    },
+    "steps": {
+      "fix_levels": "페이지 레벨 보정",
+      "detection": "텍스트 감지 및 같은 말풍선 상자 병합",
+      "ocr": "OCR",
+      "read_chapter": "챕터 읽기",
+      "translation": "문맥으로 번역",
+      "cleanup": "정리",
+      "typeset": "식자",
+      "qc": "품질 검사",
+      "export": "내보내기"
+    },
+    "status": {
+      "ran": "실행됨",
+      "skipped": "건너뜀",
+      "failed": "실패"
+    },
+    "reasons": {
+      "disabled": "설정에서 꺼짐",
+      "quality": "이 품질 수준에 포함되지 않음",
+      "no_series": "연결된 시리즈 없음",
+      "no_vision": "읽기 모델이 이미지를 볼 수 없음",
+      "up_to_date": "이미 최신 상태",
+      "no_source": "원문 없음",
+      "hand_edited": "수동 수정 유지",
+      "prerequisite_failed": "선행 작업 실패",
+      "export_not_configured": "자동 내보내기를 사용할 수 없습니다. 형식과 저장 위치를 저장하는 설정이 아직 구현되지 않았습니다."
+    }
   }
 }

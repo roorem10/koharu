@@ -1306,5 +1306,50 @@
       "crying": "Pleurs / tremblements",
       "menacing": "Menaçant / sinistre"
     }
+  },
+  "autoRun": {
+    "title": "Exécution automatique",
+    "button": "Exécution automatique · {{quality}}",
+    "confirm": "Vérifiez les étapes de ce chapitre avant de commencer. Les modifications manuelles seront conservées.",
+    "start": "Lancer l’exécution automatique",
+    "quality": "Qualité de l’exécution automatique",
+    "qualityHelp": "Rapide n’ajoute aucune requête au modèle de langage en dehors de la traduction. Équilibrée ajoute Lire le chapitre. Optimale équivaut actuellement à Équilibrée.",
+    "levelsHelp": "Ajuster les niveaux avant la détection si nécessaire. Désactivé par défaut.",
+    "visionYes": "Le modèle de lecture peut voir les images des pages.",
+    "visionNo": "Le modèle de lecture ne peut pas voir les images des pages.",
+    "estimate": "{{pages}} pages · environ {{requests}} requêtes au modèle (avant les nouvelles tentatives ; hors détection, OCR et nettoyage locaux).",
+    "summary": "{{pages}} pages · {{failures}} échecs · {{seconds}} s",
+    "qualities": {
+      "fast": "Rapide",
+      "balanced": "Équilibrée",
+      "best": "Optimale"
+    },
+    "steps": {
+      "fix_levels": "Ajuster les niveaux des pages",
+      "detection": "Détecter le texte et fusionner les cadres d’une même bulle",
+      "ocr": "OCR",
+      "read_chapter": "Lire le chapitre",
+      "translation": "Traduire avec le contexte",
+      "cleanup": "Nettoyer",
+      "typeset": "Lettrer",
+      "qc": "Contrôle qualité",
+      "export": "Exporter"
+    },
+    "status": {
+      "ran": "Exécuté",
+      "skipped": "Ignoré",
+      "failed": "Échec"
+    },
+    "reasons": {
+      "disabled": "Désactivé dans les paramètres",
+      "quality": "Non inclus à ce niveau de qualité",
+      "no_series": "Aucune série liée",
+      "no_vision": "Le modèle de lecture ne peut pas voir les images",
+      "up_to_date": "Déjà à jour",
+      "no_source": "Aucun texte source",
+      "hand_edited": "Modifications manuelles conservées",
+      "prerequisite_failed": "Une étape préalable a échoué",
+      "export_not_configured": "L’exportation automatique est indisponible : l’enregistrement du format et de la destination n’est pas encore disponible."
+    }
   }
 }

@@ -1293,5 +1293,50 @@
       "crying": "哭泣／顫抖",
       "menacing": "威嚇／陰森"
     }
+  },
+  "autoRun": {
+    "title": "自動執行",
+    "button": "自動執行 · {{quality}}",
+    "confirm": "開始前請檢查本章的處理步驟。現有手動編輯會保留。",
+    "start": "開始自動執行",
+    "quality": "自動執行品質",
+    "qualityHelp": "快速除了翻譯外不增加語言模型請求。平衡增加閱讀章節。最佳目前與平衡相同。",
+    "levelsHelp": "需要時在偵測前調整頁面色階。預設關閉。",
+    "visionYes": "閱讀模型可以辨識頁面影像。",
+    "visionNo": "閱讀模型無法辨識頁面影像。",
+    "estimate": "{{pages}} 頁 · 約 {{requests}} 次模型請求（重試前；不含本機偵測、OCR 和清理）。",
+    "summary": "{{pages}} 頁 · {{failures}} 次失敗 · {{seconds}} 秒",
+    "qualities": {
+      "fast": "快速",
+      "balanced": "平衡",
+      "best": "最佳"
+    },
+    "steps": {
+      "fix_levels": "調整頁面色階",
+      "detection": "偵測文字並合併同一對話框內的文字框",
+      "ocr": "OCR",
+      "read_chapter": "閱讀章節",
+      "translation": "結合上下文翻譯",
+      "cleanup": "清理",
+      "typeset": "排字",
+      "qc": "品質檢查",
+      "export": "匯出"
+    },
+    "status": {
+      "ran": "已執行",
+      "skipped": "已略過",
+      "failed": "失敗"
+    },
+    "reasons": {
+      "disabled": "已在設定中關閉",
+      "quality": "此品質等級不包含",
+      "no_series": "未連結系列",
+      "no_vision": "閱讀模型無法辨識影像",
+      "up_to_date": "已是最新",
+      "no_source": "沒有原文",
+      "hand_edited": "保留手動編輯",
+      "prerequisite_failed": "前置步驟失敗",
+      "export_not_configured": "自動匯出暫不可用：尚未實作儲存格式與目的地的設定。"
+    }
   }
 }

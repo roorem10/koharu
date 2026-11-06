@@ -1293,5 +1293,50 @@
       "crying": "哭泣／发抖",
       "menacing": "威吓／阴森"
     }
+  },
+  "autoRun": {
+    "title": "自动运行",
+    "button": "自动运行 · {{quality}}",
+    "confirm": "开始前检查迭一章个步骤。手工修改会保留。",
+    "start": "开始自动运行",
+    "quality": "自动运行质量",
+    "qualityHelp": "快速除翻译外勿会再请求语言模型。平衡会加上阅读章节。最佳眼下搭平衡一样。",
+    "levelsHelp": "有需要个辰光，检测前先调整页面色阶。默认关闭。",
+    "visionYes": "阅读模型看得见页面图片。",
+    "visionNo": "阅读模型看勿见页面图片。",
+    "estimate": "{{pages}} 页 · 大约 {{requests}} 次模型请求（勿算重试、本地检测、OCR 搭清理）。",
+    "summary": "{{pages}} 页 · {{failures}} 次失败 · {{seconds}} 秒",
+    "qualities": {
+      "fast": "快速",
+      "balanced": "平衡",
+      "best": "最佳"
+    },
+    "steps": {
+      "fix_levels": "调整页面色阶",
+      "detection": "检测文字并合并同一气泡里个框",
+      "ocr": "OCR",
+      "read_chapter": "阅读章节",
+      "translation": "结合上下文翻译",
+      "cleanup": "清理",
+      "typeset": "排字",
+      "qc": "质量检查",
+      "export": "导出"
+    },
+    "status": {
+      "ran": "已运行",
+      "skipped": "已跳过",
+      "failed": "失败"
+    },
+    "reasons": {
+      "disabled": "设置里关闭哉",
+      "quality": "迭个质量档位勿包括",
+      "no_series": "还呒没关联系列",
+      "no_vision": "阅读模型看勿见图片",
+      "up_to_date": "已经是最新个",
+      "no_source": "呒没原文",
+      "hand_edited": "手工修改保留哉",
+      "prerequisite_failed": "前头必需个步骤失败哉",
+      "export_not_configured": "自动导出还勿能用：保存格式搭位置个设置还呒没实现。"
+    }
   }
 }

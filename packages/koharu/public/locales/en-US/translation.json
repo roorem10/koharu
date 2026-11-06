@@ -1293,5 +1293,50 @@
       "crying": "Crying / Trembling",
       "menacing": "Menacing / Sinister"
     }
+  },
+  "autoRun": {
+    "title": "Auto run",
+    "button": "Auto run · {{quality}}",
+    "confirm": "Review this chapter recipe before starting. Existing hand edits are preserved.",
+    "start": "Start Auto run",
+    "quality": "Auto run quality",
+    "qualityHelp": "Fast uses no extra language-model requests beyond translation. Balanced adds Read chapter. Best currently matches Balanced.",
+    "levelsHelp": "Apply page levels before detection when needed. Off by default.",
+    "visionYes": "The reading model can see page images.",
+    "visionNo": "The reading model cannot see page images.",
+    "estimate": "{{pages}} pages · about {{requests}} model requests (before retries; local detection, OCR and cleanup excluded).",
+    "summary": "{{pages}} pages · {{failures}} failures · {{seconds}} s",
+    "qualities": {
+      "fast": "Fast",
+      "balanced": "Balanced",
+      "best": "Best"
+    },
+    "steps": {
+      "fix_levels": "Fix page levels",
+      "detection": "Detect text and join bubble boxes",
+      "ocr": "OCR",
+      "read_chapter": "Read chapter",
+      "translation": "Translate with context",
+      "cleanup": "Clean up",
+      "typeset": "Typeset",
+      "qc": "QC",
+      "export": "Export"
+    },
+    "status": {
+      "ran": "Ran",
+      "skipped": "Skipped",
+      "failed": "Failed"
+    },
+    "reasons": {
+      "disabled": "Disabled in Settings",
+      "quality": "Not included at this quality level",
+      "no_series": "No series linked",
+      "no_vision": "Reading model cannot see images",
+      "up_to_date": "Already up to date",
+      "no_source": "No source text",
+      "hand_edited": "Hand edits preserved",
+      "prerequisite_failed": "A prerequisite failed",
+      "export_not_configured": "Automatic export is unavailable: saved format and destination settings are not implemented yet."
+    }
   }
 }

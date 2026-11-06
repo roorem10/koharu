@@ -5,7 +5,7 @@ use koharu_translator::{TranslationRequest, Translator};
 
 use crate::TranslationConfig;
 
-use super::{StageInput, StageProcessor, finish, generation};
+use super::{StageInput, StageProcessor, finish, generation, needs_text};
 
 const PRODUCER: &str = "dev.koharu.pipeline.translation";
 
@@ -27,17 +27,17 @@ impl StageProcessor for Processor {
     }
 
     fn skip(&self, input: &StageInput) -> Result<bool> {
-        if !input.resume {
-            return Ok(false);
-        }
         if let Some(group) = input.scene.page(input.page)?.text_group()? {
             for layer in group.text_layers()? {
                 if input.contains_entity(layer.id())?
                     && !input.translation_hints.skip.contains(&layer.id())
-                    && !layer.content()?.translation()?.is_some_and(|translation| {
-                        !translation.text.value.trim().is_empty()
-                            || matches!(translation.text.origin, Origin::User)
+                    && layer.content()?.source()?.is_some_and(|source| {
+                        !source.text.value.trim().is_empty()
                     })
+                    && needs_text(
+                        layer.content()?.translation()?.as_ref().map(|value| &value.text),
+                        input.resume,
+                    )
                 {
                     return Ok(false);
                 }
@@ -64,10 +64,10 @@ impl StageProcessor for Processor {
                     continue;
                 }
                 let content = layer.content()?;
-                if content.translation()?.is_some_and(|translation| {
-                    matches!(translation.text.origin, Origin::User)
-                        || (input.resume && !translation.text.value.trim().is_empty())
-                }) {
+                if !needs_text(
+                    content.translation()?.as_ref().map(|value| &value.text),
+                    input.resume,
+                ) {
                     continue;
                 }
                 let Some(source) = content.source()? else {
@@ -77,6 +77,9 @@ impl StageProcessor for Processor {
                     targets.push((layer.id(), content.id(), source.text.value));
                 }
             }
+        }
+        if targets.is_empty() {
+            return finish(input.scene.edit());
         }
         let mut request = TranslationRequest::new(
             targets.iter().map(|(_, _, source)| source.clone()),

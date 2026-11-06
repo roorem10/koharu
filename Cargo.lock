@@ -4752,6 +4752,7 @@ dependencies = [
  "rars",
  "rayon",
  "reqwest",
+ "revision",
  "rfd",
  "rmcp",
  "schemars 1.2.3",

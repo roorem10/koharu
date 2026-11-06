@@ -395,6 +395,42 @@ impl Edit {
         Ok(())
     }
 
+    /// Automatic emphasis keeps the translation's provenance inside the app's
+    /// combined typesetting patch. A hand style must be explicitly removed first.
+    pub fn set_generated_text_runs(
+        &mut self,
+        entity: EntityId,
+        runs: &crate::TextRuns,
+    ) -> Result<()> {
+        if self.generation.is_some() || !matches!(runs.origin, Origin::Generated(_)) {
+            return Err(Error::Authorship(
+                "generated word styles require a user edit and generated provenance".into(),
+            ));
+        }
+        if !self.state.contains_entity(entity) {
+            return Err(Error::EntityNotFound(entity));
+        }
+        let owner = ComponentOwner::Entity(entity);
+        let component_key = key::<crate::TextRuns>()?;
+        if let Some(record) = self.component(owner, &component_key)? {
+            let record_exists = |id| self.state.contains_entity(id);
+            let blob_exists = |_id| true;
+            let previous = decode::<crate::TextRuns>(
+                record,
+                &ValidationContext::new(&record_exists, &blob_exists),
+            )?;
+            if previous.origin == Origin::User {
+                return Err(Error::Authorship(
+                    "automatic emphasis cannot replace hand word styles".into(),
+                ));
+            }
+        }
+        self.observe_component(owner, component_key.clone())?;
+        self.replace_component(owner, component_key, Some(self.encode_value(runs)?))?;
+        self.validate_entities.insert(entity);
+        Ok(())
+    }
+
     pub fn set_project<T: Component>(&mut self, value: &T) -> Result<()> {
         if matches!(
             T::KIND,

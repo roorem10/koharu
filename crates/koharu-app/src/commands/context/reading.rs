@@ -114,7 +114,7 @@ pub(crate) async fn get_last_read_model(
         .map(str::to_owned))
 }
 
-pub(super) fn scoped_pages(snapshot: &Snapshot, scope: &Scope) -> Result<Vec<(EntityId, u32)>> {
+pub(crate) fn scoped_pages(snapshot: &Snapshot, scope: &Scope) -> Result<Vec<(EntityId, u32)>> {
     let mut pages = Vec::new();
     for (index, page) in snapshot.pages().enumerate() {
         let included = match scope {
@@ -198,7 +198,7 @@ async fn auto_read_model(
 }
 
 /// True when some page in scope has an OCR line to read.
-pub(super) fn has_source_lines(snapshot: &Snapshot, scope: &Scope) -> Result<bool> {
+pub(crate) fn has_source_lines(snapshot: &Snapshot, scope: &Scope) -> Result<bool> {
     for (page, _) in scoped_pages(snapshot, scope)? {
         if let Some(group) = snapshot.page(page)?.text_group()? {
             for layer in group.text_layers()? {
@@ -279,6 +279,7 @@ pub(crate) async fn read(
         .read()?
         .translation
         .clone();
+    let observed_translation = translation.clone();
     let selection = reading_model(Some(selection), translation.model.clone())?;
     translation.generation.vision = Some(true);
     let pages = scoped_pages(&snapshot, scope)?;
@@ -358,6 +359,12 @@ pub(crate) async fn read(
         let projects = handle.state::<CurrentProject>();
         let mut projects = projects.project.lock().await;
         let project = projects.as_mut().context("no project is open")?;
+        if stop.stopped() {
+            return Ok(());
+        }
+        if stop.stopped() {
+            return Ok(());
+        }
         ensure!(
             project.directory() == Some(directory.as_path())
                 && project.snapshot().revision() == snapshot.revision(),
@@ -369,29 +376,33 @@ pub(crate) async fn read(
             "series changed during Read chapter"
         );
         let current_series = series::store()?.get(series_id)?;
-        let changed = project.update_context(|context| {
-            context.merge_reading(
-                merged.expect("at least one chunk"),
-                &valid_layers,
-                &current_series.glossary,
-                read_at,
-            )
-        })?;
-        project.update_context(|context| {
-            context.other.insert(
-                "chapter_read_model".into(),
-                json!(format!(
-                    "{} · {}",
-                    selection.provider.name(),
-                    selection.model.as_deref().unwrap_or_default()
-                )),
-            );
-        })?;
-        let commit = super::super::lettering::labels_changed(project, &changed).await?;
-        if let Some(commit) = &commit {
-            project.record_commit(commit);
-        }
-        (commit, project.active_page())
+        ensure!(
+            current == context && current_series == series,
+            "chapter context changed during Read chapter; run it again"
+        );
+        ensure!(
+            settings::load()? == settings
+                && koharu_pipeline::PipelineConfig::load()?.read()?.translation
+                    == observed_translation,
+            "reading settings changed during Read chapter; run it again"
+        );
+        let mut next = current.clone();
+        let changed = next.merge_reading(
+            merged.expect("at least one chunk"),
+            &valid_layers,
+            &current_series.glossary,
+            read_at,
+        );
+        next.other.insert(
+            "chapter_read_model".into(),
+            json!(format!(
+                "{} · {}",
+                selection.provider.name(),
+                selection.model.as_deref().unwrap_or_default()
+            )),
+        );
+        let commit = project.commit_chapter_read(current, next, &changed).await?;
+        (Some(commit), project.active_page())
     };
     if let Some(commit) = commit {
         let desktop = handle.state::<koharu_desktop::Desktop>();
@@ -461,6 +472,7 @@ pub(crate) async fn read_chapter(
                 project: None,
                 operation: None,
                 finish_sound: false,
+                auto_run: None,
             },
         );
     }

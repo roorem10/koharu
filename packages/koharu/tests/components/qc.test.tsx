@@ -13,6 +13,7 @@ import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import {
   commands,
+  type Job,
   type Page,
   type ProjectInfo,
   type QcFinding,
@@ -76,6 +77,36 @@ function Auto() {
 }
 
 describe('automatic QC', () => {
+  it('waits for the native recipe before refreshing automatic QC results', async () => {
+    setup()
+    const job: Job = {
+      id: 'auto',
+      state: 'running',
+      completed: 0,
+      total: 1,
+      page: null,
+      stage: null,
+      model: null,
+      error: null,
+      retry: null,
+      failures: [],
+      project: project.name,
+      operation: null,
+      finish_sound: false,
+      auto_run: { step: 'read_chapter', summary: null },
+    }
+    useKoharuStore.setState({ jobs: { auto: job } })
+    mount(<Auto />)
+    await waitFor(() => expect(commands.getChapterContext).toHaveBeenCalled())
+    act(() => queryClient.setQueryData(projectKey, { ...project, revision: 2 }))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+    })
+    expect(commands.runQc).not.toHaveBeenCalled()
+    act(() => useKoharuStore.setState({ jobs: { auto: { ...job, state: 'finished' } } }))
+    await waitFor(() => expect(commands.runQc).toHaveBeenCalledOnce(), { timeout: 1800 })
+  })
+
   it('opens findings through the shared page and layer selection', async () => {
     setup()
     const next = { ...page, id: 'page-2', label: '02.png' }
@@ -190,6 +221,7 @@ describe('automatic QC', () => {
             project: null,
             operation: null,
             finish_sound: false,
+            auto_run: null,
           },
         },
       }),

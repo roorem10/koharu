@@ -39,6 +39,7 @@ use crate::{DetectionModel, ModelCell};
 const MODEL_ID: &str = "mayocream/koharu-layout-rfdetr-seg-2xl-1152";
 const MODEL_NAME: &str = "koharu-layout-rfdetr-seg-2xl";
 const PRODUCER: &str = "dev.koharu.pipeline.detection";
+const COMPLETE_SOURCE: &str = "dev.booharu.detection.complete_source";
 const ANGLE_SNAP_DEGREES: f32 = 3.0;
 const ANGLE_SEARCH_HALF_STEPS: i32 = 90;
 const ANGLE_SEARCH_STEP_DEGREES: f64 = 0.5;
@@ -138,8 +139,20 @@ impl StageProcessor for Processor {
     }
 
     fn skip(&self, input: &StageInput) -> Result<bool> {
-        if input.redetect {
+        if input.redetect || input.refresh {
             return Ok(false);
+        }
+        // A successful blank page has no text region. Its full-page mask records
+        // the source it inspected, so rerunning a chapter does not infer it again.
+        if input.region.is_none() && input.entities.is_none()
+            && let (Some(mask), Some(source)) = (
+                input.scene.asset(input.page, &AssetRole::new("text-mask")?)?,
+                input.scene.asset(input.page, &AssetRole::new("source")?)?,
+            )
+            && matches!(&mask.origin, Origin::Generated(owner) if owner.producer.as_str() == PRODUCER)
+            && mask.metadata.attributes.get(COMPLETE_SOURCE) == Some(&source.blob.to_string())
+        {
+            return Ok(true);
         }
         for entity in input.scene.descendants(input.page)? {
             let id = entity.id();
@@ -1571,6 +1584,15 @@ async fn write_mask(
             mask.height(),
             ExtendedColorType::L8,
         )?;
+    let mut attributes = BTreeMap::new();
+    if mask.as_raw().iter().all(|value| *value == 0) {
+        attributes.insert(super::EMPTY_MASK.to_owned(), "true".to_owned());
+    }
+    if input.region.is_none() && input.entities.is_none()
+        && let Some(source) = input.scene.asset(page, &AssetRole::new("source")?)?
+    {
+        attributes.insert(COMPLETE_SOURCE.to_owned(), source.blob.to_string());
+    }
     edit.set_asset(
         page,
         &AssetRole::new("text-mask")?,
@@ -1580,7 +1602,7 @@ async fn write_mask(
             AssetMetadata {
                 width: Some(size.width),
                 height: Some(size.height),
-                attributes: BTreeMap::new(),
+                attributes,
             },
         ),
     )?;
@@ -2174,6 +2196,101 @@ mod tests {
 
         assert!(processor.skip(&input).unwrap());
         assert!(!processor.skip(&input.with_redetect(true)).unwrap());
+    }
+
+    #[tokio::test]
+    async fn a_completed_blank_page_is_current_only_for_the_observed_full_page_source() {
+        use koharu_scene::{AssetInput, AssetMetadata, AssetRole};
+        let mut session = Session::memory().await.unwrap();
+        let mut edit = session.snapshot().edit();
+        let page = edit
+            .add_page(PageDraft::new("blank", 32.0, 32.0), At::End)
+            .unwrap();
+        let source = |bytes: &'static [u8]| {
+            AssetInput::new(
+                bytes,
+                "image/png",
+                AssetMetadata {
+                    width: Some(32),
+                    height: Some(32),
+                    attributes: Default::default(),
+                },
+            )
+        };
+        edit.set_asset(page, &AssetRole::new("source").unwrap(), source(b"one"))
+            .unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let processor = Processor::new(
+            DetectionModel::KoharuLayoutRFDetrSeg2XL(KoharuLayoutRFDetrSeg2XLConfig::default()),
+            koharu_ml::Device::cpu(),
+            TextColorOptions::default(),
+            koharu_config::Config::memory(TextStyles::default()),
+        );
+        let input = StageInput::new(
+            session.snapshot(),
+            page,
+            None,
+            None,
+            std::sync::Arc::default(),
+            None,
+        );
+        assert!(!processor.skip(&input).unwrap());
+        let generated = generation(super::PRODUCER, super::MODEL_ID).unwrap();
+        let mut edit = input.scene.edit_as(generated);
+        super::write_mask(
+            &input,
+            &mut edit,
+            page,
+            &[],
+            ImageSize { width: 32, height: 32 },
+        )
+        .await
+        .unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let input = StageInput::new(
+            session.snapshot(),
+            page,
+            None,
+            None,
+            std::sync::Arc::default(),
+            None,
+        );
+        assert!(processor.skip(&input).unwrap());
+        let inpainting = super::super::inpainting::Processor::new(
+            crate::InpaintingModel::LaMa {},
+            koharu_ml::Device::cpu(),
+        )
+        .unwrap();
+        assert!(inpainting.skip(&input).unwrap());
+        assert!(!processor.skip(&input.clone().with_redetect(true)).unwrap());
+        let region = StageInput::new(
+            session.snapshot(),
+            page,
+            None,
+            Some(crate::Bounds {
+                x: 0.0,
+                y: 0.0,
+                width: 16.0,
+                height: 16.0,
+            }),
+            std::sync::Arc::default(),
+            None,
+        );
+        assert!(!processor.skip(&region).unwrap());
+        let patch = session
+            .snapshot()
+            .patch(|edit| edit.set_asset(page, &AssetRole::new("source")?, source(b"two")))
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let input = StageInput::new(
+            session.snapshot(),
+            page,
+            None,
+            None,
+            std::sync::Arc::default(),
+            None,
+        );
+        assert!(!processor.skip(&input).unwrap());
     }
 
     #[tokio::test]

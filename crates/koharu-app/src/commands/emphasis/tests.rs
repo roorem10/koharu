@@ -155,9 +155,7 @@ async fn hints_create_generated_runs_remove_the_component_and_honor_disable() {
         let result = snapshot.component::<TextRuns>(layer).unwrap();
         if enabled {
             let result = result.unwrap();
-            // The hook runs inside the user reset patch, which stamps runs as user-owned.
-            // AI emphasis is meant to be ordinary, editable word styling.
-            assert_eq!(result.origin, Origin::User);
+            assert_eq!(result.origin, Origin::Generated(generation));
             assert_eq!(
                 result
                     .runs
@@ -169,6 +167,80 @@ async fn hints_create_generated_runs_remove_the_component_and_honor_disable() {
             assert!(result.runs.iter().all(|run| run.style == settings.default));
         } else {
             assert!(result.is_none());
+        }
+    }
+}
+
+#[tokio::test]
+async fn settings_refresh_keeps_generated_emphasis_ranges_and_preserves_hand_runs() {
+    for manual in [false, true] {
+        for enabled in [false, true] {
+            let (mut project, layer) = fixture("NO! NO!").await;
+            let generation =
+                Generation::new(ProducerId::new("dev.koharu.pipeline.translation").unwrap());
+            let original = TextRuns {
+                origin: if manual {
+                    Origin::User
+                } else {
+                    Origin::Generated(generation.clone())
+                },
+                runs: vec![
+                    StyleRun {
+                        start: 0,
+                        end: 2,
+                        style: RunStyle { font_weight: Some(700), ..Default::default() },
+                    },
+                    StyleRun {
+                        start: 4,
+                        end: 6,
+                        style: RunStyle { font_weight: Some(700), ..Default::default() },
+                    },
+                ],
+            };
+            let patch = project
+                .snapshot()
+                .patch(|edit| {
+                    if manual {
+                        edit.set(layer, &original)
+                    } else {
+                        edit.set_generated_text_runs(layer, &original)
+                    }
+                })
+                .unwrap();
+            project.commit(patch).await.unwrap();
+            let settings = EmphasisSettings {
+                enabled_for_ai: enabled,
+                ..Default::default()
+            };
+            let updated = RunStyle {
+                size_scale: Some(1.3),
+                ..Default::default()
+            };
+            let snapshot = project.snapshot();
+            let patch = snapshot
+                .patch(|edit| {
+                    // Automatic typesetting filters hand styles before resetting a layer.
+                    if !manual {
+                        edit.remove::<TextRuns>(layer)?;
+                    }
+                    apply_hints_with(edit, &snapshot, &[layer], &settings, |_| Ok(updated.clone()))
+                })
+                .unwrap();
+            project.commit(patch).await.unwrap();
+            let result = project.snapshot().component::<TextRuns>(layer).unwrap();
+            if manual {
+                assert_eq!(result, Some(original));
+            } else if enabled {
+                let result = result.unwrap();
+                assert_eq!(result.origin, Origin::Generated(generation));
+                assert_eq!(
+                    result.runs.iter().map(|run| (run.start, run.end)).collect::<Vec<_>>(),
+                    [(0, 2), (4, 6)]
+                );
+                assert!(result.runs.iter().all(|run| run.style == updated));
+            } else {
+                assert!(result.is_none());
+            }
         }
     }
 }

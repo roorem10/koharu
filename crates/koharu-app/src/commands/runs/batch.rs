@@ -31,6 +31,22 @@ pub struct BatchPlan {
     pub chapters: Vec<BatchChapter>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, Type)]
+#[serde(tag = "recipe", rename_all = "snake_case")]
+pub enum BatchRecipe {
+    Preset {
+        preset: u32,
+    },
+    AutoRun {
+        quality: crate::commands::auto_run::QualityLevel,
+    },
+}
+
+enum ChapterRecipe {
+    Stages(Vec<koharu_pipeline::Stage>),
+    AutoRun(crate::commands::auto_run::QualityLevel),
+}
+
 #[derive(Clone)]
 struct ChapterInput {
     chapter: BatchChapter,
@@ -203,21 +219,60 @@ pub(crate) async fn preview_chapter_batch(
 
 #[tauri::command]
 #[specta::specta]
+pub(crate) async fn preview_batch_auto_run(
+    plan: Uuid,
+    chapters: Vec<Uuid>,
+    quality: crate::commands::auto_run::QualityLevel,
+    handle: AppHandle<CefRuntime>,
+) -> std::result::Result<crate::commands::auto_run::AutoRunPreview, Error> {
+    let state = handle.state::<BatchState>();
+    let saved = state.plan.lock();
+    let (saved_id, inputs) = saved.as_ref().context("pick a batch folder first")?;
+    require(
+        *saved_id == plan,
+        "the batch preview changed; pick the chapters again",
+    )?;
+    require(!chapters.is_empty(), "select chapters with readable pages")?;
+    require(
+        chapters
+            .iter()
+            .all(|id| inputs.iter().any(|input| input.chapter.id == *id)),
+        "unknown batch chapter",
+    )?;
+    let mut pages = 0_u32;
+    for input in inputs.iter().filter(|input| chapters.contains(&input.chapter.id)) {
+        require(
+            input.chapter.error.is_none() && input.chapter.pages > 0,
+            "select chapters with readable pages",
+        )?;
+        let count = u32::try_from(input.chapter.pages).context("too many chapter pages")?;
+        pages = pages.checked_add(count).context("too many chapter pages")?;
+    }
+    Ok(crate::commands::auto_run::batch_preview(pages, quality)?)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub(crate) async fn run_chapter_batch(
     plan: Uuid,
     chapters: Vec<Uuid>,
-    preset: u32,
+    recipe: BatchRecipe,
     close_project: Option<String>,
     on_progress: Channel<BatchProgress>,
     handle: AppHandle<CefRuntime>,
 ) -> std::result::Result<(), Error> {
     let settings = RunSettings::load()?;
-    let stages = settings
-        .presets
-        .get(preset as usize)
-        .context("choose a run preset")?
-        .stages
-        .clone();
+    let recipe = match recipe {
+        BatchRecipe::Preset { preset } => ChapterRecipe::Stages(
+            settings
+                .presets
+                .get(preset as usize)
+                .context("choose a run preset")?
+                .stages
+                .clone(),
+        ),
+        BatchRecipe::AutoRun { quality } => ChapterRecipe::AutoRun(quality),
+    };
     require(
         handle.state::<Processing>().stops.lock().is_empty(),
         "processing is already running",
@@ -295,7 +350,7 @@ pub(crate) async fn run_chapter_batch(
                 }
                 progress.chapters[index].state = ChapterStatus::Running;
                 let _ = on_progress.send(progress.clone());
-                let result = run_chapter(&handle, input, &control, &stages).await;
+                let result = run_chapter(&handle, input, &control, &recipe).await;
                 let chapter = &mut progress.chapters[index];
                 match result {
                     Ok((name, job)) => {
@@ -336,7 +391,7 @@ async fn run_chapter(
     handle: &AppHandle<CefRuntime>,
     input: ChapterInput,
     control: &BatchControl,
-    stages: &[koharu_pipeline::Stage],
+    recipe: &ChapterRecipe,
 ) -> Result<(String, super::super::processing::Job)> {
     let current = handle.state::<CurrentProject>();
     if current.project.lock().await.is_some() {
@@ -380,13 +435,22 @@ async fn run_chapter(
         if control.stop.stopped() {
             anyhow::bail!("batch stopped after import");
         }
-        let id = super::super::processing::start_batch_job(
-            handle.clone(),
-            Operation::Stages {
-                stages: stages.to_vec(),
-            },
-        )
-        .await?;
+        let id = match recipe {
+            ChapterRecipe::Stages(stages) => super::super::processing::start_batch_job(
+                handle.clone(),
+                Operation::Stages {
+                    stages: stages.clone(),
+                },
+            )
+            .await?,
+            ChapterRecipe::AutoRun(quality) => super::super::processing::start_auto_job(
+                handle.clone(),
+                koharu_pipeline::Scope::Project,
+                *quality,
+                true,
+            )
+            .await?,
+        };
         *control.job.lock() = Some(id);
         loop {
             let project = current.project.lock().await;
@@ -452,7 +516,9 @@ pub(crate) async fn stop_chapter_batch(
 
 fn stop_at_page_boundary(processing: &Processing, job: JobId) {
     let idle = processing.jobs.lock().get(&job).is_some_and(|job| {
-        job.retry.is_some() || job.model.as_deref() == Some("chapter_context_reading")
+        job.retry.is_some()
+            || job.model.as_deref() == Some("chapter_context_reading")
+            || (job.auto_run.is_some() && job.stage.is_none())
     });
     if let Some(stop) = processing.stops.lock().get(&job) {
         if idle {

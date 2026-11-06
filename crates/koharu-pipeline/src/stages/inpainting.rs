@@ -145,17 +145,38 @@ impl StageProcessor for Processor {
             return Ok(false);
         }
         let source = AssetRole::new("source")?;
-        for entity in input.scene.children(input.page)? {
-            if input
-                .scene
-                .component::<RasterLayer>(entity)?
-                .is_some_and(|layer| layer.kind == RasterLayerKind::Cleanup)
-                && input.scene.asset(entity, &source)?.is_some()
+        for entity in input.scene.descendants(input.page)? {
+            let Some(layer) = input.scene.component::<RasterLayer>(entity.id())? else {
+                continue;
+            };
+            if layer.kind != RasterLayerKind::Cleanup {
+                continue;
+            }
+            let hand_edited = layer.origin == Origin::User
+                || input
+                    .scene
+                    .component::<EntityOrigin>(entity.id())?
+                    .is_none_or(|origin| origin.origin == Origin::User);
+            if hand_edited
+                || (!input.refresh && input.scene.asset(entity.id(), &source)?.is_some())
             {
                 return Ok(true);
             }
         }
-        Ok(false)
+        // Mask producers record known-empty pixels with the asset; no model is
+        // needed for a blank page, including on its first chapter run.
+        for role in ["text-mask", "coo-mask"] {
+            if let Some(mask) = input.scene.asset(input.page, &AssetRole::new(role)?)?
+                && !mask
+                    .metadata
+                    .attributes
+                    .get(super::EMPTY_MASK)
+                    .is_some_and(|value| value == "true")
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     fn unload(&self) -> bool {
@@ -341,6 +362,7 @@ impl Model {
         edit.observe_assets(page)?;
         if let Some(entity) = cleanup_entity {
             edit.observe::<RasterLayer>(entity)?;
+            edit.observe::<EntityOrigin>(entity)?;
             edit.observe_assets(entity)?;
         }
         let image = image.to_rgba8();
@@ -1436,6 +1458,87 @@ mod tests {
 
         assert!(processor.skip(&automatic).unwrap());
         assert!(!processor.skip(&manual).unwrap());
+    }
+
+    #[tokio::test]
+    async fn stale_cleanup_refreshes_only_when_layer_and_entity_are_generated() {
+        let processor = Processor::new(InpaintingModel::LaMa {}, koharu_ml::Device::cpu()).unwrap();
+        for (hand_layer, hand_entity, nested) in [
+            (false, false, false),
+            (true, false, false),
+            (false, true, false),
+            (true, true, true),
+        ] {
+            let mut session = koharu_scene::Session::memory().await.unwrap();
+            let mut edit = session.snapshot().edit_as(generation(PRODUCER, "lama").unwrap());
+            let page = edit
+                .add_page(koharu_scene::PageDraft::new("page", 8.0, 8.0), At::End)
+                .unwrap();
+            let parent = if nested {
+                edit.add_entity(page, At::End).unwrap()
+            } else {
+                page
+            };
+            let cleanup = edit.add_entity(parent, At::Start).unwrap();
+            edit.set(
+                cleanup,
+                &RasterLayer {
+                    origin: Origin::User,
+                    name: "Cleanup".into(),
+                    kind: RasterLayerKind::Cleanup,
+                },
+            )
+            .unwrap();
+            for (entity, role) in [(page, "text-mask"), (cleanup, "source")] {
+                edit.set_asset(
+                    entity,
+                    &AssetRole::new(role).unwrap(),
+                    AssetInput::new(
+                        Arc::<[u8]>::from([0]),
+                        "image/png",
+                        AssetMetadata {
+                            width: Some(8),
+                            height: Some(8),
+                            attributes: BTreeMap::new(),
+                        },
+                    ),
+                )
+                .unwrap();
+            }
+            session.commit(edit.finish().unwrap()).await.unwrap();
+            if hand_layer || hand_entity {
+                let mut edit = session.snapshot().edit();
+                if hand_layer {
+                    edit.set(
+                        cleanup,
+                        &RasterLayer {
+                            origin: Origin::User,
+                            name: "Edited cleanup".into(),
+                            kind: RasterLayerKind::Cleanup,
+                        },
+                    )
+                    .unwrap();
+                }
+                if hand_entity {
+                    edit.promote_entity_to_user(cleanup).unwrap();
+                }
+                session.commit(edit.finish().unwrap()).await.unwrap();
+            }
+            let input = StageInput::new(
+                session.snapshot(),
+                page,
+                None,
+                None,
+                Arc::new(crate::ImageCache::default()),
+                None,
+            );
+            assert!(processor.skip(&input).unwrap());
+            assert_eq!(
+                processor.skip(&input.with_refresh(true)).unwrap(),
+                hand_layer || hand_entity,
+                "layer={hand_layer}, entity={hand_entity}, nested={nested}"
+            );
+        }
     }
 
     fn rectangle_region([left, top, right, bottom]: [u32; 4]) -> FlatFillRegion {

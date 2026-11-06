@@ -407,6 +407,7 @@ pub(crate) struct Project {
     pub(crate) active_page: Option<EntityId>,
     pub(crate) undo: Vec<Vec<Revision>>,
     pub(crate) redo: Vec<Vec<Revision>>,
+    pub(crate) context_undo: std::collections::BTreeMap<Revision, super::context::undo::ContextChange>,
     /// The last on-page typing commit (layer, editing session, revision), so a run
     /// of typing in one session is undone as one step.
     pub(crate) typing: Option<(EntityId, u32, Revision)>,
@@ -437,6 +438,7 @@ impl Project {
             active_page,
             undo: Vec::new(),
             redo: Vec::new(),
+            context_undo: Default::default(),
             typing: None,
             directory: None,
         }
@@ -1247,7 +1249,7 @@ impl Project {
 
     pub(crate) async fn undo(&mut self) -> Result<Commit> {
         let revisions = self.undo.pop().ok_or_else(|| anyhow!("nothing to undo"))?;
-        let commit = match self.session.undo_many(revisions.iter().copied()).await {
+        let commit = match self.undo_with_context(&revisions).await {
             Ok(commit) => commit,
             Err(error) => {
                 self.undo.push(revisions);
@@ -1260,7 +1262,7 @@ impl Project {
 
     pub(crate) async fn redo(&mut self) -> Result<Commit> {
         let revisions = self.redo.pop().ok_or_else(|| anyhow!("nothing to redo"))?;
-        let commit = match self.session.undo_many(revisions.iter().copied()).await {
+        let commit = match self.undo_with_context(&revisions).await {
             Ok(commit) => commit,
             Err(error) => {
                 self.redo.push(revisions);

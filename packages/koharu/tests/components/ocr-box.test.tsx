@@ -161,6 +161,7 @@ describe('OCR box drag', () => {
           project: 'OCR',
           operation: null,
           finish_sound: false,
+          auto_run: null,
         },
       },
     })

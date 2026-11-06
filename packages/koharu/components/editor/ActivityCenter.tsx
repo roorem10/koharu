@@ -4,6 +4,7 @@ import { useMutationState } from '@tanstack/react-query'
 import { CircleAlert, Download, LoaderCircle, Square, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { AutoRunSummaryContent } from '@/components/runs/AutoRun'
 import { openFailedPage, retryFailedPages } from '@/components/runs/data'
 import { call } from '@/lib/backend'
 import { usePages, useProject } from '@/lib/queries'
@@ -28,7 +29,10 @@ export function ActivityCenter() {
   const visibleJobs = Object.values(jobs).filter(
     (job) =>
       (job.project == null || job.project === project?.name) &&
-      (job.state === 'running' || job.state === 'failed' || job.state === 'finished_with_problems'),
+      (job.state === 'running' ||
+        job.state === 'failed' ||
+        job.state === 'finished_with_problems' ||
+        !!job.auto_run?.summary),
   )
   const runningDownloads = Object.values(downloads).filter(
     (download) => download.state === 'running',
@@ -108,6 +112,9 @@ function DownloadGroup({ downloads }: { downloads: DownloadState[] }) {
 function JobItem({ job }: { job: Job }) {
   const { t } = useTranslation()
   const dismiss = useKoharuStore((state) => state.dismissJob)
+  const running = useKoharuStore((state) =>
+    Object.values(state.jobs).some((job) => job.state === 'running'),
+  )
   // The pipeline reports which page it is on; the rail has already loaded the
   // labels, so this resolves from cache rather than fetching.
   const pages = usePages(job.page !== null).data
@@ -120,6 +127,35 @@ function JobItem({ job }: { job: Job }) {
     : undefined
   if (job.failures?.length && job.state !== 'running') {
     return <FailedPages job={job} />
+  }
+  if (job.auto_run?.summary && job.state !== 'running') {
+    return (
+      <div className='grid gap-2 border-b p-3 last:border-b-0'>
+        <div className='flex items-center justify-between gap-2'>
+          <span className='text-[12px] font-medium'>{t('autoRun.title')}</span>
+          <Button
+            size='icon-xs'
+            variant='ghost'
+            aria-label={t('activity.dismiss')}
+            onClick={() => dismiss(job.id)}
+          >
+            <X />
+          </Button>
+        </div>
+        <AutoRunSummaryContent summary={job.auto_run.summary} />
+        {job.error && <p className='text-[11px] break-words text-destructive'>{job.error}</p>}
+        {job.auto_run.summary.failures > 0 && (
+          <Button
+            size='sm'
+            variant='outline'
+            disabled={running}
+            onClick={() => void retryFailedPages(job).catch(() => undefined)}
+          >
+            {t('runs.retryFailedPages')}
+          </Button>
+        )}
+      </div>
+    )
   }
   if (job.state === 'failed') {
     return (
@@ -136,9 +172,11 @@ function JobItem({ job }: { job: Job }) {
         <span className='mt-1.5 size-1.5 justify-self-center rounded-full bg-primary' />
         <div className='min-w-0'>
           <span className='block truncate text-[12px] font-medium capitalize'>
-            {job.stage
-              ? t(`phase.${job.stage}`, { defaultValue: job.stage })
-              : t('activity.processing')}
+            {job.auto_run?.step
+              ? t(`autoRun.steps.${job.auto_run.step}`)
+              : job.stage
+                ? t(`phase.${job.stage}`, { defaultValue: job.stage })
+                : t('activity.processing')}
           </span>
         </div>
         <span className='pt-0.5 text-right text-[10px] tabular-nums'>
@@ -197,6 +235,7 @@ function FailedPages({ job }: { job: Job }) {
           <X />
         </Button>
       </div>
+      {job.auto_run?.summary && <AutoRunSummaryContent summary={job.auto_run.summary} />}
       <ul className='grid max-h-48 gap-2 overflow-auto'>
         {job.failures.map((failure) => (
           <li key={failure.page} className='min-w-0'>
