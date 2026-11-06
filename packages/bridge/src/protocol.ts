@@ -276,7 +276,7 @@ export type CanvasState = {
 	element_frames: TransformFrame[],
 };
 
-export type CategoryReason = "user" | "model" | "small_text" | "bubble_shape";
+export type CategoryReason = "user" | "model" | "small_text" | "bubble_shape" | "source_style" | "shout_signals" | "hand_style";
 
 export type CategoryStyles = {
 	thoughts?: TextStyle,
@@ -402,6 +402,9 @@ export type DownloadState = "running" | "finished" | "failed";
 export type EffectiveCategory = {
 	category: LetteringCategory,
 	reason: CategoryReason,
+	bold: boolean,
+	signals: ShoutSignal[],
+	source_style: SourceStyle | null,
 };
 
 /**
@@ -632,6 +635,7 @@ export type LetteringSettings = {
 	model_confidence?: number,
 	/**  Estimated source glyph size as a fraction of page height. */
 	small_text_threshold?: number,
+	shout_signals_needed?: number,
 };
 
 export type LibraryFolder = "projects" | "models";
@@ -658,6 +662,7 @@ export type LineCategory = {
 
 export type LineContext = {
 	category?: LineCategory | null,
+	source_style?: SourceStyle | null,
 	note?: string | null,
 	flags?: Flag[],
 	dismissed?: string[],
@@ -1082,12 +1087,36 @@ export type ShapeStyles = {
 	free?: TextStyle,
 };
 
+export type ShoutSignal = "source_bold" | "spiky_bubble" | "yelling_line";
+
 export type SizePart = {
 	auto_fit: boolean,
 	size: number | null,
 };
 
+export type SourceBold = "yes" | "no" | "unsure";
+
 export type SourceBytes = number[];
+
+export type SourceDifference = "thin" | "shaky" | "heavy";
+
+/**
+ *  Measurements of the original detection mask, independent of translated typography.
+ */
+export type SourceMeasurements = {
+	stroke_ratio: number,
+	ink_density: number,
+	stroke_variation: number,
+	glyph_height: number,
+	glyph_count: number,
+};
+
+export type SourceStyle = {
+	source_bold: SourceBold,
+	source_different: boolean,
+	difference: SourceDifference | null,
+	measurements: SourceMeasurements,
+};
 
 export type SourceText = {
 	text: string,

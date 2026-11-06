@@ -162,6 +162,40 @@ impl Renderer {
             .map_err(Error::FontResource)
     }
 
+    /// Select one face for an entire box before committing its category style.
+    /// Named candidates keep their order; renderer defaults are the final fallback.
+    pub async fn covering_font(
+        &self,
+        candidates: &[crate::FontPart],
+        text: &str,
+        language: Option<&str>,
+    ) -> Result<Option<String>> {
+        let requests: Vec<_> = candidates
+            .iter()
+            .filter_map(|part| {
+                part.preferred_font.as_ref().map(|family| FontRequest {
+                    family: family.clone(),
+                    weight: part.font_weight,
+                    style: part.font_style.map(Into::into),
+                })
+            })
+            .collect();
+        let preferred = candidates.first();
+        let typesetting = self.inner.typesetting.load_full();
+        self.inner
+            .fonts
+            .covering_font(
+                &requests,
+                preferred.and_then(|part| part.font_weight),
+                preferred.and_then(|part| part.font_style).map(Into::into),
+                &typesetting.font_families,
+                text,
+                language,
+            )
+            .await
+            .map_err(Error::FontResource)
+    }
+
     pub async fn font_preview(
         &self,
         family_name: &str,

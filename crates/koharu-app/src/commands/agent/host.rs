@@ -256,7 +256,14 @@ impl KoharuHost {
                 }
                 _ => unreachable!(),
             };
-            let commit = super::super::lettering::labels_changed(project, &changed_layers).await?;
+            let renderer = self.handle.state::<Desktop>().renderer();
+            let commit = super::super::lettering::labels_changed(
+                project,
+                &changed_layers,
+                false,
+                &renderer,
+            )
+            .await?;
             if let Some(commit) = &commit {
                 project.record_commit(commit);
             }
@@ -376,6 +383,10 @@ impl Host for KoharuHost {
                         "view_page",
                         "Render and inspect one page image. Call this only for pages whose visual appearance matters to the request.",
                     ),
+                    definition::<InspectSourceStyle>(
+                        "get_source_style",
+                        "Read a box's measured source boldness, difference from page dialogue, Shout signals, and the reason for its applied lettering. Does not modify the project.",
+                    ),
                     definition::<RenamePage>("rename_page", "Rename a project page."),
                     definition::<MovePage>("move_page", "Move a page to a zero-based project index."),
                     definition::<DeletePages>("delete_pages", "Delete pages and their contents."),
@@ -433,6 +444,16 @@ impl Host for KoharuHost {
             "inspect_project" => {
                 let _: InspectProject = arguments(&call)?;
                 Invocation::read(self.project_context().await?)
+            }
+            "get_source_style" => {
+                let arguments: InspectSourceStyle = arguments(&call)?;
+                let layer = entity(&arguments.layer)?;
+                let current = self.handle.state::<CurrentProject>();
+                let current = current.project.lock().await;
+                let project = current.as_ref().context("no project is open")?;
+                Invocation::read(serde_json::to_value(
+                    super::super::lettering::inspect_source_style(project, layer).await?,
+                )?)
             }
             "view_page" => {
                 let arguments: ViewPage = arguments(&call)?;
@@ -605,9 +626,17 @@ impl Host for KoharuHost {
                 let detect_colors = koharu_pipeline::PipelineConfig::load()?
                     .read()?
                     .detect_text_color;
+                let renderer = self.handle.state::<Desktop>().renderer();
                 self.mutate_optional(|project| {
                     Box::pin(async move {
-                        apply_agent_text_style(project, arguments, &styles, detect_colors).await
+                        apply_agent_text_style(
+                            project,
+                            arguments,
+                            &styles,
+                            detect_colors,
+                            &renderer,
+                        )
+                        .await
                     })
                 })
                 .await
@@ -774,23 +803,57 @@ async fn apply_agent_text_style(
     arguments: ApplyTextStyle,
     styles: &koharu_renderer::TextStyles,
     detect_colors: bool,
+    renderer: &koharu_renderer::Renderer,
 ) -> Result<(Option<Commit>, crate::commands::styles::StyleApplyResult)> {
+    use booharu_context::LetteringCategory;
     use crate::commands::styles::StyleScope;
     let scope = StyleScope::Layers(entities(&arguments.elements)?);
-    let shape_style = match arguments.shape.as_str() {
-        "rectangle" => &styles.shape_styles.rectangle,
-        "round" => &styles.shape_styles.round,
-        "spiky" => &styles.shape_styles.spiky,
-        "none" => &styles.shape_styles.free,
+    let (shape_style, category) = match arguments.shape.as_str() {
+        "rectangle" => (&styles.shape_styles.rectangle, LetteringCategory::NarrationBox),
+        "round" => (&styles.shape_styles.round, LetteringCategory::NormalDialogue),
+        "spiky" => (&styles.shape_styles.spiky, LetteringCategory::Shout),
+        "none" => (&styles.shape_styles.free, LetteringCategory::Floating),
         shape => bail!("unknown shape {shape}; valid shapes: rectangle, round, spiky, none"),
     };
     styles.validate()?;
-    project
-        .apply_style(scope, true, true, |_, _, typography| {
+    let snapshot = project.snapshot();
+    let mut prepared = std::collections::BTreeMap::new();
+    for layer in Project::style_targets(&snapshot, scope.clone())? {
+        let proposal: Result<_> = async {
+            let mut typography = snapshot
+                .component::<koharu_scene::Typography>(layer)?
+                .context("text layer has no typography")?;
             styles
                 .default_style
-                .apply_to_detected(typography, detect_colors);
-            shape_style.apply_to_detected(typography, detect_colors);
+                .apply_to_detected(&mut typography, detect_colors);
+            shape_style.apply_to_detected(&mut typography, detect_colors);
+            if let Some(translation) = snapshot.text_layer(layer)?.content()?.translation()? {
+                super::super::lettering::apply_font_coverage(
+                    renderer,
+                    styles,
+                    category,
+                    &mut typography,
+                    &translation.text.value,
+                    translation.language.as_ref().map(|language| language.as_str()),
+                )
+                .await?;
+            }
+            Ok(typography)
+        }
+        .await;
+        match proposal {
+            Ok(typography) => {
+                prepared.insert(layer, typography);
+            }
+            Err(error) => tracing::warn!(%layer, %error, "agent text style cannot be prepared"),
+        }
+    }
+    project
+        .apply_style(scope, true, true, |_, layer, typography| {
+            *typography = prepared
+                .get(&layer)
+                .context("agent text style could not be prepared")?
+                .clone();
             Ok(())
         })
         .await
@@ -803,16 +866,30 @@ struct AgentCommitter {
 #[async_trait]
 impl Committer for AgentCommitter {
     async fn commit(&mut self, output: StageOutput) -> Result<Snapshot> {
+        let renderer = self.host.handle.state::<Desktop>().renderer();
         let (commit, page) = {
             let current = self.host.handle.state::<CurrentProject>();
             let mut current = current.project.lock().await;
             let project = current.as_mut().context("no project is open")?;
-            let Some(commit) = project.commit_rebased(output.patch).await? else {
+            let Some(mut commit) = project.commit_rebased(output.patch).await? else {
                 return Ok(project.snapshot());
             };
             project.record_commit(&commit);
             if output.stage == Stage::Translation {
+                if let Some(styled) =
+                    super::super::rich_text::after_translation(project, &commit, &renderer).await?
+                {
+                    project.record_commit(&styled);
+                    commit = styled;
+                }
                 super::super::context::refresh_flags(project)?;
+            } else if matches!(output.stage, Stage::Detection | Stage::Ocr) {
+                if let Some(styled) =
+                    super::super::lettering::after_analysis(project, output.page, &renderer).await?
+                {
+                    project.record_commit(&styled);
+                    commit = styled;
+                }
             }
             (commit, project.active_page())
         };
@@ -846,6 +923,12 @@ fn entities(values: &[String]) -> Result<Vec<EntityId>> {
 
 #[derive(Deserialize, JsonSchema)]
 struct InspectProject {}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct InspectSourceStyle {
+    layer: String,
+}
 
 #[derive(Deserialize, JsonSchema)]
 struct ViewPage {
@@ -1235,7 +1318,8 @@ mod text_style_tests {
             elements: layers.iter().map(ToString::to_string).collect(),
             shape: "spiky".into(),
         };
-        let (commit, result) = apply_agent_text_style(&mut project, args(), &styles, true)
+        let renderer = koharu_renderer::Renderer::new().unwrap();
+        let (commit, result) = apply_agent_text_style(&mut project, args(), &styles, true, &renderer)
             .await
             .unwrap();
         assert_eq!((result.changed, result.skipped), (2, 0));
@@ -1256,7 +1340,7 @@ mod text_style_tests {
             first_text(&agent_pages(&project.snapshot()).unwrap())["style_origin"],
             "user"
         );
-        let (commit, result) = apply_agent_text_style(&mut project, args(), &styles, true)
+        let (commit, result) = apply_agent_text_style(&mut project, args(), &styles, true, &renderer)
             .await
             .unwrap();
         assert!(commit.is_none());
@@ -1275,7 +1359,7 @@ mod text_style_tests {
         }
         let mut invalid = args();
         invalid.shape = "triangle".into();
-        let error = apply_agent_text_style(&mut project, invalid, &styles, true)
+        let error = apply_agent_text_style(&mut project, invalid, &styles, true, &renderer)
             .await
             .unwrap_err();
         assert!(error.to_string().contains("rectangle, round, spiky, none"));

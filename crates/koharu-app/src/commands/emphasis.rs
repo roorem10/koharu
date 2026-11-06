@@ -149,9 +149,23 @@ pub(crate) fn apply_hints(
     let settings = EmphasisSettings::load()
         .and_then(|config| Ok(config.read()?.clone()))
         .map_err(|error| koharu_scene::Error::Invalid(error.to_string()))?;
+    let lettering = super::lettering::LetteringSettings::load()
+        .and_then(|config| Ok(config.read()?.clone()))
+        .map_err(|error| koharu_scene::Error::Invalid(error.to_string()))?;
     apply_hints_with(edit, snapshot, layers, &settings, |layer| {
-        category_style(&settings, context, snapshot, layer)
-            .map_err(|error| koharu_scene::Error::Invalid(error.to_string()))
+        let result = (|| -> anyhow::Result<RunStyle> {
+            let info = text_bubble_shape(snapshot, layer)?;
+            let decision =
+                super::lettering::resolve_category(context, snapshot, layer, &info, &lettering)?;
+            let mut style = settings.style(decision.category.as_str());
+            if decision.bold || decision.source_style.is_some() {
+                // Source weight is whole-box intent. AI word hints inherit it;
+                // the user's explicit word-emphasis command remains independent.
+                style.font_weight = None;
+            }
+            Ok(style)
+        })();
+        result.map_err(|error| koharu_scene::Error::Invalid(error.to_string()))
     })
 }
 

@@ -849,6 +849,52 @@ impl Fonts {
         Ok(resolved)
     }
 
+    pub(crate) async fn covering_font(
+        &self,
+        candidates: &[FontRequest],
+        weight: Option<u16>,
+        style: Option<PublicFontStyle>,
+        theme_families: &[String],
+        text: &str,
+        language: Option<&str>,
+    ) -> Result<Option<String>> {
+        self.ensure_system().await;
+        let defaults: Vec<_> = theme_families
+            .iter()
+            .map(|family| FontRequest {
+                family: family.clone(),
+                weight,
+                style,
+            })
+            .collect();
+        for request in candidates.iter().chain(&defaults) {
+            if let Err(error) = self.prepare(std::slice::from_ref(request)).await {
+                tracing::warn!(%error, family = %request.family, "could not prepare category font");
+                continue;
+            }
+            let fonts = self.resolve(
+                Some(&request.family),
+                request.weight,
+                request.style,
+                &[],
+                text,
+                language,
+            )?;
+            // The resolver also returns generic fallbacks. They must not jump
+            // ahead of another configured category font.
+            if let Some(font) = fonts.iter().find(|font| {
+                font.family_name().eq_ignore_ascii_case(&request.family) && font.covers(text)
+            }) {
+                return Ok(Some(font.family_name().to_owned()));
+            }
+        }
+        Ok(self
+            .resolve(None, weight, style, theme_families, text, language)?
+            .into_iter()
+            .find(|font| font.covers(text))
+            .map(|font| font.family_name().to_owned()))
+    }
+
     pub(crate) fn resolve_word_font(
         &self,
         request: &FontRequest,
@@ -1506,6 +1552,13 @@ pub(crate) fn layout_fixture_font() -> Font {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn whole_box_coverage_rejects_even_one_missing_printable_character() {
+        let font = layout_fixture_font();
+        assert!(font.covers("ABC日本語\n\t\u{200d}\u{fe0f}"));
+        assert!(!font.covers("ABC日本語\u{10ffff}"));
+    }
 
     #[test]
     fn catalog_preserves_filter_metadata_preview_and_weight_range() {

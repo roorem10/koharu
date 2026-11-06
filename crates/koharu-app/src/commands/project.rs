@@ -842,27 +842,42 @@ impl Project {
         styles: &koharu_renderer::TextStyles,
         detect_colors: bool,
         include_user: bool,
+        renderer: &koharu_renderer::Renderer,
     ) -> Result<(Option<Commit>, super::styles::StyleApplyResult)> {
-        use koharu_pipeline::bubble_shape::text_bubble_shape;
         styles.validate()?;
         if !styles.shape_styles.enabled {
             return Ok((None, Default::default()));
         }
-        let context = self.load_context()?;
-        self.apply_style(scope, false, include_user, |snapshot, layer, typography| {
-            let info = text_bubble_shape(snapshot, layer)?;
-            anyhow::ensure!(
-                info.bubble.is_none() || info.measures.is_some(),
-                "bubble polygon cannot be measured"
-            );
-            styles
-                .default_style
-                .apply_to_detected(typography, detect_colors);
-            if let Some(style) =
-                super::lettering::pick_style(styles, &context, snapshot, layer, &info)?
-            {
-                style.apply_to_detected(typography, detect_colors);
+        let snapshot = self.snapshot();
+        let keep_manual = !include_user && !matches!(scope, super::styles::StyleScope::Layers(_));
+        let mut targets = Self::style_targets(&snapshot, scope.clone())?;
+        if keep_manual {
+            let mut automatic = Vec::new();
+            for layer in targets {
+                if !snapshot
+                    .component::<SceneTypography>(layer)?
+                    .is_some_and(|typography| typography.origin == Origin::User)
+                {
+                    automatic.push(layer);
+                }
             }
+            targets = automatic;
+        }
+        let settings = super::lettering::LetteringSettings::load()?.read()?.clone();
+        let prepared = super::lettering::prepare_styles(
+            self,
+            &targets,
+            styles,
+            &settings,
+            detect_colors,
+            renderer,
+        )
+        .await?;
+        self.apply_style(scope, false, include_user, |_, layer, typography| {
+            *typography = prepared
+                .get(&layer)
+                .context("cannot prepare lettering style")?
+                .clone();
             Ok(())
         })
         .await
@@ -1995,6 +2010,7 @@ mod tests {
                 &styles,
                 false,
                 true,
+                &koharu_renderer::Renderer::new().unwrap(),
             )
             .await
             .unwrap();
@@ -2012,7 +2028,10 @@ mod tests {
                 typography.preferred_font.as_deref(),
                 Some(if index == 2 { "free" } else { "narration" })
             );
-            assert_eq!(typography.extensions, original.extensions);
+            for (key, value) in &original.extensions {
+                assert_eq!(typography.extensions.get(key), Some(value));
+            }
+            assert!(typography.extensions.contains_key("dev.booharu.lettering"));
             assert_eq!(typography.color, styles.default_style.fill);
         }
         project.undo().await.unwrap();
@@ -2033,6 +2052,7 @@ mod tests {
                 &styles,
                 false,
                 true,
+                &koharu_renderer::Renderer::new().unwrap(),
             )
             .await
             .unwrap();
@@ -2099,7 +2119,13 @@ mod tests {
             ..Default::default()
         };
         let (commit, result) = project
-            .apply_shape_rules(StyleScope::Project, &styles, false, false)
+            .apply_shape_rules(
+                StyleScope::Project,
+                &styles,
+                false,
+                false,
+                &koharu_renderer::Renderer::new().unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(
@@ -2136,14 +2162,26 @@ mod tests {
         }
         project.undo().await.unwrap();
         let (commit, result) = project
-            .apply_shape_rules(StyleScope::Project, &styles, false, true)
+            .apply_shape_rules(
+                StyleScope::Project,
+                &styles,
+                false,
+                true,
+                &koharu_renderer::Renderer::new().unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!((result.changed, result.kept_manual), (2, 0));
         project.record_commit(&commit.unwrap());
         project.undo().await.unwrap();
         let (_, result) = project
-            .apply_shape_rules(StyleScope::Layers(vec![layers[0].0]), &styles, false, false)
+            .apply_shape_rules(
+                StyleScope::Layers(vec![layers[0].0]),
+                &styles,
+                false,
+                false,
+                &koharu_renderer::Renderer::new().unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!((result.changed, result.kept_manual), (1, 0));
@@ -2151,7 +2189,13 @@ mod tests {
         let mut changed_styles = styles.clone();
         changed_styles.default_style.fill = Some([7, 8, 9, 255]);
         let (_, result) = project
-            .apply_shape_rules(StyleScope::Project, &changed_styles, false, false)
+            .apply_shape_rules(
+                StyleScope::Project,
+                &changed_styles,
+                false,
+                false,
+                &koharu_renderer::Renderer::new().unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!((result.changed, result.kept_manual), (1, 1));

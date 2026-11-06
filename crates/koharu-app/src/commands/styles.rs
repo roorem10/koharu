@@ -84,7 +84,13 @@ pub(crate) async fn apply_shape_rules(
         let mut project = project.project.lock().await;
         let project = project.as_mut().context("no project is open")?;
         let (commit, result) = project
-            .apply_shape_rules(scope, &styles, detect_colors, include_user)
+            .apply_shape_rules(
+                scope,
+                &styles,
+                detect_colors,
+                include_user,
+                &desktop.renderer(),
+            )
             .await?;
         if let Some(commit) = &commit {
             project.record_commit(commit);

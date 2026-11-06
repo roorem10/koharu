@@ -494,7 +494,25 @@
     "suggestHelp": "Rellena las filas vacías a partir de tu lista inicial de fuentes, usando solo las disponibles. Las opciones existentes se mantienen tal como las has definido.",
     "loading": "Cargando…",
     "loadError": "No se han podido cargar los ajustes o la categoría de rotulación.",
+    "source": {
+      "title": "Respetar la rotulación original",
+      "description": "Compara cada cuadro con la rotulación habitual de la página. El estilo manual siempre tiene prioridad.",
+      "signalsNeeded": "Señales necesarias para Grito",
+      "signalsHelp": "Cuenta la rotulación original en negrita, un bocadillo puntiagudo y una etiqueta de Grito o Grito débil de la lectura del capítulo. El valor predeterminado es 2 señales.",
+      "explanation": "{{category}}: {{reason}}",
+      "signals": {
+        "source_bold": "original en negrita",
+        "spiky_bubble": "bocadillo puntiagudo",
+        "yelling_line": "línea gritada"
+      },
+      "differences": {
+        "thin": "rotulación original fina",
+        "shaky": "rotulación original temblorosa",
+        "heavy": "rotulación original gruesa"
+      }
+    },
     "reasons": {
+      "hand_style": "estilo manual conservado",
       "user": "definido a mano",
       "model": "de la lectura del capítulo",
       "small_text": "rotulación original pequeña"

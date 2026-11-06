@@ -488,7 +488,25 @@
     "suggestHelp": "从初始字体列表中选择可用字体，填入空白行。现有选择保持不变。",
     "loading": "正在加载…",
     "loadError": "无法加载排字设置或类别。",
+    "source": {
+      "title": "匹配原稿字样",
+      "description": "将每个文本框与本页常见的字样比较。手动设置的样式始终优先。",
+      "signalsNeeded": "判定喊叫所需的信号数",
+      "signalsHelp": "原稿粗体、尖角气泡和章节阅读的“喊叫”或“弱喊叫”标签各算一个信号。默认需要2个信号。",
+      "explanation": "{{category}}：{{reason}}",
+      "signals": {
+        "source_bold": "原稿粗体",
+        "spiky_bubble": "尖角气泡",
+        "yelling_line": "喊叫台词"
+      },
+      "differences": {
+        "thin": "原稿字样较细",
+        "shaky": "原稿字样颤抖",
+        "heavy": "原稿字样厚重"
+      }
+    },
     "reasons": {
+      "hand_style": "已保留手动样式",
       "user": "手动设置",
       "model": "来自章节阅读结果",
       "small_text": "原文为小字"

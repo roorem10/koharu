@@ -488,7 +488,25 @@
     "suggestHelp": "從起始字型清單中選擇可用字型，填入空白列。現有選擇保持不變。",
     "loading": "正在載入…",
     "loadError": "無法載入排字設定或類別。",
+    "source": {
+      "title": "比照原稿字樣",
+      "description": "將每個文字框與本頁常見的字樣比較。手動設定的樣式一律優先。",
+      "signalsNeeded": "判定喊叫所需的訊號數",
+      "signalsHelp": "原稿粗體、尖角氣泡和章節閱讀的「喊叫」或「弱喊叫」標籤各算一個訊號。預設需要2個訊號。",
+      "explanation": "{{category}}：{{reason}}",
+      "signals": {
+        "source_bold": "原稿粗體",
+        "spiky_bubble": "尖角氣泡",
+        "yelling_line": "喊叫台詞"
+      },
+      "differences": {
+        "thin": "原稿字樣較細",
+        "shaky": "原稿字樣顫抖",
+        "heavy": "原稿字樣厚重"
+      }
+    },
     "reasons": {
+      "hand_style": "已保留手動樣式",
       "user": "手動設定",
       "model": "來自章節閱讀結果",
       "small_text": "原文為小字"

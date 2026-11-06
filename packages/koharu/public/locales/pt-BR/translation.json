@@ -488,7 +488,25 @@
     "suggestHelp": "Preenche as linhas vazias com sua lista inicial de fontes, usando apenas fontes disponíveis. As escolhas existentes são mantidas.",
     "loading": "Carregando…",
     "loadError": "Não foi possível carregar as configurações ou a categoria de letreiramento.",
+    "source": {
+      "title": "Respeitar o letreiramento original",
+      "description": "Compara cada caixa com o letreiramento habitual da página. O estilo manual sempre tem prioridade.",
+      "signalsNeeded": "Sinais necessários para Grito",
+      "signalsHelp": "Conta o letreiramento original em negrito, um balão pontiagudo e uma classificação de Grito ou Grito fraco na leitura do capítulo. O padrão é 2 sinais.",
+      "explanation": "{{category}}: {{reason}}",
+      "signals": {
+        "source_bold": "original em negrito",
+        "spiky_bubble": "balão pontiagudo",
+        "yelling_line": "fala gritada"
+      },
+      "differences": {
+        "thin": "letreiramento original fino",
+        "shaky": "letreiramento original trêmulo",
+        "heavy": "letreiramento original espesso"
+      }
+    },
     "reasons": {
+      "hand_style": "estilo manual preservado",
       "user": "definida à mão",
       "model": "obtida na leitura do capítulo",
       "small_text": "letras pequenas no original"

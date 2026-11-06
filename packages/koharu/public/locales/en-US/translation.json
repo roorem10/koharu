@@ -488,7 +488,25 @@
     "suggestHelp": "Fill empty rows from your starting font list, using only available fonts. Existing choices stay as you set them.",
     "loading": "Loading…",
     "loadError": "Could not load lettering settings or category.",
+    "source": {
+      "title": "Match the original lettering",
+      "description": "Compare each box with the page’s usual lettering. Hand styling always takes priority.",
+      "signalsNeeded": "Signals needed for Shout",
+      "signalsHelp": "Count bold original lettering, a spiky bubble, and a Shout or Weak Shout chapter label. The default is 2 signals.",
+      "explanation": "{{category}}: {{reason}}",
+      "signals": {
+        "source_bold": "bold original",
+        "spiky_bubble": "spiky bubble",
+        "yelling_line": "yelling line"
+      },
+      "differences": {
+        "thin": "thin original lettering",
+        "shaky": "shaky original lettering",
+        "heavy": "heavy original lettering"
+      }
+    },
     "reasons": {
+      "hand_style": "hand styling preserved",
       "user": "set by hand",
       "model": "from chapter read",
       "small_text": "small original lettering"

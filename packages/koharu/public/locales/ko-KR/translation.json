@@ -488,7 +488,25 @@
     "suggestHelp": "초기 글꼴 목록에서 사용 가능한 글꼴만 골라 빈 행을 채웁니다. 기존 선택은 그대로 유지됩니다.",
     "loading": "불러오는 중…",
     "loadError": "레터링 설정이나 범주를 불러오지 못했습니다.",
+    "source": {
+      "title": "원문의 글자 표현 맞추기",
+      "description": "각 상자를 페이지의 일반적인 글자 표현과 비교합니다. 수동으로 지정한 스타일이 항상 우선합니다.",
+      "signalsNeeded": "외침에 필요한 신호 수",
+      "signalsHelp": "원문의 굵은 글씨, 뾰족한 말풍선, 챕터 읽기의 외침 또는 약한 외침 분류를 셉니다. 기본값은 신호 2개입니다.",
+      "explanation": "{{category}}: {{reason}}",
+      "signals": {
+        "source_bold": "굵은 원문",
+        "spiky_bubble": "뾰족한 말풍선",
+        "yelling_line": "외치는 대사"
+      },
+      "differences": {
+        "thin": "가느다란 원문 글씨",
+        "shaky": "떨리는 원문 글씨",
+        "heavy": "두꺼운 원문 글씨"
+      }
+    },
     "reasons": {
+      "hand_style": "수동 스타일 유지됨",
       "user": "직접 설정됨",
       "model": "챕터 읽기 결과",
       "small_text": "원문의 작은 글씨"

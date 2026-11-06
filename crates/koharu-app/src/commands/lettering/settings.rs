@@ -18,6 +18,7 @@ pub(crate) struct LetteringSettings {
     pub model_confidence: f32,
     /// Estimated source glyph size as a fraction of page height.
     pub small_text_threshold: f32,
+    pub shout_signals_needed: u8,
 }
 
 impl Default for LetteringSettings {
@@ -27,6 +28,7 @@ impl Default for LetteringSettings {
             model_confidence: 0.6,
             // 24px on a 2000px page, between the synthetic aside and dialogue sizes.
             small_text_threshold: 0.012,
+            shout_signals_needed: 2,
         }
     }
 }
@@ -39,6 +41,10 @@ impl LetteringSettings {
     }
 
     pub(crate) fn validate(&self) -> Result<()> {
+        anyhow::ensure!(
+            (1..=3).contains(&self.shout_signals_needed),
+            "Shout requires between one and three signals"
+        );
         anyhow::ensure!(
             self.model_confidence.is_finite() && (0.0..=1.0).contains(&self.model_confidence),
             "lettering confidence must be between zero and one"

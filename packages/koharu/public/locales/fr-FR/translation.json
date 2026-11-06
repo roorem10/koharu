@@ -494,7 +494,25 @@
     "suggestHelp": "Remplissez les lignes vides à partir de votre liste de polices de départ, en utilisant uniquement les polices disponibles. Vos choix existants sont conservés.",
     "loading": "Chargement…",
     "loadError": "Impossible de charger les paramètres ou la catégorie de lettrage.",
+    "source": {
+      "title": "Respecter le lettrage original",
+      "description": "Compare chaque zone au lettrage habituel de la page. Le style manuel reste toujours prioritaire.",
+      "signalsNeeded": "Signaux requis pour Cri",
+      "signalsHelp": "Compte le lettrage original en gras, une bulle hérissée et une étiquette Cri ou Cri faible issue de la lecture du chapitre. La valeur par défaut est de 2 signaux.",
+      "explanation": "{{category}} : {{reason}}",
+      "signals": {
+        "source_bold": "original en gras",
+        "spiky_bubble": "bulle hérissée",
+        "yelling_line": "réplique criée"
+      },
+      "differences": {
+        "thin": "lettrage original fin",
+        "shaky": "lettrage original tremblant",
+        "heavy": "lettrage original épais"
+      }
+    },
     "reasons": {
+      "hand_style": "style manuel préservé",
       "user": "défini à la main",
       "model": "issu de la lecture du chapitre",
       "small_text": "petit lettrage d’origine"

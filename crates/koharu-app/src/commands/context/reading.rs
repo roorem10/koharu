@@ -387,7 +387,9 @@ pub(crate) async fn read(
                 )),
             );
         })?;
-        let commit = super::super::lettering::labels_changed(project, &changed).await?;
+        let renderer = handle.state::<koharu_desktop::Desktop>().renderer();
+        let commit =
+            super::super::lettering::labels_changed(project, &changed, false, &renderer).await?;
         if let Some(commit) = &commit {
             project.record_commit(commit);
         }

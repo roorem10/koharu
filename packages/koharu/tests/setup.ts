@@ -112,11 +112,15 @@ beforeEach(() => {
   vi.spyOn(commands, 'getEffectiveCategory').mockResolvedValue({
     category: 'floating',
     reason: 'bubble_shape',
+    bold: false,
+    signals: [],
+    source_style: null,
   })
   vi.spyOn(commands, 'getLetteringSettings').mockResolvedValue({
     sfx: 'skip',
     model_confidence: 0.6,
     small_text_threshold: 0.012,
+    shout_signals_needed: 2,
   })
   mockWo20()
   mockWo12()

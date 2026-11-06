@@ -488,7 +488,25 @@
     "suggestHelp": "从侬个初始字体列表里向选可用个字体，拿空白行填好。已有个选择保持勿变。",
     "loading": "来勒加载…",
     "loadError": "文字排版设置或者类别加载失败哉。",
+    "source": {
+      "title": "照原稿个字样来",
+      "description": "每只文字框搭本页平常个字样比较。手动调过个样式总归优先。",
+      "signalsNeeded": "判作喊叫要几只信号",
+      "signalsHelp": "原稿粗体、尖角气泡，还有章节阅读标个喊叫或弱喊叫，各算一只信号。默认要2只。",
+      "explanation": "{{category}}：{{reason}}",
+      "signals": {
+        "source_bold": "原稿是粗体",
+        "spiky_bubble": "尖角气泡",
+        "yelling_line": "喊叫个台词"
+      },
+      "differences": {
+        "thin": "原稿个细字",
+        "shaky": "原稿个发抖字",
+        "heavy": "原稿个厚重字"
+      }
+    },
     "reasons": {
+      "hand_style": "手动样式保留好哉",
       "user": "手动设置个",
       "model": "阅读章节得出个",
       "small_text": "原文字小"

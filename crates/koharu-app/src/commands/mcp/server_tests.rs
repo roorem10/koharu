@@ -103,6 +103,7 @@ impl Host for FakeHost {
         [
             "inspect_project",
             "view_page",
+            "get_source_style",
             "set_translation",
             "run_pipeline",
             "fails",
@@ -322,7 +323,7 @@ async fn http_initialization_tools_images_errors_and_session_deletion() {
         .unwrap();
     assert_eq!(
         rpc(list).await["result"]["tools"].as_array().unwrap().len(),
-        6
+        7
     );
     let inspected = rpc(server.call(&session, 2, "inspect_project").await).await;
     let value: Value =
@@ -371,6 +372,9 @@ async fn edits_are_refused_even_when_called_directly() {
         true
     );
     assert_eq!(host.edits.load(Ordering::SeqCst), 0);
+    let read = rpc(server.call(&session, 2, "get_source_style").await).await;
+    assert_ne!(read["result"]["isError"], true);
+    assert!(read["result"]["content"].is_array());
     server.stop().await;
 }
 

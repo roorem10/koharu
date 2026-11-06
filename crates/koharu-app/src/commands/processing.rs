@@ -341,6 +341,7 @@ async fn start_job_inner(
         #[async_trait::async_trait]
         impl Committer for PipelineCommitter {
             async fn commit(&mut self, output: StageOutput) -> Result<Snapshot> {
+                let renderer = self.handle.state::<Desktop>().renderer();
                 let (commit, page) = {
                     let projects = self.handle.state::<CurrentProject>();
                     let mut projects = projects.project.lock().await;
@@ -354,15 +355,23 @@ async fn start_job_inner(
                     };
                     project.record_commit(&commit);
                     if output.stage == koharu_pipeline::Stage::Translation {
-                        // WO-11A: a new translation wipes word styles and resets
-                        // the box style (decision 4).
                         if let Some(reset) =
-                            super::rich_text::after_translation(project, &commit).await?
+                            super::rich_text::after_translation(project, &commit, &renderer).await?
                         {
                             project.record_commit(&reset);
                             commit = reset;
                         }
                         super::context::refresh_flags(project)?;
+                    } else if matches!(
+                        output.stage,
+                        koharu_pipeline::Stage::Detection | koharu_pipeline::Stage::Ocr
+                    ) {
+                        if let Some(styled) =
+                            super::lettering::after_analysis(project, output.page, &renderer).await?
+                        {
+                            project.record_commit(&styled);
+                            commit = styled;
+                        }
                     }
                     let page = project.active_page();
                     (commit, page)

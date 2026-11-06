@@ -1,12 +1,14 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render as testingRender, screen, waitFor } from '@testing-library/react'
+import { render as testingRender, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { describe, expect, it, vi } from 'vitest'
 
 import { LetteringCategoryLine } from '@/components/editor/LetteringCategoryLine'
 import { SfxPreferences } from '@/components/preferences/SfxPreferences'
 import { ShapeStylePreferences } from '@/components/preferences/ShapeStylePreferences'
+import { SourceLetteringPreferences } from '@/components/preferences/SourceLetteringPreferences'
 import { fontsKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import {
@@ -20,6 +22,7 @@ import {
   type FontFamily,
   type TextStyles,
   type LineCategory,
+  type ShoutSignal,
 } from '@koharu/bridge/protocol'
 import { TooltipProvider } from '@koharu/ui/components/tooltip'
 
@@ -71,7 +74,13 @@ describe('Inspector lettering category', () => {
     ['small_text', 'small original lettering'],
     ['bubble_shape', 'rectangle bubble'],
   ] as const)('shows the effective category with reason %s', async (reason, text) => {
-    vi.spyOn(commands, 'getEffectiveCategory').mockResolvedValue({ category: 'whisper', reason })
+    vi.spyOn(commands, 'getEffectiveCategory').mockResolvedValue({
+      category: 'whisper',
+      reason,
+      bold: false,
+      signals: [],
+      source_style: null,
+    })
     vi.spyOn(commands, 'getTextBubbleShape').mockResolvedValue({
       bubble: 'bubble',
       shape: 'rectangle',
@@ -90,6 +99,9 @@ describe('Inspector lettering category', () => {
     vi.mocked(commands.getEffectiveCategory).mockImplementation(async () => ({
       category: saved?.value ?? 'floating',
       reason: saved ? 'user' : 'bubble_shape',
+      bold: false,
+      signals: [],
+      source_style: null,
     }))
     const set = vi
       .spyOn(commands, 'setLineCategory')
@@ -208,8 +220,73 @@ describe('SFX preferences', () => {
         sfx: 'translate_all',
         model_confidence: 0.6,
         small_text_threshold: 0.012,
+        shout_signals_needed: 2,
       }),
     )
     await waitFor(() => expect(picker).toHaveTextContent('Translate all'))
+  })
+})
+
+describe('Source lettering', () => {
+  it.each([1, 2, 3])(
+    'saves a %i-signal threshold while retaining the other settings',
+    async (count) => {
+      const settings = {
+        sfx: 'inside_bubbles' as const,
+        model_confidence: 0.8,
+        small_text_threshold: 0.02,
+        shout_signals_needed: count === 2 ? 3 : 2,
+      }
+      vi.mocked(commands.getLetteringSettings).mockResolvedValue(settings)
+      const save = vi
+        .spyOn(commands, 'saveLetteringSettings')
+        .mockImplementation(async (value) => value)
+      render(<SourceLetteringPreferences />)
+      const picker = screen.getByRole('combobox')
+      await waitFor(() => expect(picker).toBeEnabled())
+      const user = userEvent.setup()
+      await user.click(picker)
+      await user.click(await screen.findByRole('option', { name: String(count) }))
+      await waitFor(() =>
+        expect(save).toHaveBeenLastCalledWith({
+          ...settings,
+          shout_signals_needed: count,
+        }),
+      )
+      await waitFor(() => expect(picker).toHaveTextContent(String(count)))
+    },
+  )
+
+  it('explains the combined signals and reports protected hand styling after a revision', async () => {
+    const { result } = renderHook(() => useTranslation())
+    const { t } = result.current
+    const signals: ShoutSignal[] = ['source_bold', 'spiky_bubble']
+    vi.mocked(commands.getEffectiveCategory).mockResolvedValue({
+      category: 'shout',
+      reason: 'shout_signals',
+      bold: true,
+      signals,
+      source_style: null,
+    })
+    render(<LetteringCategoryLine layer='line' />)
+    const explanation = t('lettering.source.explanation', {
+      category: t('lettering.categories.shout'),
+      reason: signals.map((signal) => t(`lettering.source.signals.${signal}`)).join(' + '),
+    })
+    expect(await screen.findByText(explanation)).toBeInTheDocument()
+    expect(commands.getTextBubbleShape).not.toHaveBeenCalled()
+    vi.mocked(commands.getEffectiveCategory).mockResolvedValue({
+      category: 'shout',
+      reason: 'hand_style',
+      bold: false,
+      signals,
+      source_style: null,
+    })
+    queryClient.setQueryData(projectKey, {
+      ...queryClient.getQueryData<object>(projectKey),
+      revision: 2,
+    })
+    expect(await screen.findByText(t('lettering.reasons.hand_style'))).toBeInTheDocument()
+    expect(screen.queryByText(explanation)).not.toBeInTheDocument()
   })
 })

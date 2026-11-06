@@ -1552,7 +1552,7 @@ async fn write_mask(
     detections: &[KoharuLayoutDetection],
     size: ImageSize,
 ) -> Result<()> {
-    let mut mask = if size.width > 0 && size.height > 0 {
+    let cleanup_mask = if size.width > 0 && size.height > 0 {
         let radius = ((size.width.max(size.height) as f32 / 1024.0) * 6.0)
             .round()
             .clamp(1.0, 255.0) as u8;
@@ -1560,30 +1560,37 @@ async fn write_mask(
     } else {
         mask_for(detections, "text", size)
     };
-    if let Some(bounds) = input.region {
-        preserve_mask_outside_region(input, page, "text-mask", bounds, &mut mask).await?;
-    }
-    let mut bytes = Cursor::new(Vec::new());
-    PngEncoder::new_with_quality(&mut bytes, CompressionType::Fast, FilterType::NoFilter)
-        .write_image(
-            mask.as_raw(),
-            mask.width(),
-            mask.height(),
-            ExtendedColorType::L8,
+    // Cleanup dilates and closes letter strokes. Keep the detector's untouched
+    // ink separately so source-lettering measurements cannot mistake padding for bold.
+    for (role, mut mask) in [
+        ("text-mask", cleanup_mask),
+        ("source-text-mask", mask_for(detections, "text", size)),
+    ] {
+        if let Some(bounds) = input.region {
+            preserve_mask_outside_region(input, page, role, bounds, &mut mask).await?;
+        }
+        let mut bytes = Cursor::new(Vec::new());
+        PngEncoder::new_with_quality(&mut bytes, CompressionType::Fast, FilterType::NoFilter)
+            .write_image(
+                mask.as_raw(),
+                mask.width(),
+                mask.height(),
+                ExtendedColorType::L8,
+            )?;
+        edit.set_asset(
+            page,
+            &AssetRole::new(role)?,
+            AssetInput::new(
+                Arc::<[u8]>::from(bytes.into_inner()),
+                "image/png",
+                AssetMetadata {
+                    width: Some(size.width),
+                    height: Some(size.height),
+                    attributes: BTreeMap::new(),
+                },
+            ),
         )?;
-    edit.set_asset(
-        page,
-        &AssetRole::new("text-mask")?,
-        AssetInput::new(
-            Arc::<[u8]>::from(bytes.into_inner()),
-            "image/png",
-            AssetMetadata {
-                width: Some(size.width),
-                height: Some(size.height),
-                attributes: BTreeMap::new(),
-            },
-        ),
-    )?;
+    }
     Ok(())
 }
 
@@ -3382,6 +3389,87 @@ mod tests {
         let expected = close(&dilate(&page, Norm::L2, radius), Norm::L2, radius);
 
         assert_eq!(closed_mask_for(&detections, "text", size, radius), expected);
+    }
+
+    #[tokio::test]
+    async fn source_mask_keeps_original_strokes_and_survives_partial_redetection() {
+        let mut session = Session::memory().await.unwrap();
+        let mut edit = session.snapshot().edit();
+        let page = edit
+            .add_page(PageDraft::new("page", 64.0, 32.0), At::End)
+            .unwrap();
+        let snapshot = session
+            .commit(edit.finish().unwrap())
+            .await
+            .unwrap()
+            .snapshot;
+        let images = std::sync::Arc::new(crate::ImageCache::default());
+        let input = StageInput::new(snapshot, page, None, None, images.clone(), None);
+        let detections = [
+            filled_detection("text", [5.0, 5.0, 8.0, 16.0]),
+            filled_detection("text", [40.0, 5.0, 43.0, 16.0]),
+        ];
+        let size = ImageSize {
+            width: 64,
+            height: 32,
+        };
+        let expected = mask_for(&detections, "text", size);
+        let mut edit = input.scene.edit();
+        super::write_masks(&input, &mut edit, page, &detections, size)
+            .await
+            .unwrap();
+        let snapshot = session
+            .commit(edit.finish().unwrap())
+            .await
+            .unwrap()
+            .snapshot;
+        let raw = images
+            .get(&snapshot, page, "source-text-mask")
+            .await
+            .unwrap()
+            .unwrap()
+            .to_luma8();
+        let cleanup = images
+            .get(&snapshot, page, "text-mask")
+            .await
+            .unwrap()
+            .unwrap()
+            .to_luma8();
+        assert_eq!(raw, expected);
+        assert!(
+            cleanup.as_raw().iter().filter(|&&p| p != 0).count()
+                > raw.as_raw().iter().filter(|&&p| p != 0).count()
+        );
+
+        let input = StageInput::new(
+            snapshot,
+            page,
+            None,
+            Some(crate::Bounds {
+                x: 0.0,
+                y: 0.0,
+                width: 32.0,
+                height: 32.0,
+            }),
+            images.clone(),
+            None,
+        );
+        let mut edit = input.scene.edit();
+        super::write_masks(&input, &mut edit, page, &[], size)
+            .await
+            .unwrap();
+        let snapshot = session
+            .commit(edit.finish().unwrap())
+            .await
+            .unwrap()
+            .snapshot;
+        let after = images
+            .get(&snapshot, page, "source-text-mask")
+            .await
+            .unwrap()
+            .unwrap()
+            .to_luma8();
+        assert_eq!(after, mask_for(&detections[1..], "text", size));
     }
 
     #[test]

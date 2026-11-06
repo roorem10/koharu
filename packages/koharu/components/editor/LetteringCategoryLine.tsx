@@ -39,16 +39,31 @@ export function LetteringCategoryLine({
   const category = effective.data
     ? t(`lettering.categories.${effective.data.category}`)
     : t('lettering.loading')
+  const sourceDifference = effective.data?.source_style?.difference
   const reason =
-    effective.data?.reason === 'bubble_shape'
-      ? shape.isPending
-        ? t('lettering.loading')
-        : t(
-            `lettering.shapeReasons.${shape.data?.bubble === null ? 'free' : (shape.data?.shape ?? 'unknown')}`,
-          )
-      : effective.data
-        ? t(`lettering.reasons.${effective.data.reason}`)
-        : ''
+    effective.data?.reason === 'shout_signals'
+      ? t('lettering.source.explanation', {
+          category,
+          reason: effective.data.signals
+            .map((signal) => t(`lettering.source.signals.${signal}`))
+            .join(' + '),
+        })
+      : effective.data?.reason === 'source_style'
+        ? t('lettering.source.explanation', {
+            category,
+            reason: sourceDifference
+              ? t(`lettering.source.differences.${sourceDifference}`)
+              : t('lettering.source.signals.source_bold'),
+          })
+        : effective.data?.reason === 'bubble_shape'
+          ? shape.isPending
+            ? t('lettering.loading')
+            : t(
+                `lettering.shapeReasons.${shape.data?.bubble === null ? 'free' : (shape.data?.shape ?? 'unknown')}`,
+              )
+          : effective.data
+            ? t(`lettering.reasons.${effective.data.reason}`)
+            : ''
   const value = label.data?.source === 'user' ? label.data.value : 'automatic'
   return (
     <div className='grid min-w-0 gap-1' data-testid='lettering-category'>

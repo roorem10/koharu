@@ -2,13 +2,11 @@ use std::collections::BTreeSet;
 
 use anyhow::{Context as _, Result, ensure};
 use booharu_context::LetteringCategory;
-use koharu_pipeline::{
-    Bounds,
-    bubble_shape::{ShapeThresholds, classify, measure, style_for_shape},
-};
+use koharu_pipeline::Bounds;
 use koharu_renderer::TextStyles;
 use koharu_scene::{
-    At, Authored, BubbleRegion, Commit, EntityId, Geometry, OcrAnalysis, Origin, Region,
+    At, Authored, BubbleRegion, Commit, EntityId, Generation, Geometry, OcrAnalysis, Origin,
+    ProducerId, Region,
     RegionSpec as _, Snapshot, SourceText, StrokeMethod, TextAlignment, TextDirection, TextLayout,
     TextLayoutKind, TextRegion, TextRole, Translation, Typography, WritingMode,
 };
@@ -128,17 +126,13 @@ impl Project {
             }
         }
         let bubble = choose_bubble(&bubbles, rect);
-        let shape = bubble
-            .and_then(|id| bubbles.iter().find(|(candidate, _)| *candidate == id))
-            .and_then(|(_, geometry)| measure(&geometry.points))
-            .map(|m| classify(&m, &ShapeThresholds::default()));
         let mut typography = typography();
+        typography.origin = Origin::Generated(Generation::new(ProducerId::new(
+            "dev.booharu.lettering",
+        )?));
         styles
             .default_style
             .apply_to_detected(&mut typography, false);
-        if let Some(style) = style_for_shape(styles, shape) {
-            style.apply_to_detected(&mut typography, false);
-        }
         let mut edit = snapshot.edit();
         let added = add_detected_style_box(
             &mut edit,
@@ -165,11 +159,14 @@ impl Project {
                     angle_degrees: None,
                     warp: None,
                 },
-                typography: Some(typography),
+                typography: None,
                 layer_geometry: Some(geometry),
                 bubble,
             },
         )?;
+        // The drawn frame is a hand edit; its initial preset typography is not.
+        // OCR completion resolves the category once source signals are available.
+        edit.reset_typography(added.layer, &typography)?;
         Ok((self.commit(edit.finish()?).await?, added.layer))
     }
 

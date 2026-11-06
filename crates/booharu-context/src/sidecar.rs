@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use specta::Type;
 
-use crate::{ChapterBrief, Flag, GlossaryEntry, LetteringCategory};
+use crate::{ChapterBrief, Flag, GlossaryEntry, LetteringCategory, SourceBold, SourceStyle};
 
 /// File name of the sidecar inside a project directory.
 pub const CONTEXT_FILE: &str = "booharu-context.json";
@@ -53,6 +53,8 @@ impl Default for ProjectContext {
 #[serde(default)]
 pub struct LineContext {
     pub category: Option<LineCategory>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_style: Option<SourceStyle>,
     pub note: Option<String>,
     pub flags: Vec<Flag>,
     pub dismissed: Vec<String>,
@@ -68,6 +70,7 @@ pub struct LineContext {
 impl LineContext {
     fn is_empty(&self) -> bool {
         self.category.is_none()
+            && self.source_style.is_none()
             && self.note.is_none()
             && self.flags.is_empty()
             && self.dismissed.is_empty()
@@ -139,6 +142,26 @@ impl ProjectContext {
     #[must_use]
     pub fn category(&self, layer: EntityId) -> Option<LineCategory> {
         self.lines.get(&layer).and_then(|line| line.category)
+    }
+
+    #[must_use]
+    pub fn source_style(&self, layer: EntityId) -> Option<SourceStyle> {
+        self.lines.get(&layer).and_then(|line| line.source_style)
+    }
+
+    /// Source measurements are evidence, never a user label. Uncertain results
+    /// clear old evidence so a new noisy mask cannot retain an earlier bold vote.
+    pub fn set_source_style(&mut self, layer: EntityId, value: Option<SourceStyle>) -> bool {
+        let next = value.filter(|style| style.source_bold != SourceBold::Unsure);
+        if self.source_style(layer) == next {
+            return false;
+        }
+        let line = self.lines.entry(layer).or_default();
+        line.source_style = next;
+        if line.is_empty() {
+            self.lines.remove(&layer);
+        }
+        true
     }
 
     /// Sets a model label unless the user already chose one. Returns whether it changed.
@@ -288,5 +311,48 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         ProjectContext::update(directory.path(), |_| ()).unwrap();
         assert!(!directory.path().join(CONTEXT_FILE).exists());
+    }
+
+    #[test]
+    fn source_evidence_roundtrips_and_uncertainty_clears_only_evidence() {
+        let directory = tempfile::tempdir().unwrap();
+        let layer = EntityId::new();
+        let style = SourceStyle {
+            source_bold: SourceBold::Yes,
+            source_different: true,
+            difference: Some(crate::SourceDifference::Heavy),
+            measurements: crate::SourceMeasurements {
+                stroke_ratio: 0.12,
+                ink_density: 0.5,
+                stroke_variation: 0.1,
+                glyph_height: 20.0,
+                glyph_count: 6,
+            },
+        };
+        let mut context = ProjectContext::default();
+        context.set_user_category(layer, Some(LetteringCategory::Whisper));
+        assert!(context.set_source_style(layer, Some(style)));
+        assert!(!context.set_source_style(layer, Some(style)));
+        context.save(directory.path()).unwrap();
+        let mut restored = ProjectContext::load(directory.path()).unwrap();
+        assert_eq!(restored.source_style(layer), Some(style));
+        assert!(restored.set_source_style(
+            layer,
+            Some(SourceStyle {
+                source_bold: SourceBold::Unsure,
+                ..style
+            })
+        ));
+        assert_eq!(restored.source_style(layer), None);
+        assert_eq!(restored.category(layer).unwrap().source, LabelSource::User);
+        assert!(
+            serde_json::to_value(&restored).unwrap()["lines"][layer.to_string()]
+                .get("source_style")
+                .is_none()
+        );
+        restored.set_user_category(layer, None);
+        assert!(restored.lines.is_empty());
+        assert!(!restored.set_source_style(layer, None));
+        assert!(restored.lines.is_empty());
     }
 }

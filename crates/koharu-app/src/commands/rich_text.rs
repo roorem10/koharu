@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use anyhow::{Context as _, ensure};
 use koharu_desktop::Desktop;
-use koharu_renderer::TextStyles;
+use koharu_renderer::{Renderer, TextStyles};
 use koharu_scene::{
     Authored, Commit, Component as _, ComponentOwner, Edit, EntityId, Generation, Origin, Presents,
     ProducerId, RunStyle, Snapshot, SourceText, StrokeMethod, StyleRun, TextRuns, Translation,
@@ -412,7 +412,13 @@ async fn reset_translation_styles(
     commit: &Commit,
     styles: &TextStyles,
     detect_colors: bool,
-    apply_hints: impl FnOnce(&mut Edit, &Snapshot, &[EntityId]) -> koharu_scene::Result<()>,
+    renderer: &Renderer,
+    apply_hints: impl FnOnce(
+        &mut Edit,
+        &Snapshot,
+        &[EntityId],
+        &booharu_context::ProjectContext,
+    ) -> koharu_scene::Result<()>,
 ) -> anyhow::Result<Option<Commit>> {
     let snapshot = project.snapshot();
     let layers = translated_layers(&snapshot, commit)?;
@@ -420,8 +426,11 @@ async fn reset_translation_styles(
         return Ok(None);
     }
     styles.validate()?;
+    let context = super::lettering::source::refresh(project, &layers, true).await?;
+    let settings = super::lettering::LetteringSettings::load()?.read()?.clone();
     let resolver = EffectResolver::new(project, styles, detect_colors)?;
     let mut updates = Vec::new();
+    let mut automatic = Vec::new();
     for &layer in &layers {
         let translation = snapshot
             .text_layer(layer)?
@@ -429,18 +438,55 @@ async fn reset_translation_styles(
             .translation()?
             .context("translation was removed")?;
         let current = snapshot.component::<Typography>(layer)?;
+        if current
+            .as_ref()
+            .is_some_and(|typography| typography.origin == Origin::User)
+        {
+            continue;
+        }
         let baseline = default_typography(current.as_ref(), &translation, detect_colors);
-        let typography = resolver.resolve(&snapshot, layer, &baseline)?;
+        let typography = if styles.shape_styles.enabled {
+            let info = koharu_pipeline::bubble_shape::text_bubble_shape(&snapshot, layer)?;
+            let decision = super::lettering::resolve_category(
+                &context, &snapshot, layer, &info, &settings,
+            )?;
+            match super::lettering::prepare_typography(
+                styles,
+                &decision,
+                baseline.clone(),
+                detect_colors,
+                renderer,
+                Some(&translation),
+            )
+            .await
+            {
+                Ok(typography) => typography,
+                Err(error) => {
+                    tracing::warn!(%layer, %error, "lettering font cannot cover the translation");
+                    continue;
+                }
+            }
+        } else {
+            resolver.resolve(&snapshot, layer, &baseline)?
+        };
         let mut layout = snapshot.text_layer(layer)?.layout()?;
-        let warped = layout.warp.take().is_some();
+        let warped = layout.origin != Origin::User && layout.warp.take().is_some();
         if warped {
             layout.origin = baseline.origin;
         }
-        updates.push((layer, typography, layout, warped));
+        let hand_runs = snapshot
+            .component::<TextRuns>(layer)?
+            .is_some_and(|runs| runs.origin == Origin::User);
+        updates.push((layer, typography, layout, warped, hand_runs));
+        if !hand_runs {
+            automatic.push(layer);
+        }
     }
     let patch = snapshot.patch(|edit| {
-        for (layer, typography, layout, warped) in updates {
-            edit.remove::<TextRuns>(layer)?;
+        for (layer, typography, layout, warped, hand_runs) in updates {
+            if !hand_runs {
+                edit.remove::<TextRuns>(layer)?;
+            }
             if snapshot.component::<Typography>(layer)?.as_ref() != Some(&typography) {
                 edit.reset_typography(layer, &typography)?;
             }
@@ -450,7 +496,7 @@ async fn reset_translation_styles(
         }
         // Hints are fresh translation output. Emphasis may replace the runs
         // just removed, within this same undo step.
-        apply_hints(edit, &snapshot, &layers)
+        apply_hints(edit, &snapshot, &automatic, &context)
     })?;
     if patch.is_empty() {
         return Ok(None);
@@ -460,11 +506,12 @@ async fn reset_translation_styles(
 
 /// Called by the processing committer right after a Translation stage commit
 /// (normal runs and Translate again). For every box whose translation that
-/// commit rewrote, removes its word styles and resets its style to the lettering
-/// default (decision 4), then applies fresh emphasis hints in the same patch.
+/// commit rewrote, resets generated styles and applies fresh emphasis hints in
+/// the same patch. Hand typography takes precedence over automatic lettering.
 pub(crate) async fn after_translation(
     project: &mut Project,
     commit: &Commit,
+    renderer: &Renderer,
 ) -> anyhow::Result<Option<Commit>> {
     if translated_layers(&project.snapshot(), commit)?.is_empty() {
         return Ok(None);
@@ -473,14 +520,15 @@ pub(crate) async fn after_translation(
     let detect_colors = koharu_pipeline::PipelineConfig::load()?
         .read()?
         .detect_text_color;
-    // Lettering labels live in the sidecar, not the scene; load them before the patch.
-    let context = project.load_context()?;
     reset_translation_styles(
         project,
         commit,
         &styles,
         detect_colors,
-        |edit, snapshot, layers| super::emphasis::apply_hints(edit, snapshot, layers, &context),
+        renderer,
+        |edit, snapshot, layers, context| {
+            super::emphasis::apply_hints(edit, snapshot, layers, context)
+        },
     )
     .await
 }

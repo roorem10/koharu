@@ -41,7 +41,8 @@ pub(crate) async fn set_line_category(
         })?;
         // Restyle even when the label is unchanged: picking the same category
         // again is how the user reapplies fonts changed in Settings since.
-        let commit = super::lettering::labels_changed(project, &[layer]).await?;
+        let commit =
+            super::lettering::labels_changed(project, &[layer], true, &desktop.renderer()).await?;
         if let Some(commit) = &commit {
             project.record_commit(commit);
         }

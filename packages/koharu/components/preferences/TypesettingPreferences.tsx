@@ -8,6 +8,7 @@ import { FontPicker } from '@/components/controls/FontPicker'
 import { EmphasisPreferences } from '@/components/emphasis/EmphasisPreferences'
 import { PreferencePage } from '@/components/preferences/PreferenceFields'
 import { ShapeStylePreferences } from '@/components/preferences/ShapeStylePreferences'
+import { SourceLetteringPreferences } from '@/components/preferences/SourceLetteringPreferences'
 import { TextStylePreferences } from '@/components/preferences/TextStylePreferences'
 import { useFonts } from '@/lib/queries'
 import type { TypesettingConfig } from '@koharu/bridge/protocol'
@@ -49,6 +50,7 @@ export function TypesettingPreferences({
     >
       <TextStylePreferences />
       <ShapeStylePreferences />
+      <SourceLetteringPreferences />
       <EmphasisPreferences />
       <section aria-labelledby='typesetting-font-stack'>
         <header className='mb-3'>

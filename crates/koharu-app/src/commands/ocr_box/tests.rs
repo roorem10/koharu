@@ -30,6 +30,11 @@ async fn creates_a_readable_detected_style_box_in_one_undo_step() {
         auto_fit: false,
         size: Some(24.),
     });
+    styles.shape_styles.enabled = true;
+    styles.shape_styles.free.size = Some(SizePart {
+        auto_fit: false,
+        size: Some(72.),
+    });
     let (commit, layer) = project
         .create_ocr_box(
             page,
@@ -50,10 +55,72 @@ async fn creates_a_readable_detected_style_box_in_one_undo_step() {
     assert!(text.content().unwrap().source_region().unwrap().is_some());
     assert!(snapshot.relation_from::<FitsTo>(layer).unwrap().is_some());
     assert_eq!(text.typography().unwrap().unwrap().size, Some(24.));
+    assert!(matches!(
+        text.typography().unwrap().unwrap().origin,
+        Origin::Generated(_)
+    ));
+    assert_eq!(text.layout().unwrap().origin, Origin::User);
     assert_eq!(project.undo.len(), 1);
     project.undo().await.unwrap();
     assert!(project.snapshot().text_layer(layer).is_err());
     assert_eq!(project.snapshot().pages().count(), base.pages().count());
+}
+
+#[tokio::test]
+async fn ocr_box_typography_stays_automatic_until_a_hand_style_is_applied() {
+    use crate::commands::styles::StyleScope;
+    use koharu_scene::Typography;
+
+    let (mut project, page) = project().await;
+    let mut styles = TextStyles::default();
+    styles.shape_styles.enabled = true;
+    styles.shape_styles.free.size = Some(SizePart {
+        auto_fit: false,
+        size: Some(24.),
+    });
+    let (_, layer) = project
+        .create_ocr_box(
+            page,
+            Bounds {
+                x: 10.,
+                y: 20.,
+                width: 30.,
+                height: 60.,
+            },
+            &styles,
+        )
+        .await
+        .unwrap();
+    let renderer = koharu_renderer::Renderer::from_config(koharu_config::Config::memory(
+        koharu_renderer::TypesettingConfig { font_families: Vec::new() },
+    ))
+    .unwrap();
+    let (commit, result) = project
+        .apply_shape_rules(StyleScope::Page(page), &styles, false, false, &renderer)
+        .await
+        .unwrap();
+    assert!(commit.is_some());
+    assert_eq!((result.changed, result.kept_manual), (1, 0));
+    let automatic = project.snapshot().component::<Typography>(layer).unwrap().unwrap();
+    assert_eq!(automatic.size, Some(24.));
+    assert!(matches!(automatic.origin, Origin::Generated(_)));
+
+    project
+        .apply_style(StyleScope::Layers(vec![layer]), true, true, |_, _, typography| {
+            typography.size = Some(36.);
+            Ok(())
+        })
+        .await
+        .unwrap();
+    let (commit, result) = project
+        .apply_shape_rules(StyleScope::Page(page), &styles, false, false, &renderer)
+        .await
+        .unwrap();
+    assert!(commit.is_none());
+    assert_eq!((result.changed, result.kept_manual), (0, 1));
+    let hand = project.snapshot().component::<Typography>(layer).unwrap().unwrap();
+    assert_eq!(hand.origin, Origin::User);
+    assert_eq!(hand.size, Some(36.));
 }
 
 #[tokio::test]

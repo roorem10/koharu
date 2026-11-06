@@ -488,7 +488,25 @@
     "suggestHelp": "Boş satırları başlangıç yazı tipi listenizden, yalnızca kullanılabilir yazı tipleriyle doldurun. Mevcut seçimleriniz korunur.",
     "loading": "Yükleniyor…",
     "loadError": "Dizgi ayarları veya kategorisi yüklenemedi.",
+    "source": {
+      "title": "Özgün yazı biçimini eşleştir",
+      "description": "Her kutuyu sayfanın olağan yazı biçimiyle karşılaştırır. Elle verilen biçim her zaman önceliklidir.",
+      "signalsNeeded": "Bağırma için gereken sinyal sayısı",
+      "signalsHelp": "Özgün kalın yazı, sivri uçlu balon ve bölüm okumasındaki Bağırma veya Zayıf Bağırma etiketi sayılır. Varsayılan değer 2 sinyaldir.",
+      "explanation": "{{category}}: {{reason}}",
+      "signals": {
+        "source_bold": "özgün kalın yazı",
+        "spiky_bubble": "sivri uçlu balon",
+        "yelling_line": "bağırılan replik"
+      },
+      "differences": {
+        "thin": "özgün ince yazı",
+        "shaky": "özgün titrek yazı",
+        "heavy": "özgün ağır yazı"
+      }
+    },
     "reasons": {
+      "hand_style": "elle verilen biçim korundu",
       "user": "elle ayarlandı",
       "model": "bölüm okumasından",
       "small_text": "küçük orijinal yazı"

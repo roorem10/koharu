@@ -8,10 +8,15 @@ mod chapter;
 mod lettering;
 mod series;
 mod sidecar;
+mod source_style;
 
 pub use lettering::LetteringCategory;
 pub use sidecar::{
     CONTEXT_FILE, CONTEXT_VERSION, LabelSource, LineCategory, LineContext, ProjectContext,
+};
+pub use source_style::{
+    SourceBold, SourceDifference, SourceMeasurements, SourceStyle, compare_source_style,
+    measure_source_mask,
 };
 
 pub use chapter::{

@@ -488,7 +488,25 @@
     "suggestHelp": "開始時のフォントリストから、使用可能なフォントだけで空欄を埋めます。設定済みの項目は変更しません。",
     "loading": "読み込み中…",
     "loadError": "写植設定またはカテゴリを読み込めませんでした。",
+    "source": {
+      "title": "原文の文字表現に合わせる",
+      "description": "各ボックスをページ内の標準的な文字表現と比較します。手動で指定したスタイルが常に優先されます。",
+      "signalsNeeded": "「叫び」に必要な条件数",
+      "signalsHelp": "原文の太字、トゲのある吹き出し、章の読み取りによる「叫び」または「弱い叫び」のラベルを数えます。初期値は2つです。",
+      "explanation": "{{category}}：{{reason}}",
+      "signals": {
+        "source_bold": "原文が太字",
+        "spiky_bubble": "トゲのある吹き出し",
+        "yelling_line": "叫ぶセリフ"
+      },
+      "differences": {
+        "thin": "原文の細い文字",
+        "shaky": "原文の震えた文字",
+        "heavy": "原文の重厚な文字"
+      }
+    },
     "reasons": {
+      "hand_style": "手動のスタイルを維持",
       "user": "手動で設定",
       "model": "章の読み込み結果",
       "small_text": "原文の文字が小さい"
