@@ -120,7 +120,7 @@ export async function markFinding(finding: QcFinding, hidden: boolean) {
   await refreshContext()
 }
 
-export async function navigateFinding(finding: QcFinding) {
+export async function navigateFinding(finding: { page: string; layer: string | null }) {
   const previousProject = queryClient.getQueryData<ProjectInfo | null>(projectKey)
   const previousPage = queryClient.getQueryData<Page | null>(pageKey)
   const prepared = queryClient.getQueryData<CanvasPagePreparation>(preparedPageKey(finding.page))
@@ -137,7 +137,7 @@ export async function navigateFinding(finding: QcFinding) {
       return
     queryClient.setQueryData(projectKey, selection.project)
     queryClient.setQueryData(pageKey, selection.page)
-    useKoharuStore.getState().selectLayers([finding.layer])
+    useKoharuStore.getState().selectLayers(finding.layer ? [finding.layer] : [])
   } catch {
     if (
       queryClient.getQueryData<ProjectInfo | null>(projectKey)?.name === previousProject?.name &&

@@ -11,10 +11,14 @@ import { ScrollArea } from '@koharu/ui/components/scroll-area'
 
 import { useQcResults } from './data'
 import { FindingRow } from './FindingRow'
+import { usePageCheckResults } from './page-check-data'
+import { PageCheckButton } from './PageCheckButton'
+import { PageCheckResults } from './PageCheckResults'
 
 export function QcPanel() {
   const { t } = useTranslation()
   const report = useQcResults()
+  const pageChecks = usePageCheckResults().data?.pages ?? []
   const pages = usePages(false).data ?? []
   const [showHidden, setShowHidden] = useState(false)
   const [filter, setFilter] = useState<'all' | 'auto' | 'agent'>('all')
@@ -35,6 +39,7 @@ export function QcPanel() {
   return (
     <section className='flex min-h-0 min-w-0 flex-1 flex-col' aria-label={t('qc.title')}>
       <div className='grid gap-2 border-b border-border/80 p-3'>
+        <PageCheckButton />
         <p className='text-[10px] text-muted-foreground'>{t('qc.automatic')}</p>
         <div className='flex flex-wrap gap-1'>
           {(['all', 'auto', 'agent'] as const).map((value) => (
@@ -59,7 +64,8 @@ export function QcPanel() {
         </label>
       </div>
       <ScrollArea className='min-h-0 flex-1'>
-        {!entries.length && (
+        {filter !== 'agent' && <PageCheckResults />}
+        {!entries.length && (filter === 'agent' || !pageChecks.length) && (
           <p className='p-3 text-[11px] text-muted-foreground'>{t('qc.noFindings')}</p>
         )}
         {[...groups.entries()]

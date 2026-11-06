@@ -1293,5 +1293,29 @@
       "crying": "Crying / Trembling",
       "menacing": "Menacing / Sinister"
     }
+  },
+  "pageCheck": {
+    "title": "Page check",
+    "checkPage": "Check page",
+    "scope": "Pages to check",
+    "currentPage": "Current page",
+    "allPages": "All pages",
+    "confirm": "Compare the original and finished page. One vision-model request per page: {{count}} request(s). Cloud models may charge for these requests.",
+    "optional": "Off by default. Uses the vision model selected for Read chapter. You can change it in Settings.",
+    "start": "Start check",
+    "noVision": "Skipped: no vision-capable model is configured. Select one for Read chapter in Settings.",
+    "noFindings": "No page-level problems found.",
+    "stale": "The page has changed since this check. Check again before applying a fix.",
+    "outline": "Apply free-text outline",
+    "reviewOnly": "Review manually; no reliable automatic fix.",
+    "kinds": {
+      "untranslated_text": "Untranslated text left",
+      "missed_text": "Missed bubble or sound effect",
+      "cleanup_marks": "Cleanup marks",
+      "text_cut_off": "Text cut off",
+      "overlapping_art": "Text overlapping art",
+      "hard_to_read": "Hard-to-read text",
+      "reading_order": "Wrong reading order"
+    }
   }
 }

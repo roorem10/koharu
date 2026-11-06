@@ -1293,5 +1293,29 @@
       "crying": "哭泣／颤抖",
       "menacing": "威吓／阴森"
     }
+  },
+  "pageCheck": {
+    "title": "页面检查",
+    "checkPage": "检查页面",
+    "scope": "要检查的页面",
+    "currentPage": "当前页面",
+    "allPages": "所有页面",
+    "confirm": "对比原图与成品。每页向视觉模型发送一次请求，共 {{count}} 次。云端模型可能会收取请求费用。",
+    "optional": "默认关闭。使用“阅读章节”所选的视觉模型，可在设置中更改。",
+    "start": "开始检查",
+    "noVision": "已跳过：未配置支持图像的模型。请在设置中为“阅读章节”选择模型。",
+    "noFindings": "未发现页面级问题。",
+    "stale": "此页面在检查后已更改。应用修复前请重新检查。",
+    "outline": "应用自由文本描边",
+    "reviewOnly": "请手动检查，暂无可靠的自动修复。",
+    "kinds": {
+      "untranslated_text": "残留未翻译文本",
+      "missed_text": "遗漏的气泡或音效",
+      "cleanup_marks": "清理痕迹",
+      "text_cut_off": "文本被裁切",
+      "overlapping_art": "文本遮挡画面",
+      "hard_to_read": "文本难以阅读",
+      "reading_order": "阅读顺序错误"
+    }
   }
 }

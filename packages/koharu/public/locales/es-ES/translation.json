@@ -1306,5 +1306,29 @@
       "crying": "Llanto / temblor",
       "menacing": "Amenazante / siniestro"
     }
+  },
+  "pageCheck": {
+    "title": "Revisión de página",
+    "checkPage": "Revisar página",
+    "scope": "Páginas que revisar",
+    "currentPage": "Página actual",
+    "allPages": "Todas las páginas",
+    "confirm": "Compara la página original y la terminada. Una solicitud al modelo de visión por página: {{count}} solicitud(es). Los modelos en la nube pueden cobrar por estas solicitudes.",
+    "optional": "Desactivado por defecto. Usa el modelo de visión elegido para Leer capítulo. Puedes cambiarlo en Ajustes.",
+    "start": "Iniciar revisión",
+    "noVision": "Omitido: no hay un modelo con visión configurado. Elige uno para Leer capítulo en Ajustes.",
+    "noFindings": "No se encontraron problemas en la página.",
+    "stale": "La página ha cambiado desde esta revisión. Revísala de nuevo antes de aplicar una corrección.",
+    "outline": "Aplicar contorno de texto libre",
+    "reviewOnly": "Revisar manualmente; no hay una corrección automática fiable.",
+    "kinds": {
+      "untranslated_text": "Texto sin traducir",
+      "missed_text": "Bocadillo o efecto sonoro omitido",
+      "cleanup_marks": "Marcas de limpieza",
+      "text_cut_off": "Texto cortado",
+      "overlapping_art": "Texto sobre el dibujo",
+      "hard_to_read": "Texto difícil de leer",
+      "reading_order": "Orden de lectura incorrecto"
+    }
   }
 }

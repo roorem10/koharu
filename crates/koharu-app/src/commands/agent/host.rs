@@ -13,6 +13,8 @@ use serde_json::{Value, json};
 use tauri::{AppHandle, Manager as _};
 use tauri_runtime_cef::CefRuntime;
 
+mod page_check;
+
 use crate::commands::{
     ChannelExt as _,
     canvas::{CanvasChannel, Point},
@@ -414,6 +416,18 @@ impl Host for KoharuHost {
                         "run_pipeline",
                         "Run Koharu's configured processing pipeline for the whole project, selected pages, or selected text elements.",
                     ),
+                    definition::<page_check::RunPageCheck>(
+                        "run_page_check",
+                        "Start a normal Page check job comparing original and finished page images. Pass page IDs, or an empty list for all pages. Costs one vision request per page. Returns a job ID; read get_page_check_results for saved findings. Does not apply fixes. Skips with a reason if no vision model is configured.",
+                    ),
+                    definition::<InspectProject>(
+                        "get_page_check_results",
+                        "Read saved Page check findings, rough page-space areas, revision freshness, skipped reasons and available concrete fixes. Does not send images or run a model.",
+                    ),
+                    definition::<page_check::ApplyPageCheckFix>(
+                        "apply_page_check_fix",
+                        "Apply the available fix for one current Page check finding in one undoable edit. Only uniquely matched text can be fixed; user styling is preserved. Use page and finding_id from get_page_check_results.",
+                    ),
                     // WO-20 (one box per bubble) tool definitions go here.
                     definition::<crate::commands::boxes::FindSplitBubblesArgs>(
                         "find_split_bubbles",
@@ -688,6 +702,9 @@ impl Host for KoharuHost {
                 self.context_tool(&call).await
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
+            "run_page_check" | "get_page_check_results" | "apply_page_check_fix" => {
+                self.page_check_tool(&call, control).await
+            }
             // WO-20 (one box per bubble) tool calls go here.
             "find_split_bubbles" => {
                 let arguments: crate::commands::boxes::FindSplitBubblesArgs = arguments(&call)?;

@@ -1293,5 +1293,29 @@
       "crying": "Ağlama / titreme",
       "menacing": "Tehditkâr / tekinsiz"
     }
+  },
+  "pageCheck": {
+    "title": "Sayfa kontrolü",
+    "checkPage": "Sayfayı kontrol et",
+    "scope": "Kontrol edilecek sayfalar",
+    "currentPage": "Geçerli sayfa",
+    "allPages": "Tüm sayfalar",
+    "confirm": "Özgün ve tamamlanmış sayfayı karşılaştırır. Sayfa başına bir görsel model isteği: {{count}} istek. Bulut modelleri bu istekler için ücret alabilir.",
+    "optional": "Varsayılan olarak kapalıdır. Bölümü oku için seçilen görsel modeli kullanır. Ayarlar’dan değiştirebilirsiniz.",
+    "start": "Kontrolü başlat",
+    "noVision": "Atlandı: görsel destekleyen bir model yapılandırılmamış. Ayarlar’da Bölümü oku için bir model seçin.",
+    "noFindings": "Sayfada sorun bulunamadı.",
+    "stale": "Sayfa bu kontrolden sonra değişti. Düzeltme uygulamadan önce yeniden kontrol edin.",
+    "outline": "Serbest metin konturu uygula",
+    "reviewOnly": "Elle inceleyin; güvenilir bir otomatik düzeltme yok.",
+    "kinds": {
+      "untranslated_text": "Çevrilmemiş metin",
+      "missed_text": "Atlanan balon veya ses efekti",
+      "cleanup_marks": "Temizleme izleri",
+      "text_cut_off": "Kesilmiş metin",
+      "overlapping_art": "Çizimin üstünü kapatan metin",
+      "hard_to_read": "Okunması zor metin",
+      "reading_order": "Yanlış okuma sırası"
+    }
   }
 }

@@ -103,6 +103,9 @@ impl Host for FakeHost {
         [
             "inspect_project",
             "view_page",
+            "get_page_check_results",
+            "run_page_check",
+            "apply_page_check_fix",
             "set_translation",
             "run_pipeline",
             "fails",
@@ -126,7 +129,7 @@ impl Host for FakeHost {
                 control.cancelled().await;
                 Err(anyhow!("pipeline processing was cancelled"))
             }
-            "set_translation" => {
+            "set_translation" | "run_page_check" | "apply_page_check_fix" => {
                 self.edits.fetch_add(1, Ordering::SeqCst);
                 Invocation::changed(json!({ "changed": true }))
             }
@@ -322,7 +325,7 @@ async fn http_initialization_tools_images_errors_and_session_deletion() {
         .unwrap();
     assert_eq!(
         rpc(list).await["result"]["tools"].as_array().unwrap().len(),
-        6
+        9
     );
     let inspected = rpc(server.call(&session, 2, "inspect_project").await).await;
     let value: Value =
@@ -370,6 +373,31 @@ async fn edits_are_refused_even_when_called_directly() {
         rpc(server.call(&session, 1, "set_translation").await).await["result"]["isError"],
         true
     );
+    assert_eq!(host.edits.load(Ordering::SeqCst), 0);
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn page_check_results_are_read_only_but_requests_and_fixes_require_edits() {
+    let host = Arc::new(FakeHost::default());
+    let bridge = bridge(host.clone(), false);
+    let tools = bridge.tools().unwrap();
+    assert!(tools.iter().any(|tool| tool.name == "get_page_check_results"));
+    assert!(tools.iter().all(|tool| {
+        tool.name != "run_page_check" && tool.name != "apply_page_check_fix"
+    }));
+    let server = Server::start(bridge).await;
+    let session = server.initialize().await;
+    assert_eq!(
+        rpc(server.call(&session, 1, "get_page_check_results").await).await["result"]["isError"],
+        false
+    );
+    for (id, name) in [(2, "run_page_check"), (3, "apply_page_check_fix")] {
+        assert_eq!(
+            rpc(server.call(&session, id, name).await).await["result"]["isError"],
+            true
+        );
+    }
     assert_eq!(host.edits.load(Ordering::SeqCst), 0);
     server.stop().await;
 }

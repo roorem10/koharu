@@ -1293,5 +1293,29 @@
       "crying": "哭泣／发抖",
       "menacing": "威吓／阴森"
     }
+  },
+  "pageCheck": {
+    "title": "页面检查",
+    "checkPage": "检查页面",
+    "scope": "要检查个页面",
+    "currentPage": "当前页面",
+    "allPages": "全部页面",
+    "confirm": "对照原图搭完成个页面。每页向视觉模型发一趟请求，总共 {{count}} 趟。云端模型可能要收请求费用。",
+    "optional": "默认关脱。用“阅读章节”选好个视觉模型，可以到设置里改。",
+    "start": "开始检查",
+    "noVision": "跳过了：还呒没配好支持图像个模型。请到设置里帮“阅读章节”选一只模型。",
+    "noFindings": "呒没寻着页面级个问题。",
+    "stale": "检查以后页面改过了。应用修复前请重新检查。",
+    "outline": "应用自由文本描边",
+    "reviewOnly": "请手动检查，暂时呒没可靠个自动修复。",
+    "kinds": {
+      "untranslated_text": "留下来呒没翻译个文本",
+      "missed_text": "漏脱个气泡或音效",
+      "cleanup_marks": "清理痕迹",
+      "text_cut_off": "文本切脱了",
+      "overlapping_art": "文本遮牢画面",
+      "hard_to_read": "文本难读",
+      "reading_order": "阅读顺序错了"
+    }
   }
 }

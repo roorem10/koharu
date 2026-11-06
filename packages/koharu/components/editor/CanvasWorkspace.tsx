@@ -18,6 +18,7 @@ import { useCanvas } from '@/components/editor/useCanvas'
 import { WarpHandles } from '@/components/editor/WarpHandles'
 import { originalVisible, useCompareStore } from '@/components/qc/compare'
 import { OriginalOverlay } from '@/components/qc/OriginalOverlay'
+import { PageCheckOverlay } from '@/components/qc/PageCheckOverlay'
 import { useRichTextEditor } from '@/components/rich-text-editor/useRichTextEditor'
 import { call } from '@/lib/backend'
 import { expandLayerSelection } from '@/lib/document'
@@ -1158,6 +1159,9 @@ export function CanvasWorkspace() {
               <WarpHandles layerId={selected[0]} />
             )}
           {page && !showingOriginal && <CleanupQueueBar />}
+          {page && !showingOriginal && canvasState.status === 'ready' && (
+            <PageCheckOverlay page={page.id} />
+          )}
           {page && !showingOriginal && richTextEditor.overlay}
           {page && showingOriginal && <OriginalOverlay key={page.id} page={page} />}
           {page && !showingOriginal && canvasState.status === 'error' && (

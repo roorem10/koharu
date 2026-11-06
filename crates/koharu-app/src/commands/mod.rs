@@ -15,6 +15,7 @@ pub(crate) mod mcp;
 pub(crate) mod notes;
 pub(crate) mod ocr_box;
 pub(crate) mod output;
+pub(crate) mod page_check;
 pub(crate) mod preferences;
 pub(crate) mod processing;
 pub(crate) mod project;
@@ -236,6 +237,9 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             redesign::reset_box_effects,
             // WO-24 (automatic QC and context tab) commands go here.
             qc::get_qc_results,
+            page_check::start_page_check,
+            page_check::get_page_check_results,
+            page_check::fixes::apply_page_check_fix,
             qc::mark_qc_finding,
             context::reading::get_reading_model,
             context::reading::get_reading_models,

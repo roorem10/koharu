@@ -9,6 +9,7 @@ import { discussLineEvent, openContextEvent } from '@/components/context/events'
 import { AgentPanel } from '@/components/editor/AgentPanel'
 import { Inspector } from '@/components/editor/Inspector'
 import { useAutomaticQc, useQcResults } from '@/components/qc/data'
+import { usePageCheckResults } from '@/components/qc/page-check-data'
 import { QcPanel } from '@/components/qc/QcPanel'
 import { invalidateLineLabels } from '@/lib/line-labels'
 import { useKoharuStore } from '@/lib/store'
@@ -17,7 +18,11 @@ import { Button } from '@koharu/ui/components/button'
 export function RightSidebar() {
   const { t } = useTranslation()
   useAutomaticQc()
-  const issueCount = useQcResults().data?.findings.length ?? 0
+  const pageChecks = usePageCheckResults().data?.pages ?? []
+  const issueCount =
+    (useQcResults().data?.findings.length ?? 0) +
+    pageChecks.reduce((count, page) => count + page.findings.length, 0)
+  const showQc = issueCount > 0 || pageChecks.length > 0
   const jobs = useKoharuStore((state) => state.jobs)
   const completedReads = Object.values(jobs)
     .filter((job) => job.state === 'finished')
@@ -29,8 +34,8 @@ export function RightSidebar() {
   const [panel, setPanel] = useState<'agent' | 'properties' | 'context' | 'qc'>('properties')
 
   useEffect(() => {
-    if (panel === 'qc' && issueCount === 0) setPanel('properties')
-  }, [issueCount, panel])
+    if (panel === 'qc' && !showQc) setPanel('properties')
+  }, [showQc, panel])
 
   useEffect(() => {
     const open = () => setPanel('agent')
@@ -87,7 +92,7 @@ export function RightSidebar() {
           <Bot className='size-3 shrink-0' />
           <span className={label}>{t('agent.title')}</span>
         </Button>
-        {issueCount > 0 && (
+        {showQc && (
           <Button
             variant={panel === 'qc' ? 'secondary' : 'ghost'}
             aria-pressed={panel === 'qc'}

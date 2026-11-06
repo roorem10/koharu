@@ -157,6 +157,9 @@ export const commands = {
 	getBoxEffects: (layers: EntityId[]) => __TAURI_INVOKE<boolean[]>("get_box_effects", { layers }),
 	resetBoxEffects: (layers: EntityId[]) => __TAURI_INVOKE<null>("reset_box_effects", { layers }),
 	getQcResults: () => __TAURI_INVOKE<QcReport>("get_qc_results"),
+	startPageCheck: (pages: EntityId[]) => __TAURI_INVOKE<JobId>("start_page_check", { pages }),
+	getPageCheckResults: () => __TAURI_INVOKE<PageCheckReport>("get_page_check_results"),
+	applyPageCheckFix: (page: EntityId, findingId: string) => __TAURI_INVOKE<boolean>("apply_page_check_fix", { page, findingId }),
 	markQcFinding: (layer: EntityId, check: QcCheck, flag: Flag | null, ok: boolean) => __TAURI_INVOKE<null>("mark_qc_finding", { layer, check, flag, ok }),
 	getReadingModel: () => __TAURI_INVOKE<ReadModelInfo>("get_reading_model"),
 	getReadingModels: () => __TAURI_INVOKE<Model[]>("get_reading_models"),
@@ -770,6 +773,37 @@ export type Page = {
 	layers: Layer[],
 	regions: AnalysisRegion[],
 };
+
+export type PageCheckFinding = {
+	id: string,
+	kind: PageCheckKind,
+	detail: string,
+	area: Bounds,
+	matched_layer: EntityId | null,
+	fix: PageCheckFix | null,
+};
+
+export type PageCheckFix = "outline";
+
+export type PageCheckKind = "untranslated_text" | "missed_text" | "cleanup_marks" | "text_cut_off" | "overlapping_art" | "hard_to_read" | "reading_order";
+
+export type PageCheckPage = {
+	page: EntityId,
+	page_label: string,
+	revision: Revision,
+	status: PageCheckStatus,
+	reason: PageCheckSkipReason | null,
+	findings: PageCheckFinding[],
+};
+
+export type PageCheckReport = {
+	revision: Revision,
+	pages: PageCheckPage[],
+};
+
+export type PageCheckSkipReason = "no_vision_model";
+
+export type PageCheckStatus = "checked" | "skipped";
 
 export type PageFailure = {
 	page: EntityId,

@@ -1293,5 +1293,29 @@
       "crying": "哭泣／顫抖",
       "menacing": "威嚇／陰森"
     }
+  },
+  "pageCheck": {
+    "title": "頁面檢查",
+    "checkPage": "檢查頁面",
+    "scope": "要檢查的頁面",
+    "currentPage": "目前頁面",
+    "allPages": "所有頁面",
+    "confirm": "比較原圖與成品。每頁向視覺模型傳送一次請求，共 {{count}} 次。雲端模型可能會收取請求費用。",
+    "optional": "預設關閉。使用「閱讀章節」所選的視覺模型，可在設定中變更。",
+    "start": "開始檢查",
+    "noVision": "已略過：尚未設定支援圖像的模型。請在設定中為「閱讀章節」選擇模型。",
+    "noFindings": "未發現頁面層級的問題。",
+    "stale": "此頁面在檢查後已變更。套用修正前請重新檢查。",
+    "outline": "套用自由文字描邊",
+    "reviewOnly": "請手動檢查，目前沒有可靠的自動修正。",
+    "kinds": {
+      "untranslated_text": "殘留未翻譯文字",
+      "missed_text": "遺漏的對話框或音效",
+      "cleanup_marks": "清理痕跡",
+      "text_cut_off": "文字遭裁切",
+      "overlapping_art": "文字遮擋畫面",
+      "hard_to_read": "文字難以閱讀",
+      "reading_order": "閱讀順序錯誤"
+    }
   }
 }

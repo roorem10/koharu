@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { InferenceControl } from '@/components/editor/InferenceControl'
 import { useCompareStore } from '@/components/qc/compare'
+import { PageCheckButton } from '@/components/qc/PageCheckButton'
 import { call } from '@/lib/backend'
 import { usePage } from '@/lib/queries'
 import { pipelineStages, useKoharuStore, type PipelineScope } from '@/lib/store'
@@ -40,6 +41,7 @@ export function CanvasCommandBar() {
   return (
     <header className='flex h-10 shrink-0 items-center gap-2 border-b border-border/80 bg-[var(--surface-toolbar)] px-2.5'>
       <div className='min-w-0 flex-1' />
+      <PageCheckButton />
       <Button
         size='sm'
         variant={pinned ? 'secondary' : 'ghost'}
