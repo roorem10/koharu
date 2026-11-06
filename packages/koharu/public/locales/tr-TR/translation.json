@@ -1293,5 +1293,17 @@
       "crying": "Ağlama / titreme",
       "menacing": "Tehditkâr / tekinsiz"
     }
+  },
+  "ocrCorrections": {
+    "title": "OCR düzeltmesi",
+    "original": "Özgün OCR metni",
+    "suggested": "Önerilen kaynak metin",
+    "reason": "Gerekçe",
+    "accept": "Kabul et",
+    "corrected": "OCR düzeltildi",
+    "automatic": "OCR düzeltmelerini otomatik uygula",
+    "automaticDescription": "Otomatik çalıştırma sırasında görüntüyle doğrulanan OCR önerilerini çeviriden önce uygular. Elle düzenlenmiş kaynak metin her zaman korunur.",
+    "noVisionModel": "OCR denetimi atlandı: görüntüleri anlayabilen bir model seçilmedi.",
+    "translationOutOfDate": "OCR düzeltmesinden sonra çeviri güncelliğini yitirdi. Bu satırı yeniden çevirin."
   }
 }

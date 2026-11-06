@@ -397,6 +397,18 @@ impl Host for KoharuHost {
                     definition::<AddGlossaryEntry>("add_glossary_entry", "Suggest a glossary term for this chapter without replacing an existing series term."),
                     definition::<SetLineCategory>("set_line_category", "Set a model lettering category for a text layer. A user label always wins."),
                     definition::<FlagLine>("flag_line", "Mark a text layer for human review with a short message."),
+                    definition::<OcrCorrectionScope>(
+                        "get_ocr_suggestions",
+                        "Read OCR correction suggestions, their original and suggested source text, reasons, and current status. Omit pages and elements to inspect the project, or select one of them.",
+                    ),
+                    definition::<AcceptOcrCorrection>(
+                        "accept_ocr_correction",
+                        "Accept one pending OCR correction by text-layer ID in one undoable edit. Hand-edited source text is never changed; the original OCR remains recoverable.",
+                    ),
+                    definition::<OcrCorrectionScope>(
+                        "accept_ocr_corrections",
+                        "Accept all pending OCR corrections in the project, selected pages, or selected text elements, with one undo step per page. Hand-edited source text is never changed; the original OCR remains recoverable.",
+                    ),
                     definition::<SetGeometry>(
                         "set_geometry",
                         "Replace an element's page-space polygon geometry.",
@@ -686,6 +698,29 @@ impl Host for KoharuHost {
             }
             "add_glossary_entry" | "set_line_category" | "flag_line" => {
                 self.context_tool(&call).await
+            }
+            "get_ocr_suggestions" => {
+                let arguments: OcrCorrectionScope = arguments(&call)?;
+                let scope = arguments.scope()?;
+                let current = self.handle.state::<CurrentProject>();
+                let current = current.project.lock().await;
+                let project = current.as_ref().context("no project is open")?;
+                Invocation::read(crate::commands::ocr_corrections::suggestions(project, &scope)?)
+            }
+            "accept_ocr_correction" | "accept_ocr_corrections" => {
+                let scope = if call.name == "accept_ocr_correction" {
+                    let arguments: AcceptOcrCorrection = arguments(&call)?;
+                    Scope::Entities(vec![entity(&arguments.layer)?])
+                } else {
+                    let arguments: OcrCorrectionScope = arguments(&call)?;
+                    arguments.scope()?
+                };
+                let result = crate::commands::ocr_corrections::accept(&self.handle, &scope).await?;
+                if result.applied == 0 {
+                    Invocation::read(result)
+                } else {
+                    Invocation::changed(result)
+                }
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
             // WO-20 (one box per bubble) tool calls go here.
@@ -1299,4 +1334,30 @@ struct SetLineCategory {
 struct FlagLine {
     element: String,
     message: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct AcceptOcrCorrection {
+    layer: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct OcrCorrectionScope {
+    #[serde(default)]
+    pages: Vec<String>,
+    #[serde(default)]
+    elements: Vec<String>,
+}
+
+impl OcrCorrectionScope {
+    fn scope(&self) -> Result<Scope> {
+        match (self.pages.is_empty(), self.elements.is_empty()) {
+            (true, true) => Ok(Scope::Project),
+            (false, true) => Ok(Scope::Pages(entities(&self.pages)?)),
+            (true, false) => Ok(Scope::Entities(entities(&self.elements)?)),
+            (false, false) => bail!("OCR correction scope cannot contain both pages and elements"),
+        }
+    }
 }

@@ -16,6 +16,7 @@ pub use sidecar::{
 
 pub use chapter::{
     ChapterBrief, ChapterCharacter, ChapterReading, Character, Flag, GlossaryEntry,
-    InstructionTerm, ReadLine, SuggestedTerm, TermKind, instruction_terms,
+    InstructionTerm, OcrCorrection, ReadLine, ReadOcrCorrection, SuggestedTerm, TermKind,
+    instruction_terms,
 };
 pub use series::{Series, SeriesStore, atomic_json};

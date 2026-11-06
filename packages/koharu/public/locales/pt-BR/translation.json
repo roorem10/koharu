@@ -1293,5 +1293,17 @@
       "crying": "Choro / tremor",
       "menacing": "Ameaça / sinistro"
     }
+  },
+  "ocrCorrections": {
+    "title": "Correção de OCR",
+    "original": "OCR original",
+    "suggested": "Texto de origem sugerido",
+    "reason": "Motivo",
+    "accept": "Aceitar",
+    "corrected": "OCR corrigido",
+    "automatic": "Aplicar correções de OCR automaticamente",
+    "automaticDescription": "Permite que a execução automática aplique sugestões de OCR verificadas na imagem antes da tradução. O texto de origem editado à mão é sempre mantido.",
+    "noVisionModel": "Verificação de OCR ignorada: nenhum modelo com capacidade de visão foi selecionado.",
+    "translationOutOfDate": "A tradução está desatualizada após a correção de OCR. Traduza esta linha novamente."
   }
 }

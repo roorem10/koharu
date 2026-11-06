@@ -1293,5 +1293,17 @@
       "crying": "Crying / Trembling",
       "menacing": "Menacing / Sinister"
     }
+  },
+  "ocrCorrections": {
+    "title": "OCR correction",
+    "original": "Original OCR",
+    "suggested": "Suggested source",
+    "reason": "Reason",
+    "accept": "Accept",
+    "corrected": "OCR corrected",
+    "automatic": "Apply OCR corrections automatically",
+    "automaticDescription": "Let auto-run apply image-checked OCR suggestions before translation. Hand-edited source text is always kept.",
+    "noVisionModel": "OCR check skipped: no vision-capable model is selected.",
+    "translationOutOfDate": "Translation is out of date after the OCR correction. Translate this line again."
   }
 }

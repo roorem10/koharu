@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use koharu_scene::EntityId;
 use serde::{Deserialize, Serialize};
@@ -59,6 +59,7 @@ pub struct ChapterBrief {
 pub enum Flag {
     Glossary { term: String, page: u32 },
     Review { message: String, page: u32 },
+    OcrSourceChanged { page: u32 },
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -84,6 +85,22 @@ pub struct ReadLine {
     pub category: Option<String>,
     pub confidence: Option<f32>,
     pub note: Option<String>,
+    pub ocr_correction: Option<ReadOcrCorrection>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ReadOcrCorrection {
+    pub suggested: String,
+    pub reason: String,
+}
+
+/// The observed OCR stays here when its Scene source changes or is undone.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Type)]
+pub struct OcrCorrection {
+    pub original: String,
+    pub suggested: String,
+    pub reason: String,
+    pub dismissed: bool,
 }
 
 impl ProjectContext {
@@ -91,6 +108,7 @@ impl ProjectContext {
         &mut self,
         reading: ChapterReading,
         valid_layers: &BTreeSet<EntityId>,
+        correction_sources: &BTreeMap<EntityId, String>,
         series: &[GlossaryEntry],
         read_at: String,
     ) -> Vec<EntityId> {
@@ -151,6 +169,25 @@ impl ProjectContext {
             }
             if let Some(note) = line.note.filter(|text| !text.trim().is_empty()) {
                 self.lines.entry(id).or_default().note = Some(note);
+            }
+            if let Some(correction) = line.ocr_correction
+                && let Some(original) = correction_sources.get(&id)
+                && !correction.suggested.trim().is_empty()
+                && !correction.suggested.contains('\0')
+                && correction.suggested != *original
+                && !correction.reason.trim().is_empty()
+            {
+                // Preserve the original and the user's dismissal across repeated reads.
+                self.lines
+                    .entry(id)
+                    .or_default()
+                    .ocr_correction
+                    .get_or_insert(OcrCorrection {
+                        original: original.clone(),
+                        suggested: correction.suggested,
+                        reason: correction.reason,
+                        dismissed: false,
+                    });
             }
         }
         changed.into_iter().collect()
@@ -244,7 +281,13 @@ mod tests {
         .unwrap();
         assert!(
             context
-                .merge_reading(reading, &BTreeSet::from([layer]), &series, "now".into())
+                .merge_reading(
+                    reading,
+                    &BTreeSet::from([layer]),
+                    &BTreeMap::new(),
+                    &series,
+                    "now".into(),
+                )
                 .is_empty()
         );
         assert_eq!(
@@ -255,5 +298,69 @@ mod tests {
         assert_eq!(context.suggestions.len(), 1);
         assert_eq!(context.lines.len(), 1);
         assert_eq!(series[0].target, "Hina");
+    }
+
+    #[test]
+    fn corrections_need_observed_ocr_and_repeated_reads_keep_the_original_and_dismissal() {
+        let eligible = EntityId::new();
+        let hand_edited = EntityId::new();
+        let unchanged = EntityId::new();
+        let empty = EntityId::new();
+        let unexplained = EntityId::new();
+        let layers = BTreeSet::from([eligible, hand_edited, unchanged, empty, unexplained]);
+        let sources = BTreeMap::from([
+            (eligible, "ocr".into()),
+            (unchanged, "same".into()),
+            (empty, "ocr".into()),
+            (unexplained, "ocr".into()),
+        ]);
+        let read = |lines| {
+            serde_json::from_value(serde_json::json!({
+                "summary":"brief", "characters":[], "glossary":[], "lines":lines,
+            }))
+            .unwrap()
+        };
+        let reading = read(serde_json::json!([
+            {"id":eligible,"ocr_correction":{"suggested":"corrected","reason":"visible mismatch"}},
+            {"id":hand_edited,"ocr_correction":{"suggested":"replacement","reason":"guess"}},
+            {"id":unchanged,"ocr_correction":{"suggested":"same","reason":"unchanged"}},
+            {"id":empty,"ocr_correction":{"suggested":"  ","reason":"empty"}},
+            {"id":unexplained,"ocr_correction":{"suggested":"replacement","reason":"  "}},
+            {"id":"unknown","ocr_correction":{"suggested":"replacement","reason":"guess"}}
+        ]));
+        let mut context = ProjectContext::default();
+        context.merge_reading(reading, &layers, &sources, &[], "now".into());
+        assert_eq!(context.lines.len(), 1);
+        let correction = context
+            .lines
+            .get_mut(&eligible)
+            .unwrap()
+            .ocr_correction
+            .as_mut()
+            .unwrap();
+        assert_eq!(correction.original, "ocr");
+        assert_eq!(correction.suggested, "corrected");
+        correction.dismissed = true;
+        let original = correction.clone();
+        context.merge_reading(
+            read(serde_json::json!([
+                {"id":eligible,"ocr_correction":{"suggested":"different","reason":"new guess"}}
+            ])),
+            &layers,
+            &sources,
+            &[],
+            "later".into(),
+        );
+        assert_eq!(
+            context.lines[&eligible].ocr_correction.as_ref(),
+            Some(&original)
+        );
+        context.retain_layers(&BTreeSet::from([eligible]));
+        let restored: ProjectContext =
+            serde_json::from_str(&serde_json::to_string(&context).unwrap()).unwrap();
+        assert_eq!(
+            restored.lines[&eligible].ocr_correction.as_ref(),
+            Some(&original)
+        );
     }
 }

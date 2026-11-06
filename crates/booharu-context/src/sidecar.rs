@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use specta::Type;
 
-use crate::{ChapterBrief, Flag, GlossaryEntry, LetteringCategory};
+use crate::{ChapterBrief, Flag, GlossaryEntry, LetteringCategory, OcrCorrection};
 
 /// File name of the sidecar inside a project directory.
 pub const CONTEXT_FILE: &str = "booharu-context.json";
@@ -54,6 +54,7 @@ impl Default for ProjectContext {
 pub struct LineContext {
     pub category: Option<LineCategory>,
     pub note: Option<String>,
+    pub ocr_correction: Option<OcrCorrection>,
     pub flags: Vec<Flag>,
     pub dismissed: Vec<String>,
     /// QC checks (WO-12) the user marked OK for this line, by check id.
@@ -69,6 +70,7 @@ impl LineContext {
     fn is_empty(&self) -> bool {
         self.category.is_none()
             && self.note.is_none()
+            && self.ocr_correction.is_none()
             && self.flags.is_empty()
             && self.dismissed.is_empty()
             && self.qc_ok.is_empty()

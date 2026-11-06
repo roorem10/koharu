@@ -1293,5 +1293,17 @@
       "crying": "울음 / 떨림",
       "menacing": "위협적 / 음산함"
     }
+  },
+  "ocrCorrections": {
+    "title": "OCR 수정",
+    "original": "원본 OCR 텍스트",
+    "suggested": "제안된 원문",
+    "reason": "이유",
+    "accept": "수락",
+    "corrected": "OCR 수정됨",
+    "automatic": "OCR 수정 자동 적용",
+    "automaticDescription": "자동 실행 시 이미지로 확인한 OCR 수정 제안을 번역 전에 적용합니다. 직접 편집한 원문은 항상 유지됩니다.",
+    "noVisionModel": "OCR 검사를 건너뜀: 이미지를 인식할 수 있는 모델이 선택되지 않았습니다.",
+    "translationOutOfDate": "OCR 수정으로 번역이 오래되었습니다. 이 줄을 다시 번역하세요."
   }
 }

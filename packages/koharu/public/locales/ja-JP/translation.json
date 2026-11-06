@@ -1293,5 +1293,17 @@
       "crying": "泣き声・震え声",
       "menacing": "威圧・不気味"
     }
+  },
+  "ocrCorrections": {
+    "title": "OCRの修正",
+    "original": "元のOCRテキスト",
+    "suggested": "修正案",
+    "reason": "理由",
+    "accept": "採用",
+    "corrected": "OCR修正済み",
+    "automatic": "OCRの修正を自動適用",
+    "automaticDescription": "自動実行時、画像で確認されたOCRの修正案を翻訳前に適用します。手動で編集した原文は常に保持されます。",
+    "noVisionModel": "OCRの確認をスキップしました：画像を認識できるモデルが選択されていません。",
+    "translationOutOfDate": "OCRの修正により翻訳が古くなっています。この行を再翻訳してください。"
   }
 }

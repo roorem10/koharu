@@ -109,6 +109,7 @@ beforeEach(() => {
   vi.spyOn(commands, 'listSeries').mockResolvedValue([])
   vi.spyOn(commands, 'getAgentHistory').mockResolvedValue({ messages: [], running: null })
   vi.spyOn(commands, 'getLineCategory').mockResolvedValue(null)
+  vi.spyOn(commands, 'getOcrSuggestions').mockResolvedValue({ suggestions: [], skip_reason: null })
   vi.spyOn(commands, 'getEffectiveCategory').mockResolvedValue({
     category: 'floating',
     reason: 'bubble_shape',

@@ -63,6 +63,11 @@ export const commands = {
 	 *  rules decide again, then restyles the line.
 	 */
 	setLineCategory: (layer: EntityId, category: LetteringCategory | null) => __TAURI_INVOKE<LineCategory | null>("set_line_category", { layer, category }),
+	getOcrSuggestions: (scope: Scope) => __TAURI_INVOKE<OcrSuggestions>("get_ocr_suggestions", { scope }),
+	acceptOcrCorrection: (layer: EntityId) => __TAURI_INVOKE<OcrCorrectionResult>("accept_ocr_correction", { layer }),
+	dismissOcrCorrection: (layer: EntityId) => __TAURI_INVOKE<null>("dismiss_ocr_correction", { layer }),
+	/**  Recipe entry point: call after Read chapter and before the translation stage. */
+	applyOcrCorrections: (scope: Scope) => __TAURI_INVOKE<OcrCorrectionResult>("apply_ocr_corrections", { scope }),
 	getAgentHistory: () => __TAURI_INVOKE<AgentHistoryView>("get_agent_history"),
 	newAgentConversation: () => __TAURI_INVOKE<AgentHistory>("new_agent_conversation"),
 	checkGlossary: () => __TAURI_INVOKE<ProjectContext>("check_glossary"),
@@ -356,6 +361,7 @@ export type ContextSettings = {
 	read_when?: ReadWhen,
 	send_images?: boolean,
 	ask_before_reading?: boolean,
+	auto_apply_ocr_corrections?: boolean,
 	read_model?: ModelSelection | null,
 	pages_per_request?: number,
 	previous_pages?: number,
@@ -428,7 +434,7 @@ export type FillGradient = {
 	stops: GradientStop[],
 };
 
-export type Flag = { kind: "glossary"; term: string; page: number } | { kind: "review"; message: string; page: number };
+export type Flag = { kind: "glossary"; term: string; page: number } | { kind: "review"; message: string; page: number } | { kind: "ocr_source_changed"; page: number };
 
 export type Flux2KleinConfig = {
 	prompt?: string,
@@ -659,6 +665,7 @@ export type LineCategory = {
 export type LineContext = {
 	category?: LineCategory | null,
 	note?: string | null,
+	ocr_correction?: OcrCorrection | null,
 	flags?: Flag[],
 	dismissed?: string[],
 	/**  QC checks (WO-12) the user marked OK for this line, by check id. */
@@ -736,7 +743,39 @@ export type OcrBoxSettings = {
 	subtitle_outline?: [number, number, number, number],
 };
 
+export type OcrCheckSkipReason = "no_vision_model" | "disabled";
+
+/**  The observed OCR stays here when its Scene source changes or is undone. */
+export type OcrCorrection = {
+	original: string,
+	suggested: string,
+	reason: string,
+	dismissed: boolean,
+};
+
+export type OcrCorrectionResult = {
+	applied: number,
+	pages: number,
+	skip_reason: OcrCheckSkipReason | null,
+};
+
+export type OcrCorrectionStatus = "pending" | "applied" | "dismissed" | "stale" | "hand_edited";
+
 export type OcrModel = { model: "paddleocr-vl-1.6" } | { model: "manga-ocr" } | { model: "baberu-ocr" } | { model: "hayai-ocr" };
+
+export type OcrSuggestion = {
+	layer: EntityId,
+	page: EntityId,
+	original: string,
+	suggested: string,
+	reason: string,
+	status: OcrCorrectionStatus,
+};
+
+export type OcrSuggestions = {
+	suggestions: OcrSuggestion[],
+	skip_reason: OcrCheckSkipReason | null,
+};
 
 export type OnPageFailure = "continue_with_other_pages" | "stop_run";
 

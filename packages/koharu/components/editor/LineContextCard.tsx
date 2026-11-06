@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { refreshContext, useChapterContext } from '@/components/context/data'
 import { discussLine, historyChangedEvent } from '@/components/context/events'
+import { OcrCorrectionCard } from '@/components/editor/OcrCorrectionCard'
 import { call } from '@/lib/backend'
 import { pageKey, projectKey, refresh, usePage, useProject } from '@/lib/queries'
 import { commands, type EntityId, type LineExplanation } from '@koharu/bridge/protocol'
@@ -30,13 +31,16 @@ export function LineContextCard({ layer }: { layer: EntityId }) {
   if (!chapter) return null
   return (
     <div className='grid gap-2 border-t pt-3 text-[11px]'>
+      <OcrCorrectionCard key={layer} layer={layer} />
       {line?.note && <p className='break-words whitespace-pre-wrap'>{line.note}</p>}
       {line?.flags.map((flag, index) => (
         <div className='grid gap-1 rounded-md border p-2' key={index}>
           <p>
             {flag.kind === 'glossary'
               ? t('chapterContext.glossaryFlag', { term: flag.term })
-              : flag.message}
+              : flag.kind === 'ocr_source_changed'
+                ? t('ocrCorrections.translationOutOfDate')
+                : flag.message}
           </p>
           <Button
             size='sm'

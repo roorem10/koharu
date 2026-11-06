@@ -1293,5 +1293,17 @@
       "crying": "哭泣／顫抖",
       "menacing": "威嚇／陰森"
     }
+  },
+  "ocrCorrections": {
+    "title": "OCR 修正",
+    "original": "原始 OCR 文字",
+    "suggested": "建議原文",
+    "reason": "原因",
+    "accept": "接受",
+    "corrected": "OCR 已修正",
+    "automatic": "自動套用 OCR 修正",
+    "automaticDescription": "自動執行時，在翻譯前套用經過影像核對的 OCR 建議。手動編輯的原文一律保留。",
+    "noVisionModel": "已略過 OCR 檢查：未選擇支援影像辨識的模型。",
+    "translationOutOfDate": "OCR 修正後，譯文已過時。請重新翻譯此行。"
   }
 }

@@ -23,11 +23,13 @@ pub(crate) fn refresh_flags(project: &Project) -> Result<()> {
     let snapshot = project.snapshot();
     let rows = text_rows(&snapshot)?;
     project.update_context(|context| {
+        super::super::ocr_corrections::refresh_translation_flags(&snapshot, context)?;
         for row in &rows {
             let line = context.lines.entry(row.layer).or_default();
             set_flags(line, row, &terms);
         }
-    })?;
+        Ok::<_, anyhow::Error>(())
+    })??;
     Ok(())
 }
 
@@ -51,7 +53,8 @@ fn set_flags(
         })
         .map(|term| term.source.clone())
         .collect();
-    line.dismissed.retain(|term| failures.contains(term));
+    line.dismissed
+        .retain(|term| term == "ocr_source_changed" || failures.contains(term));
     for term in failures {
         if !line.dismissed.contains(&term) {
             line.flags.push(Flag::Glossary {
@@ -131,9 +134,12 @@ pub(crate) async fn dismiss_line_flag(
     project.update_context(|context| {
         if let Some(line) = context.lines.get_mut(&layer)
             && (index as usize) < line.flags.len()
-            && let Flag::Glossary { term, .. } = line.flags.remove(index as usize)
         {
-            line.dismissed.push(term);
+            match line.flags.remove(index as usize) {
+                Flag::Glossary { term, .. } => line.dismissed.push(term),
+                Flag::OcrSourceChanged { .. } => line.dismissed.push("ocr_source_changed".into()),
+                Flag::Review { .. } => {}
+            }
         }
     })?;
     Ok(())
@@ -263,6 +269,7 @@ mod tests {
             user: false,
         };
         let mut line = booharu_context::LineContext::default();
+        line.dismissed.push("ocr_source_changed".into());
         line.flags.push(Flag::Review {
             message: "Check the pun".into(),
             page: 2,
@@ -280,7 +287,7 @@ mod tests {
         row.translation = "The Demon King".into();
         set_flags(&mut line, &row, &terms);
         assert_eq!(line.flags.len(), 1);
-        assert!(line.dismissed.is_empty());
+        assert_eq!(line.dismissed, vec!["ocr_source_changed".to_owned()]);
         assert!(line.qc_ok.is_empty());
         row.translation = "The king".into();
         set_flags(&mut line, &row, &terms);

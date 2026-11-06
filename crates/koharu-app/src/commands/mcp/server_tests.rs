@@ -103,6 +103,9 @@ impl Host for FakeHost {
         [
             "inspect_project",
             "view_page",
+            "get_ocr_suggestions",
+            "accept_ocr_correction",
+            "accept_ocr_corrections",
             "set_translation",
             "run_pipeline",
             "fails",
@@ -126,7 +129,7 @@ impl Host for FakeHost {
                 control.cancelled().await;
                 Err(anyhow!("pipeline processing was cancelled"))
             }
-            "set_translation" => {
+            "set_translation" | "accept_ocr_correction" | "accept_ocr_corrections" => {
                 self.edits.fetch_add(1, Ordering::SeqCst);
                 Invocation::changed(json!({ "changed": true }))
             }
@@ -322,7 +325,7 @@ async fn http_initialization_tools_images_errors_and_session_deletion() {
         .unwrap();
     assert_eq!(
         rpc(list).await["result"]["tools"].as_array().unwrap().len(),
-        6
+        FakeHost::default().tools().len() + 1
     );
     let inspected = rpc(server.call(&session, 2, "inspect_project").await).await;
     let value: Value =
@@ -366,9 +369,22 @@ async fn edits_are_refused_even_when_called_directly() {
     let host = Arc::new(FakeHost::default());
     let server = Server::start(bridge(host.clone(), false)).await;
     let session = server.initialize().await;
+    for (id, name) in [
+        "set_translation",
+        "accept_ocr_correction",
+        "accept_ocr_corrections",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        assert_eq!(
+            rpc(server.call(&session, id as i32 + 1, name).await).await["result"]["isError"],
+            true
+        );
+    }
     assert_eq!(
-        rpc(server.call(&session, 1, "set_translation").await).await["result"]["isError"],
-        true
+        rpc(server.call(&session, 4, "get_ocr_suggestions").await).await["result"]["isError"],
+        false
     );
     assert_eq!(host.edits.load(Ordering::SeqCst), 0);
     server.stop().await;

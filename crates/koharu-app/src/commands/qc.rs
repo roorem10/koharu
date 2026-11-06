@@ -291,6 +291,7 @@ async fn run_checks(
                     let detail = match flag {
                         Flag::Review { message, .. } => message.clone(),
                         Flag::Glossary { term, .. } => term.clone(),
+                        Flag::OcrSourceChanged { .. } => String::new(),
                     };
                     push_finding(
                         &mut report,

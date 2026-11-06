@@ -1293,5 +1293,17 @@
       "crying": "哭泣／发抖",
       "menacing": "威吓／阴森"
     }
+  },
+  "ocrCorrections": {
+    "title": "OCR 修正",
+    "original": "原来个 OCR 文字",
+    "suggested": "建议个原文",
+    "reason": "缘故",
+    "accept": "接受",
+    "corrected": "OCR 已修正",
+    "automatic": "自动应用 OCR 修正",
+    "automaticDescription": "自动运行个辰光，翻译前先应用拿图片核对过个 OCR 建议。手动改过个原文始终保留。",
+    "noVisionModel": "OCR 检查跳过了：呒没选支持看图个模型。",
+    "translationOutOfDate": "OCR 修正以后，译文过时了。请重新翻译搿一行。"
   }
 }

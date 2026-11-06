@@ -20,13 +20,15 @@ export function FindingRow({
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
   const label =
-    finding.flag?.kind === 'review'
-      ? finding.detail
-      : finding.flag?.kind === 'glossary'
-        ? t('qc.glossaryFlag', { term: finding.detail })
-        : finding.check === 'too_small' && finding.detail.startsWith('word:')
-          ? t('qc.smallWord', { detail: finding.detail.slice(5) })
-          : t(`qc.checks.${finding.check}`, { detail: finding.detail || t('qc.defaultFont') })
+    finding.flag?.kind === 'ocr_source_changed'
+      ? t('ocrCorrections.translationOutOfDate')
+      : finding.flag?.kind === 'review'
+        ? finding.detail
+        : finding.flag?.kind === 'glossary'
+          ? t('qc.glossaryFlag', { term: finding.detail })
+          : finding.check === 'too_small' && finding.detail.startsWith('word:')
+            ? t('qc.smallWord', { detail: finding.detail.slice(5) })
+            : t(`qc.checks.${finding.check}`, { detail: finding.detail || t('qc.defaultFont') })
   const run = async (action: () => Promise<void>) => {
     setBusy(true)
     try {

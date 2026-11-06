@@ -75,6 +75,19 @@ export function ContextPreferences() {
             />
           </PreferenceRow>
           <PreferenceRow
+            title={t('ocrCorrections.automatic')}
+            description={t('ocrCorrections.automaticDescription')}
+          >
+            <Checkbox
+              aria-label={t('ocrCorrections.automatic')}
+              checked={settings.auto_apply_ocr_corrections}
+              disabled={mutation.isPending}
+              onCheckedChange={(checked) =>
+                save({ ...settings, auto_apply_ocr_corrections: checked === true })
+              }
+            />
+          </PreferenceRow>
+          <PreferenceRow
             title={t('chapterContext.readingModel')}
             description={t('chapterContext.readerDownload')}
           >

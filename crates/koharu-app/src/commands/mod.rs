@@ -14,6 +14,7 @@ pub(crate) mod line_labels;
 pub(crate) mod mcp;
 pub(crate) mod notes;
 pub(crate) mod ocr_box;
+pub(crate) mod ocr_corrections;
 pub(crate) mod output;
 pub(crate) mod preferences;
 pub(crate) mod processing;
@@ -128,6 +129,10 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             styles::get_text_bubble_shape,
             line_labels::get_line_category,
             line_labels::set_line_category,
+            ocr_corrections::get_ocr_suggestions,
+            ocr_corrections::accept_ocr_correction,
+            ocr_corrections::dismiss_ocr_correction,
+            ocr_corrections::apply_ocr_corrections,
             // WO-18 (chapter context) commands go here.
             context::history::get_agent_history,
             context::history::new_agent_conversation,
