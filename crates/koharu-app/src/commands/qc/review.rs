@@ -67,7 +67,7 @@ pub(crate) fn list(project: &Project) -> Result<Vec<QcReviewItem>> {
     let context = project.load_context()?;
     let report = super::cache::with_cache(&snapshot, project.directory(), |cache| {
         cache.report(&snapshot, &context)
-    });
+    })?;
     let threshold = crate::commands::lettering::LetteringSettings::load()?
         .read()?
         .model_confidence;
@@ -142,6 +142,7 @@ fn marker_items(
                             .to_owned(),
                         translation: translation.clone(),
                         flag: None,
+                        bounds: None,
                     },
                     kind: QcReviewKind::AutoFixed,
                     previous_translation: record.previous_translation,
@@ -167,6 +168,7 @@ fn marker_items(
                             .to_owned(),
                         translation,
                         flag: None,
+                        bounds: None,
                     },
                     kind: QcReviewKind::LetteringUnsure,
                     previous_translation: None,

@@ -318,6 +318,7 @@ pub(crate) async fn start_fix_job(
         automatic,
         &handle.state::<CurrentProject>(),
         &handle.state::<Desktop>(),
+        None,
     )
     .await
     .map_err(|error| error.0)?;
@@ -417,6 +418,7 @@ pub(crate) async fn start_fix_job(
         project: Some(name),
         operation: None,
         finish_sound,
+        auto_run: None,
     };
     handle.state::<Processing>().jobs.lock().insert(id, job.clone());
     handle.state::<JobChannel>().channel.publish(job);
@@ -498,6 +500,7 @@ pub(crate) async fn run_fix_pass(
                 false,
                 &handle.state::<CurrentProject>(),
                 &handle.state::<Desktop>(),
+                None,
             )
             .await
             .map_err(|error| error.0)?;
@@ -608,6 +611,7 @@ pub(crate) async fn run_fix_pass(
         false,
         &handle.state::<CurrentProject>(),
         &handle.state::<Desktop>(),
+        None,
     )
     .await
     .map_err(|error| error.0)?;
@@ -951,7 +955,7 @@ async fn model_fix(
                 && let Some(translated) = &commit
             {
                 if let Some(reset) =
-                    super::super::rich_text::after_translation(project, translated).await?
+                    super::super::rich_text::after_translation(project, translated, true).await?
                 {
                     revisions.push(reset.revision);
                     commit = Some(reset);

@@ -63,6 +63,7 @@ mod tests {
             detail: String::new(),
             translation: String::new(),
             flag: None,
+            bounds: None,
         }
     }
 
