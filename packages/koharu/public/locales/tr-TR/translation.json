@@ -741,7 +741,35 @@
     "agent": "Ajan",
     "noBoxIssues": "Bu kutuda sorun yok.",
     "hidden": "Gizli (sorunsuz işaretlendi)",
-    "editorPanels": "Düzenleyici panelleri"
+    "editorPanels": "Düzenleyici panelleri",
+    "fixAutomatically": "Otomatik düzelt",
+    "fixBox": "Bu kutuyu otomatik düzelt",
+    "checkFirst": "Önce bunları kontrol edin",
+    "reviewGroups": {
+      "open": "Çözülmemiş sorunlar",
+      "auto_fixed": "Otomatik düzeltilenler",
+      "unsure": "Belirsiz tahminler"
+    },
+    "looksGood": "Sorun yok",
+    "looksGoodFor": "{{check}} için sorun yok olarak işaretle",
+    "autoFixedReason": "Otomatik düzeltildi: {{reason}}",
+    "previousSource": "Önceki kaynak metin",
+    "previousTranslation": "Önceki çeviri",
+    "fixSummary": "{{fixes}} düzeltme · {{left}} kalan · {{requests}} istek",
+    "autoFix": "Kalite sorunlarını otomatik düzelt",
+    "autoFixDescription": "Çeviriden sonra, elle düzenlemediğiniz kutulardaki mekanik sorunları düzeltir.",
+    "letteringUnsure": "Belirsiz yazı stili: {{category}}",
+    "emptyText": "(boş)",
+    "fixReasons": {
+      "tighten_layout": "Daha sıkı satır aralığı, heceleme ve balona sığdırma",
+      "shorten_translation": "Daha kısa ifade — anlamını kontrol edin",
+      "translate_missing": "Eksik çeviri",
+      "translate_leftover": "Çeviride kalan Japonca",
+      "translate_glossary": "Zorunlu sözlük terimi",
+      "apply_category_style": "Kategori yazı stili",
+      "read_again": "Boş kaynak metin yeniden okundu",
+      "hide_empty": "Yeniden okumadan sonra hâlâ boş; olası yanlış algılama olarak gizlendi"
+    }
   },
   "rawPrep": {
     "title": "Sayfa düzeyleri",

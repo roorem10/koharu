@@ -4,16 +4,14 @@ use booharu_context::{LetteringCategory, LineContext};
 
 use super::{QcCheck, Row};
 
-pub(super) fn has_leftover_source(source: &str, translation: &str) -> bool {
-    let translation = translation.trim();
-    translation != source.trim()
-        && translation.chars().any(|character| {
-            matches!(character as u32,
-                0x3040..=0x309f | 0x30a0..=0x30ff | 0x31f0..=0x31ff |
-                0xff66..=0xff9f | 0x3400..=0x4dbf | 0x4e00..=0x9fff |
-                0x20000..=0x2ffff | 0x30000..=0x323af
-            )
-        })
+pub(super) fn has_leftover_source(translation: &str) -> bool {
+    translation.chars().any(|character| {
+        matches!(character as u32,
+            0x3040..=0x309f | 0x30a0..=0x30ff | 0x31f0..=0x31ff |
+            0xff66..=0xff9f | 0x3400..=0x4dbf | 0x4e00..=0x9fff |
+            0x20000..=0x2ffff | 0x30000..=0x323af
+        )
+    })
 }
 
 pub(super) fn font_majorities(rows: &[Row]) -> BTreeMap<LetteringCategory, Option<String>> {
@@ -61,6 +59,7 @@ mod tests {
             layer: EntityId::new(),
             source: "原文".into(),
             translation: "Translation".into(),
+            translation_checked: true,
             detected: true,
             ocr_checked: true,
             category: Some(LetteringCategory::NormalDialogue),
@@ -70,7 +69,7 @@ mod tests {
     }
 
     #[test]
-    fn japanese_scripts_and_deliberately_untranslated_lines() {
+    fn japanese_scripts_are_found_even_when_the_provider_returns_the_source() {
         for text in [
             "Hello あ",
             "Hello ア",
@@ -78,11 +77,12 @@ mod tests {
             "Hello ｱ",
             "Hello 㐀",
             "Hello 𠮷",
+            "  原文  ",
         ] {
-            assert!(has_leftover_source("原文", text), "{text}");
+            assert!(has_leftover_source(text), "{text}");
         }
-        for text in ["Hello", "", "  原文  ", "한국어", "123 !"] {
-            assert!(!has_leftover_source("原文", text), "{text}");
+        for text in ["Hello", "", "한국어", "123 !"] {
+            assert!(!has_leftover_source(text), "{text}");
         }
     }
 
@@ -148,6 +148,23 @@ mod tests {
         line.detected = false;
         checks.clear();
         text_checks(&line, &BTreeSet::new(), &BTreeMap::new(), &mut checks);
+        assert!(checks.is_empty());
+    }
+
+    #[test]
+    fn unchanged_japanese_is_a_problem_unless_lettering_skips_translation() {
+        let mut line = row("A");
+        line.translation = line.source.clone();
+        let mut checks = Vec::new();
+        text_checks(&line, &BTreeSet::new(), &BTreeMap::new(), &mut checks);
+        assert!(checks.iter().any(|(check, _)| *check == QcCheck::LeftoverSource));
+        checks.clear();
+        text_checks(
+            &line,
+            &BTreeSet::from([line.layer]),
+            &BTreeMap::new(),
+            &mut checks,
+        );
         assert!(checks.is_empty());
     }
 }

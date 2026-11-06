@@ -7,9 +7,10 @@ import { useTranslation } from 'react-i18next'
 import { useQcSettings, qcSettingsKey } from '@/components/qc/data'
 import { call } from '@/lib/backend'
 import { queryClient } from '@/lib/queries'
-import { commands } from '@koharu/bridge/protocol'
+import { commands, type QcSettings } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 import { Input } from '@koharu/ui/components/input'
+import { Switch } from '@koharu/ui/components/switch'
 
 import { PreferenceRow, PreferenceSection } from './PreferenceFields'
 
@@ -21,12 +22,20 @@ export function QcPreferences() {
     if (settings.data) setMinimum(String(settings.data.min_font_size))
   }, [settings.data])
   const mutation = useMutation({
-    mutationFn: (minimum: number) => call(commands.saveQcSettings, { min_font_size: minimum }),
+    mutationFn: (next: QcSettings) => call(commands.saveQcSettings, next),
     onSuccess: (saved) => queryClient.setQueryData(qcSettingsKey, saved),
     onError: () => setMinimum(String(settings.data?.min_font_size ?? 12)),
   })
   return (
     <PreferenceSection title={t('qc.title')}>
+      <PreferenceRow title={t('qc.autoFix')} description={t('qc.autoFixDescription')}>
+        <Switch
+          checked={settings.data?.auto_fix === true}
+          disabled={!settings.data || mutation.isPending}
+          aria-label={t('qc.autoFix')}
+          onCheckedChange={(auto_fix) => mutation.mutate({ ...settings.data, auto_fix })}
+        />
+      </PreferenceRow>
       <PreferenceRow title={t('qc.minimumFontSize')}>
         <Input
           type='number'
@@ -42,7 +51,7 @@ export function QcPreferences() {
           onBlur={(event) => {
             const value = Number(event.currentTarget.value)
             if (Number.isFinite(value) && value > 0 && value !== settings.data?.min_font_size)
-              mutation.mutate(value)
+              mutation.mutate({ ...settings.data, min_font_size: value })
             else setMinimum(String(settings.data?.min_font_size ?? 12))
           }}
         />

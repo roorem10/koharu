@@ -818,6 +818,14 @@ impl Traversal<'_> {
             font_size: typography.as_ref().and_then(|value| value.size),
             minimum_font_size: MINIMUM_FONT_SIZE,
             auto_fit: typography.as_ref().is_none_or(|value| value.auto_fit),
+            // A QC fit keeps its per-box policy in the existing typography extensions.
+            normal_hyphenation: typography.as_ref().is_some_and(|value| {
+                value
+                    .extensions
+                    .get("dev.booharu.qc.hyphenation")
+                    .map(String::as_str)
+                    == Some("normal")
+            }),
             alignment,
             writing_mode,
             foreground_color: typography
@@ -2715,6 +2723,110 @@ mod tests {
             original.layer(layer).unwrap().0.node.scene
         );
     }
+    #[tokio::test]
+    async fn qc_hyphenation_invalidates_text_and_incremental_matches_full_render() {
+        let mut session = Session::memory().await.unwrap();
+        let mut ids = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 240.0, 160.0), At::End)?;
+                let bubble = edit.add_analysis_region::<BubbleRegion>(
+                    page,
+                    At::End,
+                    &Geometry::rectangle(20.0, 20.0, 180.0, 100.0),
+                    None,
+                )?;
+                let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &Translation {
+                        text: Authored::user("Extraordinary conversations continue".into()),
+                        language: Some(koharu_scene::LanguageTag::new("en")?),
+                    },
+                )?;
+                let layer = edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &SceneTextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                        warp: None,
+                    },
+                )?;
+                edit.relate::<FlowsIn>(layer, bubble)?;
+                ids = Some((page, layer));
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let (page, layer) = ids.unwrap();
+        let renderer = Renderer::default();
+        let before = renderer.render(&snapshot, page).await.unwrap();
+        let compiled = renderer.compile(&snapshot, page).unwrap();
+        let original = compiled
+            .layers
+            .iter()
+            .find(|draft| draft.entity == layer)
+            .unwrap();
+        let typography = Typography {
+            origin: Origin::User,
+            preferred_font: None,
+            font_weight: None,
+            font_style: None,
+            size: None,
+            auto_fit: true,
+            color: None,
+            stroke_color: None,
+            stroke_width: None,
+            stroke_method: None,
+            stroke_position: None,
+            stroke_join: None,
+            outer_stroke_color: None,
+            outer_stroke_width: None,
+            line_spacing: None,
+            letter_spacing: None,
+            fill_gradient: None,
+            alignment: None,
+            writing_mode: None,
+            extensions: BTreeMap::from([("dev.booharu.qc.hyphenation".into(), "normal".into())]),
+        };
+        let patch = snapshot.patch(|edit| edit.set(layer, &typography)).unwrap();
+        let commit = session.commit(patch).await.unwrap();
+        let affected = AffectedDependencies::new(&commit.snapshot, &commit.changes).unwrap();
+        assert!(affected.intersects(&original.dependencies));
+        let compiled = renderer.compile(&commit.snapshot, page).unwrap();
+        let changed = compiled
+            .layers
+            .iter()
+            .find(|draft| draft.entity == layer)
+            .unwrap();
+        let NodeDescriptor::Text(descriptor) = &changed.descriptor else {
+            panic!("expected text descriptor");
+        };
+        assert!(descriptor.normal_hyphenation);
+        assert_ne!(changed.descriptor, original.descriptor);
+        let incremental = renderer
+            .update(&before, &commit.snapshot, &commit.changes)
+            .await
+            .unwrap();
+        let full = renderer.render(&commit.snapshot, page).await.unwrap();
+        assert_eq!(
+            incremental.layer(layer).unwrap().kind(),
+            full.layer(layer).unwrap().kind()
+        );
+        let rasterizer = Rasterizer::new().unwrap();
+        let raster = |frame: &Frame| {
+            rasterizer
+                .rasterize(&frame.raster_frame().unwrap(), RasterOptions::default())
+                .unwrap()
+                .image
+        };
+        assert_eq!(raster(&incremental), raster(&full));
+    }
+
     #[test]
     fn word_font_requests_prepare_faces_and_inherit_box_attributes() {
         let text = TextNodeDescriptor {
@@ -2732,6 +2844,7 @@ mod tests {
             font_size: Some(30.0),
             minimum_font_size: 9.0,
             auto_fit: false,
+            normal_hyphenation: false,
             alignment: TextAlign::Left,
             writing_mode: WritingMode::Horizontal,
             foreground_color: [0, 0, 0, 255],

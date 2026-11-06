@@ -11,8 +11,10 @@ import { QcPanel } from '@/components/qc/QcPanel'
 import { useBoxIssues } from '@/components/qc/useBoxIssues'
 import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
+import translations from '@/public/locales/en-US/translation.json'
 import {
   commands,
+  type Job,
   type Page,
   type ProjectInfo,
   type QcFinding,
@@ -53,6 +55,21 @@ const finding: QcFinding = {
   flag: null,
 }
 const initial: QcReport = { revision: 1, findings: [finding], hidden: [], pages_checked: 2 }
+const qcJob: Job = {
+  id: 'fix',
+  state: 'stopped',
+  completed: 1,
+  total: 2,
+  page: page.id,
+  stage: null,
+  model: null,
+  error: null,
+  retry: null,
+  failures: [],
+  project: project.name,
+  operation: null,
+  finish_sound: false,
+}
 const key = qcKey(project.name)
 function setup(report = initial) {
   queryClient.setQueryData(projectKey, project)
@@ -76,6 +93,177 @@ function Auto() {
 }
 
 describe('automatic QC', () => {
+  it('does not resume stopped fixing after context or revision refresh until successful processing', async () => {
+    setup()
+    queryClient.setQueryData(qcSettingsKey, { min_font_size: 12, auto_fix: true })
+    vi.mocked(commands.runQc).mockResolvedValue(initial)
+    vi.mocked(commands.fixQc).mockResolvedValue(null)
+    useKoharuStore.setState({ jobs: { fix: qcJob } })
+    mount(<Auto />)
+    await waitFor(() => expect(commands.runQc).toHaveBeenCalledOnce(), { timeout: 1800 })
+    expect(commands.fixQc).not.toHaveBeenCalled()
+    act(() => {
+      queryClient.setQueryData(projectKey, { ...project, revision: 2 })
+      window.dispatchEvent(new Event(historyChangedEvent))
+    })
+    await waitFor(() => expect(commands.runQc).toHaveBeenCalledTimes(2), { timeout: 1800 })
+    expect(commands.fixQc).not.toHaveBeenCalled()
+    act(() =>
+      useKoharuStore.setState({
+        jobs: {
+          fix: qcJob,
+          translation: {
+            ...qcJob,
+            id: 'translation',
+            state: 'finished',
+            operation: { operation: 'only', stage: 'translation' },
+          },
+        },
+      }),
+    )
+    await waitFor(() => expect(commands.fixQc).toHaveBeenCalledWith({ scope: 'project' }, true), {
+      timeout: 1800,
+    })
+  })
+
+  it('refreshes a completed QC job without automatically retrying its failed request', async () => {
+    setup()
+    queryClient.setQueryData(qcSettingsKey, { min_font_size: 12, auto_fix: true })
+    vi.mocked(commands.runQc).mockResolvedValue(initial)
+    vi.mocked(commands.fixQc).mockResolvedValue(null)
+    useKoharuStore.setState({ jobs: { fix: { ...qcJob, state: 'finished_with_problems' } } })
+    mount(<Auto />)
+    await waitFor(() => expect(commands.runQc).toHaveBeenCalledOnce(), { timeout: 1800 })
+    expect(commands.fixQc).not.toHaveBeenCalled()
+    act(() => window.dispatchEvent(new Event(historyChangedEvent)))
+    await waitFor(() => expect(commands.runQc).toHaveBeenCalledTimes(2), { timeout: 1800 })
+    expect(commands.fixQc).not.toHaveBeenCalled()
+    act(() => queryClient.setQueryData(projectKey, { ...project, revision: 2 }))
+    await waitFor(() => expect(commands.fixQc).toHaveBeenCalledWith({ scope: 'project' }, true), {
+      timeout: 1800,
+    })
+  })
+
+  it.each(['auto_fixed', 'lettering_unsure'] as const)(
+    'restores acknowledged review markers through Show hidden and Undo OK: %s',
+    async (check) => {
+      const marker = {
+        ...finding,
+        check,
+        detail: check === 'auto_fixed' ? 'shorten_translation' : 'whisper',
+      }
+      setup({ ...initial, hidden: [marker] })
+      mount(<QcPanel />)
+      const label =
+        check === 'auto_fixed'
+          ? translations.qc.autoFixedReason.replace(
+              '{{reason}}',
+              translations.qc.fixReasons.shorten_translation,
+            )
+          : translations.qc.letteringUnsure.replace(
+              '{{category}}',
+              translations.lettering.categories.whisper,
+            )
+      const undo = translations.qc.undoFor.replace('{{check}}', label)
+      expect(screen.queryByRole('button', { name: undo })).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('checkbox', { name: translations.qc.showHidden }))
+      const restore = await screen.findByRole('button', { name: undo })
+      vi.mocked(commands.getQcResults).mockResolvedValue(initial)
+      vi.mocked(commands.getQcReview).mockResolvedValue([
+        { finding: marker, kind: check, previous_translation: null },
+      ])
+      fireEvent.click(restore)
+      await waitFor(() =>
+        expect(commands.markQcOk).toHaveBeenCalledWith(marker.layer, check, false),
+      )
+      await screen.findByRole('button', {
+        name: translations.qc.looksGoodFor.replace('{{check}}', label),
+      })
+      expect(screen.queryByRole('button', { name: undo })).not.toBeInTheDocument()
+    },
+  )
+
+  it('keeps review-only boxes accessible and acknowledges them through QC OK while retaining earlier wording', async () => {
+    setup({ ...initial, findings: [] })
+    const fixed = { ...finding, check: 'auto_fixed' as const, detail: 'shorten_translation' }
+    vi.mocked(commands.getQcReview).mockResolvedValue([
+      { finding: fixed, kind: 'auto_fixed', previous_translation: 'Earlier wording' },
+    ])
+    vi.mocked(commands.getQcFixHistory).mockResolvedValue([
+      {
+        reason: 'overflow',
+        action: 'shorten_translation',
+        previous_source: null,
+        previous_translation: 'Earlier wording',
+      },
+    ])
+    const { unmount } = mount(<RightSidebar />)
+    const tabs = within(screen.getByRole('group', { name: 'Editor panels' }))
+    await waitFor(() => expect(tabs.getByRole('button', { name: /^QC 1$/ })).toBeInTheDocument())
+    unmount()
+    mount(<BoxQcSection layer='box-2' />)
+    const label = translations.qc.autoFixedReason.replace(
+      '{{reason}}',
+      translations.qc.fixReasons.shorten_translation,
+    )
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: translations.qc.looksGoodFor.replace('{{check}}', label),
+      }),
+    )
+    await waitFor(() => expect(commands.markQcOk).toHaveBeenCalledWith('box-2', 'auto_fixed', true))
+    expect(screen.getByText('Earlier wording')).toBeInTheDocument()
+    expect(commands.getQcReview).toHaveBeenCalledTimes(2)
+  })
+
+  it('starts fix jobs for the whole project or one box and disables both while a job runs', async () => {
+    setup()
+    mount(<QcPanel />)
+    fireEvent.click(screen.getByRole('button', { name: translations.qc.fixAutomatically }))
+    await waitFor(() => expect(commands.fixQc).toHaveBeenCalledWith({ scope: 'project' }, false))
+    fireEvent.click(screen.getByRole('button', { name: translations.qc.fixBox }))
+    await waitFor(() =>
+      expect(commands.fixQc).toHaveBeenCalledWith({ scope: 'boxes', layers: ['box-2'] }, false),
+    )
+    act(() =>
+      useKoharuStore.setState({
+        jobs: {
+          fix: {
+            id: 'fix',
+            state: 'running',
+            completed: 0,
+            total: 1,
+            page: 'page-2',
+            stage: null,
+            model: null,
+            error: null,
+            retry: null,
+            failures: [],
+            project: project.name,
+            operation: null,
+            finish_sound: false,
+          },
+        },
+      }),
+    )
+    expect(screen.getByRole('button', { name: translations.qc.fixAutomatically })).toBeDisabled()
+    expect(screen.getByRole('button', { name: translations.qc.fixBox })).toBeDisabled()
+  })
+
+  it('runs the automatic fix pass only when enabled', async () => {
+    setup()
+    queryClient.setQueryData(qcSettingsKey, { min_font_size: 12, auto_fix: true })
+    vi.mocked(commands.runQc).mockResolvedValue(initial)
+    vi.mocked(commands.fixQc).mockResolvedValue(null)
+    mount(<Auto />)
+    await waitFor(() => expect(commands.fixQc).toHaveBeenCalledWith({ scope: 'project' }, true), {
+      timeout: 1800,
+    })
+    act(() => queryClient.setQueryData(qcSettingsKey, { min_font_size: 12, auto_fix: false }))
+    await waitFor(() => expect(commands.runQc).toHaveBeenCalledTimes(2), { timeout: 1800 })
+    expect(commands.fixQc).toHaveBeenCalledOnce()
+  })
+
   it('opens findings through the shared page and layer selection', async () => {
     setup()
     const next = { ...page, id: 'page-2', label: '02.png' }
@@ -137,7 +325,11 @@ describe('automatic QC', () => {
     mount(<QcPanel />)
     fireEvent.click(screen.getByRole('button', { name: 'Agent' }))
     expect(screen.queryByText('Japanese remains in the translation')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Mark Check the joke OK' }))
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: translations.qc.looksGoodFor.replace('{{check}}', flag.message),
+      }),
+    )
     await waitFor(() =>
       expect(commands.markQcFinding).toHaveBeenCalledWith('box-2', 'flag', flag, true),
     )

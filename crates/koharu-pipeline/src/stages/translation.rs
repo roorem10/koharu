@@ -85,7 +85,16 @@ impl StageProcessor for Processor {
         input
             .translation_hints
             .apply(&mut request, &input.scene, input.page)?;
-        if let Some(instructions) = self.config.instructions.as_deref() {
+        let instructions = [
+            self.config.instructions.as_deref(),
+            input.translation_hints.instructions.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .filter(|value| !value.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n");
+        if !instructions.is_empty() {
             request = request.with_instructions(instructions);
         }
         if Translator::supports_vision(&self.config.model, &self.config.generation)

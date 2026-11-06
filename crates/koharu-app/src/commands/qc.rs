@@ -1,5 +1,8 @@
 //! Automatic review of scene snapshots; disposable results and durable sidecar acknowledgements.
 mod cache;
+pub(crate) mod fix;
+mod plan;
+pub(crate) mod review;
 mod rules;
 
 use std::{
@@ -35,6 +38,8 @@ pub(crate) enum QcCheck {
     LeftoverSource,
     OddFont,
     Flag,
+    AutoFixed,
+    LetteringUnsure,
 }
 
 impl QcCheck {
@@ -47,6 +52,8 @@ impl QcCheck {
             Self::LeftoverSource => "leftover_source",
             Self::OddFont => "odd_font",
             Self::Flag => "flag",
+            Self::AutoFixed => "auto_fixed",
+            Self::LetteringUnsure => "lettering_unsure",
         }
     }
 }
@@ -88,12 +95,14 @@ pub(crate) struct QcProgress {
 #[serde(default)]
 pub(crate) struct QcSettings {
     pub min_font_size: f32,
+    pub auto_fix: bool,
 }
 
 impl Default for QcSettings {
     fn default() -> Self {
         Self {
             min_font_size: 12.0,
+            auto_fix: true,
         }
     }
 }
@@ -125,6 +134,7 @@ struct Row {
     layer: EntityId,
     source: String,
     translation: String,
+    translation_checked: bool,
     detected: bool,
     ocr_checked: bool,
     category: Option<LetteringCategory>,
@@ -142,6 +152,7 @@ fn rows(snapshot: &Snapshot, context: &ProjectContext) -> Result<Vec<Row>> {
             let source = content.source()?;
             let region = content.source_region()?;
             let typography = layer.typography()?;
+            let translation = content.translation()?;
             let ocr_checked = source.is_some()
                 || match region {
                     Some(region) => snapshot.component::<OcrAnalysis>(region.id())?.is_some(),
@@ -152,10 +163,8 @@ fn rows(snapshot: &Snapshot, context: &ProjectContext) -> Result<Vec<Row>> {
                 page_label: label.clone(),
                 layer: layer.id(),
                 source: source.map(|source| source.text.value).unwrap_or_default(),
-                translation: content
-                    .translation()?
-                    .map(|text| text.text.value)
-                    .unwrap_or_default(),
+                translation_checked: translation.is_some(),
+                translation: translation.map(|text| text.text.value).unwrap_or_default(),
                 detected: region.is_some(),
                 ocr_checked,
                 category: Some(
@@ -197,7 +206,7 @@ pub(crate) async fn run_qc(
     .await
 }
 
-async fn run_checks(
+pub(crate) async fn run_checks(
     scope: QcScope,
     on_progress: Option<Channel<QcProgress>>,
     automatic: bool,
@@ -231,7 +240,7 @@ async fn run_checks(
     let renderer = desktop.renderer();
     for_progress(&on_progress, 0, total);
     for (index, page) in pages.into_iter().enumerate() {
-        let qualified = !automatic || qualifies(&snapshot, page, &rows, &skip)?;
+        let qualified = !automatic || qualifies(page, &rows, &skip);
         let signature = signature(&snapshot, &context, page, &settings, &majorities, &skip)?;
         let unchanged = cache::with_cache(&snapshot, directory.as_deref(), |cache| {
             cache
@@ -348,14 +357,16 @@ async fn run_checks(
         return Err(anyhow::anyhow!("project changed during QC").into());
     }
     let context = current.load_context()?;
-    Ok(cache::with_cache(
+    let mut report = cache::with_cache(
         &snapshot,
         directory.as_deref(),
         |cache| {
             cache.save(directory.as_deref(), &snapshot, complete);
             cache.report(&snapshot, &context)
         },
-    ))
+    );
+    review::append_hidden(&snapshot, &context, &mut report)?;
+    Ok(report)
 }
 
 fn small_text_detail(size: Option<f32>, base: Option<f32>, minimum: f32) -> Option<String> {
@@ -373,34 +384,17 @@ fn for_progress(channel: &Option<Channel<QcProgress>>, completed: u32, total: u3
     }
 }
 
-fn qualifies(
-    snapshot: &Snapshot,
-    page: EntityId,
-    rows: &[Row],
-    skip: &BTreeSet<EntityId>,
-) -> Result<bool> {
-    let mut has_boxes = false;
-    for row in rows.iter().filter(|row| row.page == page) {
-        has_boxes = true;
-        if !skip.contains(&row.layer) && row.translation.trim().is_empty() {
-            return Ok(false);
-        }
-    }
-    if !has_boxes {
-        return Ok(false);
-    }
-    for entity in snapshot.descendants(page)? {
-        if snapshot
-            .component::<koharu_scene::RasterLayer>(entity.id())?
-            .is_some_and(|raster| raster.kind == koharu_scene::RasterLayerKind::Cleanup)
-            && snapshot
-                .asset(entity.id(), &AssetRole::new("source")?)?
-                .is_some()
-        {
-            return Ok(true);
-        }
-    }
-    Ok(false)
+fn qualifies(page: EntityId, rows: &[Row], skip: &BTreeSet<EntityId>) -> bool {
+    let boxes: Vec<_> = rows.iter().filter(|row| row.page == page).collect();
+    // A missing line must not hold back the other translated boxes from QC.
+    // An entirely blank OCR page can be reviewed without inventing a translation.
+    !boxes.is_empty()
+        && boxes.iter().all(|row| !row.detected || row.ocr_checked)
+        && (boxes.iter().any(|row| row.translation_checked)
+            || boxes.iter().all(|row| {
+                skip.contains(&row.layer)
+                    || (row.detected && row.ocr_checked && row.source.trim().is_empty())
+            }))
 }
 
 fn signature(
@@ -451,9 +445,11 @@ pub(crate) async fn get_qc_results(
     let project = projects.as_ref().context("no project is open")?;
     let snapshot = project.snapshot();
     let context = project.load_context()?;
-    Ok(cache::with_cache(&snapshot, project.directory(), |cache| {
+    let mut report = cache::with_cache(&snapshot, project.directory(), |cache| {
         cache.report(&snapshot, &context)
-    }))
+    });
+    review::append_hidden(&snapshot, &context, &mut report)?;
+    Ok(report)
 }
 
 fn acknowledgement(check: QcCheck, flag: Option<&Flag>) -> String {
@@ -482,20 +478,9 @@ pub(crate) async fn mark_qc_finding(
     ok: bool,
     project: State<'_, CurrentProject>,
 ) -> std::result::Result<(), Error> {
-    if (check == QcCheck::Flag) != flag.is_some() {
-        return Err(anyhow::anyhow!("invalid QC finding").into());
-    }
     let projects = project.project.lock().await;
     let project = projects.as_ref().context("no project is open")?;
-    project.snapshot().text_layer(layer)?;
-    let id = acknowledgement(check, flag.as_ref());
-    project.update_context(|context| {
-        let line = context.lines.entry(layer).or_default();
-        line.qc_ok.retain(|entry| entry != &id);
-        if ok {
-            line.qc_ok.push(id);
-        }
-    })?;
+    review::acknowledge(project, layer, check, flag.as_ref(), ok)?;
     Ok(())
 }
 
@@ -514,7 +499,7 @@ fn text_checks(
     if row.detected && row.ocr_checked && row.source.trim().is_empty() {
         checks.push((QcCheck::EmptySource, String::new()));
     }
-    if has_leftover_source(&row.source, &row.translation) {
+    if !skip.contains(&row.layer) && has_leftover_source(&row.translation) {
         checks.push((QcCheck::LeftoverSource, String::new()));
     }
     if !row.user_font
@@ -562,14 +547,7 @@ pub(crate) async fn mark_qc_ok(
     }
     let project = project.project.lock().await;
     let project = project.as_ref().context("no project is open")?;
-    project.snapshot().text_layer(layer)?;
-    project.update_context(|context| {
-        let line = context.lines.entry(layer).or_default();
-        line.qc_ok.retain(|id| id != check.id());
-        if ok {
-            line.qc_ok.push(check.id().to_owned());
-        }
-    })?;
+    review::acknowledge(project, layer, check, None, ok)?;
     Ok(())
 }
 
@@ -613,7 +591,7 @@ mod tests {
     };
     use std::{io::Cursor, sync::Arc};
 
-    async fn chapter() -> (tempfile::TempDir, Project, EntityId, EntityId) {
+    pub(super) async fn chapter() -> (tempfile::TempDir, Project, EntityId, EntityId) {
         let directory = tempfile::tempdir().unwrap();
         let mut project = Project::create(
             "QC fixture".into(),
@@ -694,32 +672,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn automatic_eligibility_needs_boxes_translation_and_cleanup_and_respects_sfx_skip() {
+    async fn automatic_eligibility_reviews_partial_translation_and_empty_ocr_but_waits_for_reading() {
         let (_directory, mut project, page, layer) = chapter().await;
         let snapshot = project.snapshot();
         let rows = rows(&snapshot, &project.load_context().unwrap()).unwrap();
-        assert!(qualifies(&snapshot, page, &rows, &BTreeSet::new()).unwrap());
+        assert!(qualifies(page, &rows, &BTreeSet::new()));
+        let mut partial = self::rows(&snapshot, &project.load_context().unwrap()).unwrap();
+        let mut missing = self::rows(&snapshot, &project.load_context().unwrap())
+            .unwrap()
+            .remove(0);
+        missing.layer = EntityId::new();
+        missing.translation.clear();
+        missing.translation_checked = false;
+        partial.push(missing);
+        assert!(qualifies(page, &partial, &BTreeSet::new()));
         project.set_translation(layer, None).await.unwrap();
         let snapshot = project.snapshot();
         let rows = self::rows(&snapshot, &project.load_context().unwrap()).unwrap();
-        assert!(!qualifies(&snapshot, page, &rows, &BTreeSet::new()).unwrap());
-        assert!(qualifies(&snapshot, page, &rows, &BTreeSet::from([layer])).unwrap());
-        let cleanup = snapshot
-            .descendants(page)
-            .unwrap()
-            .find(|entity| {
-                snapshot
-                    .component::<RasterLayer>(entity.id())
-                    .unwrap()
-                    .is_some()
-            })
-            .unwrap()
-            .id();
-        let patch = snapshot
-            .patch(|edit| edit.remove_entity(cleanup, koharu_scene::RemovePolicy::Cascade))
-            .unwrap();
-        project.commit(patch).await.unwrap();
-        assert!(!qualifies(&project.snapshot(), page, &rows, &BTreeSet::from([layer])).unwrap());
+        assert!(!qualifies(page, &rows, &BTreeSet::new()));
+        assert!(qualifies(page, &rows, &BTreeSet::from([layer])));
+        let mut blank = self::rows(&snapshot, &project.load_context().unwrap()).unwrap();
+        blank[0].detected = true;
+        blank[0].source.clear();
+        blank[0].ocr_checked = true;
+        assert!(qualifies(page, &blank, &BTreeSet::new()));
+        blank[0].ocr_checked = false;
+        assert!(!qualifies(page, &blank, &BTreeSet::new()));
+        blank[0].ocr_checked = true;
+        blank[0].source = "source".into();
+        blank[0].translation_checked = true;
+        assert!(qualifies(page, &blank, &BTreeSet::new()));
     }
 
     #[tokio::test]

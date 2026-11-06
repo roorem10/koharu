@@ -741,7 +741,35 @@
     "agent": "エージェント",
     "noBoxIssues": "このボックスに問題はありません。",
     "hidden": "非表示（OKに設定済み）",
-    "editorPanels": "エディターのパネル"
+    "editorPanels": "エディターのパネル",
+    "fixAutomatically": "自動修正",
+    "fixBox": "このボックスを自動修正",
+    "checkFirst": "優先して確認",
+    "reviewGroups": {
+      "open": "未解決の問題",
+      "auto_fixed": "自動修正済み",
+      "unsure": "確信度の低い推定"
+    },
+    "looksGood": "問題なし",
+    "looksGoodFor": "{{check}} を問題なしにする",
+    "autoFixedReason": "自動修正：{{reason}}",
+    "previousSource": "修正前の原文",
+    "previousTranslation": "修正前の訳文",
+    "fixSummary": "{{fixes}} 件修正 · 残り {{left}} 件 · {{requests}} リクエスト",
+    "autoFix": "品質チェックの問題を自動修正する",
+    "autoFixDescription": "翻訳後、手動で編集していないボックスの機械的な問題を修正します。",
+    "letteringUnsure": "文字組みの推定が不確か：{{category}}",
+    "emptyText": "（空）",
+    "fixReasons": {
+      "tighten_layout": "行間・ハイフネーション・吹き出し内の配置を調整",
+      "shorten_translation": "短い表現に変更：意味を確認してください",
+      "translate_missing": "訳文の欠落",
+      "translate_leftover": "訳文に残った日本語",
+      "translate_glossary": "必須の用語集項目",
+      "apply_category_style": "カテゴリの文字スタイル",
+      "read_again": "空の原文を再読み取り",
+      "hide_empty": "再読み取り後も空のため、誤検出の可能性が高いものとして非表示"
+    }
   },
   "rawPrep": {
     "title": "ページのレベル補正",
