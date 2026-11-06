@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { offerTranslationTerm } from '@/components/context/TermLearningOffer'
 import { originalVisible, useCompareStore } from '@/components/qc/compare'
 import { call } from '@/lib/backend'
 import { effectiveLayerVisibility } from '@/lib/document'
@@ -42,6 +43,7 @@ type Session = {
   page: EntityId
   project: string | undefined
   saved: string
+  initial: string
   draft: string
   glyphText: string
   anchor: number
@@ -190,6 +192,13 @@ export function useRichTextEditor(): {
       session.current = null
       drag.current = null
       useRichTextSelection.getState().setSelection(null)
+      void offerTranslationTerm(
+        s.layer.id,
+        s.layer.content.source?.text ?? '',
+        s.initial,
+        s.saved,
+        s.project,
+      ).catch(() => undefined)
       update()
     } catch {
       // Retain the draft when a native edit failed so the user can retry it.
@@ -283,6 +292,7 @@ export function useRichTextEditor(): {
       page: current.current.page.id,
       project: current.current.project,
       saved: text,
+      initial: layer.content.translation?.text ?? '',
       draft: text,
       glyphText: text,
       anchor: 0,

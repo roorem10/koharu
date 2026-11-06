@@ -407,6 +407,7 @@ pub(crate) struct Project {
     pub(crate) active_page: Option<EntityId>,
     pub(crate) undo: Vec<Vec<Revision>>,
     pub(crate) redo: Vec<Vec<Revision>>,
+    pub(crate) series_edits: std::collections::BTreeMap<Revision, Vec<super::context::sync::SeriesEdit>>,
     /// The last on-page typing commit (layer, editing session, revision), so a run
     /// of typing in one session is undone as one step.
     pub(crate) typing: Option<(EntityId, u32, Revision)>,
@@ -437,6 +438,7 @@ impl Project {
             active_page,
             undo: Vec::new(),
             redo: Vec::new(),
+            series_edits: Default::default(),
             typing: None,
             directory: None,
         }
@@ -1246,27 +1248,33 @@ impl Project {
     }
 
     pub(crate) async fn undo(&mut self) -> Result<Commit> {
-        let revisions = self.undo.pop().ok_or_else(|| anyhow!("nothing to undo"))?;
+        let revisions = self.undo.last().cloned().ok_or_else(|| anyhow!("nothing to undo"))?;
+        let edits = super::context::sync::reverse_edits(self, &revisions)?;
         let commit = match self.session.undo_many(revisions.iter().copied()).await {
             Ok(commit) => commit,
             Err(error) => {
-                self.undo.push(revisions);
+                super::context::sync::restore_edits(self, &edits)?;
                 return Err(error.into());
             }
         };
+        self.undo.pop();
+        super::context::sync::record_inverse(self, commit.revision, edits);
         self.redo.push(vec![commit.revision]);
         Ok(commit)
     }
 
     pub(crate) async fn redo(&mut self) -> Result<Commit> {
-        let revisions = self.redo.pop().ok_or_else(|| anyhow!("nothing to redo"))?;
+        let revisions = self.redo.last().cloned().ok_or_else(|| anyhow!("nothing to redo"))?;
+        let edits = super::context::sync::reverse_edits(self, &revisions)?;
         let commit = match self.session.undo_many(revisions.iter().copied()).await {
             Ok(commit) => commit,
             Err(error) => {
-                self.redo.push(revisions);
+                super::context::sync::restore_edits(self, &edits)?;
                 return Err(error.into());
             }
         };
+        self.redo.pop();
+        super::context::sync::record_inverse(self, commit.revision, edits);
         self.undo.push(vec![commit.revision]);
         Ok(commit)
     }

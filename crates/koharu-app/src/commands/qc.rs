@@ -733,7 +733,7 @@ mod tests {
             locked: true,
             ..Default::default()
         });
-        super::super::context::series::save_series(series.clone()).unwrap();
+        super::super::context::series::import_series(series.clone(), false).unwrap();
         project
             .update_context(|context| context.series = Some(series.id.clone()))
             .unwrap();

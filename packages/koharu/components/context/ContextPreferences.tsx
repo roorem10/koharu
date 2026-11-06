@@ -46,6 +46,16 @@ export function ContextPreferences() {
     >
       {settings && (
         <>
+          <PreferenceRow title={t('chapterContext.autoSaveTerms')}>
+            <Checkbox
+              aria-label={t('chapterContext.autoSaveTerms')}
+              checked={settings.auto_save_terms}
+              disabled={mutation.isPending}
+              onCheckedChange={(checked) =>
+                save({ ...settings, auto_save_terms: checked === true })
+              }
+            />
+          </PreferenceRow>
           <PreferenceRow title={t('chapterContext.automaticReading')}>
             <Select
               value={settings.read_when === 'never' ? 'no' : 'yes'}

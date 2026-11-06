@@ -20,6 +20,7 @@ import { type DragEvent, type MouseEvent, useEffect, useMemo, useRef, useState }
 import { useTranslation } from 'react-i18next'
 
 import { GlossaryTextMenu } from '@/components/context/GlossaryTextMenu'
+import { TranslationTextarea } from '@/components/context/TranslationTextarea'
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { layerDropIndex } from '@/components/files/layer-order'
 import { useBoxIssues } from '@/components/qc/useBoxIssues'
@@ -668,17 +669,12 @@ function RowTranslation({
   const words = useRowWordToolbar(layer)
   return (
     <>
-      <CommitTextarea
+      <TranslationTextarea
+        layer={layer}
         data-testid={`row-translation-${layer.id}`}
         aria-label={label}
         wrap='soft'
         className='max-h-16 min-h-9 w-full max-w-full min-w-0 resize-y overflow-y-auto rounded-md border-primary/25 bg-background px-1.5 py-1 text-[12px] leading-4 md:text-[12px]'
-        value={layer.content.translation?.text ?? ''}
-        onCommit={(text) =>
-          void call(commands.setTranslation, layer.id, text.trim() ? text : null)
-            .then(() => refresh(projectKey, pageKey))
-            .catch(() => undefined)
-        }
         {...words.textareaProps}
       />
       {words.toolbar}

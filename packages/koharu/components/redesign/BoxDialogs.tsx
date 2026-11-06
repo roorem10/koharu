@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { discussLineEvent } from '@/components/context/events'
 import { GlossaryTextMenu } from '@/components/context/GlossaryTextMenu'
-import { CommitTextarea } from '@/components/controls/CommitTextarea'
+import { TranslationTextarea } from '@/components/context/TranslationTextarea'
 import { BoxActions } from '@/components/editor/BoxActions'
 import { BoxNoteLine } from '@/components/editor/BoxNoteLine'
 import { BubbleShapeLine } from '@/components/editor/BubbleShapeLine'
@@ -382,16 +382,11 @@ function SourceSection({ layer }: { layer: TextLayer }) {
       </Field>
       <Field label={t('inspector.translation')}>
         <GlossaryTextMenu field='translation' source={source} translation={translation}>
-          <CommitTextarea
+          <TranslationTextarea
+            layer={layer}
             data-testid={`edit-translation-${layer.id}`}
             aria-label={t('redesign.translationText')}
-            value={translation}
             className='min-h-24 w-full resize-y text-xs'
-            onCommit={(text) =>
-              void call(commands.setTranslation, layer.id, text.trim() ? text : null)
-                .then(() => refresh(projectKey, pageKey))
-                .catch(() => undefined)
-            }
           />
         </GlossaryTextMenu>
       </Field>

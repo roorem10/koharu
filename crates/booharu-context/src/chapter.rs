@@ -43,6 +43,8 @@ pub struct ChapterCharacter {
     pub name: String,
     pub original: String,
     pub pages: Vec<u32>,
+    pub notes: String,
+    pub notes_confidence: Option<f32>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize, Type)]
@@ -104,9 +106,12 @@ impl ProjectContext {
             let source = term.source.trim();
             if source.is_empty()
                 || term.target.trim().is_empty()
-                || series
+                || series.iter().any(|entry| {
+                    entry.source.trim() == source && entry.target.trim() == term.target.trim()
+                })
+                || self
+                    .suggestions
                     .iter()
-                    .chain(&self.suggestions)
                     .any(|entry| entry.source.trim() == source)
             {
                 continue;
@@ -252,7 +257,7 @@ mod tests {
             LetteringCategory::Thoughts
         );
         assert_eq!(context.brief.unwrap().summary, "User summary");
-        assert_eq!(context.suggestions.len(), 1);
+        assert_eq!(context.suggestions.len(), 2);
         assert_eq!(context.lines.len(), 1);
         assert_eq!(series[0].target, "Hina");
     }

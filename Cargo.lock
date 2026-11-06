@@ -946,6 +946,7 @@ name = "booharu-context"
 version = "0.83.5"
 dependencies = [
  "anyhow",
+ "fs4",
  "koharu-scene",
  "serde",
  "serde_json",

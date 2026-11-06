@@ -184,7 +184,21 @@
     "run": "Run",
     "view": "View",
     "lastReadWith": "Last read {{time}} with {{model}}",
-    "unknownModel": "an earlier model"
+    "unknownModel": "an earlier model",
+    "saveTermsToSeries": "Save terms to series",
+    "saveUsedTermsHint": "Save suggested terms found in both the source and translation. New entries stay unlocked.",
+    "termsSaved": "Terms added to the series: {{count}}",
+    "termConflicts": "Different translations",
+    "seriesTerm": "Series: {{target}}",
+    "chapterTerm": "Chapter: {{target}}",
+    "termConflictChoices": {
+      "keep_series": "Keep series",
+      "use_chapter": "Use chapter and update series",
+      "leave": "Leave as is"
+    },
+    "autoSaveTerms": "Save used terms to the series when a chapter finishes",
+    "learnedTerm": "{{source}}: {{before}} → {{after}}",
+    "useEverywhereAndSave": "Use this everywhere and save it to the series"
   },
   "cleanup": {
     "title": "Cleanup",

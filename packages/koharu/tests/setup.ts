@@ -98,6 +98,7 @@ beforeEach(() => {
     context: { version: 1, series: null, brief: null, suggestions: [], lines: {} },
     series: null,
     supports_tasks: false,
+    term_conflicts: [],
   })
   vi.spyOn(commands, 'getContextSettings').mockResolvedValue({
     read_when: 'missing',

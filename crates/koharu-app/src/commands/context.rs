@@ -3,10 +3,12 @@
 //! Owned by WO-18. The shared foundation only adds the translation hints hook.
 
 pub(crate) mod history;
+pub(crate) mod agent;
 pub(crate) mod lines;
 pub(crate) mod reading;
 pub(crate) mod series;
 pub(crate) mod settings;
+pub(crate) mod sync;
 
 pub(crate) use lines::refresh_flags;
 pub(crate) use reading::{auto_read, wants_auto_read};
@@ -29,11 +31,15 @@ pub(crate) fn translation_hints(
     let series = linked_series(context)?;
     let settings = settings::load()?;
     let mut glossary = Vec::new();
+    let mut sources = std::collections::BTreeSet::new();
     for entry in series
         .iter()
         .flat_map(|series| &series.glossary)
         .chain(&context.suggestions)
     {
+        if !sources.insert(entry.source.trim().to_owned()) {
+            continue;
+        }
         glossary.push(koharu_pipeline::GlossaryTerm {
             hint: koharu_translator::GlossaryHint {
                 source: entry.source.clone(),
@@ -58,18 +64,19 @@ pub(crate) fn translation_hints(
             .flat_map(|brief| &brief.characters)
             .filter(|character| character.pages.contains(&(index as u32 + 1)))
             .map(|character| {
-                let notes = series
+                let canonical = series
                     .as_ref()
                     .and_then(|series| {
                         series.characters.iter().find(|entry| {
-                            entry.name == character.name
-                                || (!entry.original.is_empty()
-                                    && entry.original == character.original)
+                            entry.name.trim() == character.name.trim()
+                                || (!entry.original.trim().is_empty()
+                                    && entry.original.trim() == character.original.trim())
                         })
-                    })
-                    .map(|entry| entry.notes.as_str())
-                    .unwrap_or_default();
-                format!("{} ({}): {}", character.name, character.original, notes)
+                    });
+                match canonical {
+                    Some(entry) => format!("{} ({}): {}", entry.name, entry.original, entry.notes),
+                    None => format!("{} ({})", character.name, character.original),
+                }
             })
             .collect();
         if !names.is_empty() {
@@ -93,6 +100,7 @@ pub struct ChapterState {
     pub context: ProjectContext,
     pub series: Option<booharu_context::Series>,
     pub supports_tasks: bool,
+    pub term_conflicts: Vec<booharu_context::TermConflict>,
 }
 
 #[tauri::command]
@@ -105,6 +113,9 @@ pub(crate) async fn get_chapter_context(
     refresh_flags(project)?;
     let context = project.load_context()?;
     let series = linked_series(&context)?;
+    let term_conflicts = series.as_ref()
+        .map(|series| booharu_context::term_conflicts(&context, series))
+        .transpose()?.unwrap_or_default();
     let config = koharu_pipeline::PipelineConfig::load()?;
     let supports_tasks =
         koharu_translator::Translator::supports_tasks(&config.read()?.translation.model);
@@ -112,6 +123,7 @@ pub(crate) async fn get_chapter_context(
         context,
         series,
         supports_tasks,
+        term_conflicts,
     })
 }
 
@@ -155,17 +167,12 @@ pub(crate) async fn accept_suggestion(
     if !(context.suggestions.iter().any(|term| term.id == entry.id)) {
         return Err(anyhow::anyhow!("suggestion no longer exists").into());
     }
-    let mut series =
-        series::store()?.get(context.series.as_deref().context("pick a series first")?)?;
-    if !(!series
-        .glossary
-        .iter()
-        .any(|term| term.source.trim() == entry.source.trim()))
-    {
-        return Err(anyhow::anyhow!("term already exists in series glossary").into());
-    }
-    series.glossary.push(entry.clone());
-    series::store()?.save(&series)?;
+    series::store()?.update(context.series.as_deref().context("pick a series first")?, |series| {
+        anyhow::ensure!(!series.glossary.iter().any(|term| term.source.trim() == entry.source.trim()),
+            "term already exists in series glossary");
+        series.glossary.push(entry.clone());
+        Ok(())
+    })?;
     project.update_context(|context| context.suggestions.retain(|term| term.id != entry.id))?;
     Ok(())
 }

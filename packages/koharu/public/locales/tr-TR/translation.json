@@ -184,7 +184,21 @@
     "run": "Run",
     "view": "Görüntüle",
     "lastReadWith": "Son okuma: {{time}}, model: {{model}}",
-    "unknownModel": "önceki bir model"
+    "unknownModel": "önceki bir model",
+    "saveTermsToSeries": "Terimleri seriye kaydet",
+    "saveUsedTermsHint": "Hem kaynakta hem de çeviride kullanılan önerilen terimleri kaydeder. Yeni girdiler kilitlenmez.",
+    "termsSaved": "Seriye eklenen terim sayısı: {{count}}",
+    "termConflicts": "Farklı çeviriler",
+    "seriesTerm": "Seri: {{target}}",
+    "chapterTerm": "Bölüm: {{target}}",
+    "termConflictChoices": {
+      "keep_series": "Serideki çeviriyi koru",
+      "use_chapter": "Bölümdeki çeviriyle seriyi güncelle",
+      "leave": "Olduğu gibi bırak"
+    },
+    "autoSaveTerms": "Bölüm tamamlandığında kullanılan terimleri seriye kaydet",
+    "learnedTerm": "{{source}}: {{before}} → {{after}}",
+    "useEverywhereAndSave": "Bu çeviriyi her yerde kullan ve seriye kaydet"
   },
   "cleanup": {
     "title": "Temizleme",

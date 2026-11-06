@@ -184,7 +184,21 @@
     "run": "Run",
     "view": "보기",
     "lastReadWith": "마지막 읽기: {{time}}, 사용 모델: {{model}}",
-    "unknownModel": "이전 모델"
+    "unknownModel": "이전 모델",
+    "saveTermsToSeries": "용어를 시리즈에 저장",
+    "saveUsedTermsHint": "원문과 번역에 모두 사용된 추천 용어를 저장합니다. 새 항목은 잠기지 않습니다.",
+    "termsSaved": "시리즈에 추가한 용어 수: {{count}}",
+    "termConflicts": "서로 다른 번역",
+    "seriesTerm": "시리즈: {{target}}",
+    "chapterTerm": "챕터: {{target}}",
+    "termConflictChoices": {
+      "keep_series": "시리즈 번역 유지",
+      "use_chapter": "챕터 번역으로 시리즈 업데이트",
+      "leave": "그대로 두기"
+    },
+    "autoSaveTerms": "챕터가 완료되면 사용한 용어를 시리즈에 저장",
+    "learnedTerm": "{{source}}: {{before}} → {{after}}",
+    "useEverywhereAndSave": "이 번역을 전체에 적용하고 시리즈에 저장"
   },
   "cleanup": {
     "title": "정리",

@@ -7,6 +7,7 @@
 mod chapter;
 mod lettering;
 mod series;
+mod series_sync;
 mod sidecar;
 
 pub use lettering::LetteringCategory;
@@ -19,3 +20,8 @@ pub use chapter::{
     InstructionTerm, ReadLine, SuggestedTerm, TermKind, instruction_terms,
 };
 pub use series::{Series, SeriesStore, atomic_json};
+pub use series_sync::{
+    TermConflict, TermConflictChoice, TermSyncResult, UsedTranslation,
+    merge_chapter_characters, resolve_term_conflict, save_chapter_terms_to_series,
+    term_conflicts,
+};

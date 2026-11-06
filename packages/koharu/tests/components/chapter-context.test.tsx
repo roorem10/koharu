@@ -6,6 +6,7 @@ import { ContextPanel } from '@/components/context/ContextPanel'
 import { GlossaryTextMenu } from '@/components/context/GlossaryTextMenu'
 import { LineContextCard } from '@/components/editor/LineContextCard'
 import { pagesKey, projectKey, queryClient } from '@/lib/queries'
+import translations from '@/public/locales/en-US/translation.json'
 import { commands, type ChapterState, type Series } from '@koharu/bridge/protocol'
 
 const series: Series = {
@@ -25,6 +26,7 @@ const chapter: ChapterState = {
   },
   series,
   supports_tasks: true,
+  term_conflicts: [],
 }
 
 function setup() {
@@ -44,6 +46,29 @@ function setup() {
 }
 
 describe('chapter context', () => {
+  it('shows a conflicting suggestion as a choice immediately, without an unusable Accept action', async () => {
+    setup()
+    vi.mocked(commands.getChapterContext).mockResolvedValue({
+      ...chapter,
+      context: {
+        ...chapter.context,
+        suggestions: [{ id: 'variant', source: 'ヒナ', target: 'Heena', kind: 'name' }],
+      },
+      term_conflicts: [{ source: 'ヒナ', series_target: 'Hina', chapter_target: 'Heena' }],
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ContextPanel />
+      </QueryClientProvider>,
+    )
+    expect(
+      await screen.findByRole('region', { name: translations.chapterContext.termConflicts }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: translations.chapterContext.accept }),
+    ).not.toBeInTheDocument()
+  })
+
   it('renders the brief and glossary in the Context panel', async () => {
     setup()
     render(
@@ -61,7 +86,7 @@ describe('chapter context', () => {
   it('adds selected source text to the glossary through the editable-field menu', async () => {
     setup()
     vi.spyOn(commands, 'getSeries').mockResolvedValue(series)
-    const save = vi.spyOn(commands, 'saveSeries').mockImplementation(async (value) => value)
+    const save = vi.spyOn(commands, 'saveSeries').mockImplementation(async (_, value) => value)
     vi.spyOn(commands, 'glossaryUsage').mockResolvedValue({ layers: [], skipped: 0 })
     render(
       <QueryClientProvider client={queryClient}>
@@ -78,7 +103,8 @@ describe('chapter context', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Lock this translation' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(save).toHaveBeenCalled())
-    expect(save.mock.calls[0][0].glossary).toContainEqual(
+    expect(save.mock.calls[0][0]).toEqual(series)
+    expect(save.mock.calls[0][1].glossary).toContainEqual(
       expect.objectContaining({ source: '魔王', target: 'The Demon King', locked: true }),
     )
   })

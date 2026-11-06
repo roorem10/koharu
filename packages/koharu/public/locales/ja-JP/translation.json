@@ -184,7 +184,21 @@
     "run": "Run",
     "view": "表示",
     "lastReadWith": "最終読み込み：{{time}}、使用モデル：{{model}}",
-    "unknownModel": "以前のモデル"
+    "unknownModel": "以前のモデル",
+    "saveTermsToSeries": "用語をシリーズに保存",
+    "saveUsedTermsHint": "原文と翻訳の両方で使われている用語候補を保存します。新しい項目はロックされません。",
+    "termsSaved": "シリーズに追加した用語数：{{count}}",
+    "termConflicts": "翻訳の相違",
+    "seriesTerm": "シリーズ：{{target}}",
+    "chapterTerm": "章：{{target}}",
+    "termConflictChoices": {
+      "keep_series": "シリーズの訳を維持",
+      "use_chapter": "章の訳でシリーズを更新",
+      "leave": "そのままにする"
+    },
+    "autoSaveTerms": "章の完了時に使用した用語をシリーズに保存",
+    "learnedTerm": "{{source}}：{{before}} → {{after}}",
+    "useEverywhereAndSave": "この訳を全体で使い、シリーズに保存"
   },
   "cleanup": {
     "title": "クリーンアップ",

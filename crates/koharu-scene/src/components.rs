@@ -6,6 +6,7 @@
 
 mod analysis;
 mod assets;
+mod context_edit;
 mod groups;
 mod layers;
 mod provenance;
@@ -19,6 +20,7 @@ pub use analysis::{
 };
 pub(crate) use assets::Assets;
 pub use assets::{Asset, AssetInput, AssetMetadata, AssetRole};
+pub use context_edit::ContextEdit;
 pub use groups::{Group, TextGroup};
 pub use layers::{
     FillGradient, FontStyle, GradientKind, GradientStop, RasterLayer, RasterLayerKind, StrokeJoin,

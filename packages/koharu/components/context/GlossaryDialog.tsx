@@ -16,6 +16,7 @@ import { Textarea } from '@koharu/ui/components/textarea'
 import { refreshContext, seriesKey, useSeries } from './data'
 import { InstructionImport } from './InstructionImport'
 import { SeriesPicker } from './SeriesPicker'
+import { retranslateTerm } from './term-usage'
 import { newTerm, TermForm } from './TermForm'
 import type { GlossaryEntry, Series } from './types'
 
@@ -40,13 +41,7 @@ export function TermUsage({ source }: { source: string }) {
         size='sm'
         variant='outline'
         disabled={usage.layers.length === usage.skipped}
-        onClick={() =>
-          void call(
-            commands.process,
-            { scope: 'entities', value: usage.layers },
-            { operation: 'only', stage: 'translation' },
-          ).catch(() => undefined)
-        }
+        onClick={() => void retranslateTerm(usage).catch(() => undefined)}
       >
         {t('chapterContext.retranslate')}
       </Button>
@@ -85,9 +80,10 @@ export function GlossaryDialog({
     setDraft(series ?? null)
   }, [series])
   async function save(value: Series) {
+    if (!series) return
     setBusy(true)
     try {
-      setDraft((await call(commands.saveSeries, value)) as Series)
+      setDraft((await call(commands.saveSeries, series, value)) as Series)
       await refreshContext()
     } finally {
       setBusy(false)

@@ -184,7 +184,21 @@
     "run": "Run",
     "view": "Ver",
     "lastReadWith": "Última leitura em {{time}} com {{model}}",
-    "unknownModel": "um modelo anterior"
+    "unknownModel": "um modelo anterior",
+    "saveTermsToSeries": "Salvar termos na série",
+    "saveUsedTermsHint": "Salva os termos sugeridos presentes no original e na tradução. As novas entradas permanecem desbloqueadas.",
+    "termsSaved": "Termos adicionados à série: {{count}}",
+    "termConflicts": "Traduções diferentes",
+    "seriesTerm": "Série: {{target}}",
+    "chapterTerm": "Capítulo: {{target}}",
+    "termConflictChoices": {
+      "keep_series": "Manter a versão da série",
+      "use_chapter": "Atualizar a série com a versão do capítulo",
+      "leave": "Deixar como está"
+    },
+    "autoSaveTerms": "Salvar os termos usados na série ao concluir um capítulo",
+    "learnedTerm": "{{source}}: {{before}} → {{after}}",
+    "useEverywhereAndSave": "Usar esta tradução em todo lugar e salvá-la na série"
   },
   "cleanup": {
     "title": "Limpeza",

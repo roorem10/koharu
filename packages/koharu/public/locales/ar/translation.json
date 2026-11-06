@@ -188,7 +188,21 @@
     "run": "Run",
     "view": "عرض",
     "lastReadWith": "آخر قراءة {{time}} باستخدام {{model}}",
-    "unknownModel": "نموذج سابق"
+    "unknownModel": "نموذج سابق",
+    "saveTermsToSeries": "حفظ المصطلحات في السلسلة",
+    "saveUsedTermsHint": "تُحفظ المصطلحات المقترحة المستخدمة في النص الأصلي والترجمة معًا. تبقى الإدخالات الجديدة غير مقفلة.",
+    "termsSaved": "عدد المصطلحات المضافة إلى السلسلة: {{count}}",
+    "termConflicts": "ترجمات مختلفة",
+    "seriesTerm": "السلسلة: {{target}}",
+    "chapterTerm": "الفصل: {{target}}",
+    "termConflictChoices": {
+      "keep_series": "الإبقاء على ترجمة السلسلة",
+      "use_chapter": "تحديث السلسلة بترجمة الفصل",
+      "leave": "تركها كما هي"
+    },
+    "autoSaveTerms": "حفظ المصطلحات المستخدمة في السلسلة عند إكمال الفصل",
+    "learnedTerm": "{{source}}: {{before}} ← {{after}}",
+    "useEverywhereAndSave": "استخدام هذه الترجمة في كل المواضع وحفظها في السلسلة"
   },
   "cleanup": {
     "title": "التنظيف",

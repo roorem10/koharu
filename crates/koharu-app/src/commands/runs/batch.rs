@@ -361,7 +361,7 @@ async fn run_chapter(
         .context("no batch project is open")?
         .snapshot()
         .project_id();
-    let result = async {
+    let mut result = async {
         // This uses the same collector and importer as File > Import.
         let pages = tokio::task::spawn_blocking(move || import::import(input.paths))
             .await
@@ -423,6 +423,18 @@ async fn run_chapter(
         .as_ref()
         .is_some_and(|project| project.snapshot().project_id() == expected);
     if still_owned {
+        if matches!(&result, Ok(job) if job.state == JobState::Finished) {
+            let mut projects = current.project.lock().await;
+            let Some(project) = projects.as_mut().filter(|project| project.snapshot().project_id() == expected) else {
+                control.stop.stop();
+                anyhow::bail!("the active project changed; the batch was stopped");
+            };
+            match super::super::context::sync::auto_save_chapter_terms_to_series(project).await {
+                Ok(Some(commit)) => project.record_commit(&commit),
+                Ok(None) => {}
+                Err(error) => result = Err(error),
+            }
+        }
         lifecycle::close_project(handle.clone())
             .await
             .map_err(|error| anyhow::anyhow!("{error:?}"))?;

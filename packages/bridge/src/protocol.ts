@@ -73,7 +73,7 @@ export const commands = {
 	listSeries: () => __TAURI_INVOKE<Series[]>("list_series"),
 	createSeries: (name: string) => __TAURI_INVOKE<Series>("create_series", { name }),
 	getSeries: (id: string) => __TAURI_INVOKE<Series>("get_series", { id }),
-	saveSeries: (series: Series) => __TAURI_INVOKE<Series>("save_series", { series }),
+	saveSeries: (expected: Series, series: Series) => __TAURI_INVOKE<Series>("save_series", { expected, series }),
 	renameSeries: (id: string, name: string) => __TAURI_INVOKE<Series>("rename_series", { id, name }),
 	deleteSeries: (id: string) => __TAURI_INVOKE<null>("delete_series", { id }),
 	setProjectSeries: (id: string | null) => __TAURI_INVOKE<null>("set_project_series", { id }),
@@ -86,6 +86,10 @@ export const commands = {
 	saveChapterSummary: (summary: string) => __TAURI_INVOKE<null>("save_chapter_summary", { summary }),
 	dismissSuggestion: (id: string) => __TAURI_INVOKE<null>("dismiss_suggestion", { id }),
 	acceptSuggestion: (entry: GlossaryEntry) => __TAURI_INVOKE<null>("accept_suggestion", { entry }),
+	saveChapterTermsToSeries: () => __TAURI_INVOKE<TermSyncResult>("save_chapter_terms_to_series"),
+	resolveSeriesTermConflict: (conflict: TermConflict, choice: TermConflictChoice) => __TAURI_INVOKE<null>("resolve_series_term_conflict", { conflict, choice }),
+	updateSeriesTerm: (seriesId: string, source: string, expectedTarget: string, target: string, projectName: string) => __TAURI_INVOKE<null>("update_series_term", { seriesId, source, expectedTarget, target, projectName }),
+	claimTermOffer: (seriesId: string, source: string, expectedTarget: string, target: string, projectName: string) => __TAURI_INVOKE<boolean>("claim_term_offer", { seriesId, source, expectedTarget, target, projectName }),
 	getContextSettings: () => __TAURI_INVOKE<ContextSettings>("get_context_settings"),
 	saveContextSettings: (settings: ContextSettings) => __TAURI_INVOKE<ContextSettings>("save_context_settings", { settings }),
 	getCanvasManifest: (generation: CanvasGeneration) => __TAURI_INVOKE<CanvasBytes>("get_canvas_manifest", { generation }),
@@ -303,12 +307,15 @@ export type ChapterCharacter = {
 	name?: string,
 	original?: string,
 	pages?: number[],
+	notes?: string,
+	notes_confidence?: number | null,
 };
 
 export type ChapterState = {
 	context: ProjectContext,
 	series: Series | null,
 	supports_tasks: boolean,
+	term_conflicts: TermConflict[],
 };
 
 export type ChapterStatus = "waiting" | "running" | "done" | "done_with_problems" | "failed" | "stopped";
@@ -360,6 +367,7 @@ export type ContextSettings = {
 	pages_per_request?: number,
 	previous_pages?: number,
 	agent_messages?: number,
+	auto_save_terms?: boolean,
 };
 
 export type CredentialInput = {
@@ -1132,7 +1140,20 @@ export type StyleTargetCounts = {
 	manual: number,
 };
 
+export type TermConflict = {
+	source: string,
+	series_target: string,
+	chapter_target: string,
+};
+
+export type TermConflictChoice = "keep_series" | "use_chapter" | "leave";
+
 export type TermKind = "name" | "place" | "term" | "honorific" | "other";
+
+export type TermSyncResult = {
+	added: number,
+	conflicts: TermConflict[],
+};
 
 export type TermUsage = {
 	layers: EntityId[],
@@ -1245,4 +1266,3 @@ export type WritingMode = "Horizontal" | "Vertical";
 export type WritingModePart = {
 	value: WritingMode | null,
 };
-

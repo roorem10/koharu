@@ -25,6 +25,7 @@ pub struct ContextSettings {
     pub pages_per_request: u8,
     pub previous_pages: u8,
     pub agent_messages: u16,
+    pub auto_save_terms: bool,
 }
 
 impl Default for ContextSettings {
@@ -37,6 +38,7 @@ impl Default for ContextSettings {
             pages_per_request: 20,
             previous_pages: 1,
             agent_messages: 20,
+            auto_save_terms: true,
         }
     }
 }

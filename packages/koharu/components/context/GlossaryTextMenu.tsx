@@ -77,7 +77,7 @@ export function GlossaryTextMenu({
             const existing = series.glossary.find(
               (term) => term.source.trim() === entry.source.trim(),
             )
-            await call(commands.saveSeries, {
+            await call(commands.saveSeries, series, {
               ...series,
               glossary: [
                 ...series.glossary.filter((term) => term.id !== existing?.id),

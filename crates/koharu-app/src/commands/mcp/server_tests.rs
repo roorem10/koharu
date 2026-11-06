@@ -103,6 +103,11 @@ impl Host for FakeHost {
         [
             "inspect_project",
             "view_page",
+            "read_series_characters",
+            "save_chapter_terms_to_series",
+            "edit_series_character",
+            "resolve_series_term_conflict",
+            "update_series_term",
             "set_translation",
             "run_pipeline",
             "fails",
@@ -322,7 +327,7 @@ async fn http_initialization_tools_images_errors_and_session_deletion() {
         .unwrap();
     assert_eq!(
         rpc(list).await["result"]["tools"].as_array().unwrap().len(),
-        6
+        FakeHost::default().tools().len() + 1
     );
     let inspected = rpc(server.call(&session, 2, "inspect_project").await).await;
     let value: Value =

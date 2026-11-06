@@ -19,6 +19,7 @@ import { refreshContext, useChapterContext } from './data'
 import { GlossaryDialog } from './GlossaryDialog'
 import { ReadChapterButton } from './ReadChapterButton'
 import { SeriesPicker } from './SeriesPicker'
+import { SeriesTermSync } from './SeriesTermSync'
 import { TermForm } from './TermForm'
 import type { GlossaryEntry } from './types'
 
@@ -52,7 +53,12 @@ export function ContextPanel() {
         {chapter.isError ? t('chapterContext.loadFailed') : t('chapterContext.loading')}
       </p>
     )
-  const terms = [...(data.series?.glossary ?? []), ...data.context.suggestions]
+  const terms = [
+    ...(data.series?.glossary ?? []),
+    ...data.context.suggestions.filter(
+      (entry) => !data.series?.glossary.some((term) => term.source.trim() === entry.source.trim()),
+    ),
+  ]
   const readAt = data.context.brief?.read_at
   const readStatus = readAt
     ? t('chapterContext.lastReadWith', {
@@ -132,6 +138,12 @@ export function ContextPanel() {
         </Dialog>
         <section className='grid min-w-0 gap-2'>
           <h3 className='font-semibold'>{t('chapterContext.glossary')}</h3>
+          {data.series && (
+            <SeriesTermSync
+              key={`${project?.name}:${data.series.id}`}
+              conflicts={data.term_conflicts}
+            />
+          )}
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}

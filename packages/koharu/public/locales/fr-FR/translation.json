@@ -185,7 +185,21 @@
     "run": "Run",
     "view": "Voir",
     "lastReadWith": "Dernière lecture {{time}} avec {{model}}",
-    "unknownModel": "un modèle précédent"
+    "unknownModel": "un modèle précédent",
+    "saveTermsToSeries": "Enregistrer les termes dans la série",
+    "saveUsedTermsHint": "Enregistre les termes suggérés présents dans le texte source et la traduction. Les nouvelles entrées restent déverrouillées.",
+    "termsSaved": "Termes ajoutés à la série : {{count}}",
+    "termConflicts": "Traductions différentes",
+    "seriesTerm": "Série : {{target}}",
+    "chapterTerm": "Chapitre : {{target}}",
+    "termConflictChoices": {
+      "keep_series": "Garder la version de la série",
+      "use_chapter": "Mettre à jour la série avec la version du chapitre",
+      "leave": "Laisser tel quel"
+    },
+    "autoSaveTerms": "Enregistrer les termes utilisés dans la série à la fin du chapitre",
+    "learnedTerm": "{{source}} : {{before}} → {{after}}",
+    "useEverywhereAndSave": "Utiliser cette traduction partout et l’enregistrer dans la série"
   },
   "cleanup": {
     "title": "Nettoyage",

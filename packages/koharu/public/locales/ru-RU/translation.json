@@ -184,7 +184,21 @@
     "run": "Run",
     "view": "Просмотр",
     "lastReadWith": "Последнее чтение: {{time}}, модель: {{model}}",
-    "unknownModel": "ранее использованная модель"
+    "unknownModel": "ранее использованная модель",
+    "saveTermsToSeries": "Сохранить термины в серию",
+    "saveUsedTermsHint": "Сохраняются предложенные термины, использованные и в оригинале, и в переводе. Новые записи остаются незакреплёнными.",
+    "termsSaved": "Терминов добавлено в серию: {{count}}",
+    "termConflicts": "Различающиеся переводы",
+    "seriesTerm": "Серия: {{target}}",
+    "chapterTerm": "Глава: {{target}}",
+    "termConflictChoices": {
+      "keep_series": "Оставить вариант серии",
+      "use_chapter": "Обновить серию вариантом главы",
+      "leave": "Оставить как есть"
+    },
+    "autoSaveTerms": "Сохранять использованные термины в серию по завершении главы",
+    "learnedTerm": "{{source}}: {{before}} → {{after}}",
+    "useEverywhereAndSave": "Использовать этот перевод везде и сохранить в серию"
   },
   "cleanup": {
     "title": "Очистка",

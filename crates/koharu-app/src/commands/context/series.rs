@@ -40,18 +40,17 @@ pub(crate) fn get_series(id: String) -> Result<Series, Error> {
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn save_series(series: Series) -> Result<Series, Error> {
-    store()?.save(&series)?;
-    Ok(series)
+pub(crate) fn save_series(expected: Series, series: Series) -> Result<Series, Error> {
+    Ok(store()?.apply_delta(&expected, &series)?)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn rename_series(id: String, name: String) -> Result<Series, Error> {
-    let mut series = store()?.get(&id)?;
-    series.name = name.trim().into();
-    store()?.save(&series)?;
-    Ok(series)
+    Ok(store()?.update(&id, |series| {
+        series.name = name.trim().into();
+        Ok(series.clone())
+    })?)
 }
 
 #[tauri::command]
@@ -157,28 +156,25 @@ pub(crate) fn import_instruction_glossary(
     {
         return Err(anyhow::anyhow!("instructions changed; preview again").into());
     }
-    let mut series = store()?.get(&id)?;
     let selected: Vec<_> = instruction_terms(&instructions)
         .into_iter()
         .filter(|entry| lines.contains(&entry.line))
         .collect();
-    for entry in &selected {
-        if !series
-            .glossary
-            .iter()
-            .any(|term| term.source.trim() == entry.source)
-        {
-            series.glossary.push(GlossaryEntry {
-                id: koharu_scene::EntityId::new().to_string(),
-                source: entry.source.clone(),
-                target: entry.target.clone(),
-                locked: true,
-                kind: TermKind::Term,
-                note: String::new(),
-            });
+    let series = store()?.update(&id, |series| {
+        for entry in &selected {
+            if !series.glossary.iter().any(|term| term.source.trim() == entry.source) {
+                series.glossary.push(GlossaryEntry {
+                    id: koharu_scene::EntityId::new().to_string(),
+                    source: entry.source.clone(),
+                    target: entry.target.clone(),
+                    locked: true,
+                    kind: TermKind::Term,
+                    note: String::new(),
+                });
+            }
         }
-    }
-    store()?.save(&series)?;
+        Ok(series.clone())
+    })?;
     if remove {
         let selected: std::collections::BTreeSet<_> =
             selected.iter().map(|term| term.line).collect();

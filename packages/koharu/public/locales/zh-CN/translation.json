@@ -184,7 +184,21 @@
     "run": "Run",
     "view": "查看",
     "lastReadWith": "上次于 {{time}} 使用 {{model}} 阅读",
-    "unknownModel": "先前使用的模型"
+    "unknownModel": "先前使用的模型",
+    "saveTermsToSeries": "将术语保存到系列",
+    "saveUsedTermsHint": "保存原文和译文中均已使用的建议术语。新条目保持未锁定状态。",
+    "termsSaved": "已添加到系列的术语数：{{count}}",
+    "termConflicts": "译法冲突",
+    "seriesTerm": "系列：{{target}}",
+    "chapterTerm": "章节：{{target}}",
+    "termConflictChoices": {
+      "keep_series": "保留系列译法",
+      "use_chapter": "使用章节译法并更新系列",
+      "leave": "保持原样"
+    },
+    "autoSaveTerms": "章节完成时将使用的术语保存到系列",
+    "learnedTerm": "{{source}}：{{before}} → {{after}}",
+    "useEverywhereAndSave": "在所有位置使用此译法并保存到系列"
   },
   "cleanup": {
     "title": "清理",

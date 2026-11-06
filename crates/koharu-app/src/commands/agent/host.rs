@@ -395,6 +395,11 @@ impl Host for KoharuHost {
                         "Style words in one text layer, in one undoable edit. Choose text (first whole-word/phrase match; plain match for CJK) or start/end (Unicode character offsets, end exclusive). Choose style: emphasis for its category preset, explicit bold/italic/size_percent/color/outline_color/outline_width, or clear: true. Colors are RGBA byte arrays. Word styles remain editable. Example: {\"layer\":\"<ID>\",\"text\":\"NO\",\"size_percent\":130}.",
                     ),
                     definition::<AddGlossaryEntry>("add_glossary_entry", "Suggest a glossary term for this chapter without replacing an existing series term."),
+                    definition::<InspectProject>("save_chapter_terms_to_series", "Save suggestions actually used in this chapter's translations as unlocked series glossary entries, in one undo step. Returns conflicting spellings for review."),
+                    definition::<InspectProject>("read_series_characters", "Read the linked series ID, characters, glossary, and pending chapter term conflicts. Read before editing a character or resolving a conflict."),
+                    definition::<crate::commands::context::agent::EditSeriesCharacter>("edit_series_character", "Add or edit a linked series character in one undo step. For editing, supply the complete previously read character as expected; for adding, expected is null and character.id is empty. Only include supported notes such as known pronouns."),
+                    definition::<crate::commands::context::agent::ResolveSeriesTermConflict>("resolve_series_term_conflict", "Resolve a pending term conflict once: keep_series, use_chapter (explicitly update the series), or leave. Uses the exact observed source and targets and is undoable."),
+                    definition::<crate::commands::context::agent::UpdateSeriesTerm>("update_series_term", "Save an explicitly chosen new spelling of a known series term/name. Supply the series ID and exact previous target; this is one undo step. Existing chapter translations remain hand-editable."),
                     definition::<SetLineCategory>("set_line_category", "Set a model lettering category for a text layer. A user label always wins."),
                     definition::<FlagLine>("flag_line", "Mark a text layer for human review with a short message."),
                     definition::<SetGeometry>(
@@ -686,6 +691,42 @@ impl Host for KoharuHost {
             }
             "add_glossary_entry" | "set_line_category" | "flag_line" => {
                 self.context_tool(&call).await
+            }
+            "save_chapter_terms_to_series" => {
+                let _: InspectProject = arguments(&call)?;
+                self.mutate_optional(|project| Box::pin(async move {
+                    crate::commands::context::sync::save_terms(project).await
+                })).await
+            }
+            "read_series_characters" => {
+                let _: InspectProject = arguments(&call)?;
+                let projects = self.handle.state::<CurrentProject>();
+                let projects = projects.project.lock().await;
+                let project = projects.as_ref().context("no project is open")?;
+                let context = project.load_context()?;
+                let series = crate::commands::context::linked_series(&context)?.context("pick a series first")?;
+                let conflicts = booharu_context::term_conflicts(&context, &series)?;
+                Invocation::read(json!({"series": series, "conflicts": conflicts}))
+            }
+            "edit_series_character" => {
+                let args: crate::commands::context::agent::EditSeriesCharacter = arguments(&call)?;
+                self.mutate_optional(|project| Box::pin(async move {
+                    crate::commands::context::sync::edit_character(project, args.expected.map(Into::into), args.character.into()).await
+                })).await
+            }
+            "resolve_series_term_conflict" => {
+                let args: crate::commands::context::agent::ResolveSeriesTermConflict = arguments(&call)?;
+                self.mutate_optional(|project| Box::pin(async move {
+                    crate::commands::context::sync::resolve_conflict(project, booharu_context::TermConflict {
+                        source: args.source, series_target: args.series_target, chapter_target: args.chapter_target,
+                    }, args.choice.into()).await
+                })).await
+            }
+            "update_series_term" => {
+                let args: crate::commands::context::agent::UpdateSeriesTerm = arguments(&call)?;
+                self.mutate_optional(|project| Box::pin(async move {
+                    crate::commands::context::sync::update_term(project, args.series_id, args.source, args.expected_target, args.target).await
+                })).await
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
             // WO-20 (one box per bubble) tool calls go here.

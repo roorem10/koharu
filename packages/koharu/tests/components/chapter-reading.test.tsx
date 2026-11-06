@@ -22,6 +22,7 @@ function setup(info: Partial<ReadModelInfo> = {}) {
     context: { version: 1, series: 'series', brief: null, suggestions: [], lines: {} },
     series: { id: 'series', name: 'Series', notes: '', characters: [], glossary: [] },
     supports_tasks: true,
+    term_conflicts: [],
   })
   queryClient.setQueryData(projectKey, {
     name: 'chapter',
@@ -131,6 +132,7 @@ describe('chapter reading confirmation', () => {
       context: { version: 1, series: null, brief: null, suggestions: [], lines: {} },
       series: null,
       supports_tasks: false,
+      term_conflicts: [],
     })
     mount()
     await clickRead()
