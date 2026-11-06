@@ -12,7 +12,7 @@ name: Preview Windows build
 
 on:
   push:
-    branches: ['booharu']
+    branches: ['booharu', 'chore/combined-test-build']
     paths-ignore: ['**.md']
   pull_request:
     branches: ['booharu']
