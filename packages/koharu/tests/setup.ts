@@ -89,6 +89,12 @@ Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), writable: true }
 
 const initial = useKoharuStore.getState()
 beforeEach(() => {
+  vi.spyOn(commands, 'getCanvasBackgrounds').mockResolvedValue({
+    light: [255, 255, 255],
+    dark: [0, 0, 0],
+  })
+  vi.spyOn(commands, 'getRecentColors').mockResolvedValue([])
+  vi.spyOn(commands, 'rememberColor').mockImplementation(async (color) => [color])
   vi.spyOn(commands, 'getTextBubbleShape').mockResolvedValue({
     bubble: null,
     shape: null,

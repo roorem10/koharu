@@ -16,6 +16,10 @@ import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { useCanvas } from '@/components/editor/useCanvas'
 import { WarpHandles } from '@/components/editor/WarpHandles'
+import {
+  canvasBackgroundColor,
+  useCanvasBackgrounds,
+} from '@/components/preferences/canvas-background'
 import { originalVisible, useCompareStore } from '@/components/qc/compare'
 import { OriginalOverlay } from '@/components/qc/OriginalOverlay'
 import { useRichTextEditor } from '@/components/rich-text-editor/useRichTextEditor'
@@ -59,8 +63,14 @@ import {
   type CanvasTool,
   type ShortcutAction,
 } from '@/lib/store'
-import { prefetchCanvasPages, workspaceColor, type CanvasColor } from '@koharu/bridge/canvas'
-import { commands, type Frame, type Point, type TransformFrame } from '@koharu/bridge/protocol'
+import { prefetchCanvasPages, type CanvasColor } from '@koharu/bridge/canvas'
+import {
+  commands,
+  type Frame,
+  type Page,
+  type Point,
+  type TransformFrame,
+} from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 
 const BRUSH_DIAMETER_STEP = 4
@@ -127,6 +137,7 @@ export function CanvasWorkspace() {
   const previousPageIndex = useRef<number | null>(null)
   const spaceHeld = useRef(false)
   const compareKey = useRef<string | null>(null)
+  const visibilityPending = useRef(new Set<ShortcutAction>())
   const lastZoomStep = useRef(-Infinity)
   const heldArrows = useRef(new Set<string>())
   const nudgeShift = useRef(false)
@@ -142,6 +153,9 @@ export function CanvasWorkspace() {
   const [hovered, setHovered] = useState<string | null>(null)
   const [cursor, setCursor] = useState<Point | null>(null)
   const colorSampling = useColorSampling()
+  const backgrounds = useCanvasBackgrounds().data
+  const backgroundsRef = useRef(backgrounds)
+  backgroundsRef.current = backgrounds
 
   const projectName = useProject().data?.name
   const showingOriginal = useCompareStore((state) => state.pinned || state.held)
@@ -315,13 +329,18 @@ export function CanvasWorkspace() {
     useKoharuStore.setState({ camera: { ...next, fitted: true } })
   }, [pageHeight, pageId, pageWidth])
 
-  const report = useCallback(() => {
-    const element = surface.current
-    if (!element || !canvas) return
-    const bounds = element.getBoundingClientRect()
-    canvas.resize(bounds.width, bounds.height, window.devicePixelRatio, workspaceColor())
-    if (useKoharuStore.getState().camera.fitted) fitCanvas()
-  }, [canvas, fitCanvas])
+  const report = useCallback(
+    (fit: boolean) => {
+      const element = surface.current
+      if (!element || !canvas) return
+      const bounds = element.getBoundingClientRect()
+      const background = canvasBackgroundColor(backgroundsRef.current)
+      element.style.backgroundColor = `rgb(${background.join(' ')})`
+      canvas.resize(bounds.width, bounds.height, window.devicePixelRatio, background)
+      if (fit && useKoharuStore.getState().camera.fitted) fitCanvas()
+    },
+    [canvas, fitCanvas],
+  )
 
   const setZoom = useCallback(
     (requestedZoom: number, anchor?: Point) => {
@@ -355,20 +374,25 @@ export function CanvasWorkspace() {
   )
 
   useEffect(() => {
+    report(false)
+  }, [backgrounds, report])
+
+  useEffect(() => {
     const element = surface.current
     if (!element) return
-    report()
-    const resize = new ResizeObserver(report)
-    const theme = new MutationObserver(report)
+    report(true)
+    const resized = () => report(true)
+    const resize = new ResizeObserver(resized)
+    const theme = new MutationObserver(() => report(false))
     resize.observe(element)
     theme.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    window.addEventListener('resize', report)
-    window.visualViewport?.addEventListener('resize', report)
+    window.addEventListener('resize', resized)
+    window.visualViewport?.addEventListener('resize', resized)
     return () => {
       resize.disconnect()
       theme.disconnect()
-      window.removeEventListener('resize', report)
-      window.visualViewport?.removeEventListener('resize', report)
+      window.removeEventListener('resize', resized)
+      window.visualViewport?.removeEventListener('resize', resized)
     }
   }, [report])
 
@@ -437,6 +461,30 @@ export function CanvasWorkspace() {
 
     const runShortcut = (event: KeyboardEvent, next: ShortcutAction | undefined) => {
       if (!next) return
+      if (next === 'toggle_text' || next === 'toggle_cleanup' || next === 'toggle_original') {
+        const currentPage = queryClient.getQueryData<Page | null>(pageKey)
+        if (!currentPage || event.repeat || visibilityPending.current.has(next)) return
+        const layers = currentPage.layers.filter((layer) =>
+          next === 'toggle_text'
+            ? layer.type === 'group' && layer.role === 'text'
+            : next === 'toggle_cleanup'
+              ? layer.type === 'raster' && layer.kind === 'cleanup'
+              : layer.type === 'artwork',
+        )
+        if (!layers.length) return
+        event.preventDefault()
+        visibilityPending.current.add(next)
+        void call(
+          commands.setVisibility,
+          layers.map((layer) => layer.id),
+          !layers.some((layer) => layer.visibility.visible),
+          null,
+        )
+          .then(() => refresh(projectKey, pageKey))
+          .catch(() => undefined)
+          .finally(() => visibilityPending.current.delete(next))
+        return
+      }
       if (next === 'brush_smaller' || next === 'brush_larger') {
         event.preventDefault()
         stepBrush(next === 'brush_smaller' ? -1 : 1)
@@ -483,6 +531,18 @@ export function CanvasWorkspace() {
         action !== 'zoom_out' &&
         action !== 'zoom_actual'
       ) {
+        return
+      }
+      if (action === 'toggle_text' || action === 'toggle_cleanup' || action === 'toggle_original') {
+        if (
+          event.defaultPrevented ||
+          event.isComposing ||
+          useKoharuStore.getState().settingsOpen ||
+          (event.target instanceof HTMLElement &&
+            event.target.closest('input, textarea, select, button, a, [contenteditable], [role]'))
+        )
+          return
+        runShortcut(event, action)
         return
       }
       const modified = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey

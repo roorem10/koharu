@@ -1,6 +1,7 @@
 pub(crate) mod agent;
 pub(crate) mod boxes;
 pub(crate) mod canvas;
+pub(crate) mod canvas_background;
 pub(crate) mod cleanup;
 pub(crate) mod context;
 pub(crate) mod editing;
@@ -20,6 +21,7 @@ pub(crate) mod processing;
 pub(crate) mod project;
 pub(crate) mod qc;
 pub(crate) mod raw_prep;
+pub(crate) mod recent_colors;
 pub(crate) mod redesign;
 pub(crate) mod rich_text;
 pub(crate) mod runs;
@@ -114,6 +116,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             fonts::get_font_preview,
             fonts::get_font_favorites,
             fonts::set_font_favorite,
+            recent_colors::get_recent_colors,
+            recent_colors::remember_color,
             preferences::save_preferences,
             preferences::get_preferences,
             preferences::get_translation_models,
@@ -121,6 +125,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             preferences::save_shortcuts,
             preferences::get_wheel_zoom,
             preferences::save_wheel_zoom,
+            canvas_background::get_canvas_backgrounds,
+            canvas_background::save_canvas_background,
             styles::get_text_styles,
             styles::save_text_styles,
             styles::count_text_style_targets,

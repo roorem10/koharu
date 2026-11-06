@@ -218,6 +218,8 @@
     "growHelp": "وسّع المناطق المحدّدة يدويًا قبل التنظيف لإزالة الكتابة الباهتة عند الحواف. تحتفظ الأقنعة المكتشفة بحجمها الحالي."
   },
   "colorPicker": {
+    "recentColors": "الألوان الأخيرة",
+    "useRecentColor": "استخدام {{color}}",
     "brushColor": "لون الفرشاة",
     "hexCode": "رمز اللون الست عشري",
     "sampleCanvas": "اختيار لون من اللوحة",
@@ -964,6 +966,11 @@
   },
   "settings": {
     "appearance": {
+      "canvasBackground": "خلفية مساحة الرسم",
+      "canvasBackgroundDescription": "اللون المحيط بالصفحة. يُحفظ لكل سمة على حدة ولا يُضمّن في الملفات المصدّرة.",
+      "lightCanvasBackground": "خلفية السمة الفاتحة",
+      "darkCanvasBackground": "خلفية السمة الداكنة",
+      "canvasBackgroundLoadError": "تعذّر تحميل ألوان خلفية مساحة الرسم.",
       "description": "طابق مساحة عملك مع الغرفة دون تغيير طريقة عرض الرسومات.",
       "interface": "الواجهة",
       "language": "اللغة",
@@ -1039,6 +1046,9 @@
       "title": "المزوّدون"
     },
     "shortcuts": {
+      "toggleText": "إظهار أو إخفاء طبقات النص",
+      "toggleCleanup": "إظهار أو إخفاء طبقات التنظيف",
+      "toggleOriginal": "إظهار أو إخفاء الطبقة الأصلية",
       "alsoUsedBy": "يستخدمه أيضًا {{action}}",
       "alternate": "بديل",
       "builtIn": "مدمجة (لا يمكن تغييرها)",

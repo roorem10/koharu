@@ -210,6 +210,8 @@
     "growHelp": "クリーンアップ前に手動で指定した領域を広げ、端に残る薄い文字を除去します。検出されたマスクのサイズは変更しません。"
   },
   "colorPicker": {
+    "recentColors": "最近使った色",
+    "useRecentColor": "{{color}}を使う",
     "brushColor": "ブラシカラー",
     "hexCode": "16進カラーコード",
     "sampleCanvas": "キャンバスから色を選択",
@@ -916,6 +918,11 @@
   },
   "settings": {
     "appearance": {
+      "canvasBackground": "キャンバスの背景",
+      "canvasBackgroundDescription": "ページの周囲の色です。テーマごとに保存され、書き出しには含まれません。",
+      "lightCanvasBackground": "ライトテーマの背景",
+      "darkCanvasBackground": "ダークテーマの背景",
+      "canvasBackgroundLoadError": "キャンバスの背景色を読み込めませんでした。",
       "description": "アートワークの描画には影響せず、作業環境の見た目を調整します。",
       "interface": "インターフェース",
       "language": "言語",
@@ -991,6 +998,9 @@
       "title": "プロバイダー"
     },
     "shortcuts": {
+      "toggleText": "テキストレイヤーの表示切替",
+      "toggleCleanup": "クリーンアップレイヤーの表示切替",
+      "toggleOriginal": "原稿レイヤーの表示切替",
       "alsoUsedBy": "{{action}}でも使用中",
       "alternate": "代替",
       "builtIn": "固定（変更不可）",

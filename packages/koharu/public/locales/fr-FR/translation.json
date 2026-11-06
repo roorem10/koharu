@@ -212,6 +212,8 @@
     "growHelp": "Agrandissez les zones marquées à la main avant le nettoyage pour retirer les lettres peu visibles sur les bords. Les masques détectés conservent leur taille actuelle."
   },
   "colorPicker": {
+    "recentColors": "Couleurs récentes",
+    "useRecentColor": "Utiliser {{color}}",
     "brushColor": "Couleur du pinceau",
     "hexCode": "Code couleur hexadécimal",
     "sampleCanvas": "Prélever une couleur sur le canevas",
@@ -928,6 +930,11 @@
   },
   "settings": {
     "appearance": {
+      "canvasBackground": "Fond du canevas",
+      "canvasBackgroundDescription": "Couleur autour de la page. Enregistrée séparément pour chaque thème et jamais incluse dans les exports.",
+      "lightCanvasBackground": "Fond du thème clair",
+      "darkCanvasBackground": "Fond du thème sombre",
+      "canvasBackgroundLoadError": "Impossible de charger les couleurs de fond du canevas.",
       "description": "Adaptez votre espace de travail à la pièce sans modifier le rendu des images.",
       "interface": "Interface",
       "language": "Langue",
@@ -1003,6 +1010,9 @@
       "title": "Fournisseurs"
     },
     "shortcuts": {
+      "toggleText": "Afficher ou masquer les calques de texte",
+      "toggleCleanup": "Afficher ou masquer les calques de nettoyage",
+      "toggleOriginal": "Afficher ou masquer le calque original",
       "alsoUsedBy": "Également utilisé par {{action}}",
       "alternate": "Secondaire",
       "builtIn": "Intégrés (non modifiables)",

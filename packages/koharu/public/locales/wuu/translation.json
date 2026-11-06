@@ -210,6 +210,8 @@
     "growHelp": "清理之前拿手动标出个区域扩大点，好拿边浪淡淡个字迹删脱。检测出个蒙版保持原来个大小。"
   },
   "colorPicker": {
+    "recentColors": "最近用过个颜色",
+    "useRecentColor": "用{{color}}",
     "brushColor": "笔刷颜色",
     "hexCode": "十六进制颜色代码",
     "sampleCanvas": "从画布浪取颜色",
@@ -916,6 +918,11 @@
   },
   "settings": {
     "appearance": {
+      "canvasBackground": "画布背景",
+      "canvasBackgroundDescription": "页面周围个颜色。每种主题分开保存，导出个辰光勿带进去。",
+      "lightCanvasBackground": "浅色主题背景",
+      "darkCanvasBackground": "深色主题背景",
+      "canvasBackgroundLoadError": "画布背景色载入失败哉。",
       "description": "照房间个环境调整工作区个外观，图稿个渲染方式弗变。",
       "interface": "界面",
       "language": "语言",
@@ -991,6 +998,9 @@
       "title": "提供商"
     },
     "shortcuts": {
+      "toggleText": "显示或者隐藏文字图层",
+      "toggleCleanup": "显示或者隐藏清理图层",
+      "toggleOriginal": "显示或者隐藏原图层",
       "alsoUsedBy": "{{action}}也勒用",
       "alternate": "备用",
       "builtIn": "内置（勿能改）",

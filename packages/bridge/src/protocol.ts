@@ -45,6 +45,8 @@ export const commands = {
 	getFontPreview: (familyName: string) => __TAURI_INVOKE<FontPreviewBytes>("get_font_preview", { familyName }),
 	getFontFavorites: () => __TAURI_INVOKE<string[]>("get_font_favorites"),
 	setFontFavorite: (familyName: string, favorite: boolean) => __TAURI_INVOKE<string[]>("set_font_favorite", { familyName, favorite }),
+	getRecentColors: () => __TAURI_INVOKE<[number, number, number, number][]>("get_recent_colors"),
+	rememberColor: (color: [number, number, number, number]) => __TAURI_INVOKE<[number, number, number, number][]>("remember_color", { color }),
 	savePreferences: (pipeline: PipelineConfig, providers: ProviderPreferences, typesetting: TypesettingConfig) => __TAURI_INVOKE<Preferences>("save_preferences", { pipeline, providers, typesetting }),
 	getPreferences: () => __TAURI_INVOKE<Preferences>("get_preferences"),
 	getTranslationModels: () => __TAURI_INVOKE<Model[]>("get_translation_models"),
@@ -52,6 +54,8 @@ export const commands = {
 	saveShortcuts: (shortcuts: { [key in string]: string }) => __TAURI_INVOKE<{ [key in string]: string }>("save_shortcuts", { shortcuts }),
 	getWheelZoom: () => __TAURI_INVOKE<WheelZoom>("get_wheel_zoom"),
 	saveWheelZoom: (wheelZoom: WheelZoom) => __TAURI_INVOKE<WheelZoom>("save_wheel_zoom", { wheelZoom }),
+	getCanvasBackgrounds: () => __TAURI_INVOKE<CanvasBackgroundColors>("get_canvas_backgrounds"),
+	saveCanvasBackground: (theme: CanvasBackgroundTheme, color: [number, number, number]) => __TAURI_INVOKE<CanvasBackgroundColors>("save_canvas_background", { theme, color }),
 	getTextStyles: () => __TAURI_INVOKE<TextStyles>("get_text_styles"),
 	saveTextStyles: (styles: TextStyles) => __TAURI_INVOKE<TextStyles>("save_text_styles", { styles }),
 	countTextStyleTargets: (scope: StyleScope) => __TAURI_INVOKE<StyleTargetCounts>("count_text_style_targets", { scope }),
@@ -258,6 +262,13 @@ export type BubbleShapeInfo = {
 };
 
 export type CaiyunConfig = Record<string, never>;
+
+export type CanvasBackgroundColors = {
+	light?: [number, number, number],
+	dark?: [number, number, number],
+};
+
+export type CanvasBackgroundTheme = "light" | "dark";
 
 export type CanvasBytes = number[];
 

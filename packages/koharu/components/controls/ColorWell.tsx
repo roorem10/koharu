@@ -6,6 +6,8 @@ import { HexColorInput, HexColorPicker } from 'react-colorful'
 import { useTranslation } from 'react-i18next'
 
 import { useColorSampling } from '@/components/controls/ColorSampling'
+import { useRecentColors } from '@/components/controls/recent-colors'
+import { hexToRgba, rgbaToHex } from '@/lib/color'
 import { Button } from '@koharu/ui/components/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@koharu/ui/components/popover'
 import { cn } from '@koharu/ui/lib/utils'
@@ -40,6 +42,7 @@ export function ColorWell(props: ColorWellProps) {
   // eyedropper or a new value from outside) clears it, so it can never override a later choice.
   const [pending, setPending] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const recent = useRecentColors(open)
   const sampling = useColorSampling()
   const accessibleLabel = label ?? t('colorPicker.brushColor')
 
@@ -60,6 +63,7 @@ export function ColorWell(props: ColorWellProps) {
     setTransparent(false)
     if (props.allowTransparent) props.onChange(normalized)
     else props.onChange(normalized)
+    recent.remember(hexToRgba(normalized))
   }
 
   const clear = () => {
@@ -146,6 +150,31 @@ export function ColorWell(props: ColorWellProps) {
             </Button>
           )}
         </div>
+        {recent.colors.length > 0 && (
+          <div className='mt-3' role='group' aria-label={t('colorPicker.recentColors')}>
+            <div className='mb-2 text-xs text-muted-foreground'>
+              {t('colorPicker.recentColors')}
+            </div>
+            <div className='grid grid-cols-10 gap-1'>
+              {recent.colors.map((color) => {
+                const hex = rgbaToHex(color)
+                return (
+                  <Button
+                    key={color.join(',')}
+                    type='button'
+                    size='icon-xs'
+                    variant='outline'
+                    className='h-5 w-full rounded-sm p-0'
+                    aria-label={t('colorPicker.useRecentColor', { color: hex })}
+                    title={hex}
+                    style={{ backgroundColor: hex }}
+                    onClick={() => set(hex)}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )}
         {allowTransparent && (
           <Button
             type='button'

@@ -210,6 +210,8 @@
     "growHelp": "Kenarlardaki silik harfleri kaldırmak için elle işaretlenen alanları temizlemeden önce genişlet. Algılanan maskelerin mevcut boyutu korunur."
   },
   "colorPicker": {
+    "recentColors": "Son kullanılan renkler",
+    "useRecentColor": "{{color}} kullan",
     "brushColor": "Fırça rengi",
     "hexCode": "Onaltılık renk kodu",
     "sampleCanvas": "Tuvalden renk seç",
@@ -916,6 +918,11 @@
   },
   "settings": {
     "appearance": {
+      "canvasBackground": "Tuval arka planı",
+      "canvasBackgroundDescription": "Sayfanın çevresindeki renk. Her tema için ayrı kaydedilir ve dışa aktarılan dosyalara dahil edilmez.",
+      "lightCanvasBackground": "Açık tema arka planı",
+      "darkCanvasBackground": "Koyu tema arka planı",
+      "canvasBackgroundLoadError": "Tuval arka plan renkleri yüklenemedi.",
       "description": "Çizimin işlenişini değiştirmeden çalışma alanını ortamınıza uyarlayın.",
       "interface": "Arayüz",
       "language": "Dil",
@@ -991,6 +998,9 @@
       "title": "Sağlayıcılar"
     },
     "shortcuts": {
+      "toggleText": "Metin katmanlarını göster veya gizle",
+      "toggleCleanup": "Temizleme katmanlarını göster veya gizle",
+      "toggleOriginal": "Orijinal katmanı göster veya gizle",
       "alsoUsedBy": "{{action}} da kullanıyor",
       "alternate": "Alternatif",
       "builtIn": "Yerleşik (değiştirilemez)",

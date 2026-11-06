@@ -16,6 +16,7 @@ import { useTheme } from 'next-themes'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { CanvasBackgroundPreferences } from '@/components/preferences/CanvasBackgroundPreferences'
 import { PipelinePreferences } from '@/components/preferences/PipelinePreferences'
 import {
   PreferencePage,
@@ -306,6 +307,7 @@ function AppearancePreferences() {
           </Select>
         </PreferenceRow>
       </PreferenceSection>
+      <CanvasBackgroundPreferences />
     </PreferencePage>
   )
 }

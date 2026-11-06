@@ -210,6 +210,8 @@
     "growHelp": "清理前扩展手动标记的区域，以移除边缘残留的浅色文字。检测生成的蒙版保持原有大小。"
   },
   "colorPicker": {
+    "recentColors": "最近使用的颜色",
+    "useRecentColor": "使用{{color}}",
     "brushColor": "笔刷颜色",
     "hexCode": "十六进制颜色代码",
     "sampleCanvas": "从画布拾取颜色",
@@ -916,6 +918,11 @@
   },
   "settings": {
     "appearance": {
+      "canvasBackground": "画布背景",
+      "canvasBackgroundDescription": "页面周围的颜色。按主题分别保存，不会包含在导出文件中。",
+      "lightCanvasBackground": "浅色主题背景",
+      "darkCanvasBackground": "深色主题背景",
+      "canvasBackgroundLoadError": "无法加载画布背景颜色。",
       "description": "调整工作区外观，而不改变图稿的渲染方式。",
       "interface": "界面",
       "language": "语言",
@@ -991,6 +998,9 @@
       "title": "提供商"
     },
     "shortcuts": {
+      "toggleText": "显示或隐藏文本图层",
+      "toggleCleanup": "显示或隐藏清理图层",
+      "toggleOriginal": "显示或隐藏原图图层",
       "alsoUsedBy": "{{action}}也在使用",
       "alternate": "备用",
       "builtIn": "内置（不可更改）",

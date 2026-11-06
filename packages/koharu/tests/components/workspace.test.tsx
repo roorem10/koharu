@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CanvasWorkspace, MIN_ZOOM, MAX_ZOOM } from '@/components/editor/CanvasWorkspace'
+import { canvasBackgroundsKey } from '@/components/preferences/canvas-background'
 import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type Layer } from '@koharu/bridge/protocol'
@@ -159,6 +160,37 @@ function installNudgeProject() {
   })
 }
 
+function installVisibilityProject() {
+  installNudgeProject()
+  queryClient.setQueryData(pageKey, (page: { layers: Layer[] }) => ({
+    ...page,
+    layers: [
+      {
+        type: 'group',
+        id: 'text-group',
+        parent: 'page',
+        role: 'text',
+        name: 'Text',
+        visibility: { visible: true, opacity: 1 },
+      },
+      ...page.layers.map((layer) => ({
+        ...layer,
+        parent: 'text-group',
+        visibility: { visible: false, opacity: 1 },
+      })),
+      { ...paintLayer, id: 'cleanup', kind: 'cleanup' },
+      {
+        ...paintLayer,
+        id: 'hidden-cleanup',
+        kind: 'cleanup',
+        visibility: { visible: false, opacity: 1 },
+      },
+      paintLayer,
+      { ...layer, id: 'original', type: 'artwork' },
+    ],
+  }))
+}
+
 function renderWorkspace() {
   render(
     <QueryClientProvider client={queryClient}>
@@ -173,6 +205,66 @@ function renderWorkspace() {
   })
   return surface
 }
+
+describe('canvas background presentation', () => {
+  it('applies saved colors for each theme without changing the page or revision', async () => {
+    const originalObserver = globalThis.ResizeObserver
+    globalThis.ResizeObserver = class {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe() {
+        this.callback([], this as unknown as ResizeObserver)
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    installProject()
+    const project = queryClient.getQueryData(projectKey)
+    const page = queryClient.getQueryData(pageKey)
+    queryClient.setQueryData(canvasBackgroundsKey, {
+      light: [240, 230, 220],
+      dark: [20, 30, 40],
+    })
+    const originalClass = document.documentElement.className
+    document.documentElement.classList.remove('dark')
+    try {
+      const surface = renderWorkspace()
+      await waitFor(() =>
+        expect(canvas.resize).toHaveBeenLastCalledWith(
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number),
+          [240, 230, 220],
+        ),
+      )
+      expect(surface).toHaveStyle({ backgroundColor: 'rgb(240, 230, 220)' })
+      const camera = { zoom: 1, translation: [10, 20] as [number, number], fitted: true }
+      act(() => useKoharuStore.setState({ camera }))
+      act(() => document.documentElement.classList.add('dark'))
+      await waitFor(() =>
+        expect(canvas.resize).toHaveBeenLastCalledWith(
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number),
+          [20, 30, 40],
+        ),
+      )
+      act(() =>
+        queryClient.setQueryData(canvasBackgroundsKey, {
+          light: [240, 230, 220],
+          dark: [50, 60, 70],
+        }),
+      )
+      await waitFor(() => expect(surface).toHaveStyle({ backgroundColor: 'rgb(50, 60, 70)' }))
+      expect(queryClient.getQueryData(projectKey)).toBe(project)
+      expect(queryClient.getQueryData(pageKey)).toBe(page)
+      expect(useKoharuStore.getState().canvasRevision).toBe(1)
+      expect(useKoharuStore.getState().camera).toBe(camera)
+    } finally {
+      document.documentElement.className = originalClass
+      globalThis.ResizeObserver = originalObserver
+    }
+  })
+})
 
 describe('canvas interaction adapter', () => {
   it('prefetches only after the authoritative canvas page and generation are active', async () => {
@@ -530,6 +622,105 @@ describe('canvas interaction adapter', () => {
     fireEvent.keyDown(window, { key: 'F2' })
     expect(useKoharuStore.getState().tool).toBe('text')
     slider.remove()
+  })
+
+  it('toggles each layer category in one edit per press without changing individual text visibility', async () => {
+    installVisibilityProject()
+    vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue()
+    const visibility = vi
+      .spyOn(commands, 'setVisibility')
+      .mockImplementation(async (ids, visible) => {
+        queryClient.setQueryData(pageKey, (page: { layers: Layer[] }) => ({
+          ...page,
+          layers: page.layers.map((layer) =>
+            ids.includes(layer.id)
+              ? { ...layer, visibility: { ...layer.visibility, visible } }
+              : layer,
+          ),
+        }))
+        return null
+      })
+    const surface = renderWorkspace()
+    const targets = [['text-group'], ['cleanup', 'hidden-cleanup'], ['original']]
+    for (const visible of [false, true]) {
+      for (const [index, ids] of targets.entries()) {
+        const options = { key: String(index + 1), ctrlKey: true, shiftKey: true }
+        await act(async () => {
+          fireEvent.keyDown(surface, options)
+          fireEvent.keyDown(surface, { ...options, repeat: true })
+          fireEvent.keyDown(surface, options)
+        })
+        expect(visibility).toHaveBeenLastCalledWith(ids, visible, null)
+      }
+    }
+    expect(visibility).toHaveBeenCalledTimes(6)
+    const layers = queryClient.getQueryData<{ layers: Layer[] }>(pageKey)!.layers
+    expect(layers.find((layer) => layer.id === 'element')!.visibility.visible).toBe(false)
+    expect(layers.find((layer) => layer.id === 'paint')!.visibility.visible).toBe(true)
+  })
+
+  it('leaves layer-toggle keys to focused controls, handled events and composition', () => {
+    installVisibilityProject()
+    const visibility = vi.spyOn(commands, 'setVisibility').mockResolvedValue(null)
+    renderWorkspace()
+    const options = { key: '1', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }
+    const controls = [
+      document.createElement('input'),
+      document.createElement('textarea'),
+      document.createElement('select'),
+      document.createElement('button'),
+      document.createElement('a'),
+      Object.assign(document.createElement('input'), { type: 'range' }),
+      Object.assign(document.createElement('input'), { type: 'checkbox' }),
+      document.createElement('div'),
+      document.createElement('div'),
+    ]
+    controls.at(-2)!.setAttribute('role', 'combobox')
+    controls.at(-1)!.setAttribute('contenteditable', 'true')
+    for (const control of controls) {
+      document.body.append(control)
+      const event = new KeyboardEvent('keydown', options)
+      fireEvent(control, event)
+      expect(event.defaultPrevented).toBe(false)
+      control.remove()
+    }
+    const handled = new KeyboardEvent('keydown', options)
+    handled.preventDefault()
+    fireEvent(window, handled)
+    fireEvent.keyDown(window, { ...options, isComposing: true })
+    useKoharuStore.setState({ settingsOpen: true })
+    fireEvent.keyDown(window, options)
+    expect(visibility).not.toHaveBeenCalled()
+  })
+
+  it('uses customized layer-toggle bindings and ignores missing layer categories', async () => {
+    installVisibilityProject()
+    vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue()
+    const visibility = vi.spyOn(commands, 'setVisibility').mockResolvedValue(null)
+    const surface = renderWorkspace()
+    useKoharuStore.getState().setShortcut('toggle_text', 'q')
+    useKoharuStore.getState().setShortcut('toggle_original_alt', 'f2')
+    fireEvent.keyDown(surface, { key: '1', ctrlKey: true, shiftKey: true })
+    expect(visibility).not.toHaveBeenCalled()
+    await act(async () => fireEvent.keyDown(surface, { key: 'q' }))
+    expect(visibility).toHaveBeenLastCalledWith(['text-group'], false, null)
+    await act(async () => fireEvent.keyDown(surface, { key: 'F2' }))
+    expect(visibility).toHaveBeenLastCalledWith(['original'], false, null)
+    await act(async () => {
+      queryClient.setQueryData(pageKey, (page: { layers: Layer[] }) => ({
+        ...page,
+        layers: page.layers.map((layer) =>
+          layer.id === 'text-group'
+            ? { ...layer, visibility: { ...layer.visibility, visible: false } }
+            : layer,
+        ),
+      }))
+      fireEvent.keyDown(surface, { key: 'q' })
+    })
+    expect(visibility).toHaveBeenLastCalledWith(['text-group'], true, null)
+    await act(async () => installProject())
+    fireEvent.keyDown(surface, { key: '2', ctrlKey: true, shiftKey: true })
+    expect(visibility).toHaveBeenCalledTimes(3)
   })
 
   it('announces WebGPU startup failures and offers recovery', () => {

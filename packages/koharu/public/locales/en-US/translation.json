@@ -210,6 +210,8 @@
     "growHelp": "Expand hand-marked areas before cleanup to remove faint lettering at the edges. Detected masks keep their existing size."
   },
   "colorPicker": {
+    "recentColors": "Recent colors",
+    "useRecentColor": "Use {{color}}",
     "brushColor": "Brush color",
     "hexCode": "Hex color code",
     "sampleCanvas": "Pick color from canvas",
@@ -916,6 +918,11 @@
   },
   "settings": {
     "appearance": {
+      "canvasBackground": "Canvas background",
+      "canvasBackgroundDescription": "Color around the page. Saved separately for each theme; never included in exports.",
+      "lightCanvasBackground": "Light theme background",
+      "darkCanvasBackground": "Dark theme background",
+      "canvasBackgroundLoadError": "Could not load canvas background colors.",
       "description": "Match your workspace to the room without changing how artwork is rendered.",
       "interface": "Interface",
       "language": "Language",
@@ -991,6 +998,9 @@
       "title": "Providers"
     },
     "shortcuts": {
+      "toggleText": "Toggle Text layers",
+      "toggleCleanup": "Toggle Cleanup layers",
+      "toggleOriginal": "Toggle Original layer",
       "alsoUsedBy": "Also used by {{action}}",
       "alternate": "Alternate",
       "builtIn": "Built-in (can’t be changed)",

@@ -210,6 +210,8 @@
     "growHelp": "清理前擴張手動標記的區域，以移除邊緣殘留的淺色文字。偵測產生的遮色片維持原有大小。"
   },
   "colorPicker": {
+    "recentColors": "最近使用的顏色",
+    "useRecentColor": "使用{{color}}",
     "brushColor": "筆刷顏色",
     "hexCode": "十六進位色彩代碼",
     "sampleCanvas": "從畫布選取色彩",
@@ -916,6 +918,11 @@
   },
   "settings": {
     "appearance": {
+      "canvasBackground": "畫布背景",
+      "canvasBackgroundDescription": "頁面周圍的顏色。依佈景主題分別儲存，不會包含在匯出檔案中。",
+      "lightCanvasBackground": "淺色佈景主題背景",
+      "darkCanvasBackground": "深色佈景主題背景",
+      "canvasBackgroundLoadError": "無法載入畫布背景顏色。",
       "description": "調整工作區外觀，而不改變圖稿的算繪方式。",
       "interface": "介面",
       "language": "語言",
@@ -991,6 +998,9 @@
       "title": "提供者"
     },
     "shortcuts": {
+      "toggleText": "顯示或隱藏文字圖層",
+      "toggleCleanup": "顯示或隱藏清理圖層",
+      "toggleOriginal": "顯示或隱藏原圖圖層",
       "alsoUsedBy": "{{action}}也在使用",
       "alternate": "備用",
       "builtIn": "內建（無法變更）",

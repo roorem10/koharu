@@ -212,6 +212,8 @@
     "growHelp": "Amplía las áreas marcadas a mano antes de la limpieza para eliminar las letras tenues de los bordes. Las máscaras detectadas conservan su tamaño actual."
   },
   "colorPicker": {
+    "recentColors": "Colores recientes",
+    "useRecentColor": "Usar {{color}}",
     "brushColor": "Color del pincel",
     "hexCode": "Código de color hexadecimal",
     "sampleCanvas": "Elegir un color del lienzo",
@@ -928,6 +930,11 @@
   },
   "settings": {
     "appearance": {
+      "canvasBackground": "Fondo del lienzo",
+      "canvasBackgroundDescription": "Color alrededor de la página. Se guarda por separado para cada tema y no se incluye en las exportaciones.",
+      "lightCanvasBackground": "Fondo del tema claro",
+      "darkCanvasBackground": "Fondo del tema oscuro",
+      "canvasBackgroundLoadError": "No se pudieron cargar los colores de fondo del lienzo.",
       "description": "Adapta el espacio de trabajo a tu entorno sin cambiar cómo se renderiza la ilustración.",
       "interface": "Interfaz",
       "language": "Idioma",
@@ -1003,6 +1010,9 @@
       "title": "Proveedores"
     },
     "shortcuts": {
+      "toggleText": "Mostrar u ocultar capas de texto",
+      "toggleCleanup": "Mostrar u ocultar capas de limpieza",
+      "toggleOriginal": "Mostrar u ocultar la capa original",
       "alsoUsedBy": "También lo usa {{action}}",
       "alternate": "Alternativa",
       "builtIn": "Integrados (no editables)",

@@ -60,6 +60,9 @@ export type ShortcutAction =
   | 'zoom_out'
   | 'zoom_actual'
   | 'compare'
+  | 'toggle_text'
+  | 'toggle_cleanup'
+  | 'toggle_original'
   | 'brush_smaller'
   | 'brush_larger'
 export type ShortcutSlot = ShortcutAction | `${ShortcutAction}_alt`
@@ -125,6 +128,9 @@ export const defaultShortcuts: Shortcuts = {
   zoom_out: 'ctrl+-',
   zoom_actual: 'ctrl+0',
   compare: '\\',
+  toggle_text: 'ctrl+shift+1',
+  toggle_cleanup: 'ctrl+shift+2',
+  toggle_original: 'ctrl+shift+3',
   ocr_box: 'o',
   brush_smaller: '[',
   brush_larger: ']',
@@ -140,6 +146,9 @@ export const defaultShortcuts: Shortcuts = {
   zoom_out_alt: 'ctrl+numpadsubtract',
   zoom_actual_alt: '',
   compare_alt: '',
+  toggle_text_alt: '',
+  toggle_cleanup_alt: '',
+  toggle_original_alt: '',
   ocr_box_alt: '',
   brush_smaller_alt: '',
   brush_larger_alt: '',

@@ -210,6 +210,8 @@
     "growHelp": "정리 전에 직접 표시한 영역을 확장하여 가장자리의 희미한 글자를 제거합니다. 감지된 마스크는 기존 크기를 유지합니다."
   },
   "colorPicker": {
+    "recentColors": "최근 사용한 색상",
+    "useRecentColor": "{{color}} 사용",
     "brushColor": "브러시 색상",
     "hexCode": "16진수 색상 코드",
     "sampleCanvas": "캔버스에서 색상 선택",
@@ -916,6 +918,11 @@
   },
   "settings": {
     "appearance": {
+      "canvasBackground": "캔버스 배경",
+      "canvasBackgroundDescription": "페이지 주변의 색상입니다. 테마별로 저장되며 내보내기에는 포함되지 않습니다.",
+      "lightCanvasBackground": "밝은 테마 배경",
+      "darkCanvasBackground": "어두운 테마 배경",
+      "canvasBackgroundLoadError": "캔버스 배경색을 불러오지 못했습니다.",
       "description": "아트워크 렌더링에는 영향을 주지 않고 작업 공간의 모습을 조정합니다.",
       "interface": "인터페이스",
       "language": "언어",
@@ -991,6 +998,9 @@
       "title": "제공자"
     },
     "shortcuts": {
+      "toggleText": "텍스트 레이어 표시 전환",
+      "toggleCleanup": "클린업 레이어 표시 전환",
+      "toggleOriginal": "원본 레이어 표시 전환",
       "alsoUsedBy": "{{action}}에서도 사용 중",
       "alternate": "보조",
       "builtIn": "내장 (변경 불가)",
