@@ -1,3 +1,5 @@
+pub(crate) mod agent;
+
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result, ensure};

@@ -5,6 +5,8 @@ use specta::Type;
 
 use super::Error;
 
+pub(crate) mod agent;
+
 #[derive(Clone, Debug, Deserialize, Serialize, Type)]
 pub struct RunPreset {
     pub name: String,

@@ -1,5 +1,7 @@
 //! Word styles and text edits share one scene patch, so undo restores both.
 
+pub(crate) mod agent;
+
 #[cfg(test)]
 mod tests;
 

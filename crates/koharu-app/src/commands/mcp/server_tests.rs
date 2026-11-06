@@ -161,7 +161,7 @@ fn read_only_list_preserves_the_host_schemas_and_descriptions() {
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names, READ_TOOLS);
+    assert_eq!(names, ["inspect_project", "view_page", "get_project_summary"]);
     assert_eq!(tools["tools"][0]["inputSchema"], host.tools()[0].parameters);
     assert_eq!(
         tools["tools"][0]["description"],
@@ -454,4 +454,83 @@ async fn word_styles_are_hidden_and_refused_when_mcp_edits_are_disabled() {
     let result = rpc(server.call(&session, 1, "style_words").await).await;
     assert_eq!(result["result"]["isError"], true);
     server.stop().await;
+}
+
+#[tokio::test]
+async fn output_runs_rich_text_and_library_obey_mcp_edit_permissions() {
+    use crate::commands::{
+        files::library::agent as library, output::agent as output,
+        rich_text::agent as rich_text, runs::agent as runs,
+    };
+
+    struct FeatureHost {
+        tools: Vec<(AgentTool, bool)>,
+        calls: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl Host for FeatureHost {
+        async fn context(&self) -> Result<Value> {
+            Ok(json!({}))
+        }
+
+        fn tools(&self) -> Vec<AgentTool> {
+            self.tools.iter().map(|(tool, _)| tool.clone()).collect()
+        }
+
+        async fn invoke(&self, _: ToolCall, _: &Control) -> Result<Invocation> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Invocation::read(json!({}))
+        }
+    }
+
+    let cases = vec![
+        (output::export_pages_definition(), false),
+        (output::export_script_definition(), false),
+        (output::preview_script_import_definition(), true),
+        (output::apply_script_import_definition(), false),
+        (output::get_export_naming_definition(), true),
+        (output::set_export_naming_definition(), false),
+        (runs::get_settings_definition(), true),
+        (runs::save_settings_definition(), false),
+        (runs::list_runs_definition(), true),
+        (runs::run_preset_definition(), false),
+        (runs::retry_definition(), false),
+        (runs::stop_definition(), false),
+        (rich_text::get_word_styles_definition(), true),
+        (rich_text::set_word_style_definition(), false),
+        (rich_text::clear_word_styles_definition(), false),
+        (rich_text::replace_text_range_definition(), false),
+        (library::list_definition(), true),
+        (library::rename_definition(), false),
+        (library::duplicate_definition(), false),
+    ];
+
+    for allow_edits in [false, true] {
+        let host = Arc::new(FeatureHost {
+            tools: cases.clone(),
+            calls: AtomicUsize::new(0),
+        });
+        let bridge = bridge(host.clone(), allow_edits);
+        let visible = bridge.tools().unwrap();
+        for (tool, read_only) in &cases {
+            assert_eq!(
+                visible.iter().any(|entry| entry.name == tool.name),
+                allow_edits || *read_only,
+                "{} visibility with edits={allow_edits}",
+                tool.name,
+            );
+        }
+        let server = Server::start(bridge).await;
+        let session = server.initialize().await;
+        let mut reached = 0;
+        for (index, (tool, read_only)) in cases.iter().enumerate() {
+            let allowed = allow_edits || *read_only;
+            let result = rpc(server.call(&session, index as i32 + 1, &tool.name).await).await;
+            assert_eq!(result["result"]["isError"], !allowed, "{}", tool.name);
+            reached += usize::from(allowed);
+            assert_eq!(host.calls.load(Ordering::SeqCst), reached, "{}", tool.name);
+        }
+        server.stop().await;
+    }
 }

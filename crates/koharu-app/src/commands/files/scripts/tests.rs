@@ -46,9 +46,13 @@ async fn fixture() -> Project {
 async fn round_trip_preserves_multiline_blank_lines_and_windows_newlines() {
     let project = fixture().await;
     let snapshot = project.snapshot();
-    let text = write_script(&project.name, &script_pages(&snapshot).unwrap()).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("script.txt");
+    export_script_to(&path, &snapshot, &project.name).await.unwrap();
+    let text = tokio::fs::read_to_string(&path).await.unwrap();
     for text in [text.clone(), text.replace('\n', "\r\n")] {
-        let preview = preview_import(&snapshot, &project.name, &text).unwrap();
+        tokio::fs::write(&path, text).await.unwrap();
+        let preview = preview_script_file(&path, &snapshot, &project.name).await.unwrap();
         assert!(preview.changes.is_empty());
         assert_eq!(preview.unchanged, 3);
         assert_eq!(preview.not_found, 0);

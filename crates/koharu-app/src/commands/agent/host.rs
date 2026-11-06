@@ -414,6 +414,25 @@ impl Host for KoharuHost {
                         "run_pipeline",
                         "Run Koharu's configured processing pipeline for the whole project, selected pages, or selected text elements.",
                     ),
+                    output::agent::export_pages_definition(),
+                    output::agent::export_script_definition(),
+                    output::agent::preview_script_import_definition(),
+                    output::agent::apply_script_import_definition(),
+                    output::agent::get_export_naming_definition(),
+                    output::agent::set_export_naming_definition(),
+                    crate::commands::runs::agent::get_settings_definition(),
+                    crate::commands::runs::agent::save_settings_definition(),
+                    crate::commands::runs::agent::list_runs_definition(),
+                    crate::commands::runs::agent::run_preset_definition(),
+                    crate::commands::runs::agent::retry_definition(),
+                    crate::commands::runs::agent::stop_definition(),
+                    crate::commands::rich_text::agent::get_word_styles_definition(),
+                    crate::commands::rich_text::agent::set_word_style_definition(),
+                    crate::commands::rich_text::agent::clear_word_styles_definition(),
+                    crate::commands::rich_text::agent::replace_text_range_definition(),
+                    crate::commands::files::library::agent::list_definition(),
+                    crate::commands::files::library::agent::rename_definition(),
+                    crate::commands::files::library::agent::duplicate_definition(),
                     // WO-20 (one box per bubble) tool definitions go here.
                     definition::<crate::commands::boxes::FindSplitBubblesArgs>(
                         "find_split_bubbles",
@@ -688,6 +707,20 @@ impl Host for KoharuHost {
                 self.context_tool(&call).await
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
+            "export_pages" | "export_script" | "preview_script_import" | "apply_script_import"
+            | "get_export_naming" | "set_export_naming" => {
+                output::agent::dispatch(&self.handle, &call).await
+            }
+            "get_run_settings" | "save_run_settings" | "list_runs" | "run_preset"
+            | "retry_failed_pages" | "stop_job" => {
+                crate::commands::runs::agent::invoke(&self.handle, &call).await
+            }
+            "get_word_styles" | "set_word_style" | "clear_word_styles" | "replace_text_range" => {
+                crate::commands::rich_text::agent::dispatch(&self.handle, &call).await
+            }
+            "list_projects" | "rename_project" | "duplicate_project" => {
+                crate::commands::files::library::agent::invoke(&self.handle, &call).await
+            }
             // WO-20 (one box per bubble) tool calls go here.
             "find_split_bubbles" => {
                 let arguments: crate::commands::boxes::FindSplitBubblesArgs = arguments(&call)?;

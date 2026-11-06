@@ -11,12 +11,14 @@ use koharu_scene::{AssetRole, EntityId, Snapshot};
 use rayon::prelude::*;
 use serde::Deserialize;
 use specta::Type;
-use std::{io::Write as _, sync::Arc};
+use std::{io::Write as _, path::PathBuf, sync::Arc};
 use tauri::{State, WebviewWindow, ipc::IpcResponse};
 use tauri_runtime_cef::CefRuntime;
 
 use super::{Error, project::CurrentProject};
 use koharu_desktop::Desktop;
+
+pub(crate) mod agent;
 
 const THUMBNAIL_EDGE: u32 = 128;
 
@@ -30,7 +32,7 @@ impl IpcResponse for ThumbnailBytes {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Type)]
+#[derive(Clone, Copy, Debug, Deserialize, schemars::JsonSchema, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportFormat {
     Png,
@@ -68,6 +70,36 @@ async fn export_selection(
     project: &CurrentProject,
     desktop: &Desktop,
 ) -> Result<()> {
+    let plan = prepare_export(format, selected, project).await?;
+    let dialog = rfd::AsyncFileDialog::new().set_parent(&window);
+    let destination = match format {
+        ExportFormat::Png | ExportFormat::Psd => dialog.pick_folder().await,
+        ExportFormat::Cbz => {
+            dialog
+                .add_filter("Comic Book Archive", &["cbz"])
+                .set_file_name(format!("{}.cbz", plan.name))
+                .save_file()
+                .await
+        }
+    };
+    let Some(destination) = destination.map(|destination| destination.path().to_owned()) else {
+        return Ok(());
+    };
+    write_export(plan, format, destination, desktop).await
+}
+
+struct ExportPlan {
+    name: String,
+    snapshot: Snapshot,
+    pages: Vec<EntityId>,
+    names: Vec<String>,
+}
+
+async fn prepare_export(
+    format: ExportFormat,
+    selected: Option<Vec<EntityId>>,
+    project: &CurrentProject,
+) -> Result<ExportPlan> {
     let (name, snapshot) = {
         let project = project.project.lock().await;
         let project = project.as_ref().context("no project is open")?;
@@ -107,20 +139,26 @@ async fn export_selection(
     if pages.is_empty() {
         return Err(anyhow::anyhow!("there are no pages to export"));
     }
-    let dialog = rfd::AsyncFileDialog::new().set_parent(&window);
-    let destination = match format {
-        ExportFormat::Png | ExportFormat::Psd => dialog.pick_folder().await,
-        ExportFormat::Cbz => {
-            dialog
-                .add_filter("Comic Book Archive", &["cbz"])
-                .set_file_name(format!("{name}.cbz"))
-                .save_file()
-                .await
-        }
-    };
-    let Some(destination) = destination.map(|destination| destination.path().to_owned()) else {
-        return Ok(());
-    };
+    Ok(ExportPlan {
+        name,
+        snapshot,
+        pages,
+        names,
+    })
+}
+
+async fn write_export(
+    plan: ExportPlan,
+    format: ExportFormat,
+    destination: PathBuf,
+    desktop: &Desktop,
+) -> Result<()> {
+    let ExportPlan {
+        snapshot,
+        pages,
+        names,
+        ..
+    } = plan;
     let renderer = desktop.renderer();
     let rasterizer = desktop.rasterizer().await?;
     let mut archive = if matches!(format, ExportFormat::Cbz) {

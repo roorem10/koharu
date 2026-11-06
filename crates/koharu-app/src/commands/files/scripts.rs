@@ -1,8 +1,12 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 use anyhow::{Context as _, Result, ensure};
 use koharu_desktop::Desktop;
 use koharu_scene::{Authored, Commit, EntityId, ProjectId, Revision, Snapshot, Translation};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{State, WebviewWindow};
@@ -14,8 +18,9 @@ use super::super::{
     project::{CurrentProject, Project},
 };
 
-#[derive(Clone, Debug, Deserialize, Serialize, Type)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, Type)]
 pub struct ScriptChange {
+    #[schemars(with = "String")]
     pub layer: EntityId,
     pub page: u32,
     pub page_label: String,
@@ -24,10 +29,12 @@ pub struct ScriptChange {
     pub new_text: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, Type)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, Type)]
 pub struct ScriptPreview {
+    #[schemars(with = "String")]
     pub project: ProjectId,
     pub project_name: String,
+    #[schemars(with = "u64")]
     pub revision: Revision,
     pub changes: Vec<ScriptChange>,
     pub unchanged: u32,
@@ -310,7 +317,6 @@ pub(crate) async fn export_script(
         let project = project.as_ref().context("no project is open")?;
         (project.name.clone(), project.snapshot())
     };
-    let text = write_script(&name, &script_pages(&snapshot)?)?;
     if let Some(file) = rfd::AsyncFileDialog::new()
         .set_parent(&window)
         .add_filter("TXT", &["txt"])
@@ -318,9 +324,7 @@ pub(crate) async fn export_script(
         .save_file()
         .await
     {
-        tokio::fs::write(file.path(), text)
-            .await
-            .context("failed to export script")?;
+        export_script_to(file.path(), &snapshot, &name).await?;
     }
     Ok(())
 }
@@ -344,10 +348,25 @@ pub(crate) async fn preview_script_import(
     else {
         return Ok(None);
     };
-    let text = tokio::fs::read_to_string(file.path())
+    Ok(Some(preview_script_file(file.path(), &snapshot, &name).await?))
+}
+
+pub(crate) async fn export_script_to(path: &Path, snapshot: &Snapshot, name: &str) -> Result<()> {
+    let text = write_script(name, &script_pages(snapshot)?)?;
+    tokio::fs::write(path, text)
+        .await
+        .context("failed to export script")
+}
+
+pub(crate) async fn preview_script_file(
+    path: &Path,
+    snapshot: &Snapshot,
+    name: &str,
+) -> Result<ScriptPreview> {
+    let text = tokio::fs::read_to_string(path)
         .await
         .context("script must be a readable UTF-8 text file")?;
-    Ok(Some(preview_import(&snapshot, &name, &text)?))
+    preview_import(snapshot, name, &text)
 }
 
 #[tauri::command]
