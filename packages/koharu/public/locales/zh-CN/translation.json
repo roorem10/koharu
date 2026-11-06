@@ -187,6 +187,16 @@
     "unknownModel": "先前使用的模型"
   },
   "cleanup": {
+    "check": "检查清理结果",
+    "checkPage": "检查当前页面",
+    "checkAll": "检查全部页面",
+    "secondTryModel": "第二次尝试使用的模型",
+    "sameModel": "与常规清理相同",
+    "secondTryHelp": "如果已清理的区域仍有文字，用此模型再清理一次。手绘修改会被保留。",
+    "checkResults": "清理检查结果",
+    "retryReason": "第二次尝试：残留文字与已清理区域重叠。",
+    "protectedReason": "已跳过自动重试：清理图层含有手动修改或未记录的修改。",
+    "clearResult": "未发现残留文字。",
     "title": "清理",
     "removeHint": "按住 Shift 拖动以选择矩形区域。Enter：清理队列中的区域。Esc：清空。",
     "queued_one": "{{count}} 个区域已加入队列",
@@ -720,6 +730,7 @@
     "settingsFailed": "无法加载 QC 设置。",
     "retry": "重试",
     "checks": {
+      "leftover_cleanup": "清理后的残留文字",
       "overflow": "文本超出文本框",
       "too_small": "字号过小：{{detail}} px",
       "missing_translation": "缺少译文",

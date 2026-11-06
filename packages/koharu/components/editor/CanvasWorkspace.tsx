@@ -7,6 +7,8 @@ import { stepBrush } from '@/components/canvas-tools/brushKeys'
 import { useOcrBoxTool } from '@/components/canvas-tools/ocrBox'
 import { useRemoveAreaTool } from '@/components/canvas-tools/removeArea'
 import type { CanvasToolHandler } from '@/components/canvas-tools/types'
+import { useFocusCleanupFinding } from '@/components/cleanup/findingFocus'
+import { LeftoverOverlay } from '@/components/cleanup/LeftoverOverlay'
 import { useColorSampling } from '@/components/controls/ColorSampling'
 import { CanvasCommandBar } from '@/components/editor/CanvasCommandBar'
 import { useCanvasContextMenu } from '@/components/editor/CanvasContextMenu'
@@ -418,6 +420,15 @@ export function CanvasWorkspace() {
   useEffect(() => {
     fitCanvas()
   }, [fitCanvas, fitCanvasRequest])
+
+  useFocusCleanupFinding(
+    surface,
+    projectName,
+    pageId,
+    canvasPage === pageId &&
+      canvasState.status === 'ready' &&
+      canvasState.generation === canvasGeneration,
+  )
 
   useEffect(() => cancelGesture, [cancelGesture, canvasGeneration, canvasRevision, page?.id, tool])
 
@@ -1158,6 +1169,9 @@ export function CanvasWorkspace() {
               <WarpHandles layerId={selected[0]} />
             )}
           {page && !showingOriginal && <CleanupQueueBar />}
+          {page && !showingOriginal && canvasPage === page.id && canvasState.status === 'ready' && (
+            <LeftoverOverlay />
+          )}
           {page && !showingOriginal && richTextEditor.overlay}
           {page && showingOriginal && <OriginalOverlay key={page.id} page={page} />}
           {page && !showingOriginal && canvasState.status === 'error' && (

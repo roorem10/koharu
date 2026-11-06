@@ -187,6 +187,16 @@
     "unknownModel": "an earlier model"
   },
   "cleanup": {
+    "check": "Check cleanup",
+    "checkPage": "Check this page",
+    "checkAll": "Check all pages",
+    "secondTryModel": "Model for the second try",
+    "sameModel": "Same as normal cleanup",
+    "secondTryHelp": "If text remains in a cleaned area, clean it again once with this model. Hand-painted cleanup is preserved.",
+    "checkResults": "Cleanup check results",
+    "retryReason": "Second try: leftover text overlaps a cleaned area.",
+    "protectedReason": "Automatic retry skipped: the Cleanup layer has manual or untracked edits.",
+    "clearResult": "No leftover text found.",
     "title": "Cleanup",
     "removeHint": "Shift-drag to select a rectangle. Enter: Clean queued areas. Esc: Clear.",
     "queued_one": "{{count}} area queued",
@@ -720,6 +730,7 @@
     "settingsFailed": "Could not load QC settings.",
     "retry": "Try again",
     "checks": {
+      "leftover_cleanup": "Leftover text in cleanup",
       "overflow": "Text overflows the box",
       "too_small": "Small text: {{detail}} px",
       "missing_translation": "Missing translation",

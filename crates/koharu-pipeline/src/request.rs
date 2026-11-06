@@ -21,6 +21,7 @@ pub struct InpaintingMask {
 pub enum Operation {
     #[default]
     Full,
+    CheckCleanup,
     Through {
         stage: Stage,
     },
@@ -36,6 +37,7 @@ impl Operation {
     pub fn stages(&self) -> Result<Vec<Stage>> {
         let stages = match self {
             Self::Full => Stage::ALL.to_vec(),
+            Self::CheckCleanup => vec![Stage::Inpainting],
             Self::Through {
                 stage: Stage::Detection,
             } => vec![Stage::Detection],

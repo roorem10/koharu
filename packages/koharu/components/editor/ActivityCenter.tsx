@@ -136,9 +136,11 @@ function JobItem({ job }: { job: Job }) {
         <span className='mt-1.5 size-1.5 justify-self-center rounded-full bg-primary' />
         <div className='min-w-0'>
           <span className='block truncate text-[12px] font-medium capitalize'>
-            {job.stage
-              ? t(`phase.${job.stage}`, { defaultValue: job.stage })
-              : t('activity.processing')}
+            {job.operation?.operation === 'check_cleanup'
+              ? t('cleanup.check')
+              : job.stage
+                ? t(`phase.${job.stage}`, { defaultValue: job.stage })
+                : t('activity.processing')}
           </span>
         </div>
         <span className='pt-0.5 text-right text-[10px] tabular-nums'>

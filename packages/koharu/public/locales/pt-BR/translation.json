@@ -187,6 +187,16 @@
     "unknownModel": "um modelo anterior"
   },
   "cleanup": {
+    "check": "Verificar limpeza",
+    "checkPage": "Verificar esta página",
+    "checkAll": "Verificar todas as páginas",
+    "secondTryModel": "Modelo para a segunda tentativa",
+    "sameModel": "O mesmo da limpeza normal",
+    "secondTryHelp": "Se restar texto em uma área limpa, limpe-a mais uma vez com este modelo. Os retoques manuais são preservados.",
+    "checkResults": "Resultados da verificação",
+    "retryReason": "Segunda tentativa: o texto restante se sobrepõe a uma área limpa.",
+    "protectedReason": "Nova tentativa automática ignorada: a camada de limpeza tem retoques manuais ou sem registro.",
+    "clearResult": "Nenhum texto restante encontrado.",
     "title": "Limpeza",
     "removeHint": "Arraste com Shift para selecionar um retângulo. Enter: limpar áreas na fila. Esc: limpar seleção.",
     "queued_one": "{{count}} área na fila",
@@ -720,6 +730,7 @@
     "settingsFailed": "Não foi possível carregar as configurações de QC.",
     "retry": "Tentar novamente",
     "checks": {
+      "leftover_cleanup": "Texto restante na limpeza",
       "overflow": "O texto ultrapassa a caixa",
       "too_small": "Texto pequeno: {{detail}} px",
       "missing_translation": "Tradução ausente",

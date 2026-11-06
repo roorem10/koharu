@@ -103,6 +103,8 @@ impl Host for FakeHost {
         [
             "inspect_project",
             "view_page",
+            "get_cleanup_check_results",
+            "check_cleanup",
             "set_translation",
             "run_pipeline",
             "fails",
@@ -126,7 +128,7 @@ impl Host for FakeHost {
                 control.cancelled().await;
                 Err(anyhow!("pipeline processing was cancelled"))
             }
-            "set_translation" => {
+            "set_translation" | "check_cleanup" => {
                 self.edits.fetch_add(1, Ordering::SeqCst);
                 Invocation::changed(json!({ "changed": true }))
             }
@@ -322,7 +324,7 @@ async fn http_initialization_tools_images_errors_and_session_deletion() {
         .unwrap();
     assert_eq!(
         rpc(list).await["result"]["tools"].as_array().unwrap().len(),
-        6
+        8
     );
     let inspected = rpc(server.call(&session, 2, "inspect_project").await).await;
     let value: Value =
@@ -371,6 +373,15 @@ async fn edits_are_refused_even_when_called_directly() {
         true
     );
     assert_eq!(host.edits.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        rpc(server.call(&session, 2, "check_cleanup").await).await["result"]["isError"],
+        true
+    );
+    assert_eq!(host.edits.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        rpc(server.call(&session, 3, "get_cleanup_check_results").await).await["result"]["isError"],
+        false
+    );
     server.stop().await;
 }
 

@@ -11,13 +11,14 @@ use crate::{
     accelerator::AcceleratorGate,
     progress,
     resources::ResourceMonitor,
-    stages::{StageInput, Stages},
+    stages::{StageInput, StageProcessor, Stages},
 };
 
 pub(crate) struct StageRunner {
     stages: Stages,
     translator: koharu_translator::Translator,
     accelerator: AcceleratorGate,
+    device: koharu_ml::Device,
 }
 
 impl StageRunner {
@@ -31,6 +32,7 @@ impl StageRunner {
             stages: Stages::new(config, translator.clone(), device)?,
             translator,
             accelerator: AcceleratorGate::new(device, resources),
+            device: device.clone(),
         })
     }
 
@@ -89,6 +91,32 @@ impl StageRunner {
         let started = Instant::now();
         let page = job.input.page();
         let model = self.stages.model(job.stage).to_owned();
+        if job.input.cleanup_check {
+            let outcome = crate::cleanup_check::run_page(
+                self,
+                job.input,
+                &job.stop,
+                job.progress.as_ref(),
+            )
+            .await
+            .map(|patch| match patch {
+                None => StageOutcome::Stopped,
+                Some(patch) if patch.is_empty() => StageOutcome::Skipped,
+                Some(patch) => StageOutcome::Patch(patch),
+            })
+            .map_err(|error| {
+                self.stages.unload(Stage::Detection);
+                self.stages.unload(Stage::Inpainting);
+                PipelineError::new(ErrorKind::Processing, Some(job.stage), error)
+            });
+            return StageCompletion {
+                page,
+                stage: job.stage,
+                model,
+                elapsed: started.elapsed(),
+                outcome,
+            };
+        }
         let outcome = retry_stage(
             job.retries,
             &job.stop,
@@ -114,6 +142,120 @@ impl StageRunner {
             elapsed: started.elapsed(),
             outcome,
         }
+    }
+
+    pub(crate) async fn cleanup_detection(
+        &self,
+        image: Arc<image::DynamicImage>,
+        page: EntityId,
+        stop: &StopToken,
+        progress: Option<&ProgressSink>,
+    ) -> Result<Option<koharu_ml::koharu_layout_rfdetr_seg_2xl::KoharuLayoutDetections>> {
+        self.cleanup_inference(
+            Stage::Detection,
+            self.stages.model(Stage::Detection),
+            page,
+            stop,
+            progress,
+            || self.stages.detect_image(image.clone()),
+        )
+        .await
+    }
+
+    pub(crate) async fn cleanup_retry(
+        &self,
+        input: StageInput,
+        model: Option<crate::InpaintingModel>,
+        stop: &StopToken,
+        progress: Option<&ProgressSink>,
+    ) -> Result<Option<Patch>> {
+        if let Some(model) = model {
+            // The alternate model is confined to this attempt; it never changes
+            // the selected cleanup model or remains resident after verification.
+            self.stages.unload(Stage::Inpainting);
+            let processor = crate::stages::inpainting::Processor::new(model, self.device.clone())?;
+            self.cleanup_inference(
+                Stage::Inpainting,
+                processor.model(),
+                input.page(),
+                stop,
+                progress,
+                || async {
+                    processor.load().await?;
+                    processor.process(input.clone()).await
+                },
+            )
+            .await
+        } else {
+            self.cleanup_inference(
+                Stage::Inpainting,
+                self.stages.model(Stage::Inpainting),
+                input.page(),
+                stop,
+                progress,
+                || async {
+                    self.stages.load(Stage::Inpainting).await?;
+                    self.stages.process(Stage::Inpainting, input.clone()).await
+                },
+            )
+            .await
+        }
+    }
+
+    async fn cleanup_inference<T, F, Fut>(
+        &self,
+        stage: Stage,
+        model: &str,
+        page: EntityId,
+        stop: &StopToken,
+        sink: Option<&ProgressSink>,
+        attempt: F,
+    ) -> Result<Option<T>>
+    where
+        F: Fn() -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        if stop.stopped() {
+            return Ok(None);
+        }
+        let permit = self.accelerator.acquire().await;
+        if stop.stopped() {
+            return Ok(None);
+        }
+        // Verification is one existing inpainting job unit, including both
+        // detector passes. Its phases must not increment the job's counter.
+        progress::emit(
+            sink,
+            Progress::Loading {
+                page,
+                stage: Stage::Inpainting,
+                model: model.to_owned(),
+            },
+        );
+        progress::emit(
+            sink,
+            Progress::Running {
+                page,
+                stage: Stage::Inpainting,
+                model: model.to_owned(),
+            },
+        );
+        let result = match attempt().await {
+            Ok(value) => Ok(value),
+            Err(error) if is_out_of_memory(&error) && !stop.stopped() => {
+                drop(permit);
+                let _permit = self.accelerator.recover(stage, &self.stages).await;
+                if stop.stopped() {
+                    return Ok(None);
+                }
+                attempt().await
+            }
+            Err(error) => Err(error),
+        };
+        if result.is_err() {
+            self.stages.unload(stage);
+        }
+        result.map(|value| (!stop.stopped()).then_some(value))
     }
 
     async fn run_with_recovery(

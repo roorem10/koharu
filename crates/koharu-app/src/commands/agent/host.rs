@@ -414,6 +414,14 @@ impl Host for KoharuHost {
                         "run_pipeline",
                         "Run Koharu's configured processing pipeline for the whole project, selected pages, or selected text elements.",
                     ),
+                    definition::<super::cleanup_check::CheckCleanup>(
+                        "check_cleanup",
+                        "Check cleaned areas for leftover text, retry cleanup once, and report anything that remains. Pass page IDs or omit pages for the project. Hand-painted cleanup is protected. Waits for the normal, stoppable processing job to finish.",
+                    ),
+                    definition::<InspectProject>(
+                        "get_cleanup_check_results",
+                        "Read the current cleanup-check results without running detection or editing the project. Results for changed pages are omitted; an absent page has no current check result.",
+                    ),
                     // WO-20 (one box per bubble) tool definitions go here.
                     definition::<crate::commands::boxes::FindSplitBubblesArgs>(
                         "find_split_bubbles",
@@ -688,6 +696,16 @@ impl Host for KoharuHost {
                 self.context_tool(&call).await
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
+            "check_cleanup" => {
+                super::cleanup_check::run(self.handle.clone(), arguments(&call)?, control).await
+            }
+            "get_cleanup_check_results" => {
+                let _: InspectProject = arguments(&call)?;
+                let current = self.handle.state::<CurrentProject>();
+                let current = current.project.lock().await;
+                let project = current.as_ref().context("no project is open")?;
+                Invocation::read(koharu_pipeline::cleanup_check::results(&project.snapshot())?)
+            }
             // WO-20 (one box per bubble) tool calls go here.
             "find_split_bubbles" => {
                 let arguments: crate::commands::boxes::FindSplitBubblesArgs = arguments(&call)?;

@@ -1,6 +1,7 @@
 //! In-process, scene-native model orchestration for Koharu.
 
 mod accelerator;
+pub mod cleanup_check;
 mod config;
 mod emphasis;
 mod error;

@@ -95,6 +95,19 @@ pub(super) struct Processor {
 }
 
 impl Processor {
+    pub(super) async fn detect_image(
+        &self,
+        image: Arc<DynamicImage>,
+    ) -> Result<KoharuLayoutDetections> {
+        self.model
+            .lock()
+            .await
+            .as_ref()
+            .ok_or_else(|| anyhow!("detection model is not loaded"))?
+            .detect(image)
+            .await
+    }
+
     pub(super) fn new(
         mut config: DetectionModel,
         device: koharu_ml::Device,

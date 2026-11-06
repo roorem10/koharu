@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Channel } from '@tauri-apps/api/core'
 import { useEffect, useRef, useState } from 'react'
 
+import { useCleanupFindingFocus } from '@/components/cleanup/findingFocus'
 import { refreshContext, useChapterContext } from '@/components/context/data'
 import { historyChangedEvent } from '@/components/context/events'
 import { call } from '@/lib/backend'
@@ -18,6 +19,8 @@ import {
   type QcFinding,
   type QcProgress,
 } from '@koharu/bridge/protocol'
+
+import { useCompareStore } from './compare'
 
 export const qcSettingsKey = ['qc-settings'] as const
 export const qcKey = (project: string | undefined) => ['qc-results', project] as const
@@ -138,6 +141,13 @@ export async function navigateFinding(finding: QcFinding) {
     queryClient.setQueryData(projectKey, selection.project)
     queryClient.setQueryData(pageKey, selection.page)
     useKoharuStore.getState().selectLayers([finding.layer])
+    if (finding.check === 'leftover_cleanup' && finding.bounds) {
+      useCompareStore.getState().reset()
+      useKoharuStore.getState().setTool('remove')
+      useCleanupFindingFocus.setState({
+        request: { project: selection.project.name, page: finding.page, bounds: finding.bounds },
+      })
+    }
   } catch {
     if (
       queryClient.getQueryData<ProjectInfo | null>(projectKey)?.name === previousProject?.name &&

@@ -1,3 +1,4 @@
+mod cleanup_check;
 pub(crate) mod host;
 
 use std::{collections::HashMap, sync::Arc};

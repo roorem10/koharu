@@ -53,23 +53,27 @@ export function FindingRow({
           {t(finding.flag?.kind === 'review' ? 'qc.agent' : 'qc.autoChecks')}
         </span>
         <span className='block text-[11px] break-words'>{label}</span>
-        <span
-          className='block truncate text-[10px] text-muted-foreground'
-          title={finding.translation}
-        >
-          {finding.translation || t('qc.noTranslation')}
-        </span>
+        {finding.check !== 'leftover_cleanup' && (
+          <span
+            className='block truncate text-[10px] text-muted-foreground'
+            title={finding.translation}
+          >
+            {finding.translation || t('qc.noTranslation')}
+          </span>
+        )}
       </button>
-      <Button
-        size='sm'
-        variant='ghost'
-        disabled={busy}
-        className='h-6 shrink-0 px-1.5 text-[10px]'
-        aria-label={t(hidden ? 'qc.undoFor' : 'qc.okFor', { check: label })}
-        onClick={() => void run(() => markFinding(finding, hidden))}
-      >
-        {t(hidden ? 'qc.undoOk' : 'qc.ok')}
-      </Button>
+      {finding.check !== 'leftover_cleanup' && (
+        <Button
+          size='sm'
+          variant='ghost'
+          disabled={busy}
+          className='h-6 shrink-0 px-1.5 text-[10px]'
+          aria-label={t(hidden ? 'qc.undoFor' : 'qc.okFor', { check: label })}
+          onClick={() => void run(() => markFinding(finding, hidden))}
+        >
+          {t(hidden ? 'qc.undoOk' : 'qc.ok')}
+        </Button>
+      )}
     </div>
   )
 }

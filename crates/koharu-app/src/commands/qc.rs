@@ -33,6 +33,7 @@ pub(crate) enum QcCheck {
     MissingTranslation,
     EmptySource,
     LeftoverSource,
+    LeftoverCleanup,
     OddFont,
     Flag,
 }
@@ -45,6 +46,7 @@ impl QcCheck {
             Self::MissingTranslation => "missing_translation",
             Self::EmptySource => "empty_source",
             Self::LeftoverSource => "leftover_source",
+            Self::LeftoverCleanup => "leftover_cleanup",
             Self::OddFont => "odd_font",
             Self::Flag => "flag",
         }
@@ -61,6 +63,9 @@ pub(crate) struct QcFinding {
     pub detail: String,
     pub translation: String,
     pub flag: Option<Flag>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    pub bounds: Option<koharu_pipeline::Bounds>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Type)]
@@ -355,7 +360,7 @@ async fn run_checks(
             cache.save(directory.as_deref(), &snapshot, complete);
             cache.report(&snapshot, &context)
         },
-    ))
+    )?)
 }
 
 fn small_text_detail(size: Option<f32>, base: Option<f32>, minimum: f32) -> Option<String> {
@@ -453,7 +458,7 @@ pub(crate) async fn get_qc_results(
     let context = project.load_context()?;
     Ok(cache::with_cache(&snapshot, project.directory(), |cache| {
         cache.report(&snapshot, &context)
-    }))
+    })?)
 }
 
 fn acknowledgement(check: QcCheck, flag: Option<&Flag>) -> String {
@@ -541,6 +546,7 @@ fn push_finding(
         detail,
         translation: row.translation.clone(),
         flag,
+        bounds: None,
     };
     if finding_hidden(context, &finding) {
         report.hidden.push(finding);

@@ -24,6 +24,7 @@ import { mockWo20 } from './mocks/wo20'
 import { mockWo21 } from './mocks/wo21'
 import { mockWo23 } from './mocks/wo23'
 import { mockWo24 } from './mocks/wo24'
+import { mockWo29 } from './mocks/wo29'
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
@@ -130,6 +131,7 @@ beforeEach(() => {
   mockWo17()
   mockWo23()
   mockWo24()
+  mockWo29()
   mockWo11a()
   mockWo11b()
   mockWo11c()

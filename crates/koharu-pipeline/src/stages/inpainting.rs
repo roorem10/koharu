@@ -49,12 +49,13 @@ pub enum PaintTarget {
     PaintLayer,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Type)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Type)]
 #[serde(default)]
 pub struct CleanupSettings {
     pub remove_mode: RemoveMode,
     pub paint_target: PaintTarget,
     pub grow_px: u8,
+    pub second_try_model: Option<InpaintingModel>,
 }
 
 impl Default for CleanupSettings {
@@ -63,6 +64,7 @@ impl Default for CleanupSettings {
             remove_mode: RemoveMode::Queue,
             paint_target: PaintTarget::Cleanup,
             grow_px: 2,
+            second_try_model: None,
         }
     }
 }
@@ -97,14 +99,14 @@ impl Default for RoremMixedConfig {
     }
 }
 
-pub(super) struct Processor {
+pub(crate) struct Processor {
     config: InpaintingModel,
     device: koharu_ml::Device,
     model: ModelCell<Model>,
 }
 
 impl Processor {
-    pub(super) fn new(config: InpaintingModel, device: koharu_ml::Device) -> Result<Self> {
+    pub(crate) fn new(config: InpaintingModel, device: koharu_ml::Device) -> Result<Self> {
         match &config {
             InpaintingModel::LaMa {} | InpaintingModel::AotInpainting {} => {}
             InpaintingModel::Flux2Klein(settings) => {
@@ -332,8 +334,9 @@ impl Model {
             }
         };
         let page = input.page;
-        let manual = input.inpainting_mask.is_some();
-        let mut edit = if manual {
+        let merge = input.inpainting_mask.is_some();
+        let manual = merge && !input.cleanup_retry;
+        let mut edit = if merge {
             input.scene.edit()
         } else {
             input.scene.edit_as(generation(PRODUCER, model_name)?)
@@ -347,13 +350,13 @@ impl Model {
         if image.dimensions() != original.dimensions() || image.dimensions() != mask.dimensions() {
             bail!("inpainted image dimensions do not match page {page}");
         }
-        let mut overlay = if manual {
+        let mut overlay = if merge {
             cleanup.unwrap_or_else(|| RgbaImage::new(image.width(), image.height()))
         } else {
             RgbaImage::new(image.width(), image.height())
         };
         for (x, y, target) in overlay.enumerate_pixels_mut() {
-            if manual {
+            if merge {
                 blend_cleanup_pixel(target, image.get_pixel(x, y), mask.get_pixel(x, y)[0]);
                 continue;
             }
@@ -369,6 +372,10 @@ impl Model {
         let width = overlay.width();
         let height = overlay.height();
         DynamicImage::ImageRgba8(overlay).write_to(&mut bytes, ImageFormat::Png)?;
+        let previous = cleanup_entity
+            .map(|entity| input.scene.asset(entity, &AssetRole::new("source")?))
+            .transpose()?
+            .flatten();
         let cleanup_entity = if let Some(entity) = cleanup_entity {
             if manual {
                 let mut layer = input
@@ -399,16 +406,18 @@ impl Model {
             )?;
             entity
         };
+        let bytes = Arc::<[u8]>::from(bytes.into_inner());
+        let attributes = crate::cleanup_check::generated_attributes(previous.as_ref(), &bytes);
         edit.set_asset(
             cleanup_entity,
             &AssetRole::new("source")?,
             AssetInput::new(
-                Arc::<[u8]>::from(bytes.into_inner()),
+                bytes,
                 "image/png",
                 AssetMetadata {
                     width: Some(width),
                     height: Some(height),
-                    attributes: BTreeMap::new(),
+                    attributes,
                 },
             ),
         )?;
@@ -552,7 +561,7 @@ async fn prepare(input: &StageInput) -> Result<InpaintInput> {
             }
         }
     }
-    if input.inpainting_mask.is_some() {
+    if input.inpainting_mask.is_some() && !input.cleanup_retry {
         let grow_px = koharu_config::load::<CleanupSettings>("cleanup")?
             .read()?
             .grow_px
