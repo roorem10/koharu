@@ -55,6 +55,7 @@ pub(crate) struct TextNodeDescriptor {
     pub(crate) font_size: Option<f32>,
     pub(crate) minimum_font_size: f32,
     pub(crate) auto_fit: bool,
+    pub(crate) normal_hyphenation: bool,
     pub(crate) alignment: TextAlign,
     pub(crate) writing_mode: WritingMode,
     pub(crate) foreground_color: [u8; 4],
@@ -364,7 +365,10 @@ impl TextRenderer {
         if let Some(language) = &descriptor.language {
             layout = layout.with_hyphenation_language_tag(language.as_str());
         }
-        if is_bubble_text && descriptor.writing_mode == WritingMode::Horizontal {
+        if is_bubble_text
+            && descriptor.writing_mode == WritingMode::Horizontal
+            && !descriptor.normal_hyphenation
+        {
             layout = layout.with_hyphenation_policy(HyphenationPolicy::LastResort);
         }
         let layout = if descriptor.auto_fit && !descriptor.point_text {
@@ -1716,6 +1720,7 @@ mod tests {
             font_size: None,
             minimum_font_size: 9.0,
             auto_fit: true,
+            normal_hyphenation: false,
             alignment: TextAlign::Center,
             writing_mode: WritingMode::Horizontal,
             foreground_color: [0, 0, 0, 255],
@@ -1758,6 +1763,7 @@ mod tests {
             font_size: Some(6.0),
             minimum_font_size: 9.0,
             auto_fit: true,
+            normal_hyphenation: false,
             alignment: TextAlign::Center,
             writing_mode: WritingMode::Horizontal,
             foreground_color: [0, 0, 0, 255],
@@ -2090,6 +2096,7 @@ mod tests {
             font_size: Some(20.0),
             minimum_font_size: 9.0,
             auto_fit: false,
+            normal_hyphenation: false,
             alignment: TextAlign::Center,
             writing_mode: WritingMode::Horizontal,
             foreground_color: [0, 0, 0, 255],

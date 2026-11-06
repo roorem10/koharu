@@ -742,7 +742,35 @@
     "agent": "Agent",
     "noBoxIssues": "No issues on this box.",
     "hidden": "Hidden (marked OK)",
-    "editorPanels": "Editor panels"
+    "editorPanels": "Editor panels",
+    "fixAutomatically": "Fix automatically",
+    "fixBox": "Fix this box automatically",
+    "checkFirst": "Check these first",
+    "reviewGroups": {
+      "open": "Still open",
+      "auto_fixed": "Auto-fixed",
+      "unsure": "Unsure guesses"
+    },
+    "looksGood": "Looks good",
+    "looksGoodFor": "Mark {{check}} as looking good",
+    "autoFixedReason": "Auto-fixed: {{reason}}",
+    "previousSource": "Earlier source",
+    "previousTranslation": "Earlier translation",
+    "fixSummary": "{{fixes}} fixes · {{left}} left · {{requests}} requests",
+    "autoFix": "Fix QC problems automatically",
+    "autoFixDescription": "After translation, fix mechanical problems in boxes you have not edited.",
+    "letteringUnsure": "Unsure lettering: {{category}}",
+    "emptyText": "(empty)",
+    "fixReasons": {
+      "tighten_layout": "Tighter line spacing, hyphenation and bubble fit",
+      "shorten_translation": "Shorter wording — review the meaning",
+      "translate_missing": "Missing translation",
+      "translate_leftover": "Japanese remaining in the translation",
+      "translate_glossary": "Required glossary term",
+      "apply_category_style": "Category lettering style",
+      "read_again": "Empty source read again",
+      "hide_empty": "Still empty after reading again; hidden as a likely false detection"
+    }
   },
   "rawPrep": {
     "title": "Page levels",

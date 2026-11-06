@@ -742,7 +742,35 @@
     "agent": "代理",
     "noBoxIssues": "此文本框未发现问题。",
     "hidden": "已隐藏（标记为 OK）",
-    "editorPanels": "编辑器面板"
+    "editorPanels": "编辑器面板",
+    "fixAutomatically": "自动修正",
+    "fixBox": "自动修正此文本框",
+    "checkFirst": "优先检查这些",
+    "reviewGroups": {
+      "open": "尚未解决",
+      "auto_fixed": "已自动修正",
+      "unsure": "不确定的判断"
+    },
+    "looksGood": "没有问题",
+    "looksGoodFor": "将 {{check}} 标为没有问题",
+    "autoFixedReason": "已自动修正：{{reason}}",
+    "previousSource": "修正前的原文",
+    "previousTranslation": "修正前的译文",
+    "fixSummary": "修正 {{fixes}} 项 · 剩余 {{left}} 项 · 请求 {{requests}} 次",
+    "autoFix": "自动修正质检问题",
+    "autoFixDescription": "翻译后，修正未经过手动编辑的文本框中的机械性问题。",
+    "letteringUnsure": "不确定的文字样式：{{category}}",
+    "emptyText": "（空）",
+    "fixReasons": {
+      "tighten_layout": "收紧行距、调整断词及气泡内布局",
+      "shorten_translation": "缩短了措辞，请检查含义",
+      "translate_missing": "缺少译文",
+      "translate_leftover": "译文中残留的日文",
+      "translate_glossary": "必须使用的术语表词条",
+      "apply_category_style": "类别文字样式",
+      "read_again": "重新识别空白原文",
+      "hide_empty": "重新识别后仍为空，可能是误检，已隐藏"
+    }
   },
   "rawPrep": {
     "title": "页面色阶",

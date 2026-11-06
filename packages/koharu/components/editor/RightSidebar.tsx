@@ -9,6 +9,7 @@ import { discussLineEvent, openContextEvent } from '@/components/context/events'
 import { AgentPanel } from '@/components/editor/AgentPanel'
 import { Inspector } from '@/components/editor/Inspector'
 import { useAutomaticQc, useQcResults } from '@/components/qc/data'
+import { useQcReview } from '@/components/qc/fixes'
 import { QcPanel } from '@/components/qc/QcPanel'
 import { invalidateLineLabels } from '@/lib/line-labels'
 import { useKoharuStore } from '@/lib/store'
@@ -17,7 +18,10 @@ import { Button } from '@koharu/ui/components/button'
 export function RightSidebar() {
   const { t } = useTranslation()
   useAutomaticQc()
-  const issueCount = useQcResults().data?.findings.length ?? 0
+  const review = useQcReview().data ?? []
+  const issueCount =
+    (useQcResults().data?.findings.length ?? 0) +
+    review.filter((item) => item.kind !== 'problem').length
   const jobs = useKoharuStore((state) => state.jobs)
   const completedReads = Object.values(jobs)
     .filter((job) => job.state === 'finished')

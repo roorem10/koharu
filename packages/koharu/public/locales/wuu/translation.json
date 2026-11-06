@@ -742,7 +742,35 @@
     "agent": "智能体",
     "noBoxIssues": "箇只文字框呒没问题。",
     "hidden": "囥脱个（标成“无问题”）",
-    "editorPanels": "编辑器面板"
+    "editorPanels": "编辑器面板",
+    "fixAutomatically": "自动修正",
+    "fixBox": "自动修正箇只文字框",
+    "checkFirst": "先检查箇眼",
+    "reviewGroups": {
+      "open": "还呒没解决",
+      "auto_fixed": "已经自动修正",
+      "unsure": "拿勿准个判断"
+    },
+    "looksGood": "看起来呒没问题",
+    "looksGoodFor": "拿 {{check}} 标成“呒没问题”",
+    "autoFixedReason": "已经自动修正：{{reason}}",
+    "previousSource": "修正前个原文",
+    "previousTranslation": "修正前个译文",
+    "fixSummary": "修正 {{fixes}} 项 · 还剩 {{left}} 项 · 请求 {{requests}} 趟",
+    "autoFix": "自动修正质检问题",
+    "autoFixDescription": "翻译好以后，自动修正侬呒没手动改过个文字框里向个机械性问题。",
+    "letteringUnsure": "拿勿准个文字样式：{{category}}",
+    "emptyText": "（空个）",
+    "fixReasons": {
+      "tighten_layout": "收紧行距、调整断词搭气泡里向个排版",
+      "shorten_translation": "译文缩短哉——请检查意思",
+      "translate_missing": "缺少译文",
+      "translate_leftover": "译文里向剩下来个日文",
+      "translate_glossary": "术语表里向必须用个词",
+      "apply_category_style": "分类个文字样式",
+      "read_again": "空个原文重新识别",
+      "hide_empty": "重新识别后还是空个，可能是误检，已经囥脱"
+    }
   },
   "rawPrep": {
     "title": "页面色阶",

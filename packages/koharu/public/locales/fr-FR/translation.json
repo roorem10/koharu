@@ -750,7 +750,35 @@
     "agent": "Agent",
     "noBoxIssues": "Aucun problème dans cette zone de texte.",
     "hidden": "Masqués (marqués OK)",
-    "editorPanels": "Panneaux de l’éditeur"
+    "editorPanels": "Panneaux de l’éditeur",
+    "fixAutomatically": "Corriger automatiquement",
+    "fixBox": "Corriger ce bloc automatiquement",
+    "checkFirst": "À vérifier en priorité",
+    "reviewGroups": {
+      "open": "Problèmes non résolus",
+      "auto_fixed": "Corrections automatiques",
+      "unsure": "Classifications incertaines"
+    },
+    "looksGood": "C’est bon",
+    "looksGoodFor": "Valider {{check}}",
+    "autoFixedReason": "Correction automatique : {{reason}}",
+    "previousSource": "Ancien texte source",
+    "previousTranslation": "Ancienne traduction",
+    "fixSummary": "{{fixes}} corrections · {{left}} à vérifier · {{requests}} requêtes",
+    "autoFix": "Corriger automatiquement les problèmes de qualité",
+    "autoFixDescription": "Après la traduction, corriger les problèmes mécaniques des blocs que vous n’avez pas modifiés.",
+    "letteringUnsure": "Lettrage incertain : {{category}}",
+    "emptyText": "(vide)",
+    "fixReasons": {
+      "tighten_layout": "Interlignage resserré, césure et ajustement à la bulle",
+      "shorten_translation": "Formulation raccourcie — vérifier le sens",
+      "translate_missing": "Traduction manquante",
+      "translate_leftover": "Japonais restant dans la traduction",
+      "translate_glossary": "Terme imposé du glossaire",
+      "apply_category_style": "Style de lettrage de la catégorie",
+      "read_again": "Nouvelle lecture du texte source vide",
+      "hide_empty": "Toujours vide après relecture ; masqué comme probable fausse détection"
+    }
   },
   "rawPrep": {
     "title": "Niveaux des pages",

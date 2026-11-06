@@ -742,7 +742,35 @@
     "agent": "Agente",
     "noBoxIssues": "Nenhum problema nesta caixa.",
     "hidden": "Ocultos (marcados como OK)",
-    "editorPanels": "Painéis do editor"
+    "editorPanels": "Painéis do editor",
+    "fixAutomatically": "Corrigir automaticamente",
+    "fixBox": "Corrigir esta caixa automaticamente",
+    "checkFirst": "Confira estes primeiro",
+    "reviewGroups": {
+      "open": "Problemas pendentes",
+      "auto_fixed": "Corrigidos automaticamente",
+      "unsure": "Classificações incertas"
+    },
+    "looksGood": "Está bom",
+    "looksGoodFor": "Marcar {{check}} como correto",
+    "autoFixedReason": "Corrigido automaticamente: {{reason}}",
+    "previousSource": "Texto original anterior",
+    "previousTranslation": "Tradução anterior",
+    "fixSummary": "{{fixes}} correções · {{left}} pendentes · {{requests}} solicitações",
+    "autoFix": "Corrigir problemas de qualidade automaticamente",
+    "autoFixDescription": "Após a tradução, corrija os problemas mecânicos nas caixas que você não editou.",
+    "letteringUnsure": "Letreiramento incerto: {{category}}",
+    "emptyText": "(vazio)",
+    "fixReasons": {
+      "tighten_layout": "Espaçamento entre linhas reduzido, hifenização e ajuste ao balão",
+      "shorten_translation": "Texto mais curto — confira o sentido",
+      "translate_missing": "Tradução ausente",
+      "translate_leftover": "Japonês restante na tradução",
+      "translate_glossary": "Termo obrigatório do glossário",
+      "apply_category_style": "Estilo de letreiramento da categoria",
+      "read_again": "Nova leitura do texto original vazio",
+      "hide_empty": "Continua vazio após a releitura; ocultado como provável detecção falsa"
+    }
   },
   "rawPrep": {
     "title": "Níveis da página",

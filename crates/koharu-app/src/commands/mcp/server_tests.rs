@@ -105,6 +105,9 @@ impl Host for FakeHost {
             "ready_check",
             "view_page",
             "download_ready_models",
+            "read_qc",
+            "run_qc_fixes",
+            "mark_qc_item_ok",
             "set_translation",
             "run_pipeline",
             "fails",
@@ -128,7 +131,7 @@ impl Host for FakeHost {
                 control.cancelled().await;
                 Err(anyhow!("pipeline processing was cancelled"))
             }
-            "set_translation" => {
+            "set_translation" | "run_qc_fixes" | "mark_qc_item_ok" => {
                 self.edits.fetch_add(1, Ordering::SeqCst);
                 Invocation::changed(json!({ "changed": true }))
             }
@@ -379,9 +382,18 @@ async fn edits_are_refused_even_when_called_directly() {
     let host = Arc::new(FakeHost::default());
     let server = Server::start(bridge(host.clone(), false)).await;
     let session = server.initialize().await;
+    for (index, tool) in ["set_translation", "run_qc_fixes", "mark_qc_item_ok"]
+        .iter()
+        .enumerate()
+    {
+        assert_eq!(
+            rpc(server.call(&session, index as i32 + 1, tool).await).await["result"]["isError"],
+            true
+        );
+    }
     assert_eq!(
-        rpc(server.call(&session, 1, "set_translation").await).await["result"]["isError"],
-        true
+        rpc(server.call(&session, 4, "read_qc").await).await["result"]["isError"],
+        false
     );
     assert_eq!(host.edits.load(Ordering::SeqCst), 0);
     assert_eq!(

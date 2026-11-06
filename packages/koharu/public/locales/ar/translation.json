@@ -774,7 +774,35 @@
     "agent": "الوكيل",
     "noBoxIssues": "لا توجد مشكلات في هذا المربع.",
     "hidden": "مخفي (معلّم بعلامة OK)",
-    "editorPanels": "لوحات المحرّر"
+    "editorPanels": "لوحات المحرّر",
+    "fixAutomatically": "إصلاح تلقائي",
+    "fixBox": "إصلاح هذا المربع تلقائيًا",
+    "checkFirst": "راجع هذه أولًا",
+    "reviewGroups": {
+      "open": "مشكلات لم تُحل",
+      "auto_fixed": "تم إصلاحها تلقائيًا",
+      "unsure": "تقديرات غير مؤكدة"
+    },
+    "looksGood": "يبدو جيدًا",
+    "looksGoodFor": "وضع علامة «يبدو جيدًا» على {{check}}",
+    "autoFixedReason": "تم الإصلاح تلقائيًا: {{reason}}",
+    "previousSource": "النص الأصلي السابق",
+    "previousTranslation": "الترجمة السابقة",
+    "fixSummary": "{{fixes}} إصلاحات · {{left}} متبقية · {{requests}} طلبات",
+    "autoFix": "إصلاح مشكلات فحص الجودة تلقائيًا",
+    "autoFixDescription": "بعد الترجمة، أصلح المشكلات الآلية في المربعات التي لم تعدّلها يدويًا.",
+    "letteringUnsure": "تصنيف كتابة غير مؤكد: {{category}}",
+    "emptyText": "(فارغ)",
+    "fixReasons": {
+      "tighten_layout": "تضييق تباعد الأسطر وتحسين تقسيم الكلمات وملاءمة الفقاعة",
+      "shorten_translation": "صياغة أقصر — راجع المعنى",
+      "translate_missing": "ترجمة مفقودة",
+      "translate_leftover": "نص ياباني متبقٍ في الترجمة",
+      "translate_glossary": "مصطلح مطلوب من المسرد",
+      "apply_category_style": "نمط الكتابة الخاص بالفئة",
+      "read_again": "إعادة قراءة المصدر الفارغ",
+      "hide_empty": "لا يزال فارغًا بعد إعادة القراءة؛ أُخفي لأنه كشف خاطئ على الأرجح"
+    }
   },
   "rawPrep": {
     "title": "مستويات الصفحة",

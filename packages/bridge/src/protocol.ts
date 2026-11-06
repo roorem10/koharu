@@ -165,6 +165,10 @@ export const commands = {
 	resetBoxEffects: (layers: EntityId[]) => __TAURI_INVOKE<null>("reset_box_effects", { layers }),
 	getQcResults: () => __TAURI_INVOKE<QcReport>("get_qc_results"),
 	markQcFinding: (layer: EntityId, check: QcCheck, flag: Flag | null, ok: boolean) => __TAURI_INVOKE<null>("mark_qc_finding", { layer, check, flag, ok }),
+	fixQc: (scope: QcFixScope, automatic: boolean | null) => __TAURI_INVOKE<JobId | null>("fix_qc", { scope, automatic }),
+	getQcFixSummary: () => __TAURI_INVOKE<QcFixSummary>("get_qc_fix_summary"),
+	getQcReview: () => __TAURI_INVOKE<QcReviewItem[]>("get_qc_review"),
+	getQcFixHistory: (layer: EntityId) => __TAURI_INVOKE<QcFixRecord[]>("get_qc_fix_history", { layer }),
 	getReadingModel: () => __TAURI_INVOKE<ReadModelInfo>("get_reading_model"),
 	getReadingModels: () => __TAURI_INVOKE<Model[]>("get_reading_models"),
 	getLastReadModel: () => __TAURI_INVOKE<string | null>("get_last_read_model"),
@@ -951,7 +955,7 @@ export type ProviderPreferences = {
 	entries: ProviderPreference[],
 };
 
-export type QcCheck = "overflow" | "too_small" | "missing_translation" | "empty_source" | "leftover_source" | "odd_font" | "flag";
+export type QcCheck = "overflow" | "too_small" | "missing_translation" | "empty_source" | "leftover_source" | "odd_font" | "flag" | "auto_fixed" | "lettering_unsure";
 
 export type QcFinding = {
 	page: EntityId,
@@ -962,6 +966,24 @@ export type QcFinding = {
 	detail: string,
 	translation: string,
 	flag: Flag | null,
+};
+
+export type QcFixAction = "tighten_layout" | "shorten_translation" | "translate_missing" | "translate_leftover" | "translate_glossary" | "apply_category_style" | "read_again" | "hide_empty";
+
+export type QcFixRecord = {
+	reason: QcCheck,
+	action: QcFixAction,
+	previous_source: string | null,
+	previous_translation: string | null,
+};
+
+export type QcFixScope = { scope: "project" } | { scope: "pages"; pages: EntityId[] } | { scope: "boxes"; layers: EntityId[] };
+
+export type QcFixSummary = {
+	fixes_made: number,
+	items_left: number,
+	/**  Pipeline OCR/translation requests, including failed attempts. */
+	requests_used: number,
 };
 
 export type QcProgress = {
@@ -976,10 +998,19 @@ export type QcReport = {
 	pages_checked: number,
 };
 
+export type QcReviewItem = {
+	finding: QcFinding,
+	kind: QcReviewKind,
+	previous_translation: string | null,
+};
+
+export type QcReviewKind = "problem" | "auto_fixed" | "lettering_unsure" | "speaker_unsure" | "ocr_corrected";
+
 export type QcScope = { scope: "page"; page: EntityId } | { scope: "project" };
 
 export type QcSettings = {
 	min_font_size?: number,
+	auto_fix?: boolean,
 };
 
 export type QualityLevel = "fast" | "balanced" | "best";

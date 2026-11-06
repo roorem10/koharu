@@ -19,6 +19,7 @@ fn descriptor(text: &str) -> TextNodeDescriptor {
         font_size: Some(40.0),
         minimum_font_size: 9.0,
         auto_fit: false,
+        normal_hyphenation: false,
         alignment: TextAlign::Left,
         writing_mode: WritingMode::Horizontal,
         foreground_color: [0, 0, 0, 255],

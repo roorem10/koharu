@@ -20,6 +20,8 @@ pub struct TranslationHints {
     pub background: String,
     pub characters: BTreeMap<EntityId, String>,
     pub previous_pages: u8,
+    /// An instruction for this run, composed with the configured translation instructions.
+    pub instructions: Option<String>,
 }
 
 impl TranslationHints {

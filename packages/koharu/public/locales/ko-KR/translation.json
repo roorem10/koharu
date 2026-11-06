@@ -742,7 +742,35 @@
     "agent": "에이전트",
     "noBoxIssues": "이 상자에는 문제가 없습니다.",
     "hidden": "숨김 (OK로 표시됨)",
-    "editorPanels": "편집기 패널"
+    "editorPanels": "편집기 패널",
+    "fixAutomatically": "자동 수정",
+    "fixBox": "이 상자 자동 수정",
+    "checkFirst": "먼저 확인할 항목",
+    "reviewGroups": {
+      "open": "미해결 문제",
+      "auto_fixed": "자동 수정됨",
+      "unsure": "불확실한 추정"
+    },
+    "looksGood": "문제없음",
+    "looksGoodFor": "{{check}} 항목을 문제없음으로 표시",
+    "autoFixedReason": "자동 수정: {{reason}}",
+    "previousSource": "수정 전 원문",
+    "previousTranslation": "수정 전 번역",
+    "fixSummary": "{{fixes}}개 수정 · {{left}}개 남음 · 요청 {{requests}}회",
+    "autoFix": "품질 검사 문제 자동 수정",
+    "autoFixDescription": "번역 후 직접 편집하지 않은 상자의 기계적인 문제를 수정합니다.",
+    "letteringUnsure": "불확실한 글자 스타일: {{category}}",
+    "emptyText": "(비어 있음)",
+    "fixReasons": {
+      "tighten_layout": "줄 간격, 하이픈 연결 및 말풍선 맞춤 조정",
+      "shorten_translation": "더 짧은 표현 — 의미를 확인하세요",
+      "translate_missing": "번역 누락",
+      "translate_leftover": "번역에 남아 있는 일본어",
+      "translate_glossary": "필수 용어집 용어",
+      "apply_category_style": "범주별 글자 스타일",
+      "read_again": "빈 원문 다시 읽기",
+      "hide_empty": "다시 읽은 후에도 비어 있어 오탐지로 간주하고 숨김"
+    }
   },
   "rawPrep": {
     "title": "페이지 레벨",

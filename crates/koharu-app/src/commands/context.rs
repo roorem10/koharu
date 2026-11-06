@@ -86,6 +86,7 @@ pub(crate) fn translation_hints(
         background,
         characters,
         previous_pages: settings.previous_pages.min(2),
+        instructions: None,
     })
 }
 

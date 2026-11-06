@@ -245,6 +245,10 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             // WO-24 (automatic QC and context tab) commands go here.
             qc::get_qc_results,
             qc::mark_qc_finding,
+            qc::fix::fix_qc,
+            qc::fix::get_qc_fix_summary,
+            qc::review::get_qc_review,
+            qc::review::get_qc_fix_history,
             context::reading::get_reading_model,
             context::reading::get_reading_models,
             context::reading::get_last_read_model,

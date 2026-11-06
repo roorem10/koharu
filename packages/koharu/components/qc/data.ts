@@ -19,6 +19,8 @@ import {
   type QcProgress,
 } from '@koharu/bridge/protocol'
 
+import { qcFixSummaryKey, qcReviewKey } from './fixes'
+
 export const qcSettingsKey = ['qc-settings'] as const
 export const qcKey = (project: string | undefined) => ['qc-results', project] as const
 
@@ -44,8 +46,10 @@ export function useAutomaticQc() {
   const settings = useQcSettings().data
   const name = project?.name
   const minimum = settings?.min_font_size
+  const autoFix = settings?.auto_fix === true
   const [agentCompleted, setAgentCompleted] = useState(0)
   const queue = useRef<Promise<unknown>>(Promise.resolve())
+  const lastStandalone = useRef<{ project: string; job: string; revision: number } | null>(null)
   const completed = Object.values(jobs)
     .filter((job) => job.state !== 'running')
     .map((job) => `${job.id}:${job.state}`)
@@ -62,6 +66,15 @@ export function useAutomaticQc() {
   useEffect(() => {
     // The native recipe owns QC ordering while Auto run is active.
     if (!name || minimum === undefined || autoRunning) return
+    const terminal = Object.values(jobs)
+      .filter((job) => job.project === name && job.state !== 'running')
+      .at(-1)
+    if (
+      terminal?.operation === null &&
+      (lastStandalone.current?.project !== name || lastStandalone.current?.job !== terminal.id)
+    ) {
+      lastStandalone.current = { project: name, job: terminal.id, revision: project.revision }
+    }
     let cancelled = false
     let updateSequence = 0
     const update = async () => {
@@ -92,6 +105,33 @@ export function useAutomaticQc() {
               queryClient.getQueryData<ProjectInfo | null>(projectKey)?.name === name
             )
               queryClient.setQueryData(qcKey(name), report)
+            await queryClient.invalidateQueries({ queryKey: qcReviewKey })
+            const current = queryClient.getQueryData<ProjectInfo | null>(projectKey)
+            const currentJobs = Object.values(useKoharuStore.getState().jobs)
+            const terminalJobs = currentJobs.filter(
+              (job) => job.project === name && job.state !== 'running',
+            )
+            const latest = terminalJobs.at(-1)
+            const stopped =
+              terminalJobs.filter((job) => job.state !== 'failed').at(-1)?.state === 'stopped'
+            // Completing a QC pass only refreshes its results. Retrying it requires
+            // a later edit or explicit run; stopping lasts until successful processing.
+            const justCompleted =
+              latest?.operation === null &&
+              (lastStandalone.current?.project !== name ||
+                lastStandalone.current?.job !== latest.id ||
+                lastStandalone.current?.revision === current?.revision)
+            if (
+              !cancelled &&
+              autoFix &&
+              report.findings.length > 0 &&
+              current?.name === name &&
+              !stopped &&
+              !justCompleted &&
+              !currentJobs.some((job) => job.state === 'running')
+            )
+              await commands.fixQc({ scope: 'project' }, true)
+            await queryClient.invalidateQueries({ queryKey: qcFixSummaryKey })
           } catch {
             // The next debounced revision replaces an obsolete check.
           }
@@ -111,6 +151,7 @@ export function useAutomaticQc() {
     context,
     minimum,
     styles,
+    autoFix,
   ])
 }
 
@@ -120,6 +161,7 @@ export async function markFinding(finding: QcFinding, hidden: boolean) {
     await call(commands.markQcFinding, finding.layer, finding.check, finding.flag, !hidden)
   else await call(commands.markQcOk, finding.layer, finding.check, !hidden)
   await queryClient.invalidateQueries({ queryKey: qcKey(project?.name) })
+  await queryClient.invalidateQueries({ queryKey: qcReviewKey })
   await refreshContext()
 }
 

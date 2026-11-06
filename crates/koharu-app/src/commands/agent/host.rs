@@ -397,6 +397,87 @@ impl KoharuHost {
                 _ => return Invocation::changed(json!({"job": job})),
             }
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    async fn run_qc_fixes(&self, arguments: FixQc, control: &Control) -> Result<Invocation> {
+        use crate::commands::{processing::JobState, qc::fix};
+
+        anyhow::ensure!(!control.is_cancelled(), "agent run was cancelled");
+        let expected = {
+            let current = self.handle.state::<CurrentProject>();
+            let current = current.project.lock().await;
+            current
+                .as_ref()
+                .context("no project is open")?
+                .snapshot()
+                .project_id()
+        };
+        let scope = match (arguments.pages, arguments.layers) {
+            (None, None) => fix::QcFixScope::Project,
+            (Some(pages), None) => fix::QcFixScope::Pages {
+                pages: entities(&pages)?,
+            },
+            (None, Some(layers)) => fix::QcFixScope::Boxes {
+                layers: entities(&layers)?,
+            },
+            (Some(_), Some(_)) => bail!("choose pages or layers, not both"),
+        };
+        let job = fix::start_fix_job(self.handle.clone(), scope, false).await?;
+        if let Some(job) = job {
+            let stop = self
+                .handle
+                .state::<Processing>()
+                .stops
+                .lock()
+                .get(&job)
+                .cloned();
+            let watcher = stop.map(|stop| {
+                let control = control.clone();
+                tauri::async_runtime::spawn(async move {
+                    control.cancelled().await;
+                    stop.stop();
+                })
+            });
+            let result = async {
+                loop {
+                    let state = self
+                        .handle
+                        .state::<Processing>()
+                        .jobs
+                        .lock()
+                        .get(&job)
+                        .cloned()
+                        .context("QC job disappeared")?;
+                    match state.state {
+                        JobState::Running => {
+                            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        }
+                        JobState::Failed => bail!(
+                            "{}",
+                            state.error.unwrap_or_else(|| "QC fixing failed".into()),
+                        ),
+                        JobState::Stopped => bail!("QC fixing was cancelled"),
+                        JobState::Finished | JobState::FinishedWithProblems => break,
+                    }
+                }
+                Ok::<_, anyhow::Error>(())
+            }
+            .await;
+            if let Some(watcher) = watcher {
+                watcher.abort();
+            }
+            result?;
+        }
+        let current = self.handle.state::<CurrentProject>();
+        let current = current.project.lock().await;
+        let project = current.as_ref().context("no project is open")?;
+        anyhow::ensure!(
+            project.snapshot().project_id() == expected,
+            "the project changed during QC repair"
+        );
+        let summary = fix::summary(project)?;
+        if summary.fixes_made == 0 {
+            Invocation::read(summary)
+        } else {
+            Invocation::changed(summary)
         }
     }
 }
@@ -469,6 +550,17 @@ impl Host for KoharuHost {
                     definition::<AutoRun>(
                         "auto_run",
                         "Run the fixed chapter recipe for the project or selected pages. Preserves hand edits and skips completed work. Quality is fast, balanced, or best; omit it to use Settings. Uses the same progress and stop control as the Process menu.",
+                    definition::<ReadQc>(
+                        "read_qc",
+                        "Read the latest QC review list, including open problems, automatic fixes and uncertain lettering. Omit pages to read the chapter; otherwise pass page IDs.",
+                    ),
+                    definition::<FixQc>(
+                        "run_qc_fixes",
+                        "Run the bounded automatic QC fix pass, preserving hand edits and making each fix undoable. Omit pages and layers for the chapter, or pass only pages or only layers. Returns fixes made, review items left and requests used.",
+                    ),
+                    definition::<MarkQcItem>(
+                        "mark_qc_item_ok",
+                        "Acknowledge a QC review item using its layer, check and flag from read_qc. Pass ok=false to restore it to review. This uses the same QC OK acknowledgement as the editor.",
                     ),
                     // WO-20 (one box per bubble) tool definitions go here.
                     definition::<crate::commands::boxes::FindSplitBubblesArgs>(
@@ -758,6 +850,47 @@ impl Host for KoharuHost {
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
             "auto_run" => self.auto_run(arguments(&call)?, control).await,
+            "run_qc_fixes" => self.run_qc_fixes(arguments(&call)?, control).await,
+            "read_qc" => {
+                let arguments: ReadQc = arguments(&call)?;
+                let pages = arguments.pages.as_deref().map(entities).transpose()?;
+                let current = self.handle.state::<CurrentProject>();
+                let current = current.project.lock().await;
+                let project = current.as_ref().context("no project is open")?;
+                if let Some(pages) = &pages {
+                    let snapshot = project.snapshot();
+                    for page in pages {
+                        snapshot.page(*page)?;
+                    }
+                }
+                let mut items = crate::commands::qc::review::list(project)?;
+                if let Some(pages) = pages {
+                    items.retain(|item| pages.contains(&item.finding.page));
+                }
+                Invocation::read(items)
+            }
+            "mark_qc_item_ok" => {
+                let arguments: MarkQcItem = arguments(&call)?;
+                let layer = entity(&arguments.layer)?;
+                let check = serde_json::from_value::<crate::commands::qc::QcCheck>(json!(
+                    arguments.check
+                ))?;
+                let flag = arguments
+                    .flag
+                    .map(serde_json::from_value::<booharu_context::Flag>)
+                    .transpose()?;
+                let current = self.handle.state::<CurrentProject>();
+                let current = current.project.lock().await;
+                let project = current.as_ref().context("no project is open")?;
+                crate::commands::qc::review::acknowledge(
+                    project,
+                    layer,
+                    check,
+                    flag.as_ref(),
+                    arguments.ok,
+                )?;
+                Invocation::changed(json!({ "layer": layer, "ok": arguments.ok }))
+            }
             // WO-20 (one box per bubble) tool calls go here.
             "find_split_bubbles" => {
                 let arguments: crate::commands::boxes::FindSplitBubblesArgs = arguments(&call)?;
@@ -1388,4 +1521,23 @@ struct SetLineCategory {
 struct FlagLine {
     element: String,
     message: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct ReadQc {
+    pages: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct FixQc {
+    pages: Option<Vec<String>>,
+    layers: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct MarkQcItem {
+    layer: String,
+    check: String,
+    flag: Option<Value>,
+    ok: bool,
 }
