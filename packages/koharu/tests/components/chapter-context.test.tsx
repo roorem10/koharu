@@ -25,6 +25,7 @@ const chapter: ChapterState = {
   },
   series,
   supports_tasks: true,
+  supports_second_pass: true,
 }
 
 function setup() {

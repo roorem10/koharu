@@ -355,6 +355,54 @@ impl KoharuHost {
             "failures": report.failures,
         }))
     }
+
+    async fn run_second_pass(
+        &self,
+        arguments: RunSecondPass,
+        control: &Control,
+    ) -> Result<Invocation> {
+        use crate::commands::context::second_pass::{self, SecondPassScope, jobs};
+
+        anyhow::ensure!(!control.is_cancelled(), "agent run was cancelled");
+        anyhow::ensure!(
+            !arguments.elements.is_empty(),
+            "second pass needs at least one text element"
+        );
+        let scope = SecondPassScope::Boxes {
+            layers: entities(&arguments.elements)?,
+        };
+        let (job, stop, requested_project) = jobs::begin_job(&self.handle).await?;
+        let watcher = tauri::async_runtime::spawn({
+            let control = control.clone();
+            let stop = stop.clone();
+            async move {
+                control.cancelled().await;
+                stop.stop();
+            }
+        });
+        let result = second_pass::run_second_pass(
+            &self.handle,
+            &scope,
+            requested_project,
+            &stop,
+            Some(job),
+        )
+        .await;
+        watcher.abort();
+        jobs::finish_job(
+            &self.handle,
+            job,
+            &stop,
+            result.as_ref().err().map(|error| format!("{error:#}")),
+        );
+        anyhow::ensure!(!stop.stopped(), "second pass was cancelled");
+        let report = result?;
+        if report.completed == 0 {
+            Invocation::read(report)
+        } else {
+            Invocation::changed(report)
+        }
+    }
 }
 
 #[async_trait]
@@ -413,6 +461,10 @@ impl Host for KoharuHost {
                     definition::<RunPipeline>(
                         "run_pipeline",
                         "Run Koharu's configured processing pipeline for the whole project, selected pages, or selected text elements.",
+                    ),
+                    definition::<RunSecondPass>(
+                        "run_second_pass",
+                        "Reconsider the wording of selected text elements with the configured hard-line model and page context. Supply at least one text element ID. Hand-edited translations are preserved; each applied line is undoable and retains its earlier wording, alternatives, and reason.",
                     ),
                     // WO-20 (one box per bubble) tool definitions go here.
                     definition::<crate::commands::boxes::FindSplitBubblesArgs>(
@@ -688,6 +740,7 @@ impl Host for KoharuHost {
                 self.context_tool(&call).await
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
+            "run_second_pass" => self.run_second_pass(arguments(&call)?, control).await,
             // WO-20 (one box per bubble) tool calls go here.
             "find_split_bubbles" => {
                 let arguments: crate::commands::boxes::FindSplitBubblesArgs = arguments(&call)?;
@@ -1082,6 +1135,12 @@ struct RunPipeline {
     #[serde(default)]
     pages: Vec<String>,
     #[serde(default)]
+    elements: Vec<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct RunSecondPass {
     elements: Vec<String>,
 }
 

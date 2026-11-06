@@ -451,12 +451,14 @@ impl Project {
         self.directory.as_deref()
     }
 
-    /// The Booharu sidecar for this project. In-memory projects have an empty one.
+    /// Sidecar context plus glossary suggestions from the current scene revision.
     pub(crate) fn load_context(&self) -> Result<booharu_context::ProjectContext> {
-        match self.directory() {
+        let mut context = match self.directory() {
             Some(directory) => booharu_context::ProjectContext::load(directory),
             None => Ok(Default::default()),
-        }
+        }?;
+        super::context::second_pass::merge_suggestions(&self.snapshot(), &mut context)?;
+        Ok(context)
     }
 
     /// Changes the sidecar in one locked load-change-save step.

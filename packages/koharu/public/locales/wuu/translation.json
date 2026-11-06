@@ -1,4 +1,15 @@
 {
+  "secondPass": {
+    "title": "再审一遍",
+    "puns": "再审：有双关语备注个句子",
+    "hard": "再审：全部难句",
+    "model": "难句用个模型",
+    "modelDescription": "只对难句用更强个模型。勿选就用平常个翻译模型。",
+    "previous": "前头个译文",
+    "restore": "恢复前头个译文",
+    "needsModel": "请到设置里向选一个支持图像个难句模型。",
+    "protected": "手动改过个译文会保留。"
+  },
   "about": {
     "author": "作者",
     "description": "漫画翻译工具",

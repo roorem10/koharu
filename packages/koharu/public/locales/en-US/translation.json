@@ -1,4 +1,15 @@
 {
+  "secondPass": {
+    "title": "Second pass",
+    "puns": "Second pass: pun notes",
+    "hard": "Second pass: all hard lines",
+    "model": "Model for hard lines",
+    "modelDescription": "Use a stronger model only for hard lines. Leave unset to use the normal translation model.",
+    "previous": "Earlier wording",
+    "restore": "Restore earlier wording",
+    "needsModel": "Choose a vision model for hard lines in Settings.",
+    "protected": "Hand-edited translations are kept."
+  },
   "about": {
     "author": "Author",
     "description": "Manga translation tools",

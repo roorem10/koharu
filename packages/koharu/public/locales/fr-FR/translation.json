@@ -1,4 +1,15 @@
 {
+  "secondPass": {
+    "title": "Seconde passe",
+    "puns": "Seconde passe : jeux de mots",
+    "hard": "Seconde passe : toutes les lignes difficiles",
+    "model": "Modèle pour les lignes difficiles",
+    "modelDescription": "Utilisez un modèle plus puissant uniquement pour les lignes difficiles. Laissez ce champ vide pour utiliser le modèle de traduction habituel.",
+    "previous": "Formulation précédente",
+    "restore": "Rétablir la formulation précédente",
+    "needsModel": "Choisissez un modèle avec vision pour les lignes difficiles dans les paramètres.",
+    "protected": "Les traductions modifiées à la main sont conservées."
+  },
   "about": {
     "author": "Auteur",
     "description": "Outils de traduction de mangas",

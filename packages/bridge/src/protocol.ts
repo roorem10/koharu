@@ -69,6 +69,8 @@ export const commands = {
 	dismissLineFlag: (layer: EntityId, index: number) => __TAURI_INVOKE<null>("dismiss_line_flag", { layer, index }),
 	glossaryUsage: (source: string) => __TAURI_INVOKE<TermUsage>("glossary_usage", { source }),
 	explainLine: (layer: EntityId) => __TAURI_INVOKE<LineExplanation>("explain_line", { layer }),
+	startSecondPass: (scope: SecondPassScope) => __TAURI_INVOKE<JobId>("start_second_pass", { scope }),
+	getSecondPass: (layer: EntityId) => __TAURI_INVOKE<SecondPassResult | null>("get_second_pass", { layer }),
 	readChapter: (scope: Scope, model: ModelSelection | null) => __TAURI_INVOKE<JobId>("read_chapter", { scope, model }),
 	listSeries: () => __TAURI_INVOKE<Series[]>("list_series"),
 	createSeries: (name: string) => __TAURI_INVOKE<Series>("create_series", { name }),
@@ -309,6 +311,7 @@ export type ChapterState = {
 	context: ProjectContext,
 	series: Series | null,
 	supports_tasks: boolean,
+	supports_second_pass: boolean,
 };
 
 export type ChapterStatus = "waiting" | "running" | "done" | "done_with_problems" | "failed" | "stopped";
@@ -357,6 +360,7 @@ export type ContextSettings = {
 	send_images?: boolean,
 	ask_before_reading?: boolean,
 	read_model?: ModelSelection | null,
+	hard_line_model?: ModelSelection | null,
 	pages_per_request?: number,
 	previous_pages?: number,
 	agent_messages?: number,
@@ -1057,6 +1061,15 @@ export type ScriptPreview = {
 	unchanged: number,
 	not_found: number,
 };
+
+export type SecondPassResult = {
+	previous: string,
+	best: string,
+	alternatives: string[],
+	reason: string,
+};
+
+export type SecondPassScope = { scope: "boxes"; layers: EntityId[] } | { scope: "puns" } | { scope: "hard" };
 
 export type Series = {
 	id?: string,

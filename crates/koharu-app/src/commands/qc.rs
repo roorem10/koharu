@@ -456,6 +456,36 @@ pub(crate) async fn get_qc_results(
     }))
 }
 
+/// Only current, unacknowledged findings can make a line eligible for second pass.
+/// Reading eligibility must not trigger a render or revive an obsolete QC result.
+pub(crate) fn flagged_layers(project: &Project) -> Result<BTreeSet<EntityId>> {
+    let snapshot = project.snapshot();
+    let context = project.load_context()?;
+    let settings = koharu_config::load::<QcSettings>("qc")?.read()?.clone();
+    let rows = rows(&snapshot, &context)?;
+    let majorities = font_majorities(&rows);
+    let skip = super::lettering::translation_skip(&context, &snapshot)?;
+    let mut signatures = BTreeMap::new();
+    for page in snapshot.pages() {
+        signatures.insert(
+            page.id(),
+            signature(&snapshot, &context, page.id(), &settings, &majorities, &skip)?,
+        );
+    }
+    Ok(cache::with_cache(&snapshot, project.directory(), |cache| {
+        cache
+            .pages
+            .iter()
+            .filter(|(page, result)| signatures.get(*page) == Some(&result.signature))
+            .flat_map(|(_, result)| &result.findings)
+            .filter(|finding| {
+                snapshot.text_layer(finding.layer).is_ok() && !finding_hidden(&context, finding)
+            })
+            .map(|finding| finding.layer)
+            .collect()
+    }))
+}
+
 fn acknowledgement(check: QcCheck, flag: Option<&Flag>) -> String {
     match flag {
         Some(flag) => super::context::lines::flag_acknowledgement(flag),
@@ -691,6 +721,67 @@ mod tests {
         project.commit(patch).await.unwrap();
         let (page, layer) = ids.unwrap();
         (directory, project, page, layer)
+    }
+
+    #[tokio::test]
+    async fn second_pass_uses_only_current_unacknowledged_qc_findings() {
+        let _checking = cache::CHECK.lock().await;
+        let (_directory, mut project, page, layer) = chapter().await;
+        project
+            .update_context(|context| {
+                context.lines.entry(layer).or_default();
+            })
+            .unwrap();
+        let snapshot = project.snapshot();
+        let context = project.load_context().unwrap();
+        let settings = koharu_config::load::<QcSettings>("qc")
+            .unwrap()
+            .read()
+            .unwrap()
+            .clone();
+        let rows = rows(&snapshot, &context).unwrap();
+        let majorities = font_majorities(&rows);
+        let skip = super::super::lettering::translation_skip(&context, &snapshot).unwrap();
+        let signature =
+            signature(&snapshot, &context, page, &settings, &majorities, &skip).unwrap();
+        cache::with_cache(&snapshot, project.directory(), |cache| {
+            cache.pages.insert(
+                page,
+                cache::PageResults {
+                    signature,
+                    findings: vec![QcFinding {
+                        page,
+                        page_label: "01.png".into(),
+                        layer,
+                        check: QcCheck::Overflow,
+                        detail: String::new(),
+                        translation: "The king".into(),
+                        flag: None,
+                    }],
+                },
+            );
+        });
+        assert_eq!(flagged_layers(&project).unwrap(), BTreeSet::from([layer]));
+        project
+            .update_context(|context| {
+                context
+                    .lines
+                    .get_mut(&layer)
+                    .unwrap()
+                    .qc_ok
+                    .push("overflow".into());
+            })
+            .unwrap();
+        assert!(flagged_layers(&project).unwrap().is_empty());
+        project
+            .update_context(|context| context.lines.get_mut(&layer).unwrap().qc_ok.clear())
+            .unwrap();
+        assert_eq!(flagged_layers(&project).unwrap(), BTreeSet::from([layer]));
+        project
+            .set_translation(layer, Some("New wording".into()))
+            .await
+            .unwrap();
+        assert!(flagged_layers(&project).unwrap().is_empty());
     }
 
     #[tokio::test]

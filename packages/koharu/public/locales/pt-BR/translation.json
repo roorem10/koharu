@@ -1,4 +1,15 @@
 {
+  "secondPass": {
+    "title": "Segunda revisão",
+    "puns": "Segunda revisão: trocadilhos anotados",
+    "hard": "Segunda revisão: todas as falas difíceis",
+    "model": "Modelo para falas difíceis",
+    "modelDescription": "Use um modelo mais potente apenas para as falas difíceis. Deixe sem selecionar para usar o modelo de tradução habitual.",
+    "previous": "Texto anterior",
+    "restore": "Restaurar texto anterior",
+    "needsModel": "Escolha um modelo com visão para as falas difíceis nas configurações.",
+    "protected": "As traduções editadas manualmente são preservadas."
+  },
   "about": {
     "author": "Autor",
     "description": "Ferramentas de tradução de mangá",

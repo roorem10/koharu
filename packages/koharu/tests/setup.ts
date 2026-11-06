@@ -98,7 +98,9 @@ beforeEach(() => {
     context: { version: 1, series: null, brief: null, suggestions: [], lines: {} },
     series: null,
     supports_tasks: false,
+    supports_second_pass: false,
   })
+  vi.spyOn(commands, 'getSecondPass').mockResolvedValue(null)
   vi.spyOn(commands, 'getContextSettings').mockResolvedValue({
     read_when: 'missing',
     send_images: true,

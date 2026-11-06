@@ -105,6 +105,7 @@ impl Host for FakeHost {
             "view_page",
             "set_translation",
             "run_pipeline",
+            "run_second_pass",
             "fails",
         ]
         .into_iter()
@@ -126,7 +127,7 @@ impl Host for FakeHost {
                 control.cancelled().await;
                 Err(anyhow!("pipeline processing was cancelled"))
             }
-            "set_translation" => {
+            "set_translation" | "run_second_pass" => {
                 self.edits.fetch_add(1, Ordering::SeqCst);
                 Invocation::changed(json!({ "changed": true }))
             }
@@ -322,7 +323,7 @@ async fn http_initialization_tools_images_errors_and_session_deletion() {
         .unwrap();
     assert_eq!(
         rpc(list).await["result"]["tools"].as_array().unwrap().len(),
-        6
+        7
     );
     let inspected = rpc(server.call(&session, 2, "inspect_project").await).await;
     let value: Value =
@@ -366,10 +367,12 @@ async fn edits_are_refused_even_when_called_directly() {
     let host = Arc::new(FakeHost::default());
     let server = Server::start(bridge(host.clone(), false)).await;
     let session = server.initialize().await;
-    assert_eq!(
-        rpc(server.call(&session, 1, "set_translation").await).await["result"]["isError"],
-        true
-    );
+    for (id, tool) in [(1, "set_translation"), (2, "run_second_pass")] {
+        assert_eq!(
+            rpc(server.call(&session, id, tool).await).await["result"]["isError"],
+            true
+        );
+    }
     assert_eq!(host.edits.load(Ordering::SeqCst), 0);
     server.stop().await;
 }

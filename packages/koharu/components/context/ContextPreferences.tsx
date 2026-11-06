@@ -20,8 +20,9 @@ import {
   SelectValue,
 } from '@koharu/ui/components/select'
 
-import { contextSettingsKey, useChapterContext } from './data'
+import { contextSettingsKey, refreshContext, useChapterContext } from './data'
 import { GlossaryDialog } from './GlossaryDialog'
+import { HardLineModelPreference } from './HardLineModelPreference'
 import { ReadingModelPicker } from './ReadingModelPicker'
 import type { ContextSettings } from './types'
 
@@ -36,7 +37,10 @@ export function ContextPreferences() {
   }).data
   const mutation = useMutation({
     mutationFn: (value: ContextSettings) => call(commands.saveContextSettings, value),
-    onSuccess: (value) => queryClient.setQueryData(contextSettingsKey, value),
+    onSuccess: async (value) => {
+      queryClient.setQueryData(contextSettingsKey, value)
+      await refreshContext()
+    },
   })
   const save = (value: ContextSettings) => mutation.mutate(value)
   return (
@@ -117,6 +121,11 @@ export function ContextPreferences() {
               )}
             </div>
           </PreferenceRow>
+          <HardLineModelPreference
+            settings={settings}
+            disabled={mutation.isPending}
+            onChange={save}
+          />
           {(['pages_per_request', 'previous_pages', 'agent_messages'] as const).map((key) => (
             <PreferenceRow key={key} title={t(`chapterContext.settings.${key}`)}>
               <Input

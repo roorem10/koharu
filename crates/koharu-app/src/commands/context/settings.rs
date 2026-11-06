@@ -22,6 +22,7 @@ pub struct ContextSettings {
     pub send_images: bool,
     pub ask_before_reading: bool,
     pub read_model: Option<ModelSelection>,
+    pub hard_line_model: Option<ModelSelection>,
     pub pages_per_request: u8,
     pub previous_pages: u8,
     pub agent_messages: u16,
@@ -34,6 +35,7 @@ impl Default for ContextSettings {
             send_images: true,
             ask_before_reading: true,
             read_model: None,
+            hard_line_model: None,
             pages_per_request: 20,
             previous_pages: 1,
             agent_messages: 20,
@@ -75,6 +77,11 @@ pub(crate) fn save_context_settings(
         && !super::reading::can_read_images(model)
     {
         return Err(anyhow::anyhow!("Read chapter needs a vision model").into());
+    }
+    if let Some(model) = &settings.hard_line_model
+        && !super::reading::can_read_images(model)
+    {
+        return Err(anyhow::anyhow!("Second pass needs a vision model").into());
     }
     if settings.read_when == ReadWhen::Always {
         settings.read_when = ReadWhen::Missing;

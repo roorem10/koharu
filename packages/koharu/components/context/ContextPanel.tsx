@@ -18,6 +18,7 @@ import { Textarea } from '@koharu/ui/components/textarea'
 import { refreshContext, useChapterContext } from './data'
 import { GlossaryDialog } from './GlossaryDialog'
 import { ReadChapterButton } from './ReadChapterButton'
+import { SecondPassButton } from './SecondPassButton'
 import { SeriesPicker } from './SeriesPicker'
 import { TermForm } from './TermForm'
 import type { GlossaryEntry } from './types'
@@ -74,6 +75,10 @@ export function ContextPanel() {
           <p className='text-muted-foreground'>{t('chapterContext.chooseSeriesHint')}</p>
         )}
         <ReadChapterButton scope={{ scope: 'project' }} />
+        <div className='grid min-w-0 gap-2'>
+          <SecondPassButton scope={{ scope: 'puns' }} />
+          <SecondPassButton scope={{ scope: 'hard' }} />
+        </div>
         <div className='flex min-w-0 items-center gap-2'>
           <div className='min-w-0 flex-1'>
             <h3 className='font-semibold'>{t('chapterContext.brief')}</h3>

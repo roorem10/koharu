@@ -1,4 +1,15 @@
 {
+  "secondPass": {
+    "title": "二次潤飾",
+    "puns": "二次潤飾：有雙關語註記的行",
+    "hard": "二次潤飾：所有難句",
+    "model": "難句使用的模型",
+    "modelDescription": "僅對難句使用更強的模型。留空則使用一般翻譯模型。",
+    "previous": "先前譯文",
+    "restore": "還原先前譯文",
+    "needsModel": "請在設定中為難句選擇支援影像的模型。",
+    "protected": "手動編輯的譯文會保留。"
+  },
   "about": {
     "author": "作者",
     "description": "漫畫翻譯工具",

@@ -24,7 +24,7 @@ export function useContextSettings() {
 export function useChapterContext() {
   const project = useProject().data
   const jobs = useKoharuStore((state) => state.jobs)
-  const model = useKoharuStore((state) => state.preferences?.pipeline.translation.model.provider)
+  const model = useKoharuStore((state) => state.preferences?.pipeline.translation.model)
   return useQuery({
     queryKey: [
       ...contextKey,

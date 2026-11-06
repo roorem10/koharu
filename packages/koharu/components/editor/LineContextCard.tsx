@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 
 import { refreshContext, useChapterContext } from '@/components/context/data'
 import { discussLine, historyChangedEvent } from '@/components/context/events'
+import { SecondPassButton } from '@/components/context/SecondPassButton'
+import { SecondPassDetails } from '@/components/context/SecondPassDetails'
 import { call } from '@/lib/backend'
 import { pageKey, projectKey, refresh, usePage, useProject } from '@/lib/queries'
 import { commands, type EntityId, type LineExplanation } from '@koharu/bridge/protocol'
@@ -51,6 +53,8 @@ export function LineContextCard({ layer }: { layer: EntityId }) {
           </Button>
         </div>
       ))}
+      <SecondPassButton scope={{ scope: 'boxes', layers: [layer] }} />
+      <SecondPassDetails layer={layer} translation={translation} />
       <Button
         size='sm'
         variant='outline'

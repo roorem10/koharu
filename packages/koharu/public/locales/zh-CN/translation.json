@@ -1,4 +1,15 @@
 {
+  "secondPass": {
+    "title": "二次润色",
+    "puns": "二次润色：有双关语注释的行",
+    "hard": "二次润色：所有难句",
+    "model": "难句使用的模型",
+    "modelDescription": "仅对难句使用更强的模型。留空则使用常规翻译模型。",
+    "previous": "先前译文",
+    "restore": "恢复先前译文",
+    "needsModel": "请在设置中为难句选择支持图像的模型。",
+    "protected": "手动编辑的译文会保留。"
+  },
   "about": {
     "author": "作者",
     "description": "漫画翻译工具",

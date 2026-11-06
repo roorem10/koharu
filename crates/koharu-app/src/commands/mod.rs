@@ -135,6 +135,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             context::lines::dismiss_line_flag,
             context::lines::glossary_usage,
             context::lines::explain_line,
+            context::second_pass::jobs::start_second_pass,
+            context::second_pass::get_second_pass,
             context::reading::read_chapter,
             context::series::list_series,
             context::series::create_series,

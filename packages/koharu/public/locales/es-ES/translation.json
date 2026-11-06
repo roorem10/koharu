@@ -1,4 +1,15 @@
 {
+  "secondPass": {
+    "title": "Segunda revisión",
+    "puns": "Segunda revisión: juegos de palabras",
+    "hard": "Segunda revisión: todas las líneas difíciles",
+    "model": "Modelo para líneas difíciles",
+    "modelDescription": "Usa un modelo más potente solo para las líneas difíciles. Déjalo sin seleccionar para usar el modelo de traducción habitual.",
+    "previous": "Redacción anterior",
+    "restore": "Restaurar redacción anterior",
+    "needsModel": "Elige un modelo con visión para las líneas difíciles en Ajustes.",
+    "protected": "Se conservan las traducciones editadas a mano."
+  },
   "about": {
     "author": "Autor",
     "description": "Herramientas de traducción de manga",

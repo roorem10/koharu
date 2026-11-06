@@ -1,4 +1,15 @@
 {
+  "secondPass": {
+    "title": "İkinci inceleme",
+    "puns": "İkinci inceleme: kelime oyunu notları",
+    "hard": "İkinci inceleme: tüm zor replikler",
+    "model": "Zor replikler için model",
+    "modelDescription": "Yalnızca zor repliklerde daha güçlü bir model kullanın. Normal çeviri modelini kullanmak için boş bırakın.",
+    "previous": "Önceki çeviri",
+    "restore": "Önceki çeviriyi geri yükle",
+    "needsModel": "Ayarlardan zor replikler için görsel destekli bir model seçin.",
+    "protected": "Elle düzenlenen çeviriler korunur."
+  },
   "about": {
     "author": "Yazar",
     "description": "Manga çeviri araçları",

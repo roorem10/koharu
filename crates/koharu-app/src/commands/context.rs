@@ -3,8 +3,10 @@
 //! Owned by WO-18. The shared foundation only adds the translation hints hook.
 
 pub(crate) mod history;
+mod line_request;
 pub(crate) mod lines;
 pub(crate) mod reading;
+pub(crate) mod second_pass;
 pub(crate) mod series;
 pub(crate) mod settings;
 
@@ -93,6 +95,7 @@ pub struct ChapterState {
     pub context: ProjectContext,
     pub series: Option<booharu_context::Series>,
     pub supports_tasks: bool,
+    pub supports_second_pass: bool,
 }
 
 #[tauri::command]
@@ -108,10 +111,15 @@ pub(crate) async fn get_chapter_context(
     let config = koharu_pipeline::PipelineConfig::load()?;
     let supports_tasks =
         koharu_translator::Translator::supports_tasks(&config.read()?.translation.model);
+    let model = settings::load()?
+        .hard_line_model
+        .unwrap_or(config.read()?.translation.model.clone());
+    let supports_second_pass = reading::can_read_images(&model);
     Ok(ChapterState {
         context,
         series,
         supports_tasks,
+        supports_second_pass,
     })
 }
 
@@ -139,7 +147,15 @@ pub(crate) async fn dismiss_suggestion(
 ) -> std::result::Result<(), Error> {
     let projects = project.project.lock().await;
     let project = projects.as_ref().context("no project is open")?;
-    project.update_context(|context| context.suggestions.retain(|term| term.id != id))?;
+    let source = project
+        .load_context()?
+        .suggestions
+        .into_iter()
+        .find(|term| term.id == id)
+        .map(|term| term.source);
+    project.update_context(|context| {
+        second_pass::dismiss_suggestion(context, &id, source.as_deref())
+    })?;
     Ok(())
 }
 
@@ -152,9 +168,11 @@ pub(crate) async fn accept_suggestion(
     let projects = project.project.lock().await;
     let project = projects.as_ref().context("no project is open")?;
     let context = project.load_context()?;
-    if !(context.suggestions.iter().any(|term| term.id == entry.id)) {
-        return Err(anyhow::anyhow!("suggestion no longer exists").into());
-    }
+    let suggested = context
+        .suggestions
+        .iter()
+        .find(|term| term.id == entry.id)
+        .context("suggestion no longer exists")?;
     let mut series =
         series::store()?.get(context.series.as_deref().context("pick a series first")?)?;
     if !(!series
@@ -166,7 +184,9 @@ pub(crate) async fn accept_suggestion(
     }
     series.glossary.push(entry.clone());
     series::store()?.save(&series)?;
-    project.update_context(|context| context.suggestions.retain(|term| term.id != entry.id))?;
+    project.update_context(|context| {
+        second_pass::dismiss_suggestion(context, &entry.id, Some(&suggested.source))
+    })?;
     Ok(())
 }
 
