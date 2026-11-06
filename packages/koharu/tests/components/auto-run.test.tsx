@@ -122,10 +122,11 @@ it('uses the native batch preview and one combined close-and-start confirmation'
   await waitFor(() => expect(start).toBeEnabled())
   await user.click(start)
   await waitFor(() => expect(run).toHaveBeenCalledOnce())
-  expect(run.mock.lastCall?.slice(0, 4)).toEqual([
+  expect(run.mock.lastCall?.slice(0, 5)).toEqual([
     'plan',
     ['one'],
     { recipe: 'auto_run', quality: 'balanced' },
+    null,
     'chapter',
   ])
 })

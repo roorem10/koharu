@@ -136,8 +136,7 @@ export const commands = {
 	saveRunSettings: (settings: RunSettings) => __TAURI_INVOKE<RunSettings>("save_run_settings", { settings }),
 	retryFailedPages: (job: JobId) => __TAURI_INVOKE<JobId>("retry_failed_pages", { job }),
 	previewChapterBatch: () => __TAURI_INVOKE<BatchPlan | null>("preview_chapter_batch"),
-	runChapterBatch: (plan: string, chapters: string[], recipe: BatchRecipe, closeProject: string | null, onProgress: Channel<BatchProgress>) => __TAURI_INVOKE<null>("run_chapter_batch", { plan, chapters, recipe, closeProject, onProgress }),
-	runChapterBatch: (plan: string, chapters: string[], preset: number, series: string | null, closeProject: string | null, onProgress: Channel<BatchProgress>) => __TAURI_INVOKE<null>("run_chapter_batch", { plan, chapters, preset, series, closeProject, onProgress }),
+	runChapterBatch: (plan: string, chapters: string[], recipe: BatchRecipe, series: string | null, closeProject: string | null, onProgress: Channel<BatchProgress>) => __TAURI_INVOKE<null>("run_chapter_batch", { plan, chapters, recipe, series, closeProject, onProgress }),
 	stopChapterBatch: () => __TAURI_INVOKE<null>("stop_chapter_batch"),
 	getBoxNote: (layer: EntityId) => __TAURI_INVOKE<string | null>("get_box_note", { layer }),
 	setBoxNote: (layer: EntityId, note: string | null) => __TAURI_INVOKE<null>("set_box_note", { layer, note }),
@@ -966,8 +965,7 @@ export type ProviderPreferences = {
 	entries: ProviderPreference[],
 };
 
-export type QcCheck = "overflow" | "too_small" | "missing_translation" | "empty_source" | "leftover_source" | "odd_font" | "flag" | "auto_fixed" | "lettering_unsure";
-export type QcCheck = "overflow" | "too_small" | "missing_translation" | "empty_source" | "leftover_source" | "leftover_cleanup" | "odd_font" | "flag";
+export type QcCheck = "overflow" | "too_small" | "missing_translation" | "empty_source" | "leftover_source" | "odd_font" | "flag" | "auto_fixed" | "lettering_unsure" | "leftover_cleanup"
 
 export type QcFinding = {
 	page: EntityId,

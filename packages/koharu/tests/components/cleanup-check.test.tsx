@@ -63,6 +63,7 @@ const running: Job = {
   project: project.name,
   operation: { operation: 'check_cleanup' },
   finish_sound: false,
+  auto_run: null,
 }
 
 function wrapper({ children }: { children: React.ReactNode }) {

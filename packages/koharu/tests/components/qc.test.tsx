@@ -69,6 +69,7 @@ const qcJob: Job = {
   project: project.name,
   operation: null,
   finish_sound: false,
+  auto_run: null,
 }
 const key = qcKey(project.name)
 function setup(report = initial) {
@@ -272,6 +273,7 @@ describe('automatic QC', () => {
             project: project.name,
             operation: null,
             finish_sound: false,
+            auto_run: null,
           },
         },
       }),
