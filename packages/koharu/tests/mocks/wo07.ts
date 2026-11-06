@@ -12,7 +12,7 @@ export function mockWo07() {
   })
   vi.spyOn(commands, 'saveOcrBoxSettings').mockImplementation(async (settings) => settings)
   vi.spyOn(commands, 'getOcrRedoInfo').mockResolvedValue({ user_sources: 0, user_translations: 0 })
-  vi.spyOn(commands, 'addOcrBox').mockResolvedValue('ocr-box')
-  vi.spyOn(commands, 'redoOcrBoxes').mockResolvedValue(['job'])
+  vi.spyOn(commands, 'addOcrBox').mockResolvedValue({ layer: 'ocr-box', no_text: false })
+  vi.spyOn(commands, 'redoOcrBoxes').mockResolvedValue({ jobs: ['job'], no_text: false })
   vi.spyOn(commands, 'addSfxSubtitle').mockResolvedValue('subtitle')
 }

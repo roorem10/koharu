@@ -617,6 +617,7 @@
     "selected": "{{count}}개 선택됨"
   },
   "ocrBox": {
+    "noTextFound": "여기에서 텍스트를 찾지 못했습니다",
     "title": "OCR 상자 및 효과음 자막",
     "modifierHint": "Alt를 누른 채 놓으면 OCR만, Shift를 누른 채 놓으면 OCR, 번역, 정리를 수행합니다. 둘 다 누르면 Alt가 우선합니다.",
     "defaultMode": "OCR 상자 기본 동작",

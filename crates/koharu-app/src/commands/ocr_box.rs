@@ -42,6 +42,18 @@ pub struct RedoInfo {
     pub user_translations: u32,
 }
 
+#[derive(Clone, Debug, Serialize, Type)]
+pub struct OcrBoxResult {
+    pub layer: EntityId,
+    pub no_text: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Type)]
+pub struct OcrRedoResult {
+    pub jobs: Vec<JobId>,
+    pub no_text: bool,
+}
+
 fn ensure_idle(handle: &AppHandle<CefRuntime>) -> Result<()> {
     ensure!(
         handle.state::<Processing>().stops.lock().is_empty(),
@@ -124,6 +136,35 @@ async fn run_text(
     .await
 }
 
+async fn has_empty_read(
+    handle: &AppHandle<CefRuntime>,
+    expected: ProjectId,
+    layers: &[EntityId],
+) -> Result<bool> {
+    let projects = handle.state::<CurrentProject>();
+    let projects = projects.project.lock().await;
+    let project = projects.as_ref().context("no project is open")?;
+    let snapshot = project.snapshot();
+    ensure!(
+        snapshot.project_id() == expected,
+        "the project changed during processing"
+    );
+    for layer in layers {
+        if snapshot
+            .text_layer(*layer)?
+            .content()?
+            .source()?
+            .is_some_and(|source| {
+                matches!(source.text.origin, koharu_scene::Origin::Generated(_))
+                    && source.text.value.trim().is_empty()
+            })
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn add_ocr_box(
@@ -131,7 +172,7 @@ pub(crate) async fn add_ocr_box(
     page: EntityId,
     rect: Bounds,
     mode: OcrBoxMode,
-) -> Result<EntityId, Error> {
+) -> Result<OcrBoxResult, Error> {
     ensure_idle(&handle)?;
     let styles = super::styles::load_text_styles()?.read()?.clone();
     let (commit, layer, active, rect) = {
@@ -173,13 +214,16 @@ pub(crate) async fn add_ocr_box(
         }
     };
     let job = run_text(&handle, vec![layer], operation).await?;
+    let finished = wait_job(&handle, job, expected).await?;
+    let no_text = finished && has_empty_read(&handle, expected, &[layer]).await?;
     if let Some(mask) = mask
-        && wait_job(&handle, job, expected).await?
+        && finished
+        && !no_text
         && mask.as_raw().iter().any(|value| *value != 0)
     {
         super::cleanup::clean_mask(handle, page, mask).await?;
     }
-    Ok(layer)
+    Ok(OcrBoxResult { layer, no_text })
 }
 
 #[tauri::command]
@@ -239,7 +283,7 @@ pub(crate) async fn redo_ocr_boxes(
     layers: Vec<EntityId>,
     action: RedoAction,
     overwrite: bool,
-) -> Result<Vec<JobId>, Error> {
+) -> Result<OcrRedoResult, Error> {
     ensure_idle(&handle)?;
     let (snapshot, commit, active, layers) = {
         let projects = handle.state::<CurrentProject>();
@@ -271,23 +315,31 @@ pub(crate) async fn redo_ocr_boxes(
                 break;
             }
         }
-        return Ok(jobs);
+        return Ok(OcrRedoResult {
+            jobs,
+            no_text: false,
+        });
     }
     check_project(&handle, expected).await?;
-    Ok(vec![
-        run_text(
-            &handle,
-            layers,
-            Operation::Only {
-                stage: match action {
-                    RedoAction::Read => Stage::Ocr,
-                    RedoAction::Translate => Stage::Translation,
-                    RedoAction::Clean => unreachable!(),
-                },
+    let job = run_text(
+        &handle,
+        layers.clone(),
+        Operation::Only {
+            stage: match action {
+                RedoAction::Read => Stage::Ocr,
+                RedoAction::Translate => Stage::Translation,
+                RedoAction::Clean => unreachable!(),
             },
-        )
-        .await?,
-    ])
+        },
+    )
+    .await?;
+    let no_text = matches!(action, RedoAction::Read)
+        && wait_job(&handle, job, expected).await?
+        && has_empty_read(&handle, expected, &layers).await?;
+    Ok(OcrRedoResult {
+        jobs: vec![job],
+        no_text,
+    })
 }
 
 #[tauri::command]

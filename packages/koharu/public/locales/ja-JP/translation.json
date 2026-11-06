@@ -617,6 +617,7 @@
     "selected": "{{count}}件選択中"
   },
   "ocrBox": {
+    "noTextFound": "ここにテキストは見つかりませんでした",
     "title": "OCRボックスと効果音の字幕",
     "modifierHint": "Altを押しながら離すとOCRのみ、Shiftを押しながら離すとOCR・翻訳・クリーンアップを実行します。両方押している場合はAltが優先されます。",
     "defaultMode": "OCRボックスの既定の操作",

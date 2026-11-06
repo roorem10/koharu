@@ -617,6 +617,7 @@
     "selected": "{{count}} selected"
   },
   "ocrBox": {
+    "noTextFound": "No text found here",
     "title": "OCR boxes and SFX subtitles",
     "modifierHint": "Release with Alt to read only; Shift to read, translate and clean. Alt takes priority if both are held.",
     "defaultMode": "OCR box default action",

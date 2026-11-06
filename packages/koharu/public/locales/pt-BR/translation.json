@@ -617,6 +617,7 @@
     "selected": "{{count}} selecionadas"
   },
   "ocrBox": {
+    "noTextFound": "Nenhum texto encontrado aqui",
     "title": "Caixas de OCR e legendas de SFX",
     "modifierHint": "Solte com Alt para fazer apenas OCR; com Shift para fazer OCR, traduzir e limpar. Alt tem prioridade se ambos estiverem pressionados.",
     "defaultMode": "Ação padrão da caixa de OCR",

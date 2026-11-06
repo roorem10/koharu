@@ -25,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@koharu/ui/components/alert-dialog'
+import { toast } from '@koharu/ui/components/toast'
 
 export const ocrBoxSettingsKey = ['ocr-box-settings'] as const
 export const ocrBoxEditKey = ['ocr-box-edit'] as const
@@ -75,8 +76,9 @@ export function useRedoActions(layers: EntityId[]) {
           return
         }
       }
-      await call(commands.redoOcrBoxes, layers, action, overwrite)
       setConfirmation(null)
+      const result = await call(commands.redoOcrBoxes, layers, action, overwrite)
+      if (result.no_text) toast.add({ type: 'info', title: t('ocrBox.noTextFound') })
     },
     onSettled: refreshOcrBoxes,
   })

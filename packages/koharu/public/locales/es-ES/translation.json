@@ -625,6 +625,7 @@
     "selected": "{{count}} seleccionadas"
   },
   "ocrBox": {
+    "noTextFound": "No se encontró texto aquí",
     "title": "Cuadros de OCR y subtítulos de SFX",
     "modifierHint": "Suelta con Alt para solo leer; con Shift para leer, traducir y limpiar. Alt tiene prioridad si se mantienen ambas teclas pulsadas.",
     "defaultMode": "Acción predeterminada del cuadro de OCR",

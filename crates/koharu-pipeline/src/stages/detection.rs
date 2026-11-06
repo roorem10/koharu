@@ -158,7 +158,7 @@ impl StageProcessor for Processor {
         self.model.unload()
     }
 
-    async fn load(&self) -> Result<()> {
+    async fn load(&self, _input: &StageInput) -> Result<()> {
         self.model
             .ensure(|| Model::load(self.device.clone(), &self.config))
             .await

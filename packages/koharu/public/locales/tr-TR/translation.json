@@ -617,6 +617,7 @@
     "selected": "{{count}} seçili"
   },
   "ocrBox": {
+    "noTextFound": "Burada metin bulunamadı",
     "title": "OCR kutuları ve SFX altyazıları",
     "modifierHint": "Yalnızca okumak için Alt basılıyken bırakın; okumak, çevirmek ve temizlemek için Shift basılıyken bırakın. İkisi de basılıysa Alt önceliklidir.",
     "defaultMode": "OCR kutusunun varsayılan işlemi",

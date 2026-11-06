@@ -2,6 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
   ocrBoxEditKey,
@@ -20,12 +21,14 @@ import {
   type OcrBoxMode,
   type Point,
 } from '@koharu/bridge/protocol'
+import { toast } from '@koharu/ui/components/toast'
 
 import type { CanvasToolHandler } from './types'
 
 type Drag = { page: EntityId; start: Point; end: Point; size: { width: number; height: number } }
 
 export function useOcrBoxTool(): CanvasToolHandler {
+  const { t } = useTranslation()
   const page = usePage().data
   const settings = useOcrBoxSettings()
   const busy = useOcrBoxBusy()
@@ -46,10 +49,18 @@ export function useOcrBoxTool(): CanvasToolHandler {
       rect: Bounds
       mode: OcrBoxMode
     }) => {
-      const layer = await call(commands.addOcrBox, page, rect, mode)
-      if (current.current.page?.id === page && useKoharuStore.getState().canvasPage === page) {
-        useKoharuStore.getState().selectLayers([layer])
+      const selectedLayers = useKoharuStore.getState().selectedLayers
+      const result = await call(commands.addOcrBox, page, rect, mode)
+      const state = useKoharuStore.getState()
+      if (
+        current.current.page?.id === page &&
+        state.canvasPage === page &&
+        state.tool === 'ocr_box' &&
+        state.selectedLayers === selectedLayers
+      ) {
+        state.selectLayers([result.layer])
       }
+      if (result.no_text) toast.add({ type: 'info', title: t('ocrBox.noTextFound') })
     },
     onSettled: refreshOcrBoxes,
   })

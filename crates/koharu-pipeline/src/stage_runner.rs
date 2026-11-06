@@ -174,7 +174,7 @@ impl StageRunner {
             },
         );
         self.stages
-            .load(job.stage)
+            .load(job.stage, &job.input)
             .await
             .map_err(|error| AttemptFailure {
                 kind: ErrorKind::ModelLoad,

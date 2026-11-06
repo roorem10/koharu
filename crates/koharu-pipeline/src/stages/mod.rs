@@ -92,7 +92,7 @@ trait StageProcessor: Send + Sync {
         Ok(false)
     }
     fn unload(&self) -> bool;
-    async fn load(&self) -> Result<()>;
+    async fn load(&self, input: &StageInput) -> Result<()>;
     async fn process(&self, input: StageInput) -> Result<Patch>;
 }
 
@@ -141,8 +141,8 @@ impl Stages {
         self.processor(stage).skip(input)
     }
 
-    pub(crate) async fn load(&self, stage: Stage) -> Result<()> {
-        self.processor(stage).load().await
+    pub(crate) async fn load(&self, stage: Stage, input: &StageInput) -> Result<()> {
+        self.processor(stage).load(input).await
     }
 
     pub(crate) async fn process(&self, stage: Stage, input: StageInput) -> Result<Patch> {
@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn resume_skips_complete_boxes_but_explicit_stages_do_not() {
+    async fn stages_skip_protected_work_and_translation_without_source() {
         let translator = koharu_translator::Translator::from_config(
             koharu_ml::Device::cpu(),
             koharu_config::Config::memory(koharu_translator::ProvidersConfig::default()),
@@ -247,13 +247,18 @@ mod tests {
                 ..Default::default()
             }));
         assert!(stages.skip(Stage::Translation, &skipped).unwrap());
+        assert!(
+            stages
+                .skip(Stage::Translation, &skipped.with_resume(false))
+                .unwrap()
+        );
         let patch = session
             .snapshot()
             .patch(|edit| {
                 edit.set(
                     content_id.unwrap(),
                     &koharu_scene::Translation {
-                        text: koharu_scene::Authored::user("translation".into()),
+                        text: koharu_scene::Authored::user(String::new()),
                         language: None,
                     },
                 )
@@ -270,9 +275,53 @@ mod tests {
         )
         .with_resume(true);
         assert!(stages.skip(Stage::Translation, &input).unwrap());
-        let explicit = input.with_resume(false);
+        let mut explicit = input.with_resume(false);
         assert!(!stages.skip(Stage::Ocr, &explicit).unwrap());
+        assert!(stages.skip(Stage::Translation, &explicit).unwrap());
+
+        let patch = session
+            .snapshot()
+            .patch(|edit| edit.remove::<koharu_scene::Translation>(content_id.unwrap()))
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let generated = generation("dev.koharu.pipeline.translation", "test").unwrap();
+        let mut edit = session.snapshot().edit_as(generated.clone());
+        edit.set(
+            content_id.unwrap(),
+            &koharu_scene::Translation {
+                text: koharu_scene::Authored::generated("translation".into(), generated),
+                language: None,
+            },
+        )
+        .unwrap();
+        explicit.scene = session.commit(edit.finish().unwrap()).await.unwrap().snapshot;
         assert!(!stages.skip(Stage::Translation, &explicit).unwrap());
+        assert!(
+            stages
+                .skip(Stage::Translation, &explicit.clone().with_resume(true))
+                .unwrap()
+        );
+
+        for source in [None, Some(" \n")] {
+            let patch = session
+                .snapshot()
+                .patch(|edit| {
+                    edit.remove::<koharu_scene::Translation>(content_id.unwrap())?;
+                    match source {
+                        Some(source) => edit.set(
+                            content_id.unwrap(),
+                            &koharu_scene::SourceText {
+                                text: koharu_scene::Authored::user(source.into()),
+                                language: None,
+                            },
+                        ),
+                        None => edit.remove::<koharu_scene::SourceText>(content_id.unwrap()),
+                    }
+                })
+                .unwrap();
+            explicit.scene = session.commit(patch).await.unwrap().snapshot;
+            assert!(stages.skip(Stage::Translation, &explicit).unwrap());
+        }
     }
 
     #[tokio::test]

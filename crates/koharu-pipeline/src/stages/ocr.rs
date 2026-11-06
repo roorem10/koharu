@@ -1,3 +1,5 @@
+mod ink;
+
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
@@ -69,20 +71,34 @@ impl StageProcessor for Processor {
         self.model.unload()
     }
 
-    async fn load(&self) -> Result<()> {
+    async fn load(&self, input: &StageInput) -> Result<()> {
+        // Empty input must work even when OCR weights are not installed. Use
+        // the same immutable snapshot and crop evidence again in process.
+        if targets(input).await?.iter().all(|target| target.ink.is_blank()) {
+            return Ok(());
+        }
         self.model
             .ensure(|| Model::load(self.device.clone(), &self.config))
             .await
     }
 
     async fn process(&self, input: StageInput) -> Result<koharu_scene::Patch> {
-        self.model
-            .lock()
-            .await
-            .as_ref()
-            .ok_or_else(|| anyhow!("OCR model is not loaded"))?
-            .run(input)
-            .await
+        let targets = targets(&input).await?;
+        let results = if targets.iter().all(|target| target.ink.is_blank()) {
+            targets
+                .into_iter()
+                .map(|target| target.into_result(String::new()))
+                .collect()
+        } else {
+            self.model
+                .lock()
+                .await
+                .as_ref()
+                .ok_or_else(|| anyhow!("OCR model is not loaded"))?
+                .run(targets)
+                .await?
+        };
+        ocr_patch(&input, results, self.model())
     }
 }
 
@@ -111,51 +127,45 @@ impl Model {
         }
     }
 
-    async fn run(&self, input: StageInput) -> Result<koharu_scene::Patch> {
-        let model_name = match self {
-            Self::Manga(_) => "manga-ocr",
-            Self::Baberu(_) => "baberu-ocr",
-            Self::Hayai(_) => "hayai-ocr",
-            Self::Paddle(_) => "paddleocr-vl-1.6",
-        };
-        let page = input.page;
-        let mut targets = Vec::new();
-        let source = input
-            .images
-            .get(&input.scene, page, "source")
-            .await?
-            .ok_or_else(|| anyhow!("page {page} has no source image"))?;
-        targets.extend(collect_targets(&input, &source)?);
-
-        let results = match self {
+    async fn run(&self, targets: Vec<OcrTarget>) -> Result<Vec<OcrResult>> {
+        match self {
             Self::Manga(model) => {
                 infer_text(model.clone(), targets, |model, image| {
                     model.inference(image)
                 })
-                .await?
+                .await
             }
             Self::Baberu(model) => {
                 infer_text(model.clone(), targets, |model, image| {
                     model.inference(image)
                 })
-                .await?
+                .await
             }
             Self::Hayai(model) => {
                 infer_text(model.clone(), targets, |model, image| {
                     model.inference(image)
                 })
-                .await?
+                .await
             }
             Self::Paddle(model) => {
                 infer_text(model.clone(), targets, |model, image| {
                     Ok(model.inference(image, PaddleOCRVLTask::Ocr)?.text)
                 })
-                .await?
+                .await
             }
-        };
-
-        ocr_patch(&input, results, model_name)
+        }
     }
+}
+
+async fn targets(input: &StageInput) -> Result<Vec<OcrTarget>> {
+    let page = input.page;
+    let source = input
+        .images
+        .get(&input.scene, page, "source")
+        .await?
+        .ok_or_else(|| anyhow!("page {page} has no source image"))?;
+    let input = input.clone();
+    tokio_rayon::spawn(move || collect_targets(&input, &source)).await
 }
 
 fn collect_targets(input: &StageInput, source: &DynamicImage) -> Result<Vec<OcrTarget>> {
@@ -187,12 +197,14 @@ fn collect_targets(input: &StageInput, source: &DynamicImage) -> Result<Vec<OcrT
             if !can_read(&previous) || !seen.insert(content) {
                 continue;
             }
+            let image = crop(source, &geometry)
+                .with_context(|| format!("text region {region} is outside its source image"))?;
             targets.push(OcrTarget {
                 content,
                 frame: region,
                 detected: true,
-                image: crop(source, &geometry)
-                    .with_context(|| format!("text region {region} is outside its source image"))?,
+                ink: ink::measure(&image),
+                image,
                 geometry: geometry.clone(),
                 previous,
             });
@@ -214,13 +226,15 @@ fn collect_targets(input: &StageInput, source: &DynamicImage) -> Result<Vec<OcrT
             let Some(geometry) = input.scene.component::<Geometry>(layer.id())? else {
                 continue;
             };
+            let image = crop(source, &geometry).with_context(|| {
+                format!("text layer {} is outside its source image", layer.id())
+            })?;
             targets.push(OcrTarget {
                 content: content.id(),
                 frame: layer.id(),
                 detected: false,
-                image: crop(source, &geometry).with_context(|| {
-                    format!("text layer {} is outside its source image", layer.id())
-                })?,
+                ink: ink::measure(&image),
+                image,
                 geometry,
                 previous,
             });
@@ -286,6 +300,20 @@ struct OcrTarget {
     geometry: Geometry,
     previous: Option<SourceText>,
     image: DynamicImage,
+    ink: ink::InkEvidence,
+}
+
+impl OcrTarget {
+    fn into_result(self, text: String) -> OcrResult {
+        OcrResult {
+            content: self.content,
+            frame: self.frame,
+            detected: self.detected,
+            geometry: self.geometry,
+            previous: self.previous,
+            text,
+        }
+    }
 }
 
 struct OcrResult {
@@ -309,14 +337,19 @@ async fn infer_text<M: Send + 'static>(
         targets
             .into_iter()
             .map(|target| {
-                Ok(OcrResult {
-                    content: target.content,
-                    frame: target.frame,
-                    detected: target.detected,
-                    geometry: target.geometry,
-                    previous: target.previous,
-                    text: normalize_ocr_text(inference(&model, &target.image)?),
-                })
+                let text = if target.ink.is_blank() {
+                    String::new()
+                } else {
+                    let text = inference(&model, &target.image)?;
+                    // Inspect raw output before placeholder normalization can turn
+                    // a repetitive hallucination into a plausible ellipsis.
+                    if target.ink.reject_output(&text) {
+                        String::new()
+                    } else {
+                        normalize_ocr_text(text)
+                    }
+                };
+                Ok(target.into_result(text))
             })
             .collect()
     })
@@ -410,7 +443,10 @@ mod tests {
             Arc::new(crate::ImageCache::default()),
             None,
         );
-        let targets = collect_targets(&input, &DynamicImage::new_rgb8(100, 100)).unwrap();
+        let image = DynamicImage::ImageLuma8(image::GrayImage::from_fn(100, 100, |x, y| {
+            image::Luma([if x == 20 && (25..45).contains(&y) { 0 } else { 255 }])
+        }));
+        let targets = collect_targets(&input, &image).unwrap();
         assert_eq!(targets.len(), 1);
         assert_eq!(
             (targets[0].image.width(), targets[0].image.height()),
@@ -506,6 +542,164 @@ mod tests {
             collect_targets(&input.with_resume(true), &image)
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn blank_reread_needs_no_model_and_commits_an_undoable_empty_source() {
+        use koharu_scene::{AssetInput, AssetMetadata, AssetRole};
+
+        let (mut session, page, boxes) = manual_boxes().await;
+        let mut png = std::io::Cursor::new(Vec::new());
+        DynamicImage::new_rgb8(100, 100)
+            .write_to(&mut png, image::ImageFormat::Png)
+            .unwrap();
+        let mut edit = session.snapshot().edit();
+        edit.set_asset(
+            page,
+            &AssetRole::new("source").unwrap(),
+            AssetInput::new(
+                png.into_inner(),
+                "image/png",
+                AssetMetadata {
+                    width: Some(100),
+                    height: Some(100),
+                    attributes: Default::default(),
+                },
+            ),
+        )
+        .unwrap();
+        // O-tool boxes have a user-authored region; they use the detected-target
+        // path even though the user drew them. Keep the second box regionless.
+        let region = edit
+            .add_analysis_region::<TextRegion>(
+                page,
+                At::End,
+                &Geometry::rectangle(10., 20., 20., 30.),
+                None,
+            )
+            .unwrap();
+        edit.relate::<RecognizedFrom>(boxes[0].1, region).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let generated = generation(PRODUCER, "test").unwrap();
+        let mut edit = session.snapshot().edit_as(generated.clone());
+        edit.set(
+            boxes[0].1,
+            &SourceText {
+                text: Authored::generated("invented text".into(), generated),
+                language: None,
+            },
+        )
+        .unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let snapshot = session.snapshot();
+        let scope = crate::scope::NormalizedScope::new(
+            &snapshot,
+            &crate::Scope::Entities(vec![boxes[0].0]),
+            &[crate::Stage::Ocr],
+        )
+        .unwrap();
+        let input = StageInput::new(
+            snapshot.clone(),
+            page,
+            scope.entities(),
+            None,
+            Arc::new(crate::ImageCache::default()),
+            None,
+        );
+        let processor = Processor::new(OcrModel::MangaOcr, koharu_ml::Device::cpu());
+        processor.load(&input).await.unwrap();
+        assert!(processor.model.lock().await.is_none());
+        let patch = processor.process(input).await.unwrap();
+        let hand_edit = snapshot
+            .patch(|edit| {
+                edit.set(
+                    boxes[0].1,
+                    &SourceText {
+                        text: Authored::user("my edit".into()),
+                        language: None,
+                    },
+                )
+            })
+            .unwrap();
+        assert!(
+            patch
+                .rebase_on(&snapshot.preview([&hand_edit]).unwrap())
+                .is_err()
+        );
+        let commit = session.commit(patch).await.unwrap();
+        let content = commit
+            .snapshot
+            .text_layer(boxes[0].0)
+            .unwrap()
+            .content()
+            .unwrap();
+        let source = content.source().unwrap().unwrap();
+        assert!(source.text.value.is_empty());
+        assert!(matches!(source.text.origin, Origin::Generated(_)));
+        assert_eq!(
+            content.translation().unwrap().unwrap().text.value,
+            "Keep my translation"
+        );
+        assert!(
+            commit
+                .snapshot
+                .component::<OcrAnalysis>(region)
+                .unwrap()
+                .is_some()
+        );
+        session.undo(commit.revision).await.unwrap();
+        assert_eq!(
+            session
+                .snapshot()
+                .component::<SourceText>(boxes[0].1)
+                .unwrap()
+                .unwrap()
+                .text
+                .value,
+            "invented text"
+        );
+    }
+
+    #[tokio::test]
+    async fn mixed_crops_skip_blank_inference_and_filter_only_near_blank_repetition() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let blank = image::GrayImage::from_pixel(64, 64, image::Luma([255]));
+        let mut dust = blank.clone();
+        dust.put_pixel(32, 32, image::Luma([0]));
+        let mut stroke = blank.clone();
+        for y in 25..45 {
+            stroke.put_pixel(32, y, image::Luma([252]));
+        }
+        let targets = [blank, dust.clone(), stroke, dust]
+            .into_iter()
+            .map(|image| {
+                let image = DynamicImage::ImageLuma8(image);
+                OcrTarget {
+                    content: EntityId::new(),
+                    frame: EntityId::new(),
+                    detected: false,
+                    geometry: Geometry::rectangle(0., 0., 64., 64.),
+                    previous: None,
+                    ink: ink::measure(&image),
+                    image,
+                }
+            })
+            .collect();
+        let calls = Arc::new(Mutex::new(AtomicUsize::new(0)));
+        let results = infer_text(calls.clone(), targets, |calls, _| {
+            Ok(["☐ ☐", "あああ", "ordinary text"][calls.fetch_add(1, Ordering::Relaxed)].into())
+        })
+        .await
+        .unwrap();
+        assert_eq!(calls.lock().unwrap().load(Ordering::Relaxed), 3);
+        assert_eq!(
+            results
+                .iter()
+                .map(|result| result.text.as_str())
+                .collect::<Vec<_>>(),
+            ["", "", "あああ", "ordinary text"]
         );
     }
 

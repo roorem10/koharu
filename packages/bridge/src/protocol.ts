@@ -139,9 +139,9 @@ export const commands = {
 	newMcpToken: () => __TAURI_INVOKE<McpStatus>("new_mcp_token"),
 	getOcrBoxSettings: () => __TAURI_INVOKE<OcrBoxSettings>("get_ocr_box_settings"),
 	saveOcrBoxSettings: (settings: OcrBoxSettings) => __TAURI_INVOKE<OcrBoxSettings>("save_ocr_box_settings", { settings }),
-	addOcrBox: (page: EntityId, rect: Bounds, mode: OcrBoxMode) => __TAURI_INVOKE<EntityId>("add_ocr_box", { page, rect, mode }),
+	addOcrBox: (page: EntityId, rect: Bounds, mode: OcrBoxMode) => __TAURI_INVOKE<OcrBoxResult>("add_ocr_box", { page, rect, mode }),
 	getOcrRedoInfo: (layers: EntityId[]) => __TAURI_INVOKE<RedoInfo>("get_ocr_redo_info", { layers }),
-	redoOcrBoxes: (layers: EntityId[], action: RedoAction, overwrite: boolean) => __TAURI_INVOKE<JobId[]>("redo_ocr_boxes", { layers, action, overwrite }),
+	redoOcrBoxes: (layers: EntityId[], action: RedoAction, overwrite: boolean) => __TAURI_INVOKE<OcrRedoResult>("redo_ocr_boxes", { layers, action, overwrite }),
 	addSfxSubtitle: (layer: EntityId) => __TAURI_INVOKE<EntityId>("add_sfx_subtitle", { layer }),
 	getCleanupSettings: () => __TAURI_INVOKE<CleanupSettings>("get_cleanup_settings"),
 	saveCleanupSettings: (settings: CleanupSettings) => __TAURI_INVOKE<CleanupSettings>("save_cleanup_settings", { settings }),
@@ -728,6 +728,11 @@ export type ModelSelection = {
 
 export type OcrBoxMode = "read" | "read_translate" | "read_translate_clean";
 
+export type OcrBoxResult = {
+	layer: EntityId,
+	no_text: boolean,
+};
+
 export type OcrBoxSettings = {
 	default_mode?: OcrBoxMode,
 	subtitle_font_family?: string | null,
@@ -737,6 +742,11 @@ export type OcrBoxSettings = {
 };
 
 export type OcrModel = { model: "paddleocr-vl-1.6" } | { model: "manga-ocr" } | { model: "baberu-ocr" } | { model: "hayai-ocr" };
+
+export type OcrRedoResult = {
+	jobs: JobId[],
+	no_text: boolean,
+};
 
 export type OnPageFailure = "continue_with_other_pages" | "stop_run";
 

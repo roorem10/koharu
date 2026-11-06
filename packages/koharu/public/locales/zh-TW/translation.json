@@ -617,6 +617,7 @@
     "selected": "已選擇 {{count}}"
   },
   "ocrBox": {
+    "noTextFound": "這裡未找到文字",
     "title": "OCR 框與 SFX 字幕",
     "modifierHint": "放開滑鼠時按住 Alt 僅辨識；按住 Shift 則辨識、翻譯並清理。同時按住兩個鍵時，Alt 優先。",
     "defaultMode": "OCR 框預設操作",

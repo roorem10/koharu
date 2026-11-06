@@ -617,6 +617,7 @@
     "selected": "拣中个页面：{{count}} 页"
   },
   "ocrBox": {
+    "noTextFound": "箇搭呒没寻着文字",
     "title": "OCR 框搭 SFX 字幕",
     "modifierHint": "放开鼠标辰光，按牢 Alt 光识别；按牢 Shift 会识别、翻译搭清理。两只键侪按牢个话，Alt 优先。",
     "defaultMode": "OCR 框默认操作",

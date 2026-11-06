@@ -11,8 +11,16 @@ import { OcrBoxPreferences } from '@/components/preferences/OcrBoxPreferences'
 import { useCompareStore } from '@/components/qc/compare'
 import { pageKey, pagesKey, projectKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { commands, type Layer, type OcrBoxMode, type OcrBoxSettings } from '@koharu/bridge/protocol'
+import {
+  commands,
+  type Layer,
+  type OcrBoxMode,
+  type OcrBoxResult,
+  type OcrBoxSettings,
+  type OcrRedoResult,
+} from '@koharu/bridge/protocol'
 import { Menubar, MenubarContent, MenubarMenu, MenubarTrigger } from '@koharu/ui/components/menubar'
+import { toast } from '@koharu/ui/components/toast'
 
 const settings: OcrBoxSettings = {
   default_mode: 'read_translate',
@@ -63,6 +71,50 @@ beforeEach(() => {
 })
 
 describe('OCR box drag', () => {
+  it.each(['selection', 'tool'] as const)(
+    'does not replace the selection when the user changes %s during OCR',
+    async (change) => {
+      let complete!: (result: OcrBoxResult) => void
+      vi.spyOn(commands, 'addOcrBox').mockReturnValue(
+        new Promise((resolve) => {
+          complete = resolve
+        }),
+      )
+      useKoharuStore.getState().selectLayers(['box'])
+      const hook = renderHook(() => useOcrBoxTool(), { wrapper })
+      const handler = hook.result.current
+      act(() => {
+        handler.start({ x: 10, y: 20 }, pointer())
+        handler.move({ x: 60, y: 80 })
+        handler.finish(pointer())
+      })
+      await waitFor(() => expect(commands.addOcrBox).toHaveBeenCalled())
+      act(() => {
+        if (change === 'selection') useKoharuStore.getState().selectLayers(['another-box'])
+        else useKoharuStore.setState({ tool: 'select' })
+      })
+      await act(async () => complete({ layer: 'new-box', no_text: false }))
+      expect(useKoharuStore.getState().selectedLayers).toEqual(
+        change === 'selection' ? ['another-box'] : ['box'],
+      )
+    },
+  )
+
+  it('keeps an empty box selected and reports a blank read without a modal', async () => {
+    vi.spyOn(commands, 'addOcrBox').mockResolvedValue({ layer: 'empty-box', no_text: true })
+    const notice = vi.spyOn(toast, 'add')
+    const hook = renderHook(() => useOcrBoxTool(), { wrapper })
+    const handler = hook.result.current
+    act(() => {
+      handler.start({ x: 10, y: 20 }, pointer())
+      handler.move({ x: 60, y: 80 })
+      handler.finish(pointer())
+    })
+    await waitFor(() => expect(useKoharuStore.getState().selectedLayers).toEqual(['empty-box']))
+    expect(notice).toHaveBeenCalledWith({ type: 'info', title: expect.any(String) })
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
   it.each([
     [{}, 'read_translate'],
     [{ altKey: true }, 'read'],
@@ -170,6 +222,41 @@ describe('OCR box drag', () => {
 })
 
 describe('box redo controls', () => {
+  it('reports a completed empty read again without another confirmation', async () => {
+    vi.spyOn(commands, 'redoOcrBoxes').mockResolvedValue({ jobs: ['job'], no_text: true })
+    const notice = vi.spyOn(toast, 'add')
+    const user = userEvent.setup()
+    render(<BoxRedoSection layers={['box']} />, { wrapper })
+    await user.click(screen.getByRole('button', { name: 'Read again' }))
+    await waitFor(() =>
+      expect(notice).toHaveBeenCalledWith({ type: 'info', title: expect.any(String) }),
+    )
+    expect(commands.redoOcrBoxes).toHaveBeenCalledWith(['box'], 'read', false)
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('closes the overwrite dialog while the approved read is still running', async () => {
+    vi.spyOn(commands, 'getOcrRedoInfo').mockResolvedValue({
+      user_sources: 1,
+      user_translations: 0,
+    })
+    let complete!: (result: OcrRedoResult) => void
+    vi.spyOn(commands, 'redoOcrBoxes').mockReturnValue(
+      new Promise((resolve) => {
+        complete = resolve
+      }),
+    )
+    const notice = vi.spyOn(toast, 'add')
+    const user = userEvent.setup()
+    render(<BoxRedoSection layers={['box']} />, { wrapper })
+    await user.click(screen.getByRole('button', { name: 'Read again' }))
+    await user.click(await screen.findByRole('button', { name: 'Overwrite and run' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    expect(notice).not.toHaveBeenCalled()
+    await act(async () => complete({ jobs: ['job'], no_text: true }))
+    expect(notice).toHaveBeenCalledWith({ type: 'info', title: expect.any(String) })
+  })
+
   it.each([
     ['Read again', 'read'],
     ['Translate again', 'translate'],

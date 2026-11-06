@@ -625,6 +625,7 @@
     "selected": "Sélection : {{count}}"
   },
   "ocrBox": {
+    "noTextFound": "Aucun texte trouvé ici",
     "title": "Zones OCR et sous-titres de SFX",
     "modifierHint": "Relâchez avec Alt pour lire uniquement ; avec Shift pour lire, traduire et nettoyer. Alt est prioritaire si les deux touches sont maintenues.",
     "defaultMode": "Action par défaut des zones OCR",
