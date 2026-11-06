@@ -1723,6 +1723,9 @@ fn rasterize_stroke(
 }
 
 #[cfg(test)]
+mod geometry_tests;
+
+#[cfg(test)]
 mod tests {
     use koharu_scene::{Generation, Presents, ProducerId, WritingMode};
 

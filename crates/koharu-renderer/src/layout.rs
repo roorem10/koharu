@@ -232,19 +232,31 @@ fn largest_fitting_font_size<T>(
     mut layout_at: impl FnMut(f32) -> Result<T>,
     fits: impl Fn(&T) -> bool,
 ) -> Result<Option<T>> {
-    const PROBES: usize = 8;
+    anyhow::ensure!(
+        minimum.is_finite() && maximum.is_finite() && minimum > 0.0 && minimum <= maximum,
+        "font size search bounds must be finite, positive, and ordered"
+    );
     if maximum - minimum <= f32::EPSILON {
         let candidate = layout_at(maximum)?;
         return Ok(fits(&candidate).then_some(candidate));
     }
-    let step = (maximum - minimum) / PROBES as f32;
+    // Anchor probes to font sizes, not the geometry-dependent maximum. Moving
+    // that maximum must not move every probe past a narrow fitting interval.
+    // Sixteen probes per doubling bound gaps to about 4.5% while keeping large
+    // page-space boxes logarithmic in cost; refine only the first fitting gap.
+    const PROBES_PER_DOUBLING: f32 = 16.0;
+    let first = (maximum.log2() * PROBES_PER_DOUBLING).ceil() as i32;
+    let last = (minimum.log2() * PROBES_PER_DOUBLING).floor() as i32;
+    let sizes = std::iter::once(maximum)
+        .chain(
+            (last..first)
+                .rev()
+                .map(|probe| 2.0_f32.powf(probe as f32 / PROBES_PER_DOUBLING))
+                .filter(|&size| size > minimum && size < maximum),
+        )
+        .chain(std::iter::once(minimum));
     let mut larger_non_fit = None;
-    for probe in 0..=PROBES {
-        let size = if probe == PROBES {
-            minimum
-        } else {
-            maximum - step * probe as f32
-        };
+    for size in sizes {
         let candidate = layout_at(size)?;
         if fits(&candidate) {
             let Some(mut high) = larger_non_fit else {
@@ -851,6 +863,7 @@ impl<'a> TextLayout<'a> {
                     WritingMode::VerticalRl => (
                         self.comic_balloon
                             .as_ref()
+                            .filter(|_| !contour_overflowed)
                             .and_then(|_| line_profiles.get(i))
                             .map_or(
                                 (line_count.saturating_sub(1) as f32 - i as f32) * line_height
@@ -863,6 +876,7 @@ impl<'a> TextLayout<'a> {
                         let y = self
                             .comic_balloon
                             .as_ref()
+                            .filter(|_| !contour_overflowed)
                             .and_then(|_| line_profiles.get(i))
                             .map_or(ascent + i as f32 * line_height, |profile| {
                                 profile.block_baseline
@@ -977,7 +991,12 @@ impl<'a> TextLayout<'a> {
                 }
             }
 
-            if let Some(balloon) = &self.comic_balloon {
+            // Overflow falls back to ordinary line spacing and centered placement.
+            // Fallback profiles can have no contour baselines; using them stacks
+            // lines at zero and moves the block away from the authored frame.
+            if let Some(balloon) = &self.comic_balloon
+                && !contour_overflowed
+            {
                 let inline_offset = line_profiles
                     .first()
                     .map_or(0.0, |profile| profile.center_offset);
@@ -2714,7 +2733,24 @@ mod tests {
         .expect("the larger fitting range should be found");
 
         assert!((11.99..=12.0).contains(&fitted));
-        assert!(calls.get() <= 18);
+        assert!(calls.get() <= 34);
+        Ok(())
+    }
+
+    #[test]
+    fn font_size_search_keeps_narrow_fit_when_maximum_changes_slightly() -> anyhow::Result<()> {
+        let search = |maximum| {
+            largest_fitting_font_size(8.0, maximum, Ok, |size| (19.8..=20.0).contains(size))
+        };
+        let original = search(40.0)?.expect("the narrow fitting interval should be found");
+        let resized = search(40.02)?.expect("a tiny resize must not skip the fitting interval");
+
+        assert_eq!(original, resized);
+        assert!((19.99..=20.0).contains(&original));
+        for only_fit in [8.3, 40.02] {
+            let fitted = largest_fitting_font_size(8.3, 40.02, Ok, |size| *size == only_fit)?;
+            assert_eq!(fitted, Some(only_fit));
+        }
         Ok(())
     }
 
@@ -3505,6 +3541,62 @@ mod tests {
             .run("Hi")?;
 
         assert!(layout.overflowed());
+        Ok(())
+    }
+
+    #[test]
+    fn overflowing_balloon_keeps_line_spacing_and_placement_across_tiny_resizes()
+    -> anyhow::Result<()> {
+        let font = crate::fonts::layout_fixture_font();
+        let text = "First\nSecond\nThird\nFourth";
+        let styled = [LayoutStyleRun {
+            range: 0..text.len(),
+            fonts: Vec::new(),
+            size_scale: 1.25,
+        }];
+
+        for mode in [WritingMode::Horizontal, WritingMode::VerticalRl] {
+            for runs in [&[][..], styled.as_slice()] {
+                for block_extent in [3.0, 3.02] {
+                    let (width, height) = if mode.is_vertical() {
+                        (block_extent, 240.0)
+                    } else {
+                        (240.0, block_extent)
+                    };
+                    let builder = TextLayout::new(&font)
+                        .with_runs(runs)
+                        .with_writing_mode(mode)
+                        .with_alignment(TextAlign::Center)
+                        .with_line_height(1.2)
+                        .with_max_width(width)
+                        .with_max_height(height);
+                    let expected = builder.clone().with_font_size(16.0).run(text)?;
+                    let actual = builder
+                        .with_min_font_size(16.0)
+                        .with_max_font_size(24.0)
+                        .with_comic_balloon(
+                            width,
+                            height,
+                            vec![(0.0, 0.0), (width, 0.0), (width, height), (0.0, height)],
+                            4.0,
+                        )
+                        .run(text)?;
+
+                    assert!(actual.overflowed());
+                    assert_eq!(actual.font_size, 16.0);
+                    assert_eq!(actual.lines.len(), 4);
+                    assert_approx_eq(actual.width, expected.width);
+                    assert_approx_eq(actual.height, expected.height);
+                    assert_approx_eq(actual.placement_offset_x(), 0.0);
+                    assert_approx_eq(actual.placement_offset_y(), 0.0);
+                    for (actual, expected) in actual.lines.iter().zip(&expected.lines) {
+                        assert_eq!(actual.range, expected.range);
+                        assert_approx_eq(actual.baseline.0, expected.baseline.0);
+                        assert_approx_eq(actual.baseline.1, expected.baseline.1);
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
