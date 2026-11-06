@@ -40,9 +40,7 @@ pub(super) const READ_TOOLS: &[&str] = &[
     "inspect_project",
     "ready_check",
     "view_page",
-    "view_page",
     "read_qc",
-    "view_page",
     "get_cleanup_check_results",
     "get_project_summary",
 ];

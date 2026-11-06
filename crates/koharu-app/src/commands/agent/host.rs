@@ -397,6 +397,9 @@ impl KoharuHost {
                 _ => return Invocation::changed(json!({"job": job})),
             }
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
+
     async fn run_qc_fixes(&self, arguments: FixQc, control: &Control) -> Result<Invocation> {
         use crate::commands::{processing::JobState, qc::fix};
 
@@ -550,6 +553,7 @@ impl Host for KoharuHost {
                     definition::<AutoRun>(
                         "auto_run",
                         "Run the fixed chapter recipe for the project or selected pages. Preserves hand edits and skips completed work. Quality is fast, balanced, or best; omit it to use Settings. Uses the same progress and stop control as the Process menu.",
+                    ),
                     definition::<ReadQc>(
                         "read_qc",
                         "Read the latest QC review list, including open problems, automatic fixes and uncertain lettering. Omit pages to read the chapter; otherwise pass page IDs.",
@@ -561,6 +565,7 @@ impl Host for KoharuHost {
                     definition::<MarkQcItem>(
                         "mark_qc_item_ok",
                         "Acknowledge a QC review item using its layer, check and flag from read_qc. Pass ok=false to restore it to review. This uses the same QC OK acknowledgement as the editor.",
+                    ),
                     definition::<super::cleanup_check::CheckCleanup>(
                         "check_cleanup",
                         "Check cleaned areas for leftover text, retry cleanup once, and report anything that remains. Pass page IDs or omit pages for the project. Hand-painted cleanup is protected. Waits for the normal, stoppable processing job to finish.",
@@ -897,6 +902,7 @@ impl Host for KoharuHost {
                     arguments.ok,
                 )?;
                 Invocation::changed(json!({ "layer": layer, "ok": arguments.ok }))
+            }
             "check_cleanup" => {
                 super::cleanup_check::run(self.handle.clone(), arguments(&call)?, control).await
             }
