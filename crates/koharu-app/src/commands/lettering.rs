@@ -1,6 +1,7 @@
 //! Resolve line categories without changing the scene's text or save format.
 
 mod settings;
+pub(crate) mod sizes;
 #[cfg(test)]
 mod tests;
 
@@ -12,7 +13,9 @@ use koharu_pipeline::bubble_shape::{
     BubbleShape, BubbleShapeInfo, original_glyph_fraction, text_bubble_shape,
 };
 use koharu_renderer::{TextStyle, TextStyles};
-use koharu_scene::{Commit, EntityId, Origin, Snapshot, Typography};
+use koharu_scene::{
+    Commit, Component as _, ComponentOwner, EntityId, Origin, Snapshot, Typography, ValueChangeKind,
+};
 use serde::Serialize;
 use specta::Type;
 use tauri::State;
@@ -164,6 +167,39 @@ pub(crate) async fn labels_changed(
     restyle_labels(project, layers, &styles, &settings, detect_colors).await
 }
 
+/// Apply app-owned category sizes after detection publishes new typography.
+pub(crate) async fn after_detection(
+    project: &mut Project,
+    commit: &Commit,
+) -> Result<Option<Commit>> {
+    let layers = commit
+        .changes
+        .components
+        .iter()
+        .filter(|change| {
+            change.kind == Typography::KIND && change.change != ValueChangeKind::Removed
+        })
+        .filter_map(|change| match change.owner {
+            ComponentOwner::Entity(layer) => Some(layer),
+            ComponentOwner::Project | ComponentOwner::Relation(_) => None,
+        })
+        .collect::<Vec<_>>();
+    if layers.is_empty() {
+        return Ok(None);
+    }
+    let context = project.load_context()?;
+    let policy = sizes::SizePolicy::load()?;
+    let (commit, _) = project
+        .apply_style(
+            StyleScope::Layers(layers),
+            false,
+            false,
+            |snapshot, layer, typography| policy.apply(&context, snapshot, layer, typography),
+        )
+        .await?;
+    Ok(commit)
+}
+
 async fn restyle_labels(
     project: &mut Project,
     layers: &[EntityId],
@@ -171,11 +207,9 @@ async fn restyle_labels(
     settings: &LetteringSettings,
     detect_colors: bool,
 ) -> Result<Option<Commit>> {
-    if !styles.shape_styles.enabled {
-        return Ok(None);
-    }
     let context = project.load_context()?;
     let snapshot = project.snapshot();
+    let size_policy = sizes::SizePolicy::load()?;
     let mut targets = Vec::new();
     for &layer in layers {
         let model_change = context
@@ -197,15 +231,18 @@ async fn restyle_labels(
             false,
             true,
             |snapshot, layer, typography| {
-                let info = text_bubble_shape(snapshot, layer)?;
-                let category =
-                    resolve_category(&context, snapshot, layer, &info, settings)?.category;
-                styles
-                    .default_style
-                    .apply_to_detected(typography, detect_colors);
-                styles
-                    .category_style(category.as_str())
-                    .apply_to_detected(typography, detect_colors);
+                if styles.shape_styles.enabled {
+                    let info = text_bubble_shape(snapshot, layer)?;
+                    let category =
+                        resolve_category(&context, snapshot, layer, &info, settings)?.category;
+                    styles
+                        .default_style
+                        .apply_to_detected(typography, detect_colors);
+                    styles
+                        .category_style(category.as_str())
+                        .apply_to_detected(typography, detect_colors);
+                }
+                size_policy.apply(&context, snapshot, layer, typography)?;
                 Ok(())
             },
         )
@@ -236,7 +273,7 @@ pub(crate) async fn get_effective_category(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn get_lettering_settings() -> Result<LetteringSettings, Error> {
-    Ok(LetteringSettings::load()?.read()?.clone())
+    Ok(LetteringSettings::load()?.read()?.clone().resolved())
 }
 
 #[tauri::command]
@@ -249,5 +286,5 @@ pub(crate) async fn save_lettering_settings(
     let mut current = config.write()?;
     *current = settings.clone();
     current.save()?;
-    Ok(settings)
+    Ok(settings.resolved())
 }

@@ -1293,5 +1293,24 @@
       "crying": "Crying / Trembling",
       "menacing": "Menacing / Sinister"
     }
+  },
+  "sizeConsistency": {
+    "title": "Category text sizes",
+    "settingsHelp": "Keep lettering at a consistent share of page height, whatever the scan resolution.",
+    "category": "Lettering category",
+    "baseSize": "Base size (% of page height)",
+    "baseHelp": "Leave blank to fit each bubble as before. Text can shrink to the QC minimum when needed.",
+    "uncapped": "Fit each bubble",
+    "mayGrow": "May grow above base size",
+    "previewScale": "{{size}} px on a {{height}} px page",
+    "preview": "I wonder what happens next.",
+    "action": "Make sizes consistent",
+    "checkHelp": "Bring auto-fit dialogue toward the chapter median when it differs by more than 20%, as far as text still fits. Hand-set and word-level sizes stay unchanged. Each changed page is one undo step.",
+    "scope": "Apply to",
+    "page": "Current page",
+    "chapter": "Whole chapter",
+    "reason": "Dialogue: more than 20% from the chapter median ({{median}}% of page height).",
+    "noDialogue": "No eligible auto-fit dialogue was found.",
+    "skipped": "Boxes unchanged: {{count}} (layout unavailable or no fitting improvement)."
   }
 }

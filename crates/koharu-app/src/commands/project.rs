@@ -773,11 +773,15 @@ impl Project {
             .into_iter()
             .map(|update| {
                 let content = Self::text_content(&snapshot, update.layer)?;
-                Ok((update, content))
+                let extensions = snapshot
+                    .component::<SceneTypography>(update.layer)?
+                    .map(|typography| typography.extensions)
+                    .unwrap_or_default();
+                Ok((update, content, extensions))
             })
             .collect::<Result<Vec<_>>>()?;
         let patch = snapshot.patch(|edit| {
-            for (update, content) in updates {
+            for (update, content, extensions) in updates {
                 edit.promote_entity_to_user(update.layer)?;
                 edit.promote_entity_to_user(content)?;
                 edit.set(
@@ -805,7 +809,7 @@ impl Project {
                         fill_gradient: update.typography.fill_gradient,
                         alignment: update.typography.alignment,
                         writing_mode: update.typography.writing_mode,
-                        extensions: Default::default(),
+                        extensions,
                     },
                 )?;
             }
@@ -849,6 +853,7 @@ impl Project {
             return Ok((None, Default::default()));
         }
         let context = self.load_context()?;
+        let size_policy = super::lettering::sizes::SizePolicy::load()?;
         self.apply_style(scope, false, include_user, |snapshot, layer, typography| {
             let info = text_bubble_shape(snapshot, layer)?;
             anyhow::ensure!(
@@ -863,6 +868,7 @@ impl Project {
             {
                 style.apply_to_detected(typography, detect_colors);
             }
+            size_policy.apply(&context, snapshot, layer, typography)?;
             Ok(())
         })
         .await
@@ -1751,6 +1757,51 @@ mod tests {
             writing_mode: Some(WritingMode::Horizontal),
             extensions: [("dev.booharu.test".into(), "kept".into())].into(),
         }
+    }
+
+    #[tokio::test]
+    async fn editing_typography_preserves_the_automatic_size_cap_and_undo() {
+        let mut session = Session::memory().await.unwrap();
+        let mut original = style_test_typography();
+        original.auto_fit = true;
+        original.size = None;
+        koharu_renderer::set_auto_fit_size_limit(
+            &mut original,
+            Some(koharu_renderer::AutoFitSizeLimit {
+                maximum: 32.0,
+                minimum: 12.0,
+            }),
+        )
+        .unwrap();
+        let mut edit = session.snapshot().edit();
+        let page = edit.add_page(PageDraft::new("page", 1400.0, 2000.0), At::End).unwrap();
+        let content = edit.add_text_content(page, At::End).unwrap();
+        let layer = edit.add_text_layer(
+            page,
+            At::End,
+            content,
+            &SceneTextLayout {
+                origin: Origin::User,
+                kind: TextLayoutKind::Paragraph,
+                angle_degrees: None,
+                warp: None,
+            },
+        ).unwrap();
+        edit.set(layer, &original).unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let mut project = Project::new(session, "size cap".into());
+        let mut typography = Project::typography_view(original.clone());
+        typography.preferred_font = Some("New font".into());
+        typography.color = Some([100, 90, 80, 255]);
+        let commit = project.set_typography(vec![TypographyUpdate { layer, typography }])
+            .await.unwrap();
+        project.record_commit(&commit);
+        let actual = project.snapshot().component::<SceneTypography>(layer).unwrap().unwrap();
+        assert_eq!(actual.extensions, original.extensions);
+        assert!(actual.auto_fit);
+        assert_eq!(actual.preferred_font.as_deref(), Some("New font"));
+        project.undo().await.unwrap();
+        assert_eq!(project.snapshot().component::<SceneTypography>(layer).unwrap(), Some(original));
     }
 
     #[tokio::test]

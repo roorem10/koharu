@@ -208,6 +208,7 @@ describe('SFX preferences', () => {
         sfx: 'translate_all',
         model_confidence: 0.6,
         small_text_threshold: 0.012,
+        category_sizes: {},
       }),
     )
     await waitFor(() => expect(picker).toHaveTextContent('Translate all'))

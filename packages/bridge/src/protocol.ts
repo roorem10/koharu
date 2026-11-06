@@ -102,6 +102,7 @@ export const commands = {
 	getEffectiveCategory: (layer: EntityId) => __TAURI_INVOKE<EffectiveCategory>("get_effective_category", { layer }),
 	getLetteringSettings: () => __TAURI_INVOKE<LetteringSettings>("get_lettering_settings"),
 	saveLetteringSettings: (settings: LetteringSettings) => __TAURI_INVOKE<LetteringSettings>("save_lettering_settings", { settings }),
+	makeSizesConsistent: (pages: EntityId[] | null) => __TAURI_INVOKE<SizeConsistencyResult>("make_sizes_consistent", { pages }),
 	getBoxSettings: () => __TAURI_INVOKE<BoxSettings>("get_box_settings"),
 	saveBoxSettings: (settings: BoxSettings) => __TAURI_INVOKE<BoxSettings>("save_box_settings", { settings }),
 	redetectPage: (page: EntityId) => __TAURI_INVOKE<JobId>("redetect_page", { page }),
@@ -277,6 +278,11 @@ export type CanvasState = {
 };
 
 export type CategoryReason = "user" | "model" | "small_text" | "bubble_shape";
+
+export type CategorySize = {
+	base_size: number | null,
+	may_grow: boolean,
+};
 
 export type CategoryStyles = {
 	thoughts?: TextStyle,
@@ -632,6 +638,11 @@ export type LetteringSettings = {
 	model_confidence?: number,
 	/**  Estimated source glyph size as a fraction of page height. */
 	small_text_threshold?: number,
+	/**
+	 *  Overrides only: an absent entry uses the category's default, while a
+	 *  present entry with no base size retains the original unrestricted fit.
+	 */
+	category_sizes?: { [key in LetteringCategory]?: CategorySize },
 };
 
 export type LibraryFolder = "projects" | "models";
@@ -1080,6 +1091,14 @@ export type ShapeStyles = {
 	round?: TextStyle,
 	spiky?: TextStyle,
 	free?: TextStyle,
+};
+
+export type SizeConsistencyResult = {
+	changed: number,
+	skipped: number,
+	kept_manual: number,
+	/**  Chapter median as a fraction of page height, for the localized reason. */
+	median_fraction: number | null,
 };
 
 export type SizePart = {

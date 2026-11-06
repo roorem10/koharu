@@ -421,7 +421,10 @@ async fn reset_translation_styles(
     }
     styles.validate()?;
     let resolver = EffectResolver::new(project, styles, detect_colors)?;
+    let context = project.load_context()?;
+    let size_policy = super::lettering::sizes::SizePolicy::load()?;
     let mut updates = Vec::new();
+    let mut hint_layers = Vec::new();
     for &layer in &layers {
         let translation = snapshot
             .text_layer(layer)?
@@ -429,14 +432,20 @@ async fn reset_translation_styles(
             .translation()?
             .context("translation was removed")?;
         let current = snapshot.component::<Typography>(layer)?;
+        let runs = snapshot.component::<TextRuns>(layer)?;
+        if super::lettering::sizes::has_manual_size(current.as_ref(), runs.as_ref()) {
+            continue;
+        }
         let baseline = default_typography(current.as_ref(), &translation, detect_colors);
-        let typography = resolver.resolve(&snapshot, layer, &baseline)?;
+        let mut typography = resolver.resolve(&snapshot, layer, &baseline)?;
+        size_policy.apply(&context, &snapshot, layer, &mut typography)?;
         let mut layout = snapshot.text_layer(layer)?.layout()?;
         let warped = layout.warp.take().is_some();
         if warped {
             layout.origin = baseline.origin;
         }
         updates.push((layer, typography, layout, warped));
+        hint_layers.push(layer);
     }
     let patch = snapshot.patch(|edit| {
         for (layer, typography, layout, warped) in updates {
@@ -450,7 +459,7 @@ async fn reset_translation_styles(
         }
         // Hints are fresh translation output. Emphasis may replace the runs
         // just removed, within this same undo step.
-        apply_hints(edit, &snapshot, &layers)
+        apply_hints(edit, &snapshot, &hint_layers)
     })?;
     if patch.is_empty() {
         return Ok(None);
@@ -460,8 +469,8 @@ async fn reset_translation_styles(
 
 /// Called by the processing committer right after a Translation stage commit
 /// (normal runs and Translate again). For every box whose translation that
-/// commit rewrote, removes its word styles and resets its style to the lettering
-/// default (decision 4), then applies fresh emphasis hints in the same patch.
+/// commit rewrote, resets automatic styling to the lettering default and applies
+/// fresh emphasis hints in the same patch. Manual box and word sizes stay intact.
 pub(crate) async fn after_translation(
     project: &mut Project,
     commit: &Commit,

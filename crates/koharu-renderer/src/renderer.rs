@@ -816,6 +816,11 @@ impl Traversal<'_> {
                 .and_then(|value| value.font_style)
                 .map(Into::into),
             font_size: typography.as_ref().and_then(|value| value.size),
+            auto_fit_size_limit: typography
+                .as_ref()
+                .map(crate::auto_fit_size_limit)
+                .transpose()?
+                .flatten(),
             minimum_font_size: MINIMUM_FONT_SIZE,
             auto_fit: typography.as_ref().is_none_or(|value| value.auto_fit),
             alignment,
@@ -2730,6 +2735,7 @@ mod tests {
             font_weight: Some(400),
             font_style: Some(FontStyle::Normal),
             font_size: Some(30.0),
+            auto_fit_size_limit: None,
             minimum_font_size: 9.0,
             auto_fit: false,
             alignment: TextAlign::Left,

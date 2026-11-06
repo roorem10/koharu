@@ -1306,5 +1306,24 @@
       "crying": "Llanto / temblor",
       "menacing": "Amenazante / siniestro"
     }
+  },
+  "sizeConsistency": {
+    "title": "Tamaños de texto por categoría",
+    "settingsHelp": "Mantén una proporción constante respecto a la altura de página, sea cual sea la resolución del escaneo.",
+    "category": "Categoría de rotulación",
+    "baseSize": "Tamaño base (% de la altura de página)",
+    "baseHelp": "Déjalo vacío para ajustar cada bocadillo como antes. El texto puede reducirse hasta el mínimo del control de calidad si es necesario.",
+    "uncapped": "Ajustar a cada bocadillo",
+    "mayGrow": "Permitir superar el tamaño base",
+    "previewScale": "{{size}} px en una página de {{height}} px",
+    "preview": "Me pregunto qué pasará después.",
+    "action": "Unificar tamaños",
+    "checkHelp": "Acerca los diálogos con ajuste automático a la mediana del capítulo cuando difieran más del 20%, siempre que el texto quepa. Los tamaños manuales y por palabra se mantienen. Cada página modificada se deshace en un paso.",
+    "scope": "Aplicar a",
+    "page": "Página actual",
+    "chapter": "Todo el capítulo",
+    "reason": "Diálogo: diferencia superior al 20% respecto a la mediana del capítulo ({{median}}% de la altura de página).",
+    "noDialogue": "No se encontró ningún diálogo apto con ajuste automático.",
+    "skipped": "Cuadros sin cambios: {{count}} (diseño no disponible o sin mejora que permita encajar el texto)."
   }
 }

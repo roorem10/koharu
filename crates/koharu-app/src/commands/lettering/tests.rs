@@ -338,6 +338,15 @@ async fn label_changes_restyle_only_requested_layers_in_one_undo() {
         restyle_labels(&mut project, &layers, &styles, &settings, false)
             .await
             .unwrap()
+            .is_some()
+    );
+    assert_eq!(current_font(&project, layers[0]).as_deref(), Some("original"));
+    let typography = project.snapshot().component::<Typography>(layers[0]).unwrap().unwrap();
+    assert!(koharu_renderer::auto_fit_size_limit(&typography).unwrap().is_some());
+    assert!(
+        restyle_labels(&mut project, &layers, &styles, &settings, false)
+            .await
+            .unwrap()
             .is_none()
     );
 }
@@ -380,4 +389,60 @@ async fn sfx_modes_filter_effective_categories_and_bubble_membership() {
     )
     .unwrap();
     assert_eq!(effective.reason, CategoryReason::User);
+}
+
+#[tokio::test]
+async fn detection_size_caps_are_undoable_and_only_follow_changed_boxes() {
+    let (_directory, mut project, layers) = project_fixture().await;
+    let mut typography = project.snapshot().component::<Typography>(layers[0]).unwrap().unwrap();
+    typography.preferred_font = Some("detected".into());
+    let generation = Generation::new(ProducerId::new("dev.koharu.pipeline.detection").unwrap());
+    let mut edit = project.snapshot().edit_as(generation);
+    edit.set(layers[0], &typography).unwrap();
+    let detected = project.commit(edit.finish().unwrap()).await.unwrap();
+    let before = project.snapshot();
+    let sized = after_detection(&mut project, &detected).await.unwrap().unwrap();
+    project.record_commit(&sized);
+    let actual = project.snapshot().component::<Typography>(layers[0]).unwrap().unwrap();
+    assert!(koharu_renderer::auto_fit_size_limit(&actual).unwrap().is_some());
+    assert!(matches!(actual.origin, Origin::Generated(_)));
+    for &layer in &layers[1..] {
+        assert_eq!(
+            project.snapshot().component::<Typography>(layer).unwrap(),
+            before.component::<Typography>(layer).unwrap(),
+        );
+    }
+    assert_eq!(project.undo.len(), 1);
+    project.undo().await.unwrap();
+    assert_eq!(
+        project.snapshot().component::<Typography>(layers[0]).unwrap(),
+        before.component::<Typography>(layers[0]).unwrap(),
+    );
+}
+
+#[tokio::test]
+async fn selecting_a_category_keeps_a_hand_size_even_if_its_style_defines_size() {
+    let (_directory, mut project, layers) = project_fixture().await;
+    let layer = layers[1];
+    let mut typography = project.snapshot().component::<Typography>(layer).unwrap().unwrap();
+    typography.auto_fit = false;
+    typography.size = Some(45.0);
+    let patch = project.snapshot().patch(|edit| edit.set(layer, &typography)).unwrap();
+    project.commit(patch).await.unwrap();
+    project.update_context(|context| {
+        context.set_user_category(layer, Some(LetteringCategory::Whisper));
+    }).unwrap();
+    let mut styles = TextStyles::default();
+    styles.shape_styles.enabled = true;
+    styles.category_styles.whisper = font("whisper");
+    styles.category_styles.whisper.size = Some(koharu_renderer::SizePart {
+        auto_fit: true,
+        size: None,
+    });
+    restyle_labels(&mut project, &[layer], &styles, &LetteringSettings::default(), false)
+        .await.unwrap().unwrap();
+    let actual = project.snapshot().component::<Typography>(layer).unwrap().unwrap();
+    assert_eq!(actual.size, Some(45.0));
+    assert!(!actual.auto_fit);
+    assert_eq!(actual.preferred_font.as_deref(), Some("whisper"));
 }

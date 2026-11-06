@@ -1,5 +1,6 @@
 //! Retained rendering of one semantic Koharu page.
 
+mod auto_fit;
 mod bubble;
 mod config;
 mod error;
@@ -15,6 +16,7 @@ mod text_renderer;
 mod types;
 mod warp;
 
+pub use auto_fit::{AutoFitSizeLimit, auto_fit_size_limit, set_auto_fit_size_limit};
 pub use config::{
     AlignmentPart, CategoryStyles, FontPart, OuterPart, OutlinePart, ShapeStyles, SizePart,
     StyleGroup, TextStyle, TextStyles, TypesettingConfig, WritingModePart,

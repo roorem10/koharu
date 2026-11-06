@@ -353,9 +353,14 @@ async fn start_job_inner(
                         return Ok(project.snapshot());
                     };
                     project.record_commit(&commit);
+                    if output.stage == koharu_pipeline::Stage::Detection
+                        && let Some(sized) = super::lettering::after_detection(project, &commit).await?
+                    {
+                        project.record_commit(&sized);
+                        commit = sized;
+                    }
                     if output.stage == koharu_pipeline::Stage::Translation {
-                        // WO-11A: a new translation wipes word styles and resets
-                        // the box style (decision 4).
+                        // Fresh translations reset automatic styles, preserving hand sizes.
                         if let Some(reset) =
                             super::rich_text::after_translation(project, &commit).await?
                         {

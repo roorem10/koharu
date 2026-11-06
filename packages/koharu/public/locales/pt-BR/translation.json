@@ -1293,5 +1293,24 @@
       "crying": "Choro / tremor",
       "menacing": "Ameaça / sinistro"
     }
+  },
+  "sizeConsistency": {
+    "title": "Tamanhos de texto por categoria",
+    "settingsHelp": "Mantenha uma proporção constante da altura da página, independentemente da resolução da digitalização.",
+    "category": "Categoria de letreiramento",
+    "baseSize": "Tamanho base (% da altura da página)",
+    "baseHelp": "Deixe em branco para ajustar cada balão como antes. O texto pode diminuir até o mínimo da verificação de qualidade quando necessário.",
+    "uncapped": "Ajustar a cada balão",
+    "mayGrow": "Permitir aumentar além do tamanho base",
+    "previewScale": "{{size}} px em uma página de {{height}} px",
+    "preview": "O que será que acontece depois?",
+    "action": "Uniformizar tamanhos",
+    "checkHelp": "Aproxima os diálogos com ajuste automático da mediana do capítulo quando a diferença supera 20%, desde que o texto caiba. Tamanhos manuais e por palavra são preservados. Cada página alterada corresponde a uma etapa de desfazer.",
+    "scope": "Aplicar a",
+    "page": "Página atual",
+    "chapter": "Capítulo inteiro",
+    "reason": "Diálogo: diferença superior a 20% em relação à mediana do capítulo ({{median}}% da altura da página).",
+    "noDialogue": "Nenhum diálogo elegível com ajuste automático foi encontrado.",
+    "skipped": "Caixas sem alterações: {{count}} (layout indisponível ou sem melhoria em que o texto caiba)."
   }
 }

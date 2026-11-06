@@ -117,6 +117,7 @@ beforeEach(() => {
     sfx: 'skip',
     model_confidence: 0.6,
     small_text_threshold: 0.012,
+    category_sizes: {},
   })
   mockWo20()
   mockWo12()

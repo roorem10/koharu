@@ -17,6 +17,7 @@ fn descriptor(text: &str) -> TextNodeDescriptor {
         font_weight: None,
         font_style: None,
         font_size: Some(40.0),
+        auto_fit_size_limit: None,
         minimum_font_size: 9.0,
         auto_fit: false,
         alignment: TextAlign::Left,
@@ -31,6 +32,66 @@ fn descriptor(text: &str) -> TextNodeDescriptor {
         point_text: true,
         runs: Vec::new(),
     }
+}
+
+#[tokio::test]
+async fn size_limit_fits_to_the_qc_floor_and_keeps_word_scales_and_fixed_sizes() {
+    let font = FontSystem::new().first_font().unwrap();
+    let family = font.family_name().to_owned();
+    let fonts = Fonts::new();
+    fonts
+        .prepare(&[FontRequest {
+            family: family.clone(),
+            weight: None,
+            style: None,
+        }])
+        .await
+        .unwrap();
+    let mut text = descriptor("OK.");
+    text.preferred_font = Some(family);
+    text.auto_fit = true;
+    text.point_text = false;
+    text.auto_fit_size_limit = Some(crate::AutoFitSizeLimit {
+        maximum: 28.0,
+        minimum: 12.0,
+    });
+    text.runs = vec![StyleRun {
+        start: 0,
+        end: 2,
+        style: RunStyle {
+            size_scale: Some(1.5),
+            ..Default::default()
+        },
+    }];
+    let renderer = TextRenderer::new();
+    let short = renderer.render_descriptor(&text, &fonts).unwrap();
+    assert_eq!(short.metadata.font_size, 28.0);
+    assert!(
+        short
+            .metadata
+            .style_runs
+            .iter()
+            .any(|run| run.font_size == 42.0)
+    );
+
+    text.text = "Words that cannot all fit at the preferred size".into();
+    text.width = 100.0;
+    text.height = 40.0;
+    let crowded = renderer.render_descriptor(&text, &fonts).unwrap();
+    assert!(crowded.metadata.font_size < 28.0);
+    assert!(crowded.metadata.font_size >= 12.0);
+
+    text.auto_fit = false;
+    text.font_size = Some(40.0);
+    let fixed = renderer.render_descriptor(&text, &fonts).unwrap();
+    assert_eq!(fixed.metadata.font_size, 40.0);
+    assert!(
+        fixed
+            .metadata
+            .style_runs
+            .iter()
+            .any(|run| run.font_size == 60.0)
+    );
 }
 
 fn gradient() -> FillGradient {

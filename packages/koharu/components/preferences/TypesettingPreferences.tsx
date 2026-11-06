@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import { FontPicker } from '@/components/controls/FontPicker'
 import { EmphasisPreferences } from '@/components/emphasis/EmphasisPreferences'
+import { CategorySizePreferences } from '@/components/preferences/CategorySizePreferences'
 import { PreferencePage } from '@/components/preferences/PreferenceFields'
 import { ShapeStylePreferences } from '@/components/preferences/ShapeStylePreferences'
 import { TextStylePreferences } from '@/components/preferences/TextStylePreferences'
@@ -49,6 +50,7 @@ export function TypesettingPreferences({
     >
       <TextStylePreferences />
       <ShapeStylePreferences />
+      <CategorySizePreferences />
       <EmphasisPreferences />
       <section aria-labelledby='typesetting-font-stack'>
         <header className='mb-3'>

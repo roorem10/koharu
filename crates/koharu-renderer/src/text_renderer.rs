@@ -53,6 +53,7 @@ pub(crate) struct TextNodeDescriptor {
     pub(crate) font_weight: Option<u16>,
     pub(crate) font_style: Option<FontStyle>,
     pub(crate) font_size: Option<f32>,
+    pub(crate) auto_fit_size_limit: Option<crate::AutoFitSizeLimit>,
     pub(crate) minimum_font_size: f32,
     pub(crate) auto_fit: bool,
     pub(crate) alignment: TextAlign,
@@ -330,7 +331,14 @@ impl TextRenderer {
         } else {
             descriptor.font_size.unwrap_or_else(automatic_maximum)
         };
-        let minimum = descriptor.minimum_font_size.min(maximum);
+        let minimum_font_size = if descriptor.auto_fit && !descriptor.point_text {
+            descriptor
+                .auto_fit_size_limit
+                .map_or(descriptor.minimum_font_size, |limit| limit.minimum)
+        } else {
+            descriptor.minimum_font_size
+        };
+        let minimum = minimum_font_size.min(maximum);
         let mut layout = TextLayout::new(&fonts[0])
             .with_fallback_fonts(&fonts[1..])
             .with_runs(&style_runs)
@@ -428,11 +436,11 @@ impl TextRenderer {
         };
         let smallest_font_size = glyphs::smallest_size(descriptor, &layout);
         let mut diagnostics = Vec::new();
-        if smallest_font_size + f32::EPSILON < descriptor.minimum_font_size {
+        if smallest_font_size + f32::EPSILON < minimum_font_size {
             diagnostics.push(RenderDiagnostic::TextBelowReadableSize {
                 entity: descriptor.entity,
                 font_size: smallest_font_size,
-                minimum_font_size: descriptor.minimum_font_size,
+                minimum_font_size,
             });
         }
         if layout.overflowed() {
@@ -1005,7 +1013,7 @@ fn automatic_maximum(
     bounds: LayoutBox,
     is_bubble_text: bool,
 ) -> f32 {
-    if is_bubble_text {
+    let maximum = if is_bubble_text {
         if descriptor.writing_mode.is_vertical() {
             bounds.height
         } else {
@@ -1015,7 +1023,16 @@ fn automatic_maximum(
         24.0
     } else {
         bounds.width.min(bounds.height).max(24.0)
+    };
+    if descriptor.auto_fit
+        && !descriptor.point_text
+        && let Some(limit) = descriptor.auto_fit_size_limit
+    {
+        // A tiny bubble may still overflow at the QC floor; never hide that
+        // problem by shrinking below the captured readability minimum.
+        return maximum.min(limit.maximum).max(limit.minimum);
     }
+    maximum
 }
 
 fn is_chinese_or_japanese_language(language: &str) -> bool {
@@ -1714,6 +1731,7 @@ mod tests {
             font_weight: None,
             font_style: None,
             font_size: None,
+            auto_fit_size_limit: None,
             minimum_font_size: 9.0,
             auto_fit: true,
             alignment: TextAlign::Center,
@@ -1756,6 +1774,7 @@ mod tests {
             font_weight: None,
             font_style: None,
             font_size: Some(6.0),
+            auto_fit_size_limit: None,
             minimum_font_size: 9.0,
             auto_fit: true,
             alignment: TextAlign::Center,
@@ -1796,6 +1815,31 @@ mod tests {
         };
         assert_eq!(automatic_maximum(&point, larger, false), 24.0);
         assert_eq!(automatic_maximum(&descriptor, bounds, true), 240.0);
+
+        let capped = TextNodeDescriptor {
+            auto_fit_size_limit: Some(crate::AutoFitSizeLimit {
+                maximum: 40.0,
+                minimum: 12.0,
+            }),
+            ..descriptor.clone()
+        };
+        assert_eq!(automatic_maximum(&capped, bounds, false), 40.0);
+        assert_eq!(automatic_maximum(&capped, larger, true), 40.0);
+        let narrow = LayoutBox {
+            width: 5.0,
+            ..bounds
+        };
+        assert_eq!(automatic_maximum(&capped, narrow, true), 12.0);
+        let point = TextNodeDescriptor {
+            point_text: true,
+            ..capped.clone()
+        };
+        assert_eq!(automatic_maximum(&point, larger, false), 24.0);
+        let manual = TextNodeDescriptor {
+            auto_fit: false,
+            ..capped
+        };
+        assert_eq!(automatic_maximum(&manual, bounds, false), 120.0);
     }
 
     #[test]
@@ -2088,6 +2132,7 @@ mod tests {
             font_weight: Some(700),
             font_style: Some(FontStyle::Italic),
             font_size: Some(20.0),
+            auto_fit_size_limit: None,
             minimum_font_size: 9.0,
             auto_fit: false,
             alignment: TextAlign::Center,

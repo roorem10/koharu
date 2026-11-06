@@ -105,6 +105,7 @@ impl KoharuHost {
                 "providers": providers,
                 "typesetting": preferences.typesetting,
                 "text_styles": text_styles_context(&styles),
+                "lettering": crate::commands::lettering::LetteringSettings::load()?.read()?.clone().resolved(),
                 "available_fonts": fonts.into_iter().map(|font| font.name).collect::<Vec<_>>(),
             },
         }))
@@ -390,6 +391,14 @@ impl Host for KoharuHost {
                         "Replace an element's typography settings. Font is a family name from available_fonts.",
                     ),
                     text_style_definition(),
+                    definition::<SetCategoryBaseSize>(
+                        "set_category_base_size",
+                        "Set a lettering category's base size as a fraction of page height (0.018 = 1.8%). Pass null to retain unrestricted auto-fit; may_grow allows larger fitting text. Applies to future typesetting; make_sizes_consistent updates existing dialogue boxes.",
+                    ),
+                    definition::<MakeSizesConsistent>(
+                        "make_sizes_consistent",
+                        "Pull automatic dialogue sizes toward the chapter median on chosen pages, with one undo step per changed page. Omit pages for the chapter. Hand-set box sizes and word sizes are preserved.",
+                    ),
                     definition::<crate::commands::emphasis::agent::StyleWords>(
                         "style_words",
                         "Style words in one text layer, in one undoable edit. Choose text (first whole-word/phrase match; plain match for CJK) or start/end (Unicode character offsets, end exclusive). Choose style: emphasis for its category preset, explicit bold/italic/size_percent/color/outline_color/outline_width, or clear: true. Colors are RGBA byte arrays. Word styles remain editable. Example: {\"layer\":\"<ID>\",\"text\":\"NO\",\"size_percent\":130}.",
@@ -612,6 +621,36 @@ impl Host for KoharuHost {
                 })
                 .await
             }
+            "set_category_base_size" => {
+                let arguments: SetCategoryBaseSize = arguments(&call)?;
+                let category = booharu_context::LetteringCategory::parse(&arguments.category)
+                    .context("invalid lettering category")?;
+                let settings = crate::commands::lettering::sizes::save_category_size(
+                    category,
+                    arguments.base_size,
+                    arguments.may_grow,
+                )?;
+                Invocation::changed(settings)
+            }
+            "make_sizes_consistent" => {
+                let arguments: MakeSizesConsistent = arguments(&call)?;
+                let pages = arguments.pages.as_deref().map(entities).transpose()?;
+                let project = self.handle.state::<CurrentProject>();
+                let desktop = self.handle.state::<Desktop>();
+                let canvas = self.handle.state::<CanvasChannel>();
+                let result = crate::commands::size_consistency::run(
+                    pages,
+                    &project,
+                    &desktop,
+                    &canvas,
+                )
+                .await?;
+                if result.changed == 0 {
+                    Invocation::read(result)
+                } else {
+                    Invocation::changed(result)
+                }
+            }
             "set_geometry" => {
                 let arguments: SetGeometry = arguments(&call)?;
                 let element = entity(&arguments.element)?;
@@ -759,6 +798,21 @@ struct ApplyTextStyle {
     shape: String,
 }
 
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct SetCategoryBaseSize {
+    /// Stable lettering category id, for example normal_dialogue, shout or title.
+    category: String,
+    base_size: Option<f32>,
+    may_grow: bool,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct MakeSizesConsistent {
+    pages: Option<Vec<String>>,
+}
+
 fn text_style_definition() -> Tool {
     let mut tool = definition::<ApplyTextStyle>(
         "apply_text_style",
@@ -785,12 +839,15 @@ async fn apply_agent_text_style(
         shape => bail!("unknown shape {shape}; valid shapes: rectangle, round, spiky, none"),
     };
     styles.validate()?;
+    let context = project.load_context()?;
+    let size_policy = crate::commands::lettering::sizes::SizePolicy::load()?;
     project
-        .apply_style(scope, true, true, |_, _, typography| {
+        .apply_style(scope, true, true, |snapshot, layer, typography| {
             styles
                 .default_style
                 .apply_to_detected(typography, detect_colors);
             shape_style.apply_to_detected(typography, detect_colors);
+            size_policy.apply(&context, snapshot, layer, typography)?;
             Ok(())
         })
         .await
@@ -807,11 +864,23 @@ impl Committer for AgentCommitter {
             let current = self.host.handle.state::<CurrentProject>();
             let mut current = current.project.lock().await;
             let project = current.as_mut().context("no project is open")?;
-            let Some(commit) = project.commit_rebased(output.patch).await? else {
+            let Some(mut commit) = project.commit_rebased(output.patch).await? else {
                 return Ok(project.snapshot());
             };
             project.record_commit(&commit);
+            if output.stage == Stage::Detection
+                && let Some(sized) = super::super::lettering::after_detection(project, &commit).await?
+            {
+                project.record_commit(&sized);
+                commit = sized;
+            }
             if output.stage == Stage::Translation {
+                if let Some(reset) =
+                    super::super::rich_text::after_translation(project, &commit).await?
+                {
+                    project.record_commit(&reset);
+                    commit = reset;
+                }
                 super::super::context::refresh_flags(project)?;
             }
             (commit, project.active_page())

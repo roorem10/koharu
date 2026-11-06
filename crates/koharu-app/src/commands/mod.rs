@@ -23,6 +23,7 @@ pub(crate) mod raw_prep;
 pub(crate) mod redesign;
 pub(crate) mod rich_text;
 pub(crate) mod runs;
+pub(crate) mod size_consistency;
 pub(crate) mod styles;
 pub(crate) mod text_glyphs;
 pub(crate) mod warp;
@@ -169,6 +170,7 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             lettering::get_effective_category,
             lettering::get_lettering_settings,
             lettering::save_lettering_settings,
+            size_consistency::make_sizes_consistent,
             // WO-20 (one box per bubble) commands go here.
             boxes::get_box_settings,
             boxes::save_box_settings,

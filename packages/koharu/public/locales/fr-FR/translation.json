@@ -1306,5 +1306,24 @@
       "crying": "Pleurs / tremblements",
       "menacing": "Menaçant / sinistre"
     }
+  },
+  "sizeConsistency": {
+    "title": "Tailles de texte par catégorie",
+    "settingsHelp": "Conservez une proportion constante de la hauteur de page, quelle que soit la résolution du scan.",
+    "category": "Catégorie de lettrage",
+    "baseSize": "Taille de base (% de la hauteur de page)",
+    "baseHelp": "Laissez vide pour ajuster chaque bulle comme auparavant. Le texte peut être réduit jusqu’au minimum du contrôle qualité si nécessaire.",
+    "uncapped": "Adapter à chaque bulle",
+    "mayGrow": "Autoriser une taille supérieure à la base",
+    "previewScale": "{{size}} px sur une page de {{height}} px",
+    "preview": "Je me demande ce qui va se passer.",
+    "action": "Harmoniser les tailles",
+    "checkHelp": "Rapproche les dialogues à taille automatique de la médiane du chapitre lorsque l’écart dépasse 20 %, tant que le texte tient. Les tailles manuelles et par mot sont conservées. Chaque page modifiée correspond à une étape d’annulation.",
+    "scope": "Appliquer à",
+    "page": "Page actuelle",
+    "chapter": "Tout le chapitre",
+    "reason": "Dialogue : écart de plus de 20 % par rapport à la médiane du chapitre ({{median}} % de la hauteur de page).",
+    "noDialogue": "Aucun dialogue à taille automatique admissible n’a été trouvé.",
+    "skipped": "Blocs inchangés : {{count}} (mise en page indisponible ou aucune amélioration permettant au texte de tenir)."
   }
 }

@@ -531,126 +531,122 @@ fn changed_typography() -> Typography {
 }
 
 #[tokio::test]
-async fn translation_reset_clears_runs_manual_typography_and_warp_but_leaves_skipped_box_alone() {
-    let (mut project, [layer, skipped]) = fixture(true).await;
-    let original = changed_typography();
+async fn translation_reset_preserves_hand_sizes_and_their_existing_caps() {
+    let (mut project, [layer, word_sized]) = fixture(true).await;
+    let mut original = changed_typography();
+    koharu_renderer::set_auto_fit_size_limit(
+        &mut original,
+        Some(koharu_renderer::AutoFitSizeLimit {
+            maximum: 30.0,
+            minimum: 12.0,
+        }),
+    )
+    .unwrap();
     let patch = project
         .snapshot()
         .patch(|edit| {
-            for id in [layer, skipped] {
-                edit.set(id, &runs(6, 11))?;
-                edit.set(id, &original)?;
-                edit.set(
-                    id,
-                    &TextLayout {
-                        origin: Origin::User,
-                        kind: TextLayoutKind::Paragraph,
-                        angle_degrees: Some(15.0),
-                        warp: Some(TextWarp::Skew {
-                            x_degrees: 10.0,
-                            y_degrees: 2.0,
-                        }),
-                    },
-                )?;
-            }
-            Ok(())
+            edit.set(layer, &original)?;
+            edit.set(
+                word_sized,
+                &TextRuns {
+                    origin: Origin::User,
+                    runs: vec![StyleRun {
+                        start: 0,
+                        end: 3,
+                        style: RunStyle {
+                            size_scale: Some(1.3),
+                            ..Default::default()
+                        },
+                    }],
+                },
+            )
         })
         .unwrap();
     project.commit(patch).await.unwrap();
     let before = project.snapshot();
-    let stage = machine_translation(&mut project, &[layer]).await;
-    let styles = TextStyles {
-        default_style: TextStyle {
-            font: Some(FontPart {
-                preferred_font: Some("Default".into()),
-                font_weight: Some(400),
-                font_style: Some(FontStyle::Normal),
-            }),
-            size: Some(SizePart {
-                auto_fit: true,
-                size: Some(28.0),
-            }),
-            fill: Some([0, 0, 0, 255]),
-            outline: Some(OutlinePart {
-                stroke_width: Some(2.0),
-                stroke_color: Some([255; 4]),
-                stroke_method: Some(StrokeMethod::Contour),
-                stroke_position: None,
-                stroke_join: None,
-            }),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
+    let stage = machine_translation(&mut project, &[layer, word_sized]).await;
     let mut hinted = Vec::new();
-    let reset = reset_translation_styles(&mut project, &stage, &styles, false, |_, _, layers| {
-        hinted = layers.to_vec();
-        Ok(())
-    })
+    let reset = reset_translation_styles(
+        &mut project,
+        &stage,
+        &TextStyles::default(),
+        false,
+        |_, _, layers| {
+            hinted = layers.to_vec();
+            Ok(())
+        },
+    )
+    .await
+    .unwrap();
+    assert!(reset.is_none());
+    assert!(hinted.is_empty());
+    for id in [layer, word_sized] {
+        assert_eq!(
+            project.snapshot().component::<Typography>(id).unwrap(),
+            before.component::<Typography>(id).unwrap(),
+        );
+        assert_eq!(
+            project.snapshot().component::<TextRuns>(id).unwrap(),
+            before.component::<TextRuns>(id).unwrap(),
+        );
+    }
+}
+
+#[tokio::test]
+async fn automatic_translation_sizes_and_style_reset_undo_together() {
+    let (mut project, [layer, _]) = fixture(true).await;
+    let mut edit = project.snapshot().edit_as(generation());
+    edit.set(layer, &runs(0, 3)).unwrap();
+    edit.set(
+        layer,
+        &TextLayout {
+            origin: Origin::Generated(generation()),
+            kind: TextLayoutKind::Paragraph,
+            angle_degrees: Some(15.0),
+            warp: Some(TextWarp::Skew {
+                x_degrees: 10.0,
+                y_degrees: 2.0,
+            }),
+        },
+    )
+    .unwrap();
+    project.commit(edit.finish().unwrap()).await.unwrap();
+    let before = project.snapshot();
+    let stage = machine_translation(&mut project, &[layer]).await;
+    let reset = reset_translation_styles(
+        &mut project,
+        &stage,
+        &TextStyles::default(),
+        false,
+        |_, _, _| Ok(()),
+    )
     .await
     .unwrap()
     .unwrap();
     project.record_commit(&reset);
-    assert_eq!(hinted, vec![layer]);
-    assert!(
-        project
-            .snapshot()
-            .component::<TextRuns>(layer)
-            .unwrap()
-            .is_none()
-    );
-    let expected = EffectResolver::new(&project, &styles, false)
-        .unwrap()
-        .resolve(
-            &before,
-            layer,
-            &default_typography(Some(&original), &translation("new words"), false),
-        )
-        .unwrap();
-    let actual = project
-        .snapshot()
-        .component::<Typography>(layer)
-        .unwrap()
-        .unwrap();
-    assert_eq!(actual, expected);
-    assert_eq!(actual.preferred_font.as_deref(), Some("Default"));
-    assert_eq!(actual.size, Some(28.0));
-    assert!(actual.auto_fit);
-    assert!(actual.fill_gradient.is_none());
-    assert!(actual.line_spacing.is_none());
-    assert!(actual.letter_spacing.is_none());
-    assert!(actual.extensions.is_empty());
-    assert!(matches!(actual.origin, Origin::Generated(_)));
-    let layout = project
-        .snapshot()
-        .component::<TextLayout>(layer)
-        .unwrap()
-        .unwrap();
+    let snapshot = project.snapshot();
+    let typography = snapshot.component::<Typography>(layer).unwrap().unwrap();
+    assert!(koharu_renderer::auto_fit_size_limit(&typography).unwrap().is_some());
+    assert!(matches!(typography.origin, Origin::Generated(_)));
+    assert!(snapshot.component::<TextRuns>(layer).unwrap().is_none());
+    let layout = snapshot.component::<TextLayout>(layer).unwrap().unwrap();
     assert!(layout.warp.is_none());
     assert_eq!(layout.angle_degrees, Some(15.0));
-    assert_eq!(
-        project.snapshot().component::<TextRuns>(skipped).unwrap(),
-        before.component::<TextRuns>(skipped).unwrap()
-    );
-    assert_eq!(
-        project.snapshot().component::<Typography>(skipped).unwrap(),
-        before.component::<Typography>(skipped).unwrap()
-    );
-    assert_eq!(
-        project.snapshot().component::<TextLayout>(skipped).unwrap(),
-        before.component::<TextLayout>(skipped).unwrap()
-    );
+    assert_eq!(project.undo.len(), 1);
     project.undo().await.unwrap();
     assert_eq!(
-        project.snapshot().component::<TextRuns>(layer).unwrap(),
-        before.component::<TextRuns>(layer).unwrap()
+        project.snapshot().component::<Typography>(layer).unwrap(),
+        before.component::<Typography>(layer).unwrap(),
     );
     assert_eq!(
-        project.snapshot().component::<Typography>(layer).unwrap(),
-        Some(original)
+        project.snapshot().component::<TextRuns>(layer).unwrap(),
+        before.component::<TextRuns>(layer).unwrap(),
+    );
+    assert_eq!(
+        project.snapshot().component::<TextLayout>(layer).unwrap(),
+        before.component::<TextLayout>(layer).unwrap(),
     );
     assert_eq!(shown_text(&project.snapshot(), layer).unwrap(), "new words");
-    assert!(project.undo.is_empty());
 }
 
 #[tokio::test]
@@ -686,9 +682,18 @@ async fn new_translation_hints_can_write_runs_in_the_same_reset_commit() {
 }
 
 #[tokio::test]
-async fn unchanged_plain_box_adds_no_reset_commit_but_still_receives_the_hints_hook() {
+async fn repeated_plain_box_reset_is_idempotent_but_still_receives_the_hints_hook() {
     let (mut project, [layer, _]) = fixture(true).await;
     let stage = machine_translation(&mut project, &[layer]).await;
+    reset_translation_styles(
+        &mut project,
+        &stage,
+        &TextStyles::default(),
+        false,
+        |_, _, _| Ok(()),
+    )
+    .await
+    .unwrap();
     let revision = project.revision();
     let mut hinted = Vec::new();
     let result = reset_translation_styles(
@@ -726,12 +731,13 @@ async fn unchanged_plain_box_adds_no_reset_commit_but_still_receives_the_hints_h
 #[tokio::test]
 async fn default_reset_preserves_detected_paint_only_when_color_detection_is_enabled() {
     let (mut project, [layer, _]) = fixture(true).await;
-    let original = changed_typography();
-    let patch = project
-        .snapshot()
-        .patch(|edit| edit.set(layer, &original))
-        .unwrap();
-    project.commit(patch).await.unwrap();
+    let mut original = changed_typography();
+    original.origin = Origin::Generated(generation());
+    original.auto_fit = true;
+    original.size = None;
+    let mut edit = project.snapshot().edit_as(generation());
+    edit.set(layer, &original).unwrap();
+    project.commit(edit.finish().unwrap()).await.unwrap();
     let mut styles = TextStyles::default();
     styles.default_style.fill = Some([200; 4]);
     styles.default_style.outline = Some(OutlinePart {

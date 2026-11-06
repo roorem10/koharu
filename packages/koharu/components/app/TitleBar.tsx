@@ -13,6 +13,7 @@ import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
 import { RedetectPageMenuItem, RedetectPageDialog } from '@/components/boxes/PageBoxActions'
 import { PageJoinMenuItem } from '@/components/boxes/PageJoinMenuItem'
 import { useScriptFiles } from '@/components/files/ScriptImport'
+import { SizeConsistencyDialog } from '@/components/lettering/SizeConsistencyDialog'
 import { useCompareStore } from '@/components/qc/compare'
 import { BatchChaptersDialog } from '@/components/runs/BatchChaptersDialog'
 import {
@@ -57,6 +58,7 @@ export function TitleBar() {
   const toggleOriginal = useCompareStore((state) => state.toggle)
   const [batchOpen, setBatchOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [sizeConsistencyOpen, setSizeConsistencyOpen] = useState(false)
   const [redetectPage, setRedetectPage] = useState<string | null>(null)
   const scripts = useScriptFiles()
   const macOS = useMacOS()
@@ -254,8 +256,19 @@ export function TitleBar() {
               </MenubarItem>
               <RedetectPageMenuItem page={page?.id ?? null} onRedetect={setRedetectPage} />
               <PageJoinMenuItem page={page?.id ?? null} />
+              <MenubarItem
+                disabled={!project || pages.length === 0 || running}
+                onClick={() => setSizeConsistencyOpen(true)}
+              >
+                {t('sizeConsistency.action')}
+              </MenubarItem>
             </MenubarContent>
             <RedetectPageDialog page={redetectPage} onClose={() => setRedetectPage(null)} />
+            <SizeConsistencyDialog
+              open={sizeConsistencyOpen}
+              onOpenChange={setSizeConsistencyOpen}
+              page={page?.id ?? null}
+            />
           </MenubarMenu>
 
           <MenubarMenu>

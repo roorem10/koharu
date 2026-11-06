@@ -1293,5 +1293,24 @@
       "crying": "Ağlama / titreme",
       "menacing": "Tehditkâr / tekinsiz"
     }
+  },
+  "sizeConsistency": {
+    "title": "Kategoriye göre metin boyutları",
+    "settingsHelp": "Tarama çözünürlüğünden bağımsız olarak sayfa yüksekliğine oranla tutarlı bir metin boyutu kullanın.",
+    "category": "Yazı kategorisi",
+    "baseSize": "Temel boyut (sayfa yüksekliğinin %’si)",
+    "baseHelp": "Her balona eskisi gibi sığdırmak için boş bırakın. Gerektiğinde metin, kalite denetiminin en küçük boyutuna kadar küçülebilir.",
+    "uncapped": "Her balona sığdır",
+    "mayGrow": "Temel boyutun üzerinde büyüyebilir",
+    "previewScale": "{{height}} piksel sayfada {{size}} piksel",
+    "preview": "Acaba sonra ne olacak?",
+    "action": "Boyutları tutarlı yap",
+    "checkHelp": "Otomatik sığdırılan diyaloglar bölüm ortancasından %20’den fazla farklıysa, metin sığdığı ölçüde boyutlarını ortancaya yaklaştırır. Elle ayarlanan ve sözcük düzeyindeki boyutlar korunur. Değiştirilen her sayfa tek adımda geri alınır.",
+    "scope": "Uygulama kapsamı",
+    "page": "Geçerli sayfa",
+    "chapter": "Tüm bölüm",
+    "reason": "Diyalog: bölüm ortancasından (sayfa yüksekliğinin %{{median}}’ı) %20’den fazla farklı.",
+    "noDialogue": "Uygun otomatik sığdırılan diyalog bulunamadı.",
+    "skipped": "{{count}} kutu değişmedi: düzen kullanılamıyor veya metin sığacak şekilde iyileştirilemiyor."
   }
 }
