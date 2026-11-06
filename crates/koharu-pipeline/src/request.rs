@@ -1,6 +1,9 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    collections::BTreeSet,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use anyhow::{Result, bail};
@@ -105,6 +108,10 @@ pub struct Request {
     /// Detect pages again even when they already have detected text (WO-20's "Detect again").
     /// Generated regions are replaced; hand-made boxes are kept.
     pub redetect: bool,
+    /// Preserve completed outputs when a recipe splits a resumable run into stage passes.
+    pub resume: bool,
+    /// Generated results whose observed inputs changed since the recipe's last run.
+    pub refresh: BTreeSet<(Stage, EntityId)>,
     pub policy: RunPolicy,
 }
 
@@ -118,6 +125,8 @@ impl Default for Request {
             inpainting_mask: None,
             translation_hints: Arc::default(),
             redetect: false,
+            resume: false,
+            refresh: BTreeSet::new(),
             policy: RunPolicy::default(),
         }
     }

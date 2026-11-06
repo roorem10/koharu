@@ -18,6 +18,43 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
+    /// Uses the same stage-owned decisions as execution, without loading a model.
+    /// Call again after prerequisites commit: detection and OCR can create work.
+    pub fn pending(
+        &self,
+        snapshot: &Snapshot,
+        request: &Request,
+    ) -> Result<Vec<(crate::Stage, koharu_scene::EntityId)>> {
+        let stages = request.operation.stages()?;
+        let scope = crate::scope::NormalizedScope::new(snapshot, &request.scope, &stages)?;
+        let resume = request.resume
+            || matches!(request.operation, crate::Operation::Full | crate::Operation::Through { .. });
+        let runner = self.current.load_full();
+        let mut pending = Vec::new();
+        for &page in scope.pages() {
+            for &stage in &stages {
+                let input = crate::stages::StageInput::new(
+                    snapshot.clone(),
+                    page,
+                    scope.entities(),
+                    scope.region(page),
+                    Arc::new(crate::images::ImageCache::default()),
+                    request.inpainting_mask.as_ref()
+                        .filter(|mask| stage == crate::Stage::Inpainting && mask.page == page)
+                        .cloned(),
+                )
+                .with_translation_hints(request.translation_hints.clone())
+                .with_redetect(request.redetect)
+                .with_refresh(request.refresh.contains(&(stage, page)))
+                .with_resume(resume && !request.refresh.contains(&(stage, page)));
+                if !runner.skip(stage, &input)? {
+                    pending.push((stage, page));
+                }
+            }
+        }
+        Ok(pending)
+    }
+
     pub fn load(device: koharu_ml::Device) -> Result<Self> {
         Self::from_config(
             PipelineConfig::load()?,
@@ -119,6 +156,96 @@ impl Pipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn split_recipe_passes_resume_and_refresh_only_generated_outputs() {
+        use koharu_scene::{
+            At, Authored, Generation, Origin, PageDraft, ProducerId, SourceText, TextLayout,
+            TextLayoutKind, Translation,
+        };
+        let pipeline = Pipeline::from_config(
+            Config::memory(PipelineConfig::default()),
+            Config::memory(koharu_translator::ProvidersConfig::default()),
+            koharu_ml::Device::cpu(),
+        )
+        .unwrap();
+        let mut session = koharu_scene::Session::memory().await.unwrap();
+        let generated = Generation::new(ProducerId::new("dev.koharu.test").unwrap());
+        let mut edit = session.snapshot().edit_as(generated.clone());
+        let page = edit
+            .add_page(PageDraft::new("one", 100.0, 100.0), At::End)
+            .unwrap();
+        let content = edit.add_text_content(page, At::End).unwrap();
+        edit.set(
+            content,
+            &SourceText {
+                text: Authored::generated("source".into(), generated.clone()),
+                language: None,
+            },
+        )
+        .unwrap();
+        edit.set(
+            content,
+            &Translation {
+                text: Authored::generated("done".into(), generated.clone()),
+                language: None,
+            },
+        )
+        .unwrap();
+        edit.add_text_layer(
+            page,
+            At::End,
+            content,
+            &TextLayout {
+                origin: Origin::Generated(generated),
+                kind: TextLayoutKind::Paragraph,
+                angle_degrees: None,
+                warp: None,
+            },
+        )
+        .unwrap();
+        session.commit(edit.finish().unwrap()).await.unwrap();
+        let mut request = Request {
+            operation: crate::Operation::Stages {
+                stages: vec![crate::Stage::Ocr, crate::Stage::Translation, crate::Stage::Inpainting],
+            },
+            resume: true,
+            ..Default::default()
+        };
+        assert!(
+            pipeline.pending(&session.snapshot(), &request).unwrap().is_empty()
+        );
+        request.refresh.insert((crate::Stage::Translation, page));
+        assert_eq!(
+            pipeline.pending(&session.snapshot(), &request).unwrap(),
+            vec![(crate::Stage::Translation, page)]
+        );
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                edit.set(content, &Translation {
+                    text: Authored::user("".into()),
+                    language: None,
+                })
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        assert!(
+            pipeline.pending(&session.snapshot(), &request).unwrap().is_empty()
+        );
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                edit.remove::<SourceText>(content)?;
+                edit.remove::<Translation>(content)
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        request.operation = crate::Operation::Only { stage: crate::Stage::Translation };
+        assert!(
+            pipeline.pending(&session.snapshot(), &request).unwrap().is_empty()
+        );
+    }
 
     #[tokio::test]
     async fn unloading_refuses_an_active_execution_and_publishes_a_fresh_sample() {

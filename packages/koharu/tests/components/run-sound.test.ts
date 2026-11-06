@@ -17,6 +17,7 @@ function job(overrides: Partial<Job> = {}): Job {
     project: 'chapter',
     operation: { operation: 'full' },
     finish_sound: true,
+    auto_run: null,
     ...overrides,
   }
 }

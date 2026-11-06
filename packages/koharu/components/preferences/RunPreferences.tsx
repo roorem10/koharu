@@ -11,7 +11,7 @@ import {
 import type { SavedRunSettings } from '@/components/runs/data'
 import { presetLabel, useRunSettings, useSaveRunSettings } from '@/components/runs/data'
 import { pipelineStages } from '@/lib/store'
-import { type OnPageFailure, type RunOrder } from '@koharu/bridge/protocol'
+import { type OnPageFailure, type QualityLevel, type RunOrder } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 import { Checkbox } from '@koharu/ui/components/checkbox'
 import { Input } from '@koharu/ui/components/input'
@@ -38,6 +38,47 @@ export function RunPreferences() {
         </p>
       ) : (
         <fieldset disabled={save.isPending}>
+          <PreferenceRow title={t('autoRun.quality')} description={t('autoRun.qualityHelp')}>
+            <Select
+              value={value.auto_run_quality}
+              onValueChange={(quality) =>
+                quality && update({ ...value, auto_run_quality: quality as QualityLevel })
+              }
+            >
+              <SelectTrigger className='w-full' aria-label={t('autoRun.quality')}>
+                <SelectValue>{t(`autoRun.qualities.${value.auto_run_quality}`)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {(['fast', 'balanced', 'best'] as const).map((quality) => (
+                  <SelectItem key={quality} value={quality}>
+                    {t(`autoRun.qualities.${quality}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </PreferenceRow>
+          <PreferenceRow
+            title={t('autoRun.steps.fix_levels')}
+            description={t('autoRun.levelsHelp')}
+          >
+            <Checkbox
+              aria-label={t('autoRun.steps.fix_levels')}
+              checked={value.auto_run_fix_levels}
+              onCheckedChange={(checked) =>
+                update({ ...value, auto_run_fix_levels: checked === true })
+              }
+            />
+          </PreferenceRow>
+          <PreferenceRow
+            title={t('autoRun.steps.export')}
+            description={t('autoRun.reasons.export_not_configured')}
+          >
+            <Checkbox
+              aria-label={t('autoRun.steps.export')}
+              checked={value.auto_run_export}
+              disabled
+            />
+          </PreferenceRow>
           <PreferenceRow title={t('runs.retries')} description={t('runs.retriesHelp')}>
             <NumberField
               label={t('runs.retries')}

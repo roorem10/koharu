@@ -164,6 +164,35 @@ fn apply_hints_with(
 ) -> koharu_scene::Result<()> {
     for &layer in layers {
         let Some(hints) = snapshot.component::<EmphasisHints>(layer)? else {
+            // Hints are consumed when translation lands. A settings-only refresh
+            // keeps those generated ranges and resolves their category style again.
+            if let Some(previous) = snapshot.component::<TextRuns>(layer)?
+                && matches!(&previous.origin, Origin::Generated(owner)
+                    if owner.producer.as_str() == "dev.koharu.pipeline.translation")
+            {
+                let mut restyled = Vec::new();
+                if settings.enabled_for_ai {
+                    let style = style(layer)?;
+                    let length = shown_text(snapshot, layer)?.chars().count() as u32;
+                    for run in previous.runs {
+                        let (start, end) = (run.start.min(length), run.end.min(length));
+                        if start < end {
+                            restyled = runs::patched(&restyled, start, end, Some(&style));
+                        }
+                    }
+                }
+                if restyled.is_empty() {
+                    edit.remove::<TextRuns>(layer)?;
+                } else {
+                    edit.set_generated_text_runs(
+                        layer,
+                        &TextRuns {
+                            origin: previous.origin,
+                            runs: restyled,
+                        },
+                    )?;
+                }
+            }
             continue;
         };
         if settings.enabled_for_ai && !hints.words.is_empty() {
@@ -176,7 +205,7 @@ fn apply_hints_with(
                     runs = runs::patched(&runs, start, end, Some(&style));
                 }
                 if !runs.is_empty() {
-                    edit.set(
+                    edit.set_generated_text_runs(
                         layer,
                         &TextRuns {
                             origin: hints.origin,

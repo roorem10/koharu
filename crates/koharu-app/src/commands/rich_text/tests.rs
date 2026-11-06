@@ -583,7 +583,7 @@ async fn translation_reset_clears_runs_manual_typography_and_warp_but_leaves_ski
         ..Default::default()
     };
     let mut hinted = Vec::new();
-    let reset = reset_translation_styles(&mut project, &stage, &styles, false, |_, _, layers| {
+    let reset = reset_translation_styles(&mut project, &stage, &styles, false, false, |_, _, layers| {
         hinted = layers.to_vec();
         Ok(())
     })
@@ -666,6 +666,7 @@ async fn new_translation_hints_can_write_runs_in_the_same_reset_commit() {
         &stage,
         &TextStyles::default(),
         false,
+        false,
         |edit, snapshot, layers| {
             assert_eq!(layers, &[layer]);
             assert_eq!(shown_text(snapshot, layer)?, "new words");
@@ -686,6 +687,79 @@ async fn new_translation_hints_can_write_runs_in_the_same_reset_commit() {
 }
 
 #[tokio::test]
+async fn automatic_typesetting_keeps_manual_styles_and_explicitly_cleared_runs() {
+    let (mut project, [manual, automatic]) = fixture(true).await;
+    let original = changed_typography();
+    let patch = project
+        .snapshot()
+        .patch(|edit| {
+            edit.set(manual, &original)?;
+            edit.set(manual, &runs(0, 3))?;
+            edit.set(manual, &TextLayout {
+                origin: Origin::User,
+                kind: TextLayoutKind::Paragraph,
+                angle_degrees: Some(15.0),
+                warp: Some(TextWarp::Skew { x_degrees: 10.0, y_degrees: 2.0 }),
+            })
+        })
+        .unwrap();
+    project.commit(patch).await.unwrap();
+    let before = project.snapshot();
+    let stage = machine_translation(&mut project, &[manual, automatic]).await;
+    reset_translation_styles(
+        &mut project,
+        &stage,
+        &TextStyles::default(),
+        false,
+        true,
+        |edit, _, layers| {
+            assert_eq!(layers, &[automatic]);
+            edit.set(automatic, &runs(0, 3))
+        },
+    )
+    .await
+    .unwrap();
+    let after = project.snapshot();
+    assert_eq!(
+        after.component::<Typography>(manual).unwrap(),
+        before.component::<Typography>(manual).unwrap()
+    );
+    assert_eq!(
+        after.component::<TextRuns>(manual).unwrap(),
+        before.component::<TextRuns>(manual).unwrap()
+    );
+    assert_eq!(
+        after.component::<TextLayout>(manual).unwrap(),
+        before.component::<TextLayout>(manual).unwrap()
+    );
+    project.clear_word_styles(&[automatic], None).await.unwrap();
+    assert!(
+        project.snapshot().component::<TextRuns>(automatic).unwrap().is_none()
+    );
+    assert!(has_manual_style(&project.snapshot(), automatic).unwrap());
+    assert!(
+        !auto_typeset_needed(&project.snapshot(), &[project.active_page().unwrap()], true).unwrap()
+    );
+}
+
+#[tokio::test]
+async fn automatic_typesetting_fills_missing_styles_and_refreshes_generated_styles() {
+    let (mut project, [layer, _]) = fixture(true).await;
+    let page = project.active_page().unwrap();
+    assert!(!auto_typeset_needed(&project.snapshot(), &[page], false).unwrap());
+    assert!(auto_typeset_needed(&project.snapshot(), &[page], true).unwrap());
+    let patch = project
+        .snapshot()
+        .patch(|edit| edit.remove::<Typography>(layer))
+        .unwrap();
+    project.commit(patch).await.unwrap();
+    assert_eq!(
+        automatic_layers(&project.snapshot(), &[page], false).unwrap(),
+        vec![layer]
+    );
+}
+
+#[tokio::test]
 async fn unchanged_plain_box_adds_no_reset_commit_but_still_receives_the_hints_hook() {
     let (mut project, [layer, _]) = fixture(true).await;
     let stage = machine_translation(&mut project, &[layer]).await;
@@ -695,6 +769,7 @@ async fn unchanged_plain_box_adds_no_reset_commit_but_still_receives_the_hints_h
         &mut project,
         &stage,
         &TextStyles::default(),
+        false,
         false,
         |_, _, layers| {
             hinted = layers.to_vec();
@@ -716,7 +791,7 @@ async fn unchanged_plain_box_adds_no_reset_commit_but_still_receives_the_hints_h
             .is_empty()
     );
     assert!(
-        after_translation(&mut project, &unrelated)
+        after_translation(&mut project, &unrelated, false)
             .await
             .unwrap()
             .is_none()
@@ -742,7 +817,7 @@ async fn default_reset_preserves_detected_paint_only_when_color_detection_is_ena
         stroke_join: None,
     });
     let stage = machine_translation(&mut project, &[layer]).await;
-    reset_translation_styles(&mut project, &stage, &styles, true, |_, _, _| Ok(()))
+    reset_translation_styles(&mut project, &stage, &styles, true, false, |_, _, _| Ok(()))
         .await
         .unwrap();
     let actual = project
@@ -786,7 +861,7 @@ async fn translation_reset_uses_the_lettering_category_default() {
         size: Some(18.0),
     });
     let stage = machine_translation(&mut project, &[layer]).await;
-    reset_translation_styles(&mut project, &stage, &styles, false, |_, _, _| Ok(()))
+    reset_translation_styles(&mut project, &stage, &styles, false, false, |_, _, _| Ok(()))
         .await
         .unwrap()
         .unwrap();

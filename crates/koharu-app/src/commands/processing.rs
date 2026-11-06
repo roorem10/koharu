@@ -53,6 +53,7 @@ pub struct Job {
     pub project: Option<String>,
     pub operation: Option<koharu_pipeline::Operation>,
     pub finish_sound: bool,
+    pub auto_run: Option<super::auto_run::AutoRunProgress>,
 }
 
 #[derive(Clone, Debug, Serialize, Type)]
@@ -76,6 +77,7 @@ pub(crate) struct RunRecord {
     pub(crate) project: koharu_scene::ProjectId,
     pub(crate) operation: koharu_pipeline::Operation,
     pub(crate) failed: Vec<koharu_scene::EntityId>,
+    pub(crate) auto_run: Option<super::auto_run::QualityLevel>,
 }
 
 #[derive(Default)]
@@ -114,6 +116,84 @@ pub(crate) async fn process(
     .await?)
 }
 
+pub(crate) struct PipelineCommitter {
+    handle: AppHandle<CefRuntime>,
+    project: koharu_scene::ProjectId,
+    preserve_manual: bool,
+    observed: Option<(koharu_pipeline::PipelineConfig, String, serde_json::Value)>,
+}
+
+#[async_trait::async_trait]
+impl Committer for PipelineCommitter {
+    async fn commit(&mut self, output: StageOutput) -> Result<Snapshot> {
+        let (commit, page) = {
+            let projects = self.handle.state::<CurrentProject>();
+            let mut projects = projects.project.lock().await;
+            let project = projects.as_mut().context("no project is open")?;
+            anyhow::ensure!(
+                project.snapshot().project_id() == self.project,
+                "the project changed during processing"
+            );
+            if let Some((config, hints, hand_context)) = &self.observed {
+                let current = koharu_pipeline::PipelineConfig::load()?.read()?.clone();
+                anyhow::ensure!(
+                    &current == config,
+                    "processing settings changed during Auto run; run again"
+                );
+                if output.stage == koharu_pipeline::Stage::Translation {
+                    let current = super::context::translation_hints(
+                        &project.load_context()?,
+                        &project.snapshot(),
+                    )?;
+                    anyhow::ensure!(
+                        &format!("{current:?}") == hints,
+                        "chapter context changed during translation; run again"
+                    );
+                }
+                if output.stage == koharu_pipeline::Stage::Detection {
+                    anyhow::ensure!(
+                        &super::auto_run::freshness::hand_context(&project.load_context()?) == hand_context,
+                        "hand labels changed during detection; run again"
+                    );
+                }
+            }
+            let Some(mut commit) = project.commit_rebased(output.patch).await? else {
+                return Ok(project.snapshot());
+            };
+            project.record_commit(&commit);
+            if output.stage == koharu_pipeline::Stage::Translation {
+                // WO-11A: a new translation wipes word styles and resets
+                // the box style (decision 4).
+                if let Some(reset) = super::rich_text::after_translation(
+                    project,
+                    &commit,
+                    self.preserve_manual,
+                )
+                .await?
+                {
+                    project.record_commit(&reset);
+                    commit = reset;
+                }
+                super::context::refresh_flags(project)?;
+            }
+            if self.preserve_manual {
+                super::auto_run::freshness::remember_stage(project, output.page, output.stage)?;
+                if output.stage == koharu_pipeline::Stage::Translation {
+                    super::auto_run::freshness::remember_typeset(project, &[output.page], false)?;
+                }
+            }
+            let page = project.active_page();
+            (commit, page)
+        };
+        let snapshot = commit.snapshot.clone();
+        let desktop = self.handle.state::<Desktop>();
+        desktop.synchronize(&commit.snapshot, page, &commit).await?;
+        let canvas = desktop.canvas_state();
+        self.handle.state::<CanvasChannel>().channel.publish(canvas);
+        Ok(snapshot)
+    }
+}
+
 /// Starts a pipeline job, as the Run menu does. `redetect` makes detection run again on pages
 /// that already have detected text (WO-20's "Detect again"). WO-14 owns the body; the
 /// signature is shared.
@@ -135,6 +215,7 @@ pub(crate) async fn start_job(
         processing,
         job_channel,
         false,
+        None,
     )
     .await
 }
@@ -152,6 +233,31 @@ pub(crate) async fn start_batch_job(
         &handle.state::<Processing>(),
         &handle.state::<JobChannel>(),
         true,
+        None,
+    )
+    .await
+}
+
+pub(crate) async fn start_auto_job(
+    handle: AppHandle<CefRuntime>,
+    scope: koharu_pipeline::Scope,
+    quality: super::auto_run::QualityLevel,
+    batch: bool,
+) -> Result<JobId> {
+    // Validate the requested page scope before publishing a running job.
+    super::auto_run::preview_auto_run(scope.clone(), quality, handle.clone())
+        .await
+        .map_err(|error| anyhow::anyhow!("{error:?}"))?;
+    start_job_inner(
+        handle.clone(),
+        scope,
+        koharu_pipeline::Operation::Full,
+        false,
+        &handle.state::<CurrentProject>(),
+        &handle.state::<Processing>(),
+        &handle.state::<JobChannel>(),
+        batch,
+        Some(quality),
     )
     .await
 }
@@ -166,6 +272,7 @@ async fn start_job_inner(
     processing: &Processing,
     job_channel: &JobChannel,
     batch: bool,
+    auto_run: Option<super::auto_run::QualityLevel>,
 ) -> Result<JobId> {
     anyhow::ensure!(
         batch || !handle.state::<super::runs::BatchState>().active(),
@@ -206,6 +313,7 @@ async fn start_job_inner(
         project: Some(project_name),
         operation: Some(operation.clone()),
         finish_sound: settings.finish_sound && !batch,
+        auto_run: auto_run.map(|_| Default::default()),
     };
     processing.runs.lock().insert(
         id,
@@ -213,6 +321,7 @@ async fn start_job_inner(
             project: run_project,
             operation: operation.clone(),
             failed: Vec::new(),
+            auto_run,
         },
     );
     processing.jobs.lock().insert(id, job.clone());
@@ -220,7 +329,11 @@ async fn start_job_inner(
 
     let pipeline = handle.state::<koharu_pipeline::Pipeline>().inner().clone();
     let task_handle = handle.clone();
-    let inpainting_mask = processing.inpainting_mask.lock().take();
+    let inpainting_mask = if auto_run.is_some() {
+        None
+    } else {
+        processing.inpainting_mask.lock().take()
+    };
     drop(tokio::spawn(async move {
         let progress = Arc::new(Mutex::new((0_usize, 0_usize)));
         let progress_handle = task_handle.clone();
@@ -233,6 +346,8 @@ async fn start_job_inner(
             translation_hints,
             redetect,
             policy: settings.policy(),
+            resume: auto_run.is_some(),
+            refresh: Default::default(),
         };
         request.progress = Some(Arc::new(move |event| {
             let update = match event {
@@ -302,6 +417,9 @@ async fn start_job_inner(
                         jobs.get_mut(&id).map(|job| {
                             job.page = Some(page);
                             job.stage = Some(stage);
+                            if let Some(auto) = &mut job.auto_run {
+                                auto.step = Some(super::auto_run::AutoRunStepId::from_stage(stage));
+                            }
                             job.retry = Some(RetryProgress { attempt, attempts });
                             job.clone()
                         })
@@ -323,6 +441,9 @@ async fn start_job_inner(
                         job.total = total;
                         job.page = page;
                         job.stage = stage;
+                        if let (Some(auto), Some(stage)) = (&mut job.auto_run, stage) {
+                            auto.step = Some(super::auto_run::AutoRunStepId::from_stage(stage));
+                        }
                         job.model = model;
                         job.clone()
                     })
@@ -333,57 +454,18 @@ async fn start_job_inner(
             }
         }));
 
-        struct PipelineCommitter {
-            handle: AppHandle<CefRuntime>,
-            project: koharu_scene::ProjectId,
-        }
-
-        #[async_trait::async_trait]
-        impl Committer for PipelineCommitter {
-            async fn commit(&mut self, output: StageOutput) -> Result<Snapshot> {
-                let (commit, page) = {
-                    let projects = self.handle.state::<CurrentProject>();
-                    let mut projects = projects.project.lock().await;
-                    let project = projects.as_mut().context("no project is open")?;
-                    anyhow::ensure!(
-                        project.snapshot().project_id() == self.project,
-                        "the project changed during processing"
-                    );
-                    let Some(mut commit) = project.commit_rebased(output.patch).await? else {
-                        return Ok(project.snapshot());
-                    };
-                    project.record_commit(&commit);
-                    if output.stage == koharu_pipeline::Stage::Translation {
-                        // WO-11A: a new translation wipes word styles and resets
-                        // the box style (decision 4).
-                        if let Some(reset) =
-                            super::rich_text::after_translation(project, &commit).await?
-                        {
-                            project.record_commit(&reset);
-                            commit = reset;
-                        }
-                        super::context::refresh_flags(project)?;
-                    }
-                    let page = project.active_page();
-                    (commit, page)
-                };
-                let snapshot = commit.snapshot.clone();
-                let desktop = self.handle.state::<Desktop>();
-                desktop.synchronize(&commit.snapshot, page, &commit).await?;
-                let canvas = desktop.canvas_state();
-                self.handle.state::<CanvasChannel>().channel.publish(canvas);
-                Ok(snapshot)
-            }
-        }
-
         let mut committer = PipelineCommitter {
             handle: task_handle.clone(),
             project: run_project,
+            preserve_manual: auto_run.is_some(),
+            observed: None,
         };
         // A run that finds text and translates is split around Read chapter, so the
         // reader sees the OCR lines and can label them (#55). Other runs read first
         // (a no-op when there's nothing to read) and keep one overlapped pass.
-        let split = if super::context::operation_translates(&request.operation) {
+        let split = if auto_run.is_none()
+            && super::context::operation_translates(&request.operation)
+        {
             match super::context::split_for_reading(&request.operation) {
                 Some(parts) => {
                     match super::context::wants_auto_read(&task_handle, &request.scope).await {
@@ -401,6 +483,19 @@ async fn start_job_inner(
             None
         };
         let result: Result<koharu_pipeline::Report> = async {
+            if let Some(quality) = auto_run {
+                return super::auto_run::execute(
+                    &task_handle,
+                    &pipeline,
+                    run_project,
+                    request,
+                    &mut committer,
+                    id,
+                    quality,
+                    &settings,
+                )
+                .await;
+            }
             let mut first_report = None;
             if let Some((finding, rest)) = split {
                 let finding_request = koharu_pipeline::Request {
@@ -462,7 +557,13 @@ async fn start_job_inner(
                     JobState::Stopped
                 } else if error.is_some() {
                     JobState::Failed
-                } else if job.failures.is_empty() {
+                } else if job.failures.is_empty()
+                    && job
+                        .auto_run
+                        .as_ref()
+                        .and_then(|auto| auto.summary.as_ref())
+                        .is_none_or(|summary| summary.failures == 0)
+                {
                     JobState::Finished
                 } else {
                     JobState::FinishedWithProblems
@@ -479,12 +580,12 @@ async fn start_job_inner(
 }
 
 /// Runs one pipeline pass on the current snapshot with fresh translation hints.
-async fn run_pass(
+pub(crate) async fn run_pass(
     handle: &AppHandle<CefRuntime>,
     pipeline: &koharu_pipeline::Pipeline,
     run_project: koharu_scene::ProjectId,
     mut request: koharu_pipeline::Request,
-    committer: &mut (dyn Committer + Send),
+    committer: &mut PipelineCommitter,
 ) -> Result<koharu_pipeline::Report> {
     let snapshot = {
         let projects = handle.state::<CurrentProject>();
@@ -499,6 +600,13 @@ async fn run_pass(
             &project.load_context()?,
             &snapshot,
         )?);
+        if committer.preserve_manual {
+            committer.observed = Some((
+                koharu_pipeline::PipelineConfig::load()?.read()?.clone(),
+                format!("{:?}", request.translation_hints),
+                super::auto_run::freshness::hand_context(&project.load_context()?),
+            ));
+        }
         snapshot
     };
     pipeline

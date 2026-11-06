@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{StageInput, StageProcessor, finish, generation};
+use super::{StageInput, StageProcessor, finish, generation, needs_text};
 use crate::{ModelCell, OcrModel, scope::geometry_extents};
 use anyhow::{Context as _, Result, anyhow, bail};
 use async_trait::async_trait;
@@ -47,16 +47,10 @@ impl StageProcessor for Processor {
     }
 
     fn skip(&self, input: &StageInput) -> Result<bool> {
-        if !input.resume {
-            return Ok(false);
-        }
         if let Some(group) = input.scene.page(input.page)?.text_group()? {
             for layer in group.text_layers()? {
                 if input.contains_entity(layer.id())?
-                    && !layer.content()?.source()?.is_some_and(|source| {
-                        !source.text.value.trim().is_empty()
-                            || matches!(source.text.origin, Origin::User)
-                    })
+                    && needs_source(layer.content()?.source()?.as_ref(), input.resume)
                 {
                     return Ok(false);
                 }
@@ -162,10 +156,7 @@ fn collect_targets(input: &StageInput, source: &DynamicImage) -> Result<Vec<OcrT
     let mut targets = Vec::new();
     let mut seen = HashSet::new();
     let can_read = |previous: &Option<SourceText>| {
-        !previous.as_ref().is_some_and(|value| {
-            matches!(value.text.origin, Origin::User)
-                || (input.resume && !value.text.value.trim().is_empty())
-        })
+        needs_source(previous.as_ref(), input.resume)
     };
     for entity in input.scene.descendants(input.page)? {
         let region = entity.id();
@@ -227,6 +218,17 @@ fn collect_targets(input: &StageInput, source: &DynamicImage) -> Result<Vec<OcrT
         }
     }
     Ok(targets)
+}
+
+fn needs_source(previous: Option<&SourceText>, resume: bool) -> bool {
+    // An empty recognized result is complete; a newly drawn box's empty OCR
+    // placeholder has no model and still needs its first recognition.
+    if resume && previous.is_some_and(|source| {
+        matches!(&source.text.origin, Origin::Generated(generated) if generated.model.is_some())
+    }) {
+        return false;
+    }
+    needs_text(previous.map(|source| &source.text), resume)
 }
 
 fn ocr_patch(
@@ -358,6 +360,23 @@ fn crop(source: &DynamicImage, geometry: &Geometry) -> Result<DynamicImage> {
 mod tests {
     use super::*;
     use koharu_scene::{At, PageDraft, Session, TextLayoutKind, Translation};
+
+    #[test]
+    fn completed_empty_ocr_is_current_but_an_unread_placeholder_is_not() {
+        let mut generated = generation(PRODUCER, "test").unwrap();
+        let mut source = SourceText {
+            text: Authored::generated(String::new(), generated.clone()),
+            language: None,
+        };
+        assert!(!needs_source(Some(&source), true));
+        assert!(needs_source(Some(&source), false));
+        generated.model = None;
+        source.text.origin = Origin::Generated(generated);
+        assert!(needs_source(Some(&source), true));
+        source.text.origin = Origin::User;
+        assert!(!needs_source(Some(&source), true));
+        assert!(!needs_source(Some(&source), false));
+    }
 
     async fn manual_boxes() -> (Session, EntityId, Vec<(EntityId, EntityId)>) {
         let mut session = Session::memory().await.unwrap();

@@ -1293,5 +1293,50 @@
       "crying": "Ağlama / titreme",
       "menacing": "Tehditkâr / tekinsiz"
     }
+  },
+  "autoRun": {
+    "title": "Otomatik çalıştır",
+    "button": "Otomatik çalıştır · {{quality}}",
+    "confirm": "Başlamadan önce bu bölümün adımlarını gözden geçirin. Elle yapılan düzenlemeler korunur.",
+    "start": "Otomatik çalıştırmayı başlat",
+    "quality": "Otomatik çalıştırma kalitesi",
+    "qualityHelp": "Hızlı, çeviri dışında ek dil modeli isteği yapmaz. Dengeli, bölüm okumayı ekler. En iyi şu an Dengeli ile aynıdır.",
+    "levelsHelp": "Gerektiğinde algılamadan önce sayfa seviyelerini düzeltir. Varsayılan olarak kapalıdır.",
+    "visionYes": "Okuma modeli sayfa görüntülerini görebiliyor.",
+    "visionNo": "Okuma modeli sayfa görüntülerini göremiyor.",
+    "estimate": "{{pages}} sayfa · yaklaşık {{requests}} model isteği (yeniden denemelerden önce; yerel algılama, OCR ve temizleme hariç).",
+    "summary": "{{pages}} sayfa · {{failures}} hata · {{seconds}} sn",
+    "qualities": {
+      "fast": "Hızlı",
+      "balanced": "Dengeli",
+      "best": "En iyi"
+    },
+    "steps": {
+      "fix_levels": "Sayfa seviyelerini düzelt",
+      "detection": "Metni algıla ve aynı balondaki kutuları birleştir",
+      "ocr": "OCR",
+      "read_chapter": "Bölümü oku",
+      "translation": "Bağlamla çevir",
+      "cleanup": "Temizle",
+      "typeset": "Dizgi yap",
+      "qc": "Kalite kontrolü",
+      "export": "Dışa aktar"
+    },
+    "status": {
+      "ran": "Çalıştırıldı",
+      "skipped": "Atlandı",
+      "failed": "Başarısız"
+    },
+    "reasons": {
+      "disabled": "Ayarlarda kapalı",
+      "quality": "Bu kalite düzeyine dahil değil",
+      "no_series": "Bağlı seri yok",
+      "no_vision": "Okuma modeli görüntüleri göremiyor",
+      "up_to_date": "Zaten güncel",
+      "no_source": "Kaynak metin yok",
+      "hand_edited": "Elle yapılan düzenlemeler korundu",
+      "prerequisite_failed": "Gerekli önceki adım başarısız oldu",
+      "export_not_configured": "Otomatik dışa aktarma kullanılamıyor: biçim ve hedefi kaydetme ayarları henüz uygulanmadı."
+    }
   }
 }

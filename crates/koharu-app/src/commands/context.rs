@@ -7,6 +7,7 @@ pub(crate) mod lines;
 pub(crate) mod reading;
 pub(crate) mod series;
 pub(crate) mod settings;
+pub(crate) mod undo;
 
 pub(crate) use lines::refresh_flags;
 pub(crate) use reading::{auto_read, wants_auto_read};

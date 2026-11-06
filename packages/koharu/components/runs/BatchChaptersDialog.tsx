@@ -1,14 +1,21 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { Channel } from '@tauri-apps/api/core'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { AutoRunPreviewContent } from '@/components/runs/AutoRun'
 import { presetLabel, useRunSettings } from '@/components/runs/data'
 import { playFinishSound, prepareFinishSound } from '@/components/runs/sound'
 import { call } from '@/lib/backend'
 import { pageKey, pagesKey, projectKey, refresh, useProject } from '@/lib/queries'
-import { commands, type BatchPlan, type BatchProgress } from '@koharu/bridge/protocol'
+import {
+  commands,
+  type BatchPlan,
+  type BatchProgress,
+  type BatchRecipe,
+} from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 import { Checkbox } from '@koharu/ui/components/checkbox'
 import {
@@ -47,6 +54,17 @@ export function BatchChaptersDialog({
   const [stopping, setStopping] = useState(false)
   const channel = useRef<Channel<BatchProgress> | null>(null)
   const running = busy || !!progress?.running
+  const quality = settings.data?.auto_run_quality ?? 'balanced'
+  const recipe: BatchRecipe =
+    preset === 'auto_run'
+      ? { recipe: 'auto_run', quality }
+      : { recipe: 'preset', preset: Number(preset) }
+  const autoPreview = useQuery({
+    queryKey: ['batch-auto-run-preview', plan?.id, selected, settings.data],
+    queryFn: () => call(commands.previewBatchAutoRun, plan!.id, selected, quality),
+    enabled: confirmClose && preset === 'auto_run' && !!plan,
+    staleTime: 0,
+  })
   const pick = async () => {
     setBusy(true)
     try {
@@ -87,7 +105,7 @@ export function BatchChaptersDialog({
     }
     channel.current = updates
     try {
-      await call(commands.runChapterBatch, plan.id, selected, Number(preset), closeProject, updates)
+      await call(commands.runChapterBatch, plan.id, selected, recipe, closeProject, updates)
     } finally {
       setBusy(false)
     }
@@ -113,9 +131,22 @@ export function BatchChaptersDialog({
         </DialogHeader>
         {confirmClose ? (
           <div className='grid gap-3'>
-            <p>{t('runs.closeFirst', { project: project?.name })}</p>
-            <Button onClick={() => void start(project?.name ?? null).catch(() => undefined)}>
-              {t('runs.closeAndStart')}
+            {project && <p>{t('runs.closeFirst', { project: project.name })}</p>}
+            {preset === 'auto_run' &&
+              (autoPreview.data ? (
+                <AutoRunPreviewContent preview={autoPreview.data} />
+              ) : (
+                <p role='status'>{t(autoPreview.isError ? 'runs.loadError' : 'runs.loading')}</p>
+              ))}
+            <Button
+              disabled={
+                busy ||
+                (preset === 'auto_run' &&
+                  (!autoPreview.data || autoPreview.isFetching || autoPreview.isError))
+              }
+              onClick={() => void start(project?.name ?? null).catch(() => undefined)}
+            >
+              {t(project ? 'runs.closeAndStart' : 'autoRun.start')}
             </Button>
             <Button variant='outline' onClick={() => setConfirmClose(false)}>
               {t('runs.cancel')}
@@ -201,12 +232,17 @@ export function BatchChaptersDialog({
                   >
                     <SelectTrigger aria-label={t('runs.batchPreset')}>
                       <SelectValue>
-                        {settings.data?.presets[Number(preset)]
-                          ? presetLabel(settings.data.presets[Number(preset)].name, t)
-                          : t('runs.choosePreset')}
+                        {preset === 'auto_run'
+                          ? t('autoRun.button', { quality: t(`autoRun.qualities.${quality}`) })
+                          : settings.data?.presets[Number(preset)]
+                            ? presetLabel(settings.data.presets[Number(preset)].name, t)
+                            : t('runs.choosePreset')}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value='auto_run'>
+                        {t('autoRun.button', { quality: t(`autoRun.qualities.${quality}`) })}
+                      </SelectItem>
                       {settings.data?.presets.map((preset, index) => (
                         <SelectItem key={index} value={String(index)}>
                           {presetLabel(preset.name, t)}
@@ -240,10 +276,11 @@ export function BatchChaptersDialog({
                         running ||
                         !plan ||
                         selected.length === 0 ||
-                        !settings.data?.presets[Number(preset)]
+                        !settings.data ||
+                        (preset !== 'auto_run' && !settings.data.presets[Number(preset)])
                       }
                       onClick={() => {
-                        if (project) setConfirmClose(true)
+                        if (project || preset === 'auto_run') setConfirmClose(true)
                         else void start(null).catch(() => undefined)
                       }}
                     >

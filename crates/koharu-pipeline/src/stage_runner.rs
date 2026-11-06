@@ -21,6 +21,10 @@ pub(crate) struct StageRunner {
 }
 
 impl StageRunner {
+    pub(crate) fn skip(&self, stage: Stage, input: &StageInput) -> Result<bool> {
+        self.stages.skip(stage, input)
+    }
+
     pub(crate) fn new(
         config: &PipelineConfig,
         translator: koharu_translator::Translator,

@@ -1293,5 +1293,50 @@
       "crying": "泣き声・震え声",
       "menacing": "威圧・不気味"
     }
+  },
+  "autoRun": {
+    "title": "自動実行",
+    "button": "自動実行 · {{quality}}",
+    "confirm": "開始前にこの章の処理手順を確認してください。手動の編集は保持されます。",
+    "start": "自動実行を開始",
+    "quality": "自動実行の品質",
+    "qualityHelp": "高速では翻訳以外の言語モデルへの追加リクエストを行いません。バランスでは章の読み込みを追加します。最高品質は現在バランスと同じです。",
+    "levelsHelp": "必要に応じて検出前にページのレベルを補正します。初期設定では無効です。",
+    "visionYes": "読み込みモデルはページ画像を認識できます。",
+    "visionNo": "読み込みモデルはページ画像を認識できません。",
+    "estimate": "{{pages}}ページ · モデルへのリクエスト約{{requests}}回（再試行前。ローカルの検出・OCR・修復は含みません）。",
+    "summary": "{{pages}}ページ · 失敗{{failures}}件 · {{seconds}}秒",
+    "qualities": {
+      "fast": "高速",
+      "balanced": "バランス",
+      "best": "最高品質"
+    },
+    "steps": {
+      "fix_levels": "ページのレベルを補正",
+      "detection": "テキスト検出と同じ吹き出し内のボックス結合",
+      "ocr": "OCR",
+      "read_chapter": "章を読み込む",
+      "translation": "文脈を使って翻訳",
+      "cleanup": "修復",
+      "typeset": "写植",
+      "qc": "品質チェック",
+      "export": "書き出し"
+    },
+    "status": {
+      "ran": "実行済み",
+      "skipped": "スキップ",
+      "failed": "失敗"
+    },
+    "reasons": {
+      "disabled": "設定で無効",
+      "quality": "この品質レベルでは対象外",
+      "no_series": "シリーズが未設定",
+      "no_vision": "読み込みモデルが画像に非対応",
+      "up_to_date": "すでに最新",
+      "no_source": "原文がありません",
+      "hand_edited": "手動編集を保持",
+      "prerequisite_failed": "前提となる処理が失敗",
+      "export_not_configured": "自動書き出しは利用できません。形式と保存先の保存設定はまだ実装されていません。"
+    }
   }
 }

@@ -9,9 +9,9 @@ use anyhow::{Context as _, ensure};
 use koharu_desktop::Desktop;
 use koharu_renderer::TextStyles;
 use koharu_scene::{
-    Authored, Commit, Component as _, ComponentOwner, Edit, EntityId, Generation, Origin, Presents,
-    ProducerId, RunStyle, Snapshot, SourceText, StrokeMethod, StyleRun, TextRuns, Translation,
-    Typography, ValueChangeKind, char_range_to_byte_range, rich_text,
+    Authored, Commit, Component as _, ComponentOwner, Edit, EntityId, EntityOrigin, Generation,
+    Origin, Presents, ProducerId, RunStyle, Snapshot, SourceText, StrokeMethod, StyleRun, TextRuns,
+    Translation, Typography, ValueChangeKind, char_range_to_byte_range, rich_text,
 };
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -412,17 +412,38 @@ async fn reset_translation_styles(
     commit: &Commit,
     styles: &TextStyles,
     detect_colors: bool,
+    preserve_manual: bool,
     apply_hints: impl FnOnce(&mut Edit, &Snapshot, &[EntityId]) -> koharu_scene::Result<()>,
 ) -> anyhow::Result<Option<Commit>> {
     let snapshot = project.snapshot();
-    let layers = translated_layers(&snapshot, commit)?;
+    let mut layers = translated_layers(&snapshot, commit)?;
+    if preserve_manual {
+        let mut automatic = Vec::new();
+        for layer in layers {
+            if !has_manual_style(&snapshot, layer)? {
+                automatic.push(layer);
+            }
+        }
+        layers = automatic;
+    }
+    reset_layer_styles(project, &layers, styles, detect_colors, apply_hints).await
+}
+
+async fn reset_layer_styles(
+    project: &mut Project,
+    layers: &[EntityId],
+    styles: &TextStyles,
+    detect_colors: bool,
+    apply_hints: impl FnOnce(&mut Edit, &Snapshot, &[EntityId]) -> koharu_scene::Result<()>,
+) -> anyhow::Result<Option<Commit>> {
     if layers.is_empty() {
         return Ok(None);
     }
+    let snapshot = project.snapshot();
     styles.validate()?;
     let resolver = EffectResolver::new(project, styles, detect_colors)?;
     let mut updates = Vec::new();
-    for &layer in &layers {
+    for &layer in layers {
         let translation = snapshot
             .text_layer(layer)?
             .content()?
@@ -450,7 +471,7 @@ async fn reset_translation_styles(
         }
         // Hints are fresh translation output. Emphasis may replace the runs
         // just removed, within this same undo step.
-        apply_hints(edit, &snapshot, &layers)
+        apply_hints(edit, &snapshot, layers)
     })?;
     if patch.is_empty() {
         return Ok(None);
@@ -458,13 +479,86 @@ async fn reset_translation_styles(
     Ok(Some(project.commit(patch).await?))
 }
 
+pub(crate) fn has_manual_style(snapshot: &Snapshot, layer: EntityId) -> koharu_scene::Result<bool> {
+    // Entity promotion also remembers an explicit clear of the last word style.
+    Ok(snapshot
+        .component::<EntityOrigin>(layer)?
+        .is_some_and(|value| value.origin == Origin::User)
+        || snapshot
+            .component::<Typography>(layer)?
+            .is_some_and(|value| value.origin == Origin::User)
+        || snapshot
+            .component::<TextRuns>(layer)?
+            .is_some_and(|value| value.origin == Origin::User)
+        || snapshot.text_layer(layer)?.layout()?.origin == Origin::User)
+}
+
+fn automatic_layers(
+    snapshot: &Snapshot,
+    pages: &[EntityId],
+    refresh: bool,
+) -> anyhow::Result<Vec<EntityId>> {
+    let mut layers = Vec::new();
+    for &page in pages {
+        if let Some(group) = snapshot.page(page)?.text_group()? {
+            for layer in group.text_layers()? {
+                if layer.content()?.translation()?.is_some()
+                    && !has_manual_style(snapshot, layer.id())?
+                    && (refresh
+                        || snapshot.component::<Typography>(layer.id())?.is_none()
+                        || snapshot
+                            .component::<koharu_pipeline::EmphasisHints>(layer.id())?
+                            .is_some())
+                {
+                    layers.push(layer.id());
+                }
+            }
+        }
+    }
+    Ok(layers)
+}
+
+pub(crate) fn auto_typeset_needed(
+    snapshot: &Snapshot,
+    pages: &[EntityId],
+    refresh: bool,
+) -> anyhow::Result<bool> {
+    Ok(!automatic_layers(snapshot, pages, refresh)?.is_empty())
+}
+
+pub(crate) async fn auto_typeset(
+    project: &mut Project,
+    pages: &[EntityId],
+    refresh: bool,
+) -> anyhow::Result<Option<Commit>> {
+    let layers = automatic_layers(&project.snapshot(), pages, refresh)?;
+    if layers.is_empty() {
+        return Ok(None);
+    }
+    let styles = super::styles::load_text_styles()?.read()?.clone();
+    let detect_colors = koharu_pipeline::PipelineConfig::load()?
+        .read()?
+        .detect_text_color;
+    let context = project.load_context()?;
+    reset_layer_styles(
+        project,
+        &layers,
+        &styles,
+        detect_colors,
+        |edit, snapshot, layers| super::emphasis::apply_hints(edit, snapshot, layers, &context),
+    )
+    .await
+}
+
 /// Called by the processing committer right after a Translation stage commit
 /// (normal runs and Translate again). For every box whose translation that
 /// commit rewrote, removes its word styles and resets its style to the lettering
 /// default (decision 4), then applies fresh emphasis hints in the same patch.
+/// Automatic recipes preserve a presentation once it has been edited by hand.
 pub(crate) async fn after_translation(
     project: &mut Project,
     commit: &Commit,
+    preserve_manual: bool,
 ) -> anyhow::Result<Option<Commit>> {
     if translated_layers(&project.snapshot(), commit)?.is_empty() {
         return Ok(None);
@@ -480,6 +574,7 @@ pub(crate) async fn after_translation(
         commit,
         &styles,
         detect_colors,
+        preserve_manual,
         |edit, snapshot, layers| super::emphasis::apply_hints(edit, snapshot, layers, &context),
     )
     .await

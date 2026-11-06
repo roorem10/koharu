@@ -17,6 +17,8 @@ pub use inpainting::{
 
 use crate::{Bounds, ImageCache, InpaintingMask, PipelineConfig, Stage, TranslationHints};
 
+const EMPTY_MASK: &str = "dev.koharu.mask.empty";
+
 #[derive(Clone)]
 pub(crate) struct StageInput {
     scene: koharu_scene::Snapshot,
@@ -28,6 +30,7 @@ pub(crate) struct StageInput {
     translation_hints: Arc<TranslationHints>,
     redetect: bool,
     resume: bool,
+    refresh: bool,
 }
 
 impl StageInput {
@@ -49,12 +52,19 @@ impl StageInput {
             translation_hints: Arc::default(),
             redetect: false,
             resume: false,
+            refresh: false,
         }
     }
 
     #[must_use]
     pub(crate) fn with_resume(mut self, resume: bool) -> Self {
         self.resume = resume;
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn with_refresh(mut self, refresh: bool) -> Self {
+        self.refresh = refresh;
         self
     }
 
@@ -164,6 +174,14 @@ fn finish(edit: Edit) -> Result<Patch> {
     edit.finish().map_err(Into::into)
 }
 
+fn needs_text(previous: Option<&koharu_scene::Authored<String>>, resume: bool) -> bool {
+    match previous {
+        Some(value) if value.origin == koharu_scene::Origin::User => false,
+        Some(value) => !resume || value.value.trim().is_empty(),
+        None => true,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,7 +199,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn resume_skips_complete_boxes_but_explicit_stages_do_not() {
+    async fn resume_skips_complete_boxes_and_explicit_stages_preserve_hand_text() {
         let translator = koharu_translator::Translator::from_config(
             koharu_ml::Device::cpu(),
             koharu_config::Config::memory(koharu_translator::ProvidersConfig::default()),
@@ -271,8 +289,26 @@ mod tests {
         .with_resume(true);
         assert!(stages.skip(Stage::Translation, &input).unwrap());
         let explicit = input.with_resume(false);
-        assert!(!stages.skip(Stage::Ocr, &explicit).unwrap());
-        assert!(!stages.skip(Stage::Translation, &explicit).unwrap());
+        assert!(stages.skip(Stage::Ocr, &explicit).unwrap());
+        assert!(stages.skip(Stage::Translation, &explicit).unwrap());
+    }
+
+    #[test]
+    fn missing_and_outdated_text_runs_but_hand_edits_always_win() {
+        use koharu_scene::Authored;
+        let generated = generation("dev.koharu.test", "test").unwrap();
+        for resume in [false, true] {
+            assert!(needs_text(None, resume));
+            assert!(!needs_text(Some(&Authored::user("".into())), resume));
+            assert!(!needs_text(Some(&Authored::user("edited".into())), resume));
+            assert!(needs_text(
+                Some(&Authored::generated(" ".into(), generated.clone())),
+                resume,
+            ));
+        }
+        let completed = Authored::generated("done".into(), generated);
+        assert!(!needs_text(Some(&completed), true));
+        assert!(needs_text(Some(&completed), false));
     }
 
     #[tokio::test]

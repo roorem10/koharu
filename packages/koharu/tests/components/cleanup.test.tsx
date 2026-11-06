@@ -55,6 +55,7 @@ function job(state: Job['state']): Job {
     project: 'Book',
     operation: null,
     finish_sound: false,
+    auto_run: null,
   }
 }
 

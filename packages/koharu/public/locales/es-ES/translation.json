@@ -1306,5 +1306,50 @@
       "crying": "Llanto / temblor",
       "menacing": "Amenazante / siniestro"
     }
+  },
+  "autoRun": {
+    "title": "Ejecución automática",
+    "button": "Ejecución automática · {{quality}}",
+    "confirm": "Revisa los pasos de este capítulo antes de empezar. Se conservarán los cambios manuales.",
+    "start": "Iniciar ejecución automática",
+    "quality": "Calidad de ejecución automática",
+    "qualityHelp": "Rápida no añade solicitudes al modelo de lenguaje aparte de la traducción. Equilibrada añade Leer capítulo. Óptima equivale actualmente a Equilibrada.",
+    "levelsHelp": "Ajusta los niveles antes de detectar cuando sea necesario. Desactivado por defecto.",
+    "visionYes": "El modelo de lectura puede ver las imágenes de las páginas.",
+    "visionNo": "El modelo de lectura no puede ver las imágenes de las páginas.",
+    "estimate": "{{pages}} páginas · unas {{requests}} solicitudes al modelo (antes de reintentos; sin detección, OCR ni limpieza locales).",
+    "summary": "{{pages}} páginas · {{failures}} fallos · {{seconds}} s",
+    "qualities": {
+      "fast": "Rápida",
+      "balanced": "Equilibrada",
+      "best": "Óptima"
+    },
+    "steps": {
+      "fix_levels": "Ajustar niveles de página",
+      "detection": "Detectar texto y unir cajas de cada bocadillo",
+      "ocr": "OCR",
+      "read_chapter": "Leer capítulo",
+      "translation": "Traducir con contexto",
+      "cleanup": "Limpiar",
+      "typeset": "Rotular",
+      "qc": "Control de calidad",
+      "export": "Exportar"
+    },
+    "status": {
+      "ran": "Ejecutado",
+      "skipped": "Omitido",
+      "failed": "Fallido"
+    },
+    "reasons": {
+      "disabled": "Desactivado en Ajustes",
+      "quality": "No incluido en este nivel de calidad",
+      "no_series": "No hay ninguna serie vinculada",
+      "no_vision": "El modelo de lectura no puede ver imágenes",
+      "up_to_date": "Ya está actualizado",
+      "no_source": "No hay texto original",
+      "hand_edited": "Se conservan los cambios manuales",
+      "prerequisite_failed": "Falló un paso previo necesario",
+      "export_not_configured": "La exportación automática no está disponible: aún no se pueden guardar el formato y el destino."
+    }
   }
 }

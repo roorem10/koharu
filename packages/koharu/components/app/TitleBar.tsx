@@ -14,6 +14,7 @@ import { RedetectPageMenuItem, RedetectPageDialog } from '@/components/boxes/Pag
 import { PageJoinMenuItem } from '@/components/boxes/PageJoinMenuItem'
 import { useScriptFiles } from '@/components/files/ScriptImport'
 import { useCompareStore } from '@/components/qc/compare'
+import { AutoRunDialog } from '@/components/runs/AutoRun'
 import { BatchChaptersDialog } from '@/components/runs/BatchChaptersDialog'
 import {
   currentRunScope,
@@ -56,6 +57,7 @@ export function TitleBar() {
   const pinned = useCompareStore((state) => state.pinned)
   const toggleOriginal = useCompareStore((state) => state.toggle)
   const [batchOpen, setBatchOpen] = useState(false)
+  const [autoRunOpen, setAutoRunOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [redetectPage, setRedetectPage] = useState<string | null>(null)
   const scripts = useScriptFiles()
@@ -262,6 +264,16 @@ export function TitleBar() {
             <MenubarTrigger>{t('menu.process')}</MenubarTrigger>
             <MenubarContent>
               <MenubarItem
+                disabled={!project || pages.length === 0 || running || !runSettings.data}
+                onClick={() => setAutoRunOpen(true)}
+              >
+                {t('autoRun.button', {
+                  quality: t(
+                    `autoRun.qualities.${runSettings.data?.auto_run_quality ?? 'balanced'}`,
+                  ),
+                })}
+              </MenubarItem>
+              <MenubarItem
                 disabled={!project || pages.length === 0}
                 onClick={() => run({ scope: 'project' })}
               >
@@ -287,7 +299,9 @@ export function TitleBar() {
               <ProcessRedoItems />
               <MenubarSeparator />
               <MenubarItem
-                disabled={running || !lastJob?.failures?.length}
+                disabled={
+                  running || !(lastJob?.failures?.length || lastJob?.auto_run?.summary?.failures)
+                }
                 onClick={() => lastJob && void retryFailedPages(lastJob).catch(() => undefined)}
               >
                 {t('runs.retryFailedPages')}
@@ -393,6 +407,11 @@ export function TitleBar() {
         {!macOS && <WindowControls />}
       </header>
       <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
+      <AutoRunDialog
+        open={autoRunOpen}
+        onOpenChange={setAutoRunOpen}
+        scope={{ scope: 'project' }}
+      />
       {scripts.dialog}
     </>
   )

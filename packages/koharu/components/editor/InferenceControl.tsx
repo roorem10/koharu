@@ -18,6 +18,7 @@ import { useChapterContext } from '@/components/context/data'
 import { ReadChapterStep } from '@/components/context/ReadChapterStep'
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { OutputPicker, type OutputDraft } from '@/components/controls/OutputPicker'
+import { AutoRunButton } from '@/components/runs/AutoRun'
 import { presetLabel, useRunSettings } from '@/components/runs/data'
 import { prepareFinishSound } from '@/components/runs/sound'
 import { call, refreshTranslationModels, savePreferences } from '@/lib/backend'
@@ -95,6 +96,7 @@ export function InferenceControl({
 
   return (
     <div className='flex items-center gap-1'>
+      <AutoRunButton disabled={disabled || !!running} />
       <RuntimeSelector
         scope={scope}
         stages={stages}

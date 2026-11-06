@@ -315,6 +315,8 @@ impl KoharuHost {
             inpainting_mask: None,
             translation_hints,
             redetect: false,
+            resume: false,
+            refresh: Default::default(),
             policy: super::super::runs::RunSettings::load()?.policy(),
         };
         let mut request = request;
@@ -354,6 +356,48 @@ impl KoharuHost {
             "elapsed_ms": report.elapsed.as_millis(),
             "failures": report.failures,
         }))
+    }
+
+    async fn auto_run(&self, arguments: AutoRun, control: &Control) -> Result<Invocation> {
+        anyhow::ensure!(!control.is_cancelled(), "Auto run was cancelled");
+        let quality = match arguments.quality {
+            Some(quality) => quality,
+            None => super::super::runs::RunSettings::load()?.auto_run_quality,
+        };
+        let scope = match arguments.scope {
+            AutoRunScope::Project => Scope::Project,
+            AutoRunScope::Pages(pages) => Scope::Pages(entities(&pages)?),
+        };
+        let id = super::super::processing::start_auto_job(
+            self.handle.clone(),
+            scope,
+            quality,
+            false,
+        )
+        .await?;
+        loop {
+            let processing = self.handle.state::<Processing>();
+            if control.is_cancelled()
+                && let Some(stop) = processing.stops.lock().get(&id)
+            {
+                stop.stop();
+            }
+            let job = processing
+                .jobs
+                .lock()
+                .get(&id)
+                .cloned()
+                .context("Auto run job is no longer available")?;
+            match job.state {
+                super::super::processing::JobState::Running => {}
+                super::super::processing::JobState::Stopped => bail!("Auto run was cancelled"),
+                super::super::processing::JobState::Failed => {
+                    bail!("{}", job.error.as_deref().unwrap_or("Auto run failed"))
+                }
+                _ => return Invocation::changed(json!({"job": job})),
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
     }
 }
 
@@ -413,6 +457,10 @@ impl Host for KoharuHost {
                     definition::<RunPipeline>(
                         "run_pipeline",
                         "Run Koharu's configured processing pipeline for the whole project, selected pages, or selected text elements.",
+                    ),
+                    definition::<AutoRun>(
+                        "auto_run",
+                        "Run the fixed chapter recipe for the project or selected pages. Preserves hand edits and skips completed work. Quality is fast, balanced, or best; omit it to use Settings. Uses the same progress and stop control as the Process menu.",
                     ),
                     // WO-20 (one box per bubble) tool definitions go here.
                     definition::<crate::commands::boxes::FindSplitBubblesArgs>(
@@ -688,6 +736,7 @@ impl Host for KoharuHost {
                 self.context_tool(&call).await
             }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
+            "auto_run" => self.auto_run(arguments(&call)?, control).await,
             // WO-20 (one box per bubble) tool calls go here.
             "find_split_bubbles" => {
                 let arguments: crate::commands::boxes::FindSplitBubblesArgs = arguments(&call)?;
@@ -1074,6 +1123,21 @@ impl From<AgentPipelineOperation> for Operation {
             },
         }
     }
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct AutoRun {
+    #[serde(default)]
+    scope: AutoRunScope,
+    quality: Option<crate::commands::auto_run::QualityLevel>,
+}
+
+#[derive(Default, Deserialize, JsonSchema)]
+#[serde(tag = "scope", content = "value", rename_all = "snake_case")]
+enum AutoRunScope {
+    #[default]
+    Project,
+    Pages(Vec<String>),
 }
 
 #[derive(Deserialize, JsonSchema)]

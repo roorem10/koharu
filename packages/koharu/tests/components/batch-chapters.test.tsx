@@ -42,7 +42,13 @@ it('previews chapters, allows exclusions, and explicitly closes the open project
   expect(run).not.toHaveBeenCalled()
   await user.click(screen.getByRole('button', { name: 'Close project and start' }))
   await waitFor(() => expect(run).toHaveBeenCalledOnce())
-  expect(run.mock.lastCall?.slice(0, 5)).toEqual(['plan', ['one'], 0, 'chapter', expect.anything()])
+  expect(run.mock.lastCall?.slice(0, 5)).toEqual([
+    'plan',
+    ['one'],
+    { recipe: 'preset', preset: 0 },
+    'chapter',
+    expect.anything(),
+  ])
   act(() =>
     run.mock.lastCall?.[4].onmessage({
       chapters: [],

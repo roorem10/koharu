@@ -42,6 +42,7 @@ pub(crate) struct Execution<'a> {
     redetect: bool,
     policy: crate::RunPolicy,
     resume: bool,
+    refresh: BTreeSet<(Stage, EntityId)>,
 }
 
 impl<'a> Execution<'a> {
@@ -99,10 +100,12 @@ impl<'a> Execution<'a> {
             translation_hints: request.translation_hints,
             redetect: request.redetect,
             policy: request.policy,
-            resume: matches!(
-                request.operation,
-                crate::Operation::Full | crate::Operation::Through { .. }
-            ),
+            resume: request.resume
+                || matches!(
+                    request.operation,
+                    crate::Operation::Full | crate::Operation::Through { .. }
+                ),
+            refresh: request.refresh,
         })
     }
 
@@ -183,7 +186,8 @@ impl<'a> Execution<'a> {
             )
             .with_translation_hints(self.translation_hints.clone())
             .with_redetect(self.redetect)
-            .with_resume(self.resume),
+            .with_refresh(self.refresh.contains(&(stage, page)))
+            .with_resume(self.resume && !self.refresh.contains(&(stage, page))),
             self.stop.clone(),
             self.progress.clone(),
             self.policy.retries,

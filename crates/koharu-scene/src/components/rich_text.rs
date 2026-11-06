@@ -822,6 +822,101 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn automatic_word_styles_preserve_provenance_without_replacing_hand_styles() {
+        use crate::{
+            At, Generation, PageDraft, ProducerId, Session, TextLayout, TextLayoutKind,
+        };
+        let generation =
+            Generation::new(ProducerId::new("dev.koharu.pipeline.translation").unwrap());
+        let mut session = Session::memory().await.unwrap();
+        let mut layer = None;
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 100.0, 100.0), At::End)?;
+                let content = edit.add_text_content(page, At::End)?;
+                layer = Some(edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &TextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: None,
+                        warp: None,
+                    },
+                )?);
+                Ok(())
+            })
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let layer = layer.unwrap();
+        let mut runs = TextRuns {
+            origin: Origin::User,
+            runs: vec![StyleRun {
+                start: 0,
+                end: 2,
+                style: RunStyle {
+                    font_weight: Some(700),
+                    ..Default::default()
+                },
+            }],
+        };
+        let snapshot = session.snapshot();
+        assert!(
+            snapshot
+                .patch(|edit| edit.set_generated_text_runs(layer, &runs))
+                .is_err()
+        );
+        runs.origin = Origin::Generated(generation.clone());
+        assert!(
+            snapshot
+                .edit_as(generation.clone())
+                .set_generated_text_runs(layer, &runs)
+                .is_err()
+        );
+        let patch = snapshot
+            .patch(|edit| edit.set_generated_text_runs(layer, &runs))
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        assert_eq!(
+            session.snapshot().component::<TextRuns>(layer).unwrap(),
+            Some(runs.clone())
+        );
+        let patch = session
+            .snapshot()
+            .patch(|edit| edit.set(layer, &runs))
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let snapshot = session.snapshot();
+        assert_eq!(
+            snapshot.component::<TextRuns>(layer).unwrap().unwrap().origin,
+            Origin::User
+        );
+        assert!(
+            snapshot
+                .patch(|edit| edit.set_generated_text_runs(layer, &runs))
+                .is_err()
+        );
+        let patch = snapshot
+            .patch(|edit| {
+                edit.remove::<TextRuns>(layer)?;
+                edit.set_generated_text_runs(layer, &runs)
+            })
+            .unwrap();
+        let reset = session.commit(patch).await.unwrap();
+        assert_eq!(
+            session.snapshot().component::<TextRuns>(layer).unwrap().unwrap().origin,
+            Origin::Generated(generation)
+        );
+        session.undo(reset.revision).await.unwrap();
+        assert_eq!(
+            session.snapshot().component::<TextRuns>(layer).unwrap().unwrap().origin,
+            Origin::User
+        );
+    }
+
+    #[tokio::test]
     async fn clamped_runs_commit_and_survive_project_save_open() {
         use crate::{At, Authored, PageDraft, Session, SourceText, TextLayout, TextLayoutKind};
         let directory = tempfile::tempdir().unwrap();

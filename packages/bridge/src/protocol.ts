@@ -126,11 +126,14 @@ export const commands = {
 	openLibraryFolder: (kind: LibraryFolder) => __TAURI_INVOKE<null>("open_library_folder", { kind }),
 	renameProject: (name: string, newName: string) => __TAURI_INVOKE<null>("rename_project", { name, newName }),
 	duplicateProject: (name: string) => __TAURI_INVOKE<string>("duplicate_project", { name }),
+	previewAutoRun: (scope: Scope, quality: QualityLevel) => __TAURI_INVOKE<AutoRunPreview>("preview_auto_run", { scope, quality }),
+	autoRun: (scope: Scope, quality: QualityLevel) => __TAURI_INVOKE<JobId>("auto_run", { scope, quality }),
+	previewBatchAutoRun: (plan: string, chapters: string[], quality: QualityLevel) => __TAURI_INVOKE<AutoRunPreview>("preview_batch_auto_run", { plan, chapters, quality }),
 	getRunSettings: () => __TAURI_INVOKE<RunSettings>("get_run_settings"),
 	saveRunSettings: (settings: RunSettings) => __TAURI_INVOKE<RunSettings>("save_run_settings", { settings }),
 	retryFailedPages: (job: JobId) => __TAURI_INVOKE<JobId>("retry_failed_pages", { job }),
 	previewChapterBatch: () => __TAURI_INVOKE<BatchPlan | null>("preview_chapter_batch"),
-	runChapterBatch: (plan: string, chapters: string[], preset: number, closeProject: string | null, onProgress: Channel<BatchProgress>) => __TAURI_INVOKE<null>("run_chapter_batch", { plan, chapters, preset, closeProject, onProgress }),
+	runChapterBatch: (plan: string, chapters: string[], recipe: BatchRecipe, closeProject: string | null, onProgress: Channel<BatchProgress>) => __TAURI_INVOKE<null>("run_chapter_batch", { plan, chapters, recipe, closeProject, onProgress }),
 	stopChapterBatch: () => __TAURI_INVOKE<null>("stop_chapter_batch"),
 	getBoxNote: (layer: EntityId) => __TAURI_INVOKE<string | null>("get_box_note", { layer }),
 	setBoxNote: (layer: EntityId, note: string | null) => __TAURI_INVOKE<null>("set_box_note", { layer, note }),
@@ -206,6 +209,45 @@ export type AnalysisRegion = {
 	label: string | null,
 };
 
+export type AutoRunPlannedStep = {
+	id: AutoRunStepId,
+	needed: boolean,
+	reason: AutoRunSkipReason | null,
+};
+
+export type AutoRunPreview = {
+	quality: QualityLevel,
+	steps: AutoRunPlannedStep[],
+	pages: number,
+	can_read_images: boolean,
+	estimated_requests: number,
+};
+
+export type AutoRunProgress = {
+	step: AutoRunStepId | null,
+	summary: AutoRunSummary | null,
+};
+
+export type AutoRunSkipReason = "disabled" | "quality" | "no_series" | "no_vision" | "up_to_date" | "no_source" | "hand_edited" | "prerequisite_failed" | "export_not_configured";
+
+export type AutoRunStepId = "fix_levels" | "detection" | "ocr" | "read_chapter" | "translation" | "cleanup" | "typeset" | "qc" | "export";
+
+export type AutoRunStepResult = {
+	id: AutoRunStepId,
+	status: AutoRunStepStatus,
+	reason: AutoRunSkipReason | null,
+	error: string | null,
+};
+
+export type AutoRunStepStatus = "ran" | "skipped" | "failed";
+
+export type AutoRunSummary = {
+	steps: AutoRunStepResult[],
+	pages: number,
+	failures: number,
+	elapsed_seconds: number,
+};
+
 export type BatchChapter = {
 	id: string,
 	name: string,
@@ -231,6 +273,8 @@ export type BatchProgress = {
 	stopped: boolean,
 	finish_sound: boolean,
 };
+
+export type BatchRecipe = { recipe: "preset"; preset: number } | { recipe: "auto_run"; quality: QualityLevel };
 
 export type Bounds = {
 	x: number,
@@ -587,6 +631,7 @@ export type Job = {
 	project: string | null,
 	operation: Operation | null,
 	finish_sound: boolean,
+	auto_run: AutoRunProgress | null,
 };
 
 export type JobId = string;
@@ -933,6 +978,8 @@ export type QcSettings = {
 	min_font_size?: number,
 };
 
+export type QualityLevel = "fast" | "balanced" | "best";
+
 export type Quantization = {
 	id: string,
 	name: string,
@@ -999,6 +1046,9 @@ export type RunSettings = {
 	on_page_failure?: OnPageFailure,
 	order?: RunOrder,
 	finish_sound?: boolean,
+	auto_run_quality?: QualityLevel,
+	auto_run_fix_levels?: boolean,
+	auto_run_export?: boolean,
 	presets?: RunPreset[],
 };
 

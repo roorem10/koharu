@@ -1,7 +1,8 @@
 use super::*;
 use koharu_renderer::{FontPart, ShapeStyles};
 use koharu_scene::{
-    At, BubbleRegion, Generation, Geometry, PageDraft, ProducerId, TextLayout, TextLayoutKind,
+    At, BubbleRegion, Generation, Geometry, Origin, PageDraft, ProducerId, TextLayout,
+    TextLayoutKind, Typography,
 };
 
 fn label(
@@ -380,4 +381,52 @@ async fn sfx_modes_filter_effective_categories_and_bubble_membership() {
     )
     .unwrap();
     assert_eq!(effective.reason, CategoryReason::User);
+}
+
+#[tokio::test]
+async fn model_labels_preserve_hand_word_styles_and_warp_even_with_generated_typography() {
+    use koharu_scene::{RunStyle, StyleRun, TextRuns, TextWarp};
+    let (_directory, mut project, layers) = project_fixture().await;
+    let snapshot = project.snapshot();
+    let patch = snapshot
+        .patch(|edit| {
+            edit.set(layers[0], &TextRuns {
+                origin: Origin::User,
+                runs: vec![StyleRun {
+                    start: 0,
+                    end: 1,
+                    style: RunStyle { font_weight: Some(700), ..Default::default() },
+                }],
+            })?;
+            let mut layout = snapshot.text_layer(layers[2])?.layout()?;
+            layout.warp = Some(TextWarp::Skew { x_degrees: 10.0, y_degrees: 2.0 });
+            edit.set(layers[2], &layout)
+        })
+        .unwrap();
+    project.commit(patch).await.unwrap();
+    project
+        .update_context(|context| {
+            for layer in [layers[0], layers[2]] {
+                context.set_model_category(layer, LetteringCategory::Whisper, Some(0.9));
+            }
+        })
+        .unwrap();
+    let mut styles = TextStyles::default();
+    styles.shape_styles.enabled = true;
+    styles.category_styles.whisper = font("whisper");
+    assert!(
+        restyle_labels(
+            &mut project,
+            &[layers[0], layers[2]],
+            &styles,
+            &LetteringSettings::default(),
+            false,
+        )
+        .await
+        .unwrap()
+        .is_none()
+    );
+    for layer in [layers[0], layers[2]] {
+        assert_eq!(current_font(&project, layer).as_deref(), Some("original"));
+    }
 }

@@ -1293,5 +1293,50 @@
       "crying": "Choro / tremor",
       "menacing": "Ameaça / sinistro"
     }
+  },
+  "autoRun": {
+    "title": "Execução automática",
+    "button": "Execução automática · {{quality}}",
+    "confirm": "Revise as etapas deste capítulo antes de começar. As edições manuais serão preservadas.",
+    "start": "Iniciar execução automática",
+    "quality": "Qualidade da execução automática",
+    "qualityHelp": "Rápida não adiciona solicitações ao modelo de linguagem além da tradução. Equilibrada inclui Ler capítulo. Máxima equivale atualmente a Equilibrada.",
+    "levelsHelp": "Ajusta os níveis das páginas antes da detecção quando necessário. Desativado por padrão.",
+    "visionYes": "O modelo de leitura pode ver as imagens das páginas.",
+    "visionNo": "O modelo de leitura não pode ver as imagens das páginas.",
+    "estimate": "{{pages}} páginas · cerca de {{requests}} solicitações ao modelo (antes das novas tentativas; sem detecção, OCR e limpeza locais).",
+    "summary": "{{pages}} páginas · {{failures}} falhas · {{seconds}} s",
+    "qualities": {
+      "fast": "Rápida",
+      "balanced": "Equilibrada",
+      "best": "Máxima"
+    },
+    "steps": {
+      "fix_levels": "Ajustar níveis das páginas",
+      "detection": "Detectar texto e unir caixas do mesmo balão",
+      "ocr": "OCR",
+      "read_chapter": "Ler capítulo",
+      "translation": "Traduzir com contexto",
+      "cleanup": "Limpar",
+      "typeset": "Diagramar texto",
+      "qc": "Controle de qualidade",
+      "export": "Exportar"
+    },
+    "status": {
+      "ran": "Executado",
+      "skipped": "Ignorado",
+      "failed": "Falhou"
+    },
+    "reasons": {
+      "disabled": "Desativado nas configurações",
+      "quality": "Não incluído neste nível de qualidade",
+      "no_series": "Nenhuma série vinculada",
+      "no_vision": "O modelo de leitura não pode ver imagens",
+      "up_to_date": "Já está atualizado",
+      "no_source": "Sem texto original",
+      "hand_edited": "Edições manuais preservadas",
+      "prerequisite_failed": "Uma etapa necessária falhou",
+      "export_not_configured": "A exportação automática está indisponível: as configurações para salvar formato e destino ainda não foram implementadas."
+    }
   }
 }
