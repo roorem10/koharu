@@ -1773,6 +1773,9 @@ impl OutlinePen for PreviewOutline<'_> {
 }
 
 #[cfg(test)]
+mod joined_bubble_tests;
+
+#[cfg(test)]
 mod tests {
     use std::{collections::BTreeMap, io::Cursor};
 
