@@ -1293,5 +1293,12 @@
       "crying": "泣き声・震え声",
       "menacing": "威圧・不気味"
     }
+  },
+  "boxSpeaker": {
+    "label": "話者",
+    "none": "なし",
+    "kindAndSpeaker": "{{kind}} · {{speaker}}",
+    "loadError": "話者を読み込めませんでした。",
+    "saveError": "話者を保存できませんでした。もう一度選択してください。"
   }
 }

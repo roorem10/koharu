@@ -12,7 +12,7 @@ const JPEG_QUALITY: u8 = 88;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TranslationRequest {
-    pub segments: Vec<String>,
+    pub segments: Vec<TranslationSegment>,
     pub source_language: Option<Language>,
     pub target_language: Language,
     pub instructions: Option<String>,
@@ -30,7 +30,13 @@ impl TranslationRequest {
         target_language: Language,
     ) -> Self {
         Self {
-            segments: segments.into_iter().map(Into::into).collect(),
+            segments: segments
+                .into_iter()
+                .map(|text| TranslationSegment {
+                    text: text.into(),
+                    context: SegmentContext::default(),
+                })
+                .collect(),
             source_language: None,
             target_language,
             instructions: None,
@@ -77,6 +83,38 @@ impl TranslationRequest {
     pub(crate) fn remove_image(&mut self) {
         self.image = None;
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct TranslationSegment {
+    pub text: String,
+    #[serde(flatten)]
+    pub context: SegmentContext,
+}
+
+/// Reference data for one box, kept beside its text through provider serialization.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct SegmentContext {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<SpeakerHint>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+impl SegmentContext {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.speaker.is_none() && self.note.is_none()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SpeakerHint {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub original: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
 }
 
 pub(crate) struct EncodedImage {

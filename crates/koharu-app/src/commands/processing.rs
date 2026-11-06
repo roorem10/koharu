@@ -349,6 +349,9 @@ async fn start_job_inner(
                         project.snapshot().project_id() == self.project,
                         "the project changed during processing"
                     );
+                    if let Some(hints) = output.translation_hints.as_deref() {
+                        super::context::validate_translation_context(project, hints)?;
+                    }
                     let Some(mut commit) = project.commit_rebased(output.patch).await? else {
                         return Ok(project.snapshot());
                     };

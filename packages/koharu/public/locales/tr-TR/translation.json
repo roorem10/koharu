@@ -1293,5 +1293,12 @@
       "crying": "Ağlama / titreme",
       "menacing": "Tehditkâr / tekinsiz"
     }
+  },
+  "boxSpeaker": {
+    "label": "Konuşan",
+    "none": "Yok",
+    "kindAndSpeaker": "{{kind}} · {{speaker}}",
+    "loadError": "Konuşan yüklenemedi.",
+    "saveError": "Konuşan kaydedilemedi. Yeniden denemek için tekrar seçin."
   }
 }

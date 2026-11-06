@@ -1293,5 +1293,12 @@
       "crying": "Choro / tremor",
       "menacing": "Ameaça / sinistro"
     }
+  },
+  "boxSpeaker": {
+    "label": "Falante",
+    "none": "Nenhum",
+    "kindAndSpeaker": "{{kind}} · {{speaker}}",
+    "loadError": "Não foi possível carregar o falante.",
+    "saveError": "Não foi possível salvar o falante. Selecione novamente para tentar de novo."
   }
 }

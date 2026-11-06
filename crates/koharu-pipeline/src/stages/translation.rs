@@ -82,9 +82,12 @@ impl StageProcessor for Processor {
             targets.iter().map(|(_, _, source)| source.clone()),
             self.config.target_language,
         );
-        input
-            .translation_hints
-            .apply(&mut request, &input.scene, input.page)?;
+        input.translation_hints.apply(
+            &mut request,
+            &input.scene,
+            input.page,
+            &targets.iter().map(|(layer, _, _)| *layer).collect::<Vec<_>>(),
+        )?;
         if let Some(instructions) = self.config.instructions.as_deref() {
             request = request.with_instructions(instructions);
         }
@@ -100,6 +103,7 @@ impl StageProcessor for Processor {
         let language = LanguageTag::new(self.config.target_language.tag())?;
         let generated = generation(PRODUCER, provider)?;
         let mut edit = input.scene.edit_as(generated.clone());
+        edit.observe_project::<crate::TranslationContextRevision>()?;
         for (_, entity, _) in &targets {
             edit.observe::<SourceText>(*entity)?;
             edit.observe::<Translation>(*entity)?;

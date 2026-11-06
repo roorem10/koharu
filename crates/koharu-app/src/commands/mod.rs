@@ -23,6 +23,7 @@ pub(crate) mod raw_prep;
 pub(crate) mod redesign;
 pub(crate) mod rich_text;
 pub(crate) mod runs;
+pub(crate) mod speakers;
 pub(crate) mod styles;
 pub(crate) mod text_glyphs;
 pub(crate) mod warp;
@@ -206,6 +207,8 @@ pub fn bindings() -> tauri_specta::Builder<tauri_runtime_cef::CefRuntime> {
             // WO-06 (text style extras and box notes) commands go here.
             notes::get_box_note,
             notes::set_box_note,
+            speakers::get_box_speaker,
+            speakers::set_box_speaker,
             // WO-21 (MCP server) commands go here.
             mcp::get_mcp_status,
             mcp::save_mcp_settings,

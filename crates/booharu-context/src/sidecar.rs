@@ -53,6 +53,7 @@ impl Default for ProjectContext {
 #[serde(default)]
 pub struct LineContext {
     pub category: Option<LineCategory>,
+    pub speaker: Option<LineSpeaker>,
     pub note: Option<String>,
     pub flags: Vec<Flag>,
     pub dismissed: Vec<String>,
@@ -68,6 +69,7 @@ pub struct LineContext {
 impl LineContext {
     fn is_empty(&self) -> bool {
         self.category.is_none()
+            && self.speaker.is_none()
             && self.note.is_none()
             && self.flags.is_empty()
             && self.dismissed.is_empty()
@@ -83,6 +85,13 @@ pub struct LineCategory {
     pub source: LabelSource,
     /// 0 to 1 when the model reported it; `None` for hand-set labels.
     pub confidence: Option<f32>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, Type)]
+pub struct LineSpeaker {
+    /// The linked series character's ID. A user-selected `None` stays blank on re-read.
+    pub value: Option<String>,
+    pub source: LabelSource,
 }
 
 /// Who set a label. A `User` label is never replaced by a model label.
@@ -139,6 +148,44 @@ impl ProjectContext {
     #[must_use]
     pub fn category(&self, layer: EntityId) -> Option<LineCategory> {
         self.lines.get(&layer).and_then(|line| line.category)
+    }
+
+    #[must_use]
+    pub fn speaker(&self, layer: EntityId) -> Option<LineSpeaker> {
+        self.lines.get(&layer).and_then(|line| line.speaker.clone())
+    }
+
+    /// A hand-picked speaker, including an explicit blank, always wins over a re-read.
+    pub fn set_user_speaker(&mut self, layer: EntityId, value: Option<String>) -> bool {
+        let next = Some(LineSpeaker {
+            value,
+            source: LabelSource::User,
+        });
+        let line = self.lines.entry(layer).or_default();
+        let changed = line.speaker != next;
+        line.speaker = next;
+        changed
+    }
+
+    pub fn set_model_speaker(&mut self, layer: EntityId, value: Option<String>) -> bool {
+        let line = self.lines.entry(layer).or_default();
+        if line
+            .speaker
+            .as_ref()
+            .is_some_and(|current| current.source == LabelSource::User)
+        {
+            return false;
+        }
+        let next = value.map(|value| LineSpeaker {
+            value: Some(value),
+            source: LabelSource::Model,
+        });
+        let changed = line.speaker != next;
+        line.speaker = next;
+        if line.is_empty() {
+            self.lines.remove(&layer);
+        }
+        changed
     }
 
     /// Sets a model label unless the user already chose one. Returns whether it changed.

@@ -103,6 +103,9 @@ impl Host for FakeHost {
         [
             "inspect_project",
             "view_page",
+            "get_box_speaker",
+            "set_box_speaker",
+            "set_box_note",
             "set_translation",
             "run_pipeline",
             "fails",
@@ -126,7 +129,7 @@ impl Host for FakeHost {
                 control.cancelled().await;
                 Err(anyhow!("pipeline processing was cancelled"))
             }
-            "set_translation" => {
+            "set_translation" | "set_box_speaker" | "set_box_note" => {
                 self.edits.fetch_add(1, Ordering::SeqCst);
                 Invocation::changed(json!({ "changed": true }))
             }
@@ -322,7 +325,7 @@ async fn http_initialization_tools_images_errors_and_session_deletion() {
         .unwrap();
     assert_eq!(
         rpc(list).await["result"]["tools"].as_array().unwrap().len(),
-        6
+        9
     );
     let inspected = rpc(server.call(&session, 2, "inspect_project").await).await;
     let value: Value =
@@ -368,6 +371,16 @@ async fn edits_are_refused_even_when_called_directly() {
     let session = server.initialize().await;
     assert_eq!(
         rpc(server.call(&session, 1, "set_translation").await).await["result"]["isError"],
+        true
+    );
+    for (id, name) in [(2, "set_box_speaker"), (3, "set_box_note")] {
+        assert_eq!(
+            rpc(server.call(&session, id, name).await).await["result"]["isError"],
+            true
+        );
+    }
+    assert_ne!(
+        rpc(server.call(&session, 4, "get_box_speaker").await).await["result"]["isError"],
         true
     );
     assert_eq!(host.edits.load(Ordering::SeqCst), 0);

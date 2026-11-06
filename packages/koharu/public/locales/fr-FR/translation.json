@@ -1306,5 +1306,12 @@
       "crying": "Pleurs / tremblements",
       "menacing": "Menaçant / sinistre"
     }
+  },
+  "boxSpeaker": {
+    "label": "Locuteur",
+    "none": "Aucun",
+    "kindAndSpeaker": "{{kind}} · {{speaker}}",
+    "loadError": "Impossible de charger le locuteur.",
+    "saveError": "Impossible d’enregistrer le locuteur. Sélectionnez-le à nouveau pour réessayer."
   }
 }

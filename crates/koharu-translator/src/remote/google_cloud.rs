@@ -34,6 +34,7 @@ pub(super) async fn translate(
     _config: &GoogleCloudConfig,
     request: &TranslationRequest,
 ) -> Result<Vec<String>> {
+    // This API has no reference-text field, so per-box context is left out rather than failing the page.
     let api_key = koharu_secrets::get("google-cloud-translation")?
         .context("google-cloud-translation API key is not configured")?;
     let mut url = Url::parse(URL).expect("Google API URL is valid");
@@ -42,7 +43,11 @@ pub(super) async fn translate(
     let response: Response = send_json(
         "google-cloud-translation",
         client.post(url).json(&Request {
-            q: &request.segments,
+            q: request
+                .segments
+                .iter()
+                .map(|segment| segment.text.as_str())
+                .collect(),
             target: request.target_language.tag(),
             source: request.source_language.map(|language| language.tag()),
             format: "text",
@@ -59,7 +64,7 @@ pub(super) async fn translate(
 
 #[derive(Serialize)]
 struct Request<'a> {
-    q: &'a [String],
+    q: Vec<&'a str>,
     target: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     source: Option<&'a str>,
@@ -80,4 +85,23 @@ struct Data {
 struct Translation {
     #[serde(rename = "translatedText")]
     translated_text: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plain_text_payload_keeps_the_original_bytes() {
+        let request = Request {
+            q: vec!["hello", "world"],
+            target: "en-US",
+            source: None,
+            format: "text",
+        };
+        assert_eq!(
+            serde_json::to_string(&request).unwrap(),
+            r#"{"q":["hello","world"],"target":"en-US","format":"text"}"#
+        );
+    }
 }

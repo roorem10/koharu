@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Result;
 use koharu_scene::{EntityId, Snapshot};
-use koharu_translator::{GlossaryHint, TranslationContext, TranslationRequest};
+use koharu_translator::{GlossaryHint, SegmentContext, TranslationContext, TranslationRequest};
 
 #[derive(Clone, Debug)]
 pub struct GlossaryTerm {
@@ -19,6 +19,9 @@ pub struct TranslationHints {
     pub glossary: Vec<GlossaryTerm>,
     pub background: String,
     pub characters: BTreeMap<EntityId, String>,
+    /// Per-box references keyed by layer ID, before filtering and ordering segments.
+    pub lines: BTreeMap<EntityId, SegmentContext>,
+    pub context_revision: Option<crate::TranslationContextRevision>,
     pub previous_pages: u8,
 }
 
@@ -28,8 +31,27 @@ impl TranslationHints {
         request: &mut TranslationRequest,
         scene: &Snapshot,
         page: EntityId,
+        layers: &[EntityId],
     ) -> Result<()> {
-        request.glossary = page_glossary(&self.glossary, &request.segments);
+        anyhow::ensure!(
+            scene.project_component::<crate::TranslationContextRevision>()? == self.context_revision,
+            "speaker or box context changed during translation; run it again"
+        );
+        anyhow::ensure!(
+            layers.len() == request.segments.len(),
+            "translation layers must match the ordered segments"
+        );
+        for (segment, layer) in request.segments.iter_mut().zip(layers) {
+            segment.context = self.lines.get(layer).cloned().unwrap_or_default();
+        }
+        request.glossary = page_glossary(
+            &self.glossary,
+            &request
+                .segments
+                .iter()
+                .map(|segment| segment.text.as_str())
+                .collect::<Vec<_>>(),
+        );
         let brief = [
             self.background.as_str(),
             self.characters.get(&page).map_or("", String::as_str),
@@ -65,13 +87,13 @@ pub fn term_occurs(text: &str, source: &str) -> bool {
             )
 }
 
-pub fn page_glossary(glossary: &[GlossaryTerm], sources: &[String]) -> Vec<GlossaryHint> {
+pub fn page_glossary(glossary: &[GlossaryTerm], sources: &[impl AsRef<str>]) -> Vec<GlossaryHint> {
     let mut matches: Vec<_> = glossary
         .iter()
         .filter(|term| {
             sources
                 .iter()
-                .any(|source| term_occurs(source, &term.hint.source))
+                .any(|source| term_occurs(source.as_ref(), &term.hint.source))
         })
         .collect();
     matches.sort_by_key(|entry| !entry.locked);
@@ -135,7 +157,7 @@ mod tests {
             term(" 魔王 ", true),
             term("unused", true),
         ];
-        let matches = page_glossary(&glossary, &["ヒ ナと魔 王".into()]);
+        let matches = page_glossary(&glossary, &["ヒ ナと魔 王"]);
         assert_eq!(
             matches
                 .iter()
@@ -144,6 +166,77 @@ mod tests {
             [" 魔王 ", "ヒナ"]
         );
         assert!(!term_occurs("anything", "  "));
+    }
+
+    #[tokio::test]
+    async fn box_context_follows_layer_ids_after_filtering_and_reordering() {
+        let scene = koharu_scene::Session::memory().await.unwrap().snapshot();
+        let first = EntityId::new();
+        let skipped = EntityId::new();
+        let last = EntityId::new();
+        let hints = TranslationHints {
+            lines: [
+                (
+                    first,
+                    SegmentContext {
+                        speaker: None,
+                        note: Some("first".into()),
+                    },
+                ),
+                (
+                    skipped,
+                    SegmentContext {
+                        speaker: None,
+                        note: Some("skipped".into()),
+                    },
+                ),
+                (
+                    last,
+                    SegmentContext {
+                        speaker: None,
+                        note: Some("last".into()),
+                    },
+                ),
+            ]
+            .into(),
+            ..Default::default()
+        };
+        let mut request =
+            TranslationRequest::new(["same", "same"], koharu_translator::Language::English);
+        hints
+            .apply(&mut request, &scene, EntityId::new(), &[last, first])
+            .unwrap();
+        assert_eq!(request.segments[0].context.note.as_deref(), Some("last"));
+        assert_eq!(request.segments[1].context.note.as_deref(), Some("first"));
+        assert!(
+            hints
+                .apply(&mut request, &scene, EntityId::new(), &[first])
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn frozen_context_rejects_newer_sidecar_transactions_before_requesting_translation() {
+        let mut session = koharu_scene::Session::memory().await.unwrap();
+        let frozen = TranslationHints::default();
+        let marker = crate::TranslationContextRevision {
+            token: "user-changed-speaker".into(),
+        };
+        let patch = session
+            .snapshot()
+            .patch(|edit| edit.set_project(&marker))
+            .unwrap();
+        session.commit(patch).await.unwrap();
+        let scene = session.snapshot();
+        let mut request = TranslationRequest::new(["text"], koharu_translator::Language::English);
+        let page = EntityId::new();
+        let layers = [EntityId::new()];
+        assert!(frozen.apply(&mut request, &scene, page, &layers).is_err());
+        let refreshed = TranslationHints {
+            context_revision: Some(marker),
+            ..Default::default()
+        };
+        refreshed.apply(&mut request, &scene, page, &layers).unwrap();
     }
 
     #[tokio::test]
@@ -199,7 +292,7 @@ mod tests {
         let mut request = TranslationRequest::new(["hello"], koharu_translator::Language::English);
         let before = request.clone();
         TranslationHints::default()
-            .apply(&mut request, &scene, page)
+            .apply(&mut request, &scene, page, &[EntityId::new()])
             .unwrap();
         assert_eq!(request, before);
         assert!(previous_context(&scene, page, 0).unwrap().is_empty());

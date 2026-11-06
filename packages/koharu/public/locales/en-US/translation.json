@@ -1293,5 +1293,12 @@
       "crying": "Crying / Trembling",
       "menacing": "Menacing / Sinister"
     }
+  },
+  "boxSpeaker": {
+    "label": "Speaker",
+    "none": "None",
+    "kindAndSpeaker": "{{kind}} · {{speaker}}",
+    "loadError": "Could not load the speaker.",
+    "saveError": "Could not save the speaker. Select again to retry."
   }
 }

@@ -1293,5 +1293,12 @@
       "crying": "哭泣／顫抖",
       "menacing": "威嚇／陰森"
     }
+  },
+  "boxSpeaker": {
+    "label": "說話者",
+    "none": "無",
+    "kindAndSpeaker": "{{kind}} · {{speaker}}",
+    "loadError": "無法載入說話者。",
+    "saveError": "無法儲存說話者。請重新選擇以重試。"
   }
 }

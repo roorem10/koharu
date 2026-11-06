@@ -287,9 +287,16 @@ impl<'a> Execution<'a> {
             return Ok(false);
         }
 
+        let translation_hints =
+            (stage == Stage::Translation).then(|| self.translation_hints.clone());
         let next = self
             .committer
-            .commit(StageOutput { page, stage, patch })
+            .commit(StageOutput {
+                page,
+                stage,
+                patch,
+                translation_hints,
+            })
             .await
             .with_context(|| format!("failed to commit {stage} output for page {page}"))
             .map_err(|error| PipelineError::new(ErrorKind::Commit, Some(stage), error))?;

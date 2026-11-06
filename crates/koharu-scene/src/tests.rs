@@ -418,6 +418,58 @@ async fn observed_page_subtree_guards_pipeline_rebase_inputs() {
 }
 
 #[tokio::test]
+async fn observed_project_components_guard_absence_updates_and_removal() {
+    let mut session = Session::memory().await.unwrap();
+    let mut ids = None;
+    let create = session
+        .snapshot()
+        .patch(|edit| {
+            let page = edit.add_page(page(), At::End)?;
+            ids = Some((page, edit.add_text_content(page, At::End)?));
+            Ok(())
+        })
+        .unwrap();
+    let base = session.commit(create).await.unwrap().snapshot;
+    let (page, content) = ids.unwrap();
+    let derived = |snapshot: &Snapshot| {
+        snapshot
+            .patch(|edit| {
+                edit.observe_project::<EvolvingComponentV1>()?;
+                edit.set(content, &source("derived"))
+            })
+            .unwrap()
+    };
+    let absent = derived(&base);
+    let unrelated = base
+        .patch(|edit| edit.set_page(page, PageDraft::new("renamed", 1200.0, 1800.0)))
+        .unwrap();
+    let current = session.commit(unrelated).await.unwrap().snapshot;
+    assert!(absent.rebase_on(&current).is_ok());
+
+    for title in ["first", "changed"] {
+        let current = session.snapshot();
+        let observed = derived(&current);
+        let change = current
+            .patch(|edit| {
+                edit.set_project(&EvolvingComponentV1 {
+                    title: title.into(),
+                    legacy_count: 0,
+                })
+            })
+            .unwrap();
+        let current = session.commit(change).await.unwrap().snapshot;
+        assert!(observed.rebase_on(&current).is_err());
+    }
+    let current = session.snapshot();
+    let observed = derived(&current);
+    let remove = current
+        .patch(|edit| edit.remove_project::<EvolvingComponentV1>())
+        .unwrap();
+    let current = session.commit(remove).await.unwrap().snapshot;
+    assert!(observed.rebase_on(&current).is_err());
+}
+
+#[tokio::test]
 async fn project_and_relation_metadata_use_typed_components() {
     let mut session = Session::memory().await.unwrap();
     let settings = Project {

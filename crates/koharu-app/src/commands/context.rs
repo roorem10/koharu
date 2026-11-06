@@ -2,6 +2,7 @@
 //!
 //! Owned by WO-18. The shared foundation only adds the translation hints hook.
 
+pub(crate) mod edits;
 pub(crate) mod history;
 pub(crate) mod lines;
 pub(crate) mod reading;
@@ -12,7 +13,10 @@ pub(crate) use lines::refresh_flags;
 pub(crate) use reading::{auto_read, wants_auto_read};
 pub(crate) use settings::get_context_settings;
 
-use super::{Error, project::CurrentProject};
+use super::{
+    Error,
+    project::{CurrentProject, Project},
+};
 use anyhow::{Context as _, Result};
 use booharu_context::ProjectContext;
 use koharu_pipeline::TranslationHints;
@@ -84,8 +88,61 @@ pub(crate) fn translation_hints(
         glossary,
         background,
         characters,
+        lines: context
+            .lines
+            .iter()
+            .filter_map(|(layer, line)| {
+                let hints = line_translation_context(line, series.as_ref());
+                (!hints.is_empty()).then_some((*layer, hints))
+            })
+            .collect(),
+        context_revision: snapshot
+            .project_component::<koharu_pipeline::TranslationContextRevision>()?,
         previous_pages: settings.previous_pages.min(2),
     })
+}
+
+fn line_translation_context(
+    line: &booharu_context::LineContext,
+    series: Option<&booharu_context::Series>,
+) -> koharu_translator::SegmentContext {
+    let speaker = line
+        .speaker
+        .as_ref()
+        .and_then(|speaker| speaker.value.as_ref())
+        .and_then(|id| {
+            series?
+                .characters
+                .iter()
+                .find(|character| &character.id == id)
+        })
+        .map(|character| koharu_translator::SpeakerHint {
+            name: character.name.clone(),
+            original: (!character.original.trim().is_empty()).then(|| character.original.clone()),
+            notes: (!character.notes.trim().is_empty()).then(|| character.notes.clone()),
+        });
+    // A hand-written box note takes precedence over the chapter reader's suggestion.
+    let note = line
+        .box_note
+        .as_ref()
+        .filter(|note| !note.trim().is_empty())
+        .or_else(|| line.note.as_ref().filter(|note| !note.trim().is_empty()))
+        .cloned();
+    koharu_translator::SegmentContext { speaker, note }
+}
+
+/// Series character details can change outside a project's scene transaction.
+/// Compare the resolved references again while the committer owns the project.
+pub(crate) fn validate_translation_context(
+    project: &Project,
+    expected: &TranslationHints,
+) -> Result<()> {
+    let current = translation_hints(&project.load_context()?, &project.snapshot())?;
+    anyhow::ensure!(
+        expected.lines == current.lines,
+        "box context or series characters changed during translation; run it again"
+    );
+    Ok(())
 }
 
 #[derive(Serialize, Type)]
@@ -206,5 +263,85 @@ pub(crate) fn linked_series(context: &ProjectContext) -> Result<Option<booharu_c
             }
             Err(error) => Err(error),
         },
+    }
+}
+
+#[cfg(test)]
+mod translation_context_tests {
+    use super::*;
+
+    #[test]
+    fn resolved_speaker_context_detects_series_edits() {
+        let mut series = booharu_context::Series {
+            characters: vec![booharu_context::Character {
+                id: "speaker".into(),
+                name: "Mika".into(),
+                notes: "Formal voice".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let line = booharu_context::LineContext {
+            speaker: Some(booharu_context::LineSpeaker {
+                value: Some("speaker".into()),
+                source: booharu_context::LabelSource::User,
+            }),
+            ..Default::default()
+        };
+        let observed = line_translation_context(&line, Some(&series));
+        series.characters[0].notes = "Casual voice".into();
+        assert_ne!(observed, line_translation_context(&line, Some(&series)));
+        series.characters[0].notes = "Formal voice".into();
+        series.characters[0].name = "Miki".into();
+        assert_ne!(observed, line_translation_context(&line, Some(&series)));
+        series.characters.clear();
+        assert_ne!(observed, line_translation_context(&line, Some(&series)));
+        assert_ne!(observed, line_translation_context(&line, None));
+    }
+
+    #[test]
+    fn speaker_uses_character_identity_and_hand_notes_take_precedence() {
+        let series = booharu_context::Series {
+            characters: vec![
+                booharu_context::Character {
+                    id: "other".into(),
+                    name: "Mika".into(),
+                    notes: "Wrong character".into(),
+                    ..Default::default()
+                },
+                booharu_context::Character {
+                    id: "mika".into(),
+                    name: "Mika".into(),
+                    original: "ミカ".into(),
+                    notes: "She speaks formally".into(),
+                },
+            ],
+            ..Default::default()
+        };
+        let mut line = booharu_context::LineContext {
+            speaker: Some(booharu_context::LineSpeaker {
+                value: Some("mika".into()),
+                source: booharu_context::LabelSource::User,
+            }),
+            note: Some("Reader note".into()),
+            box_note: Some("Hand note".into()),
+            ..Default::default()
+        };
+        let hints = line_translation_context(&line, Some(&series));
+        let speaker = hints.speaker.unwrap();
+        assert_eq!(speaker.name, "Mika");
+        assert_eq!(speaker.original.as_deref(), Some("ミカ"));
+        assert_eq!(speaker.notes.as_deref(), Some("She speaks formally"));
+        assert_eq!(hints.note.as_deref(), Some("Hand note"));
+        line.box_note = Some(" \n ".into());
+        assert_eq!(
+            line_translation_context(&line, Some(&series)).note.as_deref(),
+            Some("Reader note")
+        );
+        assert!(line_translation_context(&line, None).speaker.is_none());
+        line.speaker.as_mut().unwrap().value = None;
+        assert!(line_translation_context(&line, Some(&series)).speaker.is_none());
+        line.note = None;
+        assert!(line_translation_context(&line, Some(&series)).is_empty());
     }
 }

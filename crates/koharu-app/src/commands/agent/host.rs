@@ -60,6 +60,10 @@ impl KoharuHost {
                 for layer in layers {
                     if let Ok(id) = serde_json::from_value::<EntityId>(layer["id"].clone()) {
                         layer["lettering_category"] = serde_json::to_value(context.category(id))?;
+                        layer["speaker"] = serde_json::to_value(context.speaker(id))?;
+                        layer["box_note"] = serde_json::to_value(
+                            context.lines.get(&id).and_then(|line| line.box_note.as_ref()),
+                        )?;
                         layer["flags"] = serde_json::to_value(
                             context
                                 .lines
@@ -100,6 +104,9 @@ impl KoharuHost {
             "pages": pages,
             "brief": context.brief,
             "series_glossary": glossary,
+            "series_characters": super::super::context::linked_series(&context)?
+                .map(|series| series.characters)
+                .unwrap_or_default(),
             "configuration": {
                 "pipeline": preferences.pipeline,
                 "providers": providers,
@@ -396,6 +403,9 @@ impl Host for KoharuHost {
                     ),
                     definition::<AddGlossaryEntry>("add_glossary_entry", "Suggest a glossary term for this chapter without replacing an existing series term."),
                     definition::<SetLineCategory>("set_line_category", "Set a model lettering category for a text layer. A user label always wins."),
+                    definition::<super::super::speakers::GetBoxSpeaker>("get_box_speaker", "Read a text box's speaker and the linked series characters, including their notes."),
+                    definition::<super::super::speakers::SetBoxSpeaker>("set_box_speaker", "Set a text box's model speaker by series character ID, or null if uncertain. A hand-set speaker (including None) always wins. The change is undoable."),
+                    definition::<super::super::notes::SetBoxNote>("set_box_note", "Set a text box's translation context note, or null to clear it, in one undoable edit."),
                     definition::<FlagLine>("flag_line", "Mark a text layer for human review with a short message."),
                     definition::<SetGeometry>(
                         "set_geometry",
@@ -687,6 +697,51 @@ impl Host for KoharuHost {
             "add_glossary_entry" | "set_line_category" | "flag_line" => {
                 self.context_tool(&call).await
             }
+            "get_box_speaker" => {
+                let args: super::super::speakers::GetBoxSpeaker = arguments(&call)?;
+                let layer = entity(&args.layer)?;
+                let current = self.handle.state::<CurrentProject>();
+                let current = current.project.lock().await;
+                let project = current.as_ref().context("no project is open")?;
+                let speaker = project.box_speaker(layer)?;
+                let series = super::super::context::linked_series(&project.load_context()?)?;
+                Invocation::read(json!({
+                    "layer": layer,
+                    "speaker": speaker,
+                    "characters": series.map(|series| series.characters).unwrap_or_default(),
+                    "box_note": project.box_note(layer)?,
+                }))
+            }
+            "set_box_speaker" => {
+                let args: super::super::speakers::SetBoxSpeaker = arguments(&call)?;
+                let layer = entity(&args.layer)?;
+                self.mutate_optional(|project| {
+                    Box::pin(async move {
+                        let commit = project
+                            .set_box_speaker(layer, args.speaker, booharu_context::LabelSource::Model)
+                            .await?;
+                        Ok((
+                            commit,
+                            json!({ "layer": layer, "speaker": project.box_speaker(layer)? }),
+                        ))
+                    })
+                })
+                .await
+            }
+            "set_box_note" => {
+                let args: super::super::notes::SetBoxNote = arguments(&call)?;
+                let layer = entity(&args.layer)?;
+                self.mutate_optional(|project| {
+                    Box::pin(async move {
+                        let commit = project.set_box_note(layer, args.note).await?;
+                        Ok((
+                            commit,
+                            json!({ "layer": layer, "note": project.box_note(layer)? }),
+                        ))
+                    })
+                })
+                .await
+            }
             "run_pipeline" => self.run_pipeline(arguments(&call)?, control).await,
             // WO-20 (one box per bubble) tool calls go here.
             "find_split_bubbles" => {
@@ -807,6 +862,9 @@ impl Committer for AgentCommitter {
             let current = self.host.handle.state::<CurrentProject>();
             let mut current = current.project.lock().await;
             let project = current.as_mut().context("no project is open")?;
+            if let Some(hints) = output.translation_hints.as_deref() {
+                super::super::context::validate_translation_context(project, hints)?;
+            }
             let Some(commit) = project.commit_rebased(output.patch).await? else {
                 return Ok(project.snapshot());
             };

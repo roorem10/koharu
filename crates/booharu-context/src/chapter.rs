@@ -84,6 +84,7 @@ pub struct ReadLine {
     pub category: Option<String>,
     pub confidence: Option<f32>,
     pub note: Option<String>,
+    pub speaker: Option<String>,
 }
 
 impl ProjectContext {
@@ -92,6 +93,7 @@ impl ProjectContext {
         reading: ChapterReading,
         valid_layers: &BTreeSet<EntityId>,
         series: &[GlossaryEntry],
+        characters: &[Character],
         read_at: String,
     ) -> Vec<EntityId> {
         let brief = self.brief.get_or_insert_with(ChapterBrief::default);
@@ -152,6 +154,11 @@ impl ProjectContext {
             if let Some(note) = line.note.filter(|text| !text.trim().is_empty()) {
                 self.lines.entry(id).or_default().note = Some(note);
             }
+            if line.speaker.as_ref().is_none_or(|speaker| {
+                characters.iter().any(|character| character.id == *speaker)
+            }) {
+                self.set_model_speaker(id, line.speaker);
+            }
         }
         changed.into_iter().collect()
     }
@@ -199,6 +206,96 @@ mod tests {
     use super::*;
 
     #[test]
+    fn reading_accepts_a_known_speaker_null_and_an_omitted_speaker() {
+        for (speaker, expected) in [
+            (Some(serde_json::json!("mika")), Some("mika")),
+            (Some(serde_json::Value::Null), None),
+            (None, None),
+        ] {
+            let mut line = serde_json::json!({
+                "id": "line", "category": null, "confidence": null, "note": null,
+            });
+            if let Some(speaker) = speaker {
+                line["speaker"] = speaker;
+            }
+            let reading: ChapterReading = serde_json::from_value(serde_json::json!({
+                "summary": "", "characters": [], "glossary": [], "lines": [line],
+            }))
+            .unwrap();
+            assert_eq!(reading.lines[0].speaker.as_deref(), expected);
+        }
+        assert!(
+            serde_json::from_value::<ReadLine>(serde_json::json!({
+                "id": "line", "speaker": {"name": "mika"},
+            }))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rereading_keeps_hand_picked_speakers_including_none() {
+        let model = EntityId::new();
+        let picked = EntityId::new();
+        let blank = EntityId::new();
+        let invalid = EntityId::new();
+        let valid = BTreeSet::from([model, picked, blank, invalid]);
+        let characters = [
+            Character {
+                id: "mika".into(),
+                ..Default::default()
+            },
+            Character {
+                id: "aki".into(),
+                ..Default::default()
+            },
+        ];
+        let mut context = ProjectContext::default();
+        context.set_user_speaker(picked, Some("aki".into()));
+        context.set_user_speaker(blank, None);
+        let reading: ChapterReading = serde_json::from_value(serde_json::json!({
+            "summary": "", "characters": [], "glossary": [], "lines": [
+                {"id":model, "speaker":"mika"},
+                {"id":picked, "speaker":"mika"},
+                {"id":blank, "speaker":"mika"},
+                {"id":invalid, "speaker":"invented"},
+            ],
+        }))
+        .unwrap();
+        context.merge_reading(reading.clone(), &valid, &[], &characters, "first".into());
+        context.merge_reading(reading, &valid, &[], &characters, "again".into());
+        assert_eq!(
+            context.speaker(model),
+            Some(crate::LineSpeaker {
+                value: Some("mika".into()),
+                source: crate::LabelSource::Model,
+            })
+        );
+        assert_eq!(
+            context.speaker(picked),
+            Some(crate::LineSpeaker {
+                value: Some("aki".into()),
+                source: crate::LabelSource::User,
+            })
+        );
+        assert_eq!(
+            context.speaker(blank),
+            Some(crate::LineSpeaker {
+                value: None,
+                source: crate::LabelSource::User,
+            })
+        );
+        assert_eq!(context.speaker(invalid), None);
+
+        let directory = tempfile::tempdir().unwrap();
+        context.save(directory.path()).unwrap();
+        let mut context = ProjectContext::load(directory.path()).unwrap();
+        assert!(!context.set_model_speaker(blank, Some("mika".into())));
+        assert_eq!(context.speaker(blank).unwrap().value, None);
+        assert!(context.set_model_speaker(model, None));
+        assert_eq!(context.speaker(model), None);
+    }
+
+    #[test]
     fn parses_owner_instructions_and_keeps_line_numbers() {
         let terms = instruction_terms(
             "Use natural English.\nGlossary:\nヒナ=Hina\n魔王 = Demon King\n\n村 → Village\n町: Town",
@@ -244,7 +341,7 @@ mod tests {
         .unwrap();
         assert!(
             context
-                .merge_reading(reading, &BTreeSet::from([layer]), &series, "now".into())
+                .merge_reading(reading, &BTreeSet::from([layer]), &series, &[], "now".into())
                 .is_empty()
         );
         assert_eq!(

@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -8,13 +8,15 @@ import { projectKey, queryClient } from '@/lib/queries'
 import { commands } from '@koharu/bridge/protocol'
 
 function editor(layer = 'line') {
-  queryClient.setQueryData(projectKey, {
+  const project = {
     name: 'notes',
     revision: 1,
     active_page: null,
     can_undo: false,
     can_redo: false,
-  })
+  }
+  vi.spyOn(commands, 'getProject').mockResolvedValue(project)
+  queryClient.setQueryData(projectKey, project)
   return (
     <QueryClientProvider client={queryClient}>
       <BoxNoteLine layer={layer} />
@@ -66,5 +68,20 @@ describe('Inspector box notes', () => {
     expect(screen.queryByDisplayValue('First note')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Note' }))
     expect(await screen.findByRole('textbox', { name: 'Box note' })).toHaveValue('')
+  })
+
+  it('refetches committed notes after undo without replacing an unsaved draft', async () => {
+    vi.mocked(commands.getBoxNote).mockResolvedValue('Saved')
+    render(editor())
+    const note = await screen.findByRole('textbox', { name: 'Box note' })
+    expect(note).toHaveValue('Saved')
+    vi.mocked(commands.getBoxNote).mockResolvedValue('Undone')
+    act(() => queryClient.setQueryData(projectKey, { name: 'notes', revision: 2 }))
+    await waitFor(() => expect(note).toHaveValue('Undone'))
+    fireEvent.change(note, { target: { value: 'Unsaved edit' } })
+    vi.mocked(commands.getBoxNote).mockResolvedValue('Agent edit')
+    act(() => queryClient.setQueryData(projectKey, { name: 'notes', revision: 3 }))
+    await waitFor(() => expect(commands.getBoxNote).toHaveBeenCalledTimes(3))
+    expect(note).toHaveValue('Unsaved edit')
   })
 })

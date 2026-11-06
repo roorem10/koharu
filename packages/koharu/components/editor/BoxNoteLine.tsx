@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { refreshContext } from '@/components/context/data'
 import { call } from '@/lib/backend'
-import { queryClient, useProject } from '@/lib/queries'
+import { projectKey, queryClient, refresh, useProject } from '@/lib/queries'
 import type { EntityId } from '@koharu/bridge/protocol'
 import { commands } from '@koharu/bridge/protocol'
 import { Textarea } from '@koharu/ui/components/textarea'
@@ -32,12 +33,14 @@ function NoteEditor({
   expanded: boolean
 }) {
   const { t } = useTranslation()
-  const queryKey = ['box-note', project, layer]
+  const revision = useProject().data?.revision
+  const queryKey = ['box-note', project, layer, revision]
   const note = useQuery({
     queryKey,
     queryFn: () => call(commands.getBoxNote, layer),
     staleTime: 0,
     networkMode: 'always',
+    placeholderData: (previous) => previous,
   })
   const [open, setOpen] = useState(expanded)
   const [draft, setDraft] = useState<string | null>(null)
@@ -59,9 +62,10 @@ function NoteEditor({
     setSaving(true)
     setFailed(false)
     void call(commands.setBoxNote, layer, next)
-      .then(() => {
+      .then(async () => {
         queryClient.setQueryData(queryKey, next)
         setDraft(null)
+        await Promise.all([refresh(projectKey), refreshContext()])
       })
       .catch(() => setFailed(true))
       .finally(() => setSaving(false))

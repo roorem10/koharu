@@ -11,7 +11,7 @@ mod sidecar;
 
 pub use lettering::LetteringCategory;
 pub use sidecar::{
-    CONTEXT_FILE, CONTEXT_VERSION, LabelSource, LineCategory, LineContext, ProjectContext,
+    CONTEXT_FILE, CONTEXT_VERSION, LabelSource, LineCategory, LineContext, LineSpeaker, ProjectContext,
 };
 
 pub use chapter::{

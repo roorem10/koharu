@@ -18,7 +18,8 @@ use error::{Error, Result};
 use local::LocalTranslator;
 
 pub use backend::{
-    GlossaryHint, TaskRequest, TranslatedSegment, TranslationContext, TranslationRequest,
+    GlossaryHint, SegmentContext, SpeakerHint, TaskRequest, TranslatedSegment, TranslationContext,
+    TranslationRequest, TranslationSegment,
 };
 pub use emphasis::EmphasisSettings;
 pub use language::Language;

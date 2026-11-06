@@ -11,6 +11,7 @@ import { BoxNoteLine } from '@/components/editor/BoxNoteLine'
 import { BubbleShapeLine } from '@/components/editor/BubbleShapeLine'
 import { LetteringCategoryLine } from '@/components/editor/LetteringCategoryLine'
 import { LineContextCard } from '@/components/editor/LineContextCard'
+import { SpeakerLine } from '@/components/editor/SpeakerLine'
 import { BoxRedoSection } from '@/components/ocr-box/BoxRedoSection'
 import { BoxQcSection } from '@/components/qc/BoxQcSection'
 import { useBoxIssues } from '@/components/qc/useBoxIssues'
@@ -352,6 +353,7 @@ function DetailsDialog({ layer }: { layer: TextLayer }) {
             <>
               <BubbleShapeLine layer={layer.id} />
               <LetteringCategoryLine layer={layer.id} editable={false} />
+              <SpeakerLine layer={layer.id} />
             </>
           )}
           {section === 'source' && <SourceSection layer={layer} />}

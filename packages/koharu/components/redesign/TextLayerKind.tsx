@@ -2,6 +2,7 @@
 
 import { useTranslation } from 'react-i18next'
 
+import { useChapterContext } from '@/components/context/data'
 import { useEffectiveCategory } from '@/components/lettering/queries'
 import type { Layer } from '@koharu/bridge/protocol'
 
@@ -14,6 +15,12 @@ export function TextLayerKind({
 }) {
   const { t } = useTranslation()
   const category = useEffectiveCategory(layer.id).data
+  const chapter = useChapterContext().data
+  const speaker = chapter?.context.lines[layer.id]?.speaker?.value
+  const character = chapter?.series?.characters.find((character) => character.id === speaker)
   const label = category ? t(`lettering.categories.${category.category}`) : fallback
-  return layer.word_styles ? t('richTextPanel.styledWords', { category: label }) : label
+  const kind = character
+    ? t('boxSpeaker.kindAndSpeaker', { kind: label, speaker: character.name })
+    : label
+  return layer.word_styles ? t('richTextPanel.styledWords', { category: kind }) : kind
 }

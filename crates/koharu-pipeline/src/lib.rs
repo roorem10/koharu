@@ -18,6 +18,7 @@ mod scope;
 mod stage;
 mod stage_runner;
 mod stages;
+mod translation_context;
 
 pub use config::{
     DetectionModel, InpaintingModel, OcrModel, PipelineConfig, ProcessorConfig, TranslationConfig,
@@ -39,6 +40,7 @@ pub use stages::{
     BoxSettings, CleanupSettings, Flux2KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, PaintTarget,
     RemoveMode, RoremMixedConfig,
 };
+pub use translation_context::TranslationContextRevision;
 
 use images::ImageCache;
 use model_cell::ModelCell;

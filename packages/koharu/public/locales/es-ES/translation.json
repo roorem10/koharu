@@ -1306,5 +1306,12 @@
       "crying": "Llanto / temblor",
       "menacing": "Amenazante / siniestro"
     }
+  },
+  "boxSpeaker": {
+    "label": "Hablante",
+    "none": "Ninguno",
+    "kindAndSpeaker": "{{kind}} · {{speaker}}",
+    "loadError": "No se pudo cargar el hablante.",
+    "saveError": "No se pudo guardar el hablante. Vuelve a seleccionarlo para reintentar."
   }
 }

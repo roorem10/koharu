@@ -1293,5 +1293,12 @@
       "crying": "哭泣／发抖",
       "menacing": "威吓／阴森"
     }
+  },
+  "boxSpeaker": {
+    "label": "讲话个人",
+    "none": "无",
+    "kindAndSpeaker": "{{kind}} · {{speaker}}",
+    "loadError": "读勿进讲话个人。",
+    "saveError": "存勿进讲话个人。请再选一趟。"
   }
 }

@@ -36,7 +36,9 @@ use tokio::{net::TcpListener, sync::Mutex, task::JoinSet};
 use tokio_util::sync::CancellationToken;
 use url::Url;
 
-pub(super) const READ_TOOLS: &[&str] = &["inspect_project", "view_page", "get_project_summary"];
+pub(super) const READ_TOOLS: &[&str] = &[
+    "inspect_project", "view_page", "get_box_speaker", "get_project_summary",
+];
 type HttpResponse = Response<BoxBody<Bytes, Infallible>>;
 
 pub(super) struct Bridge {

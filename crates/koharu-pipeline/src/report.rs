@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -36,6 +36,8 @@ pub struct StageOutput {
     pub page: koharu_scene::EntityId,
     pub stage: Stage,
     pub patch: koharu_scene::Patch,
+    /// References observed by translation, for app-owned sidecar validation at commit.
+    pub translation_hints: Option<Arc<crate::TranslationHints>>,
 }
 
 #[async_trait]

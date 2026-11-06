@@ -1345,5 +1345,12 @@
       "crying": "بكاء / ارتجاف",
       "menacing": "تهديد / شر"
     }
+  },
+  "boxSpeaker": {
+    "label": "المتحدث",
+    "none": "لا أحد",
+    "kindAndSpeaker": "{{kind}} · {{speaker}}",
+    "loadError": "تعذر تحميل المتحدث.",
+    "saveError": "تعذر حفظ المتحدث. اختر مرة أخرى لإعادة المحاولة."
   }
 }

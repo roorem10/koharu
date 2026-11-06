@@ -134,6 +134,8 @@ export const commands = {
 	stopChapterBatch: () => __TAURI_INVOKE<null>("stop_chapter_batch"),
 	getBoxNote: (layer: EntityId) => __TAURI_INVOKE<string | null>("get_box_note", { layer }),
 	setBoxNote: (layer: EntityId, note: string | null) => __TAURI_INVOKE<null>("set_box_note", { layer, note }),
+	getBoxSpeaker: (layer: EntityId) => __TAURI_INVOKE<LineSpeaker | null>("get_box_speaker", { layer }),
+	setBoxSpeaker: (layer: EntityId, speaker: string | null) => __TAURI_INVOKE<LineSpeaker | null>("set_box_speaker", { layer, speaker }),
 	getMcpStatus: () => __TAURI_INVOKE<McpStatus>("get_mcp_status"),
 	saveMcpSettings: (options: McpOptions) => __TAURI_INVOKE<McpStatus>("save_mcp_settings", { options }),
 	newMcpToken: () => __TAURI_INVOKE<McpStatus>("new_mcp_token"),
@@ -658,6 +660,7 @@ export type LineCategory = {
 
 export type LineContext = {
 	category?: LineCategory | null,
+	speaker?: LineSpeaker | null,
 	note?: string | null,
 	flags?: Flag[],
 	dismissed?: string[],
@@ -670,6 +673,12 @@ export type LineContext = {
 export type LineExplanation = {
 	explanation: string,
 	alternatives: string[],
+};
+
+export type LineSpeaker = {
+	/**  The linked series character's ID. A user-selected `None` stays blank on re-read. */
+	value: string | null,
+	source: LabelSource,
 };
 
 export type LmStudioConfig = {

@@ -28,6 +28,7 @@ pub(super) async fn translate(
     _config: &CaiyunConfig,
     request: &TranslationRequest,
 ) -> Result<Vec<String>> {
+    // This API has no reference-text field, so per-box context is left out rather than failing the page.
     let api_key = koharu_secrets::get("caiyun")?.context("caiyun API key is not configured")?;
     let target = target(request.target_language).ok_or(Error::UnsupportedLanguage {
         provider: "caiyun",
@@ -42,7 +43,11 @@ pub(super) async fn translate(
                 format!("token {}", api_key.expose_secret()),
             )
             .json(&Request {
-                source: &request.segments,
+                source: request
+                    .segments
+                    .iter()
+                    .map(|segment| segment.text.as_str())
+                    .collect(),
                 trans_type: format!("auto2{target}"),
                 request_id: "koharu-translator",
                 detect: true,
@@ -72,7 +77,7 @@ pub(super) async fn translate(
 
 #[derive(Serialize)]
 struct Request<'a> {
-    source: &'a [String],
+    source: Vec<&'a str>,
     trans_type: String,
     request_id: &'static str,
     detect: bool,
@@ -123,6 +128,21 @@ fn target(language: Language) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plain_text_payload_keeps_the_original_bytes() {
+        let request = Request {
+            source: vec!["hello", "world"],
+            trans_type: "auto2en".into(),
+            request_id: "koharu-translator",
+            detect: true,
+            media: "text",
+        };
+        assert_eq!(
+            serde_json::to_string(&request).unwrap(),
+            r#"{"source":["hello","world"],"trans_type":"auto2en","request_id":"koharu-translator","detect":true,"media":"text"}"#
+        );
+    }
 
     #[test]
     fn unsupported_languages_are_not_substituted() {

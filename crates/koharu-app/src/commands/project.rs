@@ -407,6 +407,8 @@ pub(crate) struct Project {
     pub(crate) active_page: Option<EntityId>,
     pub(crate) undo: Vec<Vec<Revision>>,
     pub(crate) redo: Vec<Vec<Revision>>,
+    pub(crate) context_changes:
+        std::collections::BTreeMap<Revision, super::context::edits::ContextChanges>,
     /// The last on-page typing commit (layer, editing session, revision), so a run
     /// of typing in one session is undone as one step.
     pub(crate) typing: Option<(EntityId, u32, Revision)>,
@@ -437,6 +439,7 @@ impl Project {
             active_page,
             undo: Vec::new(),
             redo: Vec::new(),
+            context_changes: Default::default(),
             typing: None,
             directory: None,
         }
@@ -453,10 +456,7 @@ impl Project {
 
     /// The Booharu sidecar for this project. In-memory projects have an empty one.
     pub(crate) fn load_context(&self) -> Result<booharu_context::ProjectContext> {
-        match self.directory() {
-            Some(directory) => booharu_context::ProjectContext::load(directory),
-            None => Ok(Default::default()),
-        }
+        super::context::edits::load(self)
     }
 
     /// Changes the sidecar in one locked load-change-save step.
@@ -464,6 +464,7 @@ impl Project {
         &self,
         change: impl FnOnce(&mut booharu_context::ProjectContext) -> R,
     ) -> Result<R> {
+        self.load_context()?;
         let directory = self
             .directory()
             .context("this project has no folder for its context file")?;
@@ -1247,7 +1248,7 @@ impl Project {
 
     pub(crate) async fn undo(&mut self) -> Result<Commit> {
         let revisions = self.undo.pop().ok_or_else(|| anyhow!("nothing to undo"))?;
-        let commit = match self.session.undo_many(revisions.iter().copied()).await {
+        let commit = match self.undo_context_revisions(&revisions).await {
             Ok(commit) => commit,
             Err(error) => {
                 self.undo.push(revisions);
@@ -1260,7 +1261,7 @@ impl Project {
 
     pub(crate) async fn redo(&mut self) -> Result<Commit> {
         let revisions = self.redo.pop().ok_or_else(|| anyhow!("nothing to redo"))?;
-        let commit = match self.session.undo_many(revisions.iter().copied()).await {
+        let commit = match self.undo_context_revisions(&revisions).await {
             Ok(commit) => commit,
             Err(error) => {
                 self.redo.push(revisions);
