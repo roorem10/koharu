@@ -1,9 +1,9 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 
 import { seriesKey } from '@/components/context/data'
-import { useNewChapterSeries } from '@/components/context/NewChapterSeries'
+import { NewChapterSeries, useNewChapterSeries } from '@/components/context/NewChapterSeries'
 import { queryClient } from '@/lib/queries'
 import { commands, type Series } from '@koharu/bridge/protocol'
 
@@ -40,4 +40,29 @@ it('never offers a deleted series from an old last-used response', async () => {
   await act(async () => resolve({ id: 'deleted', name: 'Deleted series' }))
   await waitFor(() => expect(result.current.loading).toBe(false))
   expect(result.current.value).toBeNull()
+})
+
+it('creates a new series from the picker and selects it', async () => {
+  const created = { id: 'new', name: 'New one' }
+  const list = vi.spyOn(commands, 'listSeries').mockResolvedValue([])
+  vi.spyOn(commands, 'getLastSeries').mockResolvedValue(null)
+  const create = vi.spyOn(commands, 'createSeries').mockImplementation(async () => {
+    list.mockResolvedValue([created])
+    return created
+  })
+  let value: string | null = null
+  function Harness() {
+    const choice = useNewChapterSeries()
+    value = choice.value
+    return <NewChapterSeries choice={choice} />
+  }
+  render(<Harness />, { wrapper })
+  fireEvent.click(await screen.findByRole('button', { name: 'New series' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'Series name' }), {
+    target: { value: 'New one' },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+  await waitFor(() => expect(create).toHaveBeenCalledWith('New one'))
+  await waitFor(() => expect(value).toBe('new'))
+  expect(screen.queryByRole('textbox', { name: 'Series name' })).not.toBeInTheDocument()
 })
