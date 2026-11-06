@@ -34,12 +34,10 @@ impl KoharuHost {
 
     pub(crate) async fn set_box_note(&self, args: SetBoxNote) -> Result<Invocation> {
         let layer = entity(&args.layer)?;
-        self.mutate_optional(|project| {
-            Box::pin(async move {
-                let commit = project.set_box_note(layer, args.note).await?;
-                Ok((commit, json!({ "layer": layer })))
-            })
-        })
-        .await
+        let current = self.handle.state::<CurrentProject>();
+        let current = current.project.lock().await;
+        let project = current.as_ref().context("no project is open")?;
+        project.set_box_note(layer, args.note)?;
+        Invocation::changed(json!({ "layer": layer }))
     }
 }

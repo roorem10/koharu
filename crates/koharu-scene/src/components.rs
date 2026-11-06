@@ -8,7 +8,6 @@ mod analysis;
 mod assets;
 mod groups;
 mod layers;
-mod notes;
 mod provenance;
 pub mod rich_text;
 mod spatial;
@@ -26,7 +25,6 @@ pub use layers::{
     StrokeMethod, StrokePosition, TextAlignment, TextLayout, TextLayoutKind, TextWarp, Typography,
     WritingMode,
 };
-pub use notes::BoxNote;
 pub use provenance::{Authored, Generation, Origin};
 pub use rich_text::{RunStyle, StyleRun, TextRuns, char_range_to_byte_range};
 pub use spatial::{Geometry, Point, Visibility};

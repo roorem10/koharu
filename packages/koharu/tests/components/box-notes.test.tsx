@@ -1,11 +1,10 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { BoxNoteLine } from '@/components/editor/BoxNoteLine'
 import { projectKey, queryClient } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
 import { commands } from '@koharu/bridge/protocol'
 
 function editor(layer = 'line') {
@@ -67,27 +66,5 @@ describe('Inspector box notes', () => {
     expect(screen.queryByDisplayValue('First note')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Note' }))
     expect(await screen.findByRole('textbox', { name: 'Box note' })).toHaveValue('')
-  })
-
-  it('refreshes committed notes on revisions without replacing a hand-edited draft', async () => {
-    const read = vi.mocked(commands.getBoxNote).mockResolvedValue('Original note')
-    render(editor())
-    const note = await screen.findByRole('textbox', { name: 'Box note' })
-    expect(note).toHaveValue('Original note')
-
-    read.mockResolvedValue('Agent note')
-    act(() => useKoharuStore.setState({ canvasRevision: 2 }))
-    await waitFor(() => expect(note).toHaveValue('Agent note'))
-
-    read.mockResolvedValue('Original note')
-    act(() => useKoharuStore.setState({ canvasRevision: 3 }))
-    await waitFor(() => expect(note).toHaveValue('Original note'))
-
-    fireEvent.change(note, { target: { value: 'Unsaved hand edit' } })
-    read.mockResolvedValue('Another committed note')
-    act(() => useKoharuStore.setState({ canvasRevision: 4 }))
-    await waitFor(() => expect(note).toBeEnabled())
-    expect(note).toHaveValue('Unsaved hand edit')
-    expect(commands.setBoxNote).not.toHaveBeenCalled()
   })
 })

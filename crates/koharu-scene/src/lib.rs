@@ -25,7 +25,7 @@ pub use change::{
 pub use component::{Component, ValidationContext};
 pub use components::rich_text;
 pub use components::{
-    Asset, AssetInput, AssetMetadata, AssetRole, Authored, BoxNote, DetectionAnalysis, DetectionLabel,
+    Asset, AssetInput, AssetMetadata, AssetRole, Authored, DetectionAnalysis, DetectionLabel,
     EntityOrigin, FillGradient, FontStyle, Generation, Geometry, GradientKind, GradientStop, Group,
     LanguageTag, OcrAnalysis, Origin, Page, PageDraft, Point, Project, RasterLayer,
     RasterLayerKind, Region, RegionKind, Relation, RelationKind, RunStyle, SourceText, StrokeJoin,

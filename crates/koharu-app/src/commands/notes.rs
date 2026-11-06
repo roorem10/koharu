@@ -3,13 +3,11 @@
 pub(crate) mod agent;
 
 use anyhow::Context as _;
-use koharu_desktop::Desktop;
-use koharu_scene::{BoxNote, Commit, EntityId, Origin};
+use koharu_scene::EntityId;
 use tauri::State;
 
 use super::{
-    ChannelExt as _, Error,
-    canvas::CanvasChannel,
+    Error,
     project::{CurrentProject, Project},
 };
 
@@ -29,77 +27,48 @@ pub(crate) async fn get_box_note(
 pub(crate) async fn set_box_note(
     layer: EntityId,
     note: Option<String>,
-    desktop: State<'_, Desktop>,
     project: State<'_, CurrentProject>,
-    canvas_channel: State<'_, CanvasChannel>,
 ) -> Result<(), Error> {
-    let (commit, page) = {
-        let mut projects = project.project.lock().await;
-        let project = projects.as_mut().context("no project is open")?;
-        let commit = project.set_box_note(layer, note).await?;
-        if let Some(commit) = &commit {
-            project.record_commit(commit);
-        }
-        (commit, project.active_page())
-    };
-    if let Some(commit) = commit {
-        desktop.synchronize(&commit.snapshot, page, &commit).await?;
-        canvas_channel.channel.publish(desktop.canvas_state());
-    }
+    let projects = project.project.lock().await;
+    let project = projects.as_ref().context("no project is open")?;
+    project.set_box_note(layer, note)?;
     Ok(())
 }
 
 impl Project {
     fn box_note(&self, layer: EntityId) -> anyhow::Result<Option<String>> {
-        let snapshot = self.snapshot();
-        snapshot.text_layer(layer)?;
-        Ok(snapshot.component::<BoxNote>(layer)?.map(|note| note.text))
+        self.snapshot().text_layer(layer)?;
+        Ok(self
+            .load_context()?
+            .lines
+            .get(&layer)
+            .and_then(|line| line.box_note.clone()))
     }
 
-    async fn set_box_note(
-        &mut self,
-        layer: EntityId,
-        note: Option<String>,
-    ) -> anyhow::Result<Option<Commit>> {
-        let snapshot = self.snapshot();
-        snapshot.text_layer(layer)?;
-        let note = note.filter(|note| !note.trim().is_empty());
-        if snapshot.component::<BoxNote>(layer)?.map(|note| note.text) == note {
-            return Ok(None);
-        }
-        let patch = snapshot.patch(|edit| {
-            edit.promote_entity_to_user(layer)?;
-            match note {
-                Some(text) => edit.set(
-                    layer,
-                    &BoxNote {
-                        origin: Origin::User,
-                        text,
-                    },
-                ),
-                None => edit.remove::<BoxNote>(layer),
-            }
+    fn set_box_note(&self, layer: EntityId, note: Option<String>) -> anyhow::Result<()> {
+        self.snapshot().text_layer(layer)?;
+        self.update_context(|context| {
+            context.lines.entry(layer).or_default().box_note =
+                note.filter(|note| !note.trim().is_empty());
         })?;
-        Ok(Some(self.commit(patch).await?))
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use koharu_scene::{At, PageDraft, TextLayout, TextLayoutKind};
+    use koharu_scene::{At, Origin, PageDraft, Session, TextLayout, TextLayoutKind};
 
     #[tokio::test]
-    async fn box_notes_persist_and_undo_without_changing_chapter_notes() {
+    async fn box_notes_persist_without_changing_chapter_notes_or_undo() {
         let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("notes.khrproj");
-        let mut project = Project::create("notes".into(), path.clone()).await.unwrap();
+        let mut session = Session::memory().await.unwrap();
         let mut layer = EntityId::new();
-        let mut page = EntityId::new();
-        let patch = project
+        let patch = session
             .snapshot()
             .patch(|edit| {
-                page = edit.add_page(PageDraft::new("page", 100.0, 100.0), At::End)?;
+                let page = edit.add_page(PageDraft::new("page", 100.0, 100.0), At::End)?;
                 let content = edit.add_text_content(page, At::End)?;
                 layer = edit.add_text_layer(
                     page,
@@ -115,7 +84,9 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        project.commit(patch).await.unwrap();
+        session.commit(patch).await.unwrap();
+        let mut project = Project::new(session, "notes".into());
+        project.directory = Some(directory.path().to_owned());
         let revision = project.revision();
         project
             .update_context(|context| {
@@ -126,83 +97,41 @@ mod tests {
             })
             .unwrap();
         assert_eq!(project.box_note(layer).unwrap(), None);
-        let context = project.load_context().unwrap();
-        let commit = project
+        let mut saved = serde_json::to_value(project.load_context().unwrap()).unwrap();
+        saved["lines"][layer.to_string()]["box_note"] = serde_json::json!("Existing sidecar note");
+        std::fs::write(
+            directory.path().join(booharu_context::CONTEXT_FILE),
+            serde_json::to_vec(&saved).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            project.box_note(layer).unwrap().as_deref(),
+            Some("Existing sidecar note")
+        );
+        project
             .set_box_note(layer, Some("Check this pun".into()))
-            .await
-            .unwrap()
             .unwrap();
-        project.record_commit(&commit);
-        drop(commit);
-        assert_ne!(project.revision(), revision);
-        assert_eq!(project.undo.len(), 1);
         assert_eq!(
             project.box_note(layer).unwrap().as_deref(),
             Some("Check this pun")
         );
-        assert!(
-            project
-                .set_box_note(layer, Some("Check this pun".into()))
-                .await
-                .unwrap()
-                .is_none()
-        );
-        assert_eq!(project.undo.len(), 1);
-        project.undo().await.unwrap();
-        assert_eq!(project.box_note(layer).unwrap(), None);
-        project.redo().await.unwrap();
+        let saved = booharu_context::ProjectContext::load(directory.path()).unwrap();
         assert_eq!(
-            project.box_note(layer).unwrap().as_deref(),
+            saved.lines[&layer].box_note.as_deref(),
             Some("Check this pun")
         );
-        let commit = project
-            .set_box_note(layer, Some("  \n  ".into()))
-            .await
-            .unwrap()
-            .unwrap();
-        project.record_commit(&commit);
-        drop(commit);
-        assert_eq!(project.undo.len(), 2);
-        assert_eq!(project.box_note(layer).unwrap(), None);
-        project.undo().await.unwrap();
-        assert_eq!(
-            project.box_note(layer).unwrap().as_deref(),
-            Some("Check this pun")
-        );
-        assert_eq!(project.load_context().unwrap(), context);
-
-        let revision = project.revision();
+        project.set_box_note(layer, Some("  \n  ".into())).unwrap();
+        let line = project.load_context().unwrap().lines[&layer].clone();
+        assert_eq!(line.box_note, None);
+        assert_eq!(line.note.as_deref(), Some("Chapter reader note"));
+        assert_eq!(line.qc_ok, ["checked"]);
+        assert_eq!(line.other["future"], true);
+        assert_eq!(project.revision(), revision);
+        assert!(project.undo.is_empty());
         assert!(
             project
                 .set_box_note(EntityId::new(), Some("stale".into()))
-                .await
                 .is_err()
         );
-        assert!(
-            project
-                .set_box_note(layer, Some("bad\0note".into()))
-                .await
-                .is_err()
-        );
-        assert!(
-            project
-                .snapshot()
-                .patch(|edit| edit.set(
-                    page,
-                    &BoxNote {
-                        origin: Origin::User,
-                        text: "not a text layer".into(),
-                    },
-                ))
-                .is_err()
-        );
-        assert_eq!(project.revision(), revision);
-        drop(project);
-        let project = Project::open("notes".into(), path).await.unwrap();
-        assert_eq!(
-            project.box_note(layer).unwrap().as_deref(),
-            Some("Check this pun")
-        );
-        assert_eq!(project.load_context().unwrap(), context);
     }
 }
