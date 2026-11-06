@@ -157,8 +157,14 @@ impl Committer for PipelineCommitter {
                     );
                 }
             }
+            // Name what superseded the result. Returning the unchanged snapshot only
+            // surfaces as "committer did not advance the scene revision".
+            output
+                .patch
+                .rebase_on(&project.snapshot())
+                .with_context(|| format!("{} result is out of date", output.stage))?;
             let Some(mut commit) = project.commit_rebased(output.patch).await? else {
-                return Ok(project.snapshot());
+                anyhow::bail!("{} result made no changes when saved", output.stage);
             };
             project.record_commit(&commit);
             if output.stage == koharu_pipeline::Stage::Translation {
