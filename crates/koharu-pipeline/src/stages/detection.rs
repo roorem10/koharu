@@ -51,18 +51,12 @@ const MIN_EXTREME_COLOR_PIXELS: u32 = 4;
 const MIN_MEASURED_STROKE_WIDTH: u8 = 2;
 const DIALOGUE_MASK_CONTAINMENT_THRESHOLD: f32 = 0.9;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
 #[serde(default)]
 pub struct BoxSettings {
+    /// Off unless the user turns it on: joining by bubble shape alone merges
+    /// lines that belong apart (#94).
     pub join_in_bubble: bool,
-}
-
-impl Default for BoxSettings {
-    fn default() -> Self {
-        Self {
-            join_in_bubble: false,
-        }
-    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]

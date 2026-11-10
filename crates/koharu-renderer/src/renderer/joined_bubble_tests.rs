@@ -85,7 +85,13 @@ async fn joined_balloon_drag_and_wide_resize_preserve_placement_and_visible_pixe
     let first = original.layer(layers[0]).unwrap();
     let sibling = original.layer(layers[1]).unwrap();
     assert!(first.geometry().points.iter().all(|point| point.x <= 120.0));
-    assert!(sibling.geometry().points.iter().all(|point| point.x >= 120.0));
+    assert!(
+        sibling
+            .geometry()
+            .points
+            .iter()
+            .all(|point| point.x >= 120.0)
+    );
     let LayerKind::Text(first_text) = first.kind() else {
         panic!("expected text");
     };
@@ -156,12 +162,9 @@ async fn joined_balloon_drag_and_wide_resize_preserve_placement_and_visible_pixe
                 panic!("expected text");
             };
             assert!(
-                (moved_text.rendered_bounds.x - first_text.rendered_bounds.x - 70.0).abs()
-                    < 1e-4
+                (moved_text.rendered_bounds.x - first_text.rendered_bounds.x - 70.0).abs() < 1e-4
             );
-            assert!(
-                (moved_text.layout_bounds.x - first_text.layout_bounds.x - 70.0).abs() < 1e-4
-            );
+            assert!((moved_text.layout_bounds.x - first_text.layout_bounds.x - 70.0).abs() < 1e-4);
             let mut translated = first_text.clone();
             translated.rendered_bounds.x = moved_text.rendered_bounds.x;
             translated.layout_bounds.x = moved_text.layout_bounds.x;

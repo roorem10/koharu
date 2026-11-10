@@ -155,7 +155,12 @@ async fn agent_and_drag_geometry_preserve_shared_bubble_provenance_in_one_undo()
                 snapshot.component::<Geometry>(bubble).unwrap(),
                 before.component::<Geometry>(bubble).unwrap()
             );
-            assert!(snapshot.component::<Geometry>(layers[1].0).unwrap().is_none());
+            assert!(
+                snapshot
+                    .component::<Geometry>(layers[1].0)
+                    .unwrap()
+                    .is_none()
+            );
             assert_eq!(
                 snapshot.component::<TextLayout>(layers[1].0).unwrap(),
                 before.component::<TextLayout>(layers[1].0).unwrap()
