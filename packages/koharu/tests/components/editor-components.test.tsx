@@ -298,7 +298,7 @@ describe('greenfield editor', () => {
     const user = userEvent.setup()
     expect(screen.queryByRole('spinbutton', { name: 'Size' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Default font' }))
-    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Not set')
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('CCWildWords')
     await user.click(await screen.findByRole('option', { name: /Font A/ }))
     await waitFor(() =>
       expect(save).toHaveBeenLastCalledWith(
