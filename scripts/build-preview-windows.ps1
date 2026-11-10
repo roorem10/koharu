@@ -98,8 +98,6 @@ foreach ($directory in @('locales', 'swiftshader')) {
     $path = Join-Path $runtime $directory
     if (Test-Path $path) { Copy-Item $path -Destination $stage -Recurse -Force }
 }
-# Cargo still names the program koharu.exe; the package ships it as Booharu.exe.
-Rename-Item (Join-Path $stage 'koharu.exe') 'Booharu.exe'
 
 # CEF stores its third-party notices beside its build headers. Preserve them in the preview.
 $cefRoot = $env:CEF_PATH

@@ -116,7 +116,7 @@ jobs:
           $sha = '${{ github.event.pull_request.head.sha || github.sha }}'.Substring(0, 8)
           if ($env:GITHUB_EVENT_NAME -eq 'pull_request') { $label = 'pr${{ github.event.pull_request.number }}' }
           else { $label = $env:GITHUB_REF_NAME -replace '[^A-Za-z0-9._-]', '-' }
-          "artifact=Koharu-Preview-$label-$sha" >> $env:GITHUB_OUTPUT
+          "artifact=Booharu-Preview-$label-$sha" >> $env:GITHUB_OUTPUT
 
       # The artifact unpacks to the same Booharu folder as the portable ZIP,
       # plus the manifest beside it.
