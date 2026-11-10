@@ -289,7 +289,9 @@ impl TextStyles {
             return;
         }
         if self.default_style.fill.is_none() {
-            self.default_style.fill = legacy_color;
+            // A new profile starts with pure black text; clearing it later is
+            // a deliberate choice that this one-time step never undoes.
+            self.default_style.fill = legacy_color.or(Some([0, 0, 0, 255]));
         }
         self.legacy_color_migrated = true;
     }
@@ -610,6 +612,9 @@ mod text_style_tests {
         restored.default_style.fill = None;
         restored.migrate_color(legacy);
         assert_eq!(restored.default_style.fill, None);
+        let mut fresh = TextStyles::default();
+        fresh.migrate_color(None);
+        assert_eq!(fresh.default_style.fill, Some([0, 0, 0, 255]));
         let mut existing = TextStyles::default();
         existing.default_style.fill = Some([0, 0, 0, 255]);
         existing.migrate_color(legacy);
@@ -654,7 +659,13 @@ mod text_style_tests {
                 "empty" => {
                     assert!(!path.exists());
                     let config = TextStyles::load(|| Ok(None)).unwrap();
-                    assert_eq!(config.read().unwrap().default_style, TextStyle::default());
+                    assert_eq!(
+                        config.read().unwrap().default_style,
+                        TextStyle {
+                            fill: Some([0, 0, 0, 255]),
+                            ..TextStyle::default()
+                        }
+                    );
                     assert_eq!(config.read().unwrap().shape_styles, ShapeStyles::default());
                     *config.write().unwrap() = expected;
                     config.save().unwrap();
