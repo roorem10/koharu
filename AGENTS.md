@@ -1,6 +1,21 @@
-# Koharu Project Rules
+# Booharu Project Rules
 
 Document only durable, repository-specific constraints here. Do not record current file layouts, temporary paths, model inventories, helper names, or other implementation details that may change during a refactor. Normal Rust, TypeScript, testing, formatting, and Git practices are assumed.
+
+## Booharu
+
+This repository is Booharu, a personal Windows fork of Koharu. The rules below are upstream's and still apply; this section is the fork's own and wins where the two differ.
+
+- The goal: add a multi-page chapter, press one button, and get a very passable scanlation (clean, translated, lettered) with no further input. Hand edits stay possible afterwards and always win over automatic choices. Every feature must also work on its own for someone who never uses the automatic run.
+- `booharu` is the accepted work and the base for every branch. `main` is a clean copy of upstream and is never developed on. Branches are named `wo-NN-topic`, `fix/topic`, `chore/topic` or `release/booharu-X.Y.Z`.
+- Work reaches `booharu` only after it compiles, passes the "Booharu check" workflow, and has been tested by the owner in a Windows build. Releases are tagged `booharu-vX.Y.Z`; the version lives in `FORK_VERSION`.
+- New non-trivial logic leaves one small test. A change report ends with what was skipped or not checked, and any risk.
+- A feature that adds an action also adds its Agent tool, in the tool group it belongs to (`commands/agent/host/tools`). The MCP server offers the same tools.
+- Credit the owner only as `roorem10`, with the GitHub noreply address. No real names or personal email in commits, pull requests, issues or files.
+- A translation response must hold exactly one result for every requested line. Never keep source text as a stand-in for a missing translation.
+- Text that is deliberately left untranslated, such as skipped sound effects, stays out of the cleanup mask.
+- A hosted model does not take the accelerator lane; a model server on this machine (the built-in model, LM Studio, an OpenAI-compatible server) does. This replaces "including remote translation" in the Ownership rule below.
+- Old working notes live in `notes/archive`. They record history and are not instructions.
 
 ## Change Policy
 
