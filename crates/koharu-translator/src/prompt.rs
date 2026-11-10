@@ -42,30 +42,40 @@ pub(crate) fn translations(
             snippet(text),
         )
     })?;
-    let mut translations: Vec<_> = source_segments
-        .iter()
-        .map(|text| TranslatedSegment {
-            text: text.clone(),
-            emphasis: Vec::new(),
-        })
-        .collect();
-    let mut translated = vec![false; source_segments.len()];
-
+    // Fail closed: every requested line needs exactly one result. A line the
+    // model left out must never keep its source text as a "translation".
+    let expected = source_segments.len();
+    let mut translations: Vec<Option<TranslatedSegment>> = vec![None; expected];
+    let mut duplicates = Vec::new();
+    let mut unknown = Vec::new();
     for translation in output.translations {
-        if translation.id < translations.len() && !translated[translation.id] {
-            translations[translation.id] = TranslatedSegment {
-                text: translation.text,
-                emphasis: if emphasis {
-                    translation.emphasis
-                } else {
-                    Vec::new()
-                },
-            };
-            translated[translation.id] = true;
+        match translations.get_mut(translation.id) {
+            Some(slot @ None) => {
+                *slot = Some(TranslatedSegment {
+                    text: translation.text,
+                    emphasis: if emphasis {
+                        translation.emphasis
+                    } else {
+                        Vec::new()
+                    },
+                });
+            }
+            Some(Some(_)) => duplicates.push(translation.id),
+            None => unknown.push(translation.id),
         }
     }
+    let missing: Vec<_> = translations
+        .iter()
+        .enumerate()
+        .filter_map(|(id, slot)| slot.is_none().then_some(id))
+        .collect();
+    if !missing.is_empty() || !duplicates.is_empty() || !unknown.is_empty() {
+        anyhow::bail!(
+            "{provider} returned an incomplete translation for {expected} segments: missing ids {missing:?}, repeated ids {duplicates:?}, unknown ids {unknown:?}"
+        );
+    }
 
-    Ok(translations)
+    Ok(translations.into_iter().flatten().collect())
 }
 
 /// Keeps a model response readable in a log line without truncating so hard
@@ -385,33 +395,31 @@ mod tests {
     }
 
     #[test]
-    fn tolerates_duplicate_missing_and_out_of_range_ids() {
+    fn rejects_missing_duplicate_and_out_of_range_ids() {
         let source = ["one".to_owned(), "two".to_owned()];
         let short = r#"{"translations":[{"id":1,"text":"world"}]}"#;
-        assert_eq!(
-            translations("test", short, &source, true)
-                .unwrap()
-                .into_iter()
-                .map(|item| item.text)
-                .collect::<Vec<_>>(),
-            ["one", "world"]
-        );
+        let error = translations("test", short, &source, true).unwrap_err();
+        assert!(error.to_string().contains("missing ids [0]"), "{error}");
 
-        let response = concat!(
+        let duplicate = concat!(
             r#"{"translations":["#,
             r#"{"id":0,"text":"hello"},"#,
-            r#"{"id":0,"text":"duplicate"},"#,
+            r#"{"id":0,"text":"duplicate"}"#,
+            "]}"
+        );
+        let error = translations("test", duplicate, &source, true).unwrap_err();
+        assert!(error.to_string().contains("missing ids [1]"), "{error}");
+        assert!(error.to_string().contains("repeated ids [0]"), "{error}");
+
+        let extra = concat!(
+            r#"{"translations":["#,
+            r#"{"id":0,"text":"hello"},"#,
+            r#"{"id":1,"text":"world"},"#,
             r#"{"id":9,"text":"extra"}"#,
             "]}"
         );
-        assert_eq!(
-            translations("test", response, &source, true)
-                .unwrap()
-                .into_iter()
-                .map(|item| item.text)
-                .collect::<Vec<_>>(),
-            ["hello", "two"]
-        );
+        let error = translations("test", extra, &source, true).unwrap_err();
+        assert!(error.to_string().contains("unknown ids [9]"), "{error}");
     }
 
     #[test]
