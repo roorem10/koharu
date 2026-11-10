@@ -1,0 +1,79 @@
+name: Booharu check
+
+# Compiles and tests every Booharu work branch on push, so a branch is known to
+# build and pass its tests before anyone spends time on a Windows build (#109).
+# It runs on Linux and takes minutes once the cache is warm; the Windows
+# installer still comes from "Preview Windows build".
+
+on:
+  push:
+    branches:
+      - 'booharu'
+      - 'wo-**'
+      - 'fix/**'
+      - 'chore/**'
+      - 'release/**'
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: booharu-check-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust compile and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - run: |
+          sudo apt update
+          sudo apt install --no-install-recommends \
+            libgtk-4-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            fonts-noto-cjk \
+            dbus-x11 \
+            gnome-keyring
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: booharu-check
+          # Keep compiled dependencies even when a test fails.
+          cache-on-failure: true
+      - name: Formatting
+        run: cargo fmt -- --check
+      - name: Compile everything, tests included
+        run: cargo check --workspace --tests
+      - name: Rust tests
+        run: cargo test --workspace --tests --no-fail-fast
+
+  ui:
+    name: Interface types and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: TypeScript
+        working-directory: packages/koharu
+        run: bunx tsc --noEmit -p .
+      - name: Interface tests
+        run: bun run --filter @koharu/app test
