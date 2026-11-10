@@ -86,7 +86,7 @@ jobs:
         shell: pwsh
         run: |
           $stage = 'dist\Booharu'
-          $required = @('koharu.exe', 'libcef.dll', 'locales', 'LICENSE-MIT', 'LICENSE-APACHE',
+          $required = @('Booharu.exe', 'libcef.dll', 'locales', 'LICENSE-MIT', 'LICENSE-APACHE',
             'PREVIEW_INSTALL.md', 'CEF-LICENSE.txt', 'CEF-CREDITS.html')
           $missing = $required | Where-Object { -not (Test-Path (Join-Path $stage $_)) }
           if ($missing) { throw "Package is missing: $($missing -join ', ')" }

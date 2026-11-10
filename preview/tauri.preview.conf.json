@@ -1,6 +1,6 @@
 {
   "identifier": "rs.koharu.typesetting-preview",
-  "productName": "Koharu Typesetting Preview",
+  "productName": "Booharu",
   "build": {
     "windows": {
       "staticVCRuntime": false

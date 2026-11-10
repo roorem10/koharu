@@ -221,7 +221,7 @@ OpenAI-compatible endpoints are also supported.
 Download Booharu from the [releases page](https://github.com/roorem10/koharu/releases/latest). Each release has two files:
 
 - `Booharu-<version>-Setup.exe`: installer. Installs to your user's Programs folder and adds a Start menu entry.
-- `Booharu-<version>-Portable.zip`: extract anywhere and run `koharu.exe` from the extracted `Booharu` folder.
+- `Booharu-<version>-Portable.zip`: extract anywhere and run `Booharu.exe` from the extracted `Booharu` folder.
 
 Booharu runs on 64-bit Windows and has been tested with an NVIDIA GPU. The builds are unsigned, so Windows may show an "unknown publisher" warning; choose **More info**, then **Run anyway**. `SHA256SUMS.txt` in each release lists checksums for both files.
 
@@ -232,7 +232,7 @@ Booharu keeps its own data, so it can sit next to an official Koharu install. Fo
 Koharu's guide to startup, runtime, model, and provider errors also applies to Booharu: [Troubleshooting](https://koharu.rs/reference/troubleshooting). Set `RUST_LOG` to `debug` or `trace` for verbose logs:
 
 ```powershell
-$env:RUST_LOG="debug"; .\koharu.exe
+$env:RUST_LOG="debug"; .\Booharu.exe
 ```
 
 Booharu writes its logs to `PreviewData\logs` next to the app.

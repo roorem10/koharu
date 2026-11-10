@@ -45,7 +45,7 @@ VIAddVersionKey "LegalCopyright" "Koharu contributors; see bundled licenses"
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE VerifyDestination
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_RUN "$INSTDIR\koharu.exe"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\Booharu.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Open Booharu"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -72,16 +72,19 @@ FunctionEnd
 Section "Application"
   Call VerifyDestination
   SetOutPath "$INSTDIR"
+  ; Booharu 0.0.3 and earlier installed the program as koharu.exe. VerifyDestination has
+  ; already refused any folder holding an official Koharu, so this one is our own old copy.
+  Delete "$INSTDIR\koharu.exe"
   ; The build script already rejects dot-files in staging. With /x ".*" and a "/*" pattern, makensis on Windows found no files.
   File /r "${RUNTIME_DIR}\*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   CreateDirectory "$SMPROGRAMS\Booharu"
-  CreateShortcut "$SMPROGRAMS\Booharu\Booharu.lnk" "$INSTDIR\koharu.exe"
+  CreateShortcut "$SMPROGRAMS\Booharu\Booharu.lnk" "$INSTDIR\Booharu.exe"
   CreateShortcut "$SMPROGRAMS\Booharu\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
   WriteRegStr HKCU "Software\Booharu" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Booharu" "DisplayName" "Booharu"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Booharu" "DisplayVersion" "${PRODUCT_VERSION}"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Booharu" "DisplayIcon" "$INSTDIR\koharu.exe"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Booharu" "DisplayIcon" "$INSTDIR\Booharu.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Booharu" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Booharu" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Booharu" "NoModify" 1
