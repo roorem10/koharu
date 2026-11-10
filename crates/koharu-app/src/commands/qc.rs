@@ -125,6 +125,7 @@ struct Row {
     layer: EntityId,
     source: String,
     translation: String,
+    language: Option<String>,
     detected: bool,
     ocr_checked: bool,
     category: Option<LetteringCategory>,
@@ -142,6 +143,7 @@ fn rows(snapshot: &Snapshot, context: &ProjectContext) -> Result<Vec<Row>> {
             let source = content.source()?;
             let region = content.source_region()?;
             let typography = layer.typography()?;
+            let translation = content.translation()?;
             let ocr_checked = source.is_some()
                 || match region {
                     Some(region) => snapshot.component::<OcrAnalysis>(region.id())?.is_some(),
@@ -152,10 +154,11 @@ fn rows(snapshot: &Snapshot, context: &ProjectContext) -> Result<Vec<Row>> {
                 page_label: label.clone(),
                 layer: layer.id(),
                 source: source.map(|source| source.text.value).unwrap_or_default(),
-                translation: content
-                    .translation()?
-                    .map(|text| text.text.value)
-                    .unwrap_or_default(),
+                language: translation
+                    .as_ref()
+                    .and_then(|text| text.language.as_ref())
+                    .map(|language| language.as_str().to_owned()),
+                translation: translation.map(|text| text.text.value).unwrap_or_default(),
                 detected: region.is_some(),
                 ocr_checked,
                 category: Some(
@@ -514,7 +517,7 @@ fn text_checks(
     if row.detected && row.ocr_checked && row.source.trim().is_empty() {
         checks.push((QcCheck::EmptySource, String::new()));
     }
-    if has_leftover_source(&row.source, &row.translation) {
+    if has_leftover_source(&row.source, &row.translation, row.language.as_deref()) {
         checks.push((QcCheck::LeftoverSource, String::new()));
     }
     if !row.user_font

@@ -4,15 +4,27 @@ use booharu_context::{LetteringCategory, LineContext};
 
 use super::{QcCheck, Row};
 
-pub(super) fn has_leftover_source(source: &str, translation: &str) -> bool {
+/// Flags source-language script left in a translation.
+///
+/// The target language decides what counts as left over: Japanese targets are
+/// never flagged, and Chinese targets are flagged for kana only, because Han
+/// characters are the translation there.
+pub(super) fn has_leftover_source(source: &str, translation: &str, language: Option<&str>) -> bool {
+    let language = language.unwrap_or_default().to_ascii_lowercase();
+    if language == "ja" || language.starts_with("ja-") {
+        return false;
+    }
+    let han_is_target = language == "zh" || language.starts_with("zh-");
     let translation = translation.trim();
     translation != source.trim()
         && translation.chars().any(|character| {
-            matches!(character as u32,
-                0x3040..=0x309f | 0x30a0..=0x30ff | 0x31f0..=0x31ff |
-                0xff66..=0xff9f | 0x3400..=0x4dbf | 0x4e00..=0x9fff |
-                0x20000..=0x2ffff | 0x30000..=0x323af
-            )
+            let kana = matches!(character as u32,
+                0x3040..=0x309f | 0x30a0..=0x30ff | 0x31f0..=0x31ff | 0xff66..=0xff9f
+            );
+            let han = matches!(character as u32,
+                0x3400..=0x4dbf | 0x4e00..=0x9fff | 0x20000..=0x2ffff | 0x30000..=0x323af
+            );
+            kana || (han && !han_is_target)
         })
 }
 
@@ -61,6 +73,7 @@ mod tests {
             layer: EntityId::new(),
             source: "原文".into(),
             translation: "Translation".into(),
+            language: None,
             detected: true,
             ocr_checked: true,
             category: Some(LetteringCategory::NormalDialogue),
@@ -79,11 +92,15 @@ mod tests {
             "Hello 㐀",
             "Hello 𠮷",
         ] {
-            assert!(has_leftover_source("原文", text), "{text}");
+            assert!(has_leftover_source("原文", text, Some("en-US")), "{text}");
         }
         for text in ["Hello", "", "  原文  ", "한국어", "123 !"] {
-            assert!(!has_leftover_source("原文", text), "{text}");
+            assert!(!has_leftover_source("原文", text, None), "{text}");
         }
+        // Han characters are the translation for a Chinese target; kana is not.
+        assert!(!has_leftover_source("原文", "你好", Some("zh-CN")));
+        assert!(has_leftover_source("原文", "你好あ", Some("zh-TW")));
+        assert!(!has_leftover_source("Hello", "こんにちは", Some("ja-JP")));
     }
 
     #[test]
