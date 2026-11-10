@@ -836,3 +836,43 @@ async fn typing_chunks_in_one_editing_session_undo_together() {
     project.undo().await.unwrap();
     assert_eq!(shown_text(&project.snapshot(), layer).unwrap(), "abcd");
 }
+
+#[tokio::test]
+async fn typing_into_an_unread_box_writes_the_translation_the_page_draws() {
+    let mut session = Session::memory().await.unwrap();
+    let mut edit = session.snapshot().edit();
+    let page = edit
+        .add_page(PageDraft::new("page", 400.0, 600.0), At::End)
+        .unwrap();
+    let content = edit.add_text_content(page, At::End).unwrap();
+    edit.reset_source_text(
+        content,
+        koharu_scene::ProducerId::new("dev.koharu.pipeline.ocr").unwrap(),
+    )
+    .unwrap();
+    let layer = edit
+        .add_text_layer(
+            page,
+            At::End,
+            content,
+            &TextLayout {
+                origin: Origin::User,
+                kind: TextLayoutKind::Paragraph,
+                angle_degrees: None,
+                warp: None,
+            },
+        )
+        .unwrap();
+    session.commit(edit.finish().unwrap()).await.unwrap();
+    let mut project = Project::new(session, "new box".into());
+
+    project
+        .replace_text_range(layer, 0, 0, "Hi".into())
+        .await
+        .unwrap()
+        .unwrap();
+    let snapshot = project.snapshot();
+    let content = snapshot.text_layer(layer).unwrap().content().unwrap();
+    assert_eq!(content.translation().unwrap().unwrap().text.value, "Hi");
+    assert_eq!(content.source().unwrap().unwrap().text.value, "");
+}
