@@ -34,6 +34,10 @@ use crate::{
     TranslationRequest,
 };
 
+/// Longest wait for one complete provider response. Slow reasoning models and
+/// local servers can take minutes, so this only catches a stalled request.
+const RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
+
 pub(crate) async fn translate(
     client: &Client,
     providers: &ProvidersConfig,
@@ -162,14 +166,20 @@ pub(super) async fn send_json<T: DeserializeOwned>(
     provider: &'static str,
     request: RequestBuilder,
 ) -> Result<T> {
+    // The shared client only limits connecting. Without a response limit a
+    // provider that accepts the request and never answers hangs the run.
     let response = request
+        .timeout(RESPONSE_TIMEOUT)
         .send()
         .await
+        // Request URLs can carry credentials; keep them out of error text.
+        .map_err(reqwest::Error::without_url)
         .with_context(|| format!("{provider} request failed"))?;
     let status = response.status();
     let text = response
         .text()
         .await
+        .map_err(reqwest::Error::without_url)
         .with_context(|| format!("failed to read {provider} response"))?;
 
     if !status.is_success() {

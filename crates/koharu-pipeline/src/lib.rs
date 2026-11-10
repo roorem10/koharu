@@ -34,6 +34,7 @@ pub use request::{
 pub use resources::{DeviceResources, ResourceSnapshot};
 pub use scope::{Bounds, Scope};
 pub use stage::Stage;
+pub use stage_runner::is_out_of_memory_message;
 pub use stages::bubble_shape;
 pub use stages::{
     BoxSettings, CleanupSettings, Flux2KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, PaintTarget,

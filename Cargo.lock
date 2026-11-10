@@ -4678,6 +4678,7 @@ dependencies = [
  "clap",
  "console",
  "koharu-app",
+ "koharu-pipeline",
  "log",
  "rfd",
  "sentry",

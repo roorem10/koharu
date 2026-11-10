@@ -36,17 +36,19 @@ pub(super) async fn translate(
 ) -> Result<Vec<String>> {
     let api_key = koharu_secrets::get("google-cloud-translation")?
         .context("google-cloud-translation API key is not configured")?;
-    let mut url = Url::parse(URL).expect("Google API URL is valid");
-    url.query_pairs_mut()
-        .append_pair("key", api_key.expose_secret());
+    let url = Url::parse(URL).expect("Google API URL is valid");
     let response: Response = send_json(
         "google-cloud-translation",
-        client.post(url).json(&Request {
-            q: &request.segments,
-            target: request.target_language.tag(),
-            source: request.source_language.map(|language| language.tag()),
-            format: "text",
-        }),
+        client
+            .post(url)
+            // The key travels in a header: URLs end up in error messages and logs.
+            .header("x-goog-api-key", api_key.expose_secret())
+            .json(&Request {
+                q: &request.segments,
+                target: request.target_language.tag(),
+                source: request.source_language.map(|language| language.tag()),
+                format: "text",
+            }),
     )
     .await?;
     Ok(response

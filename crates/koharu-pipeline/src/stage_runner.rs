@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
+use futures::FutureExt as _;
 use koharu_scene::{EntityId, Patch};
 
 use crate::{
@@ -40,6 +41,13 @@ impl StageRunner {
         generation: koharu_translator::GenerationConfig,
         request: koharu_translator::TaskRequest,
     ) -> Result<serde_json::Value> {
+        if !crate::stages::uses_local_accelerator(selection.provider) {
+            // Hosted models only wait on the network; leave the accelerator free.
+            return self
+                .translator
+                .run_task(selection, generation, request)
+                .await;
+        }
         let permit = self.accelerator.acquire().await;
         match self
             .translator
@@ -137,6 +145,21 @@ impl StageRunner {
         if skip {
             return Ok(StageOutcome::Skipped);
         }
+        if self.stages.interruptible(job.stage) {
+            // A request to a model server. A hosted one leaves the accelerator
+            // free for other pages, and Stop does not wait for the answer.
+            let _permit = if self.stages.uses_accelerator(job.stage) {
+                Some(self.accelerator.acquire().await)
+            } else {
+                None
+            };
+            return tokio::select! {
+                result = self.load_and_process(job, model) => {
+                    result.map_err(|failure| self.stage_error(job.stage, model, failure))
+                }
+                () = stop_requested(&job.stop) => Ok(StageOutcome::Stopped),
+            };
+        }
         let permit = self.accelerator.acquire().await;
         if job.stop.stopped() {
             return Ok(StageOutcome::Stopped);
@@ -191,9 +214,12 @@ impl StageRunner {
                 model: model.to_owned(),
             },
         );
-        self.stages
-            .process(job.stage, job.input.clone())
+        // Torch's infallible wrappers panic on allocation failure. Turn that
+        // into an ordinary stage error so memory recovery can run.
+        std::panic::AssertUnwindSafe(self.stages.process(job.stage, job.input.clone()))
+            .catch_unwind()
             .await
+            .unwrap_or_else(|payload| Err(anyhow::anyhow!("{}", panic_message(&*payload))))
             .map(|patch| {
                 if patch.is_empty() {
                     StageOutcome::Skipped
@@ -223,12 +249,30 @@ struct AttemptFailure {
 }
 
 fn is_out_of_memory(error: &anyhow::Error) -> bool {
-    error.chain().any(|source| {
-        let message = source.to_string().to_ascii_lowercase();
-        message.contains("out of memory")
-            || message.contains("cuda_error_out_of_memory")
-            || message.contains("not enough memory")
-    })
+    error
+        .chain()
+        .any(|source| is_out_of_memory_message(&source.to_string()))
+}
+
+/// Whether a failure message describes memory exhaustion.
+///
+/// The desktop panic hook uses the same test, so a panic the stage runner can
+/// recover from does not close the app first.
+#[must_use]
+pub fn is_out_of_memory_message(message: &str) -> bool {
+    let message = message.to_ascii_lowercase();
+    message.contains("out of memory")
+        || message.contains("cuda_error_out_of_memory")
+        || message.contains("not enough memory")
+}
+
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    let message = payload
+        .downcast_ref::<&str>()
+        .copied()
+        .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+        .unwrap_or("unknown panic");
+    format!("model code panicked: {message}")
 }
 
 pub(crate) struct StageJob {
@@ -300,6 +344,12 @@ where
         }
     }
     unreachable!("the last attempt always returns")
+}
+
+async fn stop_requested(stop: &StopToken) {
+    while !stop.stopped() {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 }
 
 async fn retry_wait(retry: u8, stop: &StopToken) {

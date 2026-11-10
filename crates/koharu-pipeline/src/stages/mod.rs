@@ -14,6 +14,7 @@ pub use detection::{BoxSettings, KoharuLayoutRFDetrSeg2XLConfig};
 pub use inpainting::{
     CleanupSettings, Flux2KleinConfig, PaintTarget, RemoveMode, RoremMixedConfig,
 };
+pub(crate) use translation::uses_local_accelerator;
 
 use crate::{Bounds, ImageCache, InpaintingMask, PipelineConfig, Stage, TranslationHints};
 
@@ -91,6 +92,16 @@ trait StageProcessor: Send + Sync {
     fn skip(&self, _input: &StageInput) -> Result<bool> {
         Ok(false)
     }
+    /// Whether the stage computes on this machine. A hosted model only waits
+    /// on the network, so it must not hold the accelerator lane.
+    fn uses_accelerator(&self) -> bool {
+        true
+    }
+    /// Whether dropping the work mid-flight is safe. True for a network
+    /// request; false for model code running on this machine.
+    fn interruptible(&self) -> bool {
+        false
+    }
     fn unload(&self) -> bool;
     async fn load(&self) -> Result<()>;
     async fn process(&self, input: StageInput) -> Result<Patch>;
@@ -135,6 +146,14 @@ impl Stages {
 
     pub(crate) fn model(&self, stage: Stage) -> &'static str {
         self.processor(stage).model()
+    }
+
+    pub(crate) fn uses_accelerator(&self, stage: Stage) -> bool {
+        self.processor(stage).uses_accelerator()
+    }
+
+    pub(crate) fn interruptible(&self, stage: Stage) -> bool {
+        self.processor(stage).interruptible()
     }
 
     pub(crate) fn skip(&self, stage: Stage, input: &StageInput) -> Result<bool> {

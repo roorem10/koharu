@@ -15,9 +15,21 @@ use crate::commands::{
 };
 
 pub(crate) async fn initialize(handle: AppHandle<CefRuntime>) -> Result<()> {
-    koharu_ml::init()
-        .await
-        .context("failed to initialize the ML runtime")?;
+    // A runtime download can fail for a moment (no network yet, a dropped
+    // connection). Try again before giving up; runtimes that did initialize
+    // are kept between attempts.
+    let mut attempt = 0_u32;
+    loop {
+        match koharu_ml::init().await {
+            Ok(()) => break,
+            Err(error) if attempt < 3 => {
+                attempt += 1;
+                tracing::warn!(%error, attempt, "ML runtime initialization failed; retrying");
+                tokio::time::sleep(std::time::Duration::from_secs(5 * u64::from(attempt))).await;
+            }
+            Err(error) => return Err(error.context("failed to initialize the ML runtime")),
+        }
+    }
     let device = koharu_ml::device(false);
     let pipeline = koharu_pipeline::Pipeline::load(device)?;
     handle.manage(pipeline.clone());
