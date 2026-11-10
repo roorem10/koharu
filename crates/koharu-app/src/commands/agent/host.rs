@@ -316,6 +316,7 @@ impl KoharuHost {
             translation_hints,
             redetect: false,
             policy: super::super::runs::RunSettings::load()?.policy(),
+            ..Default::default()
         };
         let mut request = request;
         let result = async {

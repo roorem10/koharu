@@ -60,7 +60,8 @@ impl<'a> Execution<'a> {
             .map_err(|error| PipelineError::new(ErrorKind::InvalidInput, None, error))?;
         let scope = NormalizedScope::new(&snapshot, &request.scope, &stages)
             .map_err(|error| PipelineError::new(ErrorKind::InvalidInput, None, error))?;
-        let pages = scope.pages().to_vec();
+        let mut pages = scope.pages().to_vec();
+        pages.retain(|page| !request.skip_pages.contains(page));
         if let Some(mask) = request.inpainting_mask.as_ref()
             && (!pages.contains(&mask.page) || !stages.contains(&Stage::Inpainting))
         {
@@ -99,10 +100,10 @@ impl<'a> Execution<'a> {
             translation_hints: request.translation_hints,
             redetect: request.redetect,
             policy: request.policy,
-            resume: matches!(
+            resume: request.resume.unwrap_or(matches!(
                 request.operation,
                 crate::Operation::Full | crate::Operation::Through { .. }
-            ),
+            )),
         })
     }
 
