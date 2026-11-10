@@ -53,6 +53,9 @@ pub(crate) struct Scheduler {
     head: usize,
     total: usize,
     order: crate::RunOrder,
+    /// Set by "stop after the current page": started pages run to their end
+    /// and no new page begins.
+    finishing: bool,
 }
 
 impl Scheduler {
@@ -83,12 +86,17 @@ impl Scheduler {
             head: 0,
             total,
             order: crate::RunOrder::Overlapped,
+            finishing: false,
         }
     }
 
     pub(crate) fn with_order(mut self, order: crate::RunOrder) -> Self {
         self.order = order;
         self
+    }
+
+    pub(crate) fn finish_started_pages(&mut self) {
+        self.finishing = true;
     }
 
     pub(crate) fn stage_finished(&self, stage: Stage) -> bool {
@@ -108,6 +116,10 @@ impl Scheduler {
         busy_stages: &BTreeSet<Stage>,
     ) -> Option<(EntityId, Stage)> {
         if self.order == crate::RunOrder::StageAtATime {
+            // One stage covers every page here, so there is no page to finish.
+            if self.finishing {
+                return None;
+            }
             let stage = Stage::ALL
                 .into_iter()
                 .find(|stage| !self.stage_finished(*stage))?;
@@ -128,6 +140,9 @@ impl Scheduler {
         }
         for page_index in self.head..self.pages.len() {
             let started = self.pages[page_index].started();
+            if !started && self.finishing {
+                continue;
+            }
             if !started && self.active_pages >= self.page_window {
                 break;
             }
@@ -245,6 +260,32 @@ mod tests {
                 scheduler.complete_stage(page, stage);
             }
         }
+    }
+
+    #[test]
+    fn finishing_completes_started_pages_and_starts_no_new_one() {
+        let pages = pages(2);
+        let mut scheduler = Scheduler::new(&pages, &Stage::ALL);
+        let none = BTreeSet::new();
+        assert_eq!(
+            scheduler.start_next(&none),
+            Some((pages[0], Stage::Detection))
+        );
+        scheduler.finish_started_pages();
+        scheduler.complete_stage(pages[0], Stage::Detection);
+        let mut finished = vec![Stage::Detection];
+        while let Some((page, stage)) = scheduler.start_next(&none) {
+            assert_eq!(page, pages[0]);
+            scheduler.complete_stage(page, stage);
+            finished.push(stage);
+        }
+        finished.sort();
+        assert_eq!(finished, Stage::ALL);
+
+        let mut by_stage =
+            Scheduler::new(&pages, &Stage::ALL).with_order(crate::RunOrder::StageAtATime);
+        by_stage.finish_started_pages();
+        assert!(by_stage.start_next(&none).is_none());
     }
 
     #[test]
