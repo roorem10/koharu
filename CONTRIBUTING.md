@@ -1,5 +1,8 @@
 # Contributing
 
+> [!NOTE]
+> This repository is Booharu, roorem10's personal Windows fork of [Koharu](https://github.com/koharu-rs/koharu). Report problems you see in Booharu on [this fork's issues](https://github.com/roorem10/koharu/issues); the plan is in the [roadmap](https://github.com/roorem10/koharu/issues/6). The guide below is Koharu's own, and contributions to Koharu itself belong in the upstream project.
+
 Thank you for helping improve Koharu. Bug fixes, documentation, translations, model-port corrections, and focused product improvements are all welcome.
 
 Everyone participating in the Koharu community is expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
