@@ -93,7 +93,7 @@ Booharu also stays a tool for people who work by hand. Every step works on its o
 **Runs, files and setup**
 
 - Run presets, one stage at a time, retries, per-page failures with retry, resume and a finish chime
-- An incomplete translation response is rejected and asked for again, never saved as a finished translation
+- An incomplete translation response is rejected and the page is marked as failed, never saved as a finished translation
 - A provider that stops answering can't hang a run, and Stop gets through
 - Process whole chapter folders in one batch
 - Export scripts, import translations, choose page names and export selected pages
@@ -107,7 +107,7 @@ Booharu also stays a tool for people who work by hand. Every step works on its o
 - Drag and drop files and folders from Explorer to import them
 - Windows startup and loading spinner fixes
 - Settings live in a `PreviewData` folder next to the app, separate from an official Koharu install
-- Runs as `Booharu.exe` with its own logo; About shows the Booharu version and build commit, and Help links to both Booharu and Koharu
+- Runs as `Booharu.exe` with its own logo; About shows the Booharu version, and Help links to both Booharu and Koharu
 
 Booharu also turns off Koharu's updater and Sentry crash reporting. See the [releases page](https://github.com/roorem10/koharu/releases) for what changed in each version.
 
