@@ -963,7 +963,7 @@
       "processing": "처리 중",
       "detectTextColors": "텍스트 및 테두리 색상 감지",
       "defaultTextColor": "기본 텍스트 색상",
-      "textColorHelp": "새로 감지된 텍스트에 적용됩니다. 기존 텍스트 상자의 색상은 유지됩니다.",
+      "textColorHelp": "원본 글자의 채우기 및 테두리 색상을 새로 감지된 텍스트에 복사합니다. 기존 텍스트 상자의 색상은 유지됩니다.",
       "stages": {
         "detection": {
           "description": "텍스트, 말풍선, 패널을 찾습니다.",
@@ -1182,7 +1182,7 @@
     "clearAll": "모두 지우기",
     "clearGroup": "{{group}} 지우기",
     "notSet": "설정 안 됨",
-    "pipelineNote": "새 텍스트는 기본 스타일을 사용합니다.",
+    "pipelineNote": "색상 감지가 켜져 있으면 페이지에서 읽은 색상이 감지된 텍스트의 기본 색상을 대체합니다. 꺼져 있으면 감지된 텍스트는 기본 텍스트 스타일을 사용합니다.",
     "cancel": "취소",
     "applied": "텍스트 상자 {{count}}개에 적용됨",
     "skipped": "유효하지 않은 상자 {{count}}개를 건너뜀",

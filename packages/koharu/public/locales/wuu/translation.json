@@ -963,7 +963,7 @@
       "processing": "来勒处理",
       "detectTextColors": "检测文字搭描边颜色",
       "defaultTextColor": "默认文字颜色",
-      "textColorHelp": "只对新检测出个文字生效。已有个文字框颜色保持勿变。",
+      "textColorHelp": "拿原来文字个填充搭描边颜色复制到新检测出个文字浪。已有个文字框颜色保持勿变。",
       "stages": {
         "detection": {
           "description": "寻出文本、对话气泡搭分镜。",
@@ -1182,7 +1182,7 @@
     "clearAll": "全部清除",
     "clearGroup": "清除{{group}}",
     "notSet": "朆设置",
-    "pipelineNote": "新文字使用默认文字样式。",
+    "pipelineNote": "颜色检测打开个辰光，从页面读出来个颜色会代替检测文字个默认颜色。关脱个辰光，检测文字使用默认文字样式。",
     "cancel": "取消",
     "applied": "已应用到{{count}}只文字框",
     "skipped": "已跳过{{count}}只无效文字框",

@@ -975,7 +975,7 @@
       "processing": "Traitement",
       "detectTextColors": "Détecter les couleurs du texte et du contour",
       "defaultTextColor": "Couleur du texte par défaut",
-      "textColorHelp": "S’applique au texte nouvellement détecté. Les zones de texte existantes conservent leurs couleurs.",
+      "textColorHelp": "Copie les couleurs de remplissage et de contour du lettrage d’origine sur le texte nouvellement détecté. Les zones de texte existantes conservent leurs couleurs.",
       "stages": {
         "detection": {
           "description": "Trouver le texte, les bulles et les cases.",
@@ -1194,7 +1194,7 @@
     "clearAll": "Tout effacer",
     "clearGroup": "Effacer {{group}}",
     "notSet": "Non défini",
-    "pipelineNote": "Le nouveau texte utilise le style par défaut.",
+    "pipelineNote": "Lorsque la détection des couleurs est activée, les couleurs lues sur la page remplacent la couleur par défaut du texte détecté. Lorsqu’elle est désactivée, le texte détecté utilise le style de texte par défaut.",
     "cancel": "Annuler",
     "applied": "Appliqué à {{count}} zones de texte",
     "skipped": "{{count}} zones de texte invalides ignorées",

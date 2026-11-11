@@ -963,7 +963,7 @@
       "processing": "İşleniyor",
       "detectTextColors": "Metin ve kenarlık renklerini algıla",
       "defaultTextColor": "Varsayılan metin rengi",
-      "textColorHelp": "Yeni algılanan metne uygulanır. Mevcut metin kutuları renklerini korur.",
+      "textColorHelp": "Özgün yazının dolgu ve kenarlık renklerini yeni algılanan metne kopyalar. Mevcut metin kutuları renklerini korur.",
       "stages": {
         "detection": {
           "description": "Metinleri, konuşma balonlarını ve panelleri bulur.",
@@ -1182,7 +1182,7 @@
     "clearAll": "Tümünü temizle",
     "clearGroup": "{{group}} grubunu temizle",
     "notSet": "Ayarlanmadı",
-    "pipelineNote": "Yeni metin varsayılan metin stilini kullanır.",
+    "pipelineNote": "Renk algılama açıkken, sayfadan okunan renkler algılanan metnin varsayılan renginin yerini alır. Kapalıyken algılanan metin varsayılan metin stilini kullanır.",
     "cancel": "İptal",
     "applied": "{{count}} metin kutusuna uygulandı",
     "skipped": "{{count}} geçersiz metin kutusu atlandı",

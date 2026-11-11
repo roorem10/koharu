@@ -975,7 +975,7 @@
       "processing": "Procesando",
       "detectTextColors": "Detectar colores del texto y del contorno",
       "defaultTextColor": "Color de texto predeterminado",
-      "textColorHelp": "Se aplica al texto recién detectado. Los cuadros de texto existentes conservan sus colores.",
+      "textColorHelp": "Copia los colores de relleno y contorno de la rotulación original al texto recién detectado. Los cuadros de texto existentes conservan sus colores.",
       "stages": {
         "detection": {
           "description": "Encuentra texto, bocadillos y viñetas.",
@@ -1194,7 +1194,7 @@
     "clearAll": "Borrar todo",
     "clearGroup": "Borrar {{group}}",
     "notSet": "Sin definir",
-    "pipelineNote": "El texto nuevo usa el estilo predeterminado.",
+    "pipelineNote": "Con la detección de colores activada, los colores leídos de la página sustituyen al color predeterminado en el texto detectado. Si está desactivada, el texto detectado usa el estilo de texto predeterminado.",
     "cancel": "Cancelar",
     "applied": "Aplicado a {{count}} cuadros de texto",
     "skipped": "Se omitieron {{count}} cuadros no válidos",

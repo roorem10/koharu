@@ -963,7 +963,7 @@
       "processing": "Processing",
       "detectTextColors": "Detect text and outline colors",
       "defaultTextColor": "Default text color",
-      "textColorHelp": "Applies to newly detected text. Existing text boxes keep their colors.",
+      "textColorHelp": "Copies the fill and outline colors of the original lettering onto newly detected text. Existing text boxes keep their colors.",
       "stages": {
         "detection": {
           "description": "Find text, speech bubbles, and panels.",
@@ -1182,7 +1182,7 @@
     "clearAll": "Clear all",
     "clearGroup": "Clear {{group}}",
     "notSet": "Not set",
-    "pipelineNote": "New text uses the default text style.",
+    "pipelineNote": "When color detection is on, colors read from the page replace the default color for detected text. When it is off, detected text uses the default text style.",
     "cancel": "Cancel",
     "applied": "Applied to {{count}} text boxes",
     "skipped": "Skipped {{count}} invalid text boxes",

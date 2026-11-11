@@ -963,7 +963,7 @@
       "processing": "正在处理",
       "detectTextColors": "检测文字和描边颜色",
       "defaultTextColor": "默认文字颜色",
-      "textColorHelp": "仅应用于新检测的文字。现有文本框的颜色保持不变。",
+      "textColorHelp": "将原文字的填充和描边颜色复制到新检测的文字上。现有文本框的颜色保持不变。",
       "stages": {
         "detection": {
           "description": "查找文本、气泡和分镜。",
@@ -1182,7 +1182,7 @@
     "clearAll": "全部清除",
     "clearGroup": "清除{{group}}",
     "notSet": "未设置",
-    "pipelineNote": "新文字使用默认文字样式。",
+    "pipelineNote": "开启颜色检测时，从页面读取的颜色会替换检测文字的默认颜色。关闭时，检测文字使用默认文字样式。",
     "cancel": "取消",
     "applied": "已应用于{{count}}个文字框",
     "skipped": "已跳过{{count}}个无效文字框",

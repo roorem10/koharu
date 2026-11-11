@@ -963,7 +963,7 @@
       "processing": "Processando",
       "detectTextColors": "Detectar cores do texto e do contorno",
       "defaultTextColor": "Cor padrão do texto",
-      "textColorHelp": "Aplica-se ao texto recém-detectado. As caixas de texto existentes mantêm suas cores.",
+      "textColorHelp": "Copia as cores de preenchimento e de contorno do letreiramento original para o texto recém-detectado. As caixas de texto existentes mantêm suas cores.",
       "stages": {
         "detection": {
           "description": "Encontra texto, balões e quadros.",
@@ -1182,7 +1182,7 @@
     "clearAll": "Limpar tudo",
     "clearGroup": "Limpar {{group}}",
     "notSet": "Não definido",
-    "pipelineNote": "Novos textos usam o estilo padrão.",
+    "pipelineNote": "Com a detecção de cores ativada, as cores lidas da página substituem a cor padrão no texto detectado. Com ela desativada, o texto detectado usa o estilo de texto padrão.",
     "cancel": "Cancelar",
     "applied": "Aplicado a {{count}} caixas de texto",
     "skipped": "{{count}} caixas inválidas ignoradas",
