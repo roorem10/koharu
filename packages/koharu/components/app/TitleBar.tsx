@@ -356,16 +356,24 @@ export function TitleBar() {
             <MenubarTrigger>{t('menu.help')}</MenubarTrigger>
             <MenubarContent>
               <MenubarItem
-                onClick={() => void openUrl('https://discord.gg/mHvHkxGnUY').catch(() => undefined)}
+                onClick={() =>
+                  void openUrl('https://github.com/roorem10/koharu').catch(() => undefined)
+                }
               >
-                {t('menu.discord')}
+                {t('menu.booharuGithub')}
               </MenubarItem>
+              <MenubarSeparator />
               <MenubarItem
                 onClick={() =>
                   void openUrl('https://github.com/koharu-rs/koharu').catch(() => undefined)
                 }
               >
-                {t('menu.github')}
+                {t('menu.koharuGithub')}
+              </MenubarItem>
+              <MenubarItem
+                onClick={() => void openUrl('https://discord.gg/mHvHkxGnUY').catch(() => undefined)}
+              >
+                {t('menu.koharuDiscord')}
               </MenubarItem>
               <MenubarSeparator />
               <MenubarItem onClick={() => setAboutOpen(true)}>{t('menu.about')}</MenubarItem>

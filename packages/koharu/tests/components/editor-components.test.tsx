@@ -830,12 +830,16 @@ describe('greenfield editor', () => {
     render(<TitleBar />)
 
     await user.click(screen.getByRole('menuitem', { name: 'Help' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Discord' }))
-    expect(nativeOpenUrl).toHaveBeenLastCalledWith('https://discord.gg/mHvHkxGnUY')
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Booharu on GitHub' }))
+    expect(nativeOpenUrl).toHaveBeenLastCalledWith('https://github.com/roorem10/koharu')
 
     await user.click(screen.getByRole('menuitem', { name: 'Help' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'GitHub' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Koharu on GitHub' }))
     expect(nativeOpenUrl).toHaveBeenLastCalledWith('https://github.com/koharu-rs/koharu')
+
+    await user.click(screen.getByRole('menuitem', { name: 'Help' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Koharu Discord' }))
+    expect(nativeOpenUrl).toHaveBeenLastCalledWith('https://discord.gg/mHvHkxGnUY')
   })
 
   it('shows the current version and author in About', async () => {
