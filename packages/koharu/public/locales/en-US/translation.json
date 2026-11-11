@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "Author",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "Manga translation tools",
-    "forkVersion": "Fork version",
     "unavailable": "Unavailable",
     "version": "Version"
   },
@@ -26,14 +26,14 @@
     "cancel": "Cancel",
     "cancelled": "Cancelled.",
     "deviceCode": "Device code",
-    "deviceCodeHint": "Your browser has opened. Enter this code to authorize Koharu.",
+    "deviceCodeHint": "Your browser has opened. Enter this code to authorize Booharu.",
     "emptyDescription": "Ask the agent to inspect, translate, edit, or process this project. It will view page images only when needed.",
-    "emptyTitle": "What should Koharu do?",
+    "emptyTitle": "What should Booharu do?",
     "failed": "The agent request failed.",
     "loading": "Loading Codex...",
-    "message": "Message Koharu Agent",
+    "message": "Message Booharu Agent",
     "model": "Codex model",
-    "placeholder": "Ask Koharu to work on this project...",
+    "placeholder": "Ask Booharu to work on this project...",
     "properties": "Properties",
     "reasoning": "Reasoning",
     "reasoningLevels": {
@@ -46,7 +46,7 @@
     },
     "send": "Send",
     "signIn": "Sign in with Codex",
-    "signInDescription": "Sign in with your ChatGPT subscription. Koharu uses device-code authentication and never asks for an API key.",
+    "signInDescription": "Sign in with your ChatGPT subscription. Booharu uses device-code authentication and never asks for an API key.",
     "signInTitle": "Connect Codex",
     "signOut": "Sign out",
     "signingIn": "Waiting for sign-in...",
@@ -69,7 +69,7 @@
   "canvas": {
     "empty": "Select a page to begin.",
     "fit": "Fit Window",
-    "surface": "Koharu canvas",
+    "surface": "Booharu canvas",
     "unavailable": "WebGPU canvas unavailable"
   },
   "chapterContext": {
@@ -223,7 +223,7 @@
     "reset": "Reset"
   },
   "errors": {
-    "fatalTitle": "Koharu could not continue",
+    "fatalTitle": "Booharu could not continue",
     "tryAgain": "Try again"
   },
   "files": {
@@ -552,16 +552,17 @@
   },
   "menu": {
     "about": "About",
+    "booharuGithub": "Booharu on GitHub",
     "closeProject": "Close Project",
     "delete": "Delete Selected",
-    "discord": "Discord",
     "edit": "Edit",
     "export": "Export Project",
     "file": "File",
     "fit": "Fit Window",
-    "github": "GitHub",
     "help": "Help",
     "import": "Import Pages",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "Koharu on GitHub",
     "process": "Process",
     "processLayers": "Process Selected Layers",
     "processPages": "Process Selected Pages",
@@ -962,7 +963,7 @@
       "processing": "Processing",
       "detectTextColors": "Detect text and outline colors",
       "defaultTextColor": "Default text color",
-      "textColorHelp": "Applies to newly detected text. Existing text boxes keep their colors.",
+      "textColorHelp": "Copies the fill and outline colors of the original lettering onto newly detected text. Existing text boxes keep their colors.",
       "stages": {
         "detection": {
           "description": "Find text, speech bubbles, and panels.",
@@ -1077,10 +1078,10 @@
       "addFamily": "Add font family",
       "defaultFamilies": "Default font families",
       "description": "Choose default text styling and the fallback font order.",
-      "empty": "No default families. Koharu will use the system fallback.",
+      "empty": "No default families. Booharu will use the system fallback.",
       "familyLabel": "Default font family {{index}}",
       "fontFallback": "Font fallback",
-      "fontFallbackDescription": "Koharu uses the first available family that supports the text.",
+      "fontFallbackDescription": "Booharu uses the first available family that supports the text.",
       "loadError": "Fonts could not be loaded. Existing families can still be removed.",
       "loadingFonts": "Loading fonts…",
       "removeFamily": "Remove {{family}}",
@@ -1100,7 +1101,7 @@
     "loadingProjects": "Loading projects…",
     "newDescription": "Create a clean workspace for your pages, translations, and exports.",
     "newProject": "New project",
-    "projectKind": "Koharu project",
+    "projectKind": "Booharu project",
     "projectList": "Projects",
     "projectName": "Project name",
     "projectNamePlaceholder": "My new project",
@@ -1110,9 +1111,9 @@
   },
   "startup": {
     "description": "Loading local AI runtimes and preparing the workspace. First launch can take a moment.",
-    "opening": "Opening Koharu…",
+    "opening": "Opening Booharu…",
     "status": "Initializing local runtimes",
-    "title": "Preparing Koharu"
+    "title": "Preparing Booharu"
   },
   "status": {
     "zoom": "Zoom"
@@ -1135,12 +1136,12 @@
   },
   "updater": {
     "available": {
-      "description": "Koharu <strong>{{version}}</strong> is ready to install",
+      "description": "Booharu <strong>{{version}}</strong> is ready to install",
       "title": "Update available"
     },
     "close": "Close",
     "downloading": {
-      "subtitle": "Koharu {{version}}",
+      "subtitle": "Booharu {{version}}",
       "title": "Downloading update…"
     },
     "error": {
@@ -1181,7 +1182,7 @@
     "clearAll": "Clear all",
     "clearGroup": "Clear {{group}}",
     "notSet": "Not set",
-    "pipelineNote": "New text uses the default text style.",
+    "pipelineNote": "When color detection is on, colors read from the page replace the default color for detected text. When it is off, detected text uses the default text style.",
     "cancel": "Cancel",
     "applied": "Applied to {{count}} text boxes",
     "skipped": "Skipped {{count}} invalid text boxes",

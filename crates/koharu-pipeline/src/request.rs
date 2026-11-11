@@ -106,6 +106,13 @@ pub struct Request {
     /// Generated regions are replaced; hand-made boxes are kept.
     pub redetect: bool,
     pub policy: RunPolicy,
+    /// Whether finished generated work is kept instead of redone. `None`
+    /// follows the operation: on for `Full` and `Through`. A run that is split
+    /// into several passes sets it so every pass behaves like the whole run.
+    pub resume: Option<bool>,
+    /// Pages left out of this pass, such as pages that failed in an earlier
+    /// pass of the same run.
+    pub skip_pages: std::collections::BTreeSet<koharu_scene::EntityId>,
 }
 
 impl Default for Request {
@@ -119,6 +126,8 @@ impl Default for Request {
             translation_hints: Arc::default(),
             redetect: false,
             policy: RunPolicy::default(),
+            resume: None,
+            skip_pages: std::collections::BTreeSet::new(),
         }
     }
 }

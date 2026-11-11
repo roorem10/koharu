@@ -13,8 +13,9 @@ import {
   DialogTitle,
 } from '@koharu/ui/components/dialog'
 
-const author = 'Mayo Takanashi'
-const forkVersion = process.env.NEXT_PUBLIC_KOHARU_FORK_VERSION
+const author = 'Roorem10'
+// "Booharu 0.0.4" shows as 0.0.4; a work-order build such as "WO-03" shows as is.
+const forkVersion = process.env.NEXT_PUBLIC_KOHARU_FORK_VERSION?.replace(/^Booharu\s+/, '')
 const forkCommit = process.env.NEXT_PUBLIC_KOHARU_FORK_COMMIT
 
 export function AboutDialog({
@@ -34,13 +35,11 @@ export function AboutDialog({
       .then((current) => {
         if (active) setVersion(current)
       })
-      .catch(() => {
-        if (active) setVersion(t('about.unavailable'))
-      })
+      .catch(() => undefined)
     return () => {
       active = false
     }
-  }, [open, t, version])
+  }, [open, version])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,25 +49,25 @@ export function AboutDialog({
             <Image src='/icon.png' alt='' width={30} height={30} priority />
           </div>
           <DialogHeader className='min-w-0 gap-1'>
-            <DialogTitle className='text-[15px]'>Koharu</DialogTitle>
+            <DialogTitle className='text-[15px]'>Booharu</DialogTitle>
             <DialogDescription className='text-[11px]'>{t('about.description')}</DialogDescription>
           </DialogHeader>
         </div>
 
-        <dl className='grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 border-t border-border/70 pt-3 text-[11px]'>
-          <dt className='text-muted-foreground'>{t('about.version')}</dt>
-          <dd className='text-right font-medium'>{version ?? t('common.loading')}</dd>
-          <dt className='text-muted-foreground'>{t('about.author')}</dt>
-          <dd className='text-right font-medium'>{author}</dd>
-          {forkVersion && (
-            <>
-              <dt className='text-muted-foreground'>{t('about.forkVersion')}</dt>
-              <dd className='text-right font-medium'>
-                {forkCommit ? `${forkVersion} · ${forkCommit}` : forkVersion}
-              </dd>
-            </>
-          )}
-        </dl>
+        <div className='grid gap-2 border-t border-border/70 pt-3 text-[11px]'>
+          <p className='text-muted-foreground'>
+            {t('about.basedOn', { name: version ? `Koharu ${version}` : 'Koharu' })}
+          </p>
+          <dl className='grid grid-cols-[auto_1fr] gap-x-4 gap-y-2'>
+            <dt className='text-muted-foreground'>{t('about.author')}</dt>
+            <dd className='text-right font-medium'>{author}</dd>
+            <dt className='text-muted-foreground'>{t('about.version')}</dt>
+            {/* The build commit stays out of sight; hovering the version shows it for bug reports. */}
+            <dd className='text-right font-medium' title={forkCommit}>
+              {forkVersion || t('about.unavailable')}
+            </dd>
+          </dl>
+        </div>
       </DialogContent>
     </Dialog>
   )

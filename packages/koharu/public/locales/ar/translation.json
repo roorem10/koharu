@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "المؤلف",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "أدوات ترجمة المانغا",
-    "forkVersion": "إصدار النسخة المشتقة",
     "unavailable": "غير متاح",
     "version": "الإصدار"
   },
@@ -30,14 +30,14 @@
     "cancel": "إلغاء",
     "cancelled": "أُلغي.",
     "deviceCode": "رمز الجهاز",
-    "deviceCodeHint": "تم فتح متصفحك. أدخل هذا الرمز لتفويض Koharu.",
+    "deviceCodeHint": "تم فتح متصفحك. أدخل هذا الرمز لتفويض Booharu.",
     "emptyDescription": "اطلب من Agent فحص هذا المشروع أو ترجمته أو تعديله أو معالجته. لن يعرض صور الصفحات إلا عند الحاجة.",
-    "emptyTitle": "ماذا ينبغي أن يفعل Koharu؟",
+    "emptyTitle": "ماذا ينبغي أن يفعل Booharu؟",
     "failed": "فشل طلب Agent.",
     "loading": "جارٍ تحميل Codex...",
-    "message": "راسل Koharu Agent",
+    "message": "راسل Booharu Agent",
     "model": "نموذج Codex",
-    "placeholder": "اطلب من Koharu العمل على هذا المشروع...",
+    "placeholder": "اطلب من Booharu العمل على هذا المشروع...",
     "properties": "الخصائص",
     "reasoning": "التفكير",
     "reasoningLevels": {
@@ -50,7 +50,7 @@
     },
     "send": "إرسال",
     "signIn": "تسجيل الدخول عبر Codex",
-    "signInDescription": "سجّل الدخول باستخدام اشتراك ChatGPT. يستخدم Koharu مصادقة رمز الجهاز ولا يطلب API key أبدًا.",
+    "signInDescription": "سجّل الدخول باستخدام اشتراك ChatGPT. يستخدم Booharu مصادقة رمز الجهاز ولا يطلب API key أبدًا.",
     "signInTitle": "ربط Codex",
     "signOut": "تسجيل الخروج",
     "signingIn": "في انتظار تسجيل الدخول...",
@@ -73,7 +73,7 @@
   "canvas": {
     "empty": "اختر صفحة للبدء.",
     "fit": "ملاءمة النافذة",
-    "surface": "لوحة Koharu",
+    "surface": "لوحة Booharu",
     "unavailable": "لوحة WebGPU غير متاحة"
   },
   "chapterContext": {
@@ -231,7 +231,7 @@
     "reset": "إعادة ضبط"
   },
   "errors": {
-    "fatalTitle": "تعذّر على Koharu المتابعة",
+    "fatalTitle": "تعذّر على Booharu المتابعة",
     "tryAgain": "أعد المحاولة"
   },
   "files": {
@@ -576,16 +576,17 @@
   },
   "menu": {
     "about": "عن البرنامج",
+    "booharuGithub": "Booharu on GitHub",
     "closeProject": "إغلاق المشروع",
     "delete": "حذف المحدّد",
-    "discord": "Discord",
     "edit": "تحرير",
     "export": "تصدير المشروع",
     "file": "ملف",
     "fit": "ملاءمة النافذة",
-    "github": "GitHub",
     "help": "مساعدة",
     "import": "استيراد الصفحات",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "Koharu on GitHub",
     "process": "معالجة",
     "processLayers": "معالجة الطبقات المحدّدة",
     "processPages": "معالجة الصفحات المحدّدة",
@@ -1010,7 +1011,7 @@
       "processing": "المعالجة",
       "detectTextColors": "اكتشاف ألوان النص والحدود",
       "defaultTextColor": "لون النص الافتراضي",
-      "textColorHelp": "يُطبّق على النص المكتشف حديثًا. تحتفظ مربعات النص الحالية بألوانها.",
+      "textColorHelp": "ينسخ ألوان التعبئة والحدود من الكتابة الأصلية إلى النص المكتشف حديثًا. تحتفظ مربعات النص الحالية بألوانها.",
       "stages": {
         "detection": {
           "description": "إيجاد النصوص وفقاعات الكلام والألواح.",
@@ -1125,10 +1126,10 @@
       "addFamily": "إضافة عائلة خطوط",
       "defaultFamilies": "عائلات الخطوط الافتراضية",
       "description": "اختر نمط النص الافتراضي وترتيب الخطوط البديلة.",
-      "empty": "لا توجد عائلات افتراضية. سيستخدم Koharu البديل من النظام.",
+      "empty": "لا توجد عائلات افتراضية. سيستخدم Booharu البديل من النظام.",
       "familyLabel": "عائلة الخطوط الافتراضية {{index}}",
       "fontFallback": "بديل الخطوط",
-      "fontFallbackDescription": "يستخدم Koharu أول عائلة متاحة تدعم النص.",
+      "fontFallbackDescription": "يستخدم Booharu أول عائلة متاحة تدعم النص.",
       "loadError": "تعذّر تحميل الخطوط. لا يزال بإمكانك إزالة العائلات الحالية.",
       "loadingFonts": "جارٍ تحميل الخطوط…",
       "removeFamily": "إزالة {{family}}",
@@ -1148,7 +1149,7 @@
     "loadingProjects": "جارٍ تحميل المشاريع…",
     "newDescription": "أنشئ مساحة عمل نظيفة لصفحاتك وترجماتك وعمليات التصدير.",
     "newProject": "مشروع جديد",
-    "projectKind": "مشروع Koharu",
+    "projectKind": "مشروع Booharu",
     "projectList": "المشاريع",
     "projectName": "اسم المشروع",
     "projectNamePlaceholder": "مشروعي الجديد",
@@ -1158,9 +1159,9 @@
   },
   "startup": {
     "description": "جارٍ تحميل بيئات الذكاء الاصطناعي المحلية وتحضير مساحة العمل. قد يستغرق التشغيل الأول لحظة.",
-    "opening": "جارٍ فتح Koharu…",
+    "opening": "جارٍ فتح Booharu…",
     "status": "تهيئة البيئات المحلية",
-    "title": "تحضير Koharu"
+    "title": "تحضير Booharu"
   },
   "status": {
     "zoom": "تكبير"
@@ -1183,12 +1184,12 @@
   },
   "updater": {
     "available": {
-      "description": "Koharu <strong>{{version}}</strong> جاهز للتثبيت",
+      "description": "Booharu <strong>{{version}}</strong> جاهز للتثبيت",
       "title": "يتوفّر تحديث"
     },
     "close": "إغلاق",
     "downloading": {
-      "subtitle": "Koharu {{version}}",
+      "subtitle": "Booharu {{version}}",
       "title": "جارٍ تنزيل التحديث…"
     },
     "error": {
@@ -1229,7 +1230,7 @@
     "clearAll": "مسح الكل",
     "clearGroup": "مسح {{group}}",
     "notSet": "غير محدد",
-    "pipelineNote": "يستخدم النص الجديد النمط الافتراضي.",
+    "pipelineNote": "عند تفعيل اكتشاف الألوان، تحل الألوان المقروءة من الصفحة محل اللون الافتراضي للنص المكتشف. وعند إيقافه، يستخدم النص المكتشف نمط النص الافتراضي.",
     "cancel": "إلغاء",
     "applied": "طُبّق على {{count}} مربعات نص",
     "skipped": "تم تخطي {{count}} مربعات نص غير صالحة",

@@ -1,6 +1,6 @@
 [package]
 name = "koharu"
-default-run = "koharu"
+default-run = "Booharu"
 version.workspace = true
 edition.workspace = true
 description.workspace = true
@@ -12,10 +12,16 @@ keywords.workspace = true
 publish.workspace = true
 license.workspace = true
 
+# The program is built under the fork's name, so no packaging step has to rename it.
+[[bin]]
+name = "Booharu"
+path = "src/main.rs"
+
 [dependencies]
 clap = { workspace = true }
 console = { workspace = true }
 koharu-app = { workspace = true }
+koharu-pipeline = { workspace = true }
 log = { workspace = true }
 rfd = { workspace = true }
 sentry = { workspace = true }

@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "Автор",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "Инструменты перевода манги",
-    "forkVersion": "Версия форка",
     "unavailable": "Недоступно",
     "version": "Версия"
   },
@@ -26,14 +26,14 @@
     "cancel": "Отмена",
     "cancelled": "Отменено.",
     "deviceCode": "Код устройства",
-    "deviceCodeHint": "Браузер открыт. Введите этот код, чтобы авторизовать Koharu.",
+    "deviceCodeHint": "Браузер открыт. Введите этот код, чтобы авторизовать Booharu.",
     "emptyDescription": "Попросите агента проверить, перевести, изменить или обработать проект. Он будет просматривать изображения страниц только при необходимости.",
-    "emptyTitle": "Что должен сделать Koharu?",
+    "emptyTitle": "Что должен сделать Booharu?",
     "failed": "Запрос агента завершился ошибкой.",
     "loading": "Загрузка Codex…",
-    "message": "Сообщение агенту Koharu",
+    "message": "Сообщение агенту Booharu",
     "model": "Модель Codex",
-    "placeholder": "Попросите Koharu поработать над проектом…",
+    "placeholder": "Попросите Booharu поработать над проектом…",
     "properties": "Свойства",
     "reasoning": "Рассуждение",
     "reasoningLevels": {
@@ -46,7 +46,7 @@
     },
     "send": "Отправить",
     "signIn": "Войти через Codex",
-    "signInDescription": "Войдите с подпиской ChatGPT. Koharu использует авторизацию по коду устройства и никогда не запрашивает ключ API.",
+    "signInDescription": "Войдите с подпиской ChatGPT. Booharu использует авторизацию по коду устройства и никогда не запрашивает ключ API.",
     "signInTitle": "Подключить Codex",
     "signOut": "Выйти",
     "signingIn": "Ожидание входа…",
@@ -69,7 +69,7 @@
   "canvas": {
     "empty": "Выберите страницу, чтобы начать.",
     "fit": "Вписать в окно",
-    "surface": "Холст Koharu",
+    "surface": "Холст Booharu",
     "unavailable": "Холст WebGPU недоступен"
   },
   "chapterContext": {
@@ -225,7 +225,7 @@
     "reset": "Сбросить"
   },
   "errors": {
-    "fatalTitle": "Koharu не может продолжить работу",
+    "fatalTitle": "Booharu не может продолжить работу",
     "tryAgain": "Повторить"
   },
   "files": {
@@ -554,16 +554,17 @@
   },
   "menu": {
     "about": "О программе",
+    "booharuGithub": "Booharu on GitHub",
     "closeProject": "Закрыть проект",
     "delete": "Удалить выбранное",
-    "discord": "Discord",
     "edit": "Правка",
     "export": "Экспорт проекта",
     "file": "Файл",
     "fit": "Вписать в окно",
-    "github": "GitHub",
     "help": "Справка",
     "import": "Импортировать страницы",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "Koharu on GitHub",
     "process": "Обработка",
     "processLayers": "Обработать выбранные слои",
     "processPages": "Обработать выбранные страницы",
@@ -972,7 +973,7 @@
       "processing": "Обработка",
       "detectTextColors": "Определять цвета текста и обводки",
       "defaultTextColor": "Цвет текста по умолчанию",
-      "textColorHelp": "Применяется к вновь обнаруженному тексту. Цвета существующих текстовых блоков сохраняются.",
+      "textColorHelp": "Копирует цвета заливки и обводки исходной надписи на вновь обнаруженный текст. Цвета существующих текстовых блоков сохраняются.",
       "stages": {
         "detection": {
           "description": "Находит текст, пузыри и панели.",
@@ -1087,10 +1088,10 @@
       "addFamily": "Добавить семейство шрифтов",
       "defaultFamilies": "Семейства шрифтов по умолчанию",
       "description": "Выберите стиль текста по умолчанию и порядок резервных шрифтов.",
-      "empty": "Нет семейств по умолчанию. Koharu будет использовать системный запасной шрифт.",
+      "empty": "Нет семейств по умолчанию. Booharu будет использовать системный запасной шрифт.",
       "familyLabel": "Семейство шрифтов по умолчанию {{index}}",
       "fontFallback": "Запасные шрифты",
-      "fontFallbackDescription": "Koharu использует первое доступное семейство, поддерживающее текст.",
+      "fontFallbackDescription": "Booharu использует первое доступное семейство, поддерживающее текст.",
       "loadError": "Не удалось загрузить шрифты. Существующие семейства всё ещё можно удалить.",
       "loadingFonts": "Загрузка шрифтов…",
       "removeFamily": "Удалить {{family}}",
@@ -1110,7 +1111,7 @@
     "loadingProjects": "Загрузка проектов…",
     "newDescription": "Создайте чистое рабочее пространство для страниц, переводов и экспорта.",
     "newProject": "Новый проект",
-    "projectKind": "Проект Koharu",
+    "projectKind": "Проект Booharu",
     "projectList": "Проекты",
     "projectName": "Имя проекта",
     "projectNamePlaceholder": "Мой новый проект",
@@ -1120,9 +1121,9 @@
   },
   "startup": {
     "description": "Загрузка локальных сред выполнения ИИ и подготовка рабочего пространства. Первый запуск может занять некоторое время.",
-    "opening": "Запуск Koharu…",
+    "opening": "Запуск Booharu…",
     "status": "Инициализация локальных сред выполнения",
-    "title": "Подготовка Koharu"
+    "title": "Подготовка Booharu"
   },
   "status": {
     "zoom": "Масштаб"
@@ -1145,12 +1146,12 @@
   },
   "updater": {
     "available": {
-      "description": "Koharu <strong>{{version}}</strong> готов к установке",
+      "description": "Booharu <strong>{{version}}</strong> готов к установке",
       "title": "Доступно обновление"
     },
     "close": "Закрыть",
     "downloading": {
-      "subtitle": "Koharu {{version}}",
+      "subtitle": "Booharu {{version}}",
       "title": "Загрузка обновления…"
     },
     "error": {
@@ -1191,7 +1192,7 @@
     "clearAll": "Очистить всё",
     "clearGroup": "Очистить: {{group}}",
     "notSet": "Не задано",
-    "pipelineNote": "Новый текст использует стандартный стиль.",
+    "pipelineNote": "Когда определение цветов включено, цвета, считанные со страницы, заменяют стандартный цвет обнаруженного текста. Когда оно выключено, обнаруженный текст использует стандартный стиль текста.",
     "cancel": "Отмена",
     "applied": "Применено к {{count}} текстовым блокам",
     "skipped": "Пропущено недопустимых блоков: {{count}}",

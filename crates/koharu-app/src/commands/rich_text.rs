@@ -285,12 +285,34 @@ impl Project {
         let patch = snapshot.patch(|edit| {
             edit.promote_entity_to_user(layer)?;
             edit.promote_entity_to_user(content.id())?;
+            let unread = content
+                .source()?
+                .is_none_or(|source| source.text.value.is_empty());
             if let Some(translation) = content.translation()? {
                 edit.set(
                     content.id(),
                     &Translation {
                         text: Authored::user(text),
                         language: translation.language,
+                    },
+                )?;
+            } else if unread {
+                // A box with nothing read into it (a new hand-drawn box) is
+                // lettering: only the translation is drawn on the page.
+                if content.source()?.is_none() {
+                    edit.set(
+                        content.id(),
+                        &SourceText {
+                            text: Authored::user(String::new()),
+                            language: None,
+                        },
+                    )?;
+                }
+                edit.set(
+                    content.id(),
+                    &Translation {
+                        text: Authored::user(text),
+                        language: None,
                     },
                 )?;
             } else {

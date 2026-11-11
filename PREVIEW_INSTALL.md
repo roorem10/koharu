@@ -7,8 +7,8 @@ Booharu is a personal Windows fork of [Koharu](https://github.com/koharu-rs/koha
 1. Download **Booharu-<version>-Portable.zip**.
 2. In File Explorer, right-click the ZIP and choose **Extract All**.
 3. Choose a writable folder, for example `D:\Booharu`. Do not run the app from inside the ZIP.
-4. Open the extracted **Booharu** folder and double-click **koharu.exe**. Keep all the bundled files together.
-5. The app creates **PreviewData** beside koharu.exe for its settings, projects, logs and downloaded models.
+4. Open the extracted **Booharu** folder and double-click **Booharu.exe**. Keep all the bundled files together.
+5. The app creates **PreviewData** beside Booharu.exe for its settings, projects, logs and downloaded models.
 
 To update, extract the new ZIP and move the old folder's **PreviewData** into the new **Booharu** folder before the first start.
 

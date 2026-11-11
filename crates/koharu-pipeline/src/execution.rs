@@ -60,7 +60,8 @@ impl<'a> Execution<'a> {
             .map_err(|error| PipelineError::new(ErrorKind::InvalidInput, None, error))?;
         let scope = NormalizedScope::new(&snapshot, &request.scope, &stages)
             .map_err(|error| PipelineError::new(ErrorKind::InvalidInput, None, error))?;
-        let pages = scope.pages().to_vec();
+        let mut pages = scope.pages().to_vec();
+        pages.retain(|page| !request.skip_pages.contains(page));
         if let Some(mask) = request.inpainting_mask.as_ref()
             && (!pages.contains(&mask.page) || !stages.contains(&Stage::Inpainting))
         {
@@ -99,10 +100,10 @@ impl<'a> Execution<'a> {
             translation_hints: request.translation_hints,
             redetect: request.redetect,
             policy: request.policy,
-            resume: matches!(
+            resume: request.resume.unwrap_or(matches!(
                 request.operation,
                 crate::Operation::Full | crate::Operation::Through { .. }
-            ),
+            )),
         })
     }
 
@@ -141,9 +142,6 @@ impl<'a> Execution<'a> {
             if let Err(error) = self.apply_completion(completion).await {
                 self.failure = Some(error);
             }
-            if self.stop.finishing() {
-                self.stop.stop();
-            }
             if self.policy.order == crate::RunOrder::StageAtATime
                 && self.scheduler.stage_finished(stage)
             {
@@ -158,8 +156,13 @@ impl<'a> Execution<'a> {
     }
 
     fn take_ready_job(&mut self) -> Option<StageJob> {
-        if self.stopped() || self.stop.finishing() || self.failure.is_some() {
+        if self.stopped() || self.failure.is_some() {
             return None;
+        }
+        if self.stop.finishing() {
+            // "Stop after the current page": pages already under way finish
+            // their remaining stages; the run ends when nothing is left to start.
+            self.scheduler.finish_started_pages();
         }
         let (page, stage) = self.scheduler.start_next(&self.busy_stages)?;
         self.busy_stages.insert(stage);

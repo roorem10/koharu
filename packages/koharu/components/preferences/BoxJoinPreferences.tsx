@@ -25,7 +25,7 @@ export function BoxJoinPreferences() {
       <PreferenceRow title={t('boxes.joinAutomatically')} description={t('boxes.joinExplanation')}>
         <Switch
           aria-label={t('boxes.joinAutomatically')}
-          checked={settings.data?.join_in_bubble ?? true}
+          checked={settings.data?.join_in_bubble ?? false}
           disabled={!settings.data || save.isPending}
           onCheckedChange={(checked) => save.mutate(checked)}
         />

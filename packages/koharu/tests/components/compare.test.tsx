@@ -58,7 +58,7 @@ function open() {
       </TooltipProvider>
     </QueryClientProvider>,
   )
-  const surface = screen.getByLabelText('Koharu canvas')
+  const surface = screen.getByLabelText('Booharu canvas')
   Object.defineProperty(surface, 'getBoundingClientRect', {
     value: () => ({ x: 0, y: 0, width: 800, height: 600 }),
   })

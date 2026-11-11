@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "작성자",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "만화 번역 도구",
-    "forkVersion": "포크 버전",
     "unavailable": "사용할 수 없음",
     "version": "버전"
   },
@@ -26,14 +26,14 @@
     "cancel": "취소",
     "cancelled": "취소되었습니다.",
     "deviceCode": "기기 코드",
-    "deviceCodeHint": "브라우저가 열렸습니다. 이 코드를 입력해 Koharu를 승인하세요.",
+    "deviceCodeHint": "브라우저가 열렸습니다. 이 코드를 입력해 Booharu를 승인하세요.",
     "emptyDescription": "에이전트에게 이 프로젝트의 검사, 번역, 편집 또는 처리를 요청하세요. 페이지 이미지는 필요할 때만 확인합니다.",
-    "emptyTitle": "Koharu에게 무엇을 시킬까요?",
+    "emptyTitle": "Booharu에게 무엇을 시킬까요?",
     "failed": "에이전트 요청에 실패했습니다.",
     "loading": "Codex 불러오는 중…",
-    "message": "Koharu 에이전트에게 메시지 보내기",
+    "message": "Booharu 에이전트에게 메시지 보내기",
     "model": "Codex 모델",
-    "placeholder": "Koharu에게 이 프로젝트 작업 요청…",
+    "placeholder": "Booharu에게 이 프로젝트 작업 요청…",
     "properties": "속성",
     "reasoning": "추론",
     "reasoningLevels": {
@@ -46,7 +46,7 @@
     },
     "send": "보내기",
     "signIn": "Codex로 로그인",
-    "signInDescription": "ChatGPT 구독으로 로그인하세요. Koharu는 기기 코드 인증을 사용하며 API 키를 요구하지 않습니다.",
+    "signInDescription": "ChatGPT 구독으로 로그인하세요. Booharu는 기기 코드 인증을 사용하며 API 키를 요구하지 않습니다.",
     "signInTitle": "Codex 연결",
     "signOut": "로그아웃",
     "signingIn": "로그인 대기 중…",
@@ -69,7 +69,7 @@
   "canvas": {
     "empty": "시작할 페이지를 선택하세요.",
     "fit": "창에 맞춤",
-    "surface": "Koharu 캔버스",
+    "surface": "Booharu 캔버스",
     "unavailable": "WebGPU 캔버스를 사용할 수 없습니다"
   },
   "chapterContext": {
@@ -223,7 +223,7 @@
     "reset": "초기화"
   },
   "errors": {
-    "fatalTitle": "Koharu를 계속 실행할 수 없습니다",
+    "fatalTitle": "Booharu를 계속 실행할 수 없습니다",
     "tryAgain": "다시 시도"
   },
   "files": {
@@ -552,16 +552,17 @@
   },
   "menu": {
     "about": "정보",
+    "booharuGithub": "Booharu on GitHub",
     "closeProject": "프로젝트 닫기",
     "delete": "선택 항목 삭제",
-    "discord": "Discord",
     "edit": "편집",
     "export": "프로젝트 내보내기",
     "file": "파일",
     "fit": "창에 맞춤",
-    "github": "GitHub",
     "help": "도움말",
     "import": "페이지 가져오기",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "Koharu on GitHub",
     "process": "처리",
     "processLayers": "선택한 레이어 처리",
     "processPages": "선택한 페이지 처리",
@@ -962,7 +963,7 @@
       "processing": "처리 중",
       "detectTextColors": "텍스트 및 테두리 색상 감지",
       "defaultTextColor": "기본 텍스트 색상",
-      "textColorHelp": "새로 감지된 텍스트에 적용됩니다. 기존 텍스트 상자의 색상은 유지됩니다.",
+      "textColorHelp": "원본 글자의 채우기 및 테두리 색상을 새로 감지된 텍스트에 복사합니다. 기존 텍스트 상자의 색상은 유지됩니다.",
       "stages": {
         "detection": {
           "description": "텍스트, 말풍선, 패널을 찾습니다.",
@@ -1077,10 +1078,10 @@
       "addFamily": "글꼴 패밀리 추가",
       "defaultFamilies": "기본 글꼴 패밀리",
       "description": "텍스트 기본 스타일과 대체 글꼴 순서를 설정합니다.",
-      "empty": "기본 패밀리가 없습니다. Koharu가 시스템 대체 글꼴을 사용합니다.",
+      "empty": "기본 패밀리가 없습니다. Booharu가 시스템 대체 글꼴을 사용합니다.",
       "familyLabel": "기본 글꼴 패밀리 {{index}}",
       "fontFallback": "대체 글꼴",
-      "fontFallbackDescription": "Koharu는 텍스트를 지원하는 첫 번째 사용 가능한 패밀리를 사용합니다.",
+      "fontFallbackDescription": "Booharu는 텍스트를 지원하는 첫 번째 사용 가능한 패밀리를 사용합니다.",
       "loadError": "글꼴을 불러오지 못했습니다. 기존 패밀리는 삭제할 수 있습니다.",
       "loadingFonts": "글꼴 불러오는 중…",
       "removeFamily": "{{family}} 삭제",
@@ -1100,7 +1101,7 @@
     "loadingProjects": "프로젝트 불러오는 중…",
     "newDescription": "페이지, 번역 및 내보내기를 위한 새 작업 공간을 만드세요.",
     "newProject": "새 프로젝트",
-    "projectKind": "Koharu 프로젝트",
+    "projectKind": "Booharu 프로젝트",
     "projectList": "프로젝트",
     "projectName": "프로젝트 이름",
     "projectNamePlaceholder": "새 프로젝트",
@@ -1110,9 +1111,9 @@
   },
   "startup": {
     "description": "로컬 AI 런타임을 불러오고 작업 공간을 준비하고 있습니다. 처음 실행할 때는 잠시 걸릴 수 있습니다.",
-    "opening": "Koharu 여는 중…",
+    "opening": "Booharu 여는 중…",
     "status": "로컬 런타임 초기화 중",
-    "title": "Koharu 준비 중"
+    "title": "Booharu 준비 중"
   },
   "status": {
     "zoom": "확대/축소"
@@ -1135,12 +1136,12 @@
   },
   "updater": {
     "available": {
-      "description": "코하루 <strong>{{version}}</strong>을(를) 설치할 수 있습니다",
+      "description": "Booharu <strong>{{version}}</strong>을(를) 설치할 수 있습니다",
       "title": "업데이트 사용 가능"
     },
     "close": "닫기",
     "downloading": {
-      "subtitle": "코하루 {{version}}",
+      "subtitle": "Booharu {{version}}",
       "title": "업데이트 다운로드 중…"
     },
     "error": {
@@ -1181,7 +1182,7 @@
     "clearAll": "모두 지우기",
     "clearGroup": "{{group}} 지우기",
     "notSet": "설정 안 됨",
-    "pipelineNote": "새 텍스트는 기본 스타일을 사용합니다.",
+    "pipelineNote": "색상 감지가 켜져 있으면 페이지에서 읽은 색상이 감지된 텍스트의 기본 색상을 대체합니다. 꺼져 있으면 감지된 텍스트는 기본 텍스트 스타일을 사용합니다.",
     "cancel": "취소",
     "applied": "텍스트 상자 {{count}}개에 적용됨",
     "skipped": "유효하지 않은 상자 {{count}}개를 건너뜀",

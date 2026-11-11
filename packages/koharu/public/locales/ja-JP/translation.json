@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "作者",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "漫画翻訳ツール",
-    "forkVersion": "フォーク版のバージョン",
     "unavailable": "利用不可",
     "version": "バージョン"
   },
@@ -26,14 +26,14 @@
     "cancel": "キャンセル",
     "cancelled": "キャンセルしました。",
     "deviceCode": "デバイスコード",
-    "deviceCodeHint": "ブラウザーが開きました。このコードを入力してKoharuを認証してください。",
+    "deviceCodeHint": "ブラウザーが開きました。このコードを入力してBooharuを認証してください。",
     "emptyDescription": "エージェントにこのプロジェクトの確認、翻訳、編集、処理を依頼できます。ページ画像は必要な場合にのみ表示されます。",
-    "emptyTitle": "Koharuに何をさせますか？",
+    "emptyTitle": "Booharuに何をさせますか？",
     "failed": "エージェントのリクエストに失敗しました。",
     "loading": "Codexを読み込み中…",
-    "message": "Koharuエージェントにメッセージを送信",
+    "message": "Booharuエージェントにメッセージを送信",
     "model": "Codexモデル",
-    "placeholder": "Koharuにこのプロジェクトの作業を依頼…",
+    "placeholder": "Booharuにこのプロジェクトの作業を依頼…",
     "properties": "プロパティ",
     "reasoning": "推論",
     "reasoningLevels": {
@@ -46,7 +46,7 @@
     },
     "send": "送信",
     "signIn": "Codexでサインイン",
-    "signInDescription": "ChatGPTサブスクリプションでサインインします。Koharuはデバイスコード認証を使用し、APIキーを求めることはありません。",
+    "signInDescription": "ChatGPTサブスクリプションでサインインします。Booharuはデバイスコード認証を使用し、APIキーを求めることはありません。",
     "signInTitle": "Codexに接続",
     "signOut": "サインアウト",
     "signingIn": "サインインを待機中…",
@@ -69,7 +69,7 @@
   "canvas": {
     "empty": "ページを選択して開始します。",
     "fit": "ウィンドウに合わせる",
-    "surface": "Koharu キャンバス",
+    "surface": "Booharu キャンバス",
     "unavailable": "WebGPU キャンバスを利用できません"
   },
   "chapterContext": {
@@ -223,7 +223,7 @@
     "reset": "リセット"
   },
   "errors": {
-    "fatalTitle": "Koharuを続行できませんでした",
+    "fatalTitle": "Booharuを続行できませんでした",
     "tryAgain": "再試行"
   },
   "files": {
@@ -551,17 +551,18 @@
     "nodeRequired": "Node.jsが必要です。AIアプリのstdioサーバーとしてこのコマンドを実行してください。"
   },
   "menu": {
-    "about": "Koharuについて",
+    "about": "Booharuについて",
+    "booharuGithub": "Booharu on GitHub",
     "closeProject": "プロジェクトを閉じる",
     "delete": "選択項目を削除",
-    "discord": "Discord",
     "edit": "編集",
     "export": "プロジェクトを書き出す",
     "file": "ファイル",
     "fit": "ウィンドウに合わせる",
-    "github": "GitHub",
     "help": "ヘルプ",
     "import": "ページを読み込む",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "Koharu on GitHub",
     "process": "処理",
     "processLayers": "選択したレイヤーを処理",
     "processPages": "選択ページを処理",
@@ -962,7 +963,7 @@
       "processing": "処理中",
       "detectTextColors": "文字色と縁取り色を検出",
       "defaultTextColor": "既定の文字色",
-      "textColorHelp": "新しく検出した文字に適用します。既存のテキストボックスの色は変更しません。",
+      "textColorHelp": "元の文字の塗り色と縁取り色を、新しく検出した文字にコピーします。既存のテキストボックスの色は変更しません。",
       "stages": {
         "detection": {
           "description": "テキスト、吹き出し、コマを検出します。",
@@ -1077,10 +1078,10 @@
       "addFamily": "フォントファミリーを追加",
       "defaultFamilies": "既定のフォントファミリー",
       "description": "テキストの既定スタイルと代替フォントの順序を設定します。",
-      "empty": "既定のファミリーがありません。Koharuはシステムの代替フォントを使用します。",
+      "empty": "既定のファミリーがありません。Booharuはシステムの代替フォントを使用します。",
       "familyLabel": "既定のフォントファミリー {{index}}",
       "fontFallback": "代替フォント",
-      "fontFallbackDescription": "Koharuは文字に対応する最初の利用可能なファミリーを使用します。",
+      "fontFallbackDescription": "Booharuは文字に対応する最初の利用可能なファミリーを使用します。",
       "loadError": "フォントを読み込めませんでした。既存のファミリーは削除できます。",
       "loadingFonts": "フォントを読み込み中…",
       "removeFamily": "{{family}}を削除",
@@ -1100,7 +1101,7 @@
     "loadingProjects": "プロジェクトを読み込み中…",
     "newDescription": "ページ、翻訳、書き出し用の新しいワークスペースを作成します。",
     "newProject": "新規プロジェクト",
-    "projectKind": "Koharuプロジェクト",
+    "projectKind": "Booharuプロジェクト",
     "projectList": "プロジェクト",
     "projectName": "プロジェクト名",
     "projectNamePlaceholder": "新しいプロジェクト",
@@ -1110,9 +1111,9 @@
   },
   "startup": {
     "description": "ローカル AI ランタイムを読み込み、ワークスペースを準備しています。初回起動には少し時間がかかる場合があります。",
-    "opening": "Koharuを起動中…",
+    "opening": "Booharuを起動中…",
     "status": "ローカルランタイムを初期化しています",
-    "title": "Koharu を準備しています"
+    "title": "Booharu を準備しています"
   },
   "status": {
     "zoom": "ズーム"
@@ -1135,12 +1136,12 @@
   },
   "updater": {
     "available": {
-      "description": "Koharu <strong>{{version}}</strong> をインストールできます",
+      "description": "Booharu <strong>{{version}}</strong> をインストールできます",
       "title": "アップデートが利用可能"
     },
     "close": "閉じる",
     "downloading": {
-      "subtitle": "Koharu {{version}}",
+      "subtitle": "Booharu {{version}}",
       "title": "アップデートをダウンロード中…"
     },
     "error": {
@@ -1181,7 +1182,7 @@
     "clearAll": "すべてクリア",
     "clearGroup": "{{group}}をクリア",
     "notSet": "未設定",
-    "pipelineNote": "新しいテキストには既定のスタイルを使用します。",
+    "pipelineNote": "色の検出がオンのときは、ページから読み取った色が検出した文字の既定の色に置き換わります。オフのときは、検出した文字に既定のテキストスタイルを使用します。",
     "cancel": "キャンセル",
     "applied": "{{count}}個のテキストボックスに適用しました",
     "skipped": "無効なテキストボックス{{count}}個をスキップしました",

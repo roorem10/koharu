@@ -233,6 +233,7 @@ async fn start_job_inner(
             translation_hints,
             redetect,
             policy: settings.policy(),
+            ..Default::default()
         };
         request.progress = Some(Arc::new(move |event| {
             let update = match event {
@@ -403,6 +404,12 @@ async fn start_job_inner(
         let result: Result<koharu_pipeline::Report> = async {
             let mut first_report = None;
             if let Some((finding, rest)) = split {
+                // Both passes keep the whole run's resume behaviour, so a
+                // second Full run does not redo (and pay again for) finished work.
+                request.resume = Some(matches!(
+                    request.operation,
+                    koharu_pipeline::Operation::Full | koharu_pipeline::Operation::Through { .. }
+                ));
                 let finding_request = koharu_pipeline::Request {
                     operation: finding,
                     ..request.clone()
@@ -418,6 +425,8 @@ async fn start_job_inner(
                 if report.status == RunStatus::Stopped || stop.stopped() {
                     return Ok(report);
                 }
+                // A page that failed to be read must not go on to translation and cleanup.
+                request.skip_pages = report.failures.iter().map(|failure| failure.page).collect();
                 first_report = Some(report);
                 request.operation = rest;
             }

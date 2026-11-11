@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "Autor",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "Herramientas de traducción de manga",
-    "forkVersion": "Versión del fork",
     "unavailable": "No disponible",
     "version": "Versión"
   },
@@ -27,14 +27,14 @@
     "cancel": "Cancelar",
     "cancelled": "Cancelado.",
     "deviceCode": "Código de dispositivo",
-    "deviceCodeHint": "Tu navegador se ha abierto. Introduce este código para autorizar a Koharu.",
+    "deviceCodeHint": "Tu navegador se ha abierto. Introduce este código para autorizar a Booharu.",
     "emptyDescription": "Pide al agente que inspeccione, traduzca, edite o procese este proyecto. Solo verá las imágenes de las páginas cuando sea necesario.",
-    "emptyTitle": "¿Qué debería hacer Koharu?",
+    "emptyTitle": "¿Qué debería hacer Booharu?",
     "failed": "La solicitud del agente falló.",
     "loading": "Cargando Codex…",
-    "message": "Enviar mensaje al agente de Koharu",
+    "message": "Enviar mensaje al agente de Booharu",
     "model": "Modelo de Codex",
-    "placeholder": "Pide a Koharu que trabaje en este proyecto…",
+    "placeholder": "Pide a Booharu que trabaje en este proyecto…",
     "properties": "Propiedades",
     "reasoning": "Razonamiento",
     "reasoningLevels": {
@@ -47,7 +47,7 @@
     },
     "send": "Enviar",
     "signIn": "Iniciar sesión con Codex",
-    "signInDescription": "Inicia sesión con tu suscripción de ChatGPT. Koharu usa autenticación mediante código de dispositivo y nunca solicita una clave de API.",
+    "signInDescription": "Inicia sesión con tu suscripción de ChatGPT. Booharu usa autenticación mediante código de dispositivo y nunca solicita una clave de API.",
     "signInTitle": "Conectar Codex",
     "signOut": "Cerrar sesión",
     "signingIn": "Esperando el inicio de sesión…",
@@ -70,7 +70,7 @@
   "canvas": {
     "empty": "Selecciona una página para empezar.",
     "fit": "Ajustar a la ventana",
-    "surface": "Lienzo de Koharu",
+    "surface": "Lienzo de Booharu",
     "unavailable": "El lienzo WebGPU no está disponible"
   },
   "chapterContext": {
@@ -225,7 +225,7 @@
     "reset": "Restablecer"
   },
   "errors": {
-    "fatalTitle": "Koharu no pudo continuar",
+    "fatalTitle": "Booharu no pudo continuar",
     "tryAgain": "Intentar de nuevo"
   },
   "files": {
@@ -558,16 +558,17 @@
   },
   "menu": {
     "about": "Acerca de",
+    "booharuGithub": "Booharu on GitHub",
     "closeProject": "Cerrar proyecto",
     "delete": "Eliminar selección",
-    "discord": "Discord",
     "edit": "Editar",
     "export": "Exportar proyecto",
     "file": "Archivo",
     "fit": "Ajustar a la ventana",
-    "github": "GitHub",
     "help": "Ayuda",
     "import": "Importar páginas",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "Koharu on GitHub",
     "process": "Procesar",
     "processLayers": "Procesar capas seleccionadas",
     "processPages": "Procesar páginas seleccionadas",
@@ -974,7 +975,7 @@
       "processing": "Procesando",
       "detectTextColors": "Detectar colores del texto y del contorno",
       "defaultTextColor": "Color de texto predeterminado",
-      "textColorHelp": "Se aplica al texto recién detectado. Los cuadros de texto existentes conservan sus colores.",
+      "textColorHelp": "Copia los colores de relleno y contorno de la rotulación original al texto recién detectado. Los cuadros de texto existentes conservan sus colores.",
       "stages": {
         "detection": {
           "description": "Encuentra texto, bocadillos y viñetas.",
@@ -1089,10 +1090,10 @@
       "addFamily": "Añadir familia tipográfica",
       "defaultFamilies": "Familias tipográficas predeterminadas",
       "description": "Elige el estilo de texto predeterminado y el orden de las fuentes de respaldo.",
-      "empty": "No hay familias predeterminadas. Koharu usará la alternativa del sistema.",
+      "empty": "No hay familias predeterminadas. Booharu usará la alternativa del sistema.",
       "familyLabel": "Familia tipográfica predeterminada {{index}}",
       "fontFallback": "Fuentes de respaldo",
-      "fontFallbackDescription": "Koharu usa la primera familia disponible compatible con el texto.",
+      "fontFallbackDescription": "Booharu usa la primera familia disponible compatible con el texto.",
       "loadError": "No se pudieron cargar las fuentes. Las familias existentes aún se pueden eliminar.",
       "loadingFonts": "Cargando fuentes…",
       "removeFamily": "Eliminar {{family}}",
@@ -1112,7 +1113,7 @@
     "loadingProjects": "Cargando proyectos…",
     "newDescription": "Crea un espacio de trabajo limpio para tus páginas, traducciones y exportaciones.",
     "newProject": "Nuevo proyecto",
-    "projectKind": "Proyecto de Koharu",
+    "projectKind": "Proyecto de Booharu",
     "projectList": "Proyectos",
     "projectName": "Nombre del proyecto",
     "projectNamePlaceholder": "Mi nuevo proyecto",
@@ -1122,9 +1123,9 @@
   },
   "startup": {
     "description": "Cargando los entornos locales de IA y preparando el espacio de trabajo. El primer inicio puede tardar un momento.",
-    "opening": "Abriendo Koharu…",
+    "opening": "Abriendo Booharu…",
     "status": "Inicializando entornos locales",
-    "title": "Preparando Koharu"
+    "title": "Preparando Booharu"
   },
   "status": {
     "zoom": "Zoom"
@@ -1147,12 +1148,12 @@
   },
   "updater": {
     "available": {
-      "description": "Koharu <strong>{{version}}</strong> está listo para instalar",
+      "description": "Booharu <strong>{{version}}</strong> está listo para instalar",
       "title": "Actualización disponible"
     },
     "close": "Cerrar",
     "downloading": {
-      "subtitle": "Koharu {{version}}",
+      "subtitle": "Booharu {{version}}",
       "title": "Descargando actualización…"
     },
     "error": {
@@ -1193,7 +1194,7 @@
     "clearAll": "Borrar todo",
     "clearGroup": "Borrar {{group}}",
     "notSet": "Sin definir",
-    "pipelineNote": "El texto nuevo usa el estilo predeterminado.",
+    "pipelineNote": "Con la detección de colores activada, los colores leídos de la página sustituyen al color predeterminado en el texto detectado. Si está desactivada, el texto detectado usa el estilo de texto predeterminado.",
     "cancel": "Cancelar",
     "applied": "Aplicado a {{count}} cuadros de texto",
     "skipped": "Se omitieron {{count}} cuadros no válidos",

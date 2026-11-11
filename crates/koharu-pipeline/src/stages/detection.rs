@@ -51,18 +51,12 @@ const MIN_EXTREME_COLOR_PIXELS: u32 = 4;
 const MIN_MEASURED_STROKE_WIDTH: u8 = 2;
 const DIALOGUE_MASK_CONTAINMENT_THRESHOLD: f32 = 0.9;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
 #[serde(default)]
 pub struct BoxSettings {
+    /// Off unless the user turns it on: joining by bubble shape alone merges
+    /// lines that belong apart (#94).
     pub join_in_bubble: bool,
-}
-
-impl Default for BoxSettings {
-    fn default() -> Self {
-        Self {
-            join_in_bubble: true,
-        }
-    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
@@ -1995,12 +1989,61 @@ fn append_layout_subtree(index: usize, children: &[Vec<usize>], order: &mut Vec<
     }
 }
 
+/// Orders siblings the way manga is read: rows from the top, each row from the
+/// right, and anything stacked within a row from the top again.
+///
+/// Rows are bands of vertically overlapping boxes, so two panels drawn side by
+/// side stay in one row even when their top edges differ by a few pixels.
 fn sort_spatial(detections: &[KoharuLayoutDetection], indices: &mut [usize]) {
-    indices.sort_by(|&left, &right| {
-        detection_order(&detections[left], &detections[right])
-            .then_with(|| detections[right].score.total_cmp(&detections[left].score))
-            .then_with(|| left.cmp(&right))
+    let tie = |left: &usize, right: &usize| {
+        detections[*right]
+            .score
+            .total_cmp(&detections[*left].score)
+            .then_with(|| left.cmp(right))
+    };
+    indices.sort_by(|left, right| {
+        detection_order(&detections[*left], &detections[*right]).then_with(|| tie(left, right))
     });
+    let mut ordered = Vec::with_capacity(indices.len());
+    for mut row in overlap_bands(indices, |index| {
+        (detections[index].bbox[1], detections[index].bbox[3])
+    }) {
+        row.sort_by(|left, right| {
+            detections[*right].bbox[2]
+                .total_cmp(&detections[*left].bbox[2])
+                .then_with(|| detection_order(&detections[*left], &detections[*right]))
+                .then_with(|| tie(left, right))
+        });
+        for mut column in overlap_bands(&row, |index| {
+            (detections[index].bbox[0], detections[index].bbox[2])
+        }) {
+            column.sort_by(|left, right| {
+                detection_order(&detections[*left], &detections[*right])
+                    .then_with(|| tie(left, right))
+            });
+            ordered.extend(column);
+        }
+    }
+    indices.copy_from_slice(&ordered);
+}
+
+/// Groups consecutive items whose spans overlap the group's first item by more
+/// than half of the shorter span.
+fn overlap_bands(items: &[usize], span: impl Fn(usize) -> (f32, f32)) -> Vec<Vec<usize>> {
+    let mut bands: Vec<((f32, f32), Vec<usize>)> = Vec::new();
+    for &item in items {
+        let (start, end) = span(item);
+        if let Some(((band_start, band_end), members)) = bands.last_mut() {
+            let overlap = band_end.min(end) - band_start.max(start);
+            let shorter = (*band_end - *band_start).min(end - start);
+            if shorter > 0.0 && overlap > shorter * 0.5 {
+                members.push(item);
+                continue;
+            }
+        }
+        bands.push(((start, end), vec![item]));
+    }
+    bands.into_iter().map(|(_, members)| members).collect()
 }
 
 fn best_container(
@@ -3452,6 +3495,33 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(text_scores, [0.61, 0.62, 0.63]);
+    }
+
+    #[test]
+    fn layout_order_reads_a_row_right_to_left_when_tops_are_uneven() {
+        // The left panel starts slightly higher; the right one is still first.
+        let detections = vec![
+            detection("panel", 0.9, [0.0, 0.0, 95.0, 200.0]),
+            detection("panel", 0.9, [100.0, 3.0, 200.0, 200.0]),
+            detection("text", 0.2, [20.0, 30.0, 70.0, 70.0]),
+            detection("text", 0.1, [130.0, 40.0, 180.0, 80.0]),
+            // A second row, with two stacked panels left of a tall one.
+            detection("panel", 0.9, [100.0, 210.0, 200.0, 400.0]),
+            detection("panel", 0.9, [0.0, 205.0, 95.0, 300.0]),
+            detection("panel", 0.9, [0.0, 305.0, 95.0, 400.0]),
+            detection("text", 0.3, [130.0, 250.0, 180.0, 290.0]),
+            detection("text", 0.4, [20.0, 230.0, 70.0, 270.0]),
+            detection("text", 0.5, [20.0, 330.0, 70.0, 370.0]),
+        ];
+
+        let text_scores = layout_order(&detections)
+            .into_iter()
+            .filter_map(|index| {
+                (detections[index].label == "text").then_some(detections[index].score)
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(text_scores, [0.1, 0.2, 0.3, 0.4, 0.5]);
     }
 
     #[test]

@@ -26,6 +26,14 @@ impl StageProcessor for Processor {
         Translator::model(&self.config.model)
     }
 
+    fn uses_accelerator(&self) -> bool {
+        uses_local_accelerator(self.config.model.provider)
+    }
+
+    fn interruptible(&self) -> bool {
+        self.config.model.provider != koharu_translator::Provider::Local
+    }
+
     fn skip(&self, input: &StageInput) -> Result<bool> {
         if !input.resume {
             return Ok(false);
@@ -118,6 +126,16 @@ impl StageProcessor for Processor {
         }
         finish(edit)
     }
+}
+
+/// LM Studio and other OpenAI-compatible servers usually run on this
+/// machine's GPU, so they share the accelerator lane like the built-in model.
+pub(crate) fn uses_local_accelerator(provider: koharu_translator::Provider) -> bool {
+    use koharu_translator::Provider;
+    matches!(
+        provider,
+        Provider::Local | Provider::LmStudio | Provider::OpenAiCompatible
+    )
 }
 
 fn write_translation(

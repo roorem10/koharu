@@ -60,11 +60,17 @@ impl Request {
 }
 
 pub(crate) fn message(role: &str, text: impl Into<String>) -> Value {
+    // The service rejects an assistant turn whose text is typed as input.
+    let kind = if role == "assistant" {
+        "output_text"
+    } else {
+        "input_text"
+    };
     json!({
         "type": "message",
         "role": role,
         "content": [{
-            "type": "input_text",
+            "type": kind,
             "text": text.into(),
         }],
     })
@@ -115,4 +121,18 @@ pub(crate) fn function_output(
         "call_id": call_id,
         "output": output,
     }))
+}
+
+#[cfg(test)]
+mod message_tests {
+    use super::message;
+
+    #[test]
+    fn restored_assistant_turns_are_typed_as_output() {
+        assert_eq!(message("user", "hi")["content"][0]["type"], "input_text");
+        assert_eq!(
+            message("assistant", "hello")["content"][0]["type"],
+            "output_text"
+        );
+    }
 }

@@ -13,10 +13,10 @@
 > [!IMPORTANT]
 > Booharu is maintained by roorem10 and is **not an official Koharu release**. Please report problems you see in Booharu on [this fork's issues](https://github.com/roorem10/koharu/issues), not to the Koharu project, unless you can reproduce them in official Koharu too.
 
-Booharu 0.0.3 is based on Koharu 0.83.5. It keeps everything Koharu does and adds the typesetting, editing and translation changes listed below. The app's About page shows both the Koharu version and the Booharu version.
+Booharu 0.0.4 is based on Koharu 0.83.5. It keeps everything Koharu does and adds the typesetting, editing and translation changes listed below. The app's About page shows both the Koharu version and the Booharu version.
 
 > [!WARNING]
-> Projects saved by Booharu 0.0.3 can't be opened in 0.0.2 or earlier. Keep a copy of any project you still need in an older version.
+> Projects saved by Booharu 0.0.3 or later can't be opened in 0.0.2 or earlier. Keep a copy of any project you still need in an older version.
 
 Koharu introduces a local-first workflow for manga translation, utilizing the power of ML to automate the process. It combines the capabilities of object detection, OCR, inpainting, and LLMs to create a seamless translation experience.
 
@@ -70,7 +70,7 @@ Booharu also stays a tool for people who work by hand. Every step works on its o
 - Redesigned text panel with Text, Outline and Fill tabs, an FX popup and fx / ? tags on layer rows
 - Right-click a box on the page for FX, Box details, Split and Join with bubble
 - Compare with the original page (hold or toggle)
-- Drag layer rows to reorder; reviewer notes on boxes
+- Reorder layer rows; reviewer notes on boxes
 - Arrow keys nudge the selected box by one pixel, Shift+arrow by ten
 - Font picker keyboard navigation, favorite fonts and a Favorites filter
 - Zoom with editable keyboard shortcuts, key-combination recording, and a choice of wheel or Ctrl+wheel to zoom
@@ -81,7 +81,8 @@ Booharu also stays a tool for people who work by hand. Every step works on its o
 - O tool: draw a box to read text there; read, translate or clean a single box again
 - Cleanup brushes with hardness and opacity, plus a queue of areas to remove
 - Page levels: automatic levels and paper whitening, with the original kept and restorable
-- Detections in the same bubble are joined; boxes can be split and joined; fewer duplicate boxes
+- Boxes can be split and joined, with optional automatic joining of detections in the same bubble (off by default); fewer duplicate boxes
+- Sound effects you chose to skip are left on the page by cleanup
 - Inpainting on large pages no longer leaves smears or crosses into nearby line art ([koharu#731](https://github.com/koharu-rs/koharu/issues/731))
 
 **Quality checks**
@@ -92,6 +93,8 @@ Booharu also stays a tool for people who work by hand. Every step works on its o
 **Runs, files and setup**
 
 - Run presets, one stage at a time, retries, per-page failures with retry, resume and a finish chime
+- An incomplete translation response is rejected and the page is marked as failed, never saved as a finished translation
+- A provider that stops answering can't hang a run, and Stop gets through
 - Process whole chapter folders in one batch
 - Export scripts, import translations, choose page names and export selected pages
 - Choose where projects and models are stored; rename and duplicate projects
@@ -104,7 +107,7 @@ Booharu also stays a tool for people who work by hand. Every step works on its o
 - Drag and drop files and folders from Explorer to import them
 - Windows startup and loading spinner fixes
 - Settings live in a `PreviewData` folder next to the app, separate from an official Koharu install
-- About page shows the Booharu version and build commit
+- Runs as `Booharu.exe` with its own logo; About shows the Booharu version, and Help links to both Booharu and Koharu
 
 Booharu also turns off Koharu's updater and Sentry crash reporting. See the [releases page](https://github.com/roorem10/koharu/releases) for what changed in each version.
 
@@ -221,7 +224,7 @@ OpenAI-compatible endpoints are also supported.
 Download Booharu from the [releases page](https://github.com/roorem10/koharu/releases/latest). Each release has two files:
 
 - `Booharu-<version>-Setup.exe`: installer. Installs to your user's Programs folder and adds a Start menu entry.
-- `Booharu-<version>-Portable.zip`: extract anywhere and run `koharu.exe` from the extracted `Booharu` folder.
+- `Booharu-<version>-Portable.zip`: extract anywhere and run `Booharu.exe` from the extracted `Booharu` folder.
 
 Booharu runs on 64-bit Windows and has been tested with an NVIDIA GPU. The builds are unsigned, so Windows may show an "unknown publisher" warning; choose **More info**, then **Run anyway**. `SHA256SUMS.txt` in each release lists checksums for both files.
 
@@ -232,7 +235,7 @@ Booharu keeps its own data, so it can sit next to an official Koharu install. Fo
 Koharu's guide to startup, runtime, model, and provider errors also applies to Booharu: [Troubleshooting](https://koharu.rs/reference/troubleshooting). Set `RUST_LOG` to `debug` or `trace` for verbose logs:
 
 ```powershell
-$env:RUST_LOG="debug"; .\koharu.exe
+$env:RUST_LOG="debug"; .\Booharu.exe
 ```
 
 Booharu writes its logs to `PreviewData\logs` next to the app.

@@ -26,10 +26,15 @@ pub(super) async fn models(client: &Client) -> Result<Vec<Model>> {
         return Ok(Vec::new());
     };
     let mut url = Url::parse(ROOT).expect("Gemini API root is valid");
-    url.query_pairs_mut()
-        .append_pair("key", api_key.expose_secret())
-        .append_pair("pageSize", "1000");
-    let response: ModelsResponse = send_json("gemini", client.get(url)).await?;
+    url.query_pairs_mut().append_pair("pageSize", "1000");
+    // The key travels in a header: URLs end up in error messages and logs.
+    let response: ModelsResponse = send_json(
+        "gemini",
+        client
+            .get(url)
+            .header("x-goog-api-key", api_key.expose_secret()),
+    )
+    .await?;
     Ok(response
         .models
         .into_iter()
@@ -83,10 +88,8 @@ pub(super) async fn run_task(
     let api_key = koharu_secrets::get("gemini")?.context("gemini API key is not configured")?;
     let (system, user) = (request.system.clone(), request.user.clone());
     let schema = request.schema.clone();
-    let mut url =
+    let url =
         Url::parse(&format!("{ROOT}/{model}:generateContent")).expect("Gemini API root is valid");
-    url.query_pairs_mut()
-        .append_pair("key", api_key.expose_secret());
     let body = Request {
         system_instruction: Content::text(&system),
         contents: [Content::user(&user, &request.images)?],
@@ -116,7 +119,14 @@ pub(super) async fn run_task(
             response_json_schema: schema,
         },
     };
-    let response: Response = send_json("gemini", client.post(url).json(&body)).await?;
+    let response: Response = send_json(
+        "gemini",
+        client
+            .post(url)
+            .header("x-goog-api-key", api_key.expose_secret())
+            .json(&body),
+    )
+    .await?;
     let text = response
         .candidates
         .into_iter()

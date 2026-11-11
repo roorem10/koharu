@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "Yazar",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "Manga çeviri araçları",
-    "forkVersion": "Fork sürümü",
     "unavailable": "Kullanılamıyor",
     "version": "Sürüm"
   },
@@ -26,14 +26,14 @@
     "cancel": "İptal",
     "cancelled": "İptal edildi.",
     "deviceCode": "Cihaz kodu",
-    "deviceCodeHint": "Tarayıcınız açıldı. Koharu uygulamasını yetkilendirmek için bu kodu girin.",
+    "deviceCodeHint": "Tarayıcınız açıldı. Booharu uygulamasını yetkilendirmek için bu kodu girin.",
     "emptyDescription": "Ajandan bu projeyi incelemesini, çevirmesini, düzenlemesini veya işlemesini isteyin. Sayfa görüntülerini yalnızca gerektiğinde görür.",
-    "emptyTitle": "Koharu ne yapsın?",
+    "emptyTitle": "Booharu ne yapsın?",
     "failed": "Ajan isteği başarısız oldu.",
     "loading": "Codex yükleniyor…",
-    "message": "Koharu Ajanına mesaj gönder",
+    "message": "Booharu Ajanına mesaj gönder",
     "model": "Codex modeli",
-    "placeholder": "Koharu’dan bu proje üzerinde çalışmasını isteyin…",
+    "placeholder": "Booharu’dan bu proje üzerinde çalışmasını isteyin…",
     "properties": "Özellikler",
     "reasoning": "Akıl yürütme",
     "reasoningLevels": {
@@ -46,7 +46,7 @@
     },
     "send": "Gönder",
     "signIn": "Codex ile oturum aç",
-    "signInDescription": "ChatGPT aboneliğinizle oturum açın. Koharu cihaz kodu kimlik doğrulamasını kullanır ve hiçbir zaman API anahtarı istemez.",
+    "signInDescription": "ChatGPT aboneliğinizle oturum açın. Booharu cihaz kodu kimlik doğrulamasını kullanır ve hiçbir zaman API anahtarı istemez.",
     "signInTitle": "Codex’e bağlan",
     "signOut": "Oturumu kapat",
     "signingIn": "Oturum açma bekleniyor…",
@@ -69,7 +69,7 @@
   "canvas": {
     "empty": "Başlamak için bir sayfa seçin.",
     "fit": "Pencereye Sığdır",
-    "surface": "Koharu tuvali",
+    "surface": "Booharu tuvali",
     "unavailable": "WebGPU tuvali kullanılamıyor"
   },
   "chapterContext": {
@@ -223,7 +223,7 @@
     "reset": "Sıfırla"
   },
   "errors": {
-    "fatalTitle": "Koharu devam edemedi",
+    "fatalTitle": "Booharu devam edemedi",
     "tryAgain": "Tekrar dene"
   },
   "files": {
@@ -552,16 +552,17 @@
   },
   "menu": {
     "about": "Hakkında",
+    "booharuGithub": "Booharu on GitHub",
     "closeProject": "Projeyi Kapat",
     "delete": "Seçilenleri Sil",
-    "discord": "Discord",
     "edit": "Düzenle",
     "export": "Projeyi Dışa Aktar",
     "file": "Dosya",
     "fit": "Pencereye Sığdır",
-    "github": "GitHub",
     "help": "Yardım",
     "import": "Sayfaları İçe Aktar",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "Koharu on GitHub",
     "process": "İşle",
     "processLayers": "Seçili Katmanları İşle",
     "processPages": "Seçili Sayfaları İşle",
@@ -962,7 +963,7 @@
       "processing": "İşleniyor",
       "detectTextColors": "Metin ve kenarlık renklerini algıla",
       "defaultTextColor": "Varsayılan metin rengi",
-      "textColorHelp": "Yeni algılanan metne uygulanır. Mevcut metin kutuları renklerini korur.",
+      "textColorHelp": "Özgün yazının dolgu ve kenarlık renklerini yeni algılanan metne kopyalar. Mevcut metin kutuları renklerini korur.",
       "stages": {
         "detection": {
           "description": "Metinleri, konuşma balonlarını ve panelleri bulur.",
@@ -1077,10 +1078,10 @@
       "addFamily": "Yazı tipi ailesi ekle",
       "defaultFamilies": "Varsayılan yazı tipi aileleri",
       "description": "Varsayılan metin stilini ve yedek yazı tipi sırasını seçin.",
-      "empty": "Varsayılan aile yok. Koharu sistem yedeğini kullanacak.",
+      "empty": "Varsayılan aile yok. Booharu sistem yedeğini kullanacak.",
       "familyLabel": "Varsayılan yazı tipi ailesi {{index}}",
       "fontFallback": "Yedek yazı tipleri",
-      "fontFallbackDescription": "Koharu, metni destekleyen ilk kullanılabilir aileyi kullanır.",
+      "fontFallbackDescription": "Booharu, metni destekleyen ilk kullanılabilir aileyi kullanır.",
       "loadError": "Yazı tipleri yüklenemedi. Mevcut aileler yine de kaldırılabilir.",
       "loadingFonts": "Yazı tipleri yükleniyor…",
       "removeFamily": "{{family}} ailesini kaldır",
@@ -1100,7 +1101,7 @@
     "loadingProjects": "Projeler yükleniyor…",
     "newDescription": "Sayfalarınız, çevirileriniz ve dışa aktarımlarınız için temiz bir çalışma alanı oluşturun.",
     "newProject": "Yeni proje",
-    "projectKind": "Koharu projesi",
+    "projectKind": "Booharu projesi",
     "projectList": "Projeler",
     "projectName": "Proje adı",
     "projectNamePlaceholder": "Yeni projem",
@@ -1110,9 +1111,9 @@
   },
   "startup": {
     "description": "Yerel yapay zekâ çalışma zamanları yükleniyor ve çalışma alanı hazırlanıyor. İlk açılış biraz sürebilir.",
-    "opening": "Koharu açılıyor…",
+    "opening": "Booharu açılıyor…",
     "status": "Yerel çalışma zamanları başlatılıyor",
-    "title": "Koharu hazırlanıyor"
+    "title": "Booharu hazırlanıyor"
   },
   "status": {
     "zoom": "Yakınlaştırma"
@@ -1135,12 +1136,12 @@
   },
   "updater": {
     "available": {
-      "description": "Koharu <strong>{{version}}</strong> yüklenmeye hazır",
+      "description": "Booharu <strong>{{version}}</strong> yüklenmeye hazır",
       "title": "Güncelleme mevcut"
     },
     "close": "Kapat",
     "downloading": {
-      "subtitle": "Koharu {{version}}",
+      "subtitle": "Booharu {{version}}",
       "title": "Güncelleme indiriliyor…"
     },
     "error": {
@@ -1181,7 +1182,7 @@
     "clearAll": "Tümünü temizle",
     "clearGroup": "{{group}} grubunu temizle",
     "notSet": "Ayarlanmadı",
-    "pipelineNote": "Yeni metin varsayılan metin stilini kullanır.",
+    "pipelineNote": "Renk algılama açıkken, sayfadan okunan renkler algılanan metnin varsayılan renginin yerini alır. Kapalıyken algılanan metin varsayılan metin stilini kullanır.",
     "cancel": "İptal",
     "applied": "{{count}} metin kutusuna uygulandı",
     "skipped": "{{count}} geçersiz metin kutusu atlandı",

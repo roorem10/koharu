@@ -741,6 +741,17 @@ impl Project {
             edit.promote_entity_to_user(content)?;
             let shown = match text {
                 Some(text) => {
+                    // A translation needs a source beside it; a box filled in by
+                    // hand gets an empty one.
+                    if snapshot.component::<SceneSourceText>(content)?.is_none() {
+                        edit.set(
+                            content,
+                            &SceneSourceText {
+                                text: Authored::user(String::new()),
+                                language: None,
+                            },
+                        )?;
+                    }
                     edit.set(
                         content,
                         &SceneTranslation {
@@ -1721,6 +1732,9 @@ fn rasterize_stroke(
         }
     }
 }
+
+#[cfg(test)]
+mod geometry_tests;
 
 #[cfg(test)]
 mod tests {

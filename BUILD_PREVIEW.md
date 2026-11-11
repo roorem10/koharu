@@ -15,8 +15,8 @@ The Windows installer does not require these developer tools. This page is for r
 
 The preview uses its own application identifier and install folder. The build script sets `NEXT_PUBLIC_KOHARU_PREVIEW=1` and `KOHARU_PRIVATE_PREVIEW=1` to suppress the official updater, skip Sentry's build plugin, and skip browser/native Sentry initialization. It also disables Next.js telemetry and removes Sentry credentials/DSNs from the build process environment. The script explicitly enables Tauri’s production frontend protocol and statically links the Rust C runtime; the preview config disables Tauri’s separate runtime-linking override to avoid conflicting UCRT choices. Project files and native Koharu preferences use the application's existing locations. No model weights are bundled.
 
-Build status and verification results are recorded in FEATURE_PROGRESS.md. Do not treat an unbuilt source archive as an installer.
+Build status and verification results are recorded in notes/archive/FEATURE_PROGRESS.md. Do not treat an unbuilt source archive as an installer.
 
 ## Isolated preview data
 
-KOHARU_PRIVATE_PREVIEW=1 now also selects executable-relative PreviewData for application state and a separate OS credential service. Build with the preview app identifier; the private executable rejects the official identifier at startup. Do not ship PreviewData, credentials or downloaded model stores in the source/package. See PREVIEW2_IMPLEMENTATION.md for the complete changes from Preview 1.
+KOHARU_PRIVATE_PREVIEW=1 now also selects executable-relative PreviewData for application state and a separate OS credential service. Build with the preview app identifier; the private executable rejects the official identifier at startup. Do not ship PreviewData, credentials or downloaded model stores in the source/package. See notes/archive/PREVIEW2_IMPLEMENTATION.md for the complete changes from Preview 1.

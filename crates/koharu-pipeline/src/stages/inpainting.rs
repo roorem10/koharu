@@ -560,6 +560,9 @@ async fn prepare(input: &StageInput) -> Result<InpaintInput> {
         // Grow after clipping, otherwise a tight Region scope would trim the new edge away.
         mask = tokio_rayon::spawn(move || grow_user_mask(&mask, grow_px)).await;
     }
+    if input.inpainting_mask.is_none() {
+        protect_skipped_text(input, &mut mask, &mut text_mask)?;
+    }
     let flat_fill_regions = flat_fill_regions(input, source.width(), source.height())?;
     Ok(InpaintInput {
         image: source,
@@ -570,6 +573,87 @@ async fn prepare(input: &StageInput) -> Result<InpaintInput> {
         text_mask,
         flat_fill_regions,
     })
+}
+
+/// Keeps original ink that nothing will replace.
+///
+/// Text left out of translation on purpose (skipped SFX) has no replacement, so
+/// erasing it would leave a hole in the art. Areas shared with text that is
+/// being replaced are still cleaned.
+fn protect_skipped_text(
+    input: &StageInput,
+    mask: &mut GrayImage,
+    text_mask: &mut GrayImage,
+) -> Result<()> {
+    if input.translation_hints.skip.is_empty() {
+        return Ok(());
+    }
+    let Some(group) = input.scene.page(input.page)?.text_group()? else {
+        return Ok(());
+    };
+    let (width, height) = mask.dimensions();
+    // Detection closes the text mask by this radius, so the ink can reach
+    // that far outside the detected region.
+    let margin = ((f64::from(width.max(height)) / 1024.0) * 6.0)
+        .round()
+        .clamp(1.0, 255.0)
+        + 2.0;
+    let mut protected = Vec::new();
+    let mut replaced = Vec::new();
+    for layer in group.text_layers()? {
+        let content = layer.content()?;
+        let Some(region) = content.source_region()? else {
+            continue;
+        };
+        let points = region.geometry()?.points;
+        if points.is_empty() {
+            continue;
+        }
+        let (mut left, mut top) = (f64::INFINITY, f64::INFINITY);
+        let (mut right, mut bottom) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+        for point in &points {
+            left = left.min(point.x);
+            top = top.min(point.y);
+            right = right.max(point.x);
+            bottom = bottom.max(point.y);
+        }
+        let untranslated = content
+            .translation()?
+            .is_none_or(|translation| translation.text.value.trim().is_empty());
+        if input.translation_hints.skip.contains(&layer.id()) && untranslated {
+            protected.push(pixel_bounds(
+                [left - margin, top - margin, right + margin, bottom + margin],
+                width,
+                height,
+            ));
+        } else {
+            replaced.push(pixel_bounds([left, top, right, bottom], width, height));
+        }
+    }
+    for [left, top, right, bottom] in protected {
+        for y in top..bottom {
+            for x in left..right {
+                if replaced
+                    .iter()
+                    .any(|other| x >= other[0] && x < other[2] && y >= other[1] && y < other[3])
+                {
+                    continue;
+                }
+                mask.put_pixel(x, y, Luma([0]));
+                text_mask.put_pixel(x, y, Luma([0]));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn pixel_bounds(bounds: [f64; 4], width: u32, height: u32) -> [u32; 4] {
+    [
+        bounds[0].floor().clamp(0.0, f64::from(width)) as u32,
+        bounds[1].floor().clamp(0.0, f64::from(height)) as u32,
+        bounds[2].ceil().clamp(0.0, f64::from(width)) as u32,
+        bounds[3].ceil().clamp(0.0, f64::from(height)) as u32,
+    ]
 }
 
 fn blend_cleanup_pixel(target: &mut Rgba<u8>, generated: &Rgba<u8>, coverage: u8) {
@@ -1372,6 +1456,99 @@ mod tests {
         assert_eq!(prepared.mask.get_pixel(3, 4), &Luma([255]));
         assert_eq!(prepared.mask.get_pixel(0, 0), &Luma([0]));
         assert!(prepared.text_mask.pixels().all(|pixel| pixel[0] == 0));
+    }
+
+    #[tokio::test]
+    async fn skipped_text_stays_out_of_the_cleanup_mask() {
+        use koharu_scene::{
+            At, Authored, PageDraft, RecognizedFrom, SourceText, TextLayout, TextLayoutKind,
+            TextRegion,
+        };
+        let mut session = koharu_scene::Session::memory().await.unwrap();
+        let mut ids = None;
+        let encode = |image: &DynamicImage| {
+            let mut bytes = Cursor::new(Vec::new());
+            image.write_to(&mut bytes, ImageFormat::Png).unwrap();
+            Arc::<[u8]>::from(bytes.into_inner())
+        };
+        let source = DynamicImage::new_rgb8(64, 64);
+        let full = DynamicImage::ImageLuma8(GrayImage::from_pixel(64, 64, Luma([255])));
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 64.0, 64.0), At::End)?;
+                for (role, image) in [("source", &source), ("text-mask", &full)] {
+                    edit.set_asset(
+                        page,
+                        &AssetRole::new(role)?,
+                        AssetInput::new(
+                            encode(image),
+                            "image/png",
+                            AssetMetadata {
+                                width: Some(64),
+                                height: Some(64),
+                                attributes: BTreeMap::new(),
+                            },
+                        ),
+                    )?;
+                }
+                let mut layers = Vec::new();
+                for (x, text) in [(4.0, "sfx"), (40.0, "dialogue")] {
+                    let region = edit.add_analysis_region::<TextRegion>(
+                        page,
+                        At::End,
+                        &Geometry::rectangle(x, 20.0, 10.0, 10.0),
+                        None,
+                    )?;
+                    let content = edit.add_text_content(page, At::End)?;
+                    edit.set(
+                        content,
+                        &SourceText {
+                            text: Authored::user(text.into()),
+                            language: None,
+                        },
+                    )?;
+                    edit.relate::<RecognizedFrom>(content, region)?;
+                    layers.push(edit.add_text_layer(
+                        page,
+                        At::End,
+                        content,
+                        &TextLayout {
+                            origin: Origin::User,
+                            kind: TextLayoutKind::Paragraph,
+                            angle_degrees: None,
+                            warp: None,
+                        },
+                    )?);
+                }
+                ids = Some((page, layers[0]));
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(patch).await.unwrap().snapshot;
+        let (page, sfx) = ids.unwrap();
+        let input = StageInput::new(
+            snapshot,
+            page,
+            None,
+            None,
+            Arc::new(crate::ImageCache::default()),
+            None,
+        );
+
+        let untouched = prepare(&input).await.unwrap();
+        assert_eq!(untouched.mask.get_pixel(8, 24), &Luma([255]));
+
+        let skipped = input.with_translation_hints(Arc::new(crate::TranslationHints {
+            skip: [sfx].into(),
+            ..Default::default()
+        }));
+        let prepared = prepare(&skipped).await.unwrap();
+        // The skipped SFX keeps its ink; the dialogue is still cleaned.
+        assert_eq!(prepared.mask.get_pixel(8, 24), &Luma([0]));
+        assert_eq!(prepared.text_mask.get_pixel(8, 24), &Luma([0]));
+        assert_eq!(prepared.mask.get_pixel(44, 24), &Luma([255]));
+        assert_eq!(prepared.mask.get_pixel(60, 60), &Luma([255]));
     }
 
     #[tokio::test]

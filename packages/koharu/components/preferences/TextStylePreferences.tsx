@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { FontPicker } from '@/components/controls/FontPicker'
 import { NumberField, PreferenceRow } from '@/components/preferences/PreferenceFields'
+import { defaultFont } from '@/components/redesign/typography'
 import { refreshTextStyles, saveTextStyles } from '@/lib/backend'
 import { hexToRgba, rgbaToHex } from '@/lib/color'
 import { useFonts } from '@/lib/queries'
@@ -47,6 +48,7 @@ export function TextStylePreferences() {
       <div className='divide-y rounded-xl border bg-[var(--surface-panel)] px-5'>
         <TextStyleFields
           style={style}
+          builtIn={{ font: defaultFont.name, fill: '#000000' }}
           onChange={(default_style) =>
             void saveTextStyles({ ...styles, default_style }).catch(() => undefined)
           }
@@ -58,9 +60,12 @@ export function TextStylePreferences() {
 
 function TextStyleFields({
   style,
+  builtIn,
   onChange,
 }: {
   style: TextStyle
+  /** What the app uses when the default style leaves a field unset, shown instead of "Not set". */
+  builtIn?: { font: string; fill: string }
   onChange: (style: TextStyle) => void
 }) {
   const { t } = useTranslation()
@@ -85,7 +90,7 @@ function TextStyleFields({
               value={style.font?.preferred_font ?? ''}
               families={fonts.data ?? []}
               ariaLabel={t('textStyles.defaultFont')}
-              emptyLabel={t('textStyles.notSet')}
+              emptyLabel={builtIn?.font ?? t('textStyles.notSet')}
               onChange={(family) =>
                 onChange({
                   ...style,
@@ -103,13 +108,13 @@ function TextStyleFields({
         <div className='flex items-center gap-2'>
           <ColorWell
             label={t('textStyles.groups.fill')}
-            value={style.fill ? rgbaToHex(style.fill) : null}
+            value={style.fill ? rgbaToHex(style.fill) : (builtIn?.fill ?? null)}
             allowTransparent
             emptyLabel={t('textStyles.notSet')}
             onChange={(value) => onChange({ ...style, fill: value ? hexToRgba(value) : null })}
           />
           <span className='min-w-0 flex-1 text-[11px] text-muted-foreground'>
-            {style.fill ? rgbaToHex(style.fill) : t('textStyles.notSet')}
+            {style.fill ? rgbaToHex(style.fill) : (builtIn?.fill ?? t('textStyles.notSet'))}
           </span>
           {clear('fill')}
         </div>

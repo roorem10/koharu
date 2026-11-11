@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "Auteur",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "Outils de traduction de mangas",
-    "forkVersion": "Version du fork",
     "unavailable": "Indisponible",
     "version": "Version"
   },
@@ -27,14 +27,14 @@
     "cancel": "Annuler",
     "cancelled": "Annulé.",
     "deviceCode": "Code de l’appareil",
-    "deviceCodeHint": "Votre navigateur s’est ouvert. Saisissez ce code pour autoriser Koharu.",
+    "deviceCodeHint": "Votre navigateur s’est ouvert. Saisissez ce code pour autoriser Booharu.",
     "emptyDescription": "Demandez à l’agent d’analyser, de traduire, de modifier ou de traiter ce projet. Il ne consultera les images des pages qu’en cas de besoin.",
-    "emptyTitle": "Que doit faire Koharu ?",
+    "emptyTitle": "Que doit faire Booharu ?",
     "failed": "La requête de l’agent a échoué.",
     "loading": "Chargement de Codex…",
-    "message": "Message à l’agent Koharu",
+    "message": "Message à l’agent Booharu",
     "model": "Modèle Codex",
-    "placeholder": "Demandez à Koharu de travailler sur ce projet…",
+    "placeholder": "Demandez à Booharu de travailler sur ce projet…",
     "properties": "Propriétés",
     "reasoning": "Raisonnement",
     "reasoningLevels": {
@@ -47,7 +47,7 @@
     },
     "send": "Envoyer",
     "signIn": "Se connecter avec Codex",
-    "signInDescription": "Connectez-vous avec votre abonnement ChatGPT. Koharu utilise l’authentification par code d’appareil et ne demande jamais de clé API.",
+    "signInDescription": "Connectez-vous avec votre abonnement ChatGPT. Booharu utilise l’authentification par code d’appareil et ne demande jamais de clé API.",
     "signInTitle": "Connecter Codex",
     "signOut": "Se déconnecter",
     "signingIn": "En attente de connexion…",
@@ -70,7 +70,7 @@
   "canvas": {
     "empty": "Sélectionnez une page pour commencer.",
     "fit": "Ajuster à la fenêtre",
-    "surface": "Canevas Koharu",
+    "surface": "Canevas Booharu",
     "unavailable": "Canevas WebGPU indisponible"
   },
   "chapterContext": {
@@ -225,7 +225,7 @@
     "reset": "Réinitialiser"
   },
   "errors": {
-    "fatalTitle": "Koharu ne peut pas continuer",
+    "fatalTitle": "Booharu ne peut pas continuer",
     "tryAgain": "Réessayer"
   },
   "files": {
@@ -558,16 +558,17 @@
   },
   "menu": {
     "about": "À propos",
+    "booharuGithub": "Booharu on GitHub",
     "closeProject": "Fermer le projet",
     "delete": "Supprimer la sélection",
-    "discord": "Discord",
     "edit": "Édition",
     "export": "Exporter le projet",
     "file": "Fichier",
     "fit": "Ajuster à la fenêtre",
-    "github": "GitHub",
     "help": "Aide",
     "import": "Importer des pages",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "Koharu on GitHub",
     "process": "Traitement",
     "processLayers": "Traiter les calques sélectionnés",
     "processPages": "Traiter les pages sélectionnées",
@@ -974,7 +975,7 @@
       "processing": "Traitement",
       "detectTextColors": "Détecter les couleurs du texte et du contour",
       "defaultTextColor": "Couleur du texte par défaut",
-      "textColorHelp": "S’applique au texte nouvellement détecté. Les zones de texte existantes conservent leurs couleurs.",
+      "textColorHelp": "Copie les couleurs de remplissage et de contour du lettrage d’origine sur le texte nouvellement détecté. Les zones de texte existantes conservent leurs couleurs.",
       "stages": {
         "detection": {
           "description": "Trouver le texte, les bulles et les cases.",
@@ -1089,10 +1090,10 @@
       "addFamily": "Ajouter une famille de polices",
       "defaultFamilies": "Familles de polices par défaut",
       "description": "Choisissez les réglages de texte par défaut et l’ordre des polices de secours.",
-      "empty": "Aucune famille par défaut. Koharu utilisera la police de secours du système.",
+      "empty": "Aucune famille par défaut. Booharu utilisera la police de secours du système.",
       "familyLabel": "Famille de polices par défaut {{index}}",
       "fontFallback": "Police de secours",
-      "fontFallbackDescription": "Koharu utilise la première famille disponible qui prend en charge le texte.",
+      "fontFallbackDescription": "Booharu utilise la première famille disponible qui prend en charge le texte.",
       "loadError": "Impossible de charger les polices. Les familles existantes peuvent toujours être supprimées.",
       "loadingFonts": "Chargement des polices…",
       "removeFamily": "Retirer {{family}}",
@@ -1112,7 +1113,7 @@
     "loadingProjects": "Chargement des projets…",
     "newDescription": "Créez un espace de travail vierge pour vos pages, traductions et exports.",
     "newProject": "Nouveau projet",
-    "projectKind": "Projet Koharu",
+    "projectKind": "Projet Booharu",
     "projectList": "Projets",
     "projectName": "Nom du projet",
     "projectNamePlaceholder": "Mon nouveau projet",
@@ -1122,9 +1123,9 @@
   },
   "startup": {
     "description": "Chargement des environnements d’IA locaux et préparation de l’espace de travail. Le premier lancement peut prendre un moment.",
-    "opening": "Ouverture de Koharu…",
+    "opening": "Ouverture de Booharu…",
     "status": "Initialisation des environnements locaux",
-    "title": "Préparation de Koharu"
+    "title": "Préparation de Booharu"
   },
   "status": {
     "zoom": "Zoom"
@@ -1147,12 +1148,12 @@
   },
   "updater": {
     "available": {
-      "description": "Koharu <strong>{{version}}</strong> est prêt à être installé",
+      "description": "Booharu <strong>{{version}}</strong> est prêt à être installé",
       "title": "Mise à jour disponible"
     },
     "close": "Fermer",
     "downloading": {
-      "subtitle": "Koharu {{version}}",
+      "subtitle": "Booharu {{version}}",
       "title": "Téléchargement de la mise à jour…"
     },
     "error": {
@@ -1193,7 +1194,7 @@
     "clearAll": "Tout effacer",
     "clearGroup": "Effacer {{group}}",
     "notSet": "Non défini",
-    "pipelineNote": "Le nouveau texte utilise le style par défaut.",
+    "pipelineNote": "Lorsque la détection des couleurs est activée, les couleurs lues sur la page remplacent la couleur par défaut du texte détecté. Lorsqu’elle est désactivée, le texte détecté utilise le style de texte par défaut.",
     "cancel": "Annuler",
     "applied": "Appliqué à {{count}} zones de texte",
     "skipped": "{{count}} zones de texte invalides ignorées",

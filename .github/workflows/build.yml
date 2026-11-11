@@ -55,4 +55,5 @@ jobs:
           name: koharu-${{ matrix.os }}
           path: |
             target/release/koharu*
+            target/release/Booharu*
           retention-days: 3

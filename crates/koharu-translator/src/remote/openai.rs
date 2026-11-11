@@ -48,7 +48,8 @@ fn supports_translation(id: &str) -> bool {
         .and_then(|id| id.split(':').next())
         .unwrap_or(id)
         .to_ascii_lowercase();
-    let supported_family = base.starts_with("gpt-5")
+    let supported_family = base.starts_with("gpt-6")
+        || base.starts_with("gpt-5")
         || base.starts_with("gpt-4.1")
         || base.starts_with("gpt-4o")
         || base == "o3"
@@ -67,6 +68,21 @@ fn supports_translation(id: &str) -> bool {
     .iter()
     .any(|marker| base.contains(marker));
     supported_family && !incompatible
+}
+
+/// Some models cannot switch reasoning off; their lowest setting stands in for "off".
+fn reasoning_effort(model: &str, enabled: bool) -> &'static str {
+    let base = model
+        .strip_prefix("ft:")
+        .and_then(|id| id.split(':').next())
+        .unwrap_or(model)
+        .to_ascii_lowercase();
+    let always_reasons = base.starts_with("gpt-6.1-sol") || base.starts_with("gpt-6-astra");
+    match (enabled, always_reasons) {
+        (true, _) => "medium",
+        (false, true) => "low",
+        (false, false) => "none",
+    }
 }
 
 pub(super) async fn run_task(
@@ -110,7 +126,7 @@ pub(super) async fn run_task(
         presence_penalty: generation.presence_penalty,
         reasoning_effort: generation
             .reasoning
-            .map(|enabled| if enabled { "medium" } else { "none" }),
+            .map(|enabled| reasoning_effort(model, enabled)),
         response_format: ResponseFormat {
             kind: "json_schema",
             json_schema: JsonSchema {
@@ -232,10 +248,32 @@ mod tests {
         assert!(supports_translation("gpt-5.6-luna"));
         assert!(supports_translation("gpt-4o-mini"));
         assert!(supports_translation("ft:gpt-4o-mini:org:name:id"));
+        for id in [
+            "gpt-5.6-terra",
+            "gpt-5.6-sol",
+            "gpt-5.6-luna",
+            "gpt-6-astra",
+            "gpt-6-sol",
+            "gpt-6-luna",
+            "gpt-6.1-sol",
+            "gpt-6.1-terra",
+        ] {
+            assert!(supports_translation(id), "{id}");
+        }
+        assert!(!supports_translation("gpt-6-image"));
         assert!(!supports_translation("gpt-5.5-pro"));
         assert!(!supports_translation("gpt-5.3-codex"));
         assert!(!supports_translation("gpt-4o-audio-preview"));
         assert!(!supports_translation("text-embedding-3-large"));
+    }
+
+    #[test]
+    fn reasoning_off_uses_the_lowest_effort_a_model_accepts() {
+        assert_eq!(reasoning_effort("gpt-6-luna", false), "none");
+        assert_eq!(reasoning_effort("gpt-5.6-sol", false), "none");
+        assert_eq!(reasoning_effort("gpt-6.1-sol", false), "low");
+        assert_eq!(reasoning_effort("gpt-6-astra", false), "low");
+        assert_eq!(reasoning_effort("gpt-6-astra", true), "medium");
     }
 
     #[test]

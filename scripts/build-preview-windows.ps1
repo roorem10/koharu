@@ -108,7 +108,7 @@ if (-not $cefRoot) {
 }
 if (-not $cefRoot) { throw 'Cannot locate CEF notices. Keep the CEF build directory and retry.' }
 # A restored CI cache can skip the CEF build script, which is what copies the CEF runtime
-# next to koharu.exe. Take the runtime from the CEF directory itself in that case.
+# next to the program. Take the runtime from the CEF directory itself in that case.
 if (-not (Test-Path (Join-Path $stage 'libcef.dll'))) {
     Get-ChildItem $cefRoot -File | Where-Object { $_.Extension -in $extensions -and $_.Name -ne 'archive.json' } |
         Copy-Item -Destination $stage -Force
