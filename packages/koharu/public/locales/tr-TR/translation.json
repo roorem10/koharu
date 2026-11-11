@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "Yazar",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "Manga çeviri araçları",
-    "forkVersion": "Fork sürümü",
     "unavailable": "Kullanılamıyor",
     "version": "Sürüm"
   },

@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "Autor",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "Herramientas de traducción de manga",
-    "forkVersion": "Versión del fork",
     "unavailable": "No disponible",
     "version": "Versión"
   },

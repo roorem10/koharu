@@ -846,8 +846,8 @@ describe('greenfield editor', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'About' }))
 
     expect(await screen.findByRole('heading', { name: 'Booharu' })).toBeInTheDocument()
-    expect(await screen.findByText('0.62.0')).toBeInTheDocument()
-    expect(screen.getByText('Mayo Takanashi')).toBeInTheDocument()
+    expect(await screen.findByText('Based on Koharu 0.62.0 by Mayo Takanashi.')).toBeInTheDocument()
+    expect(screen.getByText('Roorem10')).toBeInTheDocument()
     expect(nativeGetVersion).toHaveBeenCalledTimes(1)
   })
 

@@ -1,8 +1,8 @@
 {
   "about": {
     "author": "المؤلف",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "أدوات ترجمة المانغا",
-    "forkVersion": "إصدار النسخة المشتقة",
     "unavailable": "غير متاح",
     "version": "الإصدار"
   },
