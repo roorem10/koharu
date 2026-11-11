@@ -299,6 +299,15 @@ impl Project {
             } else if unread {
                 // A box with nothing read into it (a new hand-drawn box) is
                 // lettering: only the translation is drawn on the page.
+                if content.source()?.is_none() {
+                    edit.set(
+                        content.id(),
+                        &SourceText {
+                            text: Authored::user(String::new()),
+                            language: None,
+                        },
+                    )?;
+                }
                 edit.set(
                     content.id(),
                     &Translation {
