@@ -701,6 +701,10 @@ function FontSizeField({
           aria-label={t('inspector.fontSize')}
           placeholder={autoFit ? t('inspector.auto') : undefined}
           className='px-1.5 text-left text-ellipsis'
+          // Booharu: Enter applies a typed size at once; the field commits only on blur.
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur()
+          }}
         />
         <DropdownMenu>
           <DropdownMenuTrigger
