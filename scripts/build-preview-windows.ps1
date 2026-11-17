@@ -73,8 +73,8 @@ Get-ChildItem Env: | Where-Object { $_.Name -like 'SENTRY_*' -or $_.Name -like '
 # Koharu keeps release debug information for Sentry's stack traces, which Booharu never sends.
 $env:CARGO_PROFILE_RELEASE_DEBUG = '0'
 # Where the CEF build script downloads Chromium Embedded Framework, so this script knows
-# where to take the runtime and its notices from.
-$env:CEF_PATH = Join-Path $root 'target\cef'
+# where to take the runtime and its notices from. CI sets its own, outside target\.
+if (-not $env:CEF_PATH) { $env:CEF_PATH = Join-Path $root 'target\cef' }
 
 if (-not $SkipDependencies) {
     # Koharu's postinstall installs the Tauri CLI, which this build doesn't use: it calls Cargo directly.
@@ -97,8 +97,10 @@ Copy-Item (Join-Path $root 'target\release\Booharu.exe') -Destination $stage -Fo
 
 # The CEF runtime goes beside the program. Take it from the CEF distribution itself rather
 # than from target\release, where a restored CI cache can leave an older copy or none.
+# download-cef unpacks it to <version>\cef_windows_x86_64 (older releases: windows_x86_64).
 $libcef = Get-ChildItem $env:CEF_PATH -Recurse -Filter 'libcef.dll' -ErrorAction SilentlyContinue |
-    Where-Object { $_.Directory.Name -eq 'windows_x86_64' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    Where-Object { $_.Directory.Name -in @('cef_windows_x86_64', 'windows_x86_64') } |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $libcef) { throw "Cannot find the CEF distribution under $env:CEF_PATH." }
 $cefRoot = $libcef.DirectoryName
 $runtimeExtensions = @('.exe', '.dll', '.pak', '.bin', '.dat', '.json')

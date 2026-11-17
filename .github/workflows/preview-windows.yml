@@ -78,10 +78,17 @@ jobs:
           cmake --version | Select-Object -First 1
           ninja --version
 
+      # rust-cache prunes target\ before saving it, and a CEF copy it had pruned (archive.json
+      # gone) stopped the CEF build script. CEF now downloads outside target\ on every run.
+      - name: Drop a CEF copy restored from the cache
+        shell: pwsh
+        run: Remove-Item target\cef -Recurse -Force -ErrorAction SilentlyContinue
+
       - name: Build preview package
         shell: pwsh
         env:
           KOHARU_FORK_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          CEF_PATH: ${{ runner.temp }}\cef
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview-windows.ps1
 
       - name: Check package layout
