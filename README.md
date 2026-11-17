@@ -15,8 +15,12 @@
 
 Booharu 0.0.4 is based on Koharu 0.83.5. It keeps everything Koharu does and adds the typesetting, editing and translation changes listed below. The app's About page shows both the Koharu version and the Booharu version.
 
+**What comes next:** Koharu 0.84.0 and 0.85.0 rewrote the program from the ground up. Booharu 0.0.5 is being rebuilt on Koharu 0.85.0, with everything Booharu added up to 0.0.4, and nothing else. Until 0.0.5 is released, 0.0.4 is the current version and this page describes it. Other planned features are on hold until then; see the [roadmap issue](https://github.com/roorem10/koharu/issues/6).
+
 > [!WARNING]
 > Projects saved by Booharu 0.0.3 or later can't be opened in 0.0.2 or earlier. Keep a copy of any project you still need in an older version.
+>
+> Booharu 0.0.5 will not open projects saved by 0.0.4 or earlier, because Koharu 0.84.0 changed the project format (one `.khr` file in place of a `.khrproj` folder). Finish chapters you have in progress on 0.0.4.
 
 Koharu introduces a local-first workflow for manga translation, utilizing the power of ML to automate the process. It combines the capabilities of object detection, OCR, inpainting, and LLMs to create a seamless translation experience.
 

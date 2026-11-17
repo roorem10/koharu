@@ -8,6 +8,7 @@ This repository is Booharu, a personal Windows fork of Koharu. The rules below a
 
 - The goal: add a multi-page chapter, press one button, and get a very passable scanlation (clean, translated, lettered) with no further input. Hand edits stay possible afterwards and always win over automatic choices. Every feature must also work on its own for someone who never uses the automatic run.
 - `booharu` is the accepted work and the base for every branch. `main` is a clean copy of upstream and is never developed on. Branches are named `wo-NN-topic`, `fix/topic`, `chore/topic` or `release/booharu-X.Y.Z`.
+- From 0.0.5 on, Booharu is rebuilt on the current Koharu release (0.85.0 for 0.0.5). That release branch starts from Koharu's code, not from `booharu`, and replaces `booharu` when the owner approves it. Where Koharu and Booharu both fixed something, Koharu's fix is used. Booharu's own code stays in its own files, crates and data namespace so later Koharu releases can be taken in. Until 0.0.5 is released, the code on `booharu` is 0.0.4.
 - Work reaches `booharu` only after it compiles, passes the "Booharu check" workflow, and has been tested by the owner in a Windows build. Releases are tagged `booharu-vX.Y.Z`; the version lives in `FORK_VERSION`.
 - New non-trivial logic leaves one small test. A change report ends with what was skipped or not checked, and any risk.
 - A feature that adds an action also adds its Agent tool, in the tool group it belongs to (`commands/agent/host/tools`). The MCP server offers the same tools.
