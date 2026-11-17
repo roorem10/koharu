@@ -368,8 +368,9 @@ mod tests {
         // The border reaches across the gap and under the second O's left
         // stroke, but leaves that stroke clear.
         assert!(clear.x0 - bordered.x1 < 15.0, "{bordered:?} {clear:?}");
-        assert!(regions[0].1.contains(Point::new((bordered.x1 + clear.x0) / 2.0, middle)));
-        assert!(!regions[0].1.contains(Point::new(clear.x0 + 3.0, middle)));
+        let (_, region) = &regions[0];
+        assert!(region.contains(Point::new((bordered.x1 + clear.x0) / 2.0, middle)));
+        assert!(!region.contains(Point::new(clear.x0 + 3.0, middle)));
         Ok(())
     }
 
