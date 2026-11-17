@@ -7,6 +7,7 @@ import { I18nextProvider } from 'react-i18next'
 import { StartupView } from '@/components/app/StartupView'
 import ClientOnly from '@/components/ClientOnly'
 import { refreshModels, refreshPreferences } from '@/lib/backend'
+import { usePageMenuGuard } from '@/lib/booharu/usePageMenuGuard' // Booharu: the menu guard.
 import i18n from '@/lib/i18n'
 import {
   pageKey,
@@ -101,6 +102,8 @@ export function Providers({ children }: { children: ReactNode }) {
     window.addEventListener('wheel', preventViewportScaling, { capture: true, passive: false })
     return () => window.removeEventListener('wheel', preventViewportScaling, { capture: true })
   }, [])
+
+  usePageMenuGuard() // Booharu: no browser page menu outside text fields.
 
   return (
     <QueryClientProvider client={queryClient}>
