@@ -5,6 +5,12 @@
 //! `tools`, they reach the open project through its private fields and
 //! helpers, and the app through the host the app gives
 //! `Tools::with_booharu`.
+//!
+//! | Tool | Does | Only reads |
+//! |---|---|---|
+//! | `booharu_get_project_overview` | each page's size and blocks, how many are translated, and the Booharu attributes on its layers; the translator's settings, the typesetting defaults, the font families, and Booharu's settings | yes |
+
+mod project;
 
 use std::sync::Arc;
 
@@ -38,8 +44,10 @@ impl Tools {
     }
 }
 
-/// Adds Booharu's tools to `tools`: none yet.
-pub(crate) fn register(_tools: &mut ToolSet) {}
+/// Adds Booharu's tools to `tools`.
+pub(crate) fn register(tools: &mut ToolSet) {
+    tools.add_tool(project::GetProjectOverview);
+}
 
 /// The host of the app the call runs in. Without one, as in the `serve`
 /// example, a tool that needs the app fails.
