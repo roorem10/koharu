@@ -304,6 +304,7 @@ mod tests {
                 size: 16.0,
                 fill: Color::BLACK,
                 stroke: None,
+                outer_stroke: None,
             }],
             vertical: false,
             align: Align::Start,
@@ -311,6 +312,7 @@ mod tests {
             hyphenation: None,
             chinese: false,
             frame: Frame::Point,
+            stroke_method: Default::default(),
         }
     }
 

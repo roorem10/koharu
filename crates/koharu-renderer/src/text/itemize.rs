@@ -345,6 +345,7 @@ mod tests {
                 size: 16.0,
                 fill: Color::BLACK,
                 stroke: None,
+                outer_stroke: None,
             }],
             vertical: false,
             align: Align::Start,
@@ -352,6 +353,7 @@ mod tests {
             hyphenation: None,
             chinese: false,
             frame: Frame::Point,
+            stroke_method: Default::default(),
         }
     }
 
@@ -374,6 +376,7 @@ mod tests {
             size: 16.0,
             fill: Color::BLACK,
             stroke: None,
+            outer_stroke: None,
         };
         let styled = Styled {
             spans: vec![span(0..4), span(4..text.len())],

@@ -6,13 +6,14 @@ use std::ops::Range;
 
 use anyhow::Result;
 use harfrust::Buffer;
-use koharu_scene::Align;
-use kurbo::Rect;
+use koharu_scene::{Align, Color, StrokeMethod};
+use kurbo::{BezPath, Rect, Shape as _};
 use unicode_bidi::{BidiInfo, Level};
 
 use super::{
     ResolvedText, TextRun,
     breaks::{Break, Segment},
+    contour,
     fit::{Placed, PlacedLine},
     itemize::{Orientation, Run},
     lettering::{LineMap, PlacedGlyph},
@@ -32,6 +33,11 @@ pub(crate) struct TextLayout {
     pub resolved: ResolvedText,
     /// What the text covers, its strokes included, in its own coordinates.
     pub bounds: Rect,
+    /// Booharu: the borders the Contour method grew from the merged letters,
+    /// each a colour and the region it fills, in the order they draw under
+    /// every fill; `None` when the Expansion method grows them from the
+    /// glyphs as they draw.
+    pub contours: Option<Vec<(Color, BezPath)>>,
 }
 
 /// The font and positioned glyphs of one of a layout's runs.
@@ -108,11 +114,17 @@ pub(super) fn arrange(
     }
 
     let (runs, text_runs) = runs(shaped, &glyphs, scale);
+    // A second border reaches past the first.
     let stroke = styled
         .spans
         .iter()
-        .filter_map(|span| span.stroke.map(|(_, width)| width * scale))
+        .filter_map(|span| {
+            let outer = span.outer_stroke.map_or(0.0, |(_, width)| width);
+            span.stroke.map(|(_, width)| (width + outer) * scale)
+        })
         .fold(0.0, f32::max);
+    let contours = (styled.stroke_method == StrokeMethod::Contour)
+        .then(|| contour::regions(&runs, &text_runs));
     let utf16 = |at: &usize| utf16(&styled.text, *at);
     Ok(TextLayout {
         runs,
@@ -129,9 +141,15 @@ pub(super) fn arrange(
             line_height: styled.line_height,
             uncovered: shaped.uncovered.clone(),
         },
-        bounds: bounds
-            .unwrap_or(placed.frame)
-            .inflate(f64::from(stroke), f64::from(stroke)),
+        // A Contour border covers its region, which a slanted or bold
+        // letter's ink can carry past the lines.
+        bounds: contours.iter().flatten().fold(
+            bounds
+                .unwrap_or(placed.frame)
+                .inflate(f64::from(stroke), f64::from(stroke)),
+            |bounds, (_, region)| bounds.union(region.bounding_box()),
+        ),
+        contours,
     })
 }
 
@@ -398,6 +416,9 @@ fn runs(shaped: &ShapedText, glyphs: &[Positioned], scale: f32) -> (Vec<GlyphRun
             size: span.size * scale,
             fill: span.fill,
             stroke: span.stroke.map(|(color, width)| (color, width * scale)),
+            outer_stroke: span
+                .outer_stroke
+                .map(|(color, width)| (color, width * scale)),
         });
         glyph_runs.push(GlyphRun {
             font: font.clone(),
@@ -536,6 +557,7 @@ mod tests {
                 size: 16.0,
                 fill: koharu_scene::Color::BLACK,
                 stroke: None,
+                outer_stroke: None,
             }],
             vertical: false,
             align: Align::Start,
@@ -543,6 +565,7 @@ mod tests {
             hyphenation: None,
             chinese: false,
             frame: Frame::Point,
+            stroke_method: Default::default(),
         }
     }
 

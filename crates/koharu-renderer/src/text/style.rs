@@ -5,7 +5,7 @@ use std::ops::Range;
 
 use anyhow::Result;
 use hypher::Lang;
-use koharu_scene::{Align, CharStyle, Color, Direction, Frame, Text};
+use koharu_scene::{Align, CharStyle, Color, Direction, Frame, StrokeMethod, Text};
 
 use crate::fonts::Font;
 
@@ -24,6 +24,8 @@ pub(super) struct Styled {
     pub chinese: bool,
     /// Where the text sets, in its own coordinates.
     pub frame: Frame,
+    /// Booharu: how its borders draw.
+    pub stroke_method: StrokeMethod,
 }
 
 pub(super) struct Span {
@@ -34,6 +36,9 @@ pub(super) struct Span {
     pub fill: Color,
     /// The colour and width of a stroke.
     pub stroke: Option<(Color, f32)>,
+    /// Booharu: the colour and width of a second border around the stroke,
+    /// which only a stroke has.
+    pub outer_stroke: Option<(Color, f32)>,
 }
 
 impl Styled {
@@ -63,6 +68,13 @@ impl Styled {
                     }
                     _ => None,
                 },
+                outer_stroke: match (style.stroke, style.stroke_width, style.outer_stroke) {
+                    (Some(_), Some(inner), Some(color)) if inner > 0.0 => style
+                        .outer_stroke_width
+                        .filter(|width| *width > 0.0)
+                        .map(|width| (Color::from(color), width as f32)),
+                    _ => None,
+                },
             });
         }
         Ok(Self {
@@ -82,6 +94,7 @@ impl Styled {
                 .and_then(Lang::from_iso),
             chinese: text.language.language.as_str() == "zh",
             frame: text.frame.clone(),
+            stroke_method: text.style.stroke_method.unwrap_or_default(),
         })
     }
 

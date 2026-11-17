@@ -213,7 +213,8 @@ const LF: u16 = b'\n' as u16;
 /// the EngineData, and a warp descriptor; and, when every run shares one
 /// stroke, an Outside stroke effect (`lfx2` with `FrFX`), how Photoshop
 /// strokes type outside its glyphs as the renderer does. Strokes that differ
-/// by span stay in the pixels only.
+/// by span stay in the pixels only, and so do Booharu's second borders, which
+/// one stroke effect can't hold.
 pub(crate) fn type_layer(layer: &Text, text: &ResolvedText, index: i32) -> Vec<TaggedBlock> {
     let vertical = layer.direction == Direction::Vertical;
     let frame = text.frame;
@@ -347,6 +348,7 @@ pub(crate) fn type_layer(layer: &Text, text: &ResolvedText, index: i32) -> Vec<T
     let stroke = text.runs[0].stroke;
     if let Some((color, width)) = stroke
         && text.runs.iter().all(|run| run.stroke == stroke)
+        && text.runs.iter().all(|run| run.outer_stroke.is_none())
     {
         // An effect's size is in page pixels, where the renderer's stroke
         // grows with the layer's transform.

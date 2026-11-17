@@ -164,7 +164,16 @@ export type Change = {
 }
 
 /**  One of the values a character's style holds. */
-export type CharKey = 'family' | 'weight' | 'italic' | 'size' | 'fill' | 'stroke' | 'stroke_width'
+export type CharKey =
+  | 'family'
+  | 'weight'
+  | 'italic'
+  | 'size'
+  | 'fill'
+  | 'stroke'
+  | 'stroke_width'
+  | 'outer_stroke'
+  | 'outer_stroke_width'
 
 /**
  *  Character values; each is also a mark key on a span, and a mark wins for
@@ -178,6 +187,14 @@ export type CharStyle = {
   fill?: Rgba | null
   stroke?: Rgba | null
   stroke_width?: number | null
+  /**
+   *  Booharu: a second border drawn around the first, outside its outer
+   *  edge; it shows only with a first border. Left out when unset, so a
+   *  text without one stays readable by Koharu.
+   */
+  outer_stroke?: Rgba | null
+  /**  Booharu: the second border's width, outward from the first border. */
+  outer_stroke_width?: number | null
 }
 
 /**  The app's theme colours the canvas draws with. */
@@ -815,6 +832,19 @@ export type Stroke = {
 }
 
 /**
+ *  Booharu: how a text's borders are drawn, both outside the letters with
+ *  round corners.
+ */
+export type StrokeMethod =
+  /**
+   *  Grown from the letters merged into one shape, so a dot, a counter,
+   *  and touching letters get the same border as the rest.
+   */
+  | 'contour'
+  /**  Each letter grown on its own, as Koharu draws borders. */
+  | 'expansion'
+
+/**
  *  What a run works on. It runs every stage it's given on everything it
  *  names, replacing what's there, and never a stage it isn't given.
  */
@@ -860,6 +890,12 @@ export type TextStyle = {
   align?: Align | null
   /**  A paragraph key: a multiple of each line's largest size. */
   line_height?: number | null
+  /**
+   *  A paragraph key, Booharu's: how the borders are drawn; `None` is
+   *  Contour. Left out when unset, so a text without one stays readable by
+   *  Koharu.
+   */
+  stroke_method?: StrokeMethod | null
 }
 
 export type Tool =

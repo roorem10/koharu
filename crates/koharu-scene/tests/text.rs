@@ -213,3 +213,41 @@ fn a_blocks_translation_comes_and_goes_with_its_own_ops() {
     let error = apply(&mut session, vec![set(json!(1))]).expect_err("locked");
     assert!(matches!(error, Error::Locked { .. }), "{error}");
 }
+
+#[test]
+fn booharu_border_keys_are_left_out_until_set() {
+    use koharu_scene::{Rgba, StrokeMethod, TextStyle};
+
+    // A style without them writes what Koharu writes, so its project stays
+    // readable there.
+    let plain = serde_json::to_value(TextStyle::default()).expect("a style");
+    assert!(plain.get("stroke_method").is_none());
+    assert!(plain["chars"].get("outer_stroke").is_none());
+    assert!(plain["chars"].get("outer_stroke_width").is_none());
+
+    let style = TextStyle {
+        chars: CharStyle {
+            outer_stroke: Some(Rgba([0.0, 0.0, 0.0, 1.0])),
+            outer_stroke_width: Some(3.0),
+            ..CharStyle::default()
+        },
+        stroke_method: Some(StrokeMethod::Expansion),
+        ..TextStyle::default()
+    };
+    let written = serde_json::to_value(&style).expect("a style");
+    assert_eq!(written["stroke_method"], json!("expansion"));
+    assert_eq!(
+        serde_json::from_value::<TextStyle>(written).expect("it reads back"),
+        style
+    );
+    // A mark's second border wins for its span, as every character key does.
+    let marked = CharStyle {
+        outer_stroke_width: Some(5.0),
+        ..CharStyle::default()
+    };
+    assert_eq!(marked.or(&style.chars).outer_stroke_width, Some(5.0));
+    assert_eq!(
+        marked.or(&style.chars).outer_stroke,
+        style.chars.outer_stroke
+    );
+}

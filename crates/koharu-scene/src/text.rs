@@ -31,6 +31,14 @@ pub struct CharStyle {
     pub stroke: Option<Rgba>,
     #[serde(default)]
     pub stroke_width: Option<f64>,
+    /// Booharu: a second border drawn around the first, outside its outer
+    /// edge; it shows only with a first border. Left out when unset, so a
+    /// text without one stays readable by Koharu.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outer_stroke: Option<Rgba>,
+    /// Booharu: the second border's width, outward from the first border.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outer_stroke_width: Option<f64>,
 }
 
 impl CharStyle {
@@ -45,6 +53,8 @@ impl CharStyle {
             fill: self.fill.or(base.fill),
             stroke: self.stroke.or(base.stroke),
             stroke_width: self.stroke_width.or(base.stroke_width),
+            outer_stroke: self.outer_stroke.or(base.outer_stroke),
+            outer_stroke_width: self.outer_stroke_width.or(base.outer_stroke_width),
         }
     }
 }
@@ -61,6 +71,24 @@ pub struct TextStyle {
     /// A paragraph key: a multiple of each line's largest size.
     #[serde(default)]
     pub line_height: Option<f64>,
+    /// A paragraph key, Booharu's: how the borders are drawn; `None` is
+    /// Contour. Left out when unset, so a text without one stays readable by
+    /// Koharu.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stroke_method: Option<StrokeMethod>,
+}
+
+/// Booharu: how a text's borders are drawn, both outside the letters with
+/// round corners.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, Type, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum StrokeMethod {
+    /// Grown from the letters merged into one shape, so a dot, a counter,
+    /// and touching letters get the same border as the rest.
+    #[default]
+    Contour,
+    /// Each letter grown on its own, as Koharu draws borders.
+    Expansion,
 }
 
 /// Text as spans in order, each with its marks, so no mark can fall outside the

@@ -4,6 +4,7 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  ArrowRightLeft,
   ChevronDown,
   Italic,
   Minus,
@@ -35,6 +36,7 @@ import {
   type Direction,
   type FontFamily,
   type LayerId,
+  type StrokeMethod,
   type Text,
   type TextStyle,
   type Value,
@@ -83,6 +85,7 @@ export function TypeBar() {
   const { t } = useTranslation()
   const tool = useKoharuStore((state) => state.tool)
   const borderWidthId = useId()
+  const secondBorderWidthId = useId()
   const page = usePage().data
   const selectedIds = useKoharuStore((state) => state.selectedLayers)
   const defaultFont = useKoharuStore(
@@ -143,7 +146,11 @@ export function TypeBar() {
   const applyChars = (patch: CharStyle) => {
     if (!typing) return apply({ chars: patch })
     // A mark can't unset a value, so no border on some characters is a border no wide.
-    const marked = patch.stroke === null ? { ...patch, stroke: undefined, stroke_width: 0 } : patch
+    let marked: CharStyle =
+      patch.stroke === null ? { ...patch, stroke: undefined, stroke_width: 0 } : patch
+    if (marked.outer_stroke === null) {
+      marked = { ...marked, outer_stroke: undefined, outer_stroke_width: 0 }
+    }
     void call(commands.styleTyping, marked).catch(() => undefined)
   }
 
@@ -170,6 +177,20 @@ export function TypeBar() {
   const strokeWidth = chars.stroke_width ?? 0
   const stroke = chars.stroke ?? null
   const strokeEnabled = stroke !== null && stroke[3] > 0 && strokeWidth > 0
+  // Booharu's second border, which only a first border has: each character's own, whatever its
+  // colour or width. While typing, the canvas doesn't say, so differing borders count.
+  const bordered =
+    strokeEnabled ||
+    ((mixed.has('stroke') || mixed.has('stroke_width')) &&
+      ('bordered' in shared ? shared.bordered : true))
+  const outerWidth = chars.outer_stroke_width ?? 0
+  const outer = chars.outer_stroke ?? null
+  const outerEnabled = bordered && outer !== null && outer[3] > 0 && outerWidth > 0
+  const strokeMethod: StrokeMethod = style.stroke_method ?? 'contour'
+  const strokeMethods: Record<StrokeMethod, string> = {
+    contour: t('inspector.outlineContour'),
+    expansion: t('inspector.outlineExpansion'),
+  }
   const direction: Direction = lettering?.direction ?? 'horizontal'
   const align: Align = style.align ?? (direction === 'vertical' ? 'start' : 'center')
 
@@ -405,11 +426,128 @@ export function TypeBar() {
                 </NumberFieldIncrement>
               </NumberFieldGroup>
             </NumberField>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type='button'
+                    aria-label={t('inspector.swapFillOutline')}
+                    disabled={mixed.has('fill') || mixed.has('stroke') || mixed.has('stroke_width')}
+                    className='grid size-6 shrink-0 place-items-center rounded-md border border-input bg-background text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50'
+                    onClick={() => applyChars(swappedColors(chars))}
+                  />
+                }
+              >
+                <ArrowRightLeft aria-hidden='true' className='size-3.5' />
+              </TooltipTrigger>
+              <TooltipContent>{t('inspector.swapFillOutline')}</TooltipContent>
+            </Tooltip>
           </div>
+          {/* Booharu: a second border around the first, and how both are drawn. */}
+          <span className='text-[10px] font-medium text-muted-foreground'>
+            {t('inspector.secondBorder')}
+          </span>
+          <div className='flex items-center gap-1'>
+            <ColorWell
+              label={t('inspector.secondBorderColor')}
+              size='sm'
+              allowTransparent
+              disabled={!bordered}
+              value={
+                mixed.has('outer_stroke') ? '' : outerEnabled && outer ? rgbaToHex(outer) : null
+              }
+              onChange={(color) => {
+                // Both keys go, so the text is as Koharu writes it again. While typing, a mark
+                // can't unset them, so characters with no second border are left unmarked.
+                if (color === null) {
+                  const some =
+                    outerEnabled || mixed.has('outer_stroke') || mixed.has('outer_stroke_width')
+                  if (some || !typing) applyChars({ outer_stroke: null, outer_stroke_width: null })
+                  return
+                }
+                // Widths that differ stay each character's own.
+                const width =
+                  outerWidth > 0 || mixed.has('outer_stroke_width') ? {} : { outer_stroke_width: 3 }
+                applyChars({ outer_stroke: hexToRgba(color), ...width })
+              }}
+            />
+            <NumberField
+              id={secondBorderWidthId}
+              name='second-border-width'
+              className='w-24'
+              value={outerWidth > 0 ? outerWidth : 3}
+              min={0.5}
+              max={32}
+              step={0.5}
+              disabled={!bordered}
+              onValueChange={(next) => {
+                if (next !== null && next >= 0.5 && next <= 32) {
+                  // Colours that differ stay each character's own.
+                  const color =
+                    outer || mixed.has('outer_stroke') ? {} : { outer_stroke: hexToRgba(BLACK) }
+                  applyChars({ outer_stroke_width: next, ...color })
+                }
+              }}
+            >
+              <NumberFieldGroup>
+                <NumberFieldDecrement aria-label={t('inspector.decreaseSecondBorderWidth')}>
+                  <Minus />
+                </NumberFieldDecrement>
+                <NumberFieldInput aria-label={t('inspector.secondBorderWidth')} />
+                <NumberFieldIncrement aria-label={t('inspector.increaseSecondBorderWidth')}>
+                  <Plus />
+                </NumberFieldIncrement>
+              </NumberFieldGroup>
+            </NumberField>
+          </div>
+          <span className='text-[10px] font-medium text-muted-foreground'>
+            {t('inspector.outlineMethod')}
+          </span>
+          <Select
+            value={strokeMethod}
+            items={strokeMethods}
+            disabled={!paragraph}
+            onValueChange={(next) =>
+              // Contour is what no method means, so the text stays readable by Koharu.
+              next && apply({ stroke_method: next === 'contour' ? null : (next as StrokeMethod) })
+            }
+          >
+            <SelectTrigger size='sm' aria-label={t('inspector.outlineMethod')} className='w-full'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent
+              // A pick with the pointer leaves the keys to the canvas, as FillBar's model does, so
+              // a tool's key that follows switches the tool, not the method by its name.
+              finalFocus={(closed) => closed === 'keyboard'}
+            >
+              {(Object.keys(strokeMethods) as StrokeMethod[]).map((method) => (
+                <SelectItem key={method} value={method}>
+                  {strokeMethods[method]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </PopoverContent>
       </Popover>
     </ContextBar>
   )
+}
+
+/** Booharu: `chars` with the text's colour and its border's swapped, as Booharu 0.0.4 swapped them.
+ * Text without a visible border gets one in its colour, at the bar's default width, over a black
+ * or white fill, whichever stands out from that colour. */
+export function swappedColors(chars: CharStyle): CharStyle {
+  const fill = chars.fill ?? hexToRgba(BLACK)
+  const stroke = chars.stroke ?? null
+  const width = chars.stroke_width ?? 0
+  if (stroke && stroke[3] > 0 && width > 0) return { fill: stroke, stroke: fill }
+  const [red, green, blue] = fill
+  const light = 0.2126 * red + 0.7152 * green + 0.0722 * blue > 0.5
+  return {
+    fill: hexToRgba(light ? BLACK : WHITE),
+    stroke: [red, green, blue, 1],
+    stroke_width: width > 0 ? width : 1.5,
+  }
 }
 
 /** A family the font list hasn't loaded, so the default still shows. */
@@ -428,11 +566,18 @@ const CHAR_KEYS: CharKey[] = [
   'fill',
   'stroke',
   'stroke_width',
+  'outer_stroke',
+  'outer_stroke_width',
 ]
 
 /** What every character of `texts` shares, each span's marks over its text's style, and the values
- * they don't, which it leaves empty, as the canvas reports a typed selection's. */
-function sharedChars(texts: Text[]): { chars: CharStyle; mixed: CharKey[] } {
+ * they don't, which it leaves empty, as the canvas reports a typed selection's; and, for Booharu's
+ * second border, whether every character has a border of its own. */
+export function sharedChars(texts: Text[]): {
+  chars: CharStyle
+  mixed: CharKey[]
+  bordered: boolean
+} {
   const styles: CharStyle[] = texts.flatMap((text) => {
     const base = text.style?.chars ?? {}
     const spans = text.content?.length ? text.content : [{ insert: '' }]
@@ -444,12 +589,15 @@ function sharedChars(texts: Text[]): { chars: CharStyle; mixed: CharKey[] } {
     }))
   })
   const [first, ...rest] = styles
-  if (!first) return { chars: {}, mixed: [] }
+  if (!first) return { chars: {}, mixed: [], bordered: false }
   const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
   const mixed = CHAR_KEYS.filter((key) => rest.some((style) => !same(style[key], first[key])))
   const chars: CharStyle = { ...first }
   for (const key of mixed) delete chars[key]
-  return { chars, mixed }
+  const bordered = styles.every(
+    (style) => (style.stroke?.[3] ?? 0) > 0 && (style.stroke_width ?? 0) > 0,
+  )
+  return { chars, mixed, bordered }
 }
 
 function hasItalic(family: FontFamily | undefined): boolean {

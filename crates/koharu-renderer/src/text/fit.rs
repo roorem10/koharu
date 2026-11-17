@@ -721,6 +721,7 @@ mod tests {
                 hyphenation: Some(Lang::English),
                 chinese: false,
                 frame,
+                stroke_method: Default::default(),
             },
             room,
         ))
@@ -788,6 +789,7 @@ mod tests {
             hyphenation: None,
             chinese: false,
             frame: frame.clone(),
+            stroke_method: Default::default(),
         };
         let mut words = vec![word(30.0, Break::Normal); 11];
         words.push(word(30.0, Break::End));
@@ -831,6 +833,7 @@ mod tests {
             hyphenation: None,
             chinese: true,
             frame: frame.clone(),
+            stroke_method: Default::default(),
         };
         let character = |after| Segment {
             range: 0..0,

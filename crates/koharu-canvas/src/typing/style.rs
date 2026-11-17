@@ -17,6 +17,8 @@ pub enum CharKey {
     Fill,
     Stroke,
     StrokeWidth,
+    OuterStroke,
+    OuterStrokeWidth,
 }
 
 /// The text being typed into, as the host shows it.
@@ -55,6 +57,14 @@ pub(super) fn shared(mut styles: impl Iterator<Item = CharStyle>) -> (CharStyle,
             CharKey::StrokeWidth,
             chars.stroke_width == style.stroke_width,
         );
+        differs(
+            CharKey::OuterStroke,
+            chars.outer_stroke == style.outer_stroke,
+        );
+        differs(
+            CharKey::OuterStrokeWidth,
+            chars.outer_stroke_width == style.outer_stroke_width,
+        );
     }
     for key in &mixed {
         match key {
@@ -65,6 +75,8 @@ pub(super) fn shared(mut styles: impl Iterator<Item = CharStyle>) -> (CharStyle,
             CharKey::Fill => chars.fill = None,
             CharKey::Stroke => chars.stroke = None,
             CharKey::StrokeWidth => chars.stroke_width = None,
+            CharKey::OuterStroke => chars.outer_stroke = None,
+            CharKey::OuterStrokeWidth => chars.outer_stroke_width = None,
         }
     }
     (chars, mixed)

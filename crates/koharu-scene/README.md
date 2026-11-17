@@ -131,6 +131,14 @@ A typed character takes the marks of the one before it, or the first one's at
 the start, as typing does in an editor, and spans whose marks end up alike
 join.
 
+Booharu adds a second border, `outer_stroke` and `outer_stroke_width`,
+character keys drawn around the stroke and only with one, and a paragraph key,
+`stroke_method`: `contour` (no value) grows the borders from the letters merged
+into one shape, and `expansion` grows each glyph, as Koharu draws them. All
+three are left out of the file while unset and the project version stays
+Koharu's, so a project that doesn't use them still opens in Koharu, and one
+that does fails to open there, unchanged.
+
 A text holds its own values. Nothing is shared between texts, because a
 balloon's text length and size differ from its neighbours', so no one style
 fits them all.

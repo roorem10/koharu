@@ -14,6 +14,7 @@ use crate::fonts::Font;
 
 mod arrange;
 mod breaks;
+mod contour;
 mod draw;
 mod fit;
 mod itemize;
@@ -38,6 +39,9 @@ pub struct TextRun {
     pub fill: Color,
     /// The stroke colour and width.
     pub stroke: Option<(Color, f32)>,
+    /// Booharu: the second border's colour and width, outward from the
+    /// stroke.
+    pub outer_stroke: Option<(Color, f32)>,
 }
 
 /// What laying out a text resolved, for the inspector and PSD export.

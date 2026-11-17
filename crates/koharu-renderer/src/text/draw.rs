@@ -4,15 +4,25 @@
 use anyhow::Result;
 use glifo::FontEmbolden;
 use kurbo::{Affine, Diagonal2, Join};
-use vello_gpu::peniko::Color;
+use vello_gpu::peniko::{Color, Fill};
 
 use super::TextLayout;
-use crate::Drawing;
+use crate::{Drawing, fonts::Font};
+
+/// What one pass over a layout's glyph runs draws.
+#[derive(Clone, Copy)]
+enum Pass {
+    /// Booharu: a second border, the glyphs grown past their stroke.
+    Outer,
+    Stroke,
+    Fill,
+}
 
 /// Draws `layout`'s glyph runs onto `drawing` through `transform`, its
 /// strokes too when `strokes` says so. Strokes draw first, under every fill,
 /// as Photoshop draws an Outside stroke under its type: as the glyphs grown
-/// by the stroke's width with round joins.
+/// by the stroke's width with round joins, or, by Booharu's Contour method,
+/// as the regions the layout grew from its merged letters.
 pub(crate) fn draw(
     drawing: &mut Drawing,
     layout: &TextLayout,
@@ -20,46 +30,67 @@ pub(crate) fn draw(
     strokes: bool,
 ) -> Result<()> {
     drawing.scene.set_transform(transform);
-    let passes: &[bool] = if strokes { &[true, false] } else { &[false] };
-    for &stroking in passes {
+    let passes: &[Pass] = match (strokes, &layout.contours) {
+        (true, Some(regions)) => {
+            drawing.scene.set_fill_rule(Fill::NonZero);
+            for (color, region) in regions {
+                drawing.scene.set_paint(*color);
+                drawing.scene.fill_path(region);
+            }
+            &[Pass::Fill]
+        }
+        (true, None) => &[Pass::Outer, Pass::Stroke, Pass::Fill],
+        (false, _) => &[Pass::Fill],
+    };
+    for &pass in passes {
         for (glyphs, run) in layout.runs.iter().zip(&layout.resolved.runs) {
-            let (paint, width, join) = match (stroking, run.stroke) {
-                (true, Some((color, width))) => (color, f64::from(width), Join::Round),
-                (true, None) => continue,
-                (false, _) => (run.fill, 0.0, Join::Miter),
+            let (paint, width, join) = match (pass, run.stroke, run.outer_stroke) {
+                (Pass::Outer, Some((_, width)), Some((color, outer))) => {
+                    (color, f64::from(width + outer), Join::Round)
+                }
+                (Pass::Stroke, Some((color, width)), _) => (color, f64::from(width), Join::Round),
+                (Pass::Outer | Pass::Stroke, ..) => continue,
+                (Pass::Fill, ..) => (run.fill, 0.0, Join::Miter),
             };
             let font = &glyphs.font;
-            // A synthetic bold grows each side by a fiftieth of the size.
-            let bold = match font.synthesis.embolden() {
-                true => f64::from(run.size) * 0.02,
-                false => 0.0,
-            };
-            // In the glyphs' own space, where y runs down: glifo flips an
-            // outline before this transform (`glyph_transform * FLIP_Y` in
-            // glifo 0.5's `glyph.rs`). A quarter turn clockwise on the page for
-            // sideways text, which maps (x, y) to (-y, x), after a synthetic
-            // slant.
-            let skew = font
-                .synthesis
-                .skew()
-                .map(|angle| Affine::skew(-f64::from(angle.to_radians().tan()), 0.0));
-            let turn = match glyphs.sideways {
-                true => Some(
-                    Affine::new([0.0, 1.0, -1.0, 0.0, 0.0, 0.0]) * skew.unwrap_or(Affine::IDENTITY),
-                ),
-                false => skew,
-            };
+            let bold = bold(font, run.size);
             drawing.scene.set_paint(Color::from(paint));
             drawing.glyphs(
                 font,
                 run.size,
-                turn,
+                turn(font, glyphs.sideways),
                 FontEmbolden::new(Diagonal2::new(bold + width, bold + width)).with_join(join),
                 &glyphs.glyphs,
             )?;
         }
     }
     Ok(())
+}
+
+/// How far `font`'s synthetic bold grows each side of its glyphs at `size`:
+/// a fiftieth of the size.
+pub(super) fn bold(font: &Font, size: f32) -> f64 {
+    match font.synthesis.embolden() {
+        true => f64::from(size) * 0.02,
+        false => 0.0,
+    }
+}
+
+/// The transform `font`'s glyphs take in their own space, where y runs down:
+/// glifo flips an outline before this transform (`glyph_transform * FLIP_Y`
+/// in glifo 0.5's `glyph.rs`). A quarter turn clockwise on the page for
+/// `sideways` text, which maps (x, y) to (-y, x), after a synthetic slant.
+pub(super) fn turn(font: &Font, sideways: bool) -> Option<Affine> {
+    let skew = font
+        .synthesis
+        .skew()
+        .map(|angle| Affine::skew(-f64::from(angle.to_radians().tan()), 0.0));
+    match sideways {
+        true => {
+            Some(Affine::new([0.0, 1.0, -1.0, 0.0, 0.0, 0.0]) * skew.unwrap_or(Affine::IDENTITY))
+        }
+        false => skew,
+    }
 }
 
 #[cfg(test)]
