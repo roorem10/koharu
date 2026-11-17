@@ -103,6 +103,9 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         debug::capture,
         #[cfg(debug_assertions)]
         debug::debug_pointer,
+        // Booharu: Booharu's commands, the same as in `bindings`.
+        crate::booharu::settings::booharu_get_preferences,
+        crate::booharu::settings::booharu_save_preferences,
     ];
     move |invoke: Invoke<CefRuntime>| {
         let message = &invoke.message;
@@ -170,5 +173,8 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         canvas::select,
         processing::fill,
         canvas::deselect,
+        // Booharu: Booharu's commands, the same as in `handler`.
+        crate::booharu::settings::booharu_get_preferences,
+        crate::booharu::settings::booharu_save_preferences,
     ](types)
 }

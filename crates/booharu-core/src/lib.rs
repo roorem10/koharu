@@ -6,3 +6,5 @@
 //! koharu-pipeline, koharu-agent, or koharu-desktop, so koharu-pipeline's
 //! Booharu hooks can call it without a dependency cycle. Feature logic that
 //! needs the pipeline goes in the `booharu` crate.
+
+pub mod settings;

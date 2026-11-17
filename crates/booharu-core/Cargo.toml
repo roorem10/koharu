@@ -12,3 +12,11 @@ keywords.workspace = true
 publish.workspace = true
 
 [dependencies]
+anyhow = { workspace = true }
+koharu-config = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+specta = { workspace = true }
+
+[dev-dependencies]
+toml = { workspace = true }

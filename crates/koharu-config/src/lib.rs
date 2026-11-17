@@ -49,6 +49,12 @@ fn home() -> Result<PathBuf> {
         .ok_or(Error::NoHome)
 }
 
+/// Booharu: the Booharu home, `~/.booharu`, which holds `config.toml` and
+/// the secrets, and Booharu's own files beside them, such as its series.
+pub fn booharu_home() -> Result<PathBuf> {
+    home()
+}
+
 fn read<T: Section>(path: &Path) -> Result<T> {
     section(path, &read_text(path)?.unwrap_or_default())
 }

@@ -1176,6 +1176,14 @@ version = "0.85.2"
 [[package]]
 name = "booharu-core"
 version = "0.85.2"
+dependencies = [
+ "anyhow",
+ "koharu-config",
+ "serde",
+ "serde_json",
+ "specta",
+ "toml 1.2.1+spec-1.1.0",
+]
 
 [[package]]
 name = "borrow-or-share"
