@@ -120,7 +120,9 @@ impl Handler {
             .project
             .read()
             .as_ref()
-            .map_or_else(ToolContext::default, Tools::tool_context);
+            .map_or_else(ToolContext::default, Tools::tool_context)
+            // Booharu: marks the call as an outside app's, for Booharu's tools.
+            .with_scope(Arc::new(crate::tools::booharu::OverMcp));
         let result = self
             .tools
             .execute(name, arguments.to_string(), &mut context)

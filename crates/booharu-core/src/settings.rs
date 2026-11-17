@@ -81,6 +81,12 @@ impl BooharuPreferences {
         tables(&Self::default()).keys().cloned().collect()
     }
 
+    /// Whether Booharu reads the section named `name` only as it starts, so a
+    /// change to it applies once Booharu restarts.
+    pub fn read_at_launch(name: &str) -> bool {
+        name == McpSettings::NAME
+    }
+
     /// The section named `name`, as JSON.
     pub fn section(&self, name: &str) -> anyhow::Result<Value> {
         tables(self).remove(name).ok_or_else(|| unknown(name))
