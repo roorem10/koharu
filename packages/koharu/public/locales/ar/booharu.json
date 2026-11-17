@@ -2,6 +2,12 @@
   "about": {
     "basedOn": "مبني على {{name}} من تطوير Mayo Takanashi."
   },
+  "activity": {
+    "downloadingFiles_few": "جارٍ تنزيل {{count}} ملفات",
+    "downloadingFiles_many": "جارٍ تنزيل {{count}} ملفًا",
+    "downloadingFiles_two": "جارٍ تنزيل ملفين ({{count}})",
+    "downloadingFiles_zero": "عدد الملفات الجاري تنزيلها: {{count}}"
+  },
   "agent": {
     "emptyTitle": "ماذا ينبغي أن يفعل Booharu؟",
     "message": "راسل Booharu Agent",
@@ -10,10 +16,26 @@
   "errors": {
     "fatalTitle": "تعذّر على Booharu المتابعة"
   },
+  "fontPicker": {
+    "fontCount_few": "{{count}} خطوط",
+    "fontCount_many": "{{count}} خطًا",
+    "fontCount_two": "خطّان ({{count}})",
+    "fontCount_zero": "لا خطوط ({{count}})"
+  },
   "history": {
     "steps": {
       "booharu_set_translation": "إضافة ترجمة"
     }
+  },
+  "inference": {
+    "selectedCount_few": "{{count}} صفحات محدّدة",
+    "selectedCount_many": "{{count}} صفحة محدّدة",
+    "selectedCount_two": "صفحتان محدّدتان ({{count}})",
+    "selectedCount_zero": "لا صفحات محدّدة ({{count}})",
+    "stageCount_few": "{{count}} مراحل",
+    "stageCount_many": "{{count}} مرحلة",
+    "stageCount_two": "مرحلتان ({{count}})",
+    "stageCount_zero": "لا مراحل ({{count}})"
   },
   "inspector": {
     "decreaseSecondBorderWidth": "تقليل عرض الحدود الثانية",

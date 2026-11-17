@@ -65,4 +65,24 @@ describe('Booharu strings overlay', () => {
       ).toEqual([])
     }
   })
+
+  it('gives every count string each plural form its language needs', () => {
+    // i18next shows a missing form as the language's _other one, which reads wrong where the forms
+    // differ, as in Arabic's two or Russian's two to four.
+    const counts = strings(resources['en-US'].translation)
+      .map(([key]) => key)
+      .filter((key) => key.endsWith('_other'))
+      .map((key) => key.replace(pluralForm, ''))
+
+    for (const language of supportedLanguages) {
+      const own = new Set(strings(resources[language].translation).map(([key]) => key))
+      const forms = new Intl.PluralRules(language).resolvedOptions().pluralCategories
+      expect(
+        counts
+          .flatMap((count) => forms.map((form) => `${count}_${form}`))
+          .filter((key) => !own.has(key)),
+        language,
+      ).toEqual([])
+    }
+  })
 })

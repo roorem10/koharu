@@ -2,6 +2,10 @@
   "about": {
     "basedOn": "Основано на {{name}} от Mayo Takanashi."
   },
+  "activity": {
+    "downloadingFiles_few": "Скачивание файлов: {{count}}",
+    "downloadingFiles_many": "Скачивание файлов: {{count}}"
+  },
   "agent": {
     "emptyTitle": "Что должен сделать Booharu?",
     "message": "Сообщение агенту Booharu",
@@ -10,10 +14,20 @@
   "errors": {
     "fatalTitle": "Booharu не может продолжить работу"
   },
+  "fontPicker": {
+    "fontCount_few": "Шрифтов: {{count}}",
+    "fontCount_many": "Шрифтов: {{count}}"
+  },
   "history": {
     "steps": {
       "booharu_set_translation": "Добавление перевода"
     }
+  },
+  "inference": {
+    "selectedCount_few": "Выбрано страниц: {{count}}",
+    "selectedCount_many": "Выбрано страниц: {{count}}",
+    "stageCount_few": "Этапов: {{count}}",
+    "stageCount_many": "Этапов: {{count}}"
   },
   "inspector": {
     "decreaseSecondBorderWidth": "Уменьшить ширину второй обводки",

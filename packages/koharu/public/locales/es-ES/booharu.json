@@ -2,6 +2,9 @@
   "about": {
     "basedOn": "Basado en {{name}}, de Mayo Takanashi."
   },
+  "activity": {
+    "downloadingFiles_many": "Descargando {{count}} archivos"
+  },
   "agent": {
     "emptyTitle": "¿Qué debería hacer Booharu?",
     "message": "Enviar mensaje al agente de Booharu",
@@ -10,10 +13,18 @@
   "errors": {
     "fatalTitle": "Booharu no pudo continuar"
   },
+  "fontPicker": {
+    "fontCount_many": "{{count}} fuentes"
+  },
   "history": {
     "steps": {
       "booharu_set_translation": "Añadir traducción"
     }
+  },
+  "inference": {
+    "selectedCount_many": "{{count}} páginas seleccionadas",
+    "selectedCount_one": "{{count}} página seleccionada",
+    "stageCount_many": "{{count}} etapas"
   },
   "inspector": {
     "decreaseSecondBorderWidth": "Reducir ancho del segundo contorno",
