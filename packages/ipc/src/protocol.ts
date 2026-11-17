@@ -123,6 +123,14 @@ export type Block = {
   cleanup?: Layer<Raster>
 }
 
+/**
+ *  Every Booharu settings section, each under its table's name. Koharu's
+ *  own stay in its `Preferences`.
+ */
+export type BooharuPreferences = {
+  'booharu-mcp': McpSettings
+}
+
 /**  A rectangle in page pixels, for text frames. */
 export type Bounds = {
   x: number
@@ -483,6 +491,16 @@ export type Mask = {
 }
 
 export type MaskMode = 'add' | 'subtract' | 'intersect'
+
+/**  `[booharu-mcp]`: the MCP server outside AI apps reach Booharu through. */
+export type McpSettings = {
+  /**
+   *  The port on 127.0.0.1 it listens on, from 1024 to 65535, read at
+   *  launch. Booharu has its own, so it runs beside Koharu, which serves
+   *  on 7878.
+   */
+  port?: number
+}
 
 /**  A model the translator or the agent can use, as rig's catalog describes it. */
 export type Model = {
@@ -1077,6 +1095,15 @@ export const commands = {
     invoke<RunId | null>('fill', { prompt, model }, { headers: headers() }),
   /** Drops the area the marquee and the lasso marked, as Photoshop's Deselect does. */
   deselect: () => invoke<null>('deselect', {}, { headers: headers() }),
+  /** Every Booharu settings section, as the file holds it now. */
+  booharuGetPreferences: () =>
+    invoke<BooharuPreferences>('booharu_get_preferences', {}, { headers: headers() }),
+  /** Saves every Booharu settings section, or none when one holds a bad value, and answers them as the file holds them now. */
+  booharuSavePreferences: (preferences: BooharuPreferences) =>
+    invoke<BooharuPreferences>('booharu_save_preferences', { preferences }, { headers: headers() }),
+  /** Sets `block`'s translation to `text` as one undo step, placing a new one as the Translation stage places its own, in the translator's target language. */
+  booharuSetTranslation: (block: LayerId, text: string) =>
+    invoke<Change>('booharu_set_translation', { block, text }, { headers: headers() }),
 }
 
 export const events = {
