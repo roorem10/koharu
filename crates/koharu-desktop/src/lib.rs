@@ -32,7 +32,7 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
     // needs the app this builds.
     let folder = if cfg!(all(windows, not(debug_assertions))) {
         platform::resource_dir(context.package_info(), &Env::default())
-            .context("Koharu's install folder is unknown")?
+            .context("Booharu's install folder is unknown")?
     } else {
         dirs::data_local_dir()
             .context("the user's local data folder is unknown")?

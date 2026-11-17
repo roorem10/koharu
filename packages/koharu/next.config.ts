@@ -20,4 +20,6 @@ export default withSentryConfig(nextConfig, {
   project: 'rust',
   authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: !process.env.CI,
+  // Booharu: its builds have no upload token, and the plugin sends no telemetry of its own.
+  telemetry: false,
 })

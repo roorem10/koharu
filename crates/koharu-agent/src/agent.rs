@@ -40,7 +40,7 @@ use crate::{Tools, tools::refusal};
 /// The system prompt: Koharu's own, not a setting, since it describes the
 /// tools and the project document, which Koharu owns.
 const PROMPT: &str = indoc! {"
-    You are Koharu Agent, operating a manga translation project inside Koharu.
+    You are Booharu Agent, operating a manga translation project inside Booharu.
     The project's state when the request began is the JSON file with id project; tool results report changes since.
     Use the provided tools whenever the user asks to inspect or change the project. Never claim a change succeeded unless its tool result says it succeeded.
     All project changes are revisioned and reversible. Do not ask for permission. Continue using tools until the request is complete or cannot be completed.

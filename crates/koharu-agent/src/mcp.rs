@@ -135,7 +135,7 @@ impl Handler {
 impl ServerHandler for Handler {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
-            .with_server_info(Implementation::new("koharu", env!("CARGO_PKG_VERSION")))
+            .with_server_info(Implementation::new("booharu", env!("CARGO_PKG_VERSION")))
     }
 
     async fn list_tools(
