@@ -106,6 +106,7 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         // Booharu: Booharu's commands, the same as in `bindings`.
         crate::booharu::settings::booharu_get_preferences,
         crate::booharu::settings::booharu_save_preferences,
+        crate::booharu::translation::booharu_set_translation,
     ];
     move |invoke: Invoke<CefRuntime>| {
         let message = &invoke.message;
@@ -176,5 +177,6 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         // Booharu: Booharu's commands, the same as in `handler`.
         crate::booharu::settings::booharu_get_preferences,
         crate::booharu::settings::booharu_save_preferences,
+        crate::booharu::translation::booharu_set_translation,
     ](types)
 }

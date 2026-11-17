@@ -1172,6 +1172,13 @@ dependencies = [
 [[package]]
 name = "booharu"
 version = "0.85.2"
+dependencies = [
+ "anyhow",
+ "koharu-pipeline",
+ "koharu-scene",
+ "serde_json",
+ "tempfile",
+]
 
 [[package]]
 name = "booharu-core"

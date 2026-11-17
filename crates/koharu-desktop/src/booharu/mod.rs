@@ -4,6 +4,7 @@
 
 pub(crate) mod mcp;
 pub(crate) mod settings;
+pub(crate) mod translation;
 
 use booharu_core::settings::BooharuPreferences;
 use koharu_agent::BooharuHost;
