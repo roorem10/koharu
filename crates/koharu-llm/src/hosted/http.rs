@@ -119,6 +119,14 @@ impl HttpClientExt for Http {
             .when(retryable)
             .adjust(retry_after)
             .await
+            // Booharu: no address in a failed send, nor in a failed read of
+            // the reply, where reqwest names it too.
+            .map(|reply| {
+                reply.map(|body| -> LazyBody<U> {
+                    Box::pin(async move { body.await.map_err(without_url) })
+                })
+            })
+            .map_err(without_url)
         }
     }
 
@@ -153,7 +161,22 @@ impl HttpClientExt for Http {
             .when(retryable)
             .adjust(retry_after)
             .await
+            // Booharu: no address in a failed send; reqwest names none in a
+            // streamed chunk's error.
+            .map_err(without_url)
         }
+    }
+}
+
+/// Booharu: `error` without the address reqwest names in a transport error,
+/// which rig shows and which can carry a key or a token.
+fn without_url(error: http_client::Error) -> http_client::Error {
+    match error {
+        http_client::Error::Instance(error) => match error.downcast::<reqwest::Error>() {
+            Ok(error) => http_client::Error::instance(error.without_url()),
+            Err(error) => http_client::Error::Instance(error),
+        },
+        error => error,
     }
 }
 
@@ -252,5 +275,46 @@ mod tests {
             let header = parts.headers.get("x-goog-api-key");
             assert_eq!(header.map(|key| key.to_str().unwrap()), key);
         }
+    }
+
+    /// Booharu: a request that can't be sent, or whose reply breaks off,
+    /// fails naming neither its address nor the key in it.
+    #[tokio::test]
+    async fn a_transport_error_names_no_address() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let request = |uri: &str| http::Request::get(uri).body(Bytes::new()).unwrap();
+        let unaddressed = |error: http_client::Error| {
+            let debug = format!("{error:?}");
+            let text = format!("{debug} {:#}", anyhow::Error::from(error));
+            assert!(
+                !text.contains("v1beta") && !text.contains("AIzaFAKE"),
+                "{text}"
+            );
+        };
+
+        // Nothing listens on the discard port.
+        let unreachable = "http://127.0.0.1:9/v1beta/models?key=AIzaFAKE";
+        let sent = Http::default().send::<_, Bytes>(request(unreachable)).await;
+        unaddressed(sent.err().unwrap());
+        let streamed = Http::default().send_streaming(request(unreachable)).await;
+        unaddressed(streamed.err().unwrap());
+
+        // A reply shorter than its length says.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let broken = format!(
+            "http://{}/v1beta/models?key=AIzaFAKE",
+            listener.local_addr().unwrap()
+        );
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            assert!(socket.read(&mut [0; 1024]).await.unwrap() > 0);
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 9\r\n\r\ncut")
+                .await
+                .unwrap();
+        });
+        let reply = Http::default().send::<_, Bytes>(request(&broken)).await;
+        unaddressed(reply.unwrap().into_body().await.unwrap_err());
     }
 }
