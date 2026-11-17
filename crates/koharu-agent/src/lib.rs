@@ -11,3 +11,5 @@ mod tools;
 pub use agent::{Agent, AgentConfig, Event};
 pub use mcp::McpServer;
 pub use tools::Tools;
+// Booharu: what the app implements for Booharu's tools.
+pub use tools::booharu::BooharuHost;

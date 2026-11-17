@@ -185,6 +185,7 @@ impl App {
             self.pipeline.clone(),
             self.renderer.clone(),
         )
+        .with_booharu(Arc::new(crate::booharu::DesktopHost)) // Booharu: the app, for its tools.
     }
 
     /// Runs `stages` on `target` in the open project, with `config` in the

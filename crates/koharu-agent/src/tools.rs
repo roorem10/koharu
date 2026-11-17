@@ -42,6 +42,9 @@ pub struct Tools {
     session: Arc<Mutex<Session>>,
     pipeline: Pipeline,
     renderer: Renderer,
+    /// Booharu: the app, as Booharu's tools reach it beyond the session, the
+    /// pipeline, and the renderer; `with_booharu` gives it.
+    booharu: Option<Arc<dyn booharu::BooharuHost>>,
 }
 
 impl Tools {
@@ -52,6 +55,7 @@ impl Tools {
             session,
             pipeline,
             renderer,
+            booharu: None, // Booharu: no host until `with_booharu`.
         }
     }
 
