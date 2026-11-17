@@ -1,0 +1,53 @@
+{
+  "about": {
+    "basedOn": "Основано на {{name}} от Mayo Takanashi."
+  },
+  "agent": {
+    "emptyTitle": "Что должен сделать Booharu?",
+    "message": "Сообщение агенту Booharu",
+    "placeholder": "Попросите Booharu поработать над проектом…"
+  },
+  "errors": {
+    "fatalTitle": "Booharu не может продолжить работу"
+  },
+  "history": {
+    "steps": {
+      "booharu_set_translation": "Добавление перевода"
+    }
+  },
+  "inspector": {
+    "decreaseSecondBorderWidth": "Уменьшить ширину второй обводки",
+    "increaseSecondBorderWidth": "Увеличить ширину второй обводки",
+    "outlineContour": "Контурная обводка",
+    "outlineExpansion": "Расширение",
+    "outlineMethod": "Способ обводки",
+    "secondBorder": "2-я обводка",
+    "secondBorderColor": "Цвет второй обводки",
+    "secondBorderWidth": "Ширина второй обводки",
+    "swapFillOutline": "Поменять цвета заливки и обводки"
+  },
+  "menu": {
+    "about": "О программе",
+    "booharuGithub": "Booharu на GitHub",
+    "koharuDiscord": "Discord Koharu",
+    "koharuGithub": "Koharu на GitHub"
+  },
+  "settings": {
+    "pipeline": {
+      "translator": {
+        "instructionsDescription": "Необязательно, на любом языке и в любой форме, например написание имени или тон. Booharu добавляет их как есть после своего системного промпта."
+      }
+    },
+    "typesetting": {
+      "empty": "Нет семейств по умолчанию. Booharu будет использовать системный запасной шрифт.",
+      "fontFallbackDescription": "Booharu использует первое доступное семейство, поддерживающее текст."
+    }
+  },
+  "start": {
+    "projectKind": "Проект Booharu"
+  },
+  "startup": {
+    "opening": "Запуск Booharu…",
+    "title": "Подготовка Booharu"
+  }
+}

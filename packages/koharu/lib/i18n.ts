@@ -5,6 +5,7 @@ import LanguageDetector from 'i18next-browser-languagedetector'
 import LocalStorageBackend from 'i18next-localstorage-backend'
 import { initReactI18next } from 'react-i18next'
 
+import { withBooharu } from '@/lib/booharu/strings'
 import ar from '@/public/locales/ar/translation.json'
 import enUS from '@/public/locales/en-US/translation.json'
 import esES from '@/public/locales/es-ES/translation.json'
@@ -18,7 +19,8 @@ import wuu from '@/public/locales/wuu/translation.json'
 import zhCN from '@/public/locales/zh-CN/translation.json'
 import zhTW from '@/public/locales/zh-TW/translation.json'
 
-export const resources = {
+// Booharu: each language's public/locales/<lng>/booharu.json merged over its translation.json.
+export const resources = withBooharu({
   'en-US': { translation: enUS },
   'zh-CN': { translation: zhCN },
   'zh-TW': { translation: zhTW },
@@ -31,7 +33,7 @@ export const resources = {
   wuu: { translation: wuu },
   'fr-FR': { translation: frFR },
   ar: { translation: ar },
-} satisfies Resource
+}) satisfies Resource
 
 export type SupportedLanguage = keyof typeof resources
 

@@ -1,0 +1,53 @@
+{
+  "about": {
+    "basedOn": "基于 Mayo Takanashi 个 {{name}}。"
+  },
+  "agent": {
+    "emptyTitle": "侬想让 Booharu 做啥？",
+    "message": "发消息畀 Booharu 智能体",
+    "placeholder": "让 Booharu 帮侬处理箇个项目…"
+  },
+  "errors": {
+    "fatalTitle": "Booharu 运行弗下去哉"
+  },
+  "history": {
+    "steps": {
+      "booharu_set_translation": "加译文"
+    }
+  },
+  "inspector": {
+    "decreaseSecondBorderWidth": "拿第二道描边调细点",
+    "increaseSecondBorderWidth": "拿第二道描边调粗点",
+    "outlineContour": "轮廓描边",
+    "outlineExpansion": "扩张",
+    "outlineMethod": "描边方式",
+    "secondBorder": "第二道描边",
+    "secondBorderColor": "第二道描边颜色",
+    "secondBorderWidth": "第二道描边宽度",
+    "swapFillOutline": "交换填充搭描边颜色"
+  },
+  "menu": {
+    "about": "关于",
+    "booharuGithub": "GitHub 浪个 Booharu",
+    "koharuDiscord": "Koharu 个 Discord",
+    "koharuGithub": "GitHub 浪个 Koharu"
+  },
+  "settings": {
+    "pipeline": {
+      "translator": {
+        "instructionsDescription": "可以勿填，用啥个语言、啥个格式写侪可以，比方讲名字哪能写、语气哪能。Booharu 会照原样接勒自家个系统提示词后头。"
+      }
+    },
+    "typesetting": {
+      "empty": "呒没默认字体系列。Booharu 会用系统后备字体。",
+      "fontFallbackDescription": "Booharu 照次序寻，选第一个可用、又支持箇段文本个字体系列。"
+    }
+  },
+  "start": {
+    "projectKind": "Booharu 项目"
+  },
+  "startup": {
+    "opening": "来勒打开 Booharu…",
+    "title": "来勒准备 Booharu"
+  }
+}

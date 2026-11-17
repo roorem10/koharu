@@ -1,0 +1,53 @@
+{
+  "about": {
+    "basedOn": "Baseado no {{name}}, de Mayo Takanashi."
+  },
+  "agent": {
+    "emptyTitle": "O que o Booharu deve fazer?",
+    "message": "Enviar mensagem ao agente do Booharu",
+    "placeholder": "Peça ao Booharu para trabalhar neste projeto…"
+  },
+  "errors": {
+    "fatalTitle": "O Booharu não pôde continuar"
+  },
+  "history": {
+    "steps": {
+      "booharu_set_translation": "Adicionar tradução"
+    }
+  },
+  "inspector": {
+    "decreaseSecondBorderWidth": "Diminuir largura do segundo contorno",
+    "increaseSecondBorderWidth": "Aumentar largura do segundo contorno",
+    "outlineContour": "Traçado do contorno",
+    "outlineExpansion": "Expansão",
+    "outlineMethod": "Método do contorno",
+    "secondBorder": "2º contorno",
+    "secondBorderColor": "Cor do segundo contorno",
+    "secondBorderWidth": "Largura do segundo contorno",
+    "swapFillOutline": "Trocar cores do preenchimento e do contorno"
+  },
+  "menu": {
+    "about": "Sobre",
+    "booharuGithub": "Booharu no GitHub",
+    "koharuDiscord": "Discord do Koharu",
+    "koharuGithub": "Koharu no GitHub"
+  },
+  "settings": {
+    "pipeline": {
+      "translator": {
+        "instructionsDescription": "Opcionais, em qualquer idioma e formato, como a grafia de um nome ou o tom. O Booharu as acrescenta como estão após o próprio prompt de sistema."
+      }
+    },
+    "typesetting": {
+      "empty": "Nenhuma família padrão. O Booharu usará a alternativa do sistema.",
+      "fontFallbackDescription": "O Booharu usa a primeira família disponível compatível com o texto."
+    }
+  },
+  "start": {
+    "projectKind": "Projeto do Booharu"
+  },
+  "startup": {
+    "opening": "Abrindo o Booharu…",
+    "title": "Preparando o Booharu"
+  }
+}

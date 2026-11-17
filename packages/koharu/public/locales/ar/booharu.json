@@ -1,0 +1,53 @@
+{
+  "about": {
+    "basedOn": "مبني على {{name}} من تطوير Mayo Takanashi."
+  },
+  "agent": {
+    "emptyTitle": "ماذا ينبغي أن يفعل Booharu؟",
+    "message": "راسل Booharu Agent",
+    "placeholder": "اطلب من Booharu العمل على هذا المشروع..."
+  },
+  "errors": {
+    "fatalTitle": "تعذّر على Booharu المتابعة"
+  },
+  "history": {
+    "steps": {
+      "booharu_set_translation": "إضافة ترجمة"
+    }
+  },
+  "inspector": {
+    "decreaseSecondBorderWidth": "تقليل عرض الحدود الثانية",
+    "increaseSecondBorderWidth": "زيادة عرض الحدود الثانية",
+    "outlineContour": "حدود المسار",
+    "outlineExpansion": "توسيع",
+    "outlineMethod": "طريقة الحدود",
+    "secondBorder": "الحدود 2",
+    "secondBorderColor": "لون الحدود الثانية",
+    "secondBorderWidth": "عرض الحدود الثانية",
+    "swapFillOutline": "تبديل لوني التعبئة والحد"
+  },
+  "menu": {
+    "about": "عن البرنامج",
+    "booharuGithub": "Booharu على GitHub",
+    "koharuDiscord": "Discord الخاص بـ Koharu",
+    "koharuGithub": "Koharu على GitHub"
+  },
+  "settings": {
+    "pipeline": {
+      "translator": {
+        "instructionsDescription": "اختيارية، بأي لغة وأي صيغة، مثل طريقة كتابة اسم أو نبرة الأسلوب. يضيفها Booharu كما هي بعد موجّه النظام الخاص به."
+      }
+    },
+    "typesetting": {
+      "empty": "لا توجد عائلات افتراضية. سيستخدم Booharu البديل من النظام.",
+      "fontFallbackDescription": "يستخدم Booharu أول عائلة متاحة تدعم النص."
+    }
+  },
+  "start": {
+    "projectKind": "مشروع Booharu"
+  },
+  "startup": {
+    "opening": "جارٍ فتح Booharu…",
+    "title": "تحضير Booharu"
+  }
+}

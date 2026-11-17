@@ -1,0 +1,53 @@
+{
+  "about": {
+    "basedOn": "Basé sur {{name}}, par Mayo Takanashi."
+  },
+  "agent": {
+    "emptyTitle": "Que doit faire Booharu ?",
+    "message": "Message à l’agent Booharu",
+    "placeholder": "Demandez à Booharu de travailler sur ce projet…"
+  },
+  "errors": {
+    "fatalTitle": "Booharu ne peut pas continuer"
+  },
+  "history": {
+    "steps": {
+      "booharu_set_translation": "Ajouter une traduction"
+    }
+  },
+  "inspector": {
+    "decreaseSecondBorderWidth": "Réduire l’épaisseur du second contour",
+    "increaseSecondBorderWidth": "Augmenter l’épaisseur du second contour",
+    "outlineContour": "Tracé du contour",
+    "outlineExpansion": "Expansion",
+    "outlineMethod": "Méthode du contour",
+    "secondBorder": "2ᵉ contour",
+    "secondBorderColor": "Couleur du second contour",
+    "secondBorderWidth": "Épaisseur du second contour",
+    "swapFillOutline": "Permuter les couleurs du texte et du contour"
+  },
+  "menu": {
+    "about": "À propos",
+    "booharuGithub": "Booharu sur GitHub",
+    "koharuDiscord": "Discord de Koharu",
+    "koharuGithub": "Koharu sur GitHub"
+  },
+  "settings": {
+    "pipeline": {
+      "translator": {
+        "instructionsDescription": "Facultatives, dans n’importe quelle langue et sous n’importe quelle forme, comme l’orthographe d’un nom ou le ton. Booharu les ajoute telles quelles après sa propre instruction système."
+      }
+    },
+    "typesetting": {
+      "empty": "Aucune famille par défaut. Booharu utilisera la police de secours du système.",
+      "fontFallbackDescription": "Booharu utilise la première famille disponible qui prend en charge le texte."
+    }
+  },
+  "start": {
+    "projectKind": "Projet Booharu"
+  },
+  "startup": {
+    "opening": "Ouverture de Booharu…",
+    "title": "Préparation de Booharu"
+  }
+}

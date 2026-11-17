@@ -1,0 +1,53 @@
+{
+  "about": {
+    "basedOn": "Based on {{name}} by Mayo Takanashi."
+  },
+  "agent": {
+    "emptyTitle": "What should Booharu do?",
+    "message": "Message Booharu Agent",
+    "placeholder": "Ask Booharu to work on this project..."
+  },
+  "errors": {
+    "fatalTitle": "Booharu could not continue"
+  },
+  "history": {
+    "steps": {
+      "booharu_set_translation": "Add translation"
+    }
+  },
+  "inspector": {
+    "decreaseSecondBorderWidth": "Decrease second border width",
+    "increaseSecondBorderWidth": "Increase second border width",
+    "outlineContour": "Contour stroke",
+    "outlineExpansion": "Expansion",
+    "outlineMethod": "Outline method",
+    "secondBorder": "2nd border",
+    "secondBorderColor": "Second border color",
+    "secondBorderWidth": "Second border width",
+    "swapFillOutline": "Swap fill and outline colors"
+  },
+  "menu": {
+    "about": "About",
+    "booharuGithub": "Booharu on GitHub",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "Koharu on GitHub"
+  },
+  "settings": {
+    "pipeline": {
+      "translator": {
+        "instructionsDescription": "Optional, in any language and form, such as a name's spelling or the tone. Booharu adds them, as written, after its own system prompt."
+      }
+    },
+    "typesetting": {
+      "empty": "No default families. Booharu will use the system fallback.",
+      "fontFallbackDescription": "Booharu uses the first available family that supports the text."
+    }
+  },
+  "start": {
+    "projectKind": "Booharu project"
+  },
+  "startup": {
+    "opening": "Opening Booharu…",
+    "title": "Preparing Booharu"
+  }
+}

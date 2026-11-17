@@ -1,0 +1,53 @@
+{
+  "about": {
+    "basedOn": "Mayo Takanashi'nin {{name}} uygulamasını temel alır."
+  },
+  "agent": {
+    "emptyTitle": "Booharu ne yapsın?",
+    "message": "Booharu Ajanına mesaj gönder",
+    "placeholder": "Booharu’dan bu proje üzerinde çalışmasını isteyin…"
+  },
+  "errors": {
+    "fatalTitle": "Booharu devam edemedi"
+  },
+  "history": {
+    "steps": {
+      "booharu_set_translation": "Çeviri ekle"
+    }
+  },
+  "inspector": {
+    "decreaseSecondBorderWidth": "İkinci kenarlık genişliğini azalt",
+    "increaseSecondBorderWidth": "İkinci kenarlık genişliğini artır",
+    "outlineContour": "Kontur çizgisi",
+    "outlineExpansion": "Genişletme",
+    "outlineMethod": "Anahat yöntemi",
+    "secondBorder": "2. kenarlık",
+    "secondBorderColor": "İkinci kenarlık rengi",
+    "secondBorderWidth": "İkinci kenarlık genişliği",
+    "swapFillOutline": "Dolgu ve dış çizgi renklerini değiştir"
+  },
+  "menu": {
+    "about": "Hakkında",
+    "booharuGithub": "GitHub'da Booharu",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "GitHub'da Koharu"
+  },
+  "settings": {
+    "pipeline": {
+      "translator": {
+        "instructionsDescription": "İsteğe bağlı, herhangi bir dilde ve biçimde; örneğin bir adın yazılışı ya da üslup. Booharu bunları kendi sistem isteminin ardından olduğu gibi ekler."
+      }
+    },
+    "typesetting": {
+      "empty": "Varsayılan aile yok. Booharu sistem yedeğini kullanacak.",
+      "fontFallbackDescription": "Booharu, metni destekleyen ilk kullanılabilir aileyi kullanır."
+    }
+  },
+  "start": {
+    "projectKind": "Booharu projesi"
+  },
+  "startup": {
+    "opening": "Booharu açılıyor…",
+    "title": "Booharu hazırlanıyor"
+  }
+}

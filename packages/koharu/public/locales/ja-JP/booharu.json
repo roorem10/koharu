@@ -1,0 +1,53 @@
+{
+  "about": {
+    "basedOn": "Mayo Takanashi による {{name}} をベースにしています。"
+  },
+  "agent": {
+    "emptyTitle": "Booharuに何をさせますか？",
+    "message": "Booharuエージェントにメッセージを送信",
+    "placeholder": "Booharuにこのプロジェクトの作業を依頼…"
+  },
+  "errors": {
+    "fatalTitle": "Booharuを続行できませんでした"
+  },
+  "history": {
+    "steps": {
+      "booharu_set_translation": "翻訳を追加"
+    }
+  },
+  "inspector": {
+    "decreaseSecondBorderWidth": "外側の縁取り幅を縮小",
+    "increaseSecondBorderWidth": "外側の縁取り幅を拡大",
+    "outlineContour": "輪郭線",
+    "outlineExpansion": "拡張",
+    "outlineMethod": "縁取り方式",
+    "secondBorder": "2重縁取り",
+    "secondBorderColor": "外側の縁取りの色",
+    "secondBorderWidth": "外側の縁取り幅",
+    "swapFillOutline": "塗りと縁取りの色を入れ替える"
+  },
+  "menu": {
+    "about": "Booharuについて",
+    "booharuGithub": "GitHub の Booharu",
+    "koharuDiscord": "Koharu の Discord",
+    "koharuGithub": "GitHub の Koharu"
+  },
+  "settings": {
+    "pipeline": {
+      "translator": {
+        "instructionsDescription": "任意。どの言語・形式でも書けます（名前の表記や口調など）。Booharu は自身のシステムプロンプトの後に、書いたとおりに追加します。"
+      }
+    },
+    "typesetting": {
+      "empty": "既定のファミリーがありません。Booharuはシステムの代替フォントを使用します。",
+      "fontFallbackDescription": "Booharuは文字に対応する最初の利用可能なファミリーを使用します。"
+    }
+  },
+  "start": {
+    "projectKind": "Booharuプロジェクト"
+  },
+  "startup": {
+    "opening": "Booharuを起動中…",
+    "title": "Booharu を準備しています"
+  }
+}

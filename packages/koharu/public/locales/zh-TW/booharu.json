@@ -1,0 +1,53 @@
+{
+  "about": {
+    "basedOn": "基於 Mayo Takanashi 開發的 {{name}}。"
+  },
+  "agent": {
+    "emptyTitle": "要讓 Booharu 做什麼？",
+    "message": "傳送訊息給 Booharu 代理",
+    "placeholder": "讓 Booharu 處理此專案…"
+  },
+  "errors": {
+    "fatalTitle": "Booharu 無法繼續執行"
+  },
+  "history": {
+    "steps": {
+      "booharu_set_translation": "新增譯文"
+    }
+  },
+  "inspector": {
+    "decreaseSecondBorderWidth": "減少第二描邊寬度",
+    "increaseSecondBorderWidth": "增加第二描邊寬度",
+    "outlineContour": "輪廓描邊",
+    "outlineExpansion": "擴張",
+    "outlineMethod": "描邊方式",
+    "secondBorder": "第二描邊",
+    "secondBorderColor": "第二描邊顏色",
+    "secondBorderWidth": "第二描邊寬度",
+    "swapFillOutline": "交換填色與描邊色彩"
+  },
+  "menu": {
+    "about": "關於",
+    "booharuGithub": "GitHub 上的 Booharu",
+    "koharuDiscord": "Koharu 的 Discord",
+    "koharuGithub": "GitHub 上的 Koharu"
+  },
+  "settings": {
+    "pipeline": {
+      "translator": {
+        "instructionsDescription": "選填，可使用任何語言和形式，例如名字的寫法或語氣。Booharu 會依原樣把它們附加在自己的系統提示詞之後。"
+      }
+    },
+    "typesetting": {
+      "empty": "沒有預設字型家族。Booharu 將使用系統後備字型。",
+      "fontFallbackDescription": "Booharu 使用第一個支援該文字的可用字型家族。"
+    }
+  },
+  "start": {
+    "projectKind": "Booharu 專案"
+  },
+  "startup": {
+    "opening": "正在開啟 Booharu…",
+    "title": "正在準備 Booharu"
+  }
+}

@@ -8,9 +8,11 @@ vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
   const { createInstance } = await import('i18next')
   const { default: translations } = await import('@/public/locales/en-US/translation.json')
+  // Booharu: its strings merged over Koharu's, as lib/i18n.ts has them.
+  const { withBooharu } = await import('@/lib/booharu/strings')
   const i18n = createInstance()
   await i18n.init({
-    resources: { 'en-US': { translation: translations } },
+    resources: withBooharu({ 'en-US': { translation: translations } }),
     lng: 'en-US',
     fallbackLng: 'en-US',
     interpolation: { escapeValue: false },
