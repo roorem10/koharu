@@ -3,6 +3,7 @@ import localFont from 'next/font/local'
 import { ThemeProvider } from 'next-themes'
 
 import './globals.css'
+import './booharu.css' // Booharu: its own styles, after Koharu's, in the same cascade layers.
 import Providers from '@/app/providers'
 
 const notoSansCJK = localFont({

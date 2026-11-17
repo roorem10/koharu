@@ -1,0 +1,16 @@
+/* Booharu's own styles. app/layout.tsx imports this file once, right after globals.css, so Koharu's
+ * stylesheet stays as upstream ships it. */
+
+/* The still interface: globals.css stops every animation with a '*' rule in layer base, and with
+ * reduced motion (Windows' animation effects off) it also stops its startup spinner. The rules here
+ * are the exceptions Booharu allows, one class each. They sit in the same native layer, base, where
+ * a class outranks '*'; an !important declaration in a layer also beats the unlayered !important
+ * reduced-motion rule and every declaration that isn't !important, such as Tailwind's
+ * motion-reduce:animate-none in layer utilities. */
+@layer base {
+  /* A loading spinner is the only sign that an import, an export, a download or a run is still
+   * going, so it keeps turning, with reduced motion too. */
+  .animate-spin {
+    animation: var(--animate-spin) !important;
+  }
+}
