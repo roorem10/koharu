@@ -75,6 +75,12 @@ $env:CARGO_PROFILE_RELEASE_DEBUG = '0'
 # Where the CEF build script downloads Chromium Embedded Framework, so this script knows
 # where to take the runtime and its notices from. CI sets its own, outside target\.
 if (-not $env:CEF_PATH) { $env:CEF_PATH = Join-Path $root 'target\cef' }
+# The CEF build script (cef-dll-sys) names the CEF it uses after the build part of its own locked
+# version: 154.5.0+154.0.34 is CEF 154.0.34. The workflow's CEF cache reads it the same way.
+$cargoLock = Get-Content (Join-Path $root 'Cargo.lock') -Raw
+$lockedCef = [regex]::Matches($cargoLock, '(?m)^name = "cef-dll-sys"\r?\nversion = "([^"]+)"')
+if ($lockedCef.Count -ne 1) { throw 'Cannot read the locked cef-dll-sys version from Cargo.lock.' }
+$cefVersion = $lockedCef[0].Groups[1].Value -replace '^[^+]*\+', ''
 
 if (-not $SkipDependencies) {
     # Koharu's postinstall installs the Tauri CLI, which this build doesn't use: it calls Cargo directly.
@@ -97,12 +103,18 @@ Copy-Item (Join-Path $root 'target\release\Booharu.exe') -Destination $stage -Fo
 
 # The CEF runtime goes beside the program. Take it from the CEF distribution itself rather
 # than from target\release, where a restored CI cache can leave an older copy or none.
-# download-cef unpacks it to <version>\cef_windows_x86_64 (older releases: windows_x86_64).
-$libcef = Get-ChildItem $env:CEF_PATH -Recurse -Filter 'libcef.dll' -ErrorAction SilentlyContinue |
-    Where-Object { $_.Directory.Name -in @('cef_windows_x86_64', 'windows_x86_64') } |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $libcef) { throw "Cannot find the CEF distribution under $env:CEF_PATH." }
-$cefRoot = $libcef.DirectoryName
+# Find it where the CEF build script took it: CEF_PATH\<CEF version>\cef_windows_x86_64 when
+# that version folder exists (the build script downloads CEF there), otherwise CEF_PATH itself.
+$cefRoot = Join-Path $env:CEF_PATH $cefVersion
+if (Test-Path $cefRoot) { $cefRoot = Join-Path $cefRoot 'cef_windows_x86_64' } else { $cefRoot = $env:CEF_PATH }
+# The CEF build script also accepts a CEF older than the locked one; Booharu ships only the locked one.
+$archiveJson = Join-Path $cefRoot 'archive.json'
+if (-not (Test-Path $archiveJson)) { throw "Cannot find the CEF distribution: $archiveJson is missing." }
+$archiveName = [string]((Get-Content $archiveJson -Raw | ConvertFrom-Json).name)
+if ([regex]::Match($archiveName, '^cef_binary_([^+]+)').Groups[1].Value -ne $cefVersion) {
+    throw "Cargo.lock locks CEF $cefVersion, but $cefRoot holds $archiveName. Remove that folder so the next build downloads CEF $cefVersion."
+}
+Write-Host "Staging CEF $cefVersion from $cefRoot"
 $runtimeExtensions = @('.exe', '.dll', '.pak', '.bin', '.dat', '.json')
 Get-ChildItem $cefRoot -File | Where-Object { $_.Extension -in $runtimeExtensions -and $_.Name -ne 'archive.json' } |
     Copy-Item -Destination $stage -Force

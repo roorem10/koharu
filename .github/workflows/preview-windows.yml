@@ -9,6 +9,10 @@ name: Preview Windows build
 # should be built through a pull request into booharu, so the first
 # run starts from booharu's cache and later pushes from the PR's own. Release
 # branches build on every push.
+#
+# The CEF cache is keyed on the locked CEF version alone. Once a build on booharu,
+# the default branch, has saved it, every branch and pull request restores it;
+# until then each branch or pull request downloads CEF once and keeps its own copy.
 
 on:
   push:
@@ -79,10 +83,33 @@ jobs:
           ninja --version
 
       # rust-cache prunes target\ before saving it, and a CEF copy it had pruned (archive.json
-      # gone) stopped the CEF build script. CEF now downloads outside target\ on every run.
+      # gone) stopped the CEF build script. CEF now lives outside target\, in CEF_PATH.
       - name: Drop a CEF copy restored from the cache
         shell: pwsh
         run: Remove-Item target\cef -Recurse -Force -ErrorAction SilentlyContinue
+
+      # The CEF build script (cef-dll-sys) downloads CEF to CEF_PATH\<CEF version>\cef_windows_x86_64
+      # only when that folder is missing, so restoring the folder skips the download. <CEF version>
+      # is the build part of cef-dll-sys's locked version: 154.5.0+154.0.34 is CEF 154.0.34.
+      # scripts\build-preview-windows.ps1 reads it the same way. To throw a bad copy away, change the
+      # key's v1 to v2.
+      - name: Find the locked CEF version
+        id: cef
+        shell: pwsh
+        run: |
+          $cargoLock = Get-Content Cargo.lock -Raw
+          $locked = [regex]::Matches($cargoLock, '(?m)^name = "cef-dll-sys"\r?\nversion = "([^"]+)"')
+          if ($locked.Count -ne 1) { throw 'Cannot read the locked cef-dll-sys version from Cargo.lock.' }
+          $version = $locked[0].Groups[1].Value -replace '^[^+]*\+', ''
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "path=$env:RUNNER_TEMP\cef\$version\cef_windows_x86_64" >> $env:GITHUB_OUTPUT
+
+      - name: Restore the CEF download
+        id: cef-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ steps.cef.outputs.path }}
+          key: cef-${{ steps.cef.outputs.version }}-windows-x86_64-v1
 
       - name: Build preview package
         shell: pwsh
@@ -90,6 +117,24 @@ jobs:
           KOHARU_FORK_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
           CEF_PATH: ${{ runner.temp }}\cef
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview-windows.ps1
+
+      # cef-dll-sys writes archive.json last, after a checked download and a complete unpack, so a
+      # folder without it is a broken copy. A complete download is kept even when the build fails.
+      - name: Check the CEF download
+        id: cef-download
+        if: ${{ !cancelled() && steps.cef-cache.outcome == 'success' && steps.cef-cache.outputs.cache-hit != 'true' }}
+        shell: pwsh
+        env:
+          CEF_DIR: ${{ steps.cef.outputs.path }}
+        run: |
+          if (Test-Path (Join-Path $env:CEF_DIR 'archive.json')) { 'complete=true' >> $env:GITHUB_OUTPUT }
+
+      - name: Save the CEF download
+        if: ${{ !cancelled() && steps.cef-download.outputs.complete == 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.cef.outputs.path }}
+          key: ${{ steps.cef-cache.outputs.cache-primary-key }}
 
       - name: Check package layout
         shell: pwsh
