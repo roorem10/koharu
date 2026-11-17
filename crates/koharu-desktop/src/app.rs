@@ -98,16 +98,16 @@ impl App {
         });
         let app = Arc::clone(self);
         tauri::async_runtime::spawn(async move {
-            // The `serve` example's port, fixed so a client's configuration
-            // stays valid from one launch to the next.
-            match McpServer::start(7878).await {
+            // Booharu: on Booharu's own port, the setting's, which stays from
+            // one launch to the next and leaves Koharu's 7878 to Koharu.
+            match crate::booharu::mcp::start().await {
                 Ok(server) => {
                     let server = app.mcp.get_or_init(|| server);
                     let project = app.project.lock();
                     server.open(project.as_ref().map(|project| app.tools(project)));
                 }
                 Err(error) => {
-                    tracing::warn!("couldn't serve MCP on port 7878: {error:#}");
+                    tracing::warn!("couldn't serve MCP: {error:#}"); // Booharu: the error names the port.
                 }
             }
         });

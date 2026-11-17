@@ -1,7 +1,8 @@
 //! Booharu's part of the app: its commands, which the Booharu block of
-//! `commands` lists, and the host Booharu's agent tools reach the app
-//! through.
+//! `commands` lists, the MCP server's start on Booharu's own port, and the
+//! host Booharu's agent tools reach the app through.
 
+pub(crate) mod mcp;
 pub(crate) mod settings;
 
 use booharu_core::settings::BooharuPreferences;
