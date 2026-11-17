@@ -135,7 +135,8 @@ impl Handler {
 impl ServerHandler for Handler {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
-            .with_server_info(Implementation::new("booharu", env!("CARGO_PKG_VERSION")))
+            // Booharu: Booharu's own version, not the Koharu one its crates carry.
+            .with_server_info(Implementation::new("booharu", booharu_core::version()))
     }
 
     async fn list_tools(
