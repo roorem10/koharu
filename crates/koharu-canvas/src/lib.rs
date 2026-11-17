@@ -2,6 +2,8 @@
 //! pointer events into edits for the host to apply.
 
 mod area;
+// Booharu: Booharu's part of the canvas.
+mod booharu;
 mod canvas;
 mod control;
 mod draw;

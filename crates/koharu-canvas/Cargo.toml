@@ -13,6 +13,8 @@ publish.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+# Booharu: the settings and attributes Booharu's part of the canvas reads.
+booharu-core = { workspace = true }
 cursor-icon = { workspace = true }
 icu_segmenter = { workspace = true }
 image = { workspace = true }

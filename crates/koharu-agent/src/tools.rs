@@ -4,6 +4,9 @@
 //! and the MCP server serves the same set to outside agents. A call finds
 //! the open project in the tool context it runs with.
 
+// Booharu: Booharu's tools, declared here to use the private parts of `Tools`.
+pub(crate) mod booharu;
+
 use std::{collections::BTreeSet, io::Cursor, sync::Arc, time::Duration};
 
 use base64::Engine as _;
@@ -63,6 +66,7 @@ impl Tools {
         tools.add_tool(Wait);
         tools.add_tool(Stop);
         tools.add_tool(ViewPage);
+        booharu::register(&mut tools); // Booharu: Booharu's tools, after Koharu's.
         tools
     }
 

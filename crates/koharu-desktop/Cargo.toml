@@ -15,6 +15,9 @@ publish.workspace = true
 alphanumeric-sort = { workspace = true }
 anyhow = { workspace = true }
 arboard = { workspace = true }
+# Booharu: what Booharu's commands and its agent tools' host work with.
+booharu = { workspace = true }
+booharu-core = { workspace = true }
 cef = { workspace = true }
 dirs = { workspace = true }
 fs-err = { workspace = true }

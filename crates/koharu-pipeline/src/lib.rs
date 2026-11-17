@@ -2,6 +2,8 @@
 //! one click, or one stage by hand on a page, a block, or a painted area. The
 //! README is the design.
 
+// Booharu: Booharu's pipeline hooks.
+mod booharu;
 mod config;
 mod error;
 mod event;

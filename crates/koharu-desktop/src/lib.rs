@@ -2,6 +2,8 @@
 //! CEF over the native canvas, and the commands the interface calls.
 
 mod app;
+// Booharu: Booharu's commands and its agent tools' host.
+mod booharu;
 mod commands;
 mod events;
 mod library;
