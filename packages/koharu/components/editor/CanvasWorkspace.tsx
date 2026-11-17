@@ -11,6 +11,7 @@ import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { TypeBar } from '@/components/editor/TypeBar'
 import { dispatch } from '@/lib/backend'
+import { controlKeepsKey } from '@/lib/booharu/keys' // Booharu: the tool-key rule in down().
 import { usePage } from '@/lib/queries'
 import { deleteSelection } from '@/lib/scene'
 import { hexToRgba, toolKeys, useKoharuStore, type CanvasTool } from '@/lib/store'
@@ -91,10 +92,6 @@ export function CanvasWorkspace() {
   )
 
   useEffect(() => {
-    const editable = (target: EventTarget | null) =>
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      (target instanceof HTMLElement && target.isContentEditable)
     // The tool Space replaced, put back when it's released, as Photoshop's hand tool.
     let held: CanvasTool | null = null
 
@@ -103,7 +100,8 @@ export function CanvasWorkspace() {
         event.preventDefault()
         return
       }
-      if (editable(event.target)) return
+      // Booharu: a slider or other non-text input lets a bare tool key through (koharu#1181).
+      if (controlKeepsKey(event)) return
       const state = useKoharuStore.getState()
       if (event.code === 'Space') {
         event.preventDefault()
