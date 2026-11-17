@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@koharu/ui/components/dialog'
 
-const author = 'Roorem10'
+const author = 'roorem10' // Booharu: the owner's GitHub handle, as the fork rules write it.
 // "Booharu 0.0.5" shows as 0.0.5; the build commit is shown on hover, for bug reports.
 const forkVersion = process.env.NEXT_PUBLIC_KOHARU_FORK_VERSION?.replace(/^Booharu\s+/, '')
 const forkCommit = process.env.NEXT_PUBLIC_KOHARU_FORK_COMMIT

@@ -106,7 +106,7 @@ describe('window chrome', () => {
 
     expect(await screen.findByRole('heading', { name: 'Booharu' })).toBeInTheDocument()
     expect(await screen.findByText('Based on Koharu 0.62.0 by Mayo Takanashi.')).toBeInTheDocument()
-    expect(screen.getByText('Roorem10')).toBeInTheDocument()
+    expect(screen.getByText('roorem10')).toBeInTheDocument()
     expect(nativeGetVersion).toHaveBeenCalledTimes(1)
   })
 })

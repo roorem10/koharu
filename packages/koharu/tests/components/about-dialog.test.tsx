@@ -23,7 +23,7 @@ describe('AboutDialog Booharu identity', () => {
     render(<AboutDialog open onOpenChange={vi.fn()} />)
 
     expect(await screen.findByText('Based on Koharu 0.85.0 by Mayo Takanashi.')).toBeInTheDocument()
-    expect(screen.getByText('Roorem10')).toBeInTheDocument()
+    expect(screen.getByText('roorem10')).toBeInTheDocument()
     expect(screen.getByText('0.0.5')).toHaveAttribute('title', '1a2b3c4d')
     expect(screen.getByRole('dialog')).not.toHaveTextContent('1a2b3c4d')
   })
