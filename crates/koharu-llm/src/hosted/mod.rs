@@ -151,7 +151,11 @@ pub(crate) fn connect(vendor: &str, id: &str) -> Result<DynModel<Completion>> {
             );
             ConnectOptions::new()
                 .api_key(key.unwrap_or_default())
-                .http(Http::default())
+                // Booharu: Gemini's own client sends the key in a header.
+                .http(match vendor {
+                    gemini::PROVIDER_NAME => Http::gemini(),
+                    _ => Http::default(),
+                })
         }
     };
     let options = match base_url {
@@ -213,7 +217,8 @@ pub(crate) async fn models(vendor: &str) -> Result<Vec<ModelSpec>> {
     let listed = match config {
         ProviderConfig::OpenAi(config) => config.connect(http).list_models().await?,
         ProviderConfig::Anthropic(config) => config.connect(http).list_models().await?,
-        ProviderConfig::Gemini(config) => config.connect(http).list_models().await?,
+        // Booharu: Gemini's own client sends the key in a header.
+        ProviderConfig::Gemini(config) => config.connect(Http::gemini()).list_models().await?,
     };
     let catalog = Catalog::builtin();
     Ok(listed

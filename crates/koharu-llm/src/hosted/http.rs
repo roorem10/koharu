@@ -157,6 +157,51 @@ impl HttpClientExt for Http {
     }
 }
 
+/// Booharu: Gemini's API key, which rig puts in the address as `key=`,
+/// where a log or an error that names the address shows it, sent in the
+/// `x-goog-api-key` header Gemini also reads. rig puts the key in as it is,
+/// unencoded, so it moves as it is; an address without one is left alone.
+struct GeminiKey;
+
+impl SignIn for GeminiKey {
+    fn authorize<'a>(&'a self, parts: &'a mut Parts) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let Some(query) = parts.uri.query() else {
+                return Ok(());
+            };
+            let mut key = None;
+            let mut kept = Vec::new();
+            for pair in query.split('&') {
+                match pair.split_once('=') {
+                    Some(("key", value)) => key = Some(value),
+                    _ => kept.push(pair),
+                }
+            }
+            let Some(key) = key else {
+                return Ok(());
+            };
+            let mut value = http::HeaderValue::from_str(key)?;
+            value.set_sensitive(true);
+            let path = parts.uri.path();
+            let mut uri = parts.uri.clone().into_parts();
+            uri.path_and_query = Some(match kept.as_slice() {
+                [] => path.parse()?,
+                kept => format!("{path}?{}", kept.join("&")).parse()?,
+            });
+            parts.uri = http::Uri::from_parts(uri)?;
+            parts.headers.insert("x-goog-api-key", value);
+            Ok(())
+        })
+    }
+}
+
+impl Http {
+    /// Booharu: a client for Gemini, sending its API key in a header.
+    pub(crate) fn gemini() -> Self {
+        Self::signed_in(GeminiKey)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use http::header::AUTHORIZATION;
@@ -172,5 +217,40 @@ mod tests {
             .into_parts();
         let parts = Http::default().authorized(parts).await.unwrap();
         assert_eq!(parts.headers[AUTHORIZATION], "Bearer key");
+    }
+
+    /// Booharu: Gemini's key leaves the address for its header, and the rest
+    /// of the address stays as it was.
+    #[tokio::test]
+    async fn gemini_sends_its_key_in_a_header() {
+        let models = "https://g.test/v1beta/models";
+        for (uri, sent, key) in [
+            (
+                format!("{models}/m:streamGenerateContent?alt=sse&key=AIzaFAKE"),
+                format!("{models}/m:streamGenerateContent?alt=sse"),
+                Some("AIzaFAKE"),
+            ),
+            (
+                format!("{models}?pageSize=1000&key=AIzaFAKE&pageToken=next"),
+                format!("{models}?pageSize=1000&pageToken=next"),
+                Some("AIzaFAKE"),
+            ),
+            (
+                format!("{models}/m:generateContent?key=AIzaFAKE"),
+                format!("{models}/m:generateContent"),
+                Some("AIzaFAKE"),
+            ),
+            (
+                format!("{models}?pageSize=1000&pageToken=next"),
+                format!("{models}?pageSize=1000&pageToken=next"),
+                None,
+            ),
+        ] {
+            let (parts, ()) = http::Request::get(uri).body(()).unwrap().into_parts();
+            let parts = Http::gemini().authorized(parts).await.unwrap();
+            assert_eq!(parts.uri.to_string(), sent);
+            let header = parts.headers.get("x-goog-api-key");
+            assert_eq!(header.map(|key| key.to_str().unwrap()), key);
+        }
     }
 }
