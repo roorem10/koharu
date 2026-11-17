@@ -7,4 +7,5 @@
 //! Booharu hooks can call it without a dependency cycle. Feature logic that
 //! needs the pipeline goes in the `booharu` crate.
 
+pub mod attrs;
 pub mod settings;
