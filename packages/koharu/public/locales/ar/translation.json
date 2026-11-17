@@ -1,6 +1,7 @@
 {
   "about": {
     "author": "المؤلف",
+    "basedOn": "مبني على {{name}} من تطوير Mayo Takanashi.",
     "description": "أدوات ترجمة المانغا",
     "unavailable": "غير متاح",
     "version": "الإصدار"
@@ -21,13 +22,13 @@
     "cancel": "إلغاء",
     "cancelled": "أُلغي.",
     "emptyDescription": "اطلب من Agent فحص هذا المشروع أو ترجمته أو تعديله أو معالجته. لن يعرض صور الصفحات إلا عند الحاجة.",
-    "emptyTitle": "ماذا ينبغي أن يفعل Koharu؟",
+    "emptyTitle": "ماذا ينبغي أن يفعل Booharu؟",
     "failed": "فشل طلب Agent.",
     "loading": "جارٍ تحميل الوكيل…",
-    "message": "راسل Koharu Agent",
+    "message": "راسل Booharu Agent",
     "model": "النموذج",
     "newChat": "محادثة جديدة",
-    "placeholder": "اطلب من Koharu العمل على هذا المشروع...",
+    "placeholder": "اطلب من Booharu العمل على هذا المشروع...",
     "reasoning": "التفكير",
     "send": "إرسال",
     "thinking": "جارٍ التفكير...",
@@ -57,32 +58,8 @@
     "loading": "جارٍ التحميل…"
   },
   "errors": {
-    "fatalTitle": "تعذّر على Koharu المتابعة",
+    "fatalTitle": "تعذّر على Booharu المتابعة",
     "tryAgain": "أعد المحاولة"
-  },
-  "feedback": {
-    "addScreenshot": "إضافة لقطة شاشة",
-    "cancel": "إلغاء",
-    "confirm": "تأكيد",
-    "email": "البريد الإلكتروني",
-    "emailPlaceholder": "your.email@example.org",
-    "emptyMessage": "يُرجى وصف ما حدث.",
-    "failed": "تعذّر إرسال الملاحظات. يُرجى المحاولة مرة أخرى.",
-    "forbidden": "لا يمكن إرسال الملاحظات من هذا الإصدار.",
-    "hide": "إخفاء",
-    "highlight": "تمييز",
-    "message": "الوصف",
-    "messagePlaceholder": "ماذا حدث؟ وماذا كنت تتوقع؟",
-    "name": "الاسم",
-    "namePlaceholder": "اسمك",
-    "noClient": "الملاحظات غير متاحة حاليًا.",
-    "removeHighlight": "إزالة",
-    "removeScreenshot": "إزالة لقطة الشاشة",
-    "required": "(مطلوب)",
-    "sent": "شكرًا على ملاحظاتك!",
-    "submit": "إرسال",
-    "timeout": "انتهت مهلة الإرسال. يُرجى المحاولة مرة أخرى.",
-    "title": "إرسال ملاحظات"
   },
   "fill": {
     "deselect": "إلغاء التحديد",
@@ -242,18 +219,18 @@
   },
   "menu": {
     "about": "عن البرنامج",
+    "booharuGithub": "Booharu على GitHub",
     "closeProject": "إغلاق المشروع",
     "delete": "حذف المحدّد",
-    "discord": "Discord",
     "edit": "تحرير",
     "export": "تصدير المشروع",
-    "feedback": "إرسال ملاحظات",
     "file": "ملف",
     "fit": "ملاءمة النافذة",
-    "github": "GitHub",
     "help": "مساعدة",
     "history": "السجل",
     "import": "استيراد الصفحات",
+    "koharuDiscord": "Discord الخاص بـ Koharu",
+    "koharuGithub": "Koharu على GitHub",
     "redo": "إعادة",
     "selectAllLayers": "تحديد كل الطبقات",
     "settings": "الإعدادات",
@@ -377,7 +354,7 @@
       "title": "خط المعالجة",
       "translator": {
         "instructions": "تعليمات إضافية",
-        "instructionsDescription": "اختيارية، بأي لغة وأي صيغة، مثل طريقة كتابة اسم أو نبرة الأسلوب. يضيفها Koharu كما هي بعد موجّه النظام الخاص به.",
+        "instructionsDescription": "اختيارية، بأي لغة وأي صيغة، مثل طريقة كتابة اسم أو نبرة الأسلوب. يضيفها Booharu كما هي بعد موجّه النظام الخاص به.",
         "reasoning": "التفكير",
         "reasoningDescription": "استخدام تفكير النموذج أثناء الترجمة.",
         "targetLanguageDescription": "اختر اللغة التي تُترجم إليها النصوص.",
@@ -417,10 +394,10 @@
       "addFamily": "إضافة عائلة خطوط",
       "defaultFamilies": "عائلات الخطوط الافتراضية",
       "description": "عيّن مجموعة الخطوط المرتّبة المستخدمة عندما لا يكون لطبقة النص عائلة معيّنة.",
-      "empty": "لا توجد عائلات افتراضية. سيستخدم Koharu البديل من النظام.",
+      "empty": "لا توجد عائلات افتراضية. سيستخدم Booharu البديل من النظام.",
       "familyLabel": "عائلة الخطوط الافتراضية {{index}}",
       "fontFallback": "الخطوط المفضلة",
-      "fontFallbackDescription": "يستخدم Koharu أول عائلة متاحة تدعم النص.",
+      "fontFallbackDescription": "يستخدم Booharu أول عائلة متاحة تدعم النص.",
       "loadError": "تعذّر تحميل الخطوط. لا يزال بإمكانك إزالة العائلات الحالية.",
       "loadingFonts": "جارٍ تحميل الخطوط…",
       "removeFamily": "إزالة {{family}}",
@@ -440,7 +417,7 @@
     "loadingProjects": "جارٍ تحميل المشاريع…",
     "newDescription": "أنشئ مساحة عمل نظيفة لصفحاتك وترجماتك وعمليات التصدير.",
     "newProject": "مشروع جديد",
-    "projectKind": "مشروع Koharu",
+    "projectKind": "مشروع Booharu",
     "projectList": "المشاريع",
     "projectName": "اسم المشروع",
     "projectNamePlaceholder": "مشروعي الجديد",
@@ -450,9 +427,9 @@
   },
   "startup": {
     "description": "جارٍ تحميل بيئات الذكاء الاصطناعي المحلية وتحضير مساحة العمل. قد يستغرق التشغيل الأول لحظة.",
-    "opening": "جارٍ فتح Koharu…",
+    "opening": "جارٍ فتح Booharu…",
     "status": "تهيئة البيئات المحلية",
-    "title": "تحضير Koharu"
+    "title": "تحضير Booharu"
   },
   "status": {
     "zoom": "تكبير"

@@ -85,12 +85,16 @@ describe('window chrome', () => {
     render(<TitleBar />)
 
     await user.click(screen.getByRole('menuitem', { name: 'Help' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Discord' }))
-    expect(nativeOpenUrl).toHaveBeenLastCalledWith('https://discord.gg/mHvHkxGnUY')
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Booharu on GitHub' }))
+    expect(nativeOpenUrl).toHaveBeenLastCalledWith('https://github.com/roorem10/koharu')
 
     await user.click(screen.getByRole('menuitem', { name: 'Help' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'GitHub' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Koharu on GitHub' }))
     expect(nativeOpenUrl).toHaveBeenLastCalledWith('https://github.com/koharu-rs/koharu')
+
+    await user.click(screen.getByRole('menuitem', { name: 'Help' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Koharu Discord' }))
+    expect(nativeOpenUrl).toHaveBeenLastCalledWith('https://discord.gg/mHvHkxGnUY')
   })
 
   it('shows the current version and author in About', async () => {
@@ -100,9 +104,9 @@ describe('window chrome', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Help' }))
     await user.click(await screen.findByRole('menuitem', { name: 'About' }))
 
-    expect(await screen.findByRole('heading', { name: 'Koharu' })).toBeInTheDocument()
-    expect(await screen.findByText('0.62.0')).toBeInTheDocument()
-    expect(screen.getByText('Mayo Takanashi')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Booharu' })).toBeInTheDocument()
+    expect(await screen.findByText('Based on Koharu 0.62.0 by Mayo Takanashi.')).toBeInTheDocument()
+    expect(screen.getByText('Roorem10')).toBeInTheDocument()
     expect(nativeGetVersion).toHaveBeenCalledTimes(1)
   })
 })

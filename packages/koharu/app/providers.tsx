@@ -5,7 +5,6 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { I18nextProvider } from 'react-i18next'
 
 import { StartupView } from '@/components/app/StartupView'
-import { Updater } from '@/components/app/Updater'
 import ClientOnly from '@/components/ClientOnly'
 import { refreshModels, refreshPreferences } from '@/lib/backend'
 import i18n from '@/lib/i18n'
@@ -165,14 +164,8 @@ function receiveChange(change: Change): void {
 
 function StartupBoundary({ children }: { children: ReactNode }) {
   const initialized = useKoharuStore((state) => state.initialized)
-  return initialized ? (
-    <>
-      {children}
-      <Updater />
-    </>
-  ) : (
-    <StartupView />
-  )
+  // Booharu never mounts Koharu's updater: it would offer Koharu's releases in place of Booharu.
+  return initialized ? <>{children}</> : <StartupView />
 }
 
 export default Providers

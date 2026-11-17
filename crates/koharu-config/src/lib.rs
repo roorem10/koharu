@@ -42,8 +42,10 @@ pub fn update<T: Section>(edit: impl FnOnce(&mut T)) -> Result<()> {
 }
 
 fn home() -> Result<PathBuf> {
+    // Booharu keeps its own settings, so an installed Koharu and Booharu never
+    // read or rewrite each other's choices.
     dirs::home_dir()
-        .map(|home| home.join(".koharu"))
+        .map(|home| home.join(".booharu"))
         .ok_or(Error::NoHome)
 }
 

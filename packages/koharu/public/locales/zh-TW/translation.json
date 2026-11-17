@@ -1,6 +1,7 @@
 {
   "about": {
     "author": "作者",
+    "basedOn": "基於 Mayo Takanashi 開發的 {{name}}。",
     "description": "漫畫翻譯工具",
     "unavailable": "無法使用",
     "version": "版本"
@@ -21,13 +22,13 @@
     "cancel": "取消",
     "cancelled": "已取消。",
     "emptyDescription": "讓代理檢查、翻譯、編輯或處理此專案。它只會在需要時查看頁面影像。",
-    "emptyTitle": "要讓 Koharu 做什麼？",
+    "emptyTitle": "要讓 Booharu 做什麼？",
     "failed": "代理要求失敗。",
     "loading": "正在載入代理…",
-    "message": "傳送訊息給 Koharu 代理",
+    "message": "傳送訊息給 Booharu 代理",
     "model": "模型",
     "newChat": "新對話",
-    "placeholder": "讓 Koharu 處理此專案…",
+    "placeholder": "讓 Booharu 處理此專案…",
     "reasoning": "推理",
     "send": "傳送",
     "thinking": "正在思考…",
@@ -57,32 +58,8 @@
     "loading": "正在載入…"
   },
   "errors": {
-    "fatalTitle": "Koharu 無法繼續執行",
+    "fatalTitle": "Booharu 無法繼續執行",
     "tryAgain": "再試一次"
-  },
-  "feedback": {
-    "addScreenshot": "新增螢幕截圖",
-    "cancel": "取消",
-    "confirm": "確認",
-    "email": "電子郵件",
-    "emailPlaceholder": "your.email@example.org",
-    "emptyMessage": "請描述發生了什麼事。",
-    "failed": "無法傳送意見回饋，請再試一次。",
-    "forbidden": "此版本無法傳送意見回饋。",
-    "hide": "隱藏",
-    "highlight": "標示",
-    "message": "描述",
-    "messagePlaceholder": "發生了什麼事？你原本預期會怎樣？",
-    "name": "姓名",
-    "namePlaceholder": "你的名字",
-    "noClient": "目前無法使用意見回饋。",
-    "removeHighlight": "移除",
-    "removeScreenshot": "移除螢幕截圖",
-    "required": "（必填）",
-    "sent": "感謝你的意見回饋！",
-    "submit": "傳送",
-    "timeout": "傳送逾時，請再試一次。",
-    "title": "傳送意見回饋"
   },
   "fill": {
     "deselect": "取消選取",
@@ -242,18 +219,18 @@
   },
   "menu": {
     "about": "關於",
+    "booharuGithub": "GitHub 上的 Booharu",
     "closeProject": "關閉專案",
     "delete": "刪除所選項目",
-    "discord": "Discord",
     "edit": "編輯",
     "export": "匯出專案",
-    "feedback": "傳送意見回饋",
     "file": "檔案",
     "fit": "適應視窗",
-    "github": "GitHub",
     "help": "說明",
     "history": "步驟記錄",
     "import": "匯入頁面",
+    "koharuDiscord": "Koharu 的 Discord",
+    "koharuGithub": "GitHub 上的 Koharu",
     "redo": "重做",
     "selectAllLayers": "選取所有圖層",
     "settings": "設定",
@@ -377,7 +354,7 @@
       "title": "流程",
       "translator": {
         "instructions": "附加指示",
-        "instructionsDescription": "選填，可使用任何語言和形式，例如名字的寫法或語氣。Koharu 會依原樣把它們附加在自己的系統提示詞之後。",
+        "instructionsDescription": "選填，可使用任何語言和形式，例如名字的寫法或語氣。Booharu 會依原樣把它們附加在自己的系統提示詞之後。",
         "reasoning": "推理",
         "reasoningDescription": "翻譯時使用模型推理。",
         "targetLanguageDescription": "選擇文字要翻譯成的語言。",
@@ -417,10 +394,10 @@
       "addFamily": "新增字型家族",
       "defaultFamilies": "預設字型家族",
       "description": "設定文字圖層未指定字型家族時使用的有序字型堆疊。",
-      "empty": "沒有預設字型家族。Koharu 將使用系統後備字型。",
+      "empty": "沒有預設字型家族。Booharu 將使用系統後備字型。",
       "familyLabel": "預設字型家族 {{index}}",
       "fontFallback": "偏好字型",
-      "fontFallbackDescription": "Koharu 使用第一個支援該文字的可用字型家族。",
+      "fontFallbackDescription": "Booharu 使用第一個支援該文字的可用字型家族。",
       "loadError": "無法載入字型。仍可移除現有字型家族。",
       "loadingFonts": "正在載入字型…",
       "removeFamily": "移除 {{family}}",
@@ -440,7 +417,7 @@
     "loadingProjects": "正在載入專案…",
     "newDescription": "為頁面、翻譯和匯出建立乾淨的工作區。",
     "newProject": "新建專案",
-    "projectKind": "Koharu 專案",
+    "projectKind": "Booharu 專案",
     "projectList": "專案",
     "projectName": "專案名稱",
     "projectNamePlaceholder": "我的新專案",
@@ -450,9 +427,9 @@
   },
   "startup": {
     "description": "正在載入本機 AI 執行環境並準備工作區。首次啟動可能需要一些時間。",
-    "opening": "正在開啟 Koharu…",
+    "opening": "正在開啟 Booharu…",
     "status": "正在初始化本機執行環境",
-    "title": "正在準備 Koharu"
+    "title": "正在準備 Booharu"
   },
   "status": {
     "zoom": "縮放"

@@ -13,8 +13,8 @@ use crate::{Error, Result, home, lock, read_file, save};
 
 pub use secrecy::{ExposeSecret, SecretString};
 
-/// The credential holding the file's key.
-const SERVICE: &str = "koharu";
+/// The credential holding the file's key; Booharu's own, apart from Koharu's.
+const SERVICE: &str = "booharu";
 const ACCOUNT: &str = "secrets";
 
 type Secrets = BTreeMap<String, String>;

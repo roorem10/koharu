@@ -2,6 +2,20 @@
 
 Koharu is a local-first manga translator: a Rust workspace with a TypeScript interface, shipped as a desktop app. This file holds durable decision rules only. Architecture, file layouts, crate and helper names, model inventories, commands, and anything else a refactor can change belong in crate READMEs and the docs. Normal Rust, TypeScript, testing, formatting, and Git practices are assumed.
 
+## Booharu
+
+This repository is Booharu, a personal Windows fork of Koharu. The rules below are upstream's and still apply; this section is the fork's own and wins where the two differ.
+
+- The goal: add a multi-page chapter, press one button, and get a very passable scanlation (clean, translated, lettered) with no further input. Hand edits stay possible afterwards and always win over automatic choices. Every feature must also work on its own for someone who never uses the automatic run.
+- Booharu stays on Koharu as its base. Koharu releases arrive as one snapshot commit each, authored with the owner's noreply address; never push upstream's own commit history here. Where Koharu and Booharu fix the same thing, keep Koharu's fix.
+- Keep edits to upstream files small and Booharu's own code in modules of its own, so the next Koharu release applies with few conflicts. Booharu-only data on a scene layer goes in its attributes under the `booharu` namespace; data the renderer must read becomes a real scene field.
+- `booharu` is the accepted work and the base for every branch. `main` is a clean copy of upstream and is never developed on. Branches are named `wo-NN-topic`, `fix/topic`, `chore/topic` or `release/booharu-X.Y.Z`.
+- Work reaches `booharu` only after it compiles, passes the "Booharu check" workflow, and has been tested by the owner in a Windows build. Releases are tagged `booharu-vX.Y.Z`; the version lives in `FORK_VERSION`. Windows is the only platform for now.
+- New non-trivial logic leaves one small test. A change report ends with what was skipped or not checked, and any risk.
+- A feature that adds an action also adds its agent tool, which the MCP server offers too.
+- Credit the owner only as `roorem10`, with the GitHub noreply address. No real names or personal email in commits, pull requests, issues or files.
+- Booharu's own commits may name an AI co-author. Anything sent to upstream Koharu follows the Contributing rules below.
+
 ## Product
 
 - Models run on the user's machine. Pages and text leave it only through a hosted provider the user chose.

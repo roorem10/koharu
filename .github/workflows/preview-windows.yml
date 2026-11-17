@@ -1,0 +1,148 @@
+name: Preview Windows build
+
+# Builds the Booharu Windows installer and portable package with the same script
+# used for hand-made builds (scripts/build-preview-windows.ps1), so a hand build
+# and a CI build are made the same way.
+#
+# Cache scoping: a run can only restore caches saved on its own branch or the
+# default branch, or on the base branch for pull requests. Work-order branches
+# should be built through a pull request into booharu, so the first
+# run starts from booharu's cache and later pushes from the PR's own. Release
+# branches build on every push.
+
+on:
+  push:
+    branches: ['booharu', 'release/**']
+    paths-ignore: ['**.md']
+  pull_request:
+    branches: ['booharu']
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Matches the toolchain used for the accepted hand-made builds.
+  RUST_TOOLCHAIN: '1.99.1'
+
+jobs:
+  portable:
+    name: Windows portable
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust ${{ env.RUST_TOOLCHAIN }}
+        shell: pwsh
+        run: |
+          rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal
+          rustup default $env:RUST_TOOLCHAIN
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install Ninja and NSIS if missing
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { choco install ninja -y --no-progress }
+          $nsis = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue) -and -not (Test-Path $nsis)) {
+            choco install nsis -y --no-progress
+          }
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Booharu 0.0.5 is built on Koharu 0.85, which shares almost no
+          # compiled dependencies with 0.0.4's, so it keeps a cache of its own.
+          shared-key: booharu-windows-koharu-085
+          # Keep compiled dependencies even when a later packaging step fails.
+          cache-on-failure: true
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: windows-bun-${{ hashFiles('**/bun.lock') }}
+
+      - name: Toolchain versions
+        shell: pwsh
+        run: |
+          rustc --version
+          cargo --version
+          bun --version
+          cmake --version | Select-Object -First 1
+          ninja --version
+
+      - name: Build preview package
+        shell: pwsh
+        env:
+          KOHARU_FORK_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview-windows.ps1
+
+      - name: Check package layout
+        shell: pwsh
+        run: |
+          $stage = 'dist\Booharu'
+          $required = @('Booharu.exe', 'libcef.dll', 'chrome_elf.dll', 'icudtl.dat', 'v8_context_snapshot.bin',
+            'resources.pak', 'locales\en-US.pak', 'LICENSE-MIT', 'LICENSE-APACHE',
+            'PREVIEW_INSTALL.md', 'CEF-LICENSE.txt', 'CEF-CREDITS.html')
+          $missing = $required | Where-Object { -not (Test-Path (Join-Path $stage $_)) }
+          if ($missing) { throw "Package is missing: $($missing -join ', ')" }
+          foreach ($userData in @('projects', 'store', 'PreviewData')) {
+            if (Test-Path (Join-Path $stage $userData)) { throw "Package contains user data: $userData" }
+          }
+
+          # A SHA-256 list of every packaged file, for comparing against other builds.
+          $root = (Resolve-Path $stage).Path
+          $files = Get-ChildItem $root -Recurse -File | Sort-Object FullName
+          $files | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Length)  $($_.FullName.Substring($root.Length + 1).Replace('\', '/'))"
+          } | Set-Content dist\MANIFEST-SHA256.txt -Encoding utf8
+
+          $size = [math]::Round(($files | Measure-Object Length -Sum).Sum / 1MB)
+          @(
+            '### Preview package'
+            ''
+            "- Commit: ``$env:GITHUB_SHA``"
+            "- Files: $($files.Count), $size MB unpacked"
+            "- Rust: $(rustc --version)"
+          ) | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: Name artifact
+        id: name
+        shell: pwsh
+        run: |
+          $sha = '${{ github.event.pull_request.head.sha || github.sha }}'.Substring(0, 8)
+          if ($env:GITHUB_EVENT_NAME -eq 'pull_request') { $label = 'pr${{ github.event.pull_request.number }}' }
+          else { $label = $env:GITHUB_REF_NAME -replace '[^A-Za-z0-9._-]', '-' }
+          "artifact=Booharu-Preview-$label-$sha" >> $env:GITHUB_OUTPUT
+
+      # The artifact unpacks to the same Booharu folder as the portable ZIP,
+      # plus the manifest beside it.
+      - name: Upload portable package
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.name.outputs.artifact }}
+          path: |
+            dist/Booharu/
+            dist/MANIFEST-SHA256.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      # The files to attach to a GitHub release: installer, portable ZIP and checksums.
+      - name: Upload release files
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.name.outputs.artifact }}-release
+          path: |
+            dist/Booharu-*-Setup.exe
+            dist/Booharu-*-Portable.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90

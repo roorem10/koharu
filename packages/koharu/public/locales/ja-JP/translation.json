@@ -1,6 +1,7 @@
 {
   "about": {
     "author": "作者",
+    "basedOn": "Mayo Takanashi による {{name}} をベースにしています。",
     "description": "漫画翻訳ツール",
     "unavailable": "利用不可",
     "version": "バージョン"
@@ -21,13 +22,13 @@
     "cancel": "キャンセル",
     "cancelled": "キャンセルしました。",
     "emptyDescription": "エージェントにこのプロジェクトの確認、翻訳、編集、処理を依頼できます。ページ画像は必要な場合にのみ表示されます。",
-    "emptyTitle": "Koharuに何をさせますか？",
+    "emptyTitle": "Booharuに何をさせますか？",
     "failed": "エージェントのリクエストに失敗しました。",
     "loading": "エージェントを読み込み中…",
-    "message": "Koharuエージェントにメッセージを送信",
+    "message": "Booharuエージェントにメッセージを送信",
     "model": "モデル",
     "newChat": "新しいチャット",
-    "placeholder": "Koharuにこのプロジェクトの作業を依頼…",
+    "placeholder": "Booharuにこのプロジェクトの作業を依頼…",
     "reasoning": "推論",
     "send": "送信",
     "thinking": "思考中…",
@@ -57,32 +58,8 @@
     "loading": "読み込み中…"
   },
   "errors": {
-    "fatalTitle": "Koharuを続行できませんでした",
+    "fatalTitle": "Booharuを続行できませんでした",
     "tryAgain": "再試行"
-  },
-  "feedback": {
-    "addScreenshot": "スクリーンショットを追加",
-    "cancel": "キャンセル",
-    "confirm": "確定",
-    "email": "メールアドレス",
-    "emailPlaceholder": "your.email@example.org",
-    "emptyMessage": "何が起きたかを入力してください。",
-    "failed": "フィードバックを送信できませんでした。もう一度お試しください。",
-    "forbidden": "このビルドからはフィードバックを送信できません。",
-    "hide": "隠す",
-    "highlight": "強調",
-    "message": "内容",
-    "messagePlaceholder": "何が起きましたか？どうなることを期待していましたか？",
-    "name": "名前",
-    "namePlaceholder": "お名前",
-    "noClient": "現在フィードバックは利用できません。",
-    "removeHighlight": "削除",
-    "removeScreenshot": "スクリーンショットを削除",
-    "required": "（必須）",
-    "sent": "フィードバックをありがとうございます！",
-    "submit": "送信",
-    "timeout": "送信がタイムアウトしました。もう一度お試しください。",
-    "title": "フィードバックを送信"
   },
   "fill": {
     "deselect": "選択を解除",
@@ -241,19 +218,19 @@
     "unlocked": "ロックなし"
   },
   "menu": {
-    "about": "Koharuについて",
+    "about": "Booharuについて",
+    "booharuGithub": "GitHub の Booharu",
     "closeProject": "プロジェクトを閉じる",
     "delete": "選択項目を削除",
-    "discord": "Discord",
     "edit": "編集",
     "export": "プロジェクトを書き出す",
-    "feedback": "フィードバックを送信",
     "file": "ファイル",
     "fit": "ウィンドウに合わせる",
-    "github": "GitHub",
     "help": "ヘルプ",
     "history": "ヒストリー",
     "import": "ページを読み込む",
+    "koharuDiscord": "Koharu の Discord",
+    "koharuGithub": "GitHub の Koharu",
     "redo": "やり直す",
     "selectAllLayers": "すべてのレイヤーを選択",
     "settings": "設定",
@@ -377,7 +354,7 @@
       "title": "パイプライン",
       "translator": {
         "instructions": "追加の指示",
-        "instructionsDescription": "任意。どの言語・形式でも書けます（名前の表記や口調など）。Koharu は自身のシステムプロンプトの後に、書いたとおりに追加します。",
+        "instructionsDescription": "任意。どの言語・形式でも書けます（名前の表記や口調など）。Booharu は自身のシステムプロンプトの後に、書いたとおりに追加します。",
         "reasoning": "推論",
         "reasoningDescription": "翻訳時にモデルの推論を使用します。",
         "targetLanguageDescription": "テキストの翻訳先言語を選択します。",
@@ -417,10 +394,10 @@
       "addFamily": "フォントファミリーを追加",
       "defaultFamilies": "既定のフォントファミリー",
       "description": "テキストレイヤーにファミリーが指定されていない場合に使う、順序付きフォントスタックを設定します。",
-      "empty": "既定のファミリーがありません。Koharuはシステムの代替フォントを使用します。",
+      "empty": "既定のファミリーがありません。Booharuはシステムの代替フォントを使用します。",
       "familyLabel": "既定のフォントファミリー {{index}}",
       "fontFallback": "優先フォント",
-      "fontFallbackDescription": "Koharuは文字に対応する最初の利用可能なファミリーを使用します。",
+      "fontFallbackDescription": "Booharuは文字に対応する最初の利用可能なファミリーを使用します。",
       "loadError": "フォントを読み込めませんでした。既存のファミリーは削除できます。",
       "loadingFonts": "フォントを読み込み中…",
       "removeFamily": "{{family}}を削除",
@@ -440,7 +417,7 @@
     "loadingProjects": "プロジェクトを読み込み中…",
     "newDescription": "ページ、翻訳、書き出し用の新しいワークスペースを作成します。",
     "newProject": "新規プロジェクト",
-    "projectKind": "Koharuプロジェクト",
+    "projectKind": "Booharuプロジェクト",
     "projectList": "プロジェクト",
     "projectName": "プロジェクト名",
     "projectNamePlaceholder": "新しいプロジェクト",
@@ -450,9 +427,9 @@
   },
   "startup": {
     "description": "ローカル AI ランタイムを読み込み、ワークスペースを準備しています。初回起動には少し時間がかかる場合があります。",
-    "opening": "Koharuを起動中…",
+    "opening": "Booharuを起動中…",
     "status": "ローカルランタイムを初期化しています",
-    "title": "Koharu を準備しています"
+    "title": "Booharu を準備しています"
   },
   "status": {
     "zoom": "ズーム"

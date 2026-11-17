@@ -1,6 +1,7 @@
 {
   "about": {
     "author": "Auteur",
+    "basedOn": "Basé sur {{name}}, par Mayo Takanashi.",
     "description": "Outils de traduction de mangas",
     "unavailable": "Indisponible",
     "version": "Version"
@@ -21,13 +22,13 @@
     "cancel": "Annuler",
     "cancelled": "Annulé.",
     "emptyDescription": "Demandez à l’agent d’analyser, de traduire, de modifier ou de traiter ce projet. Il ne consultera les images des pages qu’en cas de besoin.",
-    "emptyTitle": "Que doit faire Koharu ?",
+    "emptyTitle": "Que doit faire Booharu ?",
     "failed": "La requête de l’agent a échoué.",
     "loading": "Chargement de l’agent…",
-    "message": "Message à l’agent Koharu",
+    "message": "Message à l’agent Booharu",
     "model": "Modèle",
     "newChat": "Nouvelle discussion",
-    "placeholder": "Demandez à Koharu de travailler sur ce projet…",
+    "placeholder": "Demandez à Booharu de travailler sur ce projet…",
     "reasoning": "Raisonnement",
     "send": "Envoyer",
     "thinking": "Réflexion…",
@@ -57,32 +58,8 @@
     "loading": "Chargement…"
   },
   "errors": {
-    "fatalTitle": "Koharu ne peut pas continuer",
+    "fatalTitle": "Booharu ne peut pas continuer",
     "tryAgain": "Réessayer"
-  },
-  "feedback": {
-    "addScreenshot": "Ajouter une capture d’écran",
-    "cancel": "Annuler",
-    "confirm": "Confirmer",
-    "email": "E-mail",
-    "emailPlaceholder": "votre.adresse@example.org",
-    "emptyMessage": "Décrivez ce qui s’est passé.",
-    "failed": "Le commentaire n’a pas pu être envoyé. Veuillez réessayer.",
-    "forbidden": "Cette version ne peut pas envoyer de commentaires.",
-    "hide": "Masquer",
-    "highlight": "Surligner",
-    "message": "Description",
-    "messagePlaceholder": "Que s’est-il passé ? À quoi vous attendiez-vous ?",
-    "name": "Nom",
-    "namePlaceholder": "Votre nom",
-    "noClient": "Les commentaires ne sont pas disponibles pour le moment.",
-    "removeHighlight": "Retirer",
-    "removeScreenshot": "Retirer la capture d’écran",
-    "required": "(obligatoire)",
-    "sent": "Merci pour votre commentaire !",
-    "submit": "Envoyer",
-    "timeout": "L’envoi a expiré. Veuillez réessayer.",
-    "title": "Envoyer un commentaire"
   },
   "fill": {
     "deselect": "Désélectionner",
@@ -242,18 +219,18 @@
   },
   "menu": {
     "about": "À propos",
+    "booharuGithub": "Booharu sur GitHub",
     "closeProject": "Fermer le projet",
     "delete": "Supprimer la sélection",
-    "discord": "Discord",
     "edit": "Édition",
     "export": "Exporter le projet",
-    "feedback": "Envoyer un commentaire",
     "file": "Fichier",
     "fit": "Ajuster à la fenêtre",
-    "github": "GitHub",
     "help": "Aide",
     "history": "Historique",
     "import": "Importer des pages",
+    "koharuDiscord": "Discord de Koharu",
+    "koharuGithub": "Koharu sur GitHub",
     "redo": "Rétablir",
     "selectAllLayers": "Sélectionner tous les calques",
     "settings": "Paramètres",
@@ -377,7 +354,7 @@
       "title": "Pipeline",
       "translator": {
         "instructions": "Instructions supplémentaires",
-        "instructionsDescription": "Facultatives, dans n’importe quelle langue et sous n’importe quelle forme, comme l’orthographe d’un nom ou le ton. Koharu les ajoute telles quelles après sa propre instruction système.",
+        "instructionsDescription": "Facultatives, dans n’importe quelle langue et sous n’importe quelle forme, comme l’orthographe d’un nom ou le ton. Booharu les ajoute telles quelles après sa propre instruction système.",
         "reasoning": "Raisonnement",
         "reasoningDescription": "Utiliser le raisonnement du modèle pendant la traduction.",
         "targetLanguageDescription": "Choisissez la langue dans laquelle traduire le texte.",
@@ -417,10 +394,10 @@
       "addFamily": "Ajouter une famille de polices",
       "defaultFamilies": "Familles de polices par défaut",
       "description": "Définissez la liste ordonnée de polices utilisée lorsqu’aucune famille n’est attribuée à un calque de texte.",
-      "empty": "Aucune famille par défaut. Koharu utilisera la police de secours du système.",
+      "empty": "Aucune famille par défaut. Booharu utilisera la police de secours du système.",
       "familyLabel": "Famille de polices par défaut {{index}}",
       "fontFallback": "Polices préférées",
-      "fontFallbackDescription": "Koharu utilise la première famille disponible qui prend en charge le texte.",
+      "fontFallbackDescription": "Booharu utilise la première famille disponible qui prend en charge le texte.",
       "loadError": "Impossible de charger les polices. Les familles existantes peuvent toujours être supprimées.",
       "loadingFonts": "Chargement des polices…",
       "removeFamily": "Retirer {{family}}",
@@ -440,7 +417,7 @@
     "loadingProjects": "Chargement des projets…",
     "newDescription": "Créez un espace de travail vierge pour vos pages, traductions et exports.",
     "newProject": "Nouveau projet",
-    "projectKind": "Projet Koharu",
+    "projectKind": "Projet Booharu",
     "projectList": "Projets",
     "projectName": "Nom du projet",
     "projectNamePlaceholder": "Mon nouveau projet",
@@ -450,9 +427,9 @@
   },
   "startup": {
     "description": "Chargement des environnements d’IA locaux et préparation de l’espace de travail. Le premier lancement peut prendre un moment.",
-    "opening": "Ouverture de Koharu…",
+    "opening": "Ouverture de Booharu…",
     "status": "Initialisation des environnements locaux",
-    "title": "Préparation de Koharu"
+    "title": "Préparation de Booharu"
   },
   "status": {
     "zoom": "Zoom"

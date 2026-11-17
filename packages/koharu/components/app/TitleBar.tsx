@@ -1,6 +1,5 @@
 'use client'
 
-import * as Sentry from '@sentry/nextjs'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { FilePlus2, FolderOpen, LoaderCircle, Settings } from 'lucide-react'
 import Image from 'next/image'
@@ -59,39 +58,6 @@ export function TitleBar() {
 
   const closeProject = () => void call(commands.close).catch(() => undefined)
 
-  /** Sentry's feedback form, in the interface's language; it leaves the page when it closes. */
-  const sendFeedback = async () => {
-    const feedback = Sentry.getFeedback()
-    if (!feedback) return
-    const form = await feedback.createForm({
-      formTitle: t('feedback.title'),
-      nameLabel: t('feedback.name'),
-      namePlaceholder: t('feedback.namePlaceholder'),
-      emailLabel: t('feedback.email'),
-      emailPlaceholder: t('feedback.emailPlaceholder'),
-      messageLabel: t('feedback.message'),
-      messagePlaceholder: t('feedback.messagePlaceholder'),
-      isRequiredLabel: t('feedback.required'),
-      submitButtonLabel: t('feedback.submit'),
-      cancelButtonLabel: t('feedback.cancel'),
-      confirmButtonLabel: t('feedback.confirm'),
-      addScreenshotButtonLabel: t('feedback.addScreenshot'),
-      removeScreenshotButtonLabel: t('feedback.removeScreenshot'),
-      highlightToolText: t('feedback.highlight'),
-      hideToolText: t('feedback.hide'),
-      removeHighlightText: t('feedback.removeHighlight'),
-      successMessageText: t('feedback.sent'),
-      errorEmptyMessageText: t('feedback.emptyMessage'),
-      errorNoClientText: t('feedback.noClient'),
-      errorTimeoutText: t('feedback.timeout'),
-      errorForbiddenText: t('feedback.forbidden'),
-      errorGenericText: t('feedback.failed'),
-      onFormClose: () => form.removeFromDom(),
-    })
-    form.appendToDom()
-    form.open()
-  }
-
   return (
     <>
       <header
@@ -105,7 +71,7 @@ export function TitleBar() {
             <Image
               className='pointer-events-none'
               src='/icon.png'
-              alt='Koharu'
+              alt='Booharu'
               width={17}
               height={17}
               draggable={false}
@@ -233,19 +199,24 @@ export function TitleBar() {
             <MenubarTrigger>{t('menu.help')}</MenubarTrigger>
             <MenubarContent>
               <MenubarItem
-                onClick={() => void openUrl('https://discord.gg/mHvHkxGnUY').catch(() => undefined)}
+                onClick={() =>
+                  void openUrl('https://github.com/roorem10/koharu').catch(() => undefined)
+                }
               >
-                {t('menu.discord')}
+                {t('menu.booharuGithub')}
               </MenubarItem>
+              <MenubarSeparator />
               <MenubarItem
                 onClick={() =>
                   void openUrl('https://github.com/koharu-rs/koharu').catch(() => undefined)
                 }
               >
-                {t('menu.github')}
+                {t('menu.koharuGithub')}
               </MenubarItem>
-              <MenubarItem onClick={() => void sendFeedback().catch(() => undefined)}>
-                {t('menu.feedback')}
+              <MenubarItem
+                onClick={() => void openUrl('https://discord.gg/mHvHkxGnUY').catch(() => undefined)}
+              >
+                {t('menu.koharuDiscord')}
               </MenubarItem>
               <MenubarSeparator />
               <MenubarItem onClick={() => setAboutOpen(true)}>{t('menu.about')}</MenubarItem>
@@ -266,7 +237,7 @@ export function TitleBar() {
               )}
             </span>
           ) : (
-            <span>Koharu</span>
+            <span>Booharu</span>
           )}
         </div>
 

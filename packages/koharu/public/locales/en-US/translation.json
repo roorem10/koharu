@@ -1,6 +1,7 @@
 {
   "about": {
     "author": "Author",
+    "basedOn": "Based on {{name}} by Mayo Takanashi.",
     "description": "Manga translation tools",
     "unavailable": "Unavailable",
     "version": "Version"
@@ -21,13 +22,13 @@
     "cancel": "Cancel",
     "cancelled": "Cancelled.",
     "emptyDescription": "Ask the agent to inspect, translate, edit, or process this project. It will view page images only when needed.",
-    "emptyTitle": "What should Koharu do?",
+    "emptyTitle": "What should Booharu do?",
     "failed": "The agent request failed.",
     "loading": "Loading agent…",
-    "message": "Message Koharu Agent",
+    "message": "Message Booharu Agent",
     "model": "Model",
     "newChat": "New chat",
-    "placeholder": "Ask Koharu to work on this project...",
+    "placeholder": "Ask Booharu to work on this project...",
     "reasoning": "Reasoning",
     "send": "Send",
     "thinking": "Thinking...",
@@ -57,32 +58,8 @@
     "loading": "Loading…"
   },
   "errors": {
-    "fatalTitle": "Koharu could not continue",
+    "fatalTitle": "Booharu could not continue",
     "tryAgain": "Try again"
-  },
-  "feedback": {
-    "addScreenshot": "Add a screenshot",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "email": "Email",
-    "emailPlaceholder": "your.email@example.org",
-    "emptyMessage": "Please describe what happened.",
-    "failed": "The feedback couldn’t be sent. Please try again.",
-    "forbidden": "This build can’t send feedback.",
-    "hide": "Hide",
-    "highlight": "Highlight",
-    "message": "Description",
-    "messagePlaceholder": "What happened? What did you expect?",
-    "name": "Name",
-    "namePlaceholder": "Your name",
-    "noClient": "Feedback isn’t available right now.",
-    "removeHighlight": "Remove",
-    "removeScreenshot": "Remove screenshot",
-    "required": "(required)",
-    "sent": "Thank you for your feedback!",
-    "submit": "Send",
-    "timeout": "Sending timed out. Please try again.",
-    "title": "Send Feedback"
   },
   "fill": {
     "deselect": "Deselect",
@@ -242,18 +219,18 @@
   },
   "menu": {
     "about": "About",
+    "booharuGithub": "Booharu on GitHub",
     "closeProject": "Close Project",
     "delete": "Delete Selected",
-    "discord": "Discord",
     "edit": "Edit",
     "export": "Export Project",
-    "feedback": "Send Feedback",
     "file": "File",
     "fit": "Fit Window",
-    "github": "GitHub",
     "help": "Help",
     "history": "History",
     "import": "Import Pages",
+    "koharuDiscord": "Koharu Discord",
+    "koharuGithub": "Koharu on GitHub",
     "redo": "Redo",
     "selectAllLayers": "Select All Layers",
     "settings": "Settings",
@@ -377,7 +354,7 @@
       "title": "Pipeline",
       "translator": {
         "instructions": "Additional instructions",
-        "instructionsDescription": "Optional, in any language and form, such as a name's spelling or the tone. Koharu adds them, as written, after its own system prompt.",
+        "instructionsDescription": "Optional, in any language and form, such as a name's spelling or the tone. Booharu adds them, as written, after its own system prompt.",
         "reasoning": "Reasoning",
         "reasoningDescription": "Use model reasoning during translation.",
         "targetLanguageDescription": "Choose the language to translate text into.",
@@ -417,10 +394,10 @@
       "addFamily": "Add font family",
       "defaultFamilies": "Default font families",
       "description": "Set the ordered font stack used when a text layer has no assigned family.",
-      "empty": "No default families. Koharu will use the system fallback.",
+      "empty": "No default families. Booharu will use the system fallback.",
       "familyLabel": "Default font family {{index}}",
       "fontFallback": "Preferred fonts",
-      "fontFallbackDescription": "Koharu uses the first available family that supports the text.",
+      "fontFallbackDescription": "Booharu uses the first available family that supports the text.",
       "loadError": "Fonts could not be loaded. Existing families can still be removed.",
       "loadingFonts": "Loading fonts…",
       "removeFamily": "Remove {{family}}",
@@ -440,7 +417,7 @@
     "loadingProjects": "Loading projects…",
     "newDescription": "Create a clean workspace for your pages, translations, and exports.",
     "newProject": "New project",
-    "projectKind": "Koharu project",
+    "projectKind": "Booharu project",
     "projectList": "Projects",
     "projectName": "Project name",
     "projectNamePlaceholder": "My new project",
@@ -450,9 +427,9 @@
   },
   "startup": {
     "description": "Loading local AI runtimes and preparing the workspace. First launch can take a moment.",
-    "opening": "Opening Koharu…",
+    "opening": "Opening Booharu…",
     "status": "Initializing local runtimes",
-    "title": "Preparing Koharu"
+    "title": "Preparing Booharu"
   },
   "status": {
     "zoom": "Zoom"

@@ -1,6 +1,7 @@
 {
   "about": {
     "author": "Autor",
+    "basedOn": "Basado en {{name}}, de Mayo Takanashi.",
     "description": "Herramientas de traducción de manga",
     "unavailable": "No disponible",
     "version": "Versión"
@@ -21,13 +22,13 @@
     "cancel": "Cancelar",
     "cancelled": "Cancelado.",
     "emptyDescription": "Pide al agente que inspeccione, traduzca, edite o procese este proyecto. Solo verá las imágenes de las páginas cuando sea necesario.",
-    "emptyTitle": "¿Qué debería hacer Koharu?",
+    "emptyTitle": "¿Qué debería hacer Booharu?",
     "failed": "La solicitud del agente falló.",
     "loading": "Cargando el agente…",
-    "message": "Enviar mensaje al agente de Koharu",
+    "message": "Enviar mensaje al agente de Booharu",
     "model": "Modelo",
     "newChat": "Nuevo chat",
-    "placeholder": "Pide a Koharu que trabaje en este proyecto…",
+    "placeholder": "Pide a Booharu que trabaje en este proyecto…",
     "reasoning": "Razonamiento",
     "send": "Enviar",
     "thinking": "Pensando…",
@@ -57,32 +58,8 @@
     "loading": "Cargando…"
   },
   "errors": {
-    "fatalTitle": "Koharu no pudo continuar",
+    "fatalTitle": "Booharu no pudo continuar",
     "tryAgain": "Intentar de nuevo"
-  },
-  "feedback": {
-    "addScreenshot": "Añadir captura de pantalla",
-    "cancel": "Cancelar",
-    "confirm": "Confirmar",
-    "email": "Correo electrónico",
-    "emailPlaceholder": "tu.correo@example.org",
-    "emptyMessage": "Describe lo que ha pasado.",
-    "failed": "No se pudieron enviar los comentarios. Inténtalo de nuevo.",
-    "forbidden": "Esta versión no puede enviar comentarios.",
-    "hide": "Ocultar",
-    "highlight": "Resaltar",
-    "message": "Descripción",
-    "messagePlaceholder": "¿Qué ha pasado? ¿Qué esperabas?",
-    "name": "Nombre",
-    "namePlaceholder": "Tu nombre",
-    "noClient": "Los comentarios no están disponibles ahora mismo.",
-    "removeHighlight": "Quitar",
-    "removeScreenshot": "Quitar captura de pantalla",
-    "required": "(obligatorio)",
-    "sent": "¡Gracias por tus comentarios!",
-    "submit": "Enviar",
-    "timeout": "Se agotó el tiempo de envío. Inténtalo de nuevo.",
-    "title": "Enviar comentarios"
   },
   "fill": {
     "deselect": "Deseleccionar",
@@ -242,18 +219,18 @@
   },
   "menu": {
     "about": "Acerca de",
+    "booharuGithub": "Booharu en GitHub",
     "closeProject": "Cerrar proyecto",
     "delete": "Eliminar selección",
-    "discord": "Discord",
     "edit": "Editar",
     "export": "Exportar proyecto",
-    "feedback": "Enviar comentarios",
     "file": "Archivo",
     "fit": "Ajustar a la ventana",
-    "github": "GitHub",
     "help": "Ayuda",
     "history": "Historia",
     "import": "Importar páginas",
+    "koharuDiscord": "Discord de Koharu",
+    "koharuGithub": "Koharu en GitHub",
     "redo": "Rehacer",
     "selectAllLayers": "Seleccionar todas las capas",
     "settings": "Ajustes",
@@ -377,7 +354,7 @@
       "title": "Canalización",
       "translator": {
         "instructions": "Instrucciones adicionales",
-        "instructionsDescription": "Opcionales, en cualquier idioma y forma, como la grafía de un nombre o el tono. Koharu las añade tal cual después de su propia instrucción de sistema.",
+        "instructionsDescription": "Opcionales, en cualquier idioma y forma, como la grafía de un nombre o el tono. Booharu las añade tal cual después de su propia instrucción de sistema.",
         "reasoning": "Razonamiento",
         "reasoningDescription": "Utiliza el razonamiento del modelo durante la traducción.",
         "targetLanguageDescription": "Elige el idioma al que se traducirá el texto.",
@@ -417,10 +394,10 @@
       "addFamily": "Añadir familia tipográfica",
       "defaultFamilies": "Familias tipográficas predeterminadas",
       "description": "Define la pila ordenada de fuentes usada cuando una capa de texto no tiene una familia asignada.",
-      "empty": "No hay familias predeterminadas. Koharu usará la alternativa del sistema.",
+      "empty": "No hay familias predeterminadas. Booharu usará la alternativa del sistema.",
       "familyLabel": "Familia tipográfica predeterminada {{index}}",
       "fontFallback": "Fuentes preferidas",
-      "fontFallbackDescription": "Koharu usa la primera familia disponible compatible con el texto.",
+      "fontFallbackDescription": "Booharu usa la primera familia disponible compatible con el texto.",
       "loadError": "No se pudieron cargar las fuentes. Las familias existentes aún se pueden eliminar.",
       "loadingFonts": "Cargando fuentes…",
       "removeFamily": "Eliminar {{family}}",
@@ -440,7 +417,7 @@
     "loadingProjects": "Cargando proyectos…",
     "newDescription": "Crea un espacio de trabajo limpio para tus páginas, traducciones y exportaciones.",
     "newProject": "Nuevo proyecto",
-    "projectKind": "Proyecto de Koharu",
+    "projectKind": "Proyecto de Booharu",
     "projectList": "Proyectos",
     "projectName": "Nombre del proyecto",
     "projectNamePlaceholder": "Mi nuevo proyecto",
@@ -450,9 +427,9 @@
   },
   "startup": {
     "description": "Cargando los entornos locales de IA y preparando el espacio de trabajo. El primer inicio puede tardar un momento.",
-    "opening": "Abriendo Koharu…",
+    "opening": "Abriendo Booharu…",
     "status": "Inicializando entornos locales",
-    "title": "Preparando Koharu"
+    "title": "Preparando Booharu"
   },
   "status": {
     "zoom": "Zoom"
