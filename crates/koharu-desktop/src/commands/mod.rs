@@ -112,6 +112,11 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         crate::booharu::boxes::booharu_join_page,
         crate::booharu::boxes::booharu_split_block,
         crate::booharu::notes::booharu_set_review_note,
+        crate::booharu::styles::booharu_count_text_styles,
+        crate::booharu::styles::booharu_apply_text_styles,
+        crate::booharu::fonts::booharu_get_font_favorites,
+        crate::booharu::fonts::booharu_set_font_favorite,
+        crate::booharu::fonts::booharu_get_font_local_names,
     ];
     move |invoke: Invoke<CefRuntime>| {
         let message = &invoke.message;
@@ -188,5 +193,10 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         crate::booharu::boxes::booharu_join_page,
         crate::booharu::boxes::booharu_split_block,
         crate::booharu::notes::booharu_set_review_note,
+        crate::booharu::styles::booharu_count_text_styles,
+        crate::booharu::styles::booharu_apply_text_styles,
+        crate::booharu::fonts::booharu_get_font_favorites,
+        crate::booharu::fonts::booharu_set_font_favorite,
+        crate::booharu::fonts::booharu_get_font_local_names,
     ](types)
 }
