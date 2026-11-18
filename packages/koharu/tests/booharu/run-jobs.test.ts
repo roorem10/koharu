@@ -54,6 +54,22 @@ describe('Booharu’s record of a run', () => {
     expect(job(1)?.state).toBe('running')
   })
 
+  it('keeps a page stage waiting while another stage of its page starts or finishes', () => {
+    openChapter('Chapter 1')
+    const reading = { page: 'p1', stage: 'recognize' as const, attempt: 2, attempts: 3 }
+    tell(
+      queued(1),
+      { kind: 'retrying', run: 1, ...reading },
+      // Its clean-up needs only detection, so it goes on while its reading waits.
+      { kind: 'started', run: 1, page: 'p1', stage: 'inpaint' },
+      { kind: 'finished', run: 1, page: 'p1', stage: 'inpaint' },
+    )
+    expect(job(1)?.booharu?.retrying).toEqual([reading])
+
+    tell({ kind: 'started', run: 1, page: 'p1', stage: 'recognize' })
+    expect(job(1)?.booharu?.retrying).toEqual([])
+  })
+
   it('ends done with problems, listing the pages it gave up on', () => {
     openChapter('Chapter 1')
     const failures = [

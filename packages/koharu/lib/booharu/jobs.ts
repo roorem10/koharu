@@ -43,9 +43,10 @@ export interface RunRecord {
 const missed: RunRecord = { stages: [], pages: false, project: null, retrying: [], failures: [] }
 
 /** `job` with Booharu's record of the run kept through `event`, after Koharu's fold of it:
- * Queued's stages and whether it works on pages, with the project open; each page waiting for its
- * next try, until the page starts or finishes a stage, or is given up on; and the failed pages,
- * which a run done with problems lists as it ends, and a run that failed adds its page to. */
+ * Queued's stages and whether it works on pages, with the project open; each page stage waiting
+ * for its next try, until that stage starts or finishes, or its page is given up on; and the
+ * failed pages, which a run done with problems lists as it ends, and a run that failed adds its
+ * page to. */
 export function foldRun(job: Job, event: PipelineEvent): Job {
   if (event.kind === 'queued') {
     const { stages, pages } = event
@@ -59,17 +60,22 @@ export function foldRun(job: Job, event: PipelineEvent): Job {
     ...job,
     booharu: { ...record, ...update },
   })
-  const waiting = (page: PageId) => record.retrying.filter((retry) => retry.page !== page)
+  /** The waits but `page`'s at `stage`, or at any stage when none is named. */
+  const waiting = (page: PageId, stage?: Stage) =>
+    record.retrying.filter(
+      (retry) => retry.page !== page || (stage !== undefined && retry.stage !== stage),
+    )
   switch (event.kind) {
     case 'retrying': {
       const { page, stage, attempt, attempts } = event
-      return change({ retrying: [...waiting(page), { page, stage, attempt, attempts }] })
+      return change({ retrying: [...waiting(page, stage), { page, stage, attempt, attempts }] })
     }
     case 'started':
-    case 'finished':
-      return record.retrying.some((retry) => retry.page === event.page)
-        ? change({ retrying: waiting(event.page) })
-        : job
+    case 'finished': {
+      const { page, stage } = event
+      const retrying = waiting(page, stage)
+      return retrying.length === record.retrying.length ? job : change({ retrying })
+    }
     case 'page_failed': {
       const { page, stage, reason } = event
       return change({
