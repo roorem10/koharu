@@ -1570,7 +1570,7 @@ export const commands = {
       { scope, includeHandEdited },
       { headers: headers() },
     ),
-  /** Gives the translations of `scope` the default text look again, as one undo step labelled `booharu_apply_text_style`: the first Preferred font in place of each family, and with colour detection off the default colours and outline in place of its own. Blocks changed by hand are kept unless `include_hand_edited`, locked blocks always are, and untranslated blocks are left alone. Answers how many it changed, kept, and found untranslated; with nothing to change, it makes no undo step. */
+  /** Gives the translations of `scope` the default text look again, as one undo step labelled `booharu_apply_text_style`: the first Preferred font in place of each family, or while Pick fonts automatically is on each block's lettering category's font in place of its family, weight, and italic, and with colour detection off the default colours and outline in place of its own. Blocks changed by hand are kept unless `include_hand_edited`, locked blocks always are, and untranslated blocks are left alone. Answers how many it changed, kept, and found untranslated; with nothing to change, it makes no undo step. */
   booharuApplyTextStyles: (scope: StyleScope, includeHandEdited: boolean) =>
     invoke<StyleCounts>(
       'booharu_apply_text_styles',
