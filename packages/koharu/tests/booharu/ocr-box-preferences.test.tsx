@@ -8,6 +8,15 @@ import { queryClient } from '@/lib/queries'
 import { commands, type BooharuPreferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
+/** The sections these tests leave alone, as the desktop answers them. */
+const OTHERS = {
+  'booharu-lettering': {
+    default: { fill: null, stroke: null, stroke_width: 1.5 },
+    detect_colors: true,
+  },
+  'booharu-fonts': { favorites: [] },
+} satisfies Partial<BooharuPreferences>
+
 /** The Booharu settings the desktop's file holds, which another writer, such as the agent's
  * settings tool, may change while the page shows them; `saves` lists what each save sent. */
 function desktop() {
@@ -15,6 +24,7 @@ function desktop() {
     preferences: {
       'booharu-mcp': { port: 47821 },
       'booharu-ocr-box': { default_mode: 'read' },
+      ...OTHERS,
     },
   }
   const saves: BooharuPreferences[] = []
@@ -70,6 +80,7 @@ describe('Booharu O tool settings', () => {
     expect(saves[0]).toEqual({
       'booharu-mcp': { port: 50000 },
       'booharu-ocr-box': { default_mode: 'read_translate_clean' },
+      ...OTHERS,
     })
     await waitFor(() => expect(shownMode(select)).toBe('Read, translate and clean'))
   })
@@ -89,6 +100,7 @@ describe('Booharu O tool settings', () => {
       expect(save).toHaveBeenCalledWith({
         'booharu-mcp': { port: 47821 },
         'booharu-ocr-box': { default_mode: 'read_translate' },
+        ...OTHERS,
       }),
     )
     expect(shownMode(select)).toBe('Read and translate')

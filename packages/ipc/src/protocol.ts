@@ -142,6 +142,8 @@ export type BooharuNotice =
 export type BooharuPreferences = {
   'booharu-mcp': McpSettings
   'booharu-ocr-box': OcrBoxSettings
+  'booharu-lettering': LetteringSettings
+  'booharu-fonts': FontSettings
 }
 
 /**  A rectangle in page pixels, for text frames. */
@@ -261,6 +263,19 @@ export type Created =
   | { kind: 'page'; id: PageId; label: string | null }
   | { kind: 'layer'; id: LayerId; label: string | null }
 
+/**
+ *  The default text look's colours and outline, as Booharu 0.0.4's
+ *  Settings card set them.
+ */
+export type DefaultTextStyle = {
+  /**  The text's colour; none draws Koharu's black. */
+  fill?: Rgba | null
+  /**  The outline's colour; none for no outline. */
+  stroke?: Rgba | null
+  /**  The outline's width in pixels, from 0 to 50, when it has a colour. */
+  stroke_width?: number
+}
+
 /**  The detectors, by id in the section and by name. */
 export type Detector = 'koharu-layout-highres'
 
@@ -345,6 +360,12 @@ export type FontFace = {
 export type FontFamily = {
   name: string
   faces: FontFace[]
+}
+
+/**  `[booharu-fonts]`: the font picker's favourites. */
+export type FontSettings = {
+  /**  The families starred in the font picker, by name, in name order. */
+  favorites?: string[]
 }
 
 /**
@@ -493,6 +514,26 @@ export type Layer<
 
 /**  A layer; stored, so it survives undo. */
 export type LayerId = string
+
+/**
+ *  `[booharu-lettering]`: how new text looks. Its font isn't one of these
+ *  settings: new text gets a copy of the first of Koharu's Preferred fonts,
+ *  `[renderer] font_families`.
+ */
+export type LetteringSettings = {
+  /**
+   *  The default text look: the colours and outline new text gets, the T
+   *  tool's always, and a new translation's when `detect_colors` is off.
+   */
+  default?: DefaultTextStyle
+  /**
+   *  Whether a new translation keeps the colours Koharu measured from the
+   *  original lettering, or, typed into a block with none, copied from its
+   *  source. When off, it gets `default`'s instead. Existing translations
+   *  keep theirs either way.
+   */
+  detect_colors?: boolean
+}
 
 /**
  *  Grey pixels that limit its parent's visibility, as Photoshop's and Clip
@@ -920,6 +961,35 @@ export type StrokeMethod =
   | 'expansion'
 
 /**
+ *  How many blocks of a scope Apply changed, or would change, kept, and
+ *  found untranslated. A block whose translation has the look already
+ *  counts in none.
+ */
+export type StyleCounts = {
+  /**  Translated blocks that take the look. */
+  changed: number
+  /**
+   *  Translated blocks left as they are: changed by hand, when those
+   *  aren't included, or locked.
+   */
+  kept_hand_edited: number
+  /**  Blocks without a translation, which Apply leaves alone. */
+  untranslated: number
+}
+
+/**
+ *  The blocks Apply looks at: `{"kind": "blocks", "blocks": [...]}`,
+ *  `{"kind": "pages", "pages": [...]}`, or `{"kind": "project"}`.
+ */
+export type StyleScope =
+  /**  These blocks. */
+  | { kind: 'blocks'; blocks: LayerId[] }
+  /**  Every block on these pages. */
+  | { kind: 'pages'; pages: PageId[] }
+  /**  Every block on every page. */
+  | { kind: 'project' }
+
+/**
  *  What a run works on. It runs every stage it's given on everything it
  *  names, replacing what's there, and never a stage it isn't given.
  */
@@ -1181,6 +1251,33 @@ export const commands = {
   /** Sets the reviewer's note on `layer`, a block or a text layer, to `note` as one undo step, or removes it when `note` is null or blank. A locked layer, or one inside a locked layer, refuses it. */
   booharuSetReviewNote: (layer: LayerId, note: string | null) =>
     invoke<Change>('booharu_set_review_note', { layer, note }, { headers: headers() }),
+  /** How many blocks of `scope` applying the default text look would change, would keep because they were changed by hand, unless `include_hand_edited`, or are locked, and found untranslated: what `booharu_apply_text_styles` would answer now, changing nothing. */
+  booharuCountTextStyles: (scope: StyleScope, includeHandEdited: boolean) =>
+    invoke<StyleCounts>(
+      'booharu_count_text_styles',
+      { scope, includeHandEdited },
+      { headers: headers() },
+    ),
+  /** Gives the translations of `scope` the default text look again, as one undo step labelled `booharu_apply_text_style`: the first Preferred font in place of each family, and with colour detection off the default colours and outline in place of its own. Blocks changed by hand are kept unless `include_hand_edited`, locked blocks always are, and untranslated blocks are left alone. Answers how many it changed, kept, and found untranslated; with nothing to change, it makes no undo step. */
+  booharuApplyTextStyles: (scope: StyleScope, includeHandEdited: boolean) =>
+    invoke<StyleCounts>(
+      'booharu_apply_text_styles',
+      { scope, includeHandEdited },
+      { headers: headers() },
+    ),
+  /** The favourite font families, sorted. */
+  booharuGetFontFavorites: () =>
+    invoke<string[]>('booharu_get_font_favorites', {}, { headers: headers() }),
+  /** Makes `family` a favourite, or with `favorite` false no longer one, in one read and write of `[booharu-fonts]` under the settings file's lock, and answers the favourites as saved, sorted. */
+  booharuSetFontFavorite: (family: string, favorite: boolean) =>
+    invoke<string[]>('booharu_set_font_favorite', { family, favorite }, { headers: headers() }),
+  /** Each font family with names in other languages, by the name `list_fonts` lists it by, with those names, such as 游ゴシック for Yu Gothic: the installed families', and the bundled ones' whose faces are on disk already, as this never downloads one. Worked out off the UI thread; an installed family's names are read once per run. */
+  booharuGetFontLocalNames: () =>
+    invoke<{ [key in string]: string[] }>(
+      'booharu_get_font_local_names',
+      {},
+      { headers: headers() },
+    ),
 }
 
 export const events = {
