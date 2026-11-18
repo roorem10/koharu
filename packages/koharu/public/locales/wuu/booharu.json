@@ -81,6 +81,7 @@
       "detectColorsNote": "关脱个辰光，新翻译个文字用<a>默认文字颜色</a>（{{tab}}）。"
     },
     "runs": {
+      "alreadyDone": "箇眼页面已经处理好哉。",
       "behavior": {
         "description": "随便啥人开始个运行侪适用。",
         "title": "运行方式"
@@ -128,6 +129,7 @@
       "retriesDescription": "重试之间先等 2 秒，再等 5 秒，后首每趟等 10 秒（重试 0–5 趟）。",
       "retryFailedPages": "重试失败个页面",
       "retrying": "来勒重试（{{attempt}}/{{attempts}}）",
+      "runAllAgain": "所有阶段重新运行一趟",
       "title": "运行"
     },
     "tools": {

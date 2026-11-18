@@ -2,6 +2,7 @@
 
 import { InferenceControl } from '@/components/editor/InferenceControl'
 import { call } from '@/lib/backend'
+import { runOrCarryOn } from '@/lib/booharu/runs' // Booharu: Run carries on with what's left.
 import { usePage } from '@/lib/queries'
 import { pipelineStages, useKoharuStore, type PipelineScope } from '@/lib/store'
 import { commands, type Stage, type Target } from '@koharu/ipc/protocol'
@@ -16,7 +17,10 @@ export function CanvasCommandBar() {
     const target: Target = selection === 'project' ? 'project' : { pages: selectedPages }
     // A run takes its stages in the pipeline's order, whichever order they were picked in.
     const ordered = pipelineStages.filter((stage) => stages.includes(stage))
-    void call(commands.runPipeline, target, ordered).catch(() => undefined)
+    // Booharu: with every stage on, Run carries on with what the pages still need.
+    void runOrCarryOn(target, ordered, () => call(commands.runPipeline, target, ordered)).catch(
+      () => undefined,
+    )
   }
 
   return (

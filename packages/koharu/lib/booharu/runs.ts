@@ -5,15 +5,26 @@ import type { TFunction } from 'i18next'
 import { useCallback, useRef, useState } from 'react'
 
 import { prepareFinishSound } from '@/components/booharu/runs/sound'
+import { call } from '@/lib/backend'
 import {
   booharuPreferencesKey,
   booharuPreferencesQuery,
   saveBooharuSection,
   useBooharuPreferences,
 } from '@/lib/booharu/preferences'
+import i18n from '@/lib/i18n'
 import { queryClient } from '@/lib/queries'
 import { pipelineStages, useKoharuStore } from '@/lib/store'
-import type { BooharuPreferences, RunPreset, RunsSettings, Stage } from '@koharu/ipc/protocol'
+import {
+  commands,
+  type BooharuPreferences,
+  type RunPreset,
+  type RunsSettings,
+  type RunTarget,
+  type Stage,
+  type Target,
+} from '@koharu/ipc/protocol'
+import { toast } from '@koharu/ui/components/toast'
 
 /** `[booharu-runs]` with every value, as the desktop answers it. */
 export type Runs = Required<RunsSettings>
@@ -217,4 +228,43 @@ export async function finishSoundOn(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** What carrying on works on for the Run button's `target`: the project, or the pages chosen; none
+ * for blocks or an area. */
+function carryOnTarget(target: Target): RunTarget | null {
+  if (target === 'project') return { kind: 'project' }
+  return target.pages ? { kind: 'pages', pages: target.pages } : null
+}
+
+/** What the Run button does with `stages` on `target`, the project or the pages chosen. With every
+ * stage on, it carries on with the work the pages still need, through `booharu_run`, or, with none
+ * left, says so, offering Run all stages again, which is `run`. With fewer, it's `run`, Koharu's
+ * own run of them. The click readies the finish chime. A refusal or an error shows as every failed
+ * command's does. */
+export async function runOrCarryOn(
+  target: Target,
+  stages: Stage[],
+  run: () => Promise<unknown>,
+): Promise<void> {
+  prepareFinishSound()
+  const carried = carryOnTarget(target)
+  if (!carried || pipelineStages.some((stage) => !stages.includes(stage))) {
+    await run()
+    return
+  }
+  const plan = await call(commands.booharuRun, carried, stages)
+  if (plan.run !== null) return
+  const shown = toast.add({
+    type: 'info',
+    title: i18n.t('booharu.runs.alreadyDone'),
+    actionProps: {
+      children: i18n.t('booharu.runs.runAllAgain'),
+      onClick: () => {
+        toast.close(shown)
+        prepareFinishSound()
+        void run().catch(() => undefined)
+      },
+    },
+  })
 }

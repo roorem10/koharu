@@ -84,6 +84,7 @@
       "detectColorsNote": "Lorsque l’option est désactivée, le texte nouvellement traduit utilise les <a>couleurs de texte par défaut</a> ({{tab}})."
     },
     "runs": {
+      "alreadyDone": "Ces pages sont déjà terminées.",
       "behavior": {
         "description": "S’applique à chaque exécution, peu importe qui la lance.",
         "title": "Comportement des exécutions"
@@ -131,6 +132,7 @@
       "retriesDescription": "Attendre 2, 5, puis 10 secondes entre les tentatives (0–5 nouvelles tentatives).",
       "retryFailedPages": "Réessayer les pages en échec",
       "retrying": "Nouvelle tentative ({{attempt}}/{{attempts}})",
+      "runAllAgain": "Relancer toutes les étapes",
       "title": "Exécutions"
     },
     "tools": {

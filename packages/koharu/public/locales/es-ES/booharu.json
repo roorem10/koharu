@@ -84,6 +84,7 @@
       "detectColorsNote": "Si está desactivado, el texto recién traducido usa los <a>colores de texto predeterminados</a> ({{tab}})."
     },
     "runs": {
+      "alreadyDone": "Estas páginas ya están terminadas.",
       "behavior": {
         "description": "Se aplica a todas las ejecuciones, las inicie quien las inicie.",
         "title": "Comportamiento de las ejecuciones"
@@ -131,6 +132,7 @@
       "retriesDescription": "Espera 2, 5 y luego 10 segundos entre reintentos (0–5 reintentos).",
       "retryFailedPages": "Reintentar páginas con errores",
       "retrying": "Reintentando ({{attempt}}/{{attempts}})",
+      "runAllAgain": "Ejecutar todas las etapas de nuevo",
       "title": "Ejecuciones"
     },
     "tools": {

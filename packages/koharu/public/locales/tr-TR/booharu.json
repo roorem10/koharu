@@ -81,6 +81,7 @@
       "detectColorsNote": "Kapalıyken yeni çevrilen metin <a>varsayılan metin renklerini</a> ({{tab}}) kullanır."
     },
     "runs": {
+      "alreadyDone": "Bu sayfalar zaten tamamlandı.",
       "behavior": {
         "description": "Kim başlatırsa başlatsın her çalıştırmaya uygulanır.",
         "title": "Çalıştırma davranışı"
@@ -128,6 +129,7 @@
       "retriesDescription": "Denemeler arasında önce 2, sonra 5, ardından 10 saniye bekle (0–5 yeniden deneme).",
       "retryFailedPages": "Başarısız sayfaları yeniden dene",
       "retrying": "Yeniden deneniyor ({{attempt}}/{{attempts}})",
+      "runAllAgain": "Tüm aşamaları yeniden çalıştır",
       "title": "Çalıştırmalar"
     },
     "tools": {

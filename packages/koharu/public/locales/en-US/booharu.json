@@ -81,6 +81,7 @@
       "detectColorsNote": "When it's off, newly translated text uses the <a>default text colors</a> ({{tab}})."
     },
     "runs": {
+      "alreadyDone": "These pages are already done.",
       "behavior": {
         "description": "Applies to every run, whoever starts it.",
         "title": "Run behavior"
@@ -128,6 +129,7 @@
       "retriesDescription": "Wait 2, 5, then 10 seconds between retries (0–5 retries).",
       "retryFailedPages": "Retry failed pages",
       "retrying": "Retrying ({{attempt}}/{{attempts}})",
+      "runAllAgain": "Run all stages again",
       "title": "Runs"
     },
     "tools": {

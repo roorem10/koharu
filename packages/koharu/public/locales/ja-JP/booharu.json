@@ -81,6 +81,7 @@
       "detectColorsNote": "オフのときは、新しく翻訳した文字に<a>既定の文字色</a>（{{tab}}）を使います。"
     },
     "runs": {
+      "alreadyDone": "これらのページは処理済みです。",
       "behavior": {
         "description": "誰が開始したかにかかわらず、すべての実行に適用されます。",
         "title": "実行時の動作"
@@ -128,6 +129,7 @@
       "retriesDescription": "再試行の間に2秒、5秒、10秒の順で待機します（再試行回数：0–5回）。",
       "retryFailedPages": "失敗したページを再試行",
       "retrying": "再試行中（{{attempt}}/{{attempts}}）",
+      "runAllAgain": "すべての工程をもう一度実行",
       "title": "実行"
     },
     "tools": {

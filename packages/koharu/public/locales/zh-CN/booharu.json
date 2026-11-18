@@ -81,6 +81,7 @@
       "detectColorsNote": "关闭时，新翻译的文字使用<a>默认文字颜色</a>（{{tab}}）。"
     },
     "runs": {
+      "alreadyDone": "这些页面已经处理完毕。",
       "behavior": {
         "description": "适用于所有任务，无论由谁启动。",
         "title": "运行方式"
@@ -128,6 +129,7 @@
       "retriesDescription": "重试间隔依次为 2、5、10 秒（可重试 0–5 次）。",
       "retryFailedPages": "重试失败的页面",
       "retrying": "正在重试（{{attempt}}/{{attempts}}）",
+      "runAllAgain": "重新运行所有阶段",
       "title": "处理任务"
     },
     "tools": {

@@ -81,6 +81,7 @@
       "detectColorsNote": "이 옵션이 꺼져 있으면 새로 번역된 텍스트는 <a>기본 텍스트 색상</a>({{tab}})을 사용합니다."
     },
     "runs": {
+      "alreadyDone": "이 페이지들은 이미 처리되었습니다.",
       "behavior": {
         "description": "누가 시작했든 모든 실행에 적용됩니다.",
         "title": "실행 방식"
@@ -128,6 +129,7 @@
       "retriesDescription": "재시도 사이에 2초, 5초, 그다음 10초를 기다립니다 (재시도 0–5회).",
       "retryFailedPages": "실패한 페이지 다시 시도",
       "retrying": "다시 시도 중 ({{attempt}}/{{attempts}})",
+      "runAllAgain": "모든 단계 다시 실행",
       "title": "실행"
     },
     "tools": {
