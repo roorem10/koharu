@@ -3,6 +3,7 @@
 import { BookOpenText, Bot, Layers3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { ContextPanel, ContextTabLabel } from '@/components/booharu/context/ContextPanel' // Booharu: the Context tab.
 import { AgentPanel } from '@/components/editor/AgentPanel'
 import { LayersPanel } from '@/components/editor/LayersPanel'
 import { StoryPanel } from '@/components/editor/StoryPanel'
@@ -38,6 +39,10 @@ export function RightSidebar() {
           <TabsTrigger value='story' className={tab}>
             <BookOpenText /> {t('story.title')}
           </TabsTrigger>
+          {/* Booharu: the Context tab, the chapter's series and glossary, between Story and Agent. */}
+          <TabsTrigger value='context' className={tab}>
+            <ContextTabLabel />
+          </TabsTrigger>
           <TabsTrigger value='agent' className={tab}>
             <Bot /> {t('agent.title')}
           </TabsTrigger>
@@ -47,6 +52,10 @@ export function RightSidebar() {
         </TabsContent>
         <TabsContent value='story' className='flex min-h-0 flex-col'>
           <StoryPanel />
+        </TabsContent>
+        {/* Booharu: the Context tab's panel. */}
+        <TabsContent value='context' className='flex min-h-0 flex-col'>
+          <ContextPanel />
         </TabsContent>
         <TabsContent value='agent' keepMounted className='flex min-h-0 flex-col'>
           <AgentPanel key={project} />
