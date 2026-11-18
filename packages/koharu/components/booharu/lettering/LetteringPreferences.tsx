@@ -10,7 +10,6 @@ import { FontPicker } from '@/components/controls/FontPicker'
 import { PreferenceRow } from '@/components/preferences/PreferenceFields'
 import {
   categoryName,
-  firstFont,
   letteredFont,
   letteringCategories,
   letteringCategoriesSection,
@@ -43,9 +42,8 @@ function joinNames(names: string[], language: string): string {
  * under it, the four a bubble's shape gives saying which bubbles they letter too; the categories
  * with a font of their own are listed, each a button that chooses it; Suggest fonts fills the
  * categories with none from 0.0.4's starting list; and Apply gives the open project's translations
- * their category fonts. Each change saves at once. `preferredFonts` are Koharu's Preferred fonts,
- * whose first is the default font. */
-export function LetteringPreferences({ preferredFonts }: { preferredFonts: readonly string[] }) {
+ * their category fonts. Each change saves at once. */
+export function LetteringPreferences() {
   const { t, i18n } = useTranslation()
   const { settings, change } = useCategorySettings()
   const fonts = useFonts()
@@ -55,7 +53,6 @@ export function LetteringPreferences({ preferredFonts }: { preferredFonts: reado
   const loaded = settings !== undefined
   const categories = settings?.categories ?? {}
   const families = fonts.data ?? []
-  const defaultFont = firstFont(preferredFonts)
   const name = t(categoryName(category))
   const font = letteredFont(categories, category)
   const note = shapeNote(category)
@@ -64,10 +61,16 @@ export function LetteringPreferences({ preferredFonts }: { preferredFonts: reado
     return entry ? [{ category: candidate, entry }] : []
   })
 
-  /** An own font as the list shows it: its family, or the default font for none, bold, italic. */
-  const describe = (entry: CategoryFont) =>
+  /** An own font as the list shows it: its family, or for none Normal Dialogue's, or Normal
+   * Dialogue's the default font, bold, italic. */
+  const describe = (candidate: LetteringCategory, entry: CategoryFont) =>
     [
-      entry.family ?? t('booharu.lettering.defaultFont'),
+      entry.family ??
+        t(
+          candidate === 'normal_dialogue'
+            ? 'booharu.lettering.defaultFont'
+            : 'booharu.lettering.sameAsDialogue',
+        ),
       entry.bold && t('booharu.lettering.bold'),
       entry.italic && t('booharu.lettering.italic'),
     ]
@@ -102,7 +105,7 @@ export function LetteringPreferences({ preferredFonts }: { preferredFonts: reado
       aria-label={t(`booharu.lettering.${key}For`, { category: name })}
       pressed={font[key]}
       disabled={!loaded}
-      onPressedChange={(on) => void change(setStyle(category, key, on, defaultFont))}
+      onPressedChange={(on) => void change(setStyle(category, key, on))}
     >
       <Icon />
       {t(`booharu.lettering.${key}`)}
@@ -151,7 +154,7 @@ export function LetteringPreferences({ preferredFonts }: { preferredFonts: reado
         >
           <div className='grid gap-2'>
             <FontPicker
-              value={shownFamily(categories, category, defaultFont)}
+              value={shownFamily(categories, category)}
               families={families}
               disabled={!loaded}
               ariaLabel={t('booharu.lettering.fontFor', { category: name })}
@@ -183,7 +186,9 @@ export function LetteringPreferences({ preferredFonts }: { preferredFonts: reado
                     onClick={() => setCategory(candidate)}
                   >
                     <span className='truncate'>{t(categoryName(candidate))}</span>{' '}
-                    <span className='truncate text-muted-foreground'>{describe(entry)}</span>
+                    <span className='truncate text-muted-foreground'>
+                      {describe(candidate, entry)}
+                    </span>
                   </Button>
                 </li>
               ))}

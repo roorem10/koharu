@@ -12,9 +12,10 @@
 //! - A category's font ([`LetteringSettings::category_font`]) is its own
 //!   entry, else Normal Dialogue's, else none, and text with none gets the
 //!   default look's font, a copy of the default font, neither bold nor
-//!   italic. An entry without a family takes a copy of the default font as
-//!   its family, with its own bold and italic, as 0.0.4's entry without a
-//!   font fell back on Koharu's font chain, which starts there. Written on a
+//!   italic. An entry without a family takes Normal Dialogue's family, else
+//!   a copy of the default font, with its own bold and italic, so a category
+//!   Settings shows as "Same as Normal Dialogue" follows Normal Dialogue's
+//!   family when only its bold or italic is its own. Written on a
 //!   translation, a category's font sets its `style.chars` `family` (null
 //!   when there's no default font to copy either, for Koharu's font chain),
 //!   `weight` (700 when bold, else null), and `italic` (true when italic,
@@ -232,7 +233,8 @@ impl LetteringCategory {
 )]
 #[serde(default)]
 pub struct CategoryFont {
-    /// The font family, never blank; none for a copy of the default font.
+    /// The font family, never blank; none for Normal Dialogue's family, or
+    /// in Normal Dialogue's own entry, for a copy of the default font.
     pub family: Option<String>,
     /// Whether it's lettered bold, at weight 700.
     pub bold: bool,
@@ -260,23 +262,24 @@ impl CategoryFont {
 
 impl LetteringSettings {
     /// The font `category` is lettered in: its own entry, else Normal
-    /// Dialogue's, with a copy of `font`, the default font, for an entry
-    /// without a family; none with neither entry, so the text keeps the
-    /// default look's font. A family is written without the space around it.
+    /// Dialogue's, an entry without a family taking Normal Dialogue's, else
+    /// a copy of `font`, the default font; none with neither entry, so the
+    /// text keeps the default look's font. A family is written without the
+    /// space around it.
     #[must_use]
     pub fn category_font(
         &self,
         category: LetteringCategory,
         font: Option<&str>,
     ) -> Option<CategoryFont> {
-        let entry = self
-            .categories
-            .get(&category)
-            .or_else(|| self.categories.get(&LetteringCategory::NormalDialogue))?;
-        let family = match &entry.family {
-            Some(family) => Some(family.trim()),
-            None => font,
-        };
+        let normal = self.categories.get(&LetteringCategory::NormalDialogue);
+        let entry = self.categories.get(&category).or(normal)?;
+        let family = entry
+            .family
+            .as_deref()
+            .or_else(|| normal.and_then(|normal| normal.family.as_deref()))
+            .map(str::trim)
+            .or(font);
         Some(CategoryFont {
             family: family.map(str::to_owned),
             bold: entry.bold,
@@ -794,7 +797,7 @@ mod tests {
     }
 
     #[test]
-    fn a_category_without_a_font_falls_back_to_normal_dialogues_then_the_default_font() {
+    fn a_category_without_a_font_or_family_falls_back_to_normal_dialogues_then_the_default_font() {
         let font = |family: Option<&str>, bold, italic| CategoryFont {
             family: family.map(str::to_owned),
             bold,
@@ -815,11 +818,36 @@ mod tests {
             settings.category_font(LetteringCategory::Shout, Some("CCWildWords")),
             Some(font(Some("Comic Neue"), false, false))
         );
-        // Its own entry first; one without a family takes the default font,
-        // with its bold and italic, or with no default font no family.
+        // Its own entry first; one without a family takes Normal Dialogue's,
+        // with its own bold and italic.
         settings
             .categories
             .insert(LetteringCategory::Shout, font(None, true, false));
+        assert_eq!(
+            settings.category_font(LetteringCategory::Shout, Some("CCWildWords")),
+            Some(font(Some("Comic Neue"), true, false))
+        );
+        // Without Normal Dialogue's family, the default font, or with no
+        // default font no family; Normal Dialogue's own entry without a
+        // family takes the default font too.
+        settings
+            .categories
+            .insert(LetteringCategory::NormalDialogue, font(None, false, true));
+        assert_eq!(
+            settings.category_font(LetteringCategory::Shout, Some("CCWildWords")),
+            Some(font(Some("CCWildWords"), true, false))
+        );
+        assert_eq!(
+            settings.category_font(LetteringCategory::NormalDialogue, Some("CCWildWords")),
+            Some(font(Some("CCWildWords"), false, true))
+        );
+        assert_eq!(
+            settings.category_font(LetteringCategory::Whisper, Some("CCWildWords")),
+            Some(font(Some("CCWildWords"), false, true))
+        );
+        settings
+            .categories
+            .remove(&LetteringCategory::NormalDialogue);
         assert_eq!(
             settings.category_font(LetteringCategory::Shout, Some("CCWildWords")),
             Some(font(Some("CCWildWords"), true, false))

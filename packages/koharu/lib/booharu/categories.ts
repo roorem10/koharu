@@ -77,34 +77,22 @@ export type LetteredFont = { family: string | null; bold: boolean; italic: boole
 const NORMAL: LetteringCategory = 'normal_dialogue'
 
 /** The font `category` is lettered in, as booharu-core's `category_font` picks it: its own entry,
- * else Normal Dialogue's, else none, which leaves the default font, neither bold nor italic. */
+ * else Normal Dialogue's, an entry without a family taking Normal Dialogue's; else none, which
+ * leaves the default font, neither bold nor italic. */
 export function letteredFont(categories: CategoryFonts, category: LetteringCategory): LetteredFont {
   const entry = categories[category] ?? categories[NORMAL]
   return {
-    family: entry?.family ?? null,
+    family: entry?.family ?? categories[NORMAL]?.family ?? null,
     bold: entry?.bold ?? false,
     italic: entry?.italic ?? false,
   }
 }
 
-/** The family `category`'s font picker shows: its own, with an empty name for none of its own,
+/** The family `category`'s font picker shows: its own, or an empty name for none of its own,
  * which the picker's leading row stands for, "Same as Normal Dialogue", or for Normal Dialogue,
- * "Same as the default font". An entry of another category without a family letters in a copy of
- * the default font, `defaultFont`, so it shows that. */
-export function shownFamily(
-  categories: CategoryFonts,
-  category: LetteringCategory,
-  defaultFont: string | undefined,
-): string {
-  const entry = categories[category]
-  if (!entry) return ''
-  return entry.family ?? (category === NORMAL ? '' : (defaultFont ?? ''))
-}
-
-/** The default font, the first of Koharu's Preferred fonts, as booharu-core's `first_font` takes
- * it from `families`, `[renderer] font_families`. */
-export function firstFont(families: readonly string[] | null | undefined): string | undefined {
-  return families?.map((family) => family.trim()).find((family) => family !== '')
+ * "Same as the default font". */
+export function shownFamily(categories: CategoryFonts, category: LetteringCategory): string {
+  return categories[category]?.family ?? ''
 }
 
 /** `categories` with `category`'s entry, or without it for `font` null. An entry holds one of its
@@ -127,30 +115,31 @@ export function setAuto(auto: boolean): CategoryEdit {
 }
 
 /** Letters `category` in `family`, as bold and italic as it's lettered now; or with an empty
- * `family`, the picker's leading row, clears its entry, so it's lettered as Normal Dialogue is, or
- * Normal Dialogue in the default font. */
+ * `family`, the picker's leading row, takes away only its own family, keeping its own bold and
+ * italic, so it's lettered in Normal Dialogue's family, or Normal Dialogue in the default font; an
+ * entry left setting nothing goes, and a category without one is lettered so already. */
 export function setFamily(category: LetteringCategory, family: string): CategoryEdit {
   return (settings) => {
+    const own = settings.categories[category]
+    if (!family && !own) return settings
     const { bold, italic } = letteredFont(settings.categories, category)
-    const font = family ? { family, bold, italic } : null
+    const font = { family: family || null, bold, italic }
     return { ...settings, categories: withEntry(settings.categories, category, font) }
   }
 }
 
-/** Turns `category`'s bold or italic, `style`, on or off, in the family it's lettered in now,
- * which its entry then holds: Normal Dialogue's when it had no entry, and for a category other than
- * Normal Dialogue, the default font, `defaultFont`, by name in place of none, as its picker shows
- * it. */
+/** Turns `category`'s bold or italic, `style`, on or off, keeping the other as it's lettered now,
+ * Normal Dialogue's when it had no entry, and its own family, or none, so one without it keeps
+ * following Normal Dialogue's. */
 export function setStyle(
   category: LetteringCategory,
   style: 'bold' | 'italic',
   on: boolean,
-  defaultFont: string | undefined,
 ): CategoryEdit {
   return (settings) => {
-    const font = letteredFont(settings.categories, category)
-    const family = font.family ?? (category === NORMAL ? null : (defaultFont ?? null))
-    const next = { ...font, family, [style]: on }
+    const { bold, italic } = letteredFont(settings.categories, category)
+    const family = settings.categories[category]?.family ?? null
+    const next = { family, bold, italic, [style]: on }
     return { ...settings, categories: withEntry(settings.categories, category, next) }
   }
 }

@@ -38,9 +38,10 @@ impl Tool for GetSettings {
          automatically, whether a block's translation is lettered in its lettering category's \
          font as it's written, as its category changes, and by booharu_apply_text_style \
          (true), or in the default font (false); `categories`, the categories given their own \
-         font, by id, each with its `family`, null for the default font, `bold`, and \
-         `italic`, a category without one using `normal_dialogue`'s, and without either the \
-         default font, neither bold nor italic; `small_text`, the share of the page's height, \
+         font, by id, each with its `family`, null for `normal_dialogue`'s family (in \
+         `normal_dialogue`'s own entry, for the default font), `bold`, and `italic`, a \
+         category without one using `normal_dialogue`'s, and without either the default \
+         font, neither bold nor italic; `small_text`, the share of the page's height, \
          above 0 and at most 1, under which text's glyphs make it small text; and \
          `model_confidence`, from 0 to 1, how sure a model, you included, must be of a \
          delivery category such as `whisper` for its label to win over small text and the \

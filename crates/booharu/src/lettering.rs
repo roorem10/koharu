@@ -250,7 +250,8 @@ fn lettered(page: &Page, layer: &Layer, settings: &LetteringSettings) -> Result<
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FontSource {
-    /// Its own entry in `[booharu-lettering] categories`.
+    /// Its own entry in `[booharu-lettering] categories`, whose family, when
+    /// it has none, is Normal Dialogue's, else the default font.
     Own,
     /// Normal Dialogue's entry, as it has none of its own.
     NormalDialogue,
@@ -985,12 +986,25 @@ mod tests {
             },
         );
         let resolved = fonts(&settings, None);
-        assert_eq!(
+        let whisper = |resolved: &[ResolvedFont]| {
             resolved
                 .iter()
                 .find(|found| found.category == Whisper)
-                .map(|found| (found.family.clone(), found.italic, found.from)),
-            Some((None, true, FontSource::Own))
+                .map(|found| (found.family.clone(), found.italic, found.from))
+        };
+        assert_eq!(whisper(&resolved), Some((None, true, FontSource::Own)));
+        // With Normal Dialogue's family, an entry without one takes it.
+        settings.categories.insert(
+            NormalDialogue,
+            CategoryFont {
+                family: Some("Comic Neue".to_owned()),
+                bold: false,
+                italic: false,
+            },
+        );
+        assert_eq!(
+            whisper(&fonts(&settings, Some(FONT))),
+            Some((Some("Comic Neue".to_owned()), true, FontSource::Own))
         );
     }
 }

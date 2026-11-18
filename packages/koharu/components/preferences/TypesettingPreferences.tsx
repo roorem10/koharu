@@ -142,7 +142,7 @@ export function TypesettingPreferences({
       {/* Booharu: the default text style, saved to its own section, below the font stack it names. */}
       <DefaultTextStyleSection />
       {/* Booharu: the lettering categories' fonts, below the default text style, whose font is the first Preferred font. */}
-      <LetteringPreferences preferredFonts={fontFamilies} />
+      <LetteringPreferences />
     </PreferencePage>
   )
 }

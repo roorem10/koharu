@@ -4,7 +4,6 @@ import {
   type CategoryFonts,
   type CategorySettings,
   categoryName,
-  firstFont,
   letteredFont,
   letteringCategories,
   setFamily,
@@ -64,12 +63,6 @@ describe('Booharu lettering categories', () => {
       shout: 'booharu.lettering.shapeNotes.spiky',
     })
     expect(letteringCategories.filter((category) => shapeNote(category) !== null)).toHaveLength(4)
-  })
-
-  it('takes the default font from the first Preferred font with a name', () => {
-    expect(firstFont(['  ', ' CCWildWords ', 'Komika Text'])).toBe('CCWildWords')
-    expect(firstFont([])).toBeUndefined()
-    expect(firstFont(null)).toBeUndefined()
   })
 })
 
@@ -198,32 +191,60 @@ describe('Booharu category fonts', () => {
     expect(
       letteredFont({ ...dialogue, whisper: { family: 'Anime Ace', italic: true } }, 'whisper'),
     ).toEqual({ family: 'Anime Ace', bold: false, italic: true })
+    // An entry without a family takes Normal Dialogue's, with its own bold and italic.
+    expect(
+      letteredFont({ ...dialogue, whisper: { family: null, italic: true } }, 'whisper'),
+    ).toEqual({ family: 'Komika Text', bold: false, italic: true })
+    expect(letteredFont({ whisper: { family: null, italic: true } }, 'whisper')).toEqual({
+      family: null,
+      bold: false,
+      italic: true,
+    })
   })
 
-  it('shows a category without its own font as the leading row, and one without a family as the default font', () => {
-    expect(shownFamily({}, 'whisper', 'CCWildWords')).toBe('')
-    expect(shownFamily(dialogue, 'whisper', 'CCWildWords')).toBe('')
-    expect(shownFamily(dialogue, 'normal_dialogue', 'CCWildWords')).toBe('Komika Text')
+  it('shows a category without a family of its own as the leading row', () => {
+    expect(shownFamily({}, 'whisper')).toBe('')
+    expect(shownFamily(dialogue, 'whisper')).toBe('')
+    expect(shownFamily(dialogue, 'normal_dialogue')).toBe('Komika Text')
     // Normal Dialogue without a family is the default font: its leading row says so.
     expect(
-      shownFamily({ normal_dialogue: { family: null, italic: true } }, 'normal_dialogue', 'X'),
+      shownFamily({ normal_dialogue: { family: null, italic: true } }, 'normal_dialogue'),
     ).toBe('')
-    expect(shownFamily({ whisper: { family: null, italic: true } }, 'whisper', 'CCWildWords')).toBe(
-      'CCWildWords',
+    // Another category's entry without a family follows Normal Dialogue's.
+    expect(shownFamily({ ...dialogue, whisper: { family: null, italic: true } }, 'whisper')).toBe(
+      '',
     )
   })
 
-  it('clears a category with the leading row, leaving the others', () => {
+  it('takes away only the family with the leading row, keeping bold and italic and the others', () => {
     const settings: CategorySettings = {
       auto: true,
-      categories: { whisper: { family: 'Anime Ace', bold: true }, shout: plain('Komika Text') },
+      categories: {
+        whisper: { family: 'Anime Ace', bold: true },
+        moan: { family: 'CDX Amraam' },
+        shout: plain('Komika Text'),
+      },
     }
     expect(setFamily('whisper', '')(settings)).toEqual({
       auto: true,
-      categories: { shout: plain('Komika Text') },
+      categories: {
+        whisper: { family: null, bold: true, italic: false },
+        moan: { family: 'CDX Amraam' },
+        shout: plain('Komika Text'),
+      },
     })
-    // A category with nothing to clear stays so.
-    expect(setFamily('moan', '')(settings)).toEqual(settings)
+    // An entry then setting nothing goes.
+    expect(setFamily('moan', '')(settings)).toEqual({
+      auto: true,
+      categories: {
+        whisper: { family: 'Anime Ace', bold: true },
+        shout: plain('Komika Text'),
+      },
+    })
+    // A category without an entry is lettered as Normal Dialogue already, so it stays so, and
+    // doesn't take Normal Dialogue's bold as its own.
+    const bold = { auto: true, categories: dialogue }
+    expect(setFamily('crying', '')(bold)).toEqual(bold)
   })
 
   it('picks a family as bold and italic as the category is lettered', () => {
@@ -236,19 +257,34 @@ describe('Booharu category fonts', () => {
     ).toEqual({ normal_dialogue: { family: 'Anime Ace', bold: true, italic: false } })
   })
 
-  it('writes the family a category is lettered in when its bold or italic changes', () => {
+  it('keeps a category following Normal Dialogue’s family when its bold or italic changes', () => {
     const none: CategorySettings = { auto: false, categories: {} }
-    // The default font by name, as the category's picker shows it.
-    expect(setStyle('whisper', 'bold', true, 'CCWildWords')(none).categories).toEqual({
-      whisper: { family: 'CCWildWords', bold: true, italic: false },
+    // No family of its own, so it's lettered in Normal Dialogue's, or the default font.
+    expect(setStyle('whisper', 'bold', true)(none).categories).toEqual({
+      whisper: { family: null, bold: true, italic: false },
     })
-    // Normal Dialogue's, which it was lettered in.
+    // The bold or italic it was lettered in, Normal Dialogue's, and still no family of its own.
+    const changed = setStyle('whisper', 'italic', true)({ auto: false, categories: dialogue })
+    expect(changed.categories.whisper).toEqual({ family: null, bold: true, italic: true })
+    expect(letteredFont(changed.categories, 'whisper')).toEqual({
+      family: 'Komika Text',
+      bold: true,
+      italic: true,
+    })
+    expect(shownFamily(changed.categories, 'whisper')).toBe('')
+    // Its own family stays.
     expect(
-      setStyle('whisper', 'italic', true, 'CCWildWords')({ auto: false, categories: dialogue })
-        .categories.whisper,
-    ).toEqual({ family: 'Komika Text', bold: true, italic: true })
+      setStyle(
+        'whisper',
+        'bold',
+        true,
+      )({
+        auto: false,
+        categories: { whisper: { family: 'Anime Ace', italic: true } },
+      }).categories,
+    ).toEqual({ whisper: { family: 'Anime Ace', bold: true, italic: true } })
     // Normal Dialogue keeps the default font as none, its copy.
-    expect(setStyle('normal_dialogue', 'italic', true, 'CCWildWords')(none).categories).toEqual({
+    expect(setStyle('normal_dialogue', 'italic', true)(none).categories).toEqual({
       normal_dialogue: { family: null, bold: false, italic: true },
     })
   })
@@ -258,7 +294,7 @@ describe('Booharu category fonts', () => {
       auto: true,
       categories: { normal_dialogue: { family: null, bold: false, italic: true } },
     }
-    expect(setStyle('normal_dialogue', 'italic', false, 'CCWildWords')(italic)).toEqual({
+    expect(setStyle('normal_dialogue', 'italic', false)(italic)).toEqual({
       auto: true,
       categories: {},
     })

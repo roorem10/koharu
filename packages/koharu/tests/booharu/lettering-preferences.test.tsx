@@ -192,7 +192,7 @@ describe('Booharu Lettering categories', () => {
     expect(screen.getByText('No categories match')).toBeInTheDocument()
   })
 
-  it('clears a category with the font picker’s leading row, keeping the others', async () => {
+  it('takes a category’s family away with the font picker’s leading row, keeping its italic and the others', async () => {
     const { saves } = settingsDesktop({
       ...builtInLettering,
       auto: true,
@@ -229,10 +229,15 @@ describe('Booharu Lettering categories', () => {
     await user.click(screen.getByRole('option', { name: 'Same as Normal Dialogue' }))
 
     await waitFor(() => expect(saves).toHaveLength(1))
-    expect(saved(saves)[0]?.categories).toEqual({ shout: plain('Komika Text') })
+    // Only the family goes: Whisper stays italic, in Normal Dialogue's family.
+    expect(saved(saves)[0]?.categories).toEqual({
+      shout: plain('Komika Text'),
+      whisper: { family: null, bold: false, italic: true },
+    })
     await waitFor(() => expect(showing(font)).toBe('Same as Normal Dialogue'))
     expect(own.getAllByRole('button').map((button) => button.textContent)).toEqual([
       'Shout Komika Text',
+      'Whisper Same as Normal Dialogue · Italic',
     ])
 
     // Picking a family gives the category its own font again, as italic as it was lettered.
@@ -241,7 +246,7 @@ describe('Booharu Lettering categories', () => {
     await waitFor(() => expect(saves).toHaveLength(2))
     expect(saved(saves)[1]?.categories).toEqual({
       shout: plain('Komika Text'),
-      whisper: plain('CCWildWords'),
+      whisper: { family: 'CCWildWords', bold: false, italic: true },
     })
   })
 

@@ -243,7 +243,10 @@ export type CategoryCounts = {
  *  holds at least one of its three, as a category with none has no entry.
  */
 export type CategoryFont = {
-  /**  The font family, never blank; none for a copy of the default font. */
+  /**
+   *  The font family, never blank; none for Normal Dialogue's family, or
+   *  in Normal Dialogue's own entry, for a copy of the default font.
+   */
   family?: string | null
   /**  Whether it's lettered bold, at weight 700. */
   bold?: boolean
