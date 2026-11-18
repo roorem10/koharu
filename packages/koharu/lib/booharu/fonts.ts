@@ -4,6 +4,7 @@ import { queryOptions, useQuery } from '@tanstack/react-query'
 import { create } from 'zustand'
 
 import { call } from '@/lib/backend'
+import { queueBooharuWrite } from '@/lib/booharu/preferences'
 import { queryClient } from '@/lib/queries'
 import { commands, type FontFamily } from '@koharu/ipc/protocol'
 
@@ -94,7 +95,10 @@ async function toggleFontFavorite(family: string, favorite: boolean): Promise<vo
   starring += 1
   queryClient.setQueryData(favoritesQuery.queryKey, (stars) => starred(stars, favorite))
   try {
-    const answer = await call(commands.booharuSetFontFavorite, name, favorite)
+    // In turn with the settings saves, which write `[booharu-fonts]` too, as they read it.
+    const answer = await queueBooharuWrite(() =>
+      call(commands.booharuSetFontFavorite, name, favorite),
+    )
     // A later star still on its way shows already, and this answer, given before it, lacks it.
     if (starring === 1) queryClient.setQueryData(favoritesQuery.queryKey, answer)
   } catch {

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TypeBar } from '@/components/editor/TypeBar'
 import { TypesettingPreferences } from '@/components/preferences/TypesettingPreferences'
 import { setFavoritesOnly } from '@/lib/booharu/fonts'
+import { saveBooharuSection } from '@/lib/booharu/preferences'
 import { fontsKey, pageKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type Page } from '@koharu/ipc/protocol'
@@ -191,5 +192,46 @@ describe('Booharu font favourites', () => {
     await user.click(within(screen.getByTestId('type-bar')).getByTestId('type-font-picker'))
     expect(await screen.findByText('Favorites')).toBeInTheDocument()
     expect(listed()[0]).toBe('Komika Text')
+  })
+
+  it('stars a font after a settings save on its way, which writes the favourites as it read them', async () => {
+    // The desktop keeps the favourites in the settings file, which a save writes whole.
+    const { file } = settingsDesktop()
+    vi.spyOn(commands, 'booharuGetFontFavorites').mockImplementation(async () => [
+      ...(file.preferences['booharu-fonts'].favorites ?? []),
+    ])
+    const set = vi
+      .spyOn(commands, 'booharuSetFontFavorite')
+      .mockImplementation(async (family, favorite) => {
+        const others = (file.preferences['booharu-fonts'].favorites ?? []).filter(
+          (name) => name !== family,
+        )
+        file.preferences['booharu-fonts'].favorites = favorite ? [...others, family] : others
+        return file.preferences['booharu-fonts'].favorites
+      })
+    // The save's read of the file, answered once the star is given.
+    let answer = () => {}
+    vi.spyOn(commands, 'booharuGetPreferences').mockImplementationOnce(() => {
+      const read = structuredClone(file.preferences)
+      return new Promise((resolve) => (answer = () => resolve(read)))
+    })
+    const user = userEvent.setup()
+    renderPicker({}, { booharu: true })
+    await user.click(screen.getByRole('button', { name: 'Font' }))
+
+    const saved = saveBooharuSection('booharu-lettering', (section) => ({
+      ...section,
+      detect_colors: false,
+    }))
+    await user.click(screen.getByRole('button', { name: 'Add Komika Text to favorites' }))
+    expect(listed()[0]).toBe('Komika Text')
+    expect(set).not.toHaveBeenCalled()
+    answer()
+    await saved
+    await waitFor(() => expect(set).toHaveBeenCalledExactlyOnceWith('Komika Text', true))
+    await waitFor(() =>
+      expect(file.preferences['booharu-fonts'].favorites).toEqual(['Komika Text']),
+    )
+    expect(file.preferences['booharu-lettering'].detect_colors).toBe(false)
   })
 })

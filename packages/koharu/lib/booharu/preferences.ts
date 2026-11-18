@@ -19,8 +19,18 @@ export function useBooharuPreferences() {
   })
 }
 
-/** The last save, which the next one waits for. */
+/** The last write to the Booharu settings, which the next one waits for. */
 let saving: Promise<unknown> = Promise.resolve()
+
+/** Runs `write`, a write to the Booharu settings file, once the writes queued before it end. A
+ * command that changes one key of a section, such as a font's star, goes through here too, so a
+ * save, which writes every section as it read them just before, never puts back a value it
+ * changed in between. */
+export function queueBooharuWrite<T>(write: () => Promise<T>): Promise<T> {
+  const done = saving.catch(() => undefined).then(write)
+  saving = done
+  return done
+}
 
 /** Saves the section `name` as `change` makes it from what the file holds just before the save,
  * with every other section as the file holds it then, so no section goes back to a value read
@@ -30,18 +40,14 @@ export function saveBooharuSection<Name extends keyof BooharuPreferences>(
   name: Name,
   change: (section: BooharuPreferences[Name]) => BooharuPreferences[Name],
 ): Promise<BooharuPreferences> {
-  const save = saving
-    .catch(() => undefined)
-    .then(async () => {
-      const current = await call(commands.booharuGetPreferences)
-      queryClient.setQueryData(booharuPreferencesKey, current)
-      const saved = await call(commands.booharuSavePreferences, {
-        ...current,
-        [name]: change(current[name]),
-      })
-      queryClient.setQueryData(booharuPreferencesKey, saved)
-      return saved
+  return queueBooharuWrite(async () => {
+    const current = await call(commands.booharuGetPreferences)
+    queryClient.setQueryData(booharuPreferencesKey, current)
+    const saved = await call(commands.booharuSavePreferences, {
+      ...current,
+      [name]: change(current[name]),
     })
-  saving = save
-  return save
+    queryClient.setQueryData(booharuPreferencesKey, saved)
+    return saved
+  })
 }
