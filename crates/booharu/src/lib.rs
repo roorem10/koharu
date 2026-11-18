@@ -1,7 +1,9 @@
 //! Booharu's features on top of Koharu: the logic its desktop commands and
 //! agent tools share, one module per feature group, such as QC, Read
 //! chapter, the run planner, script export and import, Apply's default text
-//! look (`styles`), and changing blocks' lettering categories (`lettering`).
+//! look (`styles`), changing blocks' lettering categories (`lettering`), and
+//! the series glossary and chapter notes as the user and the agent change
+//! them (`context`).
 //!
 //! It may depend on koharu-pipeline, koharu-scene, koharu-llm, and
 //! koharu-renderer, as well as booharu-core. Koharu's pipeline calls only
@@ -9,6 +11,7 @@
 //! crate stays free of a dependency cycle.
 
 pub mod boxes;
+pub mod context;
 pub mod lettering;
 pub mod runs;
 pub mod styles;
