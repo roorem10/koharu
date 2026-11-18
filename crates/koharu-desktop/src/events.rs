@@ -20,7 +20,8 @@ pub struct Event<T> {
 }
 
 impl<T: Type> Event<T> {
-    const fn new(name: &'static str) -> Self {
+    // Booharu: crate-wide, so Booharu's module makes its own events.
+    pub(crate) const fn new(name: &'static str) -> Self {
         Self {
             name,
             payload: PhantomData,
@@ -84,5 +85,6 @@ pub fn bindings(types: &mut Types) -> Vec<(&'static str, DataType)> {
         NOTICE.binding(types),
         PIPELINE.binding(types),
         DOWNLOAD.binding(types),
+        crate::booharu::events::NOTICE.binding(types), // Booharu: Booharu's notice.
     ]
 }

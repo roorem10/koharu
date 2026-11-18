@@ -1,8 +1,10 @@
 //! Booharu's part of the app: its commands, which the Booharu block of
-//! `commands` lists, the MCP server's start on Booharu's own port, and the
-//! host Booharu's agent tools reach the app through.
+//! `commands` lists, its events, which `events::bindings` lists, the MCP
+//! server's start on Booharu's own port, and the host Booharu's agent tools
+//! reach the app through.
 
 pub(crate) mod boxes;
+pub(crate) mod events;
 pub(crate) mod mcp;
 pub(crate) mod notes;
 pub(crate) mod settings;
