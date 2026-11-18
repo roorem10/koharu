@@ -82,6 +82,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Añadir cuadro de texto",
+      "booharu_apply_text_style": "Aplicar estilo de texto predeterminado",
       "booharu_join_balloon": "Unir textos",
       "booharu_join_page": "Unir textos divididos",
       "booharu_set_review_note": "Editar nota",

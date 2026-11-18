@@ -88,6 +88,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "إضافة مربع نص",
+      "booharu_apply_text_style": "تطبيق نمط النص الافتراضي",
       "booharu_join_balloon": "دمج النصوص",
       "booharu_join_page": "دمج النصوص المقسّمة",
       "booharu_set_review_note": "تحرير الملاحظة",

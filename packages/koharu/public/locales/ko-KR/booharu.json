@@ -76,6 +76,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "텍스트 상자 추가",
+      "booharu_apply_text_style": "기본 글꼴 서식 적용",
       "booharu_join_balloon": "텍스트 합치기",
       "booharu_join_page": "분할된 텍스트 합치기",
       "booharu_set_review_note": "메모 편집",

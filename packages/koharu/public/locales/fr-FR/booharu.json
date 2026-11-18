@@ -82,6 +82,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Ajouter une zone de texte",
+      "booharu_apply_text_style": "Appliquer le style de texte par défaut",
       "booharu_join_balloon": "Fusionner des textes",
       "booharu_join_page": "Fusionner les textes divisés",
       "booharu_set_review_note": "Modifier la note",

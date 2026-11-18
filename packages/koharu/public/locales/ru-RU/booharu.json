@@ -84,6 +84,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Добавление текстового блока",
+      "booharu_apply_text_style": "Применение стиля текста по умолчанию",
       "booharu_join_balloon": "Объединение текстов",
       "booharu_join_page": "Объединение разделённых текстов",
       "booharu_set_review_note": "Изменение примечания",

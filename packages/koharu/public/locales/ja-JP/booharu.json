@@ -76,6 +76,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "テキストボックスを追加",
+      "booharu_apply_text_style": "既定の書式を適用",
       "booharu_join_balloon": "テキストを結合",
       "booharu_join_page": "分割されたテキストを結合",
       "booharu_set_review_note": "メモを編集",

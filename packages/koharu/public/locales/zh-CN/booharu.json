@@ -76,6 +76,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "添加文本框",
+      "booharu_apply_text_style": "应用默认文字样式",
       "booharu_join_balloon": "合并文本",
       "booharu_join_page": "合并拆分的文本",
       "booharu_set_review_note": "编辑备注",

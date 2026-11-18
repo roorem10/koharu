@@ -76,6 +76,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Add text box",
+      "booharu_apply_text_style": "Apply default text style",
       "booharu_join_balloon": "Join texts",
       "booharu_join_page": "Join split texts",
       "booharu_set_review_note": "Edit note",

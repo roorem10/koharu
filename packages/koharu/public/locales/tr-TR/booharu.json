@@ -76,6 +76,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Metin kutusu ekle",
+      "booharu_apply_text_style": "Varsayılan metin stilini uygula",
       "booharu_join_balloon": "Metinleri birleştir",
       "booharu_join_page": "Bölünmüş metinleri birleştir",
       "booharu_set_review_note": "Notu düzenle",
