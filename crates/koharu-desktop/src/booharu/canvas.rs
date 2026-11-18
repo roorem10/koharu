@@ -4,6 +4,8 @@
 //! pushed at startup, and again whenever either is saved: after Booharu's
 //! preferences, from the interface or the agent, and after Koharu's.
 
+use std::sync::{Mutex, PoisonError};
+
 use booharu_core::settings::Snapshot;
 use koharu_canvas::booharu::{BooharuSettings, TextDefaults};
 use koharu_renderer::RendererConfig;
@@ -12,10 +14,13 @@ use koharu_scene::Fit;
 use crate::screen::Screen;
 
 /// Pushes the settings as the file holds them now to `screen`'s window.
-/// When a section can't be read, the canvas keeps the settings it has, and
-/// the error is logged; the Settings page shows it too, as it reads the
-/// section.
+/// Pushes from different saves run one at a time, each read and posted to
+/// the window in turn, so the last one posted holds the last one read. When
+/// a section can't be read, the canvas keeps the settings it has, and the
+/// error is logged; the Settings page shows it too, as it reads the section.
 pub(crate) fn push(screen: &Screen) {
+    static PUSHING: Mutex<()> = Mutex::new(());
+    let _turn = PUSHING.lock().unwrap_or_else(PoisonError::into_inner);
     match settings() {
         Ok(settings) => screen.set_booharu(settings),
         Err(error) => tracing::error!("the canvas keeps its Booharu settings: {error:#}"),
