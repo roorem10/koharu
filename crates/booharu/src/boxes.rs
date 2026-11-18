@@ -2150,6 +2150,7 @@ mod tests {
             &project,
             &scope,
             false,
+            None,
             &booharu_core::settings::LetteringSettings::default(),
             Some("CCWildWords"),
             booharu_core::attrs::Origin::Automatic,

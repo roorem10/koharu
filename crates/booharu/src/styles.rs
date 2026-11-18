@@ -8,7 +8,9 @@
 //! Koharu's Preferred fonts, in place of its family, or while Pick fonts
 //! automatically is on its block's category's font in place of its family,
 //! weight, and italic, and with `detect_colors` off the default colours and
-//! outline in place of its own; with it on, Apply never recolours. A block
+//! outline in place of its own; with it on, Apply never recolours. The
+//! agent may name the category every block of the scope is lettered as
+//! instead, whatever its own and whether the switch is on. A block
 //! changed by hand ([`booharu_core::edited`]) is kept unless the caller
 //! includes those, and a locked block, or one inside a locked layer, is
 //! always kept, so a lock never fails the edit. An included block also
@@ -26,7 +28,8 @@ use std::collections::BTreeSet;
 use anyhow::{Result, ensure};
 use booharu_core::{
     attrs::{self, Auto, Origin},
-    edited, lettering,
+    edited,
+    lettering::{self, LetteringCategory},
     settings::LetteringSettings,
     styles,
 };
@@ -72,28 +75,47 @@ pub fn count(
     project: &Project,
     scope: &StyleScope,
     include_hand_edited: bool,
+    category: Option<LetteringCategory>,
     settings: &LetteringSettings,
     font: Option<&str>,
 ) -> Result<StyleCounts> {
-    Ok(planned(project, scope, include_hand_edited, settings, font)?.counts)
+    Ok(planned(
+        project,
+        scope,
+        include_hand_edited,
+        category,
+        settings,
+        font,
+    )?
+    .counts)
 }
 
 /// The edit giving the translations of `scope` in `project` the default
 /// look of `settings` and `font`, the first Preferred font, again, as one
 /// undo step labelled [`LABEL`] over any number of pages, with its numbers;
 /// none when it changes nothing. A block changed by hand takes it only with
-/// `include_hand_edited`. `origin` goes in each changed block's record:
-/// [`Origin::Agent`] makes the look the agent's choice, which a later
-/// automatic step keeps as it keeps a hand edit.
+/// `include_hand_edited`. With `category`, every block is lettered in that
+/// category's font, whatever its own and whether Pick fonts automatically is
+/// on. `origin` goes in each changed block's record: [`Origin::Agent`] makes
+/// the look the agent's choice, which a later automatic step keeps as it
+/// keeps a hand edit.
 pub fn apply(
     project: &Project,
     scope: &StyleScope,
     include_hand_edited: bool,
+    category: Option<LetteringCategory>,
     settings: &LetteringSettings,
     font: Option<&str>,
     origin: Origin,
 ) -> Result<(Option<Edit>, StyleCounts)> {
-    let plan = planned(project, scope, include_hand_edited, settings, font)?;
+    let plan = planned(
+        project,
+        scope,
+        include_hand_edited,
+        category,
+        settings,
+        font,
+    )?;
     let mut ops = Vec::new();
     for restyled in plan.restyled {
         let id = restyled.layer.id;
@@ -143,6 +165,7 @@ fn planned<'p>(
     project: &'p Project,
     scope: &StyleScope,
     include_hand_edited: bool,
+    named: Option<LetteringCategory>,
     settings: &LetteringSettings,
     font: Option<&str>,
 ) -> Result<Plan<'p>> {
@@ -163,7 +186,10 @@ fn planned<'p>(
             continue;
         }
         let current = &translation.style.chars;
-        let category = lettering::auto_category(project.parent(layer.id)?.0, layer.id, settings);
+        let category = match named {
+            Some(named) => Some(named),
+            None => lettering::auto_category(project.parent(layer.id)?.0, layer.id, settings),
+        };
         let sfx = block.role == Role::Sfx;
         let patch = styles::restyle(settings, font, sfx, category, current);
         let after = styles::patched(current, &patch)?;
@@ -436,12 +462,33 @@ mod tests {
             settings: &LetteringSettings,
             origin: Origin,
         ) -> Result<StyleCounts> {
+            self.apply_as(scope, include_hand_edited, None, settings, origin)
+        }
+
+        /// Applies the look as [`Fixture::apply`] does, every block lettered
+        /// as `category` when it names one.
+        fn apply_as(
+            &mut self,
+            scope: &StyleScope,
+            include_hand_edited: bool,
+            category: Option<LetteringCategory>,
+            settings: &LetteringSettings,
+            origin: Origin,
+        ) -> Result<StyleCounts> {
             let project = self.session.project();
-            let counted = count(&project, scope, include_hand_edited, settings, Some(NEW))?;
+            let counted = count(
+                &project,
+                scope,
+                include_hand_edited,
+                category,
+                settings,
+                Some(NEW),
+            )?;
             let (edit, counts) = apply(
                 &project,
                 scope,
                 include_hand_edited,
+                category,
                 settings,
                 Some(NEW),
                 origin,
@@ -672,6 +719,7 @@ mod tests {
                 &fixture.session.project(),
                 &group,
                 false,
+                None,
                 &detected,
                 Some(NEW)
             )
@@ -716,7 +764,7 @@ mod tests {
 
     #[test]
     fn with_the_switch_on_apply_letters_each_block_in_its_categorys_font() -> Result<()> {
-        use booharu_core::lettering::{CategoryFont, LetteringCategory};
+        use booharu_core::lettering::CategoryFont;
         let mut fixture = Fixture::new()?;
         fixture.translate(&["a", "b", "e"], &look(true, None))?;
         // b's font changed by hand, and a word of it marked light.
@@ -816,6 +864,64 @@ mod tests {
             font(&fixture, "a")?,
             (Some(NEW.to_owned()), Some(700), None)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_named_category_letters_every_block_of_the_scope_even_with_the_switch_off() -> Result<()> {
+        use booharu_core::lettering::CategoryFont;
+        let mut fixture = Fixture::new()?;
+        fixture.translate(&["a", "b", "c"], &look(true, None))?;
+        // Shout has a font; the switch stays off.
+        let shout = LetteringSettings {
+            categories: BTreeMap::from([(
+                LetteringCategory::Shout,
+                CategoryFont {
+                    family: Some("Badaboom BB".to_owned()),
+                    bold: true,
+                    italic: false,
+                },
+            )]),
+            ..look(true, None)
+        };
+        let font = |fixture: &Fixture, name: &str| -> Result<_> {
+            let chars = fixture.translation(name)?.style.chars;
+            Ok((chars.family, chars.weight, chars.italic))
+        };
+        let a = StyleScope::Blocks {
+            blocks: vec![fixture.id("a")],
+        };
+        let applied = fixture.apply_as(
+            &a,
+            false,
+            Some(LetteringCategory::Shout),
+            &shout,
+            Origin::Agent,
+        )?;
+        assert_eq!(applied, counts(1, 0, 0));
+        assert_eq!(
+            font(&fixture, "a")?,
+            (Some("Badaboom BB".to_owned()), Some(700), None)
+        );
+        // The agent's choice, kept as a hand edit is.
+        let layer = fixture.layer("a")?;
+        assert_eq!(Auto::of(&layer).origin, Origin::Agent);
+        assert!(edited(&layer).style);
+        assert_eq!(font(&fixture, "b")?.0.as_deref(), Some(OLD));
+
+        // A category with no font, nor Normal Dialogue, letters in the
+        // default font, neither bold nor italic.
+        let b = StyleScope::Blocks {
+            blocks: vec![fixture.id("b")],
+        };
+        fixture.apply_as(
+            &b,
+            false,
+            Some(LetteringCategory::Whisper),
+            &shout,
+            Origin::Agent,
+        )?;
+        assert_eq!(font(&fixture, "b")?, (Some(NEW.to_owned()), None, None));
         Ok(())
     }
 }

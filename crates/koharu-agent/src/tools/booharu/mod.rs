@@ -18,7 +18,7 @@
 //! | `booharu_join_page_balloons` | joins every split balloon of a page, as one undo step | no |
 //! | `booharu_split_block` | splits a block in two across its lines, as one undo step, and starts the run reading and translating both halves | no |
 //! | `booharu_set_review_note` | sets or clears the reviewer's note on a block or a text, as one undo step | no |
-//! | `booharu_apply_text_style` | gives the translations of some blocks, pages, or the whole project the default text look again, keeping hand-edited blocks unless told otherwise, as one undo step, and answers how many it changed, kept, and found untranslated | no |
+//! | `booharu_apply_text_style` | gives the translations of some blocks, pages, or the whole project the default text look again, each block's category font among it while Pick fonts automatically is on, or the font of a category or balloon shape the agent names, keeping hand-edited blocks unless told otherwise, as one undo step, and answers how many it changed, kept, and found untranslated | no |
 //! | `booharu_count_text_style_targets` | how many blocks `booharu_apply_text_style` would change, keep, and find untranslated | yes |
 //! | `booharu_run` | carries on with what the pages still need, as the Run button does with every stage on, one group of pages after another, or runs fewer stages on the pages named, and answers the plan with its first run | no |
 

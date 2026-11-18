@@ -3,12 +3,20 @@
 //! project, and how many blocks that would change beforehand, each worked
 //! out by `booharu::styles` as the Apply dialog's commands are, under the
 //! saved `[booharu-lettering]` and the first of Koharu's Preferred fonts as
-//! they are when called. The look the agent gives is its choice: each block
-//! it changes counts as styled by hand afterwards, so automatic steps, and an
-//! Apply that leaves hand-edited blocks alone, keep it.
+//! they are when called. The agent may also name the lettering category, or
+//! the balloon shape, every block is lettered as. The look the agent gives
+//! is its choice: each block it changes counts as styled by hand afterwards,
+//! so automatic steps, and an Apply that leaves hand-edited blocks alone,
+//! keep it.
 
 use booharu::styles::{self, StyleCounts, StyleScope};
-use booharu_core::{attrs::Origin, settings::LetteringSettings, styles::first_font};
+use booharu_core::{
+    attrs::Origin,
+    lettering::{self, LetteringCategory},
+    settings::LetteringSettings,
+    shape::BubbleShape,
+    styles::first_font,
+};
 use koharu_renderer::RendererConfig;
 use rig_core::{
     completion::ToolAnnotations,
@@ -31,6 +39,45 @@ pub(super) struct TextStyleArgs {
     /// default, they're kept as they are.
     #[serde(default)]
     include_hand_edited: bool,
+    /// The lettering category every block is lettered as, in its font,
+    /// whatever its own; left out, each block's own while Pick fonts
+    /// automatically is on. Not with `shape`.
+    #[serde(default)]
+    category: Option<LetteringCategory>,
+    /// The balloon shape every block is lettered as, as its category:
+    /// `round` as Normal Dialogue, `rectangle` as Narration Box, `spiky` as
+    /// Shout, and `none`, no balloon, as Floating. Not with `category`.
+    #[serde(default)]
+    shape: Option<Shape>,
+}
+
+/// A balloon's shape, or none.
+#[derive(Clone, Copy, Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum Shape {
+    Round,
+    Rectangle,
+    Spiky,
+    None,
+}
+
+impl TextStyleArgs {
+    /// The category the call letters every block as, when it names one.
+    fn category(&self) -> Result<Option<LetteringCategory>, ToolExecutionError> {
+        let shape = |shape| match shape {
+            Shape::Round => Some(BubbleShape::Round),
+            Shape::Rectangle => Some(BubbleShape::Rectangle),
+            Shape::Spiky => Some(BubbleShape::Spiky),
+            Shape::None => None,
+        };
+        match (self.category, self.shape) {
+            (Some(_), Some(_)) => Err(ToolExecutionError::invalid_args(
+                "name a category or a shape, not both",
+            )),
+            (category, None) => Ok(category),
+            (None, Some(named)) => Ok(Some(lettering::shape_category(shape(named)))),
+        }
+    }
 }
 
 pub(super) struct ApplyTextStyle;
@@ -44,16 +91,24 @@ impl Tool for ApplyTextStyle {
     fn description(&self) -> String {
         "Give the translations of some blocks, every block on some pages, or every block of the \
          project the default text look again, as one undo step: the default font, the first of \
-         Koharu's Preferred fonts, in place of each one's family, and with colour detection off \
-         the default colours and outline in place of its own, as `booharu-lettering` in \
-         booharu_get_settings holds them; with detection on, no colours change. Booharu leaves \
-         blocks changed by hand alone, their wording or their look, unless \
+         Koharu's Preferred fonts, in place of each one's family, or while Pick fonts \
+         automatically (`auto`) is on its block's lettering category's font in place of its \
+         family, weight, and italic, and with colour detection off the default colours and \
+         outline in place of its own, as `booharu-lettering` in booharu_get_settings holds \
+         them; with detection on, no colours change. `category`, or `shape`, letters every \
+         block as that category instead, in its font, \
+         whatever the block's own category and whether `auto` is on: use it when view_page \
+         shows a box lettered in the wrong kind of font, such as a narration box lettered as \
+         speech (`shape` `rectangle`) or speech lettered as a shout (`category` \
+         `normal_dialogue`); a category's font never touches the marks on single words. \
+         Booharu leaves blocks changed by hand alone, their wording or their look, unless \
          `include_hand_edited` is true, and always leaves locked blocks alone; blocks without \
          a translation have nothing to restyle. Answers how many blocks it `changed`, kept as \
          `kept_hand_edited` (changed by hand, or locked), and found `untranslated`: tell the \
          user how many were kept, and that including hand-edited blocks would restyle those \
          changed by hand too, though never the locked ones. The look it gives counts as chosen \
-         by hand, so later automatic steps leave those blocks alone. \
+         by hand, so later automatic steps leave \
+         those blocks alone, and restyling them again needs `include_hand_edited`. \
          booharu_count_text_style_targets answers the same numbers beforehand without changing \
          anything."
             .to_owned()
@@ -68,6 +123,7 @@ impl Tool for ApplyTextStyle {
         context: &mut ToolContext,
         args: TextStyleArgs,
     ) -> Result<StyleCounts, Self::Error> {
+        let category = args.category()?;
         let tools = project(context)?;
         // On a blocking thread, as `edit` applies, and under one lock, so the
         // blocks counted are the ones changed.
@@ -78,6 +134,7 @@ impl Tool for ApplyTextStyle {
                 &session.project(),
                 &args.scope,
                 args.include_hand_edited,
+                category,
                 &settings,
                 font.as_deref(),
                 Origin::Agent,
@@ -102,11 +159,11 @@ impl Tool for CountTextStyleTargets {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        "How many blocks booharu_apply_text_style would change for the same scope and \
-         `include_hand_edited` now, changing nothing: `changed`, the translated blocks that \
-         would take the default look; `kept_hand_edited`, those it would keep, changed by hand \
-         or locked; and `untranslated`, the blocks without a translation. A block whose \
-         translation has the look already counts in none."
+        "How many blocks booharu_apply_text_style would change for the same scope, \
+         `include_hand_edited`, `category`, and `shape` now, changing nothing: `changed`, the \
+         translated blocks that would take the look; `kept_hand_edited`, those it would keep, \
+         changed by hand or locked; and `untranslated`, the blocks without a translation. A \
+         block whose translation has the look already counts in none."
             .to_owned()
     }
 
@@ -123,6 +180,7 @@ impl Tool for CountTextStyleTargets {
         context: &mut ToolContext,
         args: TextStyleArgs,
     ) -> Result<StyleCounts, Self::Error> {
+        let category = args.category()?;
         let tools = project(context)?;
         tokio::task::spawn_blocking(move || -> anyhow::Result<StyleCounts> {
             let (settings, font) = look(&tools)?;
@@ -131,6 +189,7 @@ impl Tool for CountTextStyleTargets {
                 &project,
                 &args.scope,
                 args.include_hand_edited,
+                category,
                 &settings,
                 font.as_deref(),
             )
@@ -158,9 +217,11 @@ pub(super) fn look(tools: &Tools) -> anyhow::Result<(LetteringSettings, Option<S
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{collections::BTreeMap, sync::Arc};
 
-    use booharu_core::{attrs::Auto, edited, settings::BooharuPreferences};
+    use booharu_core::{
+        attrs::Auto, edited, lettering::CategoryFont, settings::BooharuPreferences,
+    };
     use koharu_pipeline::{Pipeline, PipelineConfig};
     use koharu_renderer::Renderer;
     use koharu_scene::{CharStyle, Content, Created, Edit, LayerId, Rgba, Session};
@@ -174,7 +235,9 @@ mod tests {
     const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
 
     /// The app, whose default look is red text with colour detection off,
-    /// and whose first Preferred font is Anime Ace.
+    /// whose first Preferred font is Anime Ace, and which letters shouts in
+    /// a bold Badaboom BB and narration boxes in an italic Comic Neue, with
+    /// Pick fonts automatically off.
     struct Red;
 
     impl BooharuHost for Red {
@@ -182,6 +245,18 @@ mod tests {
             let mut preferences = BooharuPreferences::default();
             preferences.lettering.default.fill = Some(RED);
             preferences.lettering.detect_colors = false;
+            let font = |family: &str, bold, italic| CategoryFont {
+                family: Some(family.to_owned()),
+                bold,
+                italic,
+            };
+            preferences.lettering.categories = BTreeMap::from([
+                (LetteringCategory::Shout, font("Badaboom BB", true, false)),
+                (
+                    LetteringCategory::NarrationBox,
+                    font("Comic Neue", false, true),
+                ),
+            ]);
             Ok(preferences)
         }
 
@@ -262,6 +337,8 @@ mod tests {
         TextStyleArgs {
             scope: StyleScope::Project,
             include_hand_edited,
+            category: None,
+            shape: None,
         }
     }
 
@@ -320,6 +397,151 @@ mod tests {
         // Including hand edits restyles the typed one only; the locked block
         // is kept whatever.
         assert_eq!(count(&tools, true).await, counts(1, 1, 1));
+    }
+
+    #[tokio::test]
+    async fn a_category_or_shape_named_letters_the_blocks_in_its_font_as_the_agents_choice() {
+        let (_dir, tools, id) = open();
+        let named = |names: &[&str], include_hand_edited, category, shape| TextStyleArgs {
+            scope: StyleScope::Blocks {
+                blocks: names.iter().map(|name| id(name)).collect(),
+            },
+            include_hand_edited,
+            category,
+            shape,
+        };
+        let shout = |include_hand_edited| {
+            named(
+                &["auto"],
+                include_hand_edited,
+                Some(LetteringCategory::Shout),
+                None,
+            )
+        };
+        let count = async |args| {
+            CountTextStyleTargets
+                .call(&mut tools.tool_context(), args)
+                .await
+                .expect("a count")
+        };
+        // Shout's font, though Pick fonts automatically is off.
+        assert_eq!(count(shout(false)).await, counts(1, 0, 0));
+        let applied = ApplyTextStyle
+            .call(&mut tools.tool_context(), shout(false))
+            .await
+            .expect("the look applied");
+        assert_eq!(applied, counts(1, 0, 0));
+        let project = tools.session.lock().project();
+        let layer = project.layer(id("auto")).expect("the block");
+        let Content::Block(block) = &layer.content else {
+            panic!("auto isn't a block");
+        };
+        assert_eq!(
+            block
+                .translation
+                .as_ref()
+                .expect("a translation")
+                .style
+                .chars,
+            CharStyle {
+                family: Some("Badaboom BB".to_owned()),
+                weight: Some(700),
+                size: Some(32.0),
+                fill: Some(RED),
+                ..CharStyle::default()
+            }
+        );
+        // The agent chose it, so it's kept as a hand edit is, and has the
+        // look already when hand edits are included.
+        assert_eq!(Auto::of(layer).origin, Origin::Agent);
+        assert!(edited(layer).style);
+        assert_eq!(count(shout(false)).await, counts(0, 1, 0));
+        assert_eq!(count(shout(true)).await, counts(0, 0, 0));
+
+        // A rectangular balloon's shape letters as a narration box.
+        let boxed = named(&["typed"], true, None, Some(Shape::Rectangle));
+        assert_eq!(
+            ApplyTextStyle
+                .call(&mut tools.tool_context(), boxed)
+                .await
+                .expect("the look applied"),
+            counts(1, 0, 0)
+        );
+        let project = tools.session.lock().project();
+        let layer = project.layer(id("typed")).expect("the block");
+        let Content::Block(block) = &layer.content else {
+            panic!("typed isn't a block");
+        };
+        let chars = &block
+            .translation
+            .as_ref()
+            .expect("a translation")
+            .style
+            .chars;
+        assert_eq!(
+            (chars.family.as_deref(), chars.weight, chars.italic),
+            (Some("Comic Neue"), None, Some(true))
+        );
+
+        // Naming both is refused before anything is counted or changed.
+        let steps = tools.session.lock().history().steps.len();
+        let both = || {
+            named(
+                &["auto"],
+                true,
+                Some(LetteringCategory::Shout),
+                Some(Shape::Spiky),
+            )
+        };
+        let error = ApplyTextStyle
+            .call(&mut tools.tool_context(), both())
+            .await
+            .expect_err("refused");
+        assert_eq!(error.kind(), rig_core::tool::ToolErrorKind::InvalidArgs);
+        let error = CountTextStyleTargets
+            .call(&mut tools.tool_context(), both())
+            .await
+            .expect_err("refused");
+        assert_eq!(error.kind(), rig_core::tool::ToolErrorKind::InvalidArgs);
+        assert_eq!(tools.session.lock().history().steps.len(), steps);
+    }
+
+    #[test]
+    fn each_shape_letters_as_the_category_its_balloon_gives() {
+        let shaped = |shape| {
+            TextStyleArgs {
+                shape: Some(shape),
+                ..args(false)
+            }
+            .category()
+            .expect("a category")
+        };
+        assert_eq!(
+            shaped(Shape::Round),
+            Some(LetteringCategory::NormalDialogue)
+        );
+        assert_eq!(
+            shaped(Shape::Rectangle),
+            Some(LetteringCategory::NarrationBox)
+        );
+        assert_eq!(shaped(Shape::Spiky), Some(LetteringCategory::Shout));
+        assert_eq!(shaped(Shape::None), Some(LetteringCategory::Floating));
+        assert_eq!(args(false).category().expect("no category"), None);
+        // What the schema takes.
+        let schema = ApplyTextStyle.parameters();
+        let project = json!({"kind": "project"});
+        for args in [
+            json!({"scope": project, "category": "whisper"}),
+            json!({"scope": project, "shape": "none"}),
+        ] {
+            assert_eq!(crate::tools::refusal(&schema, &args), None, "{args}");
+        }
+        for args in [
+            json!({"scope": project, "category": "automatic"}),
+            json!({"scope": project, "shape": "oval"}),
+        ] {
+            assert!(crate::tools::refusal(&schema, &args).is_some(), "{args}");
+        }
     }
 
     #[test]

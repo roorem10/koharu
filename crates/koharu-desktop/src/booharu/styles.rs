@@ -30,6 +30,7 @@ pub async fn booharu_count_text_style_targets(
             &project,
             &scope,
             include_hand_edited,
+            None,
             &settings,
             font.as_deref(),
         )
@@ -60,6 +61,7 @@ pub async fn booharu_apply_text_styles(
             &session.project(),
             &scope,
             include_hand_edited,
+            None,
             &settings,
             font.as_deref(),
             Origin::Automatic,
