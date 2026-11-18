@@ -52,6 +52,7 @@
       "favorites": "收藏字体",
       "favoritesOnly": "仅收藏",
       "noFavorites": "为字体加星标即可在此显示",
+      "noFavoritesHere": "此处没有可用的收藏字体。关闭“仅收藏”即可查看全部字体。",
       "removeFavorite": "取消收藏{{family}}"
     },
     "menu": {

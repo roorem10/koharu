@@ -55,6 +55,7 @@
       "favorites": "Favoritos",
       "favoritesOnly": "Solo favoritos",
       "noFavorites": "Marca fuentes con una estrella para añadirlas aquí",
+      "noFavoritesHere": "Ninguna de tus fuentes favoritas está disponible aquí. Desactiva “Solo favoritos” para ver todas las fuentes.",
       "removeFavorite": "Quitar {{family}} de favoritos"
     },
     "menu": {

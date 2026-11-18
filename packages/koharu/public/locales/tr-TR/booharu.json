@@ -52,6 +52,7 @@
       "favorites": "Favoriler",
       "favoritesOnly": "Yalnızca favoriler",
       "noFavorites": "Yazı tiplerini buraya eklemek için yıldızlayın",
+      "noFavoritesHere": "Favori yazı tiplerinizin hiçbiri burada kullanılamıyor. Tüm yazı tiplerini görmek için “Yalnızca favoriler” seçeneğini kapatın.",
       "removeFavorite": "{{family}} yazı tipini favorilerden kaldır"
     },
     "menu": {

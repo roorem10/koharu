@@ -52,6 +52,7 @@
       "favorites": "收藏字体",
       "favoritesOnly": "单看收藏",
       "noFavorites": "帮字体标星，伊就会显示勒此地",
+      "noFavoritesHere": "此地呒没好用个收藏字体。关脱“单看收藏”就看得到全部字体。",
       "removeFavorite": "取消收藏{{family}}"
     },
     "menu": {

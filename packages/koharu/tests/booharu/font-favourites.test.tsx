@@ -12,7 +12,15 @@ import { useKoharuStore } from '@/lib/store'
 import { commands, type Page } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
-import { comicFonts, favoritesDesktop, highlighted, listed, renderPicker, search } from './fonts'
+import {
+  comicFonts,
+  favoritesDesktop,
+  fontFamilies,
+  highlighted,
+  listed,
+  renderPicker,
+  search,
+} from './fonts'
 import { settingsDesktop } from './settings'
 
 describe('Booharu font favourites', () => {
@@ -158,6 +166,25 @@ describe('Booharu font favourites', () => {
       'true',
     )
     expect(listed()).toEqual(['Komika Text'])
+  })
+
+  it('says when Favorites only hides every font a picker offers, not that a search found none', async () => {
+    favoritesDesktop(['Anime Ace'])
+    setFavoritesOnly(true)
+    const user = userEvent.setup()
+    // A picker without the favourite, as Add font family leaves out the families already listed.
+    renderPicker({ families: fontFamilies('Komika Text', 'Wild Words') }, { booharu: true })
+    await user.click(screen.getByRole('button', { name: 'Font' }))
+
+    expect(
+      await screen.findByText(
+        'None of your favorites are available here. Turn off Favorites only to see all fonts.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('No fonts match this search')).not.toBeInTheDocument()
+
+    await user.type(search(), 'Wild')
+    expect(screen.getByText('No fonts match this search')).toBeInTheDocument()
   })
 
   it("shares the favourites between Preferred fonts' pickers and the TypeBar's", async () => {

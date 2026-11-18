@@ -52,6 +52,7 @@
       "favorites": "お気に入り",
       "favoritesOnly": "お気に入りのみ",
       "noFavorites": "フォントにスターを付けるとここに表示されます",
+      "noFavoritesHere": "ここで使えるお気に入りのフォントはありません。「お気に入りのみ」をオフにするとすべてのフォントが表示されます。",
       "removeFavorite": "{{family}}をお気に入りから削除"
     },
     "menu": {

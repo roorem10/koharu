@@ -55,6 +55,7 @@
       "favorites": "Favoris",
       "favoritesOnly": "Favoris uniquement",
       "noFavorites": "Ajoutez une étoile aux polices pour les afficher ici",
+      "noFavoritesHere": "Aucune de vos polices favorites n'est disponible ici. Désactivez « Favoris uniquement » pour voir toutes les polices.",
       "removeFavorite": "Retirer {{family}} des favoris"
     },
     "menu": {

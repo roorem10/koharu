@@ -52,6 +52,7 @@
       "favorites": "Favorites",
       "favoritesOnly": "Favorites only",
       "noFavorites": "Star fonts to add them here",
+      "noFavoritesHere": "None of your favorites are available here. Turn off Favorites only to see all fonts.",
       "removeFavorite": "Remove {{family}} from favorites"
     },
     "menu": {

@@ -7,16 +7,7 @@ import {
   type Virtualizer,
 } from '@tanstack/react-virtual'
 import { Check, ChevronDown, Search, X } from 'lucide-react'
-import {
-  useEffect,
-  useId,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-  type Ref,
-  type RefObject,
-} from 'react'
+import { useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 
 // Booharu: the favourites.
@@ -25,7 +16,13 @@ import {
   FavoriteStars,
   FontHeading,
 } from '@/components/booharu/fonts/FontFavorites'
-import { activeRow, fontRows, type BooharuFontProps, type FontRow } from '@/lib/booharu/fonts'
+import {
+  activeRow,
+  fontRows,
+  type BooharuFontProps,
+  type BooharuListProps,
+  type FontRow,
+} from '@/lib/booharu/fonts'
 import { useFontPreview } from '@/lib/queries'
 import type { FontFamily } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
@@ -245,7 +242,7 @@ export function FontPicker({
             scroller={scroller}
             onActive={setActive}
             onSelect={pick}
-            booharu={{ ...booharu, search: input }}
+            booharu={{ ...booharu, search: input, searched: query !== '' }}
           />
         )}
       </PopoverContent>
@@ -275,8 +272,9 @@ function FontList({
   scroller: Ref<Scroller>
   onActive: (key: string) => void
   onSelect: (family: string) => void
-  /** Booharu: the favourites, and the search line, which a star gives the focus back to. */
-  booharu: BooharuFontProps & { search: RefObject<HTMLInputElement | null> }
+  /** Booharu: the favourites, the search line, which a star gives the focus back to, and whether
+   * anything is searched. */
+  booharu: BooharuListProps
 }) {
   const { t } = useTranslation()
   const list = useRef<HTMLDivElement>(null)
@@ -379,10 +377,14 @@ function FontList({
       {rows.length === 0 && (
         <Empty role='status' className='absolute inset-1 rounded-md p-2'>
           <EmptyTitle className='text-[11px] text-muted-foreground'>
-            {/* Booharu: how to star a font, when only the favourites show and there are none. */}
+            {/* Booharu: how to star a font, when only the favourites show and there are none, and
+                that Favorites only hides the other fonts, when none of them is here and nothing
+                is searched. */}
             {booharu.favoritesOnly && !booharu.favorites?.length
               ? t('booharu.fonts.noFavorites')
-              : t('fontPicker.noResults')}
+              : booharu.favoritesOnly && !booharu.searched
+                ? t('booharu.fonts.noFavoritesHere')
+                : t('fontPicker.noResults')}
           </EmptyTitle>
         </Empty>
       )}

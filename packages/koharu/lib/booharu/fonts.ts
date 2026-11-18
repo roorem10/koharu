@@ -1,6 +1,7 @@
 'use client'
 
 import { queryOptions, useQuery } from '@tanstack/react-query'
+import type { RefObject } from 'react'
 import { create } from 'zustand'
 
 import { call } from '@/lib/backend'
@@ -24,6 +25,13 @@ export type BooharuFontProps = {
    * 游ゴシック for Yu Gothic: a search finds the family by any of them, and its row shows the
    * first, muted, after its name. */
   localNames?: Readonly<Record<string, readonly string[]>>
+}
+
+/** What Koharu's font list takes of Booharu's: its props, the search line, which a star gives the
+ * focus back to, and whether anything is searched. */
+export type BooharuListProps = BooharuFontProps & {
+  search: RefObject<HTMLInputElement | null>
+  searched: boolean
 }
 
 /** A row of the font list: a family, starred when it's a favourite, with the first of its names in

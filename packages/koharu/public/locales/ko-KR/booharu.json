@@ -52,6 +52,7 @@
       "favorites": "즐겨찾기",
       "favoritesOnly": "즐겨찾기만",
       "noFavorites": "글꼴에 별표를 추가하면 여기에 표시됩니다",
+      "noFavoritesHere": "여기에서 사용할 수 있는 즐겨찾기 글꼴이 없습니다. 모든 글꼴을 보려면 “즐겨찾기만”을 끄세요.",
       "removeFavorite": "{{family}} 즐겨찾기에서 제거"
     },
     "menu": {

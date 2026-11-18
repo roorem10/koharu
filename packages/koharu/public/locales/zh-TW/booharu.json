@@ -52,6 +52,7 @@
       "favorites": "我的最愛",
       "favoritesOnly": "僅顯示收藏",
       "noFavorites": "為字型加上星號即可顯示於此",
+      "noFavoritesHere": "這裡沒有可用的收藏字型。關閉「僅顯示收藏」即可查看所有字型。",
       "removeFavorite": "將{{family}}從我的最愛移除"
     },
     "menu": {
