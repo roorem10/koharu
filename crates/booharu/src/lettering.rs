@@ -175,8 +175,7 @@ pub fn set_category(
         }
         // The values written are Booharu's from now on. A translation no
         // stage wrote keeps its other values hand edits.
-        let held = Auto::of(layer);
-        let mut record = held.clone();
+        let mut record = Auto::of(layer);
         if record.style.is_none() && !styles::recorded(layer, "translation") {
             record.style = Some(AutoStyle::default());
         }

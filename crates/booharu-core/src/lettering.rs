@@ -10,14 +10,15 @@
 //!   its `auto` switch, Pick fonts automatically, off by default, decides
 //!   whether Booharu letters a block in its category's font at all.
 //! - A category's font ([`LetteringSettings::category_font`]) is its own
-//!   entry, else Normal Dialogue's, else none, and text with none keeps
-//!   stage 3's default look, a copy of the default font. An entry without a
-//!   family takes a copy of the default font as its family, with its own bold
-//!   and italic, as 0.0.4's entry without a font fell back on Koharu's font
-//!   chain, which starts there. Written on a translation, a category's font
-//!   sets its `style.chars` `family`, `weight` (700 when bold, else null), and
-//!   `italic` (true when italic, else null): never other keys and never the
-//!   marks, so word styles survive a change of category.
+//!   entry, else Normal Dialogue's, else none, and text with none gets the
+//!   default look's font, a copy of the default font, neither bold nor
+//!   italic. An entry without a family takes a copy of the default font as
+//!   its family, with its own bold and italic, as 0.0.4's entry without a
+//!   font fell back on Koharu's font chain, which starts there. Written on a
+//!   translation, a category's font sets its `style.chars` `family`,
+//!   `weight` (700 when bold, else null), and `italic` (true when italic,
+//!   else null): never other keys and never the marks, so word styles
+//!   survive a change of category.
 //! - A block's category ([`effective`]) is, in this order: a user's label; a
 //!   model's label of a presentation category ([`LetteringCategory::presentation`])
 //!   at any confidence; `sfx` for a block Koharu detected as a sound effect;
