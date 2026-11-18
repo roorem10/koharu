@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -77,6 +77,25 @@ describe('Booharu font favourites', () => {
     expect(highlighted()).toHaveAccessibleName('Wild Words')
     await user.keyboard('{Enter}')
     expect(onChange).toHaveBeenCalledExactlyOnceWith('Wild Words')
+  })
+
+  it('puts each star right after its font, and a star the focus moves to marks its font', async () => {
+    favoritesDesktop()
+    const user = userEvent.setup()
+    renderPicker({ value: 'Komika Text' }, { booharu: true })
+    await user.click(screen.getByRole('button', { name: 'Font' }))
+
+    act(() => screen.getByRole('option', { name: 'Anime Ace' }).focus())
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Add Anime Ace to favorites' })).toHaveFocus()
+    await user.tab()
+    expect(screen.getByRole('option', { name: 'CCMeanwhile' })).toHaveFocus()
+    expect(highlighted()).toHaveAccessibleName('CCMeanwhile')
+
+    // Back to the star of the font before, which the arrows then are on.
+    await user.tab({ shift: true })
+    expect(screen.getByRole('button', { name: 'Add Anime Ace to favorites' })).toHaveFocus()
+    expect(highlighted()).toHaveAccessibleName('Anime Ace')
   })
 
   it('stars a font through the desktop at once, and takes the star back when that fails', async () => {

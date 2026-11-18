@@ -1,11 +1,10 @@
 'use client'
 
-import type { VirtualItem } from '@tanstack/react-virtual'
 import { Star } from 'lucide-react'
-import type { RefObject } from 'react'
+import type { ReactElement, RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { BooharuFontProps, FontRow } from '@/lib/booharu/fonts'
+import type { BooharuFontProps, BooharuListProps, FontRow } from '@/lib/booharu/fonts'
 import { Button } from '@koharu/ui/components/button'
 import { InputGroupAddon, InputGroupButton } from '@koharu/ui/components/input-group'
 import { cn } from '@koharu/ui/lib/utils'
@@ -40,30 +39,32 @@ export function FavoritesOnlySwitch({
   )
 }
 
-/** The stars over the ends of the family rows among `items`, the rows of Koharu's font list in
- * view, given `onToggleFavorite`: each stars its family or unstars it and gives the search line the
- * focus back, so the arrows go on from there, and the focus stays in the picker when the star's row
- * goes. Moving the pointer over a star marks its row, as moving it over the row does. */
-export function FavoriteStars({
-  rows,
-  items,
+/** A family's option in Koharu's font list, `option`, and right after it, given
+ * `onToggleFavorite`, its star over the end of its row, `top` pixels down the list, so the Tab key
+ * reaches each star in turn with its family. The star stars its family or unstars it and gives the
+ * search line the focus back, so the arrows go on from there, and the focus stays in the picker
+ * when the star's row goes. Moving the pointer over a star, or the focus to it, marks its row, as
+ * moving either to the row does. */
+export function WithFavoriteStar({
+  option,
+  row,
+  top,
   booharu: { onToggleFavorite, search },
   onActive,
 }: {
-  rows: FontRow[]
-  items: VirtualItem[]
-  booharu: BooharuFontProps & { search: RefObject<HTMLInputElement | null> }
+  option: ReactElement
+  row: Extract<FontRow, { family: unknown }>
+  top: number
+  booharu: BooharuListProps
   onActive: (key: string) => void
 }) {
   const { t } = useTranslation()
-  if (!onToggleFavorite) return null
-  return items.map((item) => {
-    const row = rows[item.index]
-    if (!row || !('family' in row)) return null
-    const family = row.family.name
-    return (
+  if (!onToggleFavorite) return option
+  const family = row.family.name
+  return (
+    <>
+      {option}
       <Button
-        key={item.key}
         type='button'
         variant='ghost'
         size='icon-xs'
@@ -71,10 +72,11 @@ export function FavoriteStars({
           family,
         })}
         className='absolute top-[7px] right-1.5 text-muted-foreground hover:text-foreground'
-        style={{ transform: `translateY(${item.start}px)` }}
+        style={{ transform: `translateY(${top}px)` }}
         onPointerMove={(event) => {
           if (event.movementX || event.movementY) onActive(row.key)
         }}
+        onFocus={() => onActive(row.key)}
         onClick={() => {
           onToggleFavorite(family, !row.starred)
           search.current?.focus({ preventScroll: true })
@@ -82,8 +84,8 @@ export function FavoriteStars({
       >
         <Star className={cn('size-3.5', row.starred && 'fill-current text-amber-500')} />
       </Button>
-    )
-  })
+    </>
+  )
 }
 
 /** A section's heading in Koharu's font list, `top` pixels down it, as ModelPicker heads each

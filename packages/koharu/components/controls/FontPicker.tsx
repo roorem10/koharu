@@ -13,8 +13,8 @@ import { useTranslation } from 'react-i18next'
 // Booharu: the favourites.
 import {
   FavoritesOnlySwitch,
-  FavoriteStars,
   FontHeading,
+  WithFavoriteStar,
 } from '@/components/booharu/fonts/FontFavorites'
 import {
   activeRow,
@@ -330,7 +330,8 @@ function FontList({
           }
           const family = row.family
           const selected = normalizeFontName(family.name) === normalizeFontName(value)
-          return (
+          // Booharu: the family's option, which its star follows.
+          const option = (
             <button
               key={virtualRow.key}
               type='button'
@@ -365,14 +366,18 @@ function FontList({
               {selected && <Check className='size-3.5 shrink-0' />}
             </button>
           )
+          // Booharu: its star right after it, over its row's end.
+          return (
+            <WithFavoriteStar
+              key={virtualRow.key}
+              option={option}
+              row={row}
+              top={virtualRow.start}
+              booharu={booharu}
+              onActive={onActive}
+            />
+          )
         })}
-        {/* Booharu: each family's star, over its row's end. */}
-        <FavoriteStars
-          rows={rows}
-          items={virtualizer.getVirtualItems()}
-          booharu={booharu}
-          onActive={onActive}
-        />
       </div>
       {rows.length === 0 && (
         <Empty role='status' className='absolute inset-1 rounded-md p-2'>
