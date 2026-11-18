@@ -207,8 +207,20 @@ describe('Booharu Context tab', () => {
       (resources[language].translation as { booharu: { context: object } }).booharu.context
     const english = keys(context('en-US')).sort()
     expect(english).toContain('openGlossary')
+    // A language adds the plural forms its counts need, such as Russian's few and many.
+    const pluralForm = /_(zero|one|two|few|many|other)$/
+    const isForm = (key: string) =>
+      pluralForm.test(key) && english.includes(key.replace(pluralForm, '_other'))
     for (const language of supportedLanguages) {
-      expect(keys(context(language)).sort(), language).toEqual(english)
+      const own = keys(context(language))
+      expect(
+        english.filter((key) => !own.includes(key)),
+        language,
+      ).toEqual([])
+      expect(
+        own.filter((key) => !english.includes(key) && !isForm(key)),
+        language,
+      ).toEqual([])
     }
   })
 })
