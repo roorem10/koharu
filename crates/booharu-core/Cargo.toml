@@ -15,6 +15,7 @@ publish.workspace = true
 anyhow = { workspace = true }
 koharu-config = { workspace = true }
 koharu-scene = { workspace = true }
+schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 specta = { workspace = true }

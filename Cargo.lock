@@ -1193,6 +1193,7 @@ dependencies = [
  "anyhow",
  "koharu-config",
  "koharu-scene",
+ "schemars 1.2.3",
  "serde",
  "serde_json",
  "specta",

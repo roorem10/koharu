@@ -12,17 +12,28 @@
 //! | `booharu_get_settings` | every Booharu settings section, by its table name | yes |
 //! | `booharu_set_settings` | changes keys of one section, saved whole or not at all; an outside app can't change `booharu-mcp` | no |
 //! | `booharu_set_translation` | sets a block's translation, placing it first as the Translation stage does when the block has none, as one undo step | no |
+//! | `booharu_add_text_box` | adds a text block over a box the automatic run missed, as the O tool does, and starts the run reading it, and as its mode says translating and cleaning it | no |
+//! | `booharu_find_split_balloons` | the balloons whose text is split over two or more text blocks, on a page or every page | yes |
+//! | `booharu_join_balloon_blocks` | joins the text blocks of a block's balloon into the first one read, as one undo step | no |
+//! | `booharu_join_page_balloons` | joins every split balloon of a page, as one undo step | no |
+//! | `booharu_split_block` | splits a block in two across its lines, as one undo step, and starts the run reading and translating both halves | no |
+//! | `booharu_set_review_note` | sets or clears the reviewer's note on a block or a text, as one undo step | no |
 
+mod boxes;
+mod notes;
 mod project;
 mod settings;
 mod translation;
 
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use booharu_core::settings::BooharuPreferences;
+use koharu_pipeline::{Request, RunId, Stage, Target};
+use koharu_scene::{Change, Edit, LayerId, Session};
 use rig_agent::tool::ToolSet;
+use rig_core::tool::ToolExecutionError;
 
-use super::Tools;
+use super::{Tools, failed};
 
 /// The app, as Booharu's tools reach it beyond the open project's session,
 /// pipeline, and renderer. The desktop app gives one; a host blocks, so a
@@ -60,4 +71,47 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(settings::GetSettings);
     tools.add_tool(settings::SetSettings);
     tools.add_tool(translation::SetTranslation);
+    tools.add_tool(boxes::AddTextBox);
+    tools.add_tool(boxes::FindSplitBalloons);
+    tools.add_tool(boxes::JoinBalloonBlocks);
+    tools.add_tool(boxes::JoinPageBalloons);
+    tools.add_tool(boxes::SplitBlock);
+    tools.add_tool(notes::SetReviewNote);
+}
+
+/// Builds an edit with `build` from the open project and applies it as one
+/// undo step, under the lock it was built under, so nothing changes in
+/// between, and on a blocking thread, as `edit` applies one: a box action
+/// reads pixels. A refusal reaches the model word for word.
+async fn apply(
+    tools: &Arc<Tools>,
+    build: impl FnOnce(&Session) -> anyhow::Result<Edit> + Send + 'static,
+) -> Result<Change, ToolExecutionError> {
+    let tools = Arc::clone(tools);
+    tokio::task::spawn_blocking(move || -> anyhow::Result<Change> {
+        let mut session = tools.session.lock();
+        let edit = build(&session)?;
+        Ok(session.apply(edit)?)
+    })
+    .await
+    .map_err(failed)?
+    .map_err(|error| failed(format!("{error:#}")))
+}
+
+/// Starts the run of `stages` on `blocks` of the open project, as `run`
+/// starts one, for `wait` to follow.
+fn read(
+    tools: &Tools,
+    blocks: Vec<LayerId>,
+    stages: BTreeSet<Stage>,
+) -> Result<RunId, ToolExecutionError> {
+    let request = Request {
+        target: Target::Blocks(blocks),
+        stages,
+        config: None,
+    };
+    tools
+        .pipeline
+        .run(Arc::clone(&tools.session), request)
+        .map_err(failed)
 }

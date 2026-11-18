@@ -63,7 +63,18 @@ impl Section for OcrBoxSettings {
 /// What a box drawn with the O tool goes through, Booharu 0.0.4's three
 /// modes: it's always read. Only a box that is cleaned gets a mask, the whole
 /// box, so reading it never erases the art inside.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    specta::Type,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum OcrBoxMode {
     /// Read only.

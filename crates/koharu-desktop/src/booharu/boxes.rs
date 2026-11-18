@@ -2,10 +2,10 @@
 //! blocks, joining them, and splitting a block in two, each edit built by
 //! `booharu::boxes`, which the agent's tools share, as one undo step.
 
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 
 use booharu::boxes::{self, SplitBalloon, SplitBlock};
-use koharu_pipeline::{Stage, Target};
+use koharu_pipeline::Target;
 use koharu_scene::{Change, LayerId, PageId};
 use tauri::State;
 
@@ -53,11 +53,7 @@ pub async fn booharu_join_page(app: State<'_, Arc<App>>, page: PageId) -> Result
 pub async fn booharu_split_block(app: State<'_, Arc<App>>, block: LayerId) -> Result<SplitBlock> {
     let change = apply(&app, move |session| boxes::split_block(session, block)).await?;
     let halves = boxes::split_halves(block, &change)?;
-    let run = app.process(
-        Target::Blocks(halves.clone()),
-        BTreeSet::from([Stage::Recognize, Stage::Translate]),
-        None,
-    )?;
+    let run = app.process(Target::Blocks(halves.clone()), boxes::split_stages(), None)?;
     Ok(SplitBlock {
         change,
         halves,

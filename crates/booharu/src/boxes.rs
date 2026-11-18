@@ -86,6 +86,12 @@ pub fn stages(mode: OcrBoxMode) -> BTreeSet<Stage> {
     }
 }
 
+/// The stages a split block's halves go through, run on them alone: both
+/// are read and translated again, each keeping its part of the clean-up.
+pub fn split_stages() -> BTreeSet<Stage> {
+    BTreeSet::from([Stage::Recognize, Stage::Translate])
+}
+
 /// The edit adding the block a box drawn over `rect` of `page`, in page
 /// pixels, makes, labelled [`ADD_BOX`]; [`added_box`] finds the block in the
 /// edit's change. It decodes the page's scan, so the caller holds the
