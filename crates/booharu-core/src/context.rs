@@ -34,7 +34,7 @@ pub use self::{
         CHAPTER_VERSION, Chapter, ChapterBrief, ChapterCharacter, ChapterContext, agent_file,
         remove_side_files, side_file,
     },
-    compose::{CharacterHint, Extras, MAX_TERMS, instructions, text_known},
+    compose::{CharacterHint, Extras, MAX_TERMS, found_terms, instructions, text_known},
     instructions::{InstructionTerm, instruction_terms},
     series::{Character, GlossaryEntry, Series, SeriesStore, TermKind, valid_id},
 };

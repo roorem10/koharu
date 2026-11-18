@@ -83,16 +83,7 @@ impl Extras {
         );
         let found: Vec<&GlossaryEntry> = match fresh {
             true => terms,
-            false => {
-                let texts = sources(project);
-                terms
-                    .into_iter()
-                    .filter(|term| {
-                        let source = key(&term.source);
-                        texts.iter().any(|text| text.contains(&source))
-                    })
-                    .collect()
-            }
+            false => found(project, terms),
         };
         let left_out = found.len().saturating_sub(MAX_TERMS);
         let background = [
@@ -184,6 +175,26 @@ impl Extras {
     }
 }
 
+/// The terms of `series`, then the chapter's suggestions in `context`,
+/// whose source occurs in the source of a block on some page of `project`,
+/// as a run on a chapter whose text is known sends them, but from whatever
+/// text is known now and every one of them: each source once, the first
+/// locked term with it winning, else the first; locked terms first, each
+/// group in stored order.
+pub fn found_terms(
+    project: &Project,
+    context: &ChapterContext,
+    series: Option<&Series>,
+) -> Vec<GlossaryEntry> {
+    let terms = deduplicated(
+        series
+            .into_iter()
+            .flat_map(|series| &series.glossary)
+            .chain(&context.suggestions),
+    );
+    found(project, terms).into_iter().cloned().collect()
+}
+
 /// `instructions`, the user's own, with `extras` after them, one blank line
 /// between, as a run's snapshot holds them; with no extras, `instructions`
 /// byte for byte, so the run goes as Koharu's would.
@@ -228,6 +239,19 @@ fn unread(layers: &[Layer], locked: bool) -> bool {
             Content::Block(block) if block.source.content.text().trim().is_empty());
         (blank && !locked && !recorded(layer, "ocr")) || unread(&layer.children, locked)
     })
+}
+
+/// The terms of `terms` whose source occurs in the source of a block on
+/// some page of `project`, ignoring case and whitespace, in their order.
+fn found<'t>(project: &Project, terms: Vec<&'t GlossaryEntry>) -> Vec<&'t GlossaryEntry> {
+    let texts = sources(project);
+    terms
+        .into_iter()
+        .filter(|term| {
+            let source = key(&term.source);
+            texts.iter().any(|text| text.contains(&source))
+        })
+        .collect()
 }
 
 /// The source of every block on every page, as terms are compared.
@@ -524,6 +548,43 @@ mod tests {
         assert_eq!(sources(&extras), ["魔王", "先 生", "ヒナ", "Schale"]);
         let targets: Vec<&str> = extras.glossary.iter().map(|term| &*term.target).collect();
         assert_eq!(targets, ["Demon King", "Sensei", "Hina", "Shale"]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_terms_found_are_those_the_known_text_uses_however_many() -> anyhow::Result<()> {
+        let linked = series(vec![
+            term("先生", "Sensei", false),
+            term("ヒナ", "Hina", false),
+            term("リムル", "Rimuru", true),
+            term("ヒ ナ", "Hina!", true),
+        ]);
+        let context = ChapterContext {
+            suggestions: vec![term("ひな", "Hina-chan", false), term("アコ", "Ako", false)],
+            ..ChapterContext::default()
+        };
+        // A block still waits to be read, so a run would send every term,
+        // but the terms found are those the text known uses.
+        let page = Page::new(vec![
+            block(0, "ヒナです。ひな", &["detection", "ocr"]),
+            block(1, "", &["detection"]),
+        ])?;
+        assert!(!text_known(&page.project()));
+        let found = found_terms(&page.project(), &context, Some(&linked));
+        let found: Vec<&str> = found.iter().map(|term| &*term.target).collect();
+        assert_eq!(found, ["Hina!", "Hina-chan"]);
+        // Past 60 too.
+        let text: String = (0..70).map(|index| format!("語{index:02} ")).collect();
+        let page = Page::read(&[&text])?;
+        let terms = (0..70)
+            .map(|index| term(&format!("語{index:02}"), &format!("word {index}"), false))
+            .collect();
+        let many = found_terms(
+            &page.project(),
+            &ChapterContext::default(),
+            Some(&series(terms)),
+        );
+        assert_eq!(many.len(), 70);
         Ok(())
     }
 
