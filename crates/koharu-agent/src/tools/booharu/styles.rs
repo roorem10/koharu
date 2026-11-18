@@ -96,7 +96,7 @@ impl Tool for ApplyTextStyle {
          family, weight, and italic, and with colour detection off the default colours and \
          outline in place of its own, as `booharu-lettering` in booharu_get_settings holds \
          them; with detection on, no colours change. `category`, or `shape`, letters every \
-         block as that category instead, in its font, \
+         block as that category instead, in its font as booharu_get_text_styles lists it, \
          whatever the block's own category and whether `auto` is on: use it when view_page \
          shows a box lettered in the wrong kind of font, such as a narration box lettered as \
          speech (`shape` `rectangle`) or speech lettered as a shout (`category` \
@@ -107,7 +107,7 @@ impl Tool for ApplyTextStyle {
          `kept_hand_edited` (changed by hand, or locked), and found `untranslated`: tell the \
          user how many were kept, and that including hand-edited blocks would restyle those \
          changed by hand too, though never the locked ones. The look it gives counts as chosen \
-         by hand, so later automatic steps leave \
+         by hand, so later automatic steps, booharu_set_lettering_category's included, leave \
          those blocks alone, and restyling them again needs `include_hand_edited`. \
          booharu_count_text_style_targets answers the same numbers beforehand without changing \
          anything."

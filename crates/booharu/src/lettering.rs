@@ -22,6 +22,11 @@
 //! A category's font is written as the `lettering` module of booharu-core
 //! resolves it: the translation's family, weight, and italic, never other
 //! keys and never the marks.
+//!
+//! What the interface and the agent read of it: each block's category with
+//! why, its label, its balloon's shape, and whether it was changed by hand
+//! ([`info`] for a page, [`blocks`] for blocks named), and the font each
+//! category letters its text in, with where it comes from ([`fonts`]).
 
 use std::collections::BTreeSet;
 
@@ -29,12 +34,12 @@ use anyhow::{Context as _, Result, bail};
 use booharu_core::{
     attrs::{self, Auto, AutoStyle, Lettering, LetteringSource},
     edited,
-    lettering::{self, CategoryReason, LetteringCategory},
+    lettering::{self, CategoryFont, CategoryReason, LetteringCategory},
     settings::LetteringSettings,
     shape::{self, BlockShape},
     styles,
 };
-use koharu_scene::{Content, Edit, LayerId, Op, PageId, Project};
+use koharu_scene::{Content, Edit, Layer, LayerId, Op, Page, PageId, Project};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -205,20 +210,94 @@ pub fn info(
     project
         .blocks(page)?
         .into_iter()
-        .map(|(id, _)| {
-            let layer = project.layer(id)?;
-            let label = attrs::get::<Lettering>(layer);
-            let effective = lettering::effective_with(found, id, label.as_ref(), settings)
-                .context("a block has a category")?;
-            let edited = edited(layer);
-            Ok(BlockLettering {
-                block: id,
-                category: effective.category,
-                reason: effective.reason,
-                label,
-                shape: shape::block_shape(found, id),
-                hand_edited: edited.text || edited.style,
-            })
+        .map(|(id, _)| lettered(found, project.layer(id)?, settings))
+        .collect()
+}
+
+/// The lettering of `blocks` in `project`, each once in the order named,
+/// under `settings`, as [`info`] answers a page's. A layer that isn't a
+/// block fails.
+pub fn blocks(
+    project: &Project,
+    blocks: &[LayerId],
+    settings: &LetteringSettings,
+) -> Result<Vec<BlockLettering>> {
+    let mut seen = BTreeSet::new();
+    blocks
+        .iter()
+        .filter(|id| seen.insert(**id))
+        .map(|&id| lettered(project.parent(id)?.0, project.layer(id)?, settings))
+        .collect()
+}
+
+/// The lettering of `layer`, a block on `page`, under `settings`.
+fn lettered(page: &Page, layer: &Layer, settings: &LetteringSettings) -> Result<BlockLettering> {
+    let label = attrs::get::<Lettering>(layer);
+    let effective = lettering::effective_with(page, layer.id, label.as_ref(), settings)
+        .with_context(|| format!("layer {} isn't a block", layer.id))?;
+    let edited = edited(layer);
+    Ok(BlockLettering {
+        block: layer.id,
+        category: effective.category,
+        reason: effective.reason,
+        label,
+        shape: shape::block_shape(page, layer.id),
+        hand_edited: edited.text || edited.style,
+    })
+}
+
+/// Where a category's font comes from.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FontSource {
+    /// Its own entry in `[booharu-lettering] categories`.
+    Own,
+    /// Normal Dialogue's entry, as it has none of its own.
+    NormalDialogue,
+    /// Neither: the default look's font, a copy of the default font, neither
+    /// bold nor italic.
+    Default,
+}
+
+/// The font a category letters its text in.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ResolvedFont {
+    pub category: LetteringCategory,
+    /// Its English name.
+    pub name: &'static str,
+    /// The family; none without a default font, for Koharu's font chain.
+    pub family: Option<String>,
+    /// Whether it's bold, at weight 700.
+    pub bold: bool,
+    pub italic: bool,
+    pub from: FontSource,
+}
+
+/// The font each category letters its text in under `settings` and `font`,
+/// the default font, in Settings' order, as a block in it is lettered while
+/// Pick fonts automatically is on, with where the font comes from.
+pub fn fonts(settings: &LetteringSettings, font: Option<&str>) -> Vec<ResolvedFont> {
+    LetteringCategory::ALL
+        .into_iter()
+        .map(|category| {
+            let resolved = settings.category_font(category, font);
+            let from = match &resolved {
+                _ if settings.categories.contains_key(&category) => FontSource::Own,
+                Some(_) => FontSource::NormalDialogue,
+                None => FontSource::Default,
+            };
+            let resolved = resolved.unwrap_or_else(|| CategoryFont {
+                family: font.map(str::to_owned),
+                ..CategoryFont::default()
+            });
+            ResolvedFont {
+                category,
+                name: category.name(),
+                family: resolved.family,
+                bold: resolved.bold,
+                italic: resolved.italic,
+                from,
+            }
         })
         .collect()
 }
@@ -227,8 +306,8 @@ pub fn info(
 mod tests {
     use std::collections::BTreeMap;
 
-    use booharu_core::{lettering::CategoryFont, shape::BubbleShape};
-    use koharu_scene::{CharStyle, Created, LanguageIdentifier, Layer, Session, Span, Text};
+    use booharu_core::shape::BubbleShape;
+    use koharu_scene::{CharStyle, Created, LanguageIdentifier, Session, Span, Text};
     use serde_json::Value;
     use tempfile::TempDir;
 
@@ -789,5 +868,83 @@ mod tests {
             json!({"category": "title", "source": "user"})
         );
         Ok(())
+    }
+
+    #[test]
+    fn blocks_answers_the_blocks_named_once_each_in_order() -> Result<()> {
+        let fixture = Fixture::new()?;
+        let settings = lettered();
+        let project = fixture.session.project();
+        let (a, c) = (fixture.id("a"), fixture.id("c"));
+        let named = blocks(&project, &[c, a, c], &settings)?;
+        let ids: Vec<LayerId> = named.iter().map(|found| found.block).collect();
+        assert_eq!(ids, [c, a]);
+        // As their page's answers them.
+        let page = info(&project, fixture.page, &settings)?;
+        assert_eq!(page.iter().find(|found| found.block == a), Some(&named[1]));
+        // A layer that isn't a block fails.
+        assert!(blocks(&project, &[fixture.id("g")], &settings).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn each_categorys_font_is_resolved_with_where_it_comes_from() {
+        use LetteringCategory::{NormalDialogue, Shout, Whisper};
+        let resolved = fonts(&lettered(), Some(FONT));
+        let order: Vec<LetteringCategory> = resolved.iter().map(|found| found.category).collect();
+        assert_eq!(order, LetteringCategory::ALL);
+        let of = |category| {
+            resolved
+                .iter()
+                .find(|found| found.category == category)
+                .map(|found| {
+                    (
+                        found.family.as_deref(),
+                        found.bold,
+                        found.italic,
+                        found.from,
+                    )
+                })
+        };
+        assert_eq!(
+            of(Shout),
+            Some((Some("Badaboom BB"), true, false, FontSource::Own))
+        );
+        assert_eq!(
+            of(NormalDialogue),
+            Some((Some("Comic Neue"), false, false, FontSource::Own))
+        );
+        assert_eq!(
+            of(Whisper),
+            Some((Some("Comic Neue"), false, false, FontSource::NormalDialogue))
+        );
+        assert_eq!(resolved[5].name, "Shout");
+        // With none, every category takes the default font, plain; an entry
+        // without a family takes it too, with its own bold and italic.
+        let mut settings = LetteringSettings::default();
+        assert!(fonts(&settings, Some(FONT)).iter().all(|found| {
+            (
+                found.family.as_deref(),
+                found.bold,
+                found.italic,
+                found.from,
+            ) == (Some(FONT), false, false, FontSource::Default)
+        }));
+        settings.categories.insert(
+            Whisper,
+            CategoryFont {
+                family: None,
+                bold: false,
+                italic: true,
+            },
+        );
+        let resolved = fonts(&settings, None);
+        assert_eq!(
+            resolved
+                .iter()
+                .find(|found| found.category == Whisper)
+                .map(|found| (found.family.clone(), found.italic, found.from)),
+            Some((None, true, FontSource::Own))
+        );
     }
 }
