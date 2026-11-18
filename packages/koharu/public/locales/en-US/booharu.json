@@ -53,7 +53,7 @@
     },
     "notice": {
       "failed": "Couldn't add the box: {{message}}",
-      "locked": "That box is locked. Unlock it first.",
+      "locked": "The layer that box would go in is locked. Unlock it first.",
       "nothing_to_read": "Nothing to read in that box."
     },
     "ocrBox": {

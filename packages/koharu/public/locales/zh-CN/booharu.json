@@ -53,7 +53,7 @@
     },
     "notice": {
       "failed": "无法添加该框：{{message}}",
-      "locked": "该框已锁定，请先解锁。",
+      "locked": "该框要加入的图层已锁定，请先解锁。",
       "nothing_to_read": "该框内没有可识别的文字。"
     },
     "ocrBox": {

@@ -53,7 +53,7 @@
     },
     "notice": {
       "failed": "框加勿上：{{message}}",
-      "locked": "箇只框锁牢哉，先解锁。",
+      "locked": "箇只框要加进去个图层锁牢哉，先解锁。",
       "nothing_to_read": "箇只框里向呒没好识别个文字。"
     },
     "ocrBox": {

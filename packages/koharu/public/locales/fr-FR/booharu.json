@@ -56,7 +56,7 @@
     },
     "notice": {
       "failed": "Impossible d’ajouter la zone : {{message}}",
-      "locked": "Cette zone est verrouillée. Déverrouillez-la d’abord.",
+      "locked": "Le calque où irait cette zone est verrouillé. Déverrouillez-le d’abord.",
       "nothing_to_read": "Rien à lire dans cette zone."
     },
     "ocrBox": {

@@ -56,7 +56,7 @@
     },
     "notice": {
       "failed": "No se ha podido añadir el cuadro: {{message}}",
-      "locked": "Ese cuadro está bloqueado. Desbloquéalo primero.",
+      "locked": "La capa donde iría ese cuadro está bloqueada. Desbloquéala primero.",
       "nothing_to_read": "No hay nada que leer en ese cuadro."
     },
     "ocrBox": {

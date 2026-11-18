@@ -56,7 +56,7 @@
     },
     "notice": {
       "failed": "Não foi possível adicionar a caixa: {{message}}",
-      "locked": "Essa caixa está bloqueada. Desbloqueie-a primeiro.",
+      "locked": "A camada onde essa caixa ficaria está bloqueada. Desbloqueie-a primeiro.",
       "nothing_to_read": "Não há nada para ler nessa caixa."
     },
     "ocrBox": {

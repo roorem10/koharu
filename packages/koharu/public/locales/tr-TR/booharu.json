@@ -53,7 +53,7 @@
     },
     "notice": {
       "failed": "Kutu eklenemedi: {{message}}",
-      "locked": "Bu kutu kilitli. Önce kilidini açın.",
+      "locked": "Bu kutunun ekleneceği katman kilitli. Önce kilidini açın.",
       "nothing_to_read": "Bu kutuda okunacak bir şey yok."
     },
     "ocrBox": {

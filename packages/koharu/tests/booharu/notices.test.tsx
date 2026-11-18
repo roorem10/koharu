@@ -26,7 +26,7 @@ describe('Booharu notices', () => {
     tell({ kind: 'failed', message: 'the page has no scan' })
     expect(shown.mock.calls.map(([options]) => [options.type, options.title])).toEqual([
       ['info', 'Nothing to read in that box.'],
-      ['info', 'That box is locked. Unlock it first.'],
+      ['info', 'The layer that box would go in is locked. Unlock it first.'],
       ['error', "Couldn't add the box: the page has no scan"],
     ])
 
