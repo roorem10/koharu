@@ -33,8 +33,19 @@ impl Tool for GetSettings {
          `read`, `read_translate`, or `read_translate_clean`; `booharu-lettering` has the \
          `default` text look, its `fill` and `stroke` colours as [red, green, blue, alpha] from \
          0 to 1, or null for Koharu's black and no outline, and its `stroke_width` from 0 to \
-         50, which new text gets, and `detect_colors`, whether a new translation keeps the \
-         colours Koharu measured (true) or gets the default look's (false); `booharu-fonts` has \
+         50, which new text gets; `detect_colors`, whether a new translation keeps the colours \
+         Koharu measured (true) or gets the default look's (false); `auto`, Pick fonts \
+         automatically, whether a block's translation is lettered in its lettering category's \
+         font as it's written, as its category changes, and by booharu_apply_text_style \
+         (true), or in the default font (false); `categories`, the categories given their own \
+         font, by id, each with its `family`, null for the default font, `bold`, and \
+         `italic`, a category without one using `normal_dialogue`'s, and without either the \
+         default font, neither bold nor italic; `small_text`, the share of the page's height, \
+         above 0 and at most 1, under which text's glyphs make it small text; and \
+         `model_confidence`, from 0 to 1, how sure a model, you included, must be of a \
+         delivery category such as `whisper` for its label to win over small text and the \
+         balloon's shape (booharu_get_text_styles answers the font each category letters in \
+         and each block's category); `booharu-fonts` has \
          the font picker's `favorites`, family names; `booharu-runs` has the Run menu's \
          `presets`, each a `name` and its `stages` (`detect`, `recognize`, `inpaint`, \
          `translate`), which set the menu's stage switches and start nothing, and how runs over \
@@ -42,7 +53,7 @@ impl Tool for GetSettings {
          tried again, `on_page_failure`, `continue` with the other pages or `stop` the run, \
          `order`, `pages` (each page through its stages) or `stages` (one stage at a time over \
          every page, using less graphics memory), and `finish_sound`, whether a run over pages \
-         chimes as it ends. New text's font is the first of Koharu's Preferred fonts, not a \
+         chimes as it ends. The default font is the first of Koharu's Preferred fonts, not a \
          Booharu setting. Needs a project open, as every tool here does."
             .to_owned()
     }
@@ -101,11 +112,15 @@ impl Tool for SetSettings {
     fn description(&self) -> String {
         "Change keys of one of Booharu's settings sections, named as booharu_get_settings names \
          them, and save that section alone; an unknown section or key, a key inside one of its \
-         tables included, or an invalid value, saves nothing. \
-         Answers the section as saved, with a note when the change applies only once Booharu \
-         restarts. A change to `booharu-lettering` applies to text made from then on, never to \
-         translations already made: booharu_apply_text_style gives those the new look. A change \
-         to `booharu-runs` applies to runs started from then on, the next run of a group \
+         tables included, or an invalid value, saves nothing. Answers the section as saved, \
+         with a note when the change applies only once Booharu restarts. `categories` changes \
+         only the categories it names, each only in the keys it names, so `{\"categories\": \
+         {\"shout\": {\"bold\": true}}}` keeps Shout's family and every other category's \
+         font, and a category set to null, `{\"categories\": {\"shout\": null}}`, loses its \
+         own font. A change to `booharu-lettering`, `auto` and `categories` included, applies \
+         to text made from then on, never to translations already made: \
+         booharu_apply_text_style gives those the new look, their category fonts among it. A \
+         change to `booharu-runs` applies to runs started from then on, the next run of a group \
          booharu_run carries on with included; a run already going keeps the settings it \
          started with. A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
          a project open, as every tool here does."
@@ -324,6 +339,61 @@ mod tests {
             .await
             .expect("new favourites");
         assert_eq!(json!(saved)["saved"], json!({"favorites": ["Anime Ace"]}));
+    }
+
+    #[tokio::test]
+    async fn category_fonts_change_one_category_and_one_key_at_a_time() {
+        let settings = Arc::new(Settings::default());
+        let (_dir, tools) = open(&settings);
+        let save = async |values: Value| {
+            let args = SetSettingsArgs {
+                section: "booharu-lettering".to_owned(),
+                values: serde_json::from_value(values).expect("keys"),
+            };
+            let saved = SetSettings.call(&mut tools.tool_context(), args).await?;
+            Ok::<_, ToolExecutionError>(json!(saved)["saved"].clone())
+        };
+        let fonts = json!({"auto": true, "categories": {
+            "shout": {"family": "Badaboom BB", "bold": true},
+            "whisper": {"italic": true},
+        }});
+        let saved = save(fonts).await.expect("category fonts");
+        assert_eq!(saved["auto"], json!(true));
+        let shout = json!({"family": "Badaboom BB", "bold": true, "italic": false});
+        let whisper = json!({"family": null, "bold": false, "italic": true});
+        assert_eq!(
+            saved["categories"],
+            json!({"shout": shout, "whisper": whisper})
+        );
+        // A category changes only in the keys named, and the others keep
+        // their fonts.
+        let lighter = json!({"categories": {"shout": {"bold": false, "italic": true}}});
+        let saved = save(lighter).await.expect("a lighter shout");
+        assert_eq!(
+            saved["categories"],
+            json!({
+                "shout": {"family": "Badaboom BB", "bold": false, "italic": true},
+                "whisper": whisper,
+            })
+        );
+        // Null takes a category's own font away; an unknown category, or a
+        // font that sets nothing, saves nothing.
+        let saved = save(json!({"categories": {"whisper": null}}))
+            .await
+            .expect("whisper's font taken away");
+        assert_eq!(saved["categories"].get("whisper"), None, "{saved}");
+        for refused in [
+            json!({"categories": {"tone": {"bold": true}}}),
+            json!({"categories": {"moan": {"family": null}}}),
+        ] {
+            assert!(save(refused.clone()).await.is_err(), "{refused}");
+        }
+        let held = settings.0.lock().lettering.clone();
+        assert!(held.auto);
+        assert_eq!(
+            held.categories.keys().collect::<Vec<_>>(),
+            [&booharu_core::lettering::LetteringCategory::Shout]
+        );
     }
 
     /// An outside app's call, as it reaches Booharu's MCP server: its own

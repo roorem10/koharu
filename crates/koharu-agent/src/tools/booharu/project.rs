@@ -45,9 +45,12 @@ impl Tool for GetProjectOverview {
          families a text falls back on; the name of every font family a text can be set in; as \
          `new_text` the look new text gets: the default `font`, the first of Koharu's Preferred \
          fonts, the default `fill` and `stroke` colours as [red, green, blue, alpha] from 0 to \
-         1, null for Koharu's black and no outline, the outline's `stroke_width`, and \
-         `detect_colors`, whether a new translation keeps the colours Koharu measured; and \
-         Booharu's settings. A part that can't be read gives its error instead."
+         1, null for Koharu's black and no outline, the outline's `stroke_width`, \
+         `detect_colors`, whether a new translation keeps the colours Koharu measured, and \
+         `auto`, Pick fonts automatically, whether a new translation is lettered in its \
+         block's lettering category's font instead of `font`, as booharu_get_text_styles \
+         answers each category's font and each block's category; and Booharu's settings. A \
+         part that can't be read gives its error instead."
             .to_owned()
     }
 
@@ -123,6 +126,10 @@ struct NewText {
     /// Whether a new translation keeps the colours Koharu measured, rather
     /// than taking the default ones; the T tool's text always takes them.
     detect_colors: bool,
+    /// Pick fonts automatically: whether a new translation is lettered in
+    /// its block's lettering category's font rather than `font`; the T
+    /// tool's text never is.
+    auto: bool,
 }
 
 /// The look new text gets from `settings`, `[booharu-lettering]`, and
@@ -135,6 +142,7 @@ fn new_text((settings, font): (LetteringSettings, Option<String>)) -> NewText {
         stroke: look.stroke,
         stroke_width: look.stroke.map(|_| look.stroke_width),
         detect_colors: settings.detect_colors,
+        auto: settings.auto,
     }
 }
 
@@ -439,12 +447,14 @@ mod tests {
                 stroke: None,
                 stroke_width: None,
                 detect_colors: true,
+                auto: false,
             }
         );
         settings.default.fill = Some(red);
         settings.default.stroke = Some(Rgba([1.0; 4]));
         settings.default.stroke_width = 3.0;
         settings.detect_colors = false;
+        settings.auto = true;
         assert_eq!(
             json!(new_text((settings, None))),
             json!({
@@ -453,6 +463,7 @@ mod tests {
                 "stroke": [1.0, 1.0, 1.0, 1.0],
                 "stroke_width": 3.0,
                 "detect_colors": false,
+                "auto": true,
             })
         );
     }

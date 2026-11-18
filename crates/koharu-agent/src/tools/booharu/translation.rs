@@ -36,8 +36,9 @@ impl Tool for SetTranslation {
          gets one placed first, as the Translation stage places its own in the translator's \
          target language: in the block's room in its balloon, or in its source's frame, at the \
          page's lettering size, with the block's clean-up shown under it, and with the default \
-         look new translations get: the first Preferred font, and with colour detection off \
-         the default colours. A block with one keeps its place, lettering, and language. A \
+         look new translations get: the first Preferred font, or while Pick fonts \
+         automatically is on its lettering category's font, and with colour detection off the \
+         default colours. A block with one keeps its place, lettering, and language. A \
          translation set this way counts as typed by hand, so booharu_apply_text_style leaves \
          it alone unless told to include such blocks. Answers what changed."
             .to_owned()
