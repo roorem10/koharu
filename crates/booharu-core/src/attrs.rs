@@ -118,7 +118,7 @@ impl Attr for ReadNote {
     const KEY: &'static str = "read_note";
 }
 
-/// `review_note`: string, on a block: a reviewer's note.
+/// `review_note`: string, on a block or a text layer: a reviewer's note.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(transparent)]
 pub struct ReviewNote(pub String);
