@@ -54,7 +54,8 @@ impl<'a> Turn<'a> {
         conversation: &mut Conversation,
         model: &DynModel<Completion>,
     ) -> Result<Option<Vec<String>>> {
-        conversation.context.fit(model).await?;
+        // Booharu: a hosted model's summary has ten minutes, as a request has.
+        crate::booharu::answered(model, conversation.context.fit(model)).await?;
         let history: Vec<Message> = conversation
             .context
             .messages()
@@ -112,7 +113,8 @@ impl<'a> Turn<'a> {
             .prompt(Message::from(content))
             .history(history);
         let response = tokio::select! {
-            response = request.into_future() => response?,
+            // Booharu: a hosted model has ten minutes to answer.
+            response = crate::booharu::answered(model, request.into_future()) => response?,
             () = self.cancel.cancelled() => return Ok(None),
         };
         let translations = answers(&response.output(), &self.keys)?;

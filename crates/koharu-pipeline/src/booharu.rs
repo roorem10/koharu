@@ -15,6 +15,10 @@
 //!   reports it, with the class the run policy goes by, which the scheduler's
 //!   `booharu` module follows: another try, the page given up on, or the run
 //!   ended.
+//! - `answered`, in a translation's turn, gives a hosted model's request ten
+//!   minutes to answer.
+
+use std::{future::Future, time::Duration};
 
 use booharu_core::{
     runs::{RunPolicy, RunStage},
@@ -22,8 +26,11 @@ use booharu_core::{
     styles,
 };
 use koharu_llm::rig::{
+    catalog::ModelSpec,
+    driver::DynModel,
     error::{ErrorReport, ProviderError},
     http_client,
+    operation::Completion,
 };
 use koharu_renderer::RendererConfig;
 use koharu_scene::{LayerId, Op, PageId, Project};
@@ -153,7 +160,8 @@ pub(crate) enum Class {
     /// sent three more times, so another page try would send it four more.
     HostedRetried,
     /// Anything else, which another try may get past: a dropped connection,
-    /// an answer broken, blank, or short of a text, or a model's own error.
+    /// the ten minutes a hosted translation has, an answer broken, blank, or
+    /// short of a text, or a model's own error.
     Retryable,
 }
 
@@ -213,6 +221,52 @@ fn scene(error: &koharu_scene::Error) -> Class {
     match error {
         NotFound(_) | Invalid { .. } | Locked { .. } | Rejected(_) => Class::Invalid,
         _ => Class::Write,
+    }
+}
+
+/// How long a hosted translation's request has to answer, as Booharu 0.0.4
+/// gave each: a provider that took the request and never answers then fails
+/// the page, which is tried again, rather than holding the run.
+const ANSWER_LIMIT: Duration = Duration::from_secs(10 * 60);
+
+/// A hosted translation request that went unanswered for `ANSWER_LIMIT`.
+#[derive(Debug, thiserror::Error)]
+#[error("The translation model didn't answer within 10 minutes.")]
+pub(crate) struct Unanswered;
+
+/// `request`, a translation's call to `model`, which fails as `Unanswered`
+/// after ten minutes when `model` is hosted, and waits as long as it takes
+/// for Koharu's own: a local model's turn waits only on the GPU, which a
+/// slow card makes long. Every other vendor counts as hosted, LM Studio's,
+/// Ollama's, and an OpenAI-compatible server's included, as in Booharu 0.0.4.
+/// The limit goes on each request, never on koharu-llm's shared client, which
+/// also carries the agent's streams.
+pub(crate) async fn answered<T, E: Into<anyhow::Error>>(
+    model: &DynModel<Completion>,
+    request: impl Future<Output = Result<T, E>>,
+) -> anyhow::Result<T> {
+    within(ANSWER_LIMIT, hosted(model.spec()), request).await
+}
+
+/// Whether the model `spec` describes is a hosted one: any vendor's but
+/// Koharu's own, as `stages::key` tells them apart by the `vendor/model`
+/// reference the spec was connected from.
+fn hosted(spec: Option<&ModelSpec>) -> bool {
+    spec.is_none_or(|spec| spec.provider.vendor() != koharu_llm::KOHARU)
+}
+
+/// `request`, failing as `Unanswered` once `limit` passes when `limited`.
+async fn within<T, E: Into<anyhow::Error>>(
+    limit: Duration,
+    limited: bool,
+    request: impl Future<Output = Result<T, E>>,
+) -> anyhow::Result<T> {
+    if !limited {
+        return request.await.map_err(Into::into);
+    }
+    match tokio::time::timeout(limit, request).await {
+        Ok(answer) => answer.map_err(Into::into),
+        Err(_) => Err(Unanswered.into()),
     }
 }
 
@@ -700,5 +754,36 @@ mod tests {
         for (error, expected) in cases {
             assert_eq!(class(&error), expected, "{error:#}");
         }
+    }
+
+    #[test]
+    fn only_a_hosted_model_has_a_time_limit() {
+        use koharu_llm::rig::providers::registry::ProviderId;
+
+        let spec =
+            |vendor: &str| ModelSpec::new(ProviderId::declare(vendor).expect("a vendor"), "model");
+        assert!(!hosted(Some(&spec(koharu_llm::KOHARU))));
+        for vendor in ["openai", "lmstudio", "ollama"] {
+            assert!(hosted(Some(&spec(vendor))), "{vendor}");
+        }
+        assert!(hosted(None));
+    }
+
+    #[tokio::test]
+    async fn a_hosted_request_left_unanswered_fails_once_its_time_is_up() {
+        let limit = Duration::from_millis(20);
+        let stalled = std::future::pending::<anyhow::Result<()>>();
+        let error = within(limit, true, stalled).await.expect_err("no answer");
+        assert_eq!(
+            error.to_string(),
+            "The translation model didn't answer within 10 minutes."
+        );
+        assert_eq!(class(&error), Class::Retryable);
+        // Koharu's own model takes as long as it takes.
+        let slow = async {
+            tokio::time::sleep(limit * 3).await;
+            anyhow::Ok("answered")
+        };
+        assert_eq!(within(limit, false, slow).await.ok(), Some("answered"));
     }
 }
