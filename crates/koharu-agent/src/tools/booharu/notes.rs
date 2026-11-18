@@ -150,9 +150,9 @@ mod tests {
             .expect("a lock");
         let refused = note(&tools, block, json!("Too late")).await;
         assert!(
-            refused
-                .as_ref()
-                .is_err_and(|error| error.contains(&format!("layer {block} is locked"))),
+            refused.as_ref().is_err_and(|error| {
+                error.contains(" is locked") && error.contains(&format!("(layer {block})"))
+            }),
             "{refused:?}"
         );
         assert_eq!(noted(&tools, block), None);

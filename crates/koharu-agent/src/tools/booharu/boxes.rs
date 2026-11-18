@@ -569,9 +569,10 @@ mod tests {
         let refused = |result: Result<_, ToolExecutionError>| {
             let error = result.err().map(|error| error.to_string());
             assert!(
-                error
-                    .as_ref()
-                    .is_some_and(|error| error.contains(&format!("layer {second} is locked"))),
+                error.as_ref().is_some_and(|error| {
+                    error.contains("the text \"う\" is locked")
+                        && error.contains(&format!("(layer {second})"))
+                }),
                 "{error:?}"
             );
         };

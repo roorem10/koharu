@@ -44,16 +44,20 @@ const HALF: &str = "half";
 
 /// Why a box action changes nothing, which the interface tells apart from a
 /// failure.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum Refusal {
     /// The box holds no ink to read: the page is nearly one colour there,
     /// or shows only other blocks' lettering, which reading leaves out.
     #[error("there's nothing to read in this box")]
     NothingToRead,
     /// The action would change `layer`, or a layer inside it, and `layer`
-    /// is locked.
-    #[error("layer {layer} is locked, so this can't change it or what it holds; unlock it first")]
-    Locked { layer: LayerId },
+    /// is locked. `name` names it as the Layers panel does, for whoever
+    /// reads the message; its id is for the agent's tools.
+    #[error(
+        "{name} is locked, so this can't change it or what it holds; unlock it in Layers first \
+         (layer {layer})"
+    )]
+    Locked { layer: LayerId, name: String },
 }
 
 /// A balloon whose text is split over two or more text blocks, which a
@@ -273,7 +277,7 @@ pub fn split_block(session: &Session, block: LayerId) -> Result<Edit> {
         bail!("layer {block} isn't a block");
     };
     unlocked(&project, block)?;
-    unlocked_parts(found)?;
+    unlocked_parts(&project, block)?;
     let source = &found.source;
     let frame = match &source.frame {
         Frame::Box { bounds, .. } => kurbo::Rect::from(*bounds),
@@ -431,7 +435,7 @@ fn joined(session: &Session, project: &Project, page: PageId, groups: &[Group]) 
             unlocked(project, *id)?;
         }
         // The kept block's mask and clean-up take the others' pixels.
-        unlocked_parts(group.blocks[0].1)?;
+        unlocked_parts(project, group.blocks[0].0)?;
     }
     // Where each balloon's text stands once joined, and the page's other
     // texts, which share a balloon with a text reaching into it.
@@ -821,25 +825,64 @@ fn unlocked(project: &Project, layer: LayerId) -> Result<()> {
     let mut at = Some(project.layer(layer)?);
     while let Some(layer) = at {
         if layer.locked {
-            return Err(Refusal::Locked { layer: layer.id }.into());
+            let name = named(layer);
+            return Err(Refusal::Locked {
+                layer: layer.id,
+                name,
+            }
+            .into());
         }
         at = project.parent(layer.id)?.1;
     }
     Ok(())
 }
 
-/// Refuses when `block`'s mask or clean-up is locked itself, which a write
-/// to its pixels fails on.
-fn unlocked_parts(block: &Block) -> Result<()> {
-    for (id, locked) in [
-        (block.mask.id, block.mask.locked),
-        (block.cleanup.id, block.cleanup.locked),
+/// Refuses when the mask or the clean-up of `block` is locked itself, which
+/// a write to its pixels fails on.
+fn unlocked_parts(project: &Project, block: LayerId) -> Result<()> {
+    let layer = project.layer(block)?;
+    let Content::Block(found) = &layer.content else {
+        bail!("layer {block} isn't a block");
+    };
+    for (id, locked, part) in [
+        (found.mask.id, found.mask.locked, "mask"),
+        (found.cleanup.id, found.cleanup.locked, "clean-up"),
     ] {
         if locked {
-            return Err(Refusal::Locked { layer: id }.into());
+            let name = format!("the {part} of {}", named(layer));
+            return Err(Refusal::Locked { layer: id, name }.into());
         }
     }
     Ok(())
+}
+
+/// The most characters of a text that [`named`] quotes.
+const NAMED_TEXT: usize = 32;
+
+/// `layer` as the Layers panel names it: by its own name, else by its text,
+/// a block's translation before its source, else by its kind.
+fn named(layer: &Layer) -> String {
+    let name = layer.name.trim();
+    if !name.is_empty() {
+        return format!("\"{name}\"");
+    }
+    let text = match &layer.content {
+        Content::Block(block) => block
+            .translation
+            .as_ref()
+            .map(|translation| translation.content.text())
+            .filter(|text| !text.trim().is_empty())
+            .unwrap_or_else(|| block.source.content.text()),
+        Content::Text(text) => text.content.text(),
+        _ => String::new(),
+    };
+    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if text.is_empty() {
+        return format!("the {}", layer.kind().as_ref().replace('_', " "));
+    }
+    let quoted: String = text.chars().take(NAMED_TEXT).collect();
+    let more = if quoted.len() < text.len() { "…" } else { "" };
+    format!("the text \"{quoted}{more}\"")
 }
 
 /// What a box over `rect` of `page` goes in: the smallest balloon whose
@@ -1319,7 +1362,15 @@ mod tests {
     }
 
     fn refusal(result: Result<Edit>) -> Option<Refusal> {
-        result.err()?.downcast_ref::<Refusal>().copied()
+        result.err()?.downcast_ref::<Refusal>().cloned()
+    }
+
+    /// The layer a [`Refusal::Locked`] names, when `result` is one.
+    fn locked(result: Result<Edit>) -> Option<LayerId> {
+        match refusal(result)? {
+            Refusal::Locked { layer, .. } => Some(layer),
+            Refusal::NothingToRead => None,
+        }
     }
 
     fn pixel_rect(x: i32, y: i32, width: u32, height: u32) -> Rect {
@@ -1968,20 +2019,11 @@ mod tests {
             ..
         } = split_balloon()?;
         page.update(blank, json!({"locked": true}))?;
-        assert_eq!(
-            refusal(join_balloon(&page.session, first)),
-            Some(Refusal::Locked { layer: blank })
-        );
-        assert_eq!(
-            refusal(join_page(&page.session, page.page)),
-            Some(Refusal::Locked { layer: blank })
-        );
+        assert_eq!(locked(join_balloon(&page.session, first)), Some(blank));
+        assert_eq!(locked(join_page(&page.session, page.page)), Some(blank));
         page.update(blank, json!({"locked": false}))?;
         page.update(balloon, json!({"locked": true}))?;
-        assert_eq!(
-            refusal(join_balloon(&page.session, first)),
-            Some(Refusal::Locked { layer: balloon })
-        );
+        assert_eq!(locked(join_balloon(&page.session, first)), Some(balloon));
         Ok(())
     }
 
@@ -2283,10 +2325,7 @@ mod tests {
                 .is_err_and(|error| error.to_string().contains("too small"))
         );
         page.update(block, json!({"locked": true}))?;
-        assert_eq!(
-            refusal(split_block(&page.session, block)),
-            Some(Refusal::Locked { layer: block })
-        );
+        assert_eq!(locked(split_block(&page.session, block)), Some(block));
         Ok(())
     }
 
@@ -2335,12 +2374,66 @@ mod tests {
         assert!(review_note(&page.session.project(), raster, Some("No".to_owned())).is_err());
         page.update(group, json!({"locked": true}))?;
         assert_eq!(
-            refusal(review_note(
+            locked(review_note(
                 &page.session.project(),
                 block,
                 Some("No".to_owned())
             )),
-            Some(Refusal::Locked { layer: group })
+            Some(group)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_locked_layer_is_named_as_the_layers_panel_names_it() -> Result<()> {
+        let mut page = Fixture::new(100, 100, &[])?;
+        let panel = page.add(
+            None,
+            json!({"kind": "panel", "outline": outline(0.0, 0.0, 100.0, 100.0)}),
+        )?;
+        let block = page.add(
+            Some(panel),
+            text_block(
+                page_bounds(10.0, 10.0, 20.0, 20.0),
+                Direction::Horizontal,
+                "Hello\n there",
+            ),
+        )?;
+        let refused = |page: &Fixture| -> String {
+            let note = review_note(&page.session.project(), block, Some("No".to_owned()));
+            note.err()
+                .map(|error| error.to_string())
+                .unwrap_or_default()
+        };
+
+        page.update(panel, json!({"locked": true}))?;
+        assert_eq!(
+            refused(&page),
+            format!(
+                "the panel is locked, so this can't change it or what it holds; unlock it in \
+                 Layers first (layer {panel})"
+            )
+        );
+        // A layer's own name, which a lock keeps from changing.
+        page.update(panel, json!({"locked": false}))?;
+        page.update(panel, json!({"name": "Page top"}))?;
+        page.update(panel, json!({"locked": true}))?;
+        assert!(refused(&page).starts_with("\"Page top\" is locked"));
+        page.update(panel, json!({"locked": false}))?;
+        page.update(block, json!({"locked": true}))?;
+        assert!(refused(&page).starts_with("the text \"Hello there\" is locked"));
+
+        // A part of a block, which a split writes to, by its block.
+        page.update(block, json!({"locked": false}))?;
+        let mask = page.block(block)?.mask.id;
+        page.update(block, json!({"mask": {"locked": true}}))?;
+        let split = split_block(&page.session, block);
+        assert_eq!(
+            split.err().map(|error| error.to_string()),
+            Some(format!(
+                "the mask of the text \"Hello there\" is locked, so this can't change it or what \
+                 it holds; unlock it in Layers first (layer {mask})"
+            ))
         );
         Ok(())
     }
