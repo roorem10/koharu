@@ -22,6 +22,15 @@ export const MAX_OUTLINE_WIDTH = 50
 /** How long a change waits for the next before it's saved, as Koharu's settings autosave waits. */
 const SAVE_DELAY = 260
 
+/** The `flush` of each default text style section showing, which saves its change still waiting. */
+const flushes = new Set<() => void>()
+
+/** Saves the default text style's change still waiting at once, as Apply does before it counts or
+ * applies, in the section's own row or the Lettering categories card's. */
+export function flushDefaultTextStyle() {
+  for (const flush of flushes) flush()
+}
+
 /** Whether `width` is an outline width the section takes: finite and from 0 to 50. */
 export function isOutlineWidth(width: number | null): width is number {
   return width !== null && Number.isFinite(width) && width >= 0 && width <= MAX_OUTLINE_WIDTH
@@ -38,10 +47,10 @@ export function isBuiltIn(look: DefaultLook): boolean {
  * `change`, which takes one: changes wait until none has come for a moment, as Koharu's settings
  * do, then are saved together over what the file holds just before, replacing only the keys they
  * name, so a key or section another writer changed meanwhile stays as that writer left it. A
- * change still waiting when the section goes is saved then, and `flush` saves one at once, as
- * Apply does before it counts. Once the last save ends, what the file holds shows again, so after a
- * failed save, whose error shows as every failed command's does, the section shows the file's
- * values. */
+ * change still waiting when the section goes is saved then, and `flushDefaultTextStyle` saves one
+ * at once, as Apply does before it counts. Once the last save ends, what the file holds shows
+ * again, so after a failed save, whose error shows as every failed command's does, the section
+ * shows the file's values. */
 export function useDefaultTextStyle() {
   const preferences = useBooharuPreferences()
   const [unsaved, setUnsaved] = useState<Partial<DefaultLook> | null>(null)
@@ -65,8 +74,15 @@ export function useDefaultTextStyle() {
       })
   }, [])
 
-  // A change still waiting is saved when the section goes, such as when another tab opens.
-  useEffect(() => flush, [flush])
+  // A change still waiting is saved when Apply asks, wherever its row is, and when the section
+  // goes, such as when another tab opens.
+  useEffect(() => {
+    flushes.add(flush)
+    return () => {
+      flushes.delete(flush)
+      flush()
+    }
+  }, [flush])
 
   const change = useCallback(
     (patch: Partial<DefaultLook>) => {
@@ -89,7 +105,7 @@ export function useDefaultTextStyle() {
     stroke_width: saved?.stroke_width ?? builtInLook.stroke_width,
     ...unsaved,
   }
-  return { look, loaded: preferences.data !== undefined, change, flush }
+  return { look, loaded: preferences.data !== undefined, change }
 }
 
 /** Whether new translations keep the colours of the original lettering, `detect_colors` of
