@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { StoryBoxActions } from '@/components/booharu/boxes/BoxActionItems' // Booharu: box actions.
+import { GlossaryTextMenu } from '@/components/booharu/context/GlossaryTextMenu' // Booharu: Add to glossary.
 import { BoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the row's Box details tag.
 import { CategoryTag } from '@/components/booharu/lettering/CategoryTag' // Booharu: the row's lettering category.
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
@@ -325,27 +326,33 @@ function StoryText({
                 {t('story.sfx')}
               </span>
             )}
-            <CommitTextarea
-              aria-label={t('layers.sourceLabel', { name })}
-              placeholder={t('inspector.source')}
-              wrap='soft'
-              disabled={locked}
-              className={`${field} text-muted-foreground`}
-              value={plainText(layer.source)}
-              onCommit={(text) => dispatch(setSourceText, layer.id, text)}
-            />
-            <CommitTextarea
-              aria-label={t('layers.translationLabel', { name })}
-              placeholder={t('inspector.translation')}
-              wrap='soft'
-              disabled={locked}
-              className={`${field} border-primary/25`}
-              value={plainText(layer.translation)}
-              // Booharu: a block's first translation goes in its frame, not the page's corner (#128).
-              onCommit={(text) =>
-                dispatch(layer.translation ? setText : setTranslation, layer.id, text)
-              }
-            />
+            {/* Booharu: right-click Add to glossary on the source and the translation. */}
+            <GlossaryTextMenu
+              source={plainText(layer.source)}
+              translation={plainText(layer.translation)}
+            >
+              <CommitTextarea
+                aria-label={t('layers.sourceLabel', { name })}
+                placeholder={t('inspector.source')}
+                wrap='soft'
+                disabled={locked}
+                className={`${field} text-muted-foreground`}
+                value={plainText(layer.source)}
+                onCommit={(text) => dispatch(setSourceText, layer.id, text)}
+              />
+              <CommitTextarea
+                aria-label={t('layers.translationLabel', { name })}
+                placeholder={t('inspector.translation')}
+                wrap='soft'
+                disabled={locked}
+                className={`${field} border-primary/25`}
+                value={plainText(layer.translation)}
+                // Booharu: a block's first translation goes in its frame, not the page's corner (#128).
+                onCommit={(text) =>
+                  dispatch(layer.translation ? setText : setTranslation, layer.id, text)
+                }
+              />
+            </GlossaryTextMenu>
           </>
         ) : (
           <CommitTextarea

@@ -319,6 +319,13 @@ async function afterWrites<T>(command: () => Promise<T>): Promise<T> {
   return command()
 }
 
+/** `text`, a line's or a selection's, as a term's source or translation: on one line, its runs of
+ * whitespace one space each, trimmed. Terms are matched ignoring whitespace, so this changes no
+ * match. */
+export function termText(text: string): string {
+  return text.replace(/\s+/gu, ' ').trim()
+}
+
 /** The key of where terms are used in the open project, under the project's, so the change, undo
  * or redo of any page reads it again: a run that translates a line, or a fix by hand, changes what
  * re-translating the lines using a term would do. */

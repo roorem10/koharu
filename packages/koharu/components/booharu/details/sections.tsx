@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { GlossaryTextMenu } from '@/components/booharu/context/GlossaryTextMenu'
 import { LetteringSection } from '@/components/booharu/lettering/LetteringSection'
 import { call } from '@/lib/backend'
 import { reviewNote } from '@/lib/booharu/attrs'
@@ -43,7 +44,7 @@ export const boxDetailsSections: readonly BoxDetailsSection[] = [
 ]
 
 /** The text's source and translation, or a text layer's text, short and read-only: Story edits
- * them, and Show in Story goes there. */
+ * them, and Show in Story goes there. A block's, as in Story, take a right-click Add to glossary. */
 function SourceSection({ page, box: { layer } }: BoxDetailsProps) {
   const { t } = useTranslation()
   const fields = isBlockLayer(layer)
@@ -52,18 +53,30 @@ function SourceSection({ page, box: { layer } }: BoxDetailsProps) {
         { label: t('booharu.details.translation'), text: plainText(layer.translation) },
       ]
     : [{ label: t('booharu.details.text'), text: plainText(layer) }]
+  const list = (
+    <dl className='grid gap-1.5'>
+      {fields.map(({ label, text }) => (
+        <div key={label} className='grid gap-0.5'>
+          <dt className='text-[10px] text-muted-foreground'>{label}</dt>
+          <dd className='line-clamp-3 text-[12px] leading-4 break-words whitespace-pre-wrap'>
+            {text || <span className='text-muted-foreground'>{t('booharu.details.empty')}</span>}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
   return (
     <div className='grid gap-2'>
-      <dl className='grid gap-1.5'>
-        {fields.map(({ label, text }) => (
-          <div key={label} className='grid gap-0.5'>
-            <dt className='text-[10px] text-muted-foreground'>{label}</dt>
-            <dd className='line-clamp-3 text-[12px] leading-4 break-words whitespace-pre-wrap'>
-              {text || <span className='text-muted-foreground'>{t('booharu.details.empty')}</span>}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      {isBlockLayer(layer) ? (
+        <GlossaryTextMenu
+          source={plainText(layer.source)}
+          translation={plainText(layer.translation)}
+        >
+          {list}
+        </GlossaryTextMenu>
+      ) : (
+        list
+      )}
       <Button
         type='button'
         variant='outline'
