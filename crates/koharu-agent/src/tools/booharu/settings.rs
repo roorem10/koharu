@@ -29,7 +29,9 @@ impl Tool for GetSettings {
     fn description(&self) -> String {
         "Booharu's settings, each section under its table name with every key's value: \
          `booharu-mcp` has the `port` the MCP server outside apps reach Booharu through listens \
-         on. Needs a project open, as every tool here does."
+         on; `booharu-ocr-box` has the `default_mode` a box drawn with the O tool goes through, \
+         `read`, `read_translate`, or `read_translate_clean`. Needs a project open, as every \
+         tool here does."
             .to_owned()
     }
 
@@ -191,7 +193,13 @@ mod tests {
             .call(&mut tools.tool_context(), NoArgs {})
             .await
             .expect("the settings");
-        assert_eq!(json!(read), json!({"booharu-mcp": {"port": 47821}}));
+        assert_eq!(
+            json!(read),
+            json!({
+                "booharu-mcp": {"port": 47821},
+                "booharu-ocr-box": {"default_mode": "read_translate"},
+            })
+        );
 
         let args = |port: u16| SetSettingsArgs {
             section: McpSettings::NAME.to_owned(),

@@ -47,12 +47,42 @@ fn port<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u16, D::Error> {
     Ok(port)
 }
 
+/// `[booharu-ocr-box]`: the O tool, whose box drawn on a page becomes a text
+/// block that is read, and as its mode says translated and cleaned.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
+pub struct OcrBoxSettings {
+    /// What a drawn box goes through when the drawing picks no other mode.
+    pub default_mode: OcrBoxMode,
+}
+
+impl Section for OcrBoxSettings {
+    const NAME: &'static str = "booharu-ocr-box";
+}
+
+/// What a box drawn with the O tool goes through, Booharu 0.0.4's three
+/// modes: it's always read. Only a box that is cleaned gets a mask, the whole
+/// box, so reading it never erases the art inside.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum OcrBoxMode {
+    /// Read only.
+    Read,
+    /// Read, then translated.
+    #[default]
+    ReadTranslate,
+    /// Read, cleaned under the whole box, then translated.
+    ReadTranslateClean,
+}
+
 /// Every Booharu settings section, each under its table's name. Koharu's
 /// own stay in its `Preferences`.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct BooharuPreferences {
     #[serde(rename = "booharu-mcp")]
     pub mcp: McpSettings,
+    #[serde(rename = "booharu-ocr-box")]
+    pub ocr_box: OcrBoxSettings,
 }
 
 impl BooharuPreferences {
@@ -61,6 +91,7 @@ impl BooharuPreferences {
     pub fn get() -> anyhow::Result<Self> {
         Ok(Self {
             mcp: koharu_config::get()?,
+            ocr_box: koharu_config::get()?,
         })
     }
 
@@ -71,8 +102,9 @@ impl BooharuPreferences {
         // value, stored or given, writes nothing.
         Self::get()?;
         self.check()?;
-        let Self { mcp } = self;
+        let Self { mcp, ocr_box } = self;
         koharu_config::update(|section: &mut McpSettings| *section = mcp)?;
+        koharu_config::update(|section: &mut OcrBoxSettings| *section = ocr_box)?;
         Self::get()
     }
 
@@ -165,7 +197,12 @@ mod tests {
         let mcp: McpSettings = toml::from_str("").expect("the defaults");
         assert_eq!(mcp, McpSettings::default());
         assert_eq!(mcp.port, 47821);
-        assert_eq!(BooharuPreferences::names(), [McpSettings::NAME]);
+        let ocr_box: OcrBoxSettings = toml::from_str("").expect("the defaults");
+        assert_eq!(ocr_box.default_mode, OcrBoxMode::ReadTranslate);
+        assert_eq!(
+            BooharuPreferences::names(),
+            [McpSettings::NAME, OcrBoxSettings::NAME]
+        );
     }
 
     #[test]
@@ -183,7 +220,42 @@ mod tests {
         );
         // A save checks what it's given before it writes anything.
         let mcp = McpSettings { port: 80 };
-        assert!(BooharuPreferences { mcp }.check().is_err());
+        let preferences = BooharuPreferences {
+            mcp,
+            ..BooharuPreferences::default()
+        };
+        assert!(preferences.check().is_err());
+    }
+
+    #[test]
+    fn an_unknown_ocr_box_mode_fails_closed() {
+        let error = toml::from_str::<OcrBoxSettings>(r#"default_mode = "clean""#)
+            .expect_err("no such mode");
+        assert!(error.to_string().contains("unknown variant"), "{error}");
+        let read: OcrBoxSettings =
+            toml::from_str(r#"default_mode = "read_translate_clean""#).expect("a mode");
+        assert_eq!(read.default_mode, OcrBoxMode::ReadTranslateClean);
+    }
+
+    #[test]
+    fn the_ocr_box_mode_changes_by_its_section_alone() {
+        let mut preferences = BooharuPreferences::default();
+        preferences
+            .set_section("booharu-ocr-box", values(json!({"default_mode": "read"})))
+            .expect("a mode");
+        assert_eq!(preferences.ocr_box.default_mode, OcrBoxMode::Read);
+        assert_eq!(preferences.mcp, McpSettings::default());
+        assert_eq!(
+            preferences.section("booharu-ocr-box").ok(),
+            Some(json!({"default_mode": "read"}))
+        );
+
+        let refused = preferences.set_section(
+            "booharu-ocr-box",
+            values(json!({"default_mode": "read_everything"})),
+        );
+        assert!(refused.is_err());
+        assert_eq!(preferences.ocr_box.default_mode, OcrBoxMode::Read);
     }
 
     #[test]
