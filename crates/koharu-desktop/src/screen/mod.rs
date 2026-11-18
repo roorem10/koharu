@@ -225,6 +225,17 @@ impl Screen {
         });
     }
 
+    /// Booharu: Booharu's settings, for the canvas and any made later, as
+    /// `set_brush` sets the brush.
+    pub fn set_booharu(&self, settings: koharu_canvas::booharu::BooharuSettings) {
+        self.change(move |main| {
+            if let Some(canvas) = &mut main.canvas {
+                canvas.set_booharu(settings.clone());
+            }
+            main.settings.booharu = settings;
+        });
+    }
+
     /// Fits the page in the canvas.
     pub fn fit(&self) {
         self.change(|main| {
@@ -362,12 +373,15 @@ struct Shared {
     pacer: Pacer,
 }
 
-#[derive(Clone, Copy, Default)]
+// Booharu: not `Copy`, as Booharu's settings hold a font's name.
+#[derive(Clone, Default)]
 struct Settings {
     tool: Tool,
     brush: Brush,
     colors: Colors,
     story: Story,
+    /// Booharu: Booharu's settings, as the app pushed them last.
+    booharu: koharu_canvas::booharu::BooharuSettings,
 }
 
 impl Main {
@@ -398,13 +412,19 @@ impl Main {
     }
 
     fn set_canvas(&mut self, canvas: Option<Canvas>) {
-        let (viewport, scale, settings) = (self.physical_viewport(), self.scale(), self.settings);
+        // Booharu: the settings cloned, as they're no longer `Copy`.
+        let (viewport, scale, settings) = (
+            self.physical_viewport(),
+            self.scale(),
+            self.settings.clone(),
+        );
         self.canvas = canvas.map(|mut canvas| {
             canvas.set_viewport(viewport, scale);
             canvas.set_tool(settings.tool);
             canvas.set_brush(settings.brush);
             canvas.set_colors(settings.colors);
             canvas.set_story(settings.story);
+            canvas.set_booharu(settings.booharu); // Booharu: and Booharu's settings.
             canvas
         });
         if self.canvas.is_none() {
@@ -751,6 +771,7 @@ pub fn open(
         }),
     }));
     let _ = screen.0.set(handle.clone());
+    crate::booharu::canvas::push(screen); // Booharu: Booharu's settings, from the start.
 
     let config = handle
         .config()

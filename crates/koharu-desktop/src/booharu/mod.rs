@@ -1,9 +1,11 @@
 //! Booharu's part of the app: its commands, which the Booharu block of
 //! `commands` lists, its events, which `events::bindings` lists, what the
-//! canvas's Booharu effect does, the MCP server's start on Booharu's own
-//! port, and the host Booharu's agent tools reach the app through.
+//! canvas's Booharu effect does, the Booharu settings pushed to the canvas,
+//! the MCP server's start on Booharu's own port, and the host Booharu's
+//! agent tools reach the app through.
 
 pub(crate) mod boxes;
+pub(crate) mod canvas;
 pub(crate) mod events;
 pub(crate) mod fonts;
 pub(crate) mod mcp;
@@ -19,7 +21,7 @@ use booharu_core::settings::BooharuPreferences;
 use koharu_agent::BooharuHost;
 use koharu_scene::{Change, Edit, Session};
 
-use crate::{app::App, commands::Result};
+use crate::{app::App, commands::Result, screen::Screen};
 
 /// Builds an edit with `build` from the open project and applies it as one
 /// undo step, as `App::edit` applies one, but under the lock it was built
@@ -46,8 +48,9 @@ fn applied(
 }
 
 /// The app as Booharu's agent tools reach it, the in-app agent's and the MCP
-/// server's alike, through what the commands run.
-pub(crate) struct DesktopHost;
+/// server's alike, through what the commands run: the window, for the
+/// canvas's settings after a save.
+pub(crate) struct DesktopHost(pub(crate) Screen);
 
 impl BooharuHost for DesktopHost {
     fn preferences(&self) -> anyhow::Result<BooharuPreferences> {
@@ -58,6 +61,8 @@ impl BooharuHost for DesktopHost {
         &self,
         preferences: BooharuPreferences,
     ) -> anyhow::Result<BooharuPreferences> {
-        preferences.save()
+        let saved = preferences.save()?;
+        canvas::push(&self.0);
+        Ok(saved)
     }
 }
