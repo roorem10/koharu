@@ -35,6 +35,15 @@ Koharu Agent はエディターに組み込まれたプロジェクトのアシ�
 
 Koharu の実行中は、同じツールを MCP の Streamable HTTP トランスポートで `http://127.0.0.1:7878/mcp` から提供します。この URL はエージェントパネルの上部に表示されます。同じマシンの MCP クライアントにこの URL を追加してください。サーバーは開いているプロジェクトを対象に動作し、このマシンからの接続だけを受け付け、Web ページからのリクエストは拒否します。
 
+{/* Booharu: its own MCP port. */}
+
+<Note>
+  Booharu は Koharu と同時に実行できるよう、独自のポートで MCP を提供します。既定のアドレスは
+  `http://127.0.0.1:47821/mcp` です。ポートを変えるには、`~/.booharu/config.toml` の `[booharu-mcp]`
+  セクションで `port` を設定し、Booharu を再起動してください。ポートは起動時に読み込まれます。MCP
+  で接続したエージェントはこの設定を変更できません。
+</Note>
+
 <Card title='プロジェクトで作業する' icon='comment' href='/ja/agent/projects'>
   エージェントに明確な範囲を伝え、編集を確認し、プロジェクトの履歴を使います。
 </Card>

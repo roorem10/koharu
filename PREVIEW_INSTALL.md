@@ -30,6 +30,17 @@ Booharu is unsigned, so Windows may warn about an unknown publisher; choose **Mo
 - API keys and sign-ins: `%USERPROFILE%\.booharu\secrets.age`, locked with a key kept in the Windows credential store under **booharu**. These do not travel with the portable folder.
 - Logs: `%LOCALAPPDATA%\Booharu\logs`. Browser storage: `%LOCALAPPDATA%\Booharu\cef`.
 
+## Agents in other programs
+
+While Booharu runs, an MCP client on the same computer can work on the open project at `http://127.0.0.1:47821/mcp`. Official Koharu keeps `127.0.0.1:7878`, so both can run at once. To use another port, from 1024 to 65535, set it in `%USERPROFILE%\.booharu\config.toml` and restart Booharu, which reads it only at start-up, for example:
+
+```toml
+[booharu-mcp]
+port = 47822
+```
+
+If the port is taken or outside that range, Booharu starts without the MCP server. Agents connected over MCP can't change this setting.
+
 ## Projects from Booharu 0.0.4 and earlier
 
 Booharu 0.0.5 uses Koharu 0.85's project format (`.khr`). It cannot open `.khrproj` projects made by Booharu 0.0.4 or earlier, or by Koharu 0.83 and earlier. Booharu 0.0.4 and earlier kept everything in a **PreviewData** folder beside the program; installing 0.0.5 leaves that folder alone.

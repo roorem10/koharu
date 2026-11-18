@@ -38,6 +38,15 @@ Each request starts with the open project's outline: its pages and their layers.
 
 While Koharu runs, it serves the same tools to agents in other programs over MCP's Streamable HTTP transport at `http://127.0.0.1:7878/mcp`, shown at the top of the Agent panel. Add that URL to an MCP client on the same machine. The server works on whichever project is open, accepts connections from this machine only, and refuses requests from web pages.
 
+{/* Booharu: its own MCP port. */}
+
+<Note>
+  Booharu serves MCP on its own port, so it can run beside Koharu: `http://127.0.0.1:47821/mcp` by
+  default. To use another port, set `port` in the `[booharu-mcp]` section of
+  `~/.booharu/config.toml` and restart Booharu, which reads it at launch. Agents connected over MCP
+  can't change that setting.
+</Note>
+
 <Card title='Work with a project' icon='comment' href='/agent/projects'>
   Give the Agent a precise scope, review its edits, and use project history.
 </Card>
