@@ -93,19 +93,38 @@ function rerun(selection: BoxSelection, stage: Stage): Promise<unknown> {
   return call(commands.runPipeline, { blocks: ids }, [stage])
 }
 
-/** The texts a join of the selection's one text block would make one, its balloon's in reading
- * order, the first kept; none unless the balloon holds another, the block shows, and nothing the
- * join changes is locked, which would refuse it all. */
+/** The texts a join of `balloon` would make one, in reading order, the first kept; none unless it
+ * holds two or more and nothing the join changes is locked, which would refuse it all. `locked` is
+ * whether the balloon, or a layer holding it, is locked. */
+function joinable(balloon: Layer, locked: boolean): BlockLayer[] | null {
+  const texts = balloonTexts(balloon)
+  const kept = texts[0]
+  if (locked || !kept || texts.length < 2 || texts.some(({ locked }) => locked)) return null
+  // The kept block's mask and clean-up take the others' pixels.
+  return kept.mask?.locked || kept.cleanup?.locked ? null : texts
+}
+
+/** The texts a join of the selection's one text block would make one, its balloon's, as
+ * `joinable` finds them; none unless the block shows, as a hidden one is no part of the join. */
 function joining(selection: BoxSelection): BlockLayer[] | null {
   const box = only(selection)
   if (!box || box.locked || !isBlockLayer(box.layer) || box.layer.role === 'sfx') return null
   if (!box.layer.visible) return null
-  if (box.parent?.kind !== 'balloon') return null
-  const texts = balloonTexts(box.parent)
-  const kept = texts[0]
-  if (!kept || texts.length < 2 || texts.some(({ locked }) => locked)) return null
-  // The kept block's mask and clean-up take the others' pixels.
-  return kept.mask?.locked || kept.cleanup?.locked ? null : texts
+  // The box isn't locked, so neither is its balloon nor a layer holding that.
+  return box.parent?.kind === 'balloon' ? joinable(box.parent, false) : null
+}
+
+/** Whether a join of every balloon the desktop found split on a page, `split`, among `layers`, the
+ * page's, can go ahead: there's one, and nothing any of them would change is locked, as a lock in
+ * one refuses them all. */
+export function joinsPage(layers: Layer[], split: SplitBalloon[]): boolean {
+  return (
+    split.length > 0 &&
+    split.every(({ balloon }) => {
+      const placed = findLayer(layers, balloon)
+      return placed !== undefined && joinable(placed.layer, isLockedLayer(placed)) !== null
+    })
+  )
 }
 
 /** The selection's one block a split cuts in two, a sound effect's as well as a text's, as the

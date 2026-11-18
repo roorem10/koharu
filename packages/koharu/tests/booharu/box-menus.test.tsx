@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -142,5 +142,26 @@ describe('Booharu box actions in the menus', () => {
     expect(
       await screen.findByRole('menuitem', { name: 'Join split texts on this page' }),
     ).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('disables the page join while a lock in any split balloon would refuse it all', async () => {
+    const { findSplit } = desktop()
+    // The desktop finds the held balloon's text split too.
+    findSplit.mockResolvedValue([
+      { page: 'page', balloon: 'split', blocks: ['first', 'second'] },
+      { page: 'page', balloon: 'held', blocks: ['held-first', 'held-second'] },
+    ])
+    const unlocked = boxesPage()
+    unlocked.layers[0]!.children![2]!.locked = false
+    openProject(unlocked)
+    const user = userEvent.setup()
+    show(<TitleBar />)
+
+    await openEdit(user)
+    const item = await screen.findByRole('menuitem', { name: 'Join split texts on this page' })
+    await waitFor(() => expect(item).not.toHaveAttribute('aria-disabled', 'true'))
+    // Locked, the held balloon would refuse the join of both.
+    act(() => openProject(boxesPage()))
+    await waitFor(() => expect(item).toHaveAttribute('aria-disabled', 'true'))
   })
 })

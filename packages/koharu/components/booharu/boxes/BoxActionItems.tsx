@@ -8,6 +8,7 @@ import { call } from '@/lib/backend'
 import {
   boxActions,
   joinPage,
+  joinsPage,
   runBoxAction,
   selectedBoxes,
   type BoxSelection,
@@ -74,7 +75,8 @@ function StoryItem({ className, ...props }: ItemProps) {
 }
 
 /** The Edit menu's box items, after a `Separator`, each an `Item` of the menu: the box actions for
- * the selection on `page`, the page the canvas shows, then joining every split balloon there. */
+ * the selection on `page`, the page the canvas shows, then joining every split balloon there,
+ * disabled while a lock in any of them would refuse the join. */
 export function BoxMenuItems({
   page,
   Item,
@@ -91,14 +93,15 @@ export function BoxMenuItems({
     [page, selected],
   )
   const split = useSplitBalloons(page?.id ?? null)
+  const joins = page !== null && split !== undefined && joinsPage(page.layers, split)
   return (
     <>
       <Separator />
       <ActionItems selection={selection} Item={Item} />
       <Item
-        disabled={!page || !split?.length}
+        disabled={!joins}
         onClick={() => {
-          if (page && split?.length)
+          if (page && split && joins)
             void joinPage(page.id, page.layers, split).catch(() => undefined)
         }}
       >
