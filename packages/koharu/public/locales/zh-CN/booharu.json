@@ -75,6 +75,24 @@
       "ocrBoxModifiers": "Alt：仅识别。Shift：识别、翻译并清理。"
     },
     "typesetting": {
+      "apply": {
+        "confirm": "应用",
+        "description": "为它们应用此样式：默认字体；“{{setting}}”关闭时还包括这些颜色。",
+        "includeHandEdited": "也重新设置我手动修改过的文本框样式",
+        "keptLocked_one": "{{count}} 个已锁定的文本框保持不变。",
+        "keptLocked_other": "{{count}} 个已锁定的文本框保持不变。",
+        "kept_one": "{{count}} 个你手动修改过的文本框保持不变。",
+        "kept_other": "{{count}} 个你手动修改过的文本框保持不变。",
+        "restyle_one": "将重新设置 {{count}} 个文本框的样式。",
+        "restyle_other": "将重新设置 {{count}} 个文本框的样式。",
+        "restyled_one": "已重新设置 {{count}} 个文本框的样式",
+        "restyled_other": "已重新设置 {{count}} 个文本框的样式",
+        "row": "现有译文",
+        "title": "应用到打开的项目",
+        "undo": "按 Ctrl+Z 可一次性撤销。",
+        "untranslated_one": "{{count}} 个文本框还没有译文。",
+        "untranslated_other": "{{count}} 个文本框还没有译文。"
+      },
       "clear": "清除",
       "clearAll": "全部清除",
       "clearFill": "清除文本颜色",
@@ -98,7 +116,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "添加文本框",
-      "booharu_apply_text_style": "应用默认文字样式",
+      "booharu_apply_text_style": "应用文字样式",
       "booharu_join_balloon": "合并文本",
       "booharu_join_page": "合并拆分的文本",
       "booharu_set_review_note": "编辑备注",

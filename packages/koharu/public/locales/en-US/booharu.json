@@ -75,6 +75,24 @@
       "ocrBoxModifiers": "Alt: read only. Shift: read, translate and clean."
     },
     "typesetting": {
+      "apply": {
+        "confirm": "Apply",
+        "description": "Apply this style to them: the default font, and these colors when “{{setting}}” is off.",
+        "includeHandEdited": "Also restyle boxes I changed by hand",
+        "keptLocked_one": "{{count}} locked box is kept.",
+        "keptLocked_other": "{{count}} locked boxes are kept.",
+        "kept_one": "{{count}} box you changed by hand is kept.",
+        "kept_other": "{{count}} boxes you changed by hand are kept.",
+        "restyle_one": "{{count}} box will be restyled.",
+        "restyle_other": "{{count}} boxes will be restyled.",
+        "restyled_one": "Restyled {{count}} box",
+        "restyled_other": "Restyled {{count}} boxes",
+        "row": "Existing translations",
+        "title": "Apply to the open project",
+        "undo": "Ctrl+Z undoes this in one step.",
+        "untranslated_one": "{{count}} box has no translation yet.",
+        "untranslated_other": "{{count}} boxes have no translation yet."
+      },
       "clear": "Clear",
       "clearAll": "Clear all",
       "clearFill": "Clear text color",
@@ -98,7 +116,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Add text box",
-      "booharu_apply_text_style": "Apply default text style",
+      "booharu_apply_text_style": "Apply text style",
       "booharu_join_balloon": "Join texts",
       "booharu_join_page": "Join split texts",
       "booharu_set_review_note": "Edit note",

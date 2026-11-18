@@ -75,6 +75,24 @@
       "ocrBoxModifiers": "Alt：光识别。Shift：识别、翻译搭清理。"
     },
     "typesetting": {
+      "apply": {
+        "confirm": "应用",
+        "description": "拿箇只样式用到伊拉身浪：默认字体；“{{setting}}”关脱个辰光还有箇眼颜色。",
+        "includeHandEdited": "手动改过个文字框也重新套用样式",
+        "keptLocked_one": "锁牢个 {{count}} 只文字框保持勿变。",
+        "keptLocked_other": "锁牢个 {{count}} 只文字框保持勿变。",
+        "kept_one": "侬手动改过个 {{count}} 只文字框保持勿变。",
+        "kept_other": "侬手动改过个 {{count}} 只文字框保持勿变。",
+        "restyle_one": "要重新套用 {{count}} 只文字框个样式。",
+        "restyle_other": "要重新套用 {{count}} 只文字框个样式。",
+        "restyled_one": "已经重新套用 {{count}} 只文字框个样式",
+        "restyled_other": "已经重新套用 {{count}} 只文字框个样式",
+        "row": "已有个译文",
+        "title": "应用到打开个项目",
+        "undo": "按Ctrl+Z可以一趟撤销。",
+        "untranslated_one": "还有 {{count}} 只文字框呒没译文。",
+        "untranslated_other": "还有 {{count}} 只文字框呒没译文。"
+      },
       "clear": "清除",
       "clearAll": "全部清除",
       "clearFill": "清除文本颜色",
@@ -98,7 +116,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "加文字框",
-      "booharu_apply_text_style": "应用默认文字样式",
+      "booharu_apply_text_style": "应用文字样式",
       "booharu_join_balloon": "合并文字",
       "booharu_join_page": "合并拆开个文字",
       "booharu_set_review_note": "编辑备注",

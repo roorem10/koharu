@@ -75,6 +75,24 @@
       "ocrBoxModifiers": "Alt：僅辨識。Shift：辨識、翻譯並清理。"
     },
     "typesetting": {
+      "apply": {
+        "confirm": "套用",
+        "description": "為它們套用此樣式：預設字型；「{{setting}}」關閉時還包括這些色彩。",
+        "includeHandEdited": "也重新套用我手動修改過的文字框樣式",
+        "keptLocked_one": "{{count}} 個已鎖定的文字框保持不變。",
+        "keptLocked_other": "{{count}} 個已鎖定的文字框保持不變。",
+        "kept_one": "{{count}} 個你手動修改過的文字框保持不變。",
+        "kept_other": "{{count}} 個你手動修改過的文字框保持不變。",
+        "restyle_one": "將重新套用 {{count}} 個文字框的樣式。",
+        "restyle_other": "將重新套用 {{count}} 個文字框的樣式。",
+        "restyled_one": "已重新套用 {{count}} 個文字框的樣式",
+        "restyled_other": "已重新套用 {{count}} 個文字框的樣式",
+        "row": "現有譯文",
+        "title": "套用到開啟的專案",
+        "undo": "按 Ctrl+Z 可一次復原。",
+        "untranslated_one": "{{count}} 個文字框還沒有譯文。",
+        "untranslated_other": "{{count}} 個文字框還沒有譯文。"
+      },
       "clear": "清除",
       "clearAll": "全部清除",
       "clearFill": "清除文字色彩",
@@ -98,7 +116,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "新增文字框",
-      "booharu_apply_text_style": "套用預設文字樣式",
+      "booharu_apply_text_style": "套用文字樣式",
       "booharu_join_balloon": "合併文字",
       "booharu_join_page": "合併分割的文字",
       "booharu_set_review_note": "編輯備註",

@@ -4,6 +4,7 @@ import { Minus, Plus } from 'lucide-react'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ApplyStyles } from '@/components/booharu/typesetting/ApplyStyles'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { PreferenceRow } from '@/components/preferences/PreferenceFields'
 import {
@@ -32,8 +33,8 @@ const WHITE = '#FFFFFF'
 /** The default text style, under Settings > Typesetting below Preferred fonts: the `default` of
  * `[booharu-lettering]`, the colours and outline that text added with the T tool gets, and new
  * translations too when they don't keep the original lettering's, with a Clear button per group
- * and Clear all. Unset, the text colour shows the black text is drawn in and the outline None.
- * Changes save on their own, as Koharu's settings do. */
+ * and Clear all, then Apply for the open project. Unset, the text colour shows the black text is
+ * drawn in and the outline None. Changes save on their own, as Koharu's settings do. */
 export function DefaultTextStyleSection() {
   const { t } = useTranslation()
   const { look, loaded, change } = useDefaultTextStyle()
@@ -174,6 +175,7 @@ export function DefaultTextStyleSection() {
             </Button>
           </div>
         </PreferenceRow>
+        <ApplyStyles />
       </div>
     </section>
   )

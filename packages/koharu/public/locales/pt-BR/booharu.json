@@ -78,6 +78,29 @@
       "ocrBoxModifiers": "Alt: somente OCR. Shift: OCR, tradução e limpeza."
     },
     "typesetting": {
+      "apply": {
+        "confirm": "Aplicar",
+        "description": "Aplique este estilo a elas: a fonte padrão e, quando “{{setting}}” está desativado, estas cores.",
+        "includeHandEdited": "Reaplicar estilo também às caixas que editei à mão",
+        "keptLocked_many": "{{count}} caixas bloqueadas são mantidas.",
+        "keptLocked_one": "{{count}} caixa bloqueada é mantida.",
+        "keptLocked_other": "{{count}} caixas bloqueadas são mantidas.",
+        "kept_many": "{{count}} caixas que você editou à mão são mantidas.",
+        "kept_one": "{{count}} caixa que você editou à mão é mantida.",
+        "kept_other": "{{count}} caixas que você editou à mão são mantidas.",
+        "restyle_many": "{{count}} caixas terão o estilo reaplicado.",
+        "restyle_one": "{{count}} caixa terá o estilo reaplicado.",
+        "restyle_other": "{{count}} caixas terão o estilo reaplicado.",
+        "restyled_many": "Estilo reaplicado em {{count}} caixas",
+        "restyled_one": "Estilo reaplicado em {{count}} caixa",
+        "restyled_other": "Estilo reaplicado em {{count}} caixas",
+        "row": "Traduções existentes",
+        "title": "Aplicar ao projeto aberto",
+        "undo": "Ctrl+Z desfaz tudo em uma etapa.",
+        "untranslated_many": "{{count}} caixas ainda não têm tradução.",
+        "untranslated_one": "{{count}} caixa ainda não tem tradução.",
+        "untranslated_other": "{{count}} caixas ainda não têm tradução."
+      },
       "clear": "Limpar",
       "clearAll": "Limpar tudo",
       "clearFill": "Limpar cor do texto",
@@ -104,7 +127,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Adicionar caixa de texto",
-      "booharu_apply_text_style": "Aplicar estilo de texto padrão",
+      "booharu_apply_text_style": "Aplicar estilo de texto",
       "booharu_join_balloon": "Unir textos",
       "booharu_join_page": "Unir textos divididos",
       "booharu_set_review_note": "Editar nota",

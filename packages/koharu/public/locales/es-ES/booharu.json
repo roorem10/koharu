@@ -78,6 +78,29 @@
       "ocrBoxModifiers": "Alt: solo leer. Mayús: leer, traducir y limpiar."
     },
     "typesetting": {
+      "apply": {
+        "confirm": "Aplicar",
+        "description": "Aplícales este estilo: la fuente predeterminada y, si “{{setting}}” está desactivado, estos colores.",
+        "includeHandEdited": "Cambiar también el estilo de los cuadros que edité a mano",
+        "keptLocked_many": "Se conservan {{count}} cuadros bloqueados.",
+        "keptLocked_one": "Se conserva {{count}} cuadro bloqueado.",
+        "keptLocked_other": "Se conservan {{count}} cuadros bloqueados.",
+        "kept_many": "Se conservan {{count}} cuadros que editaste a mano.",
+        "kept_one": "Se conserva {{count}} cuadro que editaste a mano.",
+        "kept_other": "Se conservan {{count}} cuadros que editaste a mano.",
+        "restyle_many": "Se cambiará el estilo de {{count}} cuadros.",
+        "restyle_one": "Se cambiará el estilo de {{count}} cuadro.",
+        "restyle_other": "Se cambiará el estilo de {{count}} cuadros.",
+        "restyled_many": "Se cambió el estilo de {{count}} cuadros",
+        "restyled_one": "Se cambió el estilo de {{count}} cuadro",
+        "restyled_other": "Se cambió el estilo de {{count}} cuadros",
+        "row": "Traducciones existentes",
+        "title": "Aplicar al proyecto abierto",
+        "undo": "Ctrl+Z lo deshace en un paso.",
+        "untranslated_many": "{{count}} cuadros aún no tienen traducción.",
+        "untranslated_one": "{{count}} cuadro aún no tiene traducción.",
+        "untranslated_other": "{{count}} cuadros aún no tienen traducción."
+      },
       "clear": "Borrar",
       "clearAll": "Borrar todo",
       "clearFill": "Borrar color del texto",
@@ -104,7 +127,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Añadir cuadro de texto",
-      "booharu_apply_text_style": "Aplicar estilo de texto predeterminado",
+      "booharu_apply_text_style": "Aplicar estilo de texto",
       "booharu_join_balloon": "Unir textos",
       "booharu_join_page": "Unir textos divididos",
       "booharu_set_review_note": "Editar nota",

@@ -75,6 +75,24 @@
       "ocrBoxModifiers": "Alt：OCRのみ。Shift：OCR・翻訳・クリーンアップ。"
     },
     "typesetting": {
+      "apply": {
+        "confirm": "適用",
+        "description": "既定のフォントと、「{{setting}}」がオフのときはこれらの色を適用します。",
+        "includeHandEdited": "手動で変更したボックスにもスタイルを適用する",
+        "keptLocked_one": "ロック中の{{count}}個のボックスはそのままです。",
+        "keptLocked_other": "ロック中の{{count}}個のボックスはそのままです。",
+        "kept_one": "手動で変更した{{count}}個のボックスはそのままです。",
+        "kept_other": "手動で変更した{{count}}個のボックスはそのままです。",
+        "restyle_one": "{{count}}個のボックスのスタイルを変更します。",
+        "restyle_other": "{{count}}個のボックスのスタイルを変更します。",
+        "restyled_one": "{{count}}個のボックスのスタイルを変更しました",
+        "restyled_other": "{{count}}個のボックスのスタイルを変更しました",
+        "row": "既存の翻訳",
+        "title": "開いているプロジェクトに適用",
+        "undo": "Ctrl+Zでまとめて元に戻せます。",
+        "untranslated_one": "{{count}}個のボックスはまだ翻訳されていません。",
+        "untranslated_other": "{{count}}個のボックスはまだ翻訳されていません。"
+      },
       "clear": "クリア",
       "clearAll": "すべてクリア",
       "clearFill": "文字色をクリア",
@@ -98,7 +116,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "テキストボックスを追加",
-      "booharu_apply_text_style": "既定の書式を適用",
+      "booharu_apply_text_style": "書式を適用",
       "booharu_join_balloon": "テキストを結合",
       "booharu_join_page": "分割されたテキストを結合",
       "booharu_set_review_note": "メモを編集",
