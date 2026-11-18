@@ -10,6 +10,12 @@
 //! and so does the project closing or another opening, which stops the run
 //! going. Each run is followed through `Pipeline::history`, which keeps
 //! every event, where the broadcast the interface hears can drop some.
+//!
+//! A group's follower is spawned with its first run, on the thread that
+//! queues it, which no caller can cancel, and frees the group's place as it
+//! goes, however it goes: a caller that went away meanwhile, as an agent's
+//! tool call does when its chat is stopped, can't leave a group in place
+//! that no one follows, which every later call would answer.
 
 use std::{
     sync::{
@@ -22,7 +28,8 @@ use std::{
 use anyhow::Context as _;
 use koharu_pipeline::{Event, Outcome, Pipeline, Request, RunId, Stage, Target};
 use koharu_scene::{PageId, ProjectId, Session};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, MutexGuard};
+use tokio::{runtime::Handle, task::JoinHandle};
 
 use super::{PlanGroup, RunPlan, RunTarget, all_stages, groups};
 
@@ -77,34 +84,49 @@ pub async fn carry_on(
     target: RunTarget,
     stages: Vec<Stage>,
 ) -> anyhow::Result<RunPlan> {
-    let starting = Arc::clone(&host);
-    let (plan, first) = tokio::task::spawn_blocking(move || {
-        let (plan, run) = start(&*starting, &session, &target, &stages)?;
-        anyhow::Ok((plan, run.map(|run| (session, run))))
-    })
-    .await??;
-    if let Some((session, run)) = first {
-        tokio::spawn(follow(host, session, plan.group, run));
-    }
+    let runtime = Handle::current();
+    let (plan, _following) =
+        tokio::task::spawn_blocking(move || start(host, session, &target, &stages, &runtime))
+            .await??;
     Ok(plan)
 }
 
-/// `carry_on`'s work, on the thread that calls it: the plan, and the first
-/// run it queued, which a follower then follows.
+/// `carry_on`'s work, on a thread no caller can cancel: the plan, and the
+/// follower of the first run it queued, already spawned on `runtime`.
 fn start(
-    host: &dyn RunHost,
-    session: &Arc<Mutex<Session>>,
+    host: Arc<dyn RunHost>,
+    session: Arc<Mutex<Session>>,
     target: &RunTarget,
     stages: &[Stage],
-) -> anyhow::Result<(RunPlan, Option<RunId>)> {
+    runtime: &Handle,
+) -> anyhow::Result<(RunPlan, Option<JoinHandle<()>>)> {
     let project = session.lock().id();
-    let mut going = GOING.lock();
+    let going = GOING.lock();
     if let Some(plan) = answer(going.as_ref(), project) {
         return Ok((plan, None));
     }
     let groups = groups(&session.lock(), target, stages)?;
+    let first = groups
+        .first()
+        .map(|first| request(first_target(target, stages, first), &first.stages));
+    go(going, host, session, project, groups, first, runtime)
+}
+
+/// Starts a group of `groups` in `project` from `first`, its first group's
+/// run, in the place `going` holds: queues the run, announces it, and spawns
+/// its follower on `runtime` once the place is let go, which the follower
+/// then holds. With no run, a plan of none, which takes no place.
+fn go(
+    mut going: MutexGuard<'_, Option<Going>>,
+    host: Arc<dyn RunHost>,
+    session: Arc<Mutex<Session>>,
+    project: ProjectId,
+    groups: Vec<PlanGroup>,
+    first: Option<Request>,
+    runtime: &Handle,
+) -> anyhow::Result<(RunPlan, Option<JoinHandle<()>>)> {
     let group = MADE.fetch_add(1, Ordering::Relaxed) + 1;
-    let Some(first) = groups.first() else {
+    let Some(first) = first else {
         let plan = RunPlan {
             group,
             groups,
@@ -112,10 +134,7 @@ fn start(
         };
         return Ok((plan, None));
     };
-    let request = request(first_target(target, stages, first), &first.stages);
-    let run = host
-        .queue(session, request)?
-        .context("the project closed")?;
+    let run = host.queue(&session, first)?.context("the project closed")?;
     let plan = RunPlan {
         group,
         groups,
@@ -126,7 +145,11 @@ fn start(
         plan: plan.clone(),
         project,
     });
-    Ok((plan, Some(run)))
+    // Let go first, as a follower that can't be spawned, on a runtime
+    // shutting down, frees the place as it's dropped.
+    drop(going);
+    let following = runtime.spawn(follow(host, session, Place(group), run));
+    Ok((plan, Some(following)))
 }
 
 /// The group going on in `project`, as `carry_on` answers it.
@@ -155,16 +178,31 @@ fn request(target: Target, stages: &[Stage]) -> Request {
     }
 }
 
-/// Follows `group` from `run`, its first: once each run ends, queues the
-/// group's next run, or ends the group.
-async fn follow(host: Arc<dyn RunHost>, session: Arc<Mutex<Session>>, group: u64, mut run: RunId) {
+/// A group's place, which its follower holds: freed as the follower goes,
+/// however it goes, unless another group took it meanwhile.
+struct Place(u64);
+
+impl Drop for Place {
+    fn drop(&mut self) {
+        free(self.0);
+    }
+}
+
+/// Follows the group whose place it holds from `run`, its first: once each
+/// run ends, queues the group's next run, or ends the group.
+async fn follow(
+    host: Arc<dyn RunHost>,
+    session: Arc<Mutex<Session>>,
+    place: Place,
+    mut run: RunId,
+) {
+    let group = place.0;
     let mut index = 0;
     loop {
         let outcome = match ended(host.pipeline(), run).await {
             Ok(outcome) => outcome,
             Err(error) => {
                 tracing::warn!("couldn't follow run group {group}: {error:#}");
-                free(group);
                 return;
             }
         };
@@ -181,7 +219,6 @@ async fn follow(host: Arc<dyn RunHost>, session: Arc<Mutex<Session>>, group: u64
             }
             Err(error) => {
                 tracing::warn!("couldn't queue run group {group}'s next run: {error}");
-                free(group);
                 return;
             }
         }
@@ -294,10 +331,14 @@ fn next_step(
 
 #[cfg(test)]
 mod tests {
-    use koharu_pipeline::PageFailure;
-    use koharu_scene::Uuid;
+    use std::sync::atomic::AtomicBool;
+
+    use koharu_pipeline::{PageFailure, PipelineConfig};
+    use koharu_scene::{Edit, Uuid};
+    use serde_json::json;
 
     use super::*;
+    use crate::runs::every_stage;
 
     fn page(number: u128) -> PageId {
         PageId(Uuid::from_u128(number))
@@ -410,5 +451,264 @@ mod tests {
             first_target(&RunTarget::Project {}, &fewer, &planned),
             Target::Project
         );
+    }
+
+    /// The tests that place groups, one at a time, as the place is the
+    /// app's one.
+    static PLACING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    /// A project of `pages` blank pages without a scan, on which a run of
+    /// detection ends without loading a model, in a folder removed with it;
+    /// and its pages, in order.
+    fn chapter(pages: usize) -> (tempfile::TempDir, Arc<Mutex<Session>>, Vec<PageId>) {
+        let dir = tempfile::tempdir().expect("a folder");
+        let mut session = Session::create(dir.path().join("test.khr")).expect("a project");
+        let ops = (0..pages)
+            .map(|index| {
+                serde_json::from_value(json!({
+                    "op": "add_page", "index": index, "size": {"width": 100, "height": 100},
+                }))
+                .expect("an op")
+            })
+            .collect();
+        session
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops,
+            })
+            .expect("the pages");
+        let pages = session.project().pages().map(|page| page.id).collect();
+        (dir, Arc::new(Mutex::new(session)), pages)
+    }
+
+    /// A group of detection on `pages`, which ends without a model.
+    fn detection(pages: &[PageId]) -> PlanGroup {
+        PlanGroup {
+            stages: vec![Stage::Detect],
+            pages: pages.to_vec(),
+        }
+    }
+
+    /// The app as the tests' groups reach it, on a pipeline of its own: the
+    /// targets it queued and, for each run it announced, its group and its
+    /// group's index, in order.
+    struct Host {
+        pipeline: Pipeline,
+        queued: Mutex<Vec<Target>>,
+        announced: Mutex<Vec<(u64, usize)>>,
+        /// Whether `queue` finds the project closed, or fails.
+        closed: AtomicBool,
+        broken: AtomicBool,
+        /// Holds `queue` until the test lets it go, once it told it came.
+        gate: Option<Gate>,
+    }
+
+    struct Gate {
+        came: tokio::sync::mpsc::UnboundedSender<()>,
+        released: Mutex<std::sync::mpsc::Receiver<()>>,
+    }
+
+    impl Host {
+        fn new() -> Self {
+            Self {
+                pipeline: Pipeline::new(PipelineConfig::default()),
+                queued: Mutex::default(),
+                announced: Mutex::default(),
+                closed: AtomicBool::new(false),
+                broken: AtomicBool::new(false),
+                gate: None,
+            }
+        }
+
+        fn queued(&self) -> Vec<Target> {
+            self.queued.lock().clone()
+        }
+
+        fn announced(&self) -> Vec<(u64, usize)> {
+            self.announced.lock().clone()
+        }
+    }
+
+    impl RunHost for Host {
+        fn pipeline(&self) -> &Pipeline {
+            &self.pipeline
+        }
+
+        fn queue(
+            &self,
+            session: &Arc<Mutex<Session>>,
+            request: Request,
+        ) -> anyhow::Result<Option<RunId>> {
+            if let Some(gate) = &self.gate {
+                gate.came.send(()).expect("the test waits");
+                gate.released.lock().recv().expect("the test lets it go");
+            }
+            if self.broken.load(Ordering::Relaxed) {
+                anyhow::bail!("the run settings can't be read");
+            }
+            if self.closed.load(Ordering::Relaxed) {
+                return Ok(None);
+            }
+            self.queued.lock().push(request.target.clone());
+            Ok(Some(self.pipeline.run(Arc::clone(session), request)?))
+        }
+
+        fn announce(&self, plan: &RunPlan, index: usize, _: RunId) {
+            self.announced.lock().push((plan.group, index));
+        }
+    }
+
+    /// Waits until no group holds the place, as once its follower went.
+    async fn freed() {
+        let waited = tokio::time::Instant::now();
+        while GOING.lock().is_some() {
+            assert!(
+                waited.elapsed() < Duration::from_secs(30),
+                "the place stays taken"
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_group_runs_its_groups_one_after_another_then_frees_its_place() {
+        let _placing = PLACING.lock().await;
+        let (_dir, session, pages) = chapter(2);
+        let host = Arc::new(Host::new());
+        let project = session.lock().id();
+        let groups = vec![detection(&pages[..1]), detection(&pages[1..])];
+        let first = request(Target::Pages(vec![pages[0]]), &[Stage::Detect]);
+        let held: Arc<dyn RunHost> = host.clone();
+        let runtime = Handle::current();
+        let (plan, following) = go(
+            GOING.lock(),
+            held,
+            Arc::clone(&session),
+            project,
+            groups,
+            Some(first),
+            &runtime,
+        )
+        .expect("the group");
+        // A call while it goes answers it, and queues nothing, whatever it
+        // asks for.
+        let held: Arc<dyn RunHost> = host.clone();
+        let (answered, none) = start(
+            held,
+            Arc::clone(&session),
+            &RunTarget::Project {},
+            &every_stage(),
+            &runtime,
+        )
+        .expect("the plan");
+        assert!(answered == plan && none.is_none(), "{answered:?}");
+        following
+            .expect("a follower")
+            .await
+            .expect("followed to the end");
+        assert_eq!(
+            host.announced(),
+            [(plan.group, 0), (plan.group, 1)],
+            "each run with its group's index"
+        );
+        assert_eq!(
+            host.queued(),
+            [Target::Pages(vec![pages[0]]), Target::Pages(vec![pages[1]])]
+        );
+        assert!(GOING.lock().is_none());
+    }
+
+    #[tokio::test]
+    async fn a_group_ends_at_a_run_failed_or_stopped_or_a_run_it_cant_queue() {
+        let _placing = PLACING.lock().await;
+        let (_dir, session, pages) = chapter(2);
+        let host = Host::new();
+        let project = session.lock().id();
+        // Places a group of two whose first run ended.
+        let place = || {
+            let group = MADE.fetch_add(1, Ordering::Relaxed) + 1;
+            *GOING.lock() = Some(Going {
+                plan: RunPlan {
+                    group,
+                    groups: vec![detection(&pages[..1]), detection(&pages[1..])],
+                    run: Some(RunId(0)),
+                },
+                project,
+            });
+            group
+        };
+        let ends = |outcome: &Outcome| {
+            let group = place();
+            let next = advance(&host, &session, group, 0, outcome);
+            assert!(GOING.lock().is_none(), "{outcome:?}");
+            next
+        };
+        let failed = Outcome::Failed {
+            page: pages[0],
+            stage: Stage::Detect,
+            reason: "no connection".to_owned(),
+        };
+        for outcome in [failed, Outcome::Stopped] {
+            assert_eq!(ends(&outcome).expect("the end"), None);
+        }
+        host.closed.store(true, Ordering::Relaxed);
+        assert_eq!(ends(&Outcome::Done).expect("the end"), None);
+        host.closed.store(false, Ordering::Relaxed);
+        host.broken.store(true, Ordering::Relaxed);
+        assert!(ends(&Outcome::Done).is_err());
+        host.broken.store(false, Ordering::Relaxed);
+        assert!(host.queued().is_empty() && host.announced().is_empty());
+        // Another group that took the place meanwhile keeps it.
+        let group = place();
+        let theirs = place();
+        let next = advance(&host, &session, group, 0, &Outcome::Done).expect("not ours");
+        assert!(next.is_none());
+        assert_eq!(
+            GOING.lock().take().map(|going| going.plan.group),
+            Some(theirs)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_group_whose_caller_went_away_is_followed_to_its_end() {
+        let _placing = PLACING.lock().await;
+        let (_dir, session, _) = chapter(1);
+        let (came, mut coming) = tokio::sync::mpsc::unbounded_channel();
+        let (release, released) = std::sync::mpsc::channel();
+        let host = Arc::new(Host {
+            gate: Some(Gate {
+                came,
+                released: Mutex::new(released),
+            }),
+            ..Host::new()
+        });
+        let calling = tokio::spawn(carry_on(
+            host.clone(),
+            Arc::clone(&session),
+            RunTarget::Project {},
+            vec![Stage::Detect],
+        ));
+        coming.recv().await.expect("the run being queued");
+        // The caller goes away while its run is queued, as the agent's tool
+        // call does when its chat is stopped.
+        calling.abort();
+        assert!(calling.await.is_err_and(|error| error.is_cancelled()));
+        release.send(()).expect("the run waits to be queued");
+        let waited = tokio::time::Instant::now();
+        while host.announced().is_empty() {
+            assert!(waited.elapsed() < Duration::from_secs(30), "never queued");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        freed().await;
+        // So a later call plans again, here finding nothing left to do.
+        let plan = carry_on(
+            Arc::new(Host::new()),
+            session,
+            RunTarget::Project {},
+            every_stage(),
+        )
+        .await
+        .expect("a plan");
+        assert!(plan.run.is_none() && plan.groups.is_empty(), "{plan:?}");
     }
 }
