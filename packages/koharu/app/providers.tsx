@@ -8,6 +8,7 @@ import { StartupView } from '@/components/app/StartupView'
 import ClientOnly from '@/components/ClientOnly'
 import { refreshModels, refreshPreferences } from '@/lib/backend'
 import { useBooharuRunGroups } from '@/lib/booharu/chime' // Booharu: carrying-on groups' runs.
+import { useBooharuContextChanges } from '@/lib/booharu/context' // Booharu: glossary changes.
 import { useBooharuNotices } from '@/lib/booharu/notices' // Booharu: its notices, as toasts.
 import { usePageMenuGuard } from '@/lib/booharu/usePageMenuGuard' // Booharu: the menu guard.
 import i18n from '@/lib/i18n'
@@ -108,6 +109,7 @@ export function Providers({ children }: { children: ReactNode }) {
   usePageMenuGuard() // Booharu: no browser page menu outside text fields.
   useBooharuNotices() // Booharu: its own notices, such as why a drawn box added nothing.
   useBooharuRunGroups() // Booharu: which runs carry on a chapter together, so a group chimes once.
+  useBooharuContextChanges() // Booharu: reads the series and the chapter again as they change.
 
   return (
     <QueryClientProvider client={queryClient}>
