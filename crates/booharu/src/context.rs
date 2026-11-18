@@ -165,12 +165,12 @@ pub fn suggest(project: &Path, store: &SeriesStore, entry: GlossaryEntry) -> Res
 
 /// Accepts the suggestion of the chapter of the project file `project`
 /// that `entry` names by its id into the series the chapter links, in
-/// `store`, as `entry` holds it, the user's changes included: in place of the
-/// series' term with its source, keeping that term's place and id, or after
-/// the others ([`Series::put`]). The suggestion then leaves the chapter.
-/// Fails, changing nothing, when the chapter has no such suggestion or links
-/// no series, the series is gone, or the term lacks a source or a target.
-/// Answers the series as saved.
+/// `store`, as `entry` holds it, the user's changes included, trimmed: in
+/// place of the series' term with its source, keeping that term's place and
+/// id, or after the others ([`Series::put`]). The suggestion then leaves the
+/// chapter. Fails, changing nothing, when the chapter has no such suggestion
+/// or links no series, the series is gone, or the term lacks a source or a
+/// target. Answers the series as saved.
 pub fn accept(project: &Path, store: &SeriesStore, entry: GlossaryEntry) -> Result<Series> {
     let chapter = ChapterContext::load(project)?;
     ensure!(
@@ -182,6 +182,13 @@ pub fn accept(project: &Path, store: &SeriesStore, entry: GlossaryEntry) -> Resu
         .series
         .context("the chapter is linked to no series; pick one first")?;
     let suggestion = entry.id.clone();
+    // As the term form wrote it, trimmed, as every term is saved.
+    let entry = GlossaryEntry {
+        source: entry.source.trim().to_owned(),
+        target: entry.target.trim().to_owned(),
+        note: entry.note.trim().to_owned(),
+        ..entry
+    };
     let series = store.update(&id, |series| {
         series.put(entry);
         series.clone()
@@ -878,9 +885,11 @@ mod tests {
         assert!(link(path, &store, Some(&series.id))?);
         assert!(!link(path, &store, Some(&series.id))?);
 
-        // Its source is the series' first term's: it takes that term's place.
+        // Its source is the series' first term's: it takes that term's place,
+        // as the user edited it, trimmed.
         let edited = GlossaryEntry {
-            target: "Sensei".to_owned(),
+            target: " Sensei ".to_owned(),
+            note: " the teacher\n".to_owned(),
             locked: true,
             ..suggestion
         };
@@ -891,6 +900,8 @@ mod tests {
             saved.glossary[0],
             GlossaryEntry {
                 id: held,
+                target: "Sensei".to_owned(),
+                note: "the teacher".to_owned(),
                 ..edited.clone()
             }
         );
