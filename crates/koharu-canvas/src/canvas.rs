@@ -76,6 +76,8 @@ pub struct Canvas {
     /// What the last draw showed: a draw that would show the same does
     /// nothing.
     drawn: Option<Look>,
+    /// Booharu: Booharu's settings, as the host pushed them last.
+    booharu: crate::booharu::BooharuSettings,
 }
 
 /// What a draw shows: everything it reads, compared in one place.
@@ -136,6 +138,7 @@ impl Canvas {
             generation: 0,
             target: None,
             drawn: None,
+            booharu: Default::default(), // Booharu: Koharu's behaviour until the host pushes its own.
         }
     }
 
@@ -196,6 +199,14 @@ impl Canvas {
     /// What the Story panel shows, which the canvas numbers the texts for.
     pub fn set_story(&mut self, story: Story) {
         self.story = story;
+    }
+
+    /// Booharu: Booharu's settings, which the host pushes at startup and
+    /// whenever the settings they come from are saved. Only text drawn or
+    /// typed from then on reads them, so they neither redraw nor restyle
+    /// anything, and the same ones again change nothing.
+    pub fn set_booharu(&mut self, settings: crate::booharu::BooharuSettings) {
+        self.booharu = settings;
     }
 
     pub fn camera(&self) -> TranslateScale {
@@ -381,7 +392,7 @@ impl Canvas {
         let (Some(typing), Some(snapshot)) = (self.typing.take(), &self.snapshot) else {
             return Vec::new();
         };
-        typing.commit(snapshot.page())
+        typing.commit(snapshot.page(), &self.booharu) // Booharu: and Booharu's settings.
     }
 
     /// A key the host passes while the canvas holds the keyboard, after a
@@ -537,6 +548,7 @@ impl Canvas {
             brush: self.brush,
             colors: self.colors,
             session: &self.session,
+            booharu: &self.booharu, // Booharu: for the T tool's text.
         })
     }
 

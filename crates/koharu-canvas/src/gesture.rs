@@ -36,6 +36,8 @@ pub(crate) struct Context<'a> {
     pub colors: Colors,
     /// Locked only to read pixels.
     pub session: &'a Mutex<Session>,
+    /// Booharu: Booharu's settings, as the host pushed them.
+    pub booharu: &'a crate::booharu::BooharuSettings,
 }
 
 /// What a press starts, what it answers at once, and the anchors it picks

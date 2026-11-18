@@ -55,14 +55,15 @@ impl Draft {
                 },
             ),
         };
-        Text {
+        let text = Text {
             content: RichText::default(),
             style: TextStyle::default(),
             frame,
             direction: Default::default(),
             language: LanguageIdentifier::UNKNOWN,
             transform: Transform([[1.0, 0.0, origin.x], [0.0, 1.0, origin.y]]),
-        }
+        };
+        crate::booharu::drafted(text, cx.booharu) // Booharu: the default look, and a box's fit.
     }
 
     pub fn preview(&self, overlay: &mut Overlay) {

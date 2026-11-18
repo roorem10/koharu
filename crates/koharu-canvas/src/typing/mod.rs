@@ -461,7 +461,9 @@ impl Typing {
 
     /// The step that keeps what was typed into `page`: none when nothing
     /// changed, or a new text was left empty.
-    pub fn commit(mut self, page: &Page) -> Vec<Effect> {
+    // Booharu: with Booharu's settings, for a translation typed into a block
+    // with none.
+    pub fn commit(mut self, page: &Page, booharu: &crate::booharu::BooharuSettings) -> Vec<Effect> {
         self.settle();
         let edit = |label: &str, ops: Vec<Op>| {
             Effect::Edit(Edit {
@@ -478,6 +480,8 @@ impl Typing {
                 vec![edit("set_text", vec![spans(layer, self.content)])]
             }
             Target::Untranslated(layer) if !self.content.0.is_empty() => {
+                // Booharu: the default look a new translation gets.
+                crate::booharu::untranslated(&mut self.base, page, layer, booharu);
                 // The translation takes its source's place and style; its
                 // characters come only through the text ops.
                 let mut placed = serde_json::to_value(&self.base).expect("a text serializes");

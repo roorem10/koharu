@@ -1,7 +1,12 @@
-//! The O tool's box, as the canvas answers it, on the canvas's harness.
+//! The O tool's box, as the canvas answers it, and the default look of the
+//! text the T tool adds and of a translation typed into a block with none,
+//! on the canvas's harness.
+
+use booharu_core::settings::{DefaultTextStyle, LetteringSettings};
+use koharu_scene::{CharStyle, Fit};
 
 use super::*;
-use crate::booharu::{BoxModifiers, Effect as Booharu};
+use crate::booharu::{BooharuSettings, BoxModifiers, Effect as Booharu, TextDefaults};
 
 const NONE: Modifiers = Modifiers::empty();
 
@@ -244,4 +249,159 @@ fn the_box_shows_dashed_in_the_selection_colour_while_dragged() {
     assert_eq!(inside, [255; 4]);
     canvas.input(up(1, (150.5, 120.5))).expect("input");
     assert_eq!(red(canvas).0, 0);
+}
+
+const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
+const WHITE: Rgba = Rgba([1.0; 4]);
+const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
+
+/// A family no machine has, so the renderer neither finds nor downloads it,
+/// and sets the text in its own fallback.
+const FONT: &str = "Booharu Test";
+
+/// Booharu's settings as the host pushes them: the default font, red text
+/// outlined 2 pixels wide in `stroke`, colour detection as given, and boxes
+/// at Best Fit.
+fn pushed(detect_colors: bool, stroke: Option<Rgba>) -> BooharuSettings {
+    BooharuSettings {
+        text: TextDefaults {
+            lettering: LetteringSettings {
+                default: DefaultTextStyle {
+                    fill: Some(RED),
+                    stroke,
+                    stroke_width: 2.0,
+                },
+                detect_colors,
+            },
+            family: Some(FONT.to_owned()),
+            fit: Fit::Best,
+        },
+    }
+}
+
+/// Types "Hi" with the T tool from a press at `from` dragged to `to`, and
+/// commits it: the text added, as JSON.
+fn type_new(fixture: &mut Fixture, from: (f64, f64), to: (f64, f64)) -> Value {
+    fixture.canvas.set_tool(Tool::Text);
+    let effects = gesture(&mut fixture.canvas, from, to);
+    assert!(apply(fixture, effects).is_empty());
+    type_text(&mut fixture.canvas, "Hi");
+    let effects = press_key(&mut fixture.canvas, NamedKey::Enter, Code::Enter, CONTROL);
+    assert_eq!(apply(fixture, effects), ["add_text"]);
+    let added = *layers(fixture).last().expect("the text");
+    layer(fixture, added)
+}
+
+fn chars(value: &Value) -> CharStyle {
+    serde_json::from_value(value["style"]["chars"].clone()).expect("a style")
+}
+
+#[test]
+fn the_t_tools_text_takes_the_pushed_look_and_a_box_best_fit() {
+    let Some(mut fixture) = unscaled(Vec::new()) else {
+        return;
+    };
+    // Before the host pushes any settings, Koharu's own.
+    let boxed = type_new(&mut fixture, (10.0, 10.0), (110.0, 60.0));
+    assert_eq!(chars(&boxed), CharStyle::default());
+    assert_eq!(boxed["frame"]["box"]["fit"], json!("shrink"));
+
+    fixture.canvas.set_booharu(pushed(true, Some(WHITE)));
+    let look = CharStyle {
+        family: Some(FONT.to_owned()),
+        fill: Some(RED),
+        stroke: Some(WHITE),
+        stroke_width: Some(2.0),
+        ..CharStyle::default()
+    };
+    let boxed = type_new(&mut fixture, (10.0, 210.0), (110.0, 260.0));
+    assert_eq!(chars(&boxed), look);
+    assert_eq!(boxed["frame"]["box"]["fit"], json!("best"));
+    let point = type_new(&mut fixture, (200.0, 100.0), (200.0, 100.0));
+    assert_eq!(chars(&point), look);
+    assert_eq!(point["frame"], json!("point"));
+}
+
+/// A page of two blocks without a translation, dialogue and a sound
+/// effect, each lettered in blue outlined 3 pixels wide in white at size 32
+/// in a box of its own: the fixture and the blocks.
+fn untranslated() -> Option<(Fixture, LayerId, LayerId)> {
+    let block = |role: &str, x: f64| {
+        json!({"kind": "block", "role": role, "source": {
+            "frame": {"box": {"bounds": {"x": x, "y": 50.0, "width": 100.0, "height": 100.0}}},
+            "content": "やあ",
+            "style": {"chars": {"size": 32.0, "fill": BLUE, "stroke": WHITE, "stroke_width": 3.0}},
+        }})
+    };
+    let fixture = unscaled(vec![
+        json!({"op": "add_layer", "page": "$page", "index": 0, "layer": block("text", 50.0)}),
+        json!({"op": "add_layer", "page": "$page", "index": 1, "layer": block("sfx", 250.0)}),
+    ])?;
+    let [talk, boom] = layers(&fixture)[..] else {
+        panic!("two blocks");
+    };
+    Some((fixture, talk, boom))
+}
+
+/// Types "Hi" with the T tool into the block pressed at `at`, and commits
+/// it: the translation's character values.
+fn type_translation(fixture: &mut Fixture, block: LayerId, at: (f64, f64)) -> CharStyle {
+    fixture.canvas.set_tool(Tool::Text);
+    let effects = gesture(&mut fixture.canvas, at, at);
+    assert_eq!(selections(&effects), [vec![block]]);
+    type_text(&mut fixture.canvas, "Hi");
+    let effects = press_key(&mut fixture.canvas, NamedKey::Enter, Code::Enter, CONTROL);
+    assert_eq!(apply(fixture, effects), ["set_text"]);
+    chars(&layer(fixture, block)["translation"])
+}
+
+#[test]
+fn a_translation_typed_into_a_block_with_none_takes_a_new_translations_look() {
+    let Some((mut fixture, talk, boom)) = untranslated() else {
+        return;
+    };
+    let source = CharStyle {
+        size: Some(32.0),
+        fill: Some(BLUE),
+        stroke: Some(WHITE),
+        stroke_width: Some(3.0),
+        ..CharStyle::default()
+    };
+    // With detection on, the colours copied from the source stay, and the
+    // default font comes in.
+    fixture.canvas.set_booharu(pushed(true, Some(WHITE)));
+    assert_eq!(
+        type_translation(&mut fixture, talk, (100.0, 100.0)),
+        CharStyle {
+            family: Some(FONT.to_owned()),
+            ..source.clone()
+        }
+    );
+    // With it off, the default colours; a sound effect keeps a white
+    // outline about red, an em's sixteenth wide, as the default has none.
+    fixture.canvas.set_booharu(pushed(false, None));
+    assert_eq!(
+        type_translation(&mut fixture, boom, (300.0, 100.0)),
+        CharStyle {
+            family: Some(FONT.to_owned()),
+            fill: Some(RED),
+            stroke: Some(WHITE),
+            stroke_width: Some(2.0),
+            ..source
+        }
+    );
+}
+
+#[test]
+fn pushing_settings_redraws_nothing() {
+    let Some(mut fixture) = unscaled(red_square()) else {
+        return;
+    };
+    let canvas = &mut fixture.canvas;
+    assert!(canvas.draw().expect("a draw").is_some());
+    canvas.set_booharu(pushed(false, Some(WHITE)));
+    assert!(canvas.draw().expect("a draw").is_none());
+    // The same ones again, as each save pushes them.
+    canvas.set_booharu(pushed(false, Some(WHITE)));
+    assert!(canvas.draw().expect("a draw").is_none());
 }
