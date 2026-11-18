@@ -8,8 +8,11 @@
 //! Koharu's `Preferences` keys its own: the desktop's settings commands read
 //! and save it whole, and the settings tool reaches one section by its name.
 
+use std::collections::BTreeSet;
+
 use anyhow::{anyhow, bail};
 use koharu_config::Section;
+use koharu_scene::Rgba;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned, de::Error as _};
 use serde_json::{Map, Value};
 
@@ -86,6 +89,113 @@ pub enum OcrBoxMode {
     ReadTranslateClean,
 }
 
+/// `[booharu-lettering]`: how new text looks. Its font isn't one of these
+/// settings: new text gets a copy of the first of Koharu's Preferred fonts,
+/// `[renderer] font_families`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
+pub struct LetteringSettings {
+    /// The default text look: the colours and outline new text gets, the T
+    /// tool's always, and a new translation's when `detect_colors` is off.
+    pub default: DefaultTextStyle,
+    /// Whether a new translation keeps the colours Koharu measured from the
+    /// original lettering, or, typed into a block with none, copied from its
+    /// source. When off, it gets `default`'s instead. Existing translations
+    /// keep theirs either way.
+    pub detect_colors: bool,
+}
+
+impl Default for LetteringSettings {
+    fn default() -> Self {
+        Self {
+            default: DefaultTextStyle::default(),
+            detect_colors: true,
+        }
+    }
+}
+
+impl Section for LetteringSettings {
+    const NAME: &'static str = "booharu-lettering";
+}
+
+/// The default text look's colours and outline, as Booharu 0.0.4's
+/// Settings card set them.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
+pub struct DefaultTextStyle {
+    /// The text's colour; none draws Koharu's black.
+    #[serde(deserialize_with = "colour")]
+    #[specta(type = Option<Rgba>)]
+    pub fill: Option<Rgba>,
+    /// The outline's colour; none for no outline.
+    #[serde(deserialize_with = "colour")]
+    #[specta(type = Option<Rgba>)]
+    pub stroke: Option<Rgba>,
+    /// The outline's width in pixels, from 0 to 50, when it has a colour.
+    #[serde(deserialize_with = "stroke_width")]
+    #[specta(type = f64)]
+    pub stroke_width: f64,
+}
+
+impl Default for DefaultTextStyle {
+    fn default() -> Self {
+        Self {
+            fill: None,
+            stroke: None,
+            stroke_width: 1.5,
+        }
+    }
+}
+
+/// A colour of four channels, each from 0 to 1, as the scene holds one.
+fn colour<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Rgba>, D::Error> {
+    let colour = Option::<Rgba>::deserialize(deserializer)?;
+    if let Some(Rgba(channels)) = colour
+        && !channels.iter().all(|channel| (0.0..=1.0).contains(channel))
+    {
+        return Err(D::Error::custom(format!(
+            "colour {channels:?} isn't four channels from 0 to 1"
+        )));
+    }
+    Ok(colour)
+}
+
+/// The widest outline the default look takes, in pixels.
+const STROKE_WIDTH: f64 = 50.0;
+
+fn stroke_width<'de, D: Deserializer<'de>>(deserializer: D) -> Result<f64, D::Error> {
+    let width = f64::deserialize(deserializer)?;
+    if !(0.0..=STROKE_WIDTH).contains(&width) {
+        return Err(D::Error::custom(format!(
+            "an outline {width} pixels wide isn't between 0 and {STROKE_WIDTH}"
+        )));
+    }
+    Ok(width)
+}
+
+/// `[booharu-fonts]`: the font picker's favourites.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
+pub struct FontSettings {
+    /// The families starred in the font picker, by name, in name order.
+    #[serde(deserialize_with = "families")]
+    #[specta(type = Vec<String>)]
+    pub favorites: BTreeSet<String>,
+}
+
+impl Section for FontSettings {
+    const NAME: &'static str = "booharu-fonts";
+}
+
+/// Family names, none of them blank.
+fn families<'de, D: Deserializer<'de>>(deserializer: D) -> Result<BTreeSet<String>, D::Error> {
+    let families = BTreeSet::<String>::deserialize(deserializer)?;
+    if families.iter().any(|family| family.trim().is_empty()) {
+        return Err(D::Error::custom("a font family's name can't be blank"));
+    }
+    Ok(families)
+}
+
 /// Every Booharu settings section, each under its table's name. Koharu's
 /// own stay in its `Preferences`.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -94,6 +204,10 @@ pub struct BooharuPreferences {
     pub mcp: McpSettings,
     #[serde(rename = "booharu-ocr-box")]
     pub ocr_box: OcrBoxSettings,
+    #[serde(rename = "booharu-lettering")]
+    pub lettering: LetteringSettings,
+    #[serde(rename = "booharu-fonts")]
+    pub fonts: FontSettings,
 }
 
 impl BooharuPreferences {
@@ -103,6 +217,8 @@ impl BooharuPreferences {
         Ok(Self {
             mcp: koharu_config::get()?,
             ocr_box: koharu_config::get()?,
+            lettering: koharu_config::get()?,
+            fonts: koharu_config::get()?,
         })
     }
 
@@ -113,9 +229,16 @@ impl BooharuPreferences {
         // value, stored or given, writes nothing.
         Self::get()?;
         self.check()?;
-        let Self { mcp, ocr_box } = self;
+        let Self {
+            mcp,
+            ocr_box,
+            lettering,
+            fonts,
+        } = self;
         koharu_config::update(|section: &mut McpSettings| *section = mcp)?;
         koharu_config::update(|section: &mut OcrBoxSettings| *section = ocr_box)?;
+        koharu_config::update(|section: &mut LetteringSettings| *section = lettering)?;
+        koharu_config::update(|section: &mut FontSettings| *section = fonts)?;
         Self::get()
     }
 
@@ -210,10 +333,122 @@ mod tests {
         assert_eq!(mcp.port, 47821);
         let ocr_box: OcrBoxSettings = toml::from_str("").expect("the defaults");
         assert_eq!(ocr_box.default_mode, OcrBoxMode::ReadTranslate);
+        let lettering: LetteringSettings = toml::from_str("").expect("the defaults");
+        assert_eq!(lettering.default.fill, None);
+        assert_eq!(lettering.default.stroke, None);
+        assert_eq!(lettering.default.stroke_width, 1.5);
+        assert!(lettering.detect_colors);
+        let fonts: FontSettings = toml::from_str("").expect("the defaults");
+        assert!(fonts.favorites.is_empty());
+        // In whichever order serde_json keeps a map's keys.
+        let mut names = BooharuPreferences::names();
+        names.sort();
         assert_eq!(
-            BooharuPreferences::names(),
-            [McpSettings::NAME, OcrBoxSettings::NAME]
+            names,
+            [
+                FontSettings::NAME,
+                LetteringSettings::NAME,
+                McpSettings::NAME,
+                OcrBoxSettings::NAME
+            ]
         );
+    }
+
+    #[test]
+    fn the_default_look_reads_back_as_it_was_written() {
+        let lettering = LetteringSettings {
+            default: DefaultTextStyle {
+                fill: Some(Rgba([1.0, 0.25, 0.0, 1.0])),
+                stroke: None,
+                stroke_width: 3.0,
+            },
+            detect_colors: false,
+        };
+        // TOML has no null: an unset colour is left out.
+        let text = toml::to_string(&lettering).expect("a table");
+        assert!(!text.contains("stroke ="), "{text}");
+        assert_eq!(
+            toml::from_str::<LetteringSettings>(&text).ok(),
+            Some(lettering)
+        );
+        let whole: LetteringSettings = toml::from_str(
+            "detect_colors = false\n\n[default]\nstroke = [1, 1, 1, 1]\nstroke_width = 2\n",
+        )
+        .expect("whole numbers for a colour and a width");
+        assert_eq!(whole.default.stroke, Some(Rgba([1.0; 4])));
+        assert_eq!(whole.default.stroke_width, 2.0);
+    }
+
+    #[test]
+    fn a_bad_colour_width_or_favourite_fails_closed() {
+        let refused = [
+            "[default]\nfill = [1.5, 0, 0, 1]",
+            "[default]\nfill = [-0.1, 0, 0, 1]",
+            "[default]\nstroke = [0, 0, 0]",
+            "[default]\nstroke = [nan, 0, 0, 1]",
+            "[default]\nstroke_width = -1",
+            "[default]\nstroke_width = 50.5",
+            "[default]\nstroke_width = inf",
+            "[default]\nstroke_width = nan",
+            "detect_colors = 1",
+        ];
+        for text in refused {
+            assert!(
+                toml::from_str::<LetteringSettings>(text).is_err(),
+                "took {text}"
+            );
+        }
+        let widest: LetteringSettings =
+            toml::from_str("[default]\nstroke_width = 50").expect("the widest");
+        assert_eq!(widest.default.stroke_width, 50.0);
+        for text in [r#"favorites = [""]"#, r#"favorites = ["Arial", "  "]"#] {
+            assert!(toml::from_str::<FontSettings>(text).is_err(), "took {text}");
+        }
+    }
+
+    #[test]
+    fn the_look_and_the_favourites_change_by_their_sections() {
+        let mut preferences = BooharuPreferences::default();
+        preferences
+            .set_section(
+                "booharu-lettering",
+                values(json!({
+                    "default": {"fill": [1, 0, 0, 1], "stroke": null, "stroke_width": 2},
+                    "detect_colors": false,
+                })),
+            )
+            .expect("a look");
+        assert_eq!(
+            preferences.lettering,
+            LetteringSettings {
+                default: DefaultTextStyle {
+                    fill: Some(Rgba([1.0, 0.0, 0.0, 1.0])),
+                    stroke: None,
+                    stroke_width: 2.0,
+                },
+                detect_colors: false,
+            }
+        );
+        let refused = preferences.set_section(
+            "booharu-lettering",
+            values(json!({"default": {"stroke": [2, 0, 0, 1]}})),
+        );
+        assert!(refused.is_err());
+        assert_eq!(preferences.lettering.default.stroke_width, 2.0);
+
+        preferences
+            .set_section(
+                "booharu-fonts",
+                values(json!({"favorites": ["Arial", "CCWildWords", "Arial"]})),
+            )
+            .expect("favourites");
+        assert_eq!(
+            preferences.section("booharu-fonts").ok(),
+            Some(json!({"favorites": ["Arial", "CCWildWords"]}))
+        );
+        let refused = preferences.set_section("booharu-fonts", values(json!({"favorites": [""]})));
+        assert!(refused.is_err());
+        assert_eq!(preferences.fonts.favorites.len(), 2);
     }
 
     #[test]
