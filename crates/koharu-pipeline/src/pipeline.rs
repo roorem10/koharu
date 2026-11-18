@@ -64,6 +64,7 @@ impl Pipeline {
         let config = request
             .config
             .unwrap_or_else(|| self.0.config.read().clone());
+        let config = crate::booharu::queued(config); // Booharu: the run's snapshot of its settings.
         let project = session.lock().project();
         let plan = Plan::new(&project, &request.target, &request.stages)?;
         let id = RunId(self.0.next.fetch_add(1, Ordering::Relaxed));

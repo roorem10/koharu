@@ -89,6 +89,8 @@ pub(crate) async fn recognize(task: &Task, config: &PipelineConfig) -> anyhow::R
                         key: "ocr".to_owned(),
                         value: Some(action("c2pa.created", &name, None)),
                     });
+                    // Booharu: the hand-edit record of the wording read.
+                    ops.push(crate::booharu::recognized(project, block, &text)?);
                 }
                 Ok(ops)
             })

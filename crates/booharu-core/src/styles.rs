@@ -172,8 +172,9 @@ pub fn patched(chars: &CharStyle, patch: &Map<String, Value>) -> Result<CharStyl
 /// before the edit, as placement reads the project: after placement's op in
 /// the same edit, the default look as a patch on the translation's style
 /// when it writes anything, then the hand-edit record, written on every
-/// translation, styled or not, so a block the run translated never counts as
-/// typed by hand.
+/// translation, styled or not, so a translation the run wrote never counts
+/// as typed by hand, while the style values one typed by hand had, and the
+/// run left, stay hand edits.
 pub fn translated(
     layer: &Layer,
     text: &str,
@@ -183,9 +184,15 @@ pub fn translated(
 ) -> Result<Vec<Op>> {
     let looked = looked(layer, placed, settings, font)?;
     let mut record = Auto::of(layer);
-    // A new translation's style owes nothing to one the block had before.
+    // A new translation's style owes nothing to one the block had before,
+    // nor to whoever chose that one's. One no stage wrote was made by hand,
+    // so with nothing recorded its values stay hand edits, but for those
+    // this step writes.
     if !looked.existed {
         record.style = None;
+        record.origin = Origin::Automatic;
+    } else if record.style.is_none() && !recorded(layer, "translation") {
+        record.style = Some(AutoStyle::default());
     }
     record.text = Some(text_hash(text));
     let record = record.restyled(&looked.after, &looked.written);
@@ -206,6 +213,22 @@ pub fn typed(
     font: Option<&str>,
 ) -> Result<Option<Op>> {
     Ok(looked(layer, placed, settings, font)?.op)
+}
+
+/// The op recording on `layer`, a block read before the edit, that the
+/// Translation stage was given its source back unchanged, so it wrote no
+/// translation, in the stage's edit: the record's translation is no text,
+/// so one typed there later counts as typed by hand, even as the wording
+/// the stage was given, and the record keeps no style or origin, which went
+/// with any translation the block had. Its source part is kept.
+pub fn given_back(layer: &Layer) -> Result<Op> {
+    let record = Auto {
+        origin: Origin::Automatic,
+        text: Some(text_hash("")),
+        style: None,
+        ..Auto::of(layer)
+    };
+    attrs::set(layer.id, &record)
 }
 
 /// The op recording `text` as the source wording the Recognition stage
@@ -402,12 +425,7 @@ pub fn edited(layer: &Layer) -> Edited {
         }
         _ => return Edited::default(),
     };
-    let recorded = |step: &str| {
-        layer
-            .attributes
-            .get(C2PA)
-            .is_some_and(|steps| steps.contains_key(step))
-    };
+    let recorded = |step: &str| recorded(layer, step);
     let record = Auto::of(layer);
     let wording = block.source.content.text();
     let source = match &record.source {
@@ -439,6 +457,15 @@ pub fn edited(layer: &Layer) -> Edited {
         style,
         drawn: !recorded("detection"),
     }
+}
+
+/// Whether a Koharu stage recorded in `layer`'s `c2pa` attributes making
+/// its part `step`.
+fn recorded(layer: &Layer, step: &str) -> bool {
+    layer
+        .attributes
+        .get(C2PA)
+        .is_some_and(|steps| steps.contains_key(step))
 }
 
 #[cfg(test)]
@@ -980,6 +1007,38 @@ mod tests {
     }
 
     #[test]
+    fn a_translation_typed_by_hand_keeps_its_own_values_hand_edits_once_translated() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        apply(
+            &mut session,
+            vec![
+                Op::SetText {
+                    layer: block.into(),
+                    text: "Hm".to_owned(),
+                },
+                Op::UpdateLayer {
+                    layer: block.into(),
+                    patch: json!({"translation": {"style": {"chars": {"family": "Comic Neue"}}}}),
+                },
+            ],
+        );
+        let look = settings(false, Some(RED), None);
+        translate(&mut session, block, "Why?", &look, Some("CCWildWords"));
+
+        // The record holds the colours this step wrote; the family it left
+        // is still the user's.
+        let found = layer(&session, block);
+        let style = Auto::of(&found).style.expect("a style");
+        assert_eq!((style.family, style.fill), (None, Some(RED)));
+        let after = edited(&found);
+        assert_eq!((after.text, after.style), (false, true));
+        assert_eq!(
+            translation(&session, block).style.chars.family.as_deref(),
+            Some("Comic Neue")
+        );
+    }
+
+    #[test]
     fn a_style_the_agent_chose_counts_as_a_hand_edit() {
         let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
         translate(
@@ -1000,6 +1059,62 @@ mod tests {
         );
         let agent = edited(&layer(&session, block));
         assert_eq!((agent.text, agent.style), (false, true));
+
+        // Its translation given back unchanged and so cleared, the agent's
+        // choice goes with it, and the record holds no translation.
+        let read = recognized(&layer(&session, block), "どうして").expect("the record");
+        apply(&mut session, vec![read]);
+        let given = given_back(&layer(&session, block)).expect("the record");
+        apply(
+            &mut session,
+            vec![
+                Op::UpdateLayer {
+                    layer: block.into(),
+                    patch: json!({"translation": null}),
+                },
+                given,
+            ],
+        );
+        let found = layer(&session, block);
+        assert_eq!(
+            Auto::of(&found),
+            Auto {
+                source: Some(text_hash("どうして")),
+                text: Some(text_hash("")),
+                ..Auto::default()
+            }
+        );
+        assert_eq!(edited(&found), Edited::default());
+
+        // A translation typed there afterwards is the user's, even as the
+        // wording the stage was given back.
+        apply(
+            &mut session,
+            vec![Op::SetText {
+                layer: block.into(),
+                text: "どうして".to_owned(),
+            }],
+        );
+        assert!(edited(&layer(&session, block)).text);
+        apply(
+            &mut session,
+            vec![Op::UpdateLayer {
+                layer: block.into(),
+                patch: json!({"translation": null}),
+            }],
+        );
+
+        // A new translation the stage writes is Booharu's again.
+        translate(
+            &mut session,
+            block,
+            "Why?",
+            &settings(true, None, None),
+            None,
+        );
+        let found = layer(&session, block);
+        assert_eq!(Auto::of(&found).origin, Origin::Automatic);
+        assert_eq!(edited(&found), Edited::default());
     }
 
     #[test]

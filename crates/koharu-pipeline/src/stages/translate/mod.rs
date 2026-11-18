@@ -120,6 +120,7 @@ pub(crate) async fn translate(
 ) -> Result<()> {
     let member = &task.members[0];
     let translator = config.translator.clone();
+    let booharu = config.booharu.clone(); // Booharu: the run's settings, for `written`.
     let (read, vision) = (member.clone(), translator.vision);
     let page = tokio::task::spawn_blocking(move || {
         let _span = info_span!("read", stage = %Stage::Translate, page = read.index + 1).entered();
@@ -171,7 +172,7 @@ pub(crate) async fn translate(
         .collect();
     member
         .apply(Stage::Translate, move |project| {
-            written(project, translated, &translator)
+            written(project, translated, &translator, &booharu) // Booharu: and the run's settings.
         })
         .await
 }
@@ -222,10 +223,13 @@ fn sight(scan: &image::DynamicImage) -> Result<String> {
 
 /// The ops writing each block's translation, placed, into the project as it
 /// is now.
-fn written(
+// Booharu: crate-wide, for the tests of Booharu's hooks in it, and given the
+// run's Booharu settings, for those hooks.
+pub(crate) fn written(
     project: &Project,
     translated: Vec<(LayerId, LanguageIdentifier, String)>,
     config: &TranslatorConfig,
+    booharu: &booharu_core::settings::Snapshot,
 ) -> Result<Vec<Op>> {
     let target = &config.target;
     // Each block's placement reads the project as it is before any of them,
@@ -251,13 +255,19 @@ fn written(
                 layer: block.into(),
                 patch: json!({"translation": null, "cleanup": {"visible": false}}),
             });
+            // Booharu: the hand-edit record of no translation.
+            ops.push(crate::booharu::given_back(project, block)?);
             continue;
         };
+        // Booharu: the default look and the hand-edit record, read as
+        // placement reads the project and written after its op.
+        let look = crate::booharu::translated(project, block, &text, placed.as_ref().ok(), booharu);
         ops.push(Op::SetText {
             layer: block.into(),
             text,
         });
         ops.push(placed?);
+        ops.extend(look?); // Booharu: the look and the record, after placement's op.
         ops.push(Op::UpdateLayer {
             layer: block.into(),
             patch: json!({"translation": {"language": target}, "cleanup": {"visible": true}}),

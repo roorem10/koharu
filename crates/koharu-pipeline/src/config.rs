@@ -15,6 +15,11 @@ pub struct PipelineConfig {
     pub recognizer: RecognizerConfig,
     pub inpainter: InpainterConfig,
     pub translator: TranslatorConfig,
+    /// Booharu: Booharu's settings as a run read them when it was queued,
+    /// which every page of it uses; never in the file or the interface's
+    /// types.
+    #[serde(skip)]
+    pub booharu: booharu_core::settings::Snapshot,
 }
 
 impl koharu_config::Section for PipelineConfig {
