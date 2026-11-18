@@ -86,6 +86,8 @@ pub(crate) enum Gesture {
     Reshape(Reshape),
     Pick(Pick),
     Mark(Mark),
+    /// Booharu: the O tool's box being dragged out.
+    Booharu(crate::booharu::OcrBox),
 }
 
 impl Gesture {
@@ -100,6 +102,7 @@ impl Gesture {
             Self::Reshape(reshape) => reshape.moved(samples),
             Self::Pick(pick) => pick.moved(samples),
             Self::Mark(mark) => mark.moved(samples),
+            Self::Booharu(ocr_box) => ocr_box.moved(samples), // Booharu: the O tool's box.
         }
         Vec::new()
     }
@@ -117,6 +120,7 @@ impl Gesture {
             Self::Pick(pick) => Ok(pick.finish(cx.view)),
             // The canvas joins a mark to its area itself.
             Self::Mark(_) => Ok(Vec::new()),
+            Self::Booharu(ocr_box) => Ok(ocr_box.finish(cx)), // Booharu: the O tool's box.
         }
     }
 
@@ -130,6 +134,7 @@ impl Gesture {
             Self::Reshape(reshape) => reshape.preview(overlay),
             Self::Pick(pick) => pick.preview(overlay),
             Self::Mark(mark) => mark.preview(overlay),
+            Self::Booharu(ocr_box) => ocr_box.preview(cx, overlay), // Booharu: the O tool's box.
         }
         Ok(())
     }
@@ -145,6 +150,7 @@ impl Gesture {
             Self::Reshape(reshape) => Some(reshape.cursor()),
             Self::Pick(_) => Some(CursorIcon::Default),
             Self::Mark(_) => Some(CursorIcon::Crosshair),
+            Self::Booharu(_) => Some(CursorIcon::Crosshair), // Booharu: the O tool's box.
         }
     }
 
@@ -180,6 +186,7 @@ impl Gesture {
             Self::Reshape(reshape) => GestureLook::Pointer(reshape.current()),
             Self::Pick(pick) => GestureLook::Rect(pick.rect()),
             Self::Mark(mark) => mark.look(),
+            Self::Booharu(ocr_box) => ocr_box.look(), // Booharu: the O tool's box.
         }
     }
 

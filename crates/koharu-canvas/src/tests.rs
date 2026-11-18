@@ -1,6 +1,9 @@
 //! The canvas's behaviour, through its public API, on a real project and
 //! GPU.
 
+// Booharu: the O tool's box, on this harness.
+mod booharu;
+
 use std::sync::Arc;
 
 use koharu_renderer::{Gpu, Renderer, RendererConfig};

@@ -598,6 +598,8 @@ impl Canvas {
             (Tool::ColorPicker, Some(PointerButton::Primary)) => {
                 Press::answers(tools::picker::pick(&cx, sample)?)
             }
+            // Booharu: the O tool drags out a box.
+            (Tool::OcrBox, Some(PointerButton::Primary)) => crate::booharu::press(sample),
             (tool, Some(PointerButton::Primary)) if tool.is_brush() => {
                 tools::brush::press(&cx, sample)
             }

@@ -1,12 +1,13 @@
 //! Booharu's part of the app: its commands, which the Booharu block of
-//! `commands` lists, its events, which `events::bindings` lists, the MCP
-//! server's start on Booharu's own port, and the host Booharu's agent tools
-//! reach the app through.
+//! `commands` lists, its events, which `events::bindings` lists, what the
+//! canvas's Booharu effect does, the MCP server's start on Booharu's own
+//! port, and the host Booharu's agent tools reach the app through.
 
 pub(crate) mod boxes;
 pub(crate) mod events;
 pub(crate) mod mcp;
 pub(crate) mod notes;
+pub(crate) mod ocr_box;
 pub(crate) mod settings;
 pub(crate) mod translation;
 
@@ -27,16 +28,19 @@ async fn apply(
     build: impl FnOnce(&Session) -> anyhow::Result<Edit> + Send + 'static,
 ) -> Result<Change> {
     let app = Arc::clone(app);
-    Ok(
-        tokio::task::spawn_blocking(move || -> anyhow::Result<Change> {
-            let session = app.session()?;
-            let mut session = session.lock();
-            let edit = build(&session)?;
-            tracing::info!(label = %edit.label, ops = edit.ops.len(), "edit");
-            Ok(session.apply(edit)?)
-        })
-        .await??,
-    )
+    Ok(tokio::task::spawn_blocking(move || applied(&app, build)).await??)
+}
+
+/// `apply`'s work, on the thread that calls it.
+fn applied(
+    app: &App,
+    build: impl FnOnce(&Session) -> anyhow::Result<Edit>,
+) -> anyhow::Result<Change> {
+    let session = app.session()?;
+    let mut session = session.lock();
+    let edit = build(&session)?;
+    tracing::info!(label = %edit.label, ops = edit.ops.len(), "edit");
+    Ok(session.apply(edit)?)
 }
 
 /// The app as Booharu's agent tools reach it, the in-app agent's and the MCP

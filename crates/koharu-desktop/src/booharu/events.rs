@@ -10,10 +10,6 @@ use crate::events::Event;
 /// for the interface to say in the user's language.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[expect(
-    dead_code,
-    reason = "the O tool's handler, the next change, sends them"
-)]
 pub enum BooharuNotice {
     /// The box holds no ink to read.
     NothingToRead,

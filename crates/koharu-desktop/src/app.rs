@@ -355,6 +355,12 @@ impl App {
                         None,
                     )
                     .map(drop),
+                // Booharu: a box drawn with the O tool, which Booharu adds
+                // and reads off this thread.
+                Effect::Booharu(effect) => {
+                    crate::booharu::ocr_box::carry(self, effect);
+                    Ok(())
+                }
             };
             if let Err(error) = result {
                 tracing::error!("failed to carry out a canvas gesture: {error:#}");

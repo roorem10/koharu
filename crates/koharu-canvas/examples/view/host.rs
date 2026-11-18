@@ -83,6 +83,9 @@ impl Host {
                     tracing::info!("copied {text:?}; the example has no clipboard")
                 }
                 Effect::Paste => tracing::info!("the example has no clipboard to paste from"),
+                // Booharu: the app makes a block of an O tool box; the example
+                // only says so.
+                Effect::Booharu(effect) => tracing::info!("Booharu's {effect:?}"),
             }
         }
         Ok(())

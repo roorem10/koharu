@@ -47,6 +47,7 @@ pointer hits is what the user sees.
 | remove | paints the area for the inpainting model to redraw, as the pipeline's area run takes it | |
 | colour picker | the page's own pixel under the pointer, not the screen's | |
 | pan | drags the view; the wheel and a pinch move and zoom it | |
+| O (Booharu) | drags out a box over the page, cut to it and dashed in the selection's colour, and answers it as Booharu's effect with the modifiers held as the pointer lifts, for the host to make a text block of and read; a box under four screen pixels across or down is none, as Booharu 0.0.4's was | |
 
 ## 3. Gestures
 

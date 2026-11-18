@@ -32,6 +32,9 @@ pub enum Effect {
     /// Paste while typing: the host gives its clipboard's text to
     /// `Canvas::insert`.
     Paste,
+    /// Booharu: what one of Booharu's gestures did, such as a box drawn with
+    /// the O tool.
+    Booharu(crate::booharu::Effect),
 }
 
 /// Why a gesture did nothing, for the app to say in the user's language.
