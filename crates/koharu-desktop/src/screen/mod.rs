@@ -225,6 +225,12 @@ impl Screen {
         });
     }
 
+    /// Booharu: the app's handle once the window opened, through which
+    /// Booharu's agent tools reach the app.
+    pub fn handle(&self) -> Option<AppHandle<CefRuntime>> {
+        self.0.get().cloned()
+    }
+
     /// Booharu: Booharu's settings, for the canvas and any made later, as
     /// `set_brush` sets the brush.
     pub fn set_booharu(&self, settings: koharu_canvas::booharu::BooharuSettings) {

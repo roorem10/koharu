@@ -313,6 +313,7 @@ impl Tool for Wait {
          many page stages it does, each page's stages as they started and finished, and last, \
          once it ended, how: done, failed with its reason, or stopped."
             .to_owned()
+            + booharu::WAIT // Booharu: what a run tells under Booharu's run settings.
     }
 
     fn parameters(&self) -> Value {

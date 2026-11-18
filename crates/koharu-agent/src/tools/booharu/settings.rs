@@ -104,9 +104,11 @@ impl Tool for SetSettings {
          tables included, or an invalid value, saves nothing. \
          Answers the section as saved, with a note when the change applies only once Booharu \
          restarts. A change to `booharu-lettering` applies to text made from then on, never to \
-         translations already made: booharu_apply_text_style gives those the new look. A call \
-         an outside app makes over MCP can't change `booharu-mcp`. Needs a project open, as \
-         every tool here does."
+         translations already made: booharu_apply_text_style gives those the new look. A change \
+         to `booharu-runs` applies to runs started from then on, the next run of a group \
+         booharu_run carries on with included; a run already going keeps the settings it \
+         started with. A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
+         a project open, as every tool here does."
             .to_owned()
     }
 

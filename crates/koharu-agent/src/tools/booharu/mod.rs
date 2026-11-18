@@ -20,13 +20,17 @@
 //! | `booharu_set_review_note` | sets or clears the reviewer's note on a block or a text, as one undo step | no |
 //! | `booharu_apply_text_style` | gives the translations of some blocks, pages, or the whole project the default text look again, keeping hand-edited blocks unless told otherwise, as one undo step, and answers how many it changed, kept, and found untranslated | no |
 //! | `booharu_count_text_style_targets` | how many blocks `booharu_apply_text_style` would change, keep, and find untranslated | yes |
+//! | `booharu_run` | carries on with what the pages still need, as the Run button does with every stage on, one group of pages after another, or runs fewer stages on the pages named, and answers the plan with its first run | no |
 
 mod boxes;
 mod notes;
 mod project;
+mod runs;
 mod settings;
 mod styles;
 mod translation;
+
+pub(crate) use self::runs::WAIT;
 
 use std::{collections::BTreeSet, sync::Arc};
 
@@ -61,6 +65,14 @@ pub trait BooharuHost: Send + Sync {
     /// Koharu's Preferred fonts, `[renderer] font_families`, as the app holds
     /// them now; the first is the default font new text gets.
     fn font_families(&self) -> anyhow::Result<Vec<String>>;
+
+    /// What the groups of runs `booharu_run` carries on with reach the app
+    /// through, as the Run button's do: the app queues a run only on the
+    /// project open and tells the interface each one. `None`, as outside
+    /// the app, runs them on the tools' own pipeline and tells no one.
+    fn runs(&self) -> Option<Arc<dyn booharu::runs::RunHost>> {
+        None
+    }
 }
 
 impl Tools {
@@ -91,6 +103,7 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(notes::SetReviewNote);
     tools.add_tool(styles::ApplyTextStyle);
     tools.add_tool(styles::CountTextStyleTargets);
+    tools.add_tool(runs::Run);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one

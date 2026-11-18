@@ -21,6 +21,7 @@ use std::sync::Arc;
 use booharu_core::settings::BooharuPreferences;
 use koharu_agent::BooharuHost;
 use koharu_scene::{Change, Edit, Session};
+use tauri::Manager as _;
 
 use crate::{app::App, commands::Result, screen::Screen};
 
@@ -50,7 +51,8 @@ fn applied(
 
 /// The app as Booharu's agent tools reach it, the in-app agent's and the MCP
 /// server's alike, through what the commands run: the window, for the
-/// canvas's settings after a save.
+/// canvas's settings after a save, and through its handle the app, for the
+/// run groups `booharu_run` carries on with.
 pub(crate) struct DesktopHost(pub(crate) Screen);
 
 impl BooharuHost for DesktopHost {
@@ -70,5 +72,11 @@ impl BooharuHost for DesktopHost {
 
     fn font_families(&self) -> anyhow::Result<Vec<String>> {
         Ok(koharu_config::get::<koharu_renderer::RendererConfig>()?.font_families)
+    }
+
+    fn runs(&self) -> Option<Arc<dyn booharu::runs::RunHost>> {
+        let handle = self.0.handle()?;
+        let app: Arc<App> = Arc::clone(handle.try_state::<Arc<App>>()?.inner());
+        Some(app)
     }
 }

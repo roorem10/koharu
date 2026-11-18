@@ -97,6 +97,12 @@ pub fn all_stages(stages: &[Stage]) -> bool {
     Stage::VARIANTS.iter().all(|stage| stages.contains(stage))
 }
 
+/// Every stage, in stage order, which carries on.
+#[must_use]
+pub fn every_stage() -> Vec<Stage> {
+    Stage::VARIANTS.to_vec()
+}
+
 /// The pages `target` names, in page order. A page the project doesn't have
 /// fails, as Koharu's run on pages does.
 pub fn pages(project: &Project, target: &RunTarget) -> Result<Vec<PageId>> {
