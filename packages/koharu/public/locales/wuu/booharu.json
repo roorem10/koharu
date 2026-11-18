@@ -23,6 +23,9 @@
       "booharuGithub": "GitHub 浪个 Booharu",
       "koharuDiscord": "Koharu 个 Discord",
       "koharuGithub": "GitHub 浪个 Koharu"
+    },
+    "tools": {
+      "ocrBoxModifiers": "Alt：光识别。Shift：识别、翻译搭清理。"
     }
   },
   "errors": {
@@ -50,5 +53,8 @@
   "startup": {
     "opening": "来勒打开 Booharu…",
     "title": "来勒准备 Booharu"
+  },
+  "tools": {
+    "ocr_box": "识别框里向个文字"
   }
 }

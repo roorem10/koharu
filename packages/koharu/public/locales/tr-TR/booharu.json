@@ -23,6 +23,9 @@
       "booharuGithub": "GitHub'da Booharu",
       "koharuDiscord": "Koharu Discord",
       "koharuGithub": "GitHub'da Koharu"
+    },
+    "tools": {
+      "ocrBoxModifiers": "Alt: yalnızca oku. Shift: oku, çevir ve temizle."
     }
   },
   "errors": {
@@ -50,5 +53,8 @@
   "startup": {
     "opening": "Booharu açılıyor…",
     "title": "Booharu hazırlanıyor"
+  },
+  "tools": {
+    "ocr_box": "Kutudaki metni oku"
   }
 }

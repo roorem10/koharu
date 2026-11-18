@@ -23,6 +23,9 @@
       "booharuGithub": "GitHub 上的 Booharu",
       "koharuDiscord": "Koharu 的 Discord",
       "koharuGithub": "GitHub 上的 Koharu"
+    },
+    "tools": {
+      "ocrBoxModifiers": "Alt：僅辨識。Shift：辨識、翻譯並清理。"
     }
   },
   "errors": {
@@ -50,5 +53,8 @@
   "startup": {
     "opening": "正在開啟 Booharu…",
     "title": "正在準備 Booharu"
+  },
+  "tools": {
+    "ocr_box": "辨識框內文字"
   }
 }

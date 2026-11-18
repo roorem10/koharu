@@ -27,6 +27,9 @@
       "booharuGithub": "Booharu на GitHub",
       "koharuDiscord": "Discord Koharu",
       "koharuGithub": "Koharu на GitHub"
+    },
+    "tools": {
+      "ocrBoxModifiers": "Alt — только распознать. Shift — распознать, перевести и очистить."
     }
   },
   "errors": {
@@ -64,5 +67,8 @@
   "startup": {
     "opening": "Запуск Booharu…",
     "title": "Подготовка Booharu"
+  },
+  "tools": {
+    "ocr_box": "Распознать текст в рамке"
   }
 }

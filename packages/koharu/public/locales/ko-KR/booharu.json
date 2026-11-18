@@ -23,6 +23,9 @@
       "booharuGithub": "GitHub의 Booharu",
       "koharuDiscord": "Koharu Discord",
       "koharuGithub": "GitHub의 Koharu"
+    },
+    "tools": {
+      "ocrBoxModifiers": "Alt: OCR만. Shift: OCR, 번역 및 정리."
     }
   },
   "errors": {
@@ -50,5 +53,8 @@
   "startup": {
     "opening": "Booharu 여는 중…",
     "title": "Booharu 준비 중"
+  },
+  "tools": {
+    "ocr_box": "상자 안의 텍스트 읽기"
   }
 }

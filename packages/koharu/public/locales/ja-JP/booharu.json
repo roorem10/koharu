@@ -23,6 +23,9 @@
       "booharuGithub": "GitHub の Booharu",
       "koharuDiscord": "Koharu の Discord",
       "koharuGithub": "GitHub の Koharu"
+    },
+    "tools": {
+      "ocrBoxModifiers": "Alt：OCRのみ。Shift：OCR・翻訳・クリーンアップ。"
     }
   },
   "errors": {
@@ -53,5 +56,8 @@
   "startup": {
     "opening": "Booharuを起動中…",
     "title": "Booharu を準備しています"
+  },
+  "tools": {
+    "ocr_box": "ボックス内の文字を読み取る"
   }
 }

@@ -23,6 +23,9 @@
       "booharuGithub": "Booharu on GitHub",
       "koharuDiscord": "Koharu Discord",
       "koharuGithub": "Koharu on GitHub"
+    },
+    "tools": {
+      "ocrBoxModifiers": "Alt: read only. Shift: read, translate and clean."
     }
   },
   "errors": {
@@ -50,5 +53,8 @@
   "startup": {
     "opening": "Opening Booharu…",
     "title": "Preparing Booharu"
+  },
+  "tools": {
+    "ocr_box": "Read text in a box"
   }
 }

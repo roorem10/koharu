@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { OcrBoxHint, ocrBoxTool } from '@/components/booharu/boxes/OcrBoxTool' // Booharu: the O tool.
 import { ColorWell } from '@/components/controls/ColorWell'
 import { usePage } from '@/lib/queries'
 import {
@@ -79,6 +80,7 @@ const tools = [
   ['eraser', Eraser],
   ['color_picker', Pipette],
   ['remove', Remove],
+  ocrBoxTool, // Booharu: the O tool, before Pan as in Booharu 0.0.4.
   ['pan', Hand],
 ] as const satisfies ReadonlyArray<readonly [CanvasTool, typeof MousePointer2]>
 
@@ -116,6 +118,8 @@ export function ToolBar() {
               <TooltipContent side='right'>
                 {t(`tools.${tool}`)}
                 <span className='ml-2 opacity-60'>{toolKeys[tool].toUpperCase()}</span>
+                {/* Booharu: the O tool's Alt and Shift modes, under its name and key. */}
+                {tool === 'ocr_box' && <OcrBoxHint />}
               </TooltipContent>
             </Tooltip>
           </div>

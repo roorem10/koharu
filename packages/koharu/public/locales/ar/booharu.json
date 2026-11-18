@@ -29,6 +29,9 @@
       "booharuGithub": "Booharu على GitHub",
       "koharuDiscord": "Discord الخاص بـ Koharu",
       "koharuGithub": "Koharu على GitHub"
+    },
+    "tools": {
+      "ocrBoxModifiers": "Alt: قراءة فقط. Shift: قراءة وترجمة وتنظيف."
     }
   },
   "errors": {
@@ -72,5 +75,8 @@
   "startup": {
     "opening": "جارٍ فتح Booharu…",
     "title": "تحضير Booharu"
+  },
+  "tools": {
+    "ocr_box": "قراءة النص داخل مربع"
   }
 }

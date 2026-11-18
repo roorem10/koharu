@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { booharuTools } from '@/lib/booharu/keys'
 import { booharuStrings, mergeStrings } from '@/lib/booharu/strings'
 import { resources, supportedLanguages } from '@/lib/i18n'
 
@@ -23,9 +24,12 @@ function koharuStrings(language: string): object {
 const pluralForm = /_(zero|one|two|few|many|other)$/
 
 /** Whether `key` is one of Booharu's own strings, which every language has, rather than an override
- * of one of Koharu's at Koharu's path. */
+ * of one of Koharu's at Koharu's path: its own, its edits' history steps, and its tools' names,
+ * which Koharu's tool rail looks up by the tool's id. */
 const isBooharuKey = (key: string) =>
-  key.startsWith('booharu.') || key.startsWith('history.steps.booharu_')
+  key.startsWith('booharu.') ||
+  key.startsWith('history.steps.booharu_') ||
+  [...booharuTools].some((tool) => key === `tools.${tool}`)
 
 describe('Booharu strings overlay', () => {
   it('merges objects key by key, lets Booharu values win, and changes neither input', () => {
