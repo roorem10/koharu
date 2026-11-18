@@ -1,7 +1,4 @@
 {
-  "about": {
-    "basedOn": "Основано на {{name}} от Mayo Takanashi."
-  },
   "activity": {
     "downloadingFiles_few": "Скачивание файлов: {{count}}",
     "downloadingFiles_many": "Скачивание файлов: {{count}}"
@@ -10,6 +7,27 @@
     "emptyTitle": "Что должен сделать Booharu?",
     "message": "Сообщение агенту Booharu",
     "placeholder": "Попросите Booharu поработать над проектом…"
+  },
+  "booharu": {
+    "about": {
+      "basedOn": "Основано на {{name}} от Mayo Takanashi."
+    },
+    "borders": {
+      "decreaseSecondBorderWidth": "Уменьшить ширину второй обводки",
+      "increaseSecondBorderWidth": "Увеличить ширину второй обводки",
+      "outlineContour": "Контурная обводка",
+      "outlineExpansion": "Расширение",
+      "outlineMethod": "Способ обводки",
+      "secondBorder": "2-я обводка",
+      "secondBorderColor": "Цвет второй обводки",
+      "secondBorderWidth": "Ширина второй обводки",
+      "swapFillOutline": "Поменять цвета заливки и обводки"
+    },
+    "menu": {
+      "booharuGithub": "Booharu на GitHub",
+      "koharuDiscord": "Discord Koharu",
+      "koharuGithub": "Koharu на GitHub"
+    }
   },
   "errors": {
     "fatalTitle": "Booharu не может продолжить работу"
@@ -29,22 +47,8 @@
     "stageCount_few": "Этапов: {{count}}",
     "stageCount_many": "Этапов: {{count}}"
   },
-  "inspector": {
-    "decreaseSecondBorderWidth": "Уменьшить ширину второй обводки",
-    "increaseSecondBorderWidth": "Увеличить ширину второй обводки",
-    "outlineContour": "Контурная обводка",
-    "outlineExpansion": "Расширение",
-    "outlineMethod": "Способ обводки",
-    "secondBorder": "2-я обводка",
-    "secondBorderColor": "Цвет второй обводки",
-    "secondBorderWidth": "Ширина второй обводки",
-    "swapFillOutline": "Поменять цвета заливки и обводки"
-  },
   "menu": {
-    "about": "О программе",
-    "booharuGithub": "Booharu на GitHub",
-    "koharuDiscord": "Discord Koharu",
-    "koharuGithub": "Koharu на GitHub"
+    "about": "О программе"
   },
   "settings": {
     "pipeline": {

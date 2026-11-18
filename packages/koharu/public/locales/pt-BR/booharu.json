@@ -1,7 +1,4 @@
 {
-  "about": {
-    "basedOn": "Baseado no {{name}}, de Mayo Takanashi."
-  },
   "activity": {
     "downloadingFiles_many": "Baixando {{count}} arquivos"
   },
@@ -9,6 +6,27 @@
     "emptyTitle": "O que o Booharu deve fazer?",
     "message": "Enviar mensagem ao agente do Booharu",
     "placeholder": "Peça ao Booharu para trabalhar neste projeto…"
+  },
+  "booharu": {
+    "about": {
+      "basedOn": "Baseado no {{name}}, de Mayo Takanashi."
+    },
+    "borders": {
+      "decreaseSecondBorderWidth": "Diminuir largura do segundo contorno",
+      "increaseSecondBorderWidth": "Aumentar largura do segundo contorno",
+      "outlineContour": "Traçado do contorno",
+      "outlineExpansion": "Expansão",
+      "outlineMethod": "Método do contorno",
+      "secondBorder": "2º contorno",
+      "secondBorderColor": "Cor do segundo contorno",
+      "secondBorderWidth": "Largura do segundo contorno",
+      "swapFillOutline": "Trocar cores do preenchimento e do contorno"
+    },
+    "menu": {
+      "booharuGithub": "Booharu no GitHub",
+      "koharuDiscord": "Discord do Koharu",
+      "koharuGithub": "Koharu no GitHub"
+    }
   },
   "errors": {
     "fatalTitle": "O Booharu não pôde continuar"
@@ -26,22 +44,8 @@
     "selectedCount_one": "{{count}} página selecionada",
     "stageCount_many": "{{count}} etapas"
   },
-  "inspector": {
-    "decreaseSecondBorderWidth": "Diminuir largura do segundo contorno",
-    "increaseSecondBorderWidth": "Aumentar largura do segundo contorno",
-    "outlineContour": "Traçado do contorno",
-    "outlineExpansion": "Expansão",
-    "outlineMethod": "Método do contorno",
-    "secondBorder": "2º contorno",
-    "secondBorderColor": "Cor do segundo contorno",
-    "secondBorderWidth": "Largura do segundo contorno",
-    "swapFillOutline": "Trocar cores do preenchimento e do contorno"
-  },
   "menu": {
-    "about": "Sobre",
-    "booharuGithub": "Booharu no GitHub",
-    "koharuDiscord": "Discord do Koharu",
-    "koharuGithub": "Koharu no GitHub"
+    "about": "Sobre"
   },
   "settings": {
     "pipeline": {

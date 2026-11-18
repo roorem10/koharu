@@ -188,8 +188,8 @@ export function TypeBar() {
   const outerEnabled = bordered && outer !== null && outer[3] > 0 && outerWidth > 0
   const strokeMethod: StrokeMethod = style.stroke_method ?? 'contour'
   const strokeMethods: Record<StrokeMethod, string> = {
-    contour: t('inspector.outlineContour'),
-    expansion: t('inspector.outlineExpansion'),
+    contour: t('booharu.borders.outlineContour'),
+    expansion: t('booharu.borders.outlineExpansion'),
   }
   const direction: Direction = lettering?.direction ?? 'horizontal'
   const align: Align = style.align ?? (direction === 'vertical' ? 'start' : 'center')
@@ -431,7 +431,7 @@ export function TypeBar() {
                 render={
                   <button
                     type='button'
-                    aria-label={t('inspector.swapFillOutline')}
+                    aria-label={t('booharu.borders.swapFillOutline')}
                     disabled={mixed.has('fill') || mixed.has('stroke') || mixed.has('stroke_width')}
                     className='grid size-6 shrink-0 place-items-center rounded-md border border-input bg-background text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50'
                     onClick={() => applyChars(swappedColors(chars))}
@@ -440,16 +440,16 @@ export function TypeBar() {
               >
                 <ArrowRightLeft aria-hidden='true' className='size-3.5' />
               </TooltipTrigger>
-              <TooltipContent>{t('inspector.swapFillOutline')}</TooltipContent>
+              <TooltipContent>{t('booharu.borders.swapFillOutline')}</TooltipContent>
             </Tooltip>
           </div>
           {/* Booharu: a second border around the first, and how both are drawn. */}
           <span className='text-[10px] font-medium text-muted-foreground'>
-            {t('inspector.secondBorder')}
+            {t('booharu.borders.secondBorder')}
           </span>
           <div className='flex items-center gap-1'>
             <ColorWell
-              label={t('inspector.secondBorderColor')}
+              label={t('booharu.borders.secondBorderColor')}
               size='sm'
               allowTransparent
               disabled={!bordered}
@@ -490,18 +490,18 @@ export function TypeBar() {
               }}
             >
               <NumberFieldGroup>
-                <NumberFieldDecrement aria-label={t('inspector.decreaseSecondBorderWidth')}>
+                <NumberFieldDecrement aria-label={t('booharu.borders.decreaseSecondBorderWidth')}>
                   <Minus />
                 </NumberFieldDecrement>
-                <NumberFieldInput aria-label={t('inspector.secondBorderWidth')} />
-                <NumberFieldIncrement aria-label={t('inspector.increaseSecondBorderWidth')}>
+                <NumberFieldInput aria-label={t('booharu.borders.secondBorderWidth')} />
+                <NumberFieldIncrement aria-label={t('booharu.borders.increaseSecondBorderWidth')}>
                   <Plus />
                 </NumberFieldIncrement>
               </NumberFieldGroup>
             </NumberField>
           </div>
           <span className='text-[10px] font-medium text-muted-foreground'>
-            {t('inspector.outlineMethod')}
+            {t('booharu.borders.outlineMethod')}
           </span>
           <Select
             value={strokeMethod}
@@ -512,7 +512,11 @@ export function TypeBar() {
               next && apply({ stroke_method: next === 'contour' ? null : (next as StrokeMethod) })
             }
           >
-            <SelectTrigger size='sm' aria-label={t('inspector.outlineMethod')} className='w-full'>
+            <SelectTrigger
+              size='sm'
+              aria-label={t('booharu.borders.outlineMethod')}
+              className='w-full'
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent

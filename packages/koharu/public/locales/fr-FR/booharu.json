@@ -1,7 +1,4 @@
 {
-  "about": {
-    "basedOn": "Basé sur {{name}}, par Mayo Takanashi."
-  },
   "activity": {
     "downloadingFiles_many": "Téléchargement de {{count}} fichiers"
   },
@@ -9,6 +6,27 @@
     "emptyTitle": "Que doit faire Booharu ?",
     "message": "Message à l’agent Booharu",
     "placeholder": "Demandez à Booharu de travailler sur ce projet…"
+  },
+  "booharu": {
+    "about": {
+      "basedOn": "Basé sur {{name}}, par Mayo Takanashi."
+    },
+    "borders": {
+      "decreaseSecondBorderWidth": "Réduire l’épaisseur du second contour",
+      "increaseSecondBorderWidth": "Augmenter l’épaisseur du second contour",
+      "outlineContour": "Tracé du contour",
+      "outlineExpansion": "Expansion",
+      "outlineMethod": "Méthode du contour",
+      "secondBorder": "2ᵉ contour",
+      "secondBorderColor": "Couleur du second contour",
+      "secondBorderWidth": "Épaisseur du second contour",
+      "swapFillOutline": "Permuter les couleurs du texte et du contour"
+    },
+    "menu": {
+      "booharuGithub": "Booharu sur GitHub",
+      "koharuDiscord": "Discord de Koharu",
+      "koharuGithub": "Koharu sur GitHub"
+    }
   },
   "errors": {
     "fatalTitle": "Booharu ne peut pas continuer"
@@ -25,22 +43,8 @@
     "selectedCount_many": "{{count}} pages sélectionnées",
     "stageCount_many": "{{count}} étapes"
   },
-  "inspector": {
-    "decreaseSecondBorderWidth": "Réduire l’épaisseur du second contour",
-    "increaseSecondBorderWidth": "Augmenter l’épaisseur du second contour",
-    "outlineContour": "Tracé du contour",
-    "outlineExpansion": "Expansion",
-    "outlineMethod": "Méthode du contour",
-    "secondBorder": "2ᵉ contour",
-    "secondBorderColor": "Couleur du second contour",
-    "secondBorderWidth": "Épaisseur du second contour",
-    "swapFillOutline": "Permuter les couleurs du texte et du contour"
-  },
   "menu": {
-    "about": "À propos",
-    "booharuGithub": "Booharu sur GitHub",
-    "koharuDiscord": "Discord de Koharu",
-    "koharuGithub": "Koharu sur GitHub"
+    "about": "À propos"
   },
   "settings": {
     "pipeline": {

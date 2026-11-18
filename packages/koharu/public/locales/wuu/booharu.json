@@ -1,11 +1,29 @@
 {
-  "about": {
-    "basedOn": "基于 Mayo Takanashi 个 {{name}}。"
-  },
   "agent": {
     "emptyTitle": "侬想让 Booharu 做啥？",
     "message": "发消息畀 Booharu 智能体",
     "placeholder": "让 Booharu 帮侬处理箇个项目…"
+  },
+  "booharu": {
+    "about": {
+      "basedOn": "基于 Mayo Takanashi 个 {{name}}。"
+    },
+    "borders": {
+      "decreaseSecondBorderWidth": "拿第二道描边调细点",
+      "increaseSecondBorderWidth": "拿第二道描边调粗点",
+      "outlineContour": "轮廓描边",
+      "outlineExpansion": "扩张",
+      "outlineMethod": "描边方式",
+      "secondBorder": "第二道描边",
+      "secondBorderColor": "第二道描边颜色",
+      "secondBorderWidth": "第二道描边宽度",
+      "swapFillOutline": "交换填充搭描边颜色"
+    },
+    "menu": {
+      "booharuGithub": "GitHub 浪个 Booharu",
+      "koharuDiscord": "Koharu 个 Discord",
+      "koharuGithub": "GitHub 浪个 Koharu"
+    }
   },
   "errors": {
     "fatalTitle": "Booharu 运行弗下去哉"
@@ -15,22 +33,8 @@
       "booharu_set_translation": "加译文"
     }
   },
-  "inspector": {
-    "decreaseSecondBorderWidth": "拿第二道描边调细点",
-    "increaseSecondBorderWidth": "拿第二道描边调粗点",
-    "outlineContour": "轮廓描边",
-    "outlineExpansion": "扩张",
-    "outlineMethod": "描边方式",
-    "secondBorder": "第二道描边",
-    "secondBorderColor": "第二道描边颜色",
-    "secondBorderWidth": "第二道描边宽度",
-    "swapFillOutline": "交换填充搭描边颜色"
-  },
   "menu": {
-    "about": "关于",
-    "booharuGithub": "GitHub 浪个 Booharu",
-    "koharuDiscord": "Koharu 个 Discord",
-    "koharuGithub": "GitHub 浪个 Koharu"
+    "about": "关于"
   },
   "settings": {
     "pipeline": {

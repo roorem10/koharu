@@ -1,7 +1,4 @@
 {
-  "about": {
-    "basedOn": "مبني على {{name}} من تطوير Mayo Takanashi."
-  },
   "activity": {
     "downloadingFiles_few": "جارٍ تنزيل {{count}} ملفات",
     "downloadingFiles_many": "جارٍ تنزيل {{count}} ملفًا",
@@ -12,6 +9,27 @@
     "emptyTitle": "ماذا ينبغي أن يفعل Booharu؟",
     "message": "راسل Booharu Agent",
     "placeholder": "اطلب من Booharu العمل على هذا المشروع..."
+  },
+  "booharu": {
+    "about": {
+      "basedOn": "مبني على {{name}} من تطوير Mayo Takanashi."
+    },
+    "borders": {
+      "decreaseSecondBorderWidth": "تقليل عرض الحدود الثانية",
+      "increaseSecondBorderWidth": "زيادة عرض الحدود الثانية",
+      "outlineContour": "حدود المسار",
+      "outlineExpansion": "توسيع",
+      "outlineMethod": "طريقة الحدود",
+      "secondBorder": "الحدود 2",
+      "secondBorderColor": "لون الحدود الثانية",
+      "secondBorderWidth": "عرض الحدود الثانية",
+      "swapFillOutline": "تبديل لوني التعبئة والحد"
+    },
+    "menu": {
+      "booharuGithub": "Booharu على GitHub",
+      "koharuDiscord": "Discord الخاص بـ Koharu",
+      "koharuGithub": "Koharu على GitHub"
+    }
   },
   "errors": {
     "fatalTitle": "تعذّر على Booharu المتابعة"
@@ -37,22 +55,8 @@
     "stageCount_two": "مرحلتان ({{count}})",
     "stageCount_zero": "لا مراحل ({{count}})"
   },
-  "inspector": {
-    "decreaseSecondBorderWidth": "تقليل عرض الحدود الثانية",
-    "increaseSecondBorderWidth": "زيادة عرض الحدود الثانية",
-    "outlineContour": "حدود المسار",
-    "outlineExpansion": "توسيع",
-    "outlineMethod": "طريقة الحدود",
-    "secondBorder": "الحدود 2",
-    "secondBorderColor": "لون الحدود الثانية",
-    "secondBorderWidth": "عرض الحدود الثانية",
-    "swapFillOutline": "تبديل لوني التعبئة والحد"
-  },
   "menu": {
-    "about": "عن البرنامج",
-    "booharuGithub": "Booharu على GitHub",
-    "koharuDiscord": "Discord الخاص بـ Koharu",
-    "koharuGithub": "Koharu على GitHub"
+    "about": "عن البرنامج"
   },
   "settings": {
     "pipeline": {

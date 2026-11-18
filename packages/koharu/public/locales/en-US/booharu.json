@@ -1,11 +1,29 @@
 {
-  "about": {
-    "basedOn": "Based on {{name}} by Mayo Takanashi."
-  },
   "agent": {
     "emptyTitle": "What should Booharu do?",
     "message": "Message Booharu Agent",
     "placeholder": "Ask Booharu to work on this project..."
+  },
+  "booharu": {
+    "about": {
+      "basedOn": "Based on {{name}} by Mayo Takanashi."
+    },
+    "borders": {
+      "decreaseSecondBorderWidth": "Decrease second border width",
+      "increaseSecondBorderWidth": "Increase second border width",
+      "outlineContour": "Contour stroke",
+      "outlineExpansion": "Expansion",
+      "outlineMethod": "Outline method",
+      "secondBorder": "2nd border",
+      "secondBorderColor": "Second border color",
+      "secondBorderWidth": "Second border width",
+      "swapFillOutline": "Swap fill and outline colors"
+    },
+    "menu": {
+      "booharuGithub": "Booharu on GitHub",
+      "koharuDiscord": "Koharu Discord",
+      "koharuGithub": "Koharu on GitHub"
+    }
   },
   "errors": {
     "fatalTitle": "Booharu could not continue"
@@ -15,22 +33,8 @@
       "booharu_set_translation": "Add translation"
     }
   },
-  "inspector": {
-    "decreaseSecondBorderWidth": "Decrease second border width",
-    "increaseSecondBorderWidth": "Increase second border width",
-    "outlineContour": "Contour stroke",
-    "outlineExpansion": "Expansion",
-    "outlineMethod": "Outline method",
-    "secondBorder": "2nd border",
-    "secondBorderColor": "Second border color",
-    "secondBorderWidth": "Second border width",
-    "swapFillOutline": "Swap fill and outline colors"
-  },
   "menu": {
-    "about": "About",
-    "booharuGithub": "Booharu on GitHub",
-    "koharuDiscord": "Koharu Discord",
-    "koharuGithub": "Koharu on GitHub"
+    "about": "About"
   },
   "settings": {
     "pipeline": {

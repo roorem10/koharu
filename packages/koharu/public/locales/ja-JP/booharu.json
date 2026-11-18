@@ -1,11 +1,29 @@
 {
-  "about": {
-    "basedOn": "Mayo Takanashi による {{name}} をベースにしています。"
-  },
   "agent": {
     "emptyTitle": "Booharuに何をさせますか？",
     "message": "Booharuエージェントにメッセージを送信",
     "placeholder": "Booharuにこのプロジェクトの作業を依頼…"
+  },
+  "booharu": {
+    "about": {
+      "basedOn": "Mayo Takanashi による {{name}} をベースにしています。"
+    },
+    "borders": {
+      "decreaseSecondBorderWidth": "外側の縁取り幅を縮小",
+      "increaseSecondBorderWidth": "外側の縁取り幅を拡大",
+      "outlineContour": "輪郭線",
+      "outlineExpansion": "拡張",
+      "outlineMethod": "縁取り方式",
+      "secondBorder": "2重縁取り",
+      "secondBorderColor": "外側の縁取りの色",
+      "secondBorderWidth": "外側の縁取り幅",
+      "swapFillOutline": "塗りと縁取りの色を入れ替える"
+    },
+    "menu": {
+      "booharuGithub": "GitHub の Booharu",
+      "koharuDiscord": "Koharu の Discord",
+      "koharuGithub": "GitHub の Koharu"
+    }
   },
   "errors": {
     "fatalTitle": "Booharuを続行できませんでした"
@@ -15,22 +33,8 @@
       "booharu_set_translation": "翻訳を追加"
     }
   },
-  "inspector": {
-    "decreaseSecondBorderWidth": "外側の縁取り幅を縮小",
-    "increaseSecondBorderWidth": "外側の縁取り幅を拡大",
-    "outlineContour": "輪郭線",
-    "outlineExpansion": "拡張",
-    "outlineMethod": "縁取り方式",
-    "secondBorder": "2重縁取り",
-    "secondBorderColor": "外側の縁取りの色",
-    "secondBorderWidth": "外側の縁取り幅",
-    "swapFillOutline": "塗りと縁取りの色を入れ替える"
-  },
   "menu": {
-    "about": "Booharuについて",
-    "booharuGithub": "GitHub の Booharu",
-    "koharuDiscord": "Koharu の Discord",
-    "koharuGithub": "GitHub の Koharu"
+    "about": "Booharuについて"
   },
   "settings": {
     "pipeline": {

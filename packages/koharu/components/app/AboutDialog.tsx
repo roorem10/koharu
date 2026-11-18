@@ -57,7 +57,7 @@ export function AboutDialog({
         <div className='grid gap-2 border-t border-border/70 pt-3 text-[11px]'>
           {/* The version Tauri reports is the Koharu release Booharu is built on. */}
           <p className='text-muted-foreground'>
-            {t('about.basedOn', { name: version ? `Koharu ${version}` : 'Koharu' })}
+            {t('booharu.about.basedOn', { name: version ? `Koharu ${version}` : 'Koharu' })}
           </p>
           <dl className='grid grid-cols-[auto_1fr] gap-x-4 gap-y-2'>
             <dt className='text-muted-foreground'>{t('about.author')}</dt>
