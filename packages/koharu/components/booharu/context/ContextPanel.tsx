@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { GlossaryDialog } from '@/components/booharu/context/GlossaryDialog'
 import { SeriesPicker } from '@/components/booharu/context/SeriesPicker'
 import { TermForm } from '@/components/booharu/context/TermForm'
+import { TermUsage } from '@/components/booharu/context/TermUsage'
 import {
   acceptSuggestion,
   dismissSuggestion,
@@ -42,9 +43,9 @@ interface Listed {
  * follows, picked or made here; a line asking for one while it links none, or saying the one it
  * links is gone; and the glossary its translations follow, searchable, the series' terms then the
  * terms suggested for the chapter, each suggestion to accept into the series, to edit and accept,
- * or to dismiss; then Open full glossary, the glossary editor. A side file that doesn't read shows
- * its error, which names it. Everything is read again after every change to the chapter, its
- * series or its pages. */
+ * or to dismiss, a term accepted showing where it's used, with Re-translate those lines; then Open
+ * full glossary, the glossary editor. A side file that doesn't read shows its error, which names
+ * it. Everything is read again after every change to the chapter, its series or its pages. */
 export function ContextPanel() {
   const { t } = useTranslation()
   const heading = useId()
@@ -54,6 +55,10 @@ export function ContextPanel() {
   const [glossaryOpen, setGlossaryOpen] = useState(false)
   // The suggestion an Accept or Dismiss is under way for, whose buttons wait for it.
   const [pending, setPending] = useState<string | null>(null)
+  // The term accepted last, whose use shows, and how many were, so each shows anew.
+  const [accepted, setAccepted] = useState<{ entry: FullEntry; count: number } | null>(null)
+  const showUse = (entry: FullEntry) =>
+    setAccepted((last) => ({ entry, count: (last?.count ?? 0) + 1 }))
 
   if (chapter.error) {
     return (
@@ -106,6 +111,13 @@ export function ContextPanel() {
             className='h-7 text-[11px]'
             onChange={(event) => setSearch(event.currentTarget.value)}
           />
+          {accepted && (
+            <TermUsage
+              key={accepted.count}
+              entry={accepted.entry}
+              onClose={() => setAccepted(null)}
+            />
+          )}
           {terms.length === 0 ? (
             <p className='text-muted-foreground'>{t('booharu.context.noTerms')}</p>
           ) : shown.length === 0 ? (
@@ -145,9 +157,13 @@ export function ContextPanel() {
                         size='xs'
                         variant='outline'
                         disabled={!linked || pending === entry.id}
-                        onClick={() =>
-                          settle(entry.id, acceptSuggestion({ ...entry, locked: false }))
-                        }
+                        onClick={() => {
+                          const unlocked = { ...entry, locked: false }
+                          settle(
+                            entry.id,
+                            acceptSuggestion(unlocked).then(() => showUse(unlocked)),
+                          )
+                        }}
                       >
                         {t('booharu.context.accept')}
                       </Button>
@@ -191,7 +207,7 @@ export function ContextPanel() {
           initial={editing}
           glossary={linked?.glossary}
           onClose={() => setEditing(null)}
-          onSave={(entry) => acceptSuggestion(entry)}
+          onSave={(entry) => acceptSuggestion(entry).then(() => showUse(entry))}
         />
       )}
       {glossaryOpen && (

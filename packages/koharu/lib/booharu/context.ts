@@ -10,6 +10,7 @@ import {
   events,
   type ChapterState,
   type Character,
+  type FixedTerm,
   type GlossaryEntry,
   type Series,
   type TermKind,
@@ -308,4 +309,38 @@ export function acceptSuggestion(entry: FullEntry): Promise<ChapterState> {
 /** Dismisses the open chapter's suggestion `id`. */
 export function dismissSuggestion(id: string): Promise<ChapterState> {
   return queueWrite(() => call(commands.booharuDismissSuggestion, id))
+}
+
+/** Runs `command` once the writes queued before it end, so it reads the series and the chapter as
+ * they left them, without holding back the writes queued after it. A failure shows its error, as
+ * every failed command's does, and rejects. */
+async function afterWrites<T>(command: () => Promise<T>): Promise<T> {
+  await writing.catch(() => undefined)
+  return command()
+}
+
+/** The key of where terms are used in the open project, under the project's, so the change, undo
+ * or redo of any page reads it again: a run that translates a line, or a fix by hand, changes what
+ * re-translating the lines using a term would do. */
+export const usageKey = [...projectKey, 'booharu', 'usage'] as const
+
+/** Where the term `source` is used in the open project: the lines whose source it occurs in, and
+ * which of them are fixed by hand or locked, read for each project anew, and not while none is
+ * open. A failed read shows no toast: the view says why. */
+export function useGlossaryUsage(source: string) {
+  const project = useProject().data?.name ?? null
+  return useQuery({
+    queryKey: [...usageKey, project ?? '', source],
+    queryFn: () => commands.booharuGlossaryUsage(source),
+    enabled: project !== null && source.trim() !== '',
+  })
+}
+
+/** Re-translates the lines using the term `source`, Fix it everywhere: one ordinary Translation run
+ * on every line of the open project using it that's neither locked nor fixed by hand, untranslated
+ * ones included, queued once the writes before it end, so the run follows the glossary as just
+ * saved. Answers the run, none when no line was left to translate, and how many lines it translates
+ * and left alone. */
+export function fixTermEverywhere(source: string): Promise<FixedTerm> {
+  return afterWrites(() => call(commands.booharuFixTermEverywhere, source))
 }

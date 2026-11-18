@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { CommitInput } from '@/components/booharu/context/CommitInput'
 import { SeriesPicker } from '@/components/booharu/context/SeriesPicker'
 import { TermForm } from '@/components/booharu/context/TermForm'
+import { TermUsage } from '@/components/booharu/context/TermUsage'
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import {
   changeCharacter,
@@ -20,6 +21,7 @@ import {
   putTerm,
   removeTerm,
   renameSeries,
+  sameSource,
   useSeries,
   useSeriesList,
   type FullCharacter,
@@ -310,7 +312,8 @@ function Characters({ series }: { series: FullSeries }) {
   )
 }
 
-/** A series' terms, searchable, each to edit in the term form or delete, and Add term. */
+/** A series' terms, searchable, each to edit in the term form or delete, and Add term; under them,
+ * once a term is saved, where it's used, with Re-translate those lines. */
 function Terms({ series }: { series: FullSeries }) {
   const { t } = useTranslation()
   const heading = useId()
@@ -318,6 +321,8 @@ function Terms({ series }: { series: FullSeries }) {
   const [editing, setEditing] = useState<FullEntry | null>(null)
   // The term a Delete is under way for, whose buttons wait for it.
   const [deleting, setDeleting] = useState<string | null>(null)
+  // The term saved last, whose use shows, and how many were, so each shows anew.
+  const [saved, setSaved] = useState<{ entry: FullEntry; count: number } | null>(null)
   const shown = series.glossary.filter((entry) => matchesSearch(entry, search))
   const cell = 'max-w-56 px-2 py-1.5 align-top break-words'
 
@@ -411,12 +416,21 @@ function Terms({ series }: { series: FullSeries }) {
           </table>
         </div>
       )}
+      {saved && <TermUsage key={saved.count} entry={saved.entry} onClose={() => setSaved(null)} />}
       {editing && (
         <TermForm
           initial={editing}
           glossary={series.glossary}
           onClose={() => setEditing(null)}
-          onSave={(entry) => changeSeries(series.id, (held) => putTerm(held, entry))}
+          onSave={(entry) =>
+            changeSeries(series.id, (held) => putTerm(held, entry)).then((written) =>
+              setSaved((last) => ({
+                entry:
+                  written.glossary.find((term) => sameSource(term.source, entry.source)) ?? entry,
+                count: (last?.count ?? 0) + 1,
+              })),
+            )
+          }
         />
       )}
     </section>

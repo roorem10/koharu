@@ -109,6 +109,13 @@ export function contextDesktop({
       files.chapter.suggestions = files.chapter.suggestions.filter((item) => item.id !== id)
       return state()
     }),
+    // A term no line of the project uses, so Fix it everywhere has nothing to translate.
+    usage: vi
+      .spyOn(commands, 'booharuGlossaryUsage')
+      .mockResolvedValue({ blocks: [], translate: [], hand_edited: 0, locked: 0 }),
+    fix: vi
+      .spyOn(commands, 'booharuFixTermEverywhere')
+      .mockResolvedValue({ run: null, translated: 0, kept_hand_edited: 0, kept_locked: 0 }),
   }
   return { files, saves, spies }
 }
