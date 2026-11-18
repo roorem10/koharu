@@ -67,9 +67,10 @@ function SourceSection({ page, box: { layer } }: BoxDetailsProps) {
   )
 }
 
-/** The reviewer's note on the text, saved when the field loses focus as one undo step, and removed
- * when it's left blank. A locked text, or one in a locked layer, takes no note, as the scene
- * refuses one, so the section says why in place of the field. */
+/** The reviewer's note on the text, saved when the field loses focus, or when Box details closes
+ * while it has focus, as one undo step, and removed when it's left blank. A locked text, or one in a
+ * locked layer, takes no note, as the scene refuses one, so the section says why in place of the
+ * field. */
 function NoteSection({ box: { layer, locked } }: BoxDetailsProps) {
   const { t } = useTranslation()
   const note = reviewNote(layer)
@@ -79,8 +80,13 @@ function NoteSection({ box: { layer, locked } }: BoxDetailsProps) {
   useEffect(() => {
     if (!editing.current) setDraft(null)
   }, [note])
+  // Escape closes Box details before the field can lose focus, as React hears no blur while it
+  // takes the field away: what's typed then is saved as it goes, as losing focus saves it.
+  const saveOnLeave = useRef<() => void>(() => undefined)
+  useEffect(() => () => saveOnLeave.current(), [])
 
   if (locked) {
+    saveOnLeave.current = () => undefined
     return (
       <div className='grid gap-1.5'>
         {note && <p className='text-[12px] leading-4 break-words whitespace-pre-wrap'>{note}</p>}
@@ -101,6 +107,9 @@ function NoteSection({ box: { layer, locked } }: BoxDetailsProps) {
     }
     // A failure shows its error, as every command's does, and leaves what was typed.
     void call(commands.booharuSetReviewNote, layer.id, next).catch(() => undefined)
+  }
+  saveOnLeave.current = () => {
+    if (editing.current) save()
   }
   return (
     <Textarea

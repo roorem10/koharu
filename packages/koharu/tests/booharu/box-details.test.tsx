@@ -161,6 +161,33 @@ describe('Booharu Box details', () => {
     expect(note).toHaveBeenLastCalledWith('second', null)
   })
 
+  it('saves the note being typed when Escape closes Box details, and only once', async () => {
+    const { note } = desktop()
+    openProject(notedPage())
+    const user = userEvent.setup()
+    mount(<BoxDetailsDialog />)
+
+    act(() => openBoxDetails('page', 'first'))
+    let field = within(await details()).getByRole('textbox', { name: 'Box note' })
+    await user.click(field)
+    await user.type(field, 'Check the tone')
+    await user.keyboard('{Escape}')
+    await closed()
+    expect(note.mock.calls).toEqual([['first', 'Check the tone']])
+
+    // Saved as the field lost focus, it isn't saved again as Box details closes.
+    act(() => openBoxDetails('page', 'second'))
+    field = within(await details()).getByRole('textbox', { name: 'Box note' })
+    await user.click(field)
+    await user.type(field, '!')
+    await user.click(within(await details()).getByRole('button', { name: 'Close' }))
+    await closed()
+    expect(note.mock.calls).toEqual([
+      ['first', 'Check the tone'],
+      ['second', 'Check the tone!'],
+    ])
+  })
+
   it('says why a locked text takes no note, and saves none', async () => {
     const { note } = desktop()
     openProject(notedPage())
