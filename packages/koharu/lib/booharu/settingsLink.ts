@@ -2,6 +2,11 @@
 
 import { useEffect } from 'react'
 
+/** The tabs Booharu adds to the Settings page, after Koharu's, each with its name at
+ * `settings.tabs.<tab>` in booharu.json, where Koharu's tab list looks a tab's name up. */
+export const booharuTabs = ['runs'] as const
+export type BooharuTab = (typeof booharuTabs)[number]
+
 /** The Settings page's tabs, by SettingsPage's names for them. */
 export type SettingsTab = 'appearance' | 'pipeline' | 'providers' | 'typesetting'
 

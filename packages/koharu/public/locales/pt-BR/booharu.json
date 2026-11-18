@@ -83,6 +83,52 @@
       "detectColorsDescription": "Copia as cores de preenchimento e de contorno do letreiramento original para o texto recém-traduzido. As traduções existentes mantêm suas cores.",
       "detectColorsNote": "Quando desativada, o texto recém-traduzido usa as <a>cores de texto padrão</a> ({{tab}})."
     },
+    "runs": {
+      "behavior": {
+        "description": "Vale para todas as execuções, não importa quem as inicie.",
+        "title": "Comportamento das execuções"
+      },
+      "description": "Repita as tarefas com falha, escolha a ordem de execução e salve predefinições de etapas.",
+      "fewerRetries": "Menos tentativas",
+      "finishSound": "Reproduzir som ao concluir",
+      "finishSoundDescription": "Toca quando uma execução em páginas termina, com um tom mais grave se houve problemas.",
+      "loadError": "Não foi possível carregar as configurações de execução.",
+      "loading": "Carregando configurações de execução…",
+      "moreRetries": "Mais tentativas",
+      "onFailure": "Quando uma página falhar",
+      "onFailureModes": {
+        "continue": "Seguir com as outras páginas",
+        "stop": "Parar a execução"
+      },
+      "order": "Ordem de execução",
+      "orders": {
+        "pages": "Página por página",
+        "stages": "Uma etapa por vez",
+        "stagesHint": "Carrega um modelo por vez, o que usa menos memória de vídeo."
+      },
+      "presets": {
+        "add": "Adicionar",
+        "blank": "Dê um nome à predefinição.",
+        "builtIn": {
+          "detectOcr": "Detecção + OCR",
+          "translateCleanup": "Tradução + limpeza"
+        },
+        "delete": "Excluir",
+        "description": "Uma predefinição ativa suas etapas no menu Executar e não inicia nada.",
+        "duplicate": "Já existe uma predefinição chamada “{{name}}”.",
+        "empty": "Nenhuma predefinição ainda.",
+        "limit": "O Booharu guarda até {{max}} predefinições.",
+        "name": "Nome da predefinição",
+        "newName": "Nome da nova predefinição",
+        "save": "Salvar",
+        "saveAs": "Salvar como predefinição",
+        "short": "Predefinições",
+        "title": "Predefinições de execução"
+      },
+      "retries": "Tentativas por etapa com falha",
+      "retriesDescription": "Aguarda 2, 5 e depois 10 segundos entre tentativas (0–5 tentativas).",
+      "title": "Execuções"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: somente OCR. Shift: OCR, tradução e limpeza."
     },
@@ -154,6 +200,9 @@
       "translator": {
         "instructionsDescription": "Opcionais, em qualquer idioma e formato, como a grafia de um nome ou o tom. O Booharu as acrescenta como estão após o próprio prompt de sistema."
       }
+    },
+    "tabs": {
+      "runs": "Execuções"
     },
     "typesetting": {
       "empty": "Nenhuma família padrão. O Booharu usará a alternativa do sistema.",

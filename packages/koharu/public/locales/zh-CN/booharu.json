@@ -80,6 +80,52 @@
       "detectColorsDescription": "将原文字的填充和描边颜色复制到新翻译的文字上。现有译文的颜色保持不变。",
       "detectColorsNote": "关闭时，新翻译的文字使用<a>默认文字颜色</a>（{{tab}}）。"
     },
+    "runs": {
+      "behavior": {
+        "description": "适用于所有任务，无论由谁启动。",
+        "title": "运行方式"
+      },
+      "description": "重试失败的任务、选择处理顺序并保存阶段预设。",
+      "fewerRetries": "减少重试次数",
+      "finishSound": "完成时播放提示音",
+      "finishSoundDescription": "处理页面的任务结束时播放提示音，出现问题时音调更低。",
+      "loadError": "无法加载任务设置。",
+      "loading": "正在加载任务设置…",
+      "moreRetries": "增加重试次数",
+      "onFailure": "页面处理失败后",
+      "onFailureModes": {
+        "continue": "继续处理其他页面",
+        "stop": "停止任务"
+      },
+      "order": "处理顺序",
+      "orders": {
+        "pages": "逐页处理",
+        "stages": "逐阶段处理",
+        "stagesHint": "每次只加载一个模型，占用的显存更少。"
+      },
+      "presets": {
+        "add": "添加",
+        "blank": "请为预设命名。",
+        "builtIn": {
+          "detectOcr": "检测 + OCR",
+          "translateCleanup": "翻译 + 清理"
+        },
+        "delete": "删除",
+        "description": "预设会在运行菜单中开启它包含的阶段，但不会开始处理。",
+        "duplicate": "已有名为“{{name}}”的预设。",
+        "empty": "还没有预设。",
+        "limit": "Booharu 最多保留 {{max}} 个预设。",
+        "name": "预设名称",
+        "newName": "新预设名称",
+        "save": "保存",
+        "saveAs": "保存为预设",
+        "short": "预设",
+        "title": "任务预设"
+      },
+      "retries": "每个失败阶段的重试次数",
+      "retriesDescription": "重试间隔依次为 2、5、10 秒（可重试 0–5 次）。",
+      "title": "处理任务"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：仅识别。Shift：识别、翻译并清理。"
     },
@@ -138,6 +184,9 @@
       "translator": {
         "instructionsDescription": "可选，可用任何语言和形式填写，例如名字的写法或语气。Booharu 会按原样把它们附加在自己的系统提示词之后。"
       }
+    },
+    "tabs": {
+      "runs": "处理任务"
     },
     "typesetting": {
       "empty": "没有默认字体系列。Booharu 将使用系统后备字体。",

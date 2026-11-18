@@ -80,6 +80,52 @@
       "detectColorsDescription": "元の文字の塗り色と縁取り色を、新しく翻訳した文字にコピーします。既存の翻訳の色は変更しません。",
       "detectColorsNote": "オフのときは、新しく翻訳した文字に<a>既定の文字色</a>（{{tab}}）を使います。"
     },
+    "runs": {
+      "behavior": {
+        "description": "誰が開始したかにかかわらず、すべての実行に適用されます。",
+        "title": "実行時の動作"
+      },
+      "description": "失敗した処理の再試行、実行順序の選択、工程のプリセット保存を行います。",
+      "fewerRetries": "再試行回数を減らす",
+      "finishSound": "完了音を鳴らす",
+      "finishSoundDescription": "ページを処理する実行が終わると音で知らせます。問題があった場合は低い音になります。",
+      "loadError": "実行設定を読み込めませんでした。",
+      "loading": "実行設定を読み込み中…",
+      "moreRetries": "再試行回数を増やす",
+      "onFailure": "ページの処理が失敗したとき",
+      "onFailureModes": {
+        "continue": "他のページの処理を続行",
+        "stop": "実行を停止"
+      },
+      "order": "実行順序",
+      "orders": {
+        "pages": "ページごとに処理",
+        "stages": "工程を1つずつ処理",
+        "stagesHint": "一度に1つのモデルだけを読み込むため、使用するグラフィックメモリが少なくなります。"
+      },
+      "presets": {
+        "add": "追加",
+        "blank": "プリセットの名前を入力してください。",
+        "builtIn": {
+          "detectOcr": "検出 + OCR",
+          "translateCleanup": "翻訳 + クリーンアップ"
+        },
+        "delete": "削除",
+        "description": "プリセットは実行メニューでその工程をオンにするだけで、処理は開始しません。",
+        "duplicate": "「{{name}}」という名前のプリセットはすでにあります。",
+        "empty": "プリセットはまだありません。",
+        "limit": "Booharuが保存できるプリセットは{{max}}個までです。",
+        "name": "プリセット名",
+        "newName": "新しいプリセット名",
+        "save": "保存",
+        "saveAs": "プリセットとして保存",
+        "short": "プリセット",
+        "title": "実行プリセット"
+      },
+      "retries": "失敗した工程ごとの再試行回数",
+      "retriesDescription": "再試行の間に2秒、5秒、10秒の順で待機します（再試行回数：0–5回）。",
+      "title": "実行"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：OCRのみ。Shift：OCR・翻訳・クリーンアップ。"
     },
@@ -141,6 +187,9 @@
       "translator": {
         "instructionsDescription": "任意。どの言語・形式でも書けます（名前の表記や口調など）。Booharu は自身のシステムプロンプトの後に、書いたとおりに追加します。"
       }
+    },
+    "tabs": {
+      "runs": "実行"
     },
     "typesetting": {
       "empty": "既定のファミリーがありません。Booharuはシステムの代替フォントを使用します。",

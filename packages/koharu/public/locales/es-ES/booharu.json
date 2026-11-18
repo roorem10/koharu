@@ -83,6 +83,52 @@
       "detectColorsDescription": "Copia los colores de relleno y contorno de la rotulación original al texto recién traducido. Las traducciones existentes conservan sus colores.",
       "detectColorsNote": "Si está desactivado, el texto recién traducido usa los <a>colores de texto predeterminados</a> ({{tab}})."
     },
+    "runs": {
+      "behavior": {
+        "description": "Se aplica a todas las ejecuciones, las inicie quien las inicie.",
+        "title": "Comportamiento de las ejecuciones"
+      },
+      "description": "Reintenta los fallos, elige el orden de ejecución y guarda preajustes de etapas.",
+      "fewerRetries": "Menos reintentos",
+      "finishSound": "Reproducir un sonido al terminar",
+      "finishSoundDescription": "Suena cuando termina una ejecución sobre páginas, con un tono más grave si hubo problemas.",
+      "loadError": "No se han podido cargar los ajustes de ejecución.",
+      "loading": "Cargando ajustes de ejecución…",
+      "moreRetries": "Más reintentos",
+      "onFailure": "Cuando falla una página",
+      "onFailureModes": {
+        "continue": "Seguir con las demás páginas",
+        "stop": "Detener la ejecución"
+      },
+      "order": "Orden de ejecución",
+      "orders": {
+        "pages": "Página a página",
+        "stages": "Una etapa cada vez",
+        "stagesHint": "Carga un solo modelo a la vez, por lo que usa menos memoria gráfica."
+      },
+      "presets": {
+        "add": "Añadir",
+        "blank": "Ponle un nombre al preajuste.",
+        "builtIn": {
+          "detectOcr": "Detección + OCR",
+          "translateCleanup": "Traducir + limpiar"
+        },
+        "delete": "Eliminar",
+        "description": "Un preajuste activa sus etapas en el menú de ejecución y no inicia nada.",
+        "duplicate": "Ya hay un preajuste llamado “{{name}}”.",
+        "empty": "Todavía no hay preajustes.",
+        "limit": "Booharu guarda hasta {{max}} preajustes.",
+        "name": "Nombre del preajuste",
+        "newName": "Nombre del nuevo preajuste",
+        "save": "Guardar",
+        "saveAs": "Guardar como preajuste",
+        "short": "Preajustes",
+        "title": "Preajustes de ejecución"
+      },
+      "retries": "Reintentos por etapa fallida",
+      "retriesDescription": "Espera 2, 5 y luego 10 segundos entre reintentos (0–5 reintentos).",
+      "title": "Ejecuciones"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: solo leer. Mayús: leer, traducir y limpiar."
     },
@@ -154,6 +200,9 @@
       "translator": {
         "instructionsDescription": "Opcionales, en cualquier idioma y forma, como la grafía de un nombre o el tono. Booharu las añade tal cual después de su propia instrucción de sistema."
       }
+    },
+    "tabs": {
+      "runs": "Ejecuciones"
     },
     "typesetting": {
       "empty": "No hay familias predeterminadas. Booharu usará la alternativa del sistema.",

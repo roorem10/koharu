@@ -80,6 +80,52 @@
       "detectColorsDescription": "將原文字的填色與描邊色彩複製到新翻譯的文字上。現有譯文的色彩保持不變。",
       "detectColorsNote": "關閉時，新翻譯的文字使用<a>預設文字色彩</a>（{{tab}}）。"
     },
+    "runs": {
+      "behavior": {
+        "description": "適用於所有作業，無論由誰啟動。",
+        "title": "執行方式"
+      },
+      "description": "重試失敗的作業、選擇處理順序並儲存階段預設。",
+      "fewerRetries": "減少重試次數",
+      "finishSound": "完成時播放提示音",
+      "finishSoundDescription": "處理頁面的作業結束時播放提示音，有問題時音調較低。",
+      "loadError": "無法載入作業設定。",
+      "loading": "正在載入作業設定…",
+      "moreRetries": "增加重試次數",
+      "onFailure": "頁面處理失敗後",
+      "onFailureModes": {
+        "continue": "繼續處理其他頁面",
+        "stop": "停止作業"
+      },
+      "order": "處理順序",
+      "orders": {
+        "pages": "逐頁處理",
+        "stages": "逐階段處理",
+        "stagesHint": "一次只載入一個模型，使用的顯示記憶體較少。"
+      },
+      "presets": {
+        "add": "新增",
+        "blank": "請為預設命名。",
+        "builtIn": {
+          "detectOcr": "偵測 + OCR",
+          "translateCleanup": "翻譯 + 清理"
+        },
+        "delete": "刪除",
+        "description": "預設會在執行選單中開啟它包含的階段，但不會開始處理。",
+        "duplicate": "已有名為「{{name}}」的預設。",
+        "empty": "尚無預設。",
+        "limit": "Booharu 最多保留 {{max}} 個預設。",
+        "name": "預設名稱",
+        "newName": "新預設名稱",
+        "save": "儲存",
+        "saveAs": "儲存為預設",
+        "short": "預設",
+        "title": "作業預設"
+      },
+      "retries": "每個失敗階段的重試次數",
+      "retriesDescription": "重試間隔依序為 2、5、10 秒（可重試 0–5 次）。",
+      "title": "處理作業"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：僅辨識。Shift：辨識、翻譯並清理。"
     },
@@ -138,6 +184,9 @@
       "translator": {
         "instructionsDescription": "選填，可使用任何語言和形式，例如名字的寫法或語氣。Booharu 會依原樣把它們附加在自己的系統提示詞之後。"
       }
+    },
+    "tabs": {
+      "runs": "處理作業"
     },
     "typesetting": {
       "empty": "沒有預設字型家族。Booharu 將使用系統後備字型。",

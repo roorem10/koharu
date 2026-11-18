@@ -80,6 +80,52 @@
       "detectColorsDescription": "원본 글자의 채우기 및 테두리 색상을 새로 번역된 텍스트에 복사합니다. 기존 번역의 색상은 유지됩니다.",
       "detectColorsNote": "이 옵션이 꺼져 있으면 새로 번역된 텍스트는 <a>기본 텍스트 색상</a>({{tab}})을 사용합니다."
     },
+    "runs": {
+      "behavior": {
+        "description": "누가 시작했든 모든 실행에 적용됩니다.",
+        "title": "실행 방식"
+      },
+      "description": "실패한 작업을 다시 시도하고 실행 순서를 선택하며 단계 프리셋을 저장합니다.",
+      "fewerRetries": "재시도 횟수 줄이기",
+      "finishSound": "완료 소리 재생",
+      "finishSoundDescription": "페이지를 처리하는 실행이 끝나면 소리로 알리고, 문제가 있었으면 더 낮은 음으로 알립니다.",
+      "loadError": "실행 설정을 불러오지 못했습니다.",
+      "loading": "실행 설정 불러오는 중…",
+      "moreRetries": "재시도 횟수 늘리기",
+      "onFailure": "페이지 처리 실패 시",
+      "onFailureModes": {
+        "continue": "다른 페이지 계속 처리",
+        "stop": "실행 중지"
+      },
+      "order": "실행 순서",
+      "orders": {
+        "pages": "페이지 단위로",
+        "stages": "한 번에 한 단계씩",
+        "stagesHint": "한 번에 모델 하나만 불러오므로 그래픽 메모리를 덜 사용합니다."
+      },
+      "presets": {
+        "add": "추가",
+        "blank": "프리셋 이름을 입력하세요.",
+        "builtIn": {
+          "detectOcr": "감지 + OCR",
+          "translateCleanup": "번역 + 정리"
+        },
+        "delete": "삭제",
+        "description": "프리셋은 실행 메뉴에서 해당 단계를 켤 뿐, 실행을 시작하지 않습니다.",
+        "duplicate": "이름이 “{{name}}”인 프리셋이 이미 있습니다.",
+        "empty": "아직 프리셋이 없습니다.",
+        "limit": "Booharu는 프리셋을 최대 {{max}}개까지 저장합니다.",
+        "name": "프리셋 이름",
+        "newName": "새 프리셋 이름",
+        "save": "저장",
+        "saveAs": "프리셋으로 저장",
+        "short": "프리셋",
+        "title": "실행 프리셋"
+      },
+      "retries": "실패한 단계별 재시도 횟수",
+      "retriesDescription": "재시도 사이에 2초, 5초, 그다음 10초를 기다립니다 (재시도 0–5회).",
+      "title": "실행"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: OCR만. Shift: OCR, 번역 및 정리."
     },
@@ -138,6 +184,9 @@
       "translator": {
         "instructionsDescription": "선택 사항이며 어떤 언어와 형식으로든 쓸 수 있습니다(이름 표기나 말투 등). Booharu는 자체 시스템 프롬프트 뒤에 쓴 그대로 덧붙입니다."
       }
+    },
+    "tabs": {
+      "runs": "실행"
     },
     "typesetting": {
       "empty": "기본 패밀리가 없습니다. Booharu가 시스템 대체 글꼴을 사용합니다.",

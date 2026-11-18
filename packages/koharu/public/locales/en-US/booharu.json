@@ -80,6 +80,52 @@
       "detectColorsDescription": "Copies the fill and outline colors of the original lettering onto newly translated text. Existing translations keep their colors.",
       "detectColorsNote": "When it's off, newly translated text uses the <a>default text colors</a> ({{tab}})."
     },
+    "runs": {
+      "behavior": {
+        "description": "Applies to every run, whoever starts it.",
+        "title": "Run behavior"
+      },
+      "description": "Retry failures, choose the run order, and save stage presets.",
+      "fewerRetries": "Fewer retries",
+      "finishSound": "Play a finish sound",
+      "finishSoundDescription": "Chimes when a run over pages ends, with a lower tone when it had problems.",
+      "loadError": "Could not load run settings.",
+      "loading": "Loading run settings…",
+      "moreRetries": "More retries",
+      "onFailure": "After a page fails",
+      "onFailureModes": {
+        "continue": "Keep going with the other pages",
+        "stop": "Stop the run"
+      },
+      "order": "Run order",
+      "orders": {
+        "pages": "Page by page",
+        "stages": "One stage at a time",
+        "stagesHint": "Loads one model at a time, which uses less graphics memory."
+      },
+      "presets": {
+        "add": "Add",
+        "blank": "Give the preset a name.",
+        "builtIn": {
+          "detectOcr": "Detect + OCR",
+          "translateCleanup": "Translate + clean up"
+        },
+        "delete": "Delete",
+        "description": "A preset switches on its stages in the Run menu and starts nothing.",
+        "duplicate": "Another preset is already named “{{name}}”.",
+        "empty": "No presets yet.",
+        "limit": "Booharu keeps up to {{max}} presets.",
+        "name": "Preset name",
+        "newName": "New preset name",
+        "save": "Save",
+        "saveAs": "Save as preset",
+        "short": "Presets",
+        "title": "Run presets"
+      },
+      "retries": "Retries per failed stage",
+      "retriesDescription": "Wait 2, 5, then 10 seconds between retries (0–5 retries).",
+      "title": "Runs"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: read only. Shift: read, translate and clean."
     },
@@ -138,6 +184,9 @@
       "translator": {
         "instructionsDescription": "Optional, in any language and form, such as a name's spelling or the tone. Booharu adds them, as written, after its own system prompt."
       }
+    },
+    "tabs": {
+      "runs": "Runs"
     },
     "typesetting": {
       "empty": "No default families. Booharu will use the system fallback.",

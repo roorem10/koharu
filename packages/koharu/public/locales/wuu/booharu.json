@@ -80,6 +80,52 @@
       "detectColorsDescription": "拿原来文字个填充搭描边颜色复制到新翻译个文字浪。已有个译文颜色保持勿变。",
       "detectColorsNote": "关脱个辰光，新翻译个文字用<a>默认文字颜色</a>（{{tab}}）。"
     },
+    "runs": {
+      "behavior": {
+        "description": "随便啥人开始个运行侪适用。",
+        "title": "运行方式"
+      },
+      "description": "重试失败个操作、选择运行顺序，再保存处理阶段预设。",
+      "fewerRetries": "重试少几趟",
+      "finishSound": "完成辰光放提示音",
+      "finishSoundDescription": "处理页面个运行结束个辰光会响一记，有问题个辰光音调低一眼。",
+      "loadError": "运行设置加载失败哉。",
+      "loading": "来勒加载运行设置…",
+      "moreRetries": "重试多几趟",
+      "onFailure": "一页处理失败以后",
+      "onFailureModes": {
+        "continue": "继续处理其他页面",
+        "stop": "停止箇趟运行"
+      },
+      "order": "运行顺序",
+      "orders": {
+        "pages": "一页一页处理",
+        "stages": "一趟一只阶段",
+        "stagesHint": "一趟只加载一只模型，占用个显存会少一眼。"
+      },
+      "presets": {
+        "add": "添加",
+        "blank": "请帮预设起只名字。",
+        "builtIn": {
+          "detectOcr": "检测 + OCR",
+          "translateCleanup": "翻译 + 清理"
+        },
+        "delete": "删除",
+        "description": "预设会得辣运行菜单里向打开伊个阶段，勿会开始运行。",
+        "duplicate": "已经有叫“{{name}}”个预设哉。",
+        "empty": "还呒没预设。",
+        "limit": "Booharu 顶多保留 {{max}} 只预设。",
+        "name": "预设名称",
+        "newName": "新预设名称",
+        "save": "保存",
+        "saveAs": "保存为预设",
+        "short": "预设",
+        "title": "运行预设"
+      },
+      "retries": "每个失败阶段个重试次数",
+      "retriesDescription": "重试之间先等 2 秒，再等 5 秒，后首每趟等 10 秒（重试 0–5 趟）。",
+      "title": "运行"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：光识别。Shift：识别、翻译搭清理。"
     },
@@ -138,6 +184,9 @@
       "translator": {
         "instructionsDescription": "可以勿填，用啥个语言、啥个格式写侪可以，比方讲名字哪能写、语气哪能。Booharu 会照原样接勒自家个系统提示词后头。"
       }
+    },
+    "tabs": {
+      "runs": "运行"
     },
     "typesetting": {
       "empty": "呒没默认字体系列。Booharu 会用系统后备字体。",

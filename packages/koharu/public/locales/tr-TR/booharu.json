@@ -80,6 +80,52 @@
       "detectColorsDescription": "Özgün yazının dolgu ve kenarlık renklerini yeni çevrilen metne kopyalar. Mevcut çeviriler renklerini korur.",
       "detectColorsNote": "Kapalıyken yeni çevrilen metin <a>varsayılan metin renklerini</a> ({{tab}}) kullanır."
     },
+    "runs": {
+      "behavior": {
+        "description": "Kim başlatırsa başlatsın her çalıştırmaya uygulanır.",
+        "title": "Çalıştırma davranışı"
+      },
+      "description": "Başarısız işlemleri yeniden deneyin, çalışma sırasını seçin ve aşama önayarlarını kaydedin.",
+      "fewerRetries": "Daha az yeniden deneme",
+      "finishSound": "Bitiş sesi çal",
+      "finishSoundDescription": "Sayfaları işleyen bir çalıştırma bittiğinde ses çalar; sorun çıktıysa ton daha pestir.",
+      "loadError": "Çalıştırma ayarları yüklenemedi.",
+      "loading": "Çalıştırma ayarları yükleniyor…",
+      "moreRetries": "Daha fazla yeniden deneme",
+      "onFailure": "Bir sayfa başarısız olduğunda",
+      "onFailureModes": {
+        "continue": "Diğer sayfalarla devam et",
+        "stop": "Çalıştırmayı durdur"
+      },
+      "order": "Çalışma sırası",
+      "orders": {
+        "pages": "Sayfa sayfa",
+        "stages": "Her seferinde tek aşama",
+        "stagesHint": "Aynı anda yalnızca bir model yükler, bu yüzden daha az grafik belleği kullanır."
+      },
+      "presets": {
+        "add": "Ekle",
+        "blank": "Önayara bir ad verin.",
+        "builtIn": {
+          "detectOcr": "Algılama + OCR",
+          "translateCleanup": "Çeviri + temizleme"
+        },
+        "delete": "Sil",
+        "description": "Bir önayar, Çalıştır menüsünde kendi aşamalarını açar ve hiçbir şeyi başlatmaz.",
+        "duplicate": "“{{name}}” adlı bir önayar zaten var.",
+        "empty": "Henüz önayar yok.",
+        "limit": "Booharu en fazla {{max}} önayar saklar.",
+        "name": "Önayar adı",
+        "newName": "Yeni önayar adı",
+        "save": "Kaydet",
+        "saveAs": "Önayar olarak kaydet",
+        "short": "Önayarlar",
+        "title": "Çalıştırma önayarları"
+      },
+      "retries": "Başarısız aşama başına yeniden deneme sayısı",
+      "retriesDescription": "Denemeler arasında önce 2, sonra 5, ardından 10 saniye bekle (0–5 yeniden deneme).",
+      "title": "Çalıştırmalar"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: yalnızca oku. Shift: oku, çevir ve temizle."
     },
@@ -138,6 +184,9 @@
       "translator": {
         "instructionsDescription": "İsteğe bağlı, herhangi bir dilde ve biçimde; örneğin bir adın yazılışı ya da üslup. Booharu bunları kendi sistem isteminin ardından olduğu gibi ekler."
       }
+    },
+    "tabs": {
+      "runs": "Çalıştırmalar"
     },
     "typesetting": {
       "empty": "Varsayılan aile yok. Booharu sistem yedeğini kullanacak.",
