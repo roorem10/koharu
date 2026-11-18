@@ -222,16 +222,29 @@ function pageOrder(): PageId[] {
   return project?.pages.map((page) => page.id) ?? []
 }
 
-/** Retry failed pages: queues `job`'s retry runs, one after another, each an ordinary run, and once
- * they're queued, takes the job's failed pages off the Activity center. The click readies the
- * finish chime. A run that can't be queued shows its error as the Run button's do, and leaves
- * them. */
+/** Retry failed pages: queues `job`'s retry runs, one after another, each an ordinary run, taking
+ * each run's pages off the job's failed pages once it's queued, and the job off the Activity
+ * center once every one is. The click readies the finish chime. A run that can't be queued shows
+ * its error as the Run button's do, and leaves the pages not yet queued, which a later click
+ * retries alone. */
 export async function retryFailedPages(job: Job): Promise<void> {
   prepareFinishSound()
+  const id = String(job.id)
   for (const { stages, pages } of retryRuns(job, pageOrder())) {
     await call(commands.runPipeline, { pages }, stages)
+    retried(id, pages)
   }
-  useKoharuStore.getState().dismissJob(String(job.id))
+  useKoharuStore.getState().dismissJob(id)
+}
+
+/** Takes `pages`, which a retry queued, off job `id`'s failed pages. */
+function retried(id: string, pages: readonly PageId[]): void {
+  useKoharuStore.setState((state) => {
+    const job = state.jobs[id]
+    if (!job?.booharu) return {}
+    const failures = job.booharu.failures.filter((failure) => !pages.includes(failure.page))
+    return { jobs: { ...state.jobs, [id]: { ...job, booharu: { ...job.booharu, failures } } } }
+  })
 }
 
 /** The last run in the open project, once it ended with failed pages to queue again, whether it

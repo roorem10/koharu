@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { ActivityCenter } from '@/components/editor/ActivityCenter'
 import { InferenceControl } from '@/components/editor/InferenceControl'
+import { retryFailedPages } from '@/lib/booharu/jobs'
 import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type Stage } from '@koharu/ipc/protocol'
@@ -183,6 +184,25 @@ describe('Booharu failed pages in the Activity center', () => {
     await waitFor(() =>
       expect(run.mock.calls).toEqual([[{ pages: ['p3'] }, ['recognize', 'inpaint', 'translate']]]),
     )
+  })
+
+  it('keeps only the failed pages a retry could not queue', async () => {
+    settingsDesktop()
+    const run = vi
+      .spyOn(commands, 'runPipeline')
+      .mockResolvedValueOnce(5)
+      .mockRejectedValueOnce(new Error('there is no page p2'))
+    doneWithProblems()
+    const job = () => useKoharuStore.getState().jobs['1']!
+
+    await expect(retryFailedPages(job())).rejects.toThrow('there is no page p2')
+    expect(job().booharu?.failures.map((failure) => failure.page)).toEqual(['p2'])
+
+    // The next click retries only the page left.
+    run.mockResolvedValue(6)
+    await retryFailedPages(job())
+    expect(run.mock.calls.at(-1)).toEqual([{ pages: ['p2'] }, ['translate']])
+    expect(useKoharuStore.getState().jobs['1']).toBeUndefined()
   })
 
   it('offers nothing once a later run here ends without problems, or in another project', async () => {
