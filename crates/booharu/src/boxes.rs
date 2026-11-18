@@ -248,7 +248,9 @@ pub fn find_split_balloons(project: &Project, page: Option<PageId>) -> Result<Ve
 /// the Translation stage leaves one the model gave back unchanged, then
 /// gives the translation its source wording in its place. A balloon holding
 /// one text block has nothing to join, and a hidden block, which isn't
-/// drawn, is no part of its balloon's text.
+/// drawn, is no part of its balloon's text. The first keeps its hand-edit
+/// record, so a style set on it by hand stays a hand edit, and its joined
+/// wording, which no automatic step wrote, counts as changed by hand.
 pub fn join_balloon(session: &Session, block: LayerId) -> Result<Edit> {
     let project = session.project();
     let layer = project.layer(block)?;
@@ -398,8 +400,8 @@ pub fn split_block(session: &Session, block: LayerId) -> Result<Edit> {
             !first_side(point)
         })?);
     }
-    ops.extend(dropped(layer, &block.into()));
-    ops.extend(dropped(layer, &copy));
+    ops.extend(dropped(layer, &block.into(), true));
+    ops.extend(dropped(layer, &copy, true));
     Ok(Edit {
         label: SPLIT_BLOCK.to_owned(),
         ops,
@@ -667,7 +669,7 @@ fn join(
     }
     let others: Vec<&Block> = rest.iter().map(|(_, block)| *block).collect();
     ops.extend(merged(session, first, &others)?);
-    ops.extend(dropped(project.layer(*kept)?, &(*kept).into()));
+    ops.extend(dropped(project.layer(*kept)?, &(*kept).into(), false));
     ops.extend(carried(project, group)?);
     ops.extend(rest.iter().map(|(id, _)| Op::RemoveLayer {
         layer: (*id).into(),
@@ -841,8 +843,12 @@ fn kept_side(
 }
 
 /// The ops dropping from `layer`, as `target`, the Booharu keys that
-/// describe a block's text, which a join or split rewrites.
-fn dropped(layer: &Layer, target: &Ref) -> Vec<Op> {
+/// describe a block's text, which a join or split rewrites, and with
+/// `record` its hand-edit record. A split drops it, as its halves are read
+/// and translated again, which records them anew; a join keeps it, so the
+/// joined block's style set by hand stays a hand edit, and its joined
+/// wording, which differs from what the record holds, counts as one too.
+fn dropped(layer: &Layer, target: &Ref, record: bool) -> Vec<Op> {
     fn drop<A: Attr>(layer: &Layer, target: &Ref, ops: &mut Vec<Op>) {
         if layer
             .attributes
@@ -854,7 +860,9 @@ fn dropped(layer: &Layer, target: &Ref) -> Vec<Op> {
     }
     let mut ops = Vec::new();
     drop::<Lettering>(layer, target, &mut ops);
-    drop::<Auto>(layer, target, &mut ops);
+    if record {
+        drop::<Auto>(layer, target, &mut ops);
+    }
     drop::<QcOk>(layer, target, &mut ops);
     drop::<ReadNote>(layer, target, &mut ops);
     ops
@@ -2065,6 +2073,88 @@ mod tests {
         // One undo gives each text its own again.
         page.session.undo()?;
         assert!(page.session.project() == before);
+        Ok(())
+    }
+
+    /// Leaves `block` as a run of Koharu's stages leaves one, with Booharu's
+    /// hooks: found and read, its wording recorded, then translated as
+    /// `text`, with the default look and the record of what it wrote.
+    fn run_on(page: &mut Fixture, block: LayerId, text: &str) -> Result<()> {
+        let english: koharu_scene::LanguageIdentifier = "en".parse()?;
+        let made = |step: &str, action: &str| Op::SetAttribute {
+            layer: block.into(),
+            namespace: "c2pa".to_owned(),
+            key: step.to_owned(),
+            value: Some(json!({"action": action})),
+        };
+        let project = page.session.project();
+        let wording = page.block(block)?.source.content.text();
+        page.session.apply(edit(vec![
+            made("detection", "c2pa.created"),
+            made("ocr", "c2pa.created"),
+            booharu_core::styles::recognized(project.layer(block)?, &wording)?,
+        ]))?;
+        let project = page.session.project();
+        let placed = koharu_pipeline::placement(&project, block, &english)?;
+        let mut ops = vec![
+            Op::SetText {
+                layer: block.into(),
+                text: text.to_owned(),
+            },
+            placed.clone(),
+        ];
+        ops.extend(booharu_core::styles::translated(
+            project.layer(block)?,
+            text,
+            &placed,
+            &booharu_core::settings::LetteringSettings::default(),
+            None,
+        )?);
+        ops.push(Op::UpdateLayer {
+            layer: block.into(),
+            patch: json!({"translation": {"language": english}, "cleanup": {"visible": true}}),
+        });
+        ops.push(made("translation", "c2pa.translated"));
+        page.session.apply(edit(ops))?;
+        Ok(())
+    }
+
+    #[test]
+    fn a_join_keeps_a_style_set_by_hand_a_hand_edit() -> Result<()> {
+        let (mut page, [first, second]) = two_cleaned("あ", "う")?;
+        run_on(&mut page, first, "Ah")?;
+        run_on(&mut page, second, "Oh")?;
+        let edited = |page: &Fixture| -> Result<_> {
+            Ok(booharu_core::edited(page.session.project().layer(first)?))
+        };
+        assert!(!edited(&page)?.hand_edited());
+        // The kept block's font set by hand, as the TypeBar sets one.
+        page.update(
+            first,
+            json!({"translation": {"style": {"chars": {"family": "Comic Neue"}}}}),
+        )?;
+
+        page.session.apply(join_balloon(&page.session, first)?)?;
+
+        let joined = edited(&page)?;
+        assert!(joined.style, "{joined:?}");
+        // Its joined wording is no automatic step's either.
+        assert!(joined.source && joined.text, "{joined:?}");
+        // So Apply keeps it, unless told to include hand edits.
+        let project = page.session.project();
+        let scope = crate::styles::StyleScope::Blocks {
+            blocks: vec![first],
+        };
+        let (restyled, counts) = crate::styles::apply(
+            &project,
+            &scope,
+            false,
+            &booharu_core::settings::LetteringSettings::default(),
+            Some("CCWildWords"),
+            booharu_core::attrs::Origin::Automatic,
+        )?;
+        assert!(restyled.is_none());
+        assert_eq!(counts.kept_hand_edited, 1);
         Ok(())
     }
 
