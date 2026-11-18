@@ -166,6 +166,25 @@ describe('Booharu failed pages in the Activity center', () => {
     await waitFor(() => expect(screen.queryByRole('group', { name: 'Presets' })).toBeNull())
   })
 
+  it('offers Retry failed pages in the Run menu for a stopped run that gave up on pages', async () => {
+    settingsDesktop()
+    const run = vi.spyOn(commands, 'runPipeline').mockResolvedValue(5)
+    openChapter('Chapter 1')
+    tell(queued(1), pageFailed(1, { page: 'p3', stage: 'recognize', reason: 'the model failed' }), {
+      kind: 'ended',
+      run: 1,
+      outcome: { kind: 'stopped' },
+    })
+    const user = userEvent.setup()
+    renderRunMenu()
+
+    await user.click(screen.getByRole('button', { name: 'Processing settings' }))
+    await user.click(await screen.findByRole('button', { name: 'Retry failed pages' }))
+    await waitFor(() =>
+      expect(run.mock.calls).toEqual([[{ pages: ['p3'] }, ['recognize', 'inpaint', 'translate']]]),
+    )
+  })
+
   it('offers nothing once a later run here ends without problems, or in another project', async () => {
     settingsDesktop()
     doneWithProblems()

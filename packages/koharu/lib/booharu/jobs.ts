@@ -141,7 +141,8 @@ function inProject(job: Job, project: string | null): boolean {
 }
 
 /** The runs the Activity center lists, in run order: Koharu's, running or failed, and a run done
- * with problems, each only while the project it was queued in is open. */
+ * with problems, each only while the project it was queued in is open. A run that stopped isn't
+ * listed, whatever pages it gave up on, as Koharu doesn't list it; the Run menu offers them. */
 export function useVisibleJobs(jobs: Record<string, Job>): Job[] {
   const project = useProject().data?.name ?? null
   return Object.values(jobs).filter(
@@ -233,8 +234,9 @@ export async function retryFailedPages(job: Job): Promise<void> {
   useKoharuStore.getState().dismissJob(String(job.id))
 }
 
-/** The last run in the open project, while it has failed pages to queue again: the Run menu offers
- * Retry failed pages for it then. */
+/** The last run in the open project, once it ended with failed pages to queue again, whether it
+ * was done with problems, failed, or stopped after giving up on pages: the Run menu offers Retry
+ * failed pages for it then. */
 export function useRetryable(): Job | null {
   const jobs = useKoharuStore((state) => state.jobs)
   const project = useProject().data
@@ -243,7 +245,7 @@ export function useRetryable(): Job | null {
     .filter((job) => inProject(job, name))
     .at(-1)
   const order = project?.pages.map((page) => page.id) ?? []
-  return last && listsFailedPages(last) && retryRuns(last, order).length ? last : null
+  return last && last.state !== 'running' && retryRuns(last, order).length ? last : null
 }
 
 /** Shows a failed page as clicking it in the page rail does: it alone selected among the pages,
