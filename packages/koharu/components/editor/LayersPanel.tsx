@@ -32,6 +32,7 @@ import {
 import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { LayerKind } from '@/components/booharu/lettering/LayerKind' // Booharu: a block's lettering category.
 import { call, dispatch } from '@/lib/backend'
 import {
   dropMoves,
@@ -323,7 +324,8 @@ function LayerRow({
             <span className='min-w-0 flex-1'>
               <span className='block truncate text-[11px] font-medium'>{name}</span>
               <span className='block truncate text-[9px] leading-3 text-muted-foreground'>
-                {detail}
+                {/* Booharu: a block's lettering category in place of its kind, as 0.0.4 named it. */}
+                <LayerKind layer={layer} kind={detail} />
               </span>
             </span>
           </button>

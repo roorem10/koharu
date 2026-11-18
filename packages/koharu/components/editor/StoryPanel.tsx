@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 
 import { StoryBoxActions } from '@/components/booharu/boxes/BoxActionItems' // Booharu: box actions.
 import { BoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the row's Box details tag.
+import { CategoryTag } from '@/components/booharu/lettering/CategoryTag' // Booharu: the row's lettering category.
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { call, dispatch } from '@/lib/backend'
 import { setTranslation } from '@/lib/booharu/translation' // Booharu: a block's first translation.
@@ -315,6 +316,8 @@ function StoryText({
         </DropdownMenu>
       </div>
       <div className='grid min-w-0 gap-1'>
+        {/* Booharu: the block's lettering category tag, beside the ? tag, which opens its picker. */}
+        <CategoryTag page={page} layer={layer} name={name} locked={locked} />
         {isBlockLayer(layer) ? (
           <>
             {layer.role === 'sfx' && (
