@@ -26,6 +26,8 @@ pub(crate) struct Run {
     pub(super) area: Option<Arc<AreaWork>>,
     pub(super) graph: StableDiGraph<Job, ()>,
     pub(super) cancel: CancellationToken,
+    /// Booharu: the pages it gave up on while it went on with the others.
+    pub(super) failures: Vec<crate::PageFailure>,
 }
 
 pub(super) struct Job {
@@ -35,6 +37,8 @@ pub(super) struct Job {
     pub(super) stage: Stage,
     pub(super) blocks: Option<Arc<[LayerId]>>,
     pub(super) running: bool,
+    /// Booharu: its tries that failed, and when it may go again.
+    pub(super) tries: super::booharu::Tries,
 }
 
 /// What a run works on: its pages in order, each with the blocks it's
@@ -151,6 +155,7 @@ impl Run {
                         stage,
                         blocks: blocks.clone(),
                         running: false,
+                        tries: Default::default(), // Booharu: none failed yet.
                     };
                     (stage, graph.add_node(job))
                 })
@@ -178,6 +183,7 @@ impl Run {
             area: plan.area,
             graph,
             cancel: CancellationToken::new(),
+            failures: Vec::new(), // Booharu: none given up on yet.
         }
     }
 }

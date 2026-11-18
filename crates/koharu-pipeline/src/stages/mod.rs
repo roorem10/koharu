@@ -190,6 +190,11 @@ pub(crate) async fn run(task: Task, inputs: Inputs) -> Result<(), crate::booharu
     let stage = task.stage;
     let config = &inputs.config;
     let result = match stage {
+        // Booharu: the scheduler's tests stand in for the stages.
+        #[cfg(test)]
+        _ if crate::booharu::stand_in::scripted(&task) => {
+            crate::booharu::stand_in::run(&task).await
+        }
         Stage::Detect => detect::detect(&task, config).await,
         Stage::Recognize => recognize::recognize(&task, config).await,
         Stage::Inpaint => inpaint::inpaint(&task, config, inputs.area).await,

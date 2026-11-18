@@ -4,6 +4,9 @@
 //! for the GPU thread in its own line, by priority. The stages are known here
 //! only by `Stage` and by the model `stages::key` names.
 
+// Booharu: Booharu's run policy: retries, going on past a failed page, and
+// one stage at a time.
+mod booharu;
 mod run;
 
 use std::{
@@ -125,6 +128,7 @@ impl Scheduler {
 
     async fn run(mut self) {
         loop {
+            let retry = booharu::retry(&self.runs, Instant::now()); // Booharu: the next try due.
             tokio::select! {
                 command = self.commands.recv() => match command {
                     Some(command) => self.handle(command),
@@ -137,6 +141,8 @@ impl Scheduler {
                     self.idle = None;
                     self.settle();
                 }
+                // Booharu: a page stage's wait to be tried again is over.
+                () = time::sleep_until(retry.unwrap_or_else(Instant::now)), if retry.is_some() => {}
             }
             self.admit();
         }
@@ -157,8 +163,12 @@ impl Scheduler {
                 run: run.id,
                 outcome: Outcome::Done,
             }),
-            Command::Run(run) => self.runs.push(run),
+            Command::Run(run) => {
+                self.admitted(&run); // Booharu: one stage at a time starts with no model loaded.
+                self.runs.push(run);
+            }
             Command::Stop => {
+                let staged = booharu::staged(&self.runs); // Booharu: for the models' upkeep.
                 // Each task's call waiting for the GPU is dropped unrun.
                 for run in std::mem::take(&mut self.runs) {
                     run.cancel.cancel();
@@ -168,6 +178,7 @@ impl Scheduler {
                     });
                 }
                 self.rest();
+                self.upkeep(staged); // Booharu: a run one stage at a time ends with none loaded.
             }
             Command::Unload => self
                 .gpu
@@ -192,6 +203,7 @@ impl Scheduler {
             // Booharu: with its class.
             Err(error) => Err(crate::booharu::Failure::panicked(stage, &error)),
         };
+        let staged = booharu::staged(&self.runs); // Booharu: for the models' upkeep.
         let runs = std::mem::take(&mut self.runs);
         let mut ended = false;
         match result {
@@ -212,7 +224,8 @@ impl Scheduler {
                         ended = true;
                         self.emit(Event::Ended {
                             run: run.id,
-                            outcome: Outcome::Done,
+                            // Booharu: done, or done with problems.
+                            outcome: booharu::outcome(&run),
                         });
                     } else {
                         self.runs.push(run);
@@ -223,6 +236,12 @@ impl Scheduler {
                 let reason = &failure.reason; // Booharu: the failure's wording.
                 for run in runs {
                     if jobs.iter().any(|&(id, _)| id == run.id) {
+                        // Booharu: as its policy says, the run tries the page
+                        // again or goes on without it, or it ends as Koharu
+                        // ends it.
+                        let Some(run) = self.failed(run, &jobs, stage, &failure, &mut ended) else {
+                            continue;
+                        };
                         ended = true;
                         run.cancel.cancel();
                         self.emit(Event::Ended {
@@ -242,6 +261,7 @@ impl Scheduler {
         if ended {
             self.rest();
         }
+        self.upkeep(staged); // Booharu: a stage's model leaves with its last job.
     }
 
     /// A run ended: the models no setting uses leave `KEEP` from now.
@@ -263,14 +283,18 @@ impl Scheduler {
     /// The ready jobs not yet started. A project's translation isn't ready
     /// while another holds its conversation.
     fn ready(&self) -> Vec<Candidate> {
+        let now = Instant::now(); // Booharu: for the tries due.
         self.runs
             .iter()
             .enumerate()
             .flat_map(|(at, run)| {
+                let stage = booharu::stage(run); // Booharu: one stage at a time, its stage.
                 run.graph.externals(Incoming).filter_map(move |job| {
                     let node = &run.graph[job];
                     let held =
                         node.stage == Stage::Translate && self.conversations.busy(run.project);
+                    // Booharu: nor while it waits to be tried again, or for its stage.
+                    let held = held || booharu::held(node, stage, now);
                     (!node.running && !held).then_some(Candidate {
                         run: at,
                         job,
@@ -310,7 +334,9 @@ impl Scheduler {
                 return;
             };
             let mut chosen = vec![first];
-            if first.stage == Stage::Recognize {
+            // Booharu: a page tried again is read alone, so another's failure
+            // can't fail it.
+            if first.stage == Stage::Recognize && !self.alone(first) {
                 let model = stages::key(first.stage, &self.runs[first.run].config);
                 let mut others: Vec<Candidate> = ready
                     .iter()
@@ -318,6 +344,7 @@ impl Scheduler {
                         other.stage == Stage::Recognize
                             && other.priority != first.priority
                             && stages::key(other.stage, &self.runs[other.run].config) == model
+                            && !self.alone(**other) // Booharu: nor with one tried again.
                     })
                     .copied()
                     .collect();

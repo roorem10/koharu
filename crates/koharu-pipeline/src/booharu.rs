@@ -270,6 +270,147 @@ async fn within<T, E: Into<anyhow::Error>>(
     }
 }
 
+/// Stand-ins for the stages in the scheduler's tests, which load no model:
+/// what each page stage of a scripted project does, try by try, and a log of
+/// the tasks that ran and the models the scheduler unloaded, in order.
+#[cfg(test)]
+pub(crate) mod stand_in {
+    use std::{
+        collections::{BTreeMap, HashMap, HashSet, VecDeque},
+        time::Duration,
+    };
+
+    use koharu_scene::ProjectId;
+    use parking_lot::Mutex;
+    use tokio::time::Instant;
+
+    use crate::{
+        Stage,
+        gpu::Key,
+        stages::{Member, Stopped, Task},
+    };
+
+    /// What a page stage's try does.
+    pub(crate) enum Try {
+        /// It takes this long, then passes.
+        Slow(Duration),
+        /// It fails with the error this makes.
+        Fail(fn() -> anyhow::Error),
+    }
+
+    /// A stand-in task that ran, or an unloading the scheduler queued.
+    #[derive(Clone, Debug, PartialEq)]
+    pub(crate) enum Entry {
+        /// A task of `stage` on the pages at these places in the run, from
+        /// `at`.
+        Ran {
+            stage: Stage,
+            pages: Vec<usize>,
+            at: Instant,
+        },
+        /// Every model but these stages' was unloaded.
+        Unloaded(Vec<Stage>),
+    }
+
+    #[derive(Default)]
+    struct Script {
+        /// Each page stage's tries to come; a try with none passes.
+        tries: HashMap<(usize, Stage), VecDeque<Try>>,
+        log: Vec<Entry>,
+    }
+
+    static SCRIPTS: Mutex<BTreeMap<ProjectId, Script>> = Mutex::new(BTreeMap::new());
+
+    /// The stand-ins of a project's stages while it's held.
+    pub(crate) struct Scripted(ProjectId);
+
+    impl Scripted {
+        pub(crate) fn new(project: ProjectId) -> Self {
+            SCRIPTS.lock().insert(project, Script::default());
+            Self(project)
+        }
+
+        /// Gives the stage of the page at `index` these tries, before any
+        /// it has left.
+        pub(crate) fn tries(&self, index: usize, stage: Stage, tries: Vec<Try>) {
+            let mut scripts = SCRIPTS.lock();
+            let script = scripts.get_mut(&self.0).expect("held");
+            script
+                .tries
+                .entry((index, stage))
+                .or_default()
+                .extend(tries);
+        }
+
+        /// What ran, and what was unloaded, so far.
+        pub(crate) fn log(&self) -> Vec<Entry> {
+            SCRIPTS.lock()[&self.0].log.clone()
+        }
+    }
+
+    impl Drop for Scripted {
+        fn drop(&mut self) {
+            SCRIPTS.lock().remove(&self.0);
+        }
+    }
+
+    fn project(task: &Task) -> ProjectId {
+        task.members[0].session.lock().id()
+    }
+
+    /// Whether `task`'s project has stand-ins.
+    pub(crate) fn scripted(task: &Task) -> bool {
+        SCRIPTS.lock().contains_key(&project(task))
+    }
+
+    /// `task` as its stand-ins go: started as a stage starts, unless its run
+    /// stopped, then each of its pages' next try, in order, the first failure
+    /// failing it whole, as a recognition task fails with any of its pages.
+    pub(crate) async fn run(task: &Task) -> anyhow::Result<()> {
+        let members: Vec<&Member> = task.members.iter().collect();
+        // As the GPU drops a stopped run's work unrun.
+        if members.iter().all(|member| member.cancel.is_cancelled()) {
+            return Err(Stopped.into());
+        }
+        task.started(&members);
+        let tries: Vec<Try> = {
+            let mut scripts = SCRIPTS.lock();
+            let script = scripts.get_mut(&project(task)).expect("scripted");
+            script.log.push(Entry::Ran {
+                stage: task.stage,
+                pages: members.iter().map(|member| member.index).collect(),
+                at: Instant::now(),
+            });
+            members
+                .iter()
+                .filter_map(|member| {
+                    script
+                        .tries
+                        .get_mut(&(member.index, task.stage))?
+                        .pop_front()
+                })
+                .collect()
+        };
+        for tried in tries {
+            match tried {
+                Try::Slow(time) => tokio::time::sleep(time).await,
+                Try::Fail(error) => return Err(error()),
+            }
+        }
+        Ok(())
+    }
+
+    /// Logs that the scheduler unloaded every model but `wanted`, for a run
+    /// of `project`.
+    pub(crate) fn unloaded(project: ProjectId, wanted: &HashSet<Key>) {
+        if let Some(script) = SCRIPTS.lock().get_mut(&project) {
+            let mut kept: Vec<Stage> = wanted.iter().map(|key| key.stage).collect();
+            kept.sort();
+            script.log.push(Entry::Unloaded(kept));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{collections::BTreeMap, sync::Arc, time::Duration};
