@@ -66,8 +66,30 @@
         "read_translate_clean": "Read, translate and clean"
       }
     },
+    "pipeline": {
+      "detectColors": "Use the original lettering's colors",
+      "detectColorsDescription": "Copies the fill and outline colors of the original lettering onto newly translated text. Existing translations keep their colors.",
+      "detectColorsNote": "When it's off, newly translated text uses the <a>default text colors</a> ({{tab}})."
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: read only. Shift: read, translate and clean."
+    },
+    "typesetting": {
+      "clear": "Clear",
+      "clearAll": "Clear all",
+      "clearFill": "Clear text color",
+      "clearOutline": "Clear outline",
+      "decreaseOutlineWidth": "Decrease outline width",
+      "description": "Colors for new text. Text you add with the {{tool}} tool always gets them; new translations get them when “{{setting}}” is off ({{tab}}).",
+      "fill": "Text color",
+      "font": "The default font is the first in {{list}}: new text gets a copy of it, so changing it later leaves finished pages alone.",
+      "increaseOutlineWidth": "Increase outline width",
+      "none": "None",
+      "outline": "Outline",
+      "outlineColor": "Outline color",
+      "outlineWidth": "Outline width",
+      "title": "Default text style",
+      "width": "Width"
     }
   },
   "errors": {

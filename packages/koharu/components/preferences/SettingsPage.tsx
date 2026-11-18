@@ -14,6 +14,7 @@ import {
 import { ProviderPreferences } from '@/components/preferences/ProviderPreferences'
 import { TypesettingPreferences } from '@/components/preferences/TypesettingPreferences'
 import { refreshModels, refreshPreferences, savePreferences } from '@/lib/backend'
+import { useSettingsLinks } from '@/lib/booharu/settingsLink' // Booharu: links between tabs.
 import { supportedLanguages } from '@/lib/i18n'
 import { useKoharuStore } from '@/lib/store'
 import type { Preferences } from '@koharu/ipc/protocol'
@@ -42,6 +43,7 @@ export function SettingsPage() {
   const preferences = useKoharuStore((state) => state.preferences)
   const models = useKoharuStore((state) => state.models)
   const [tab, setTab] = useState<Tab>('appearance')
+  useSettingsLinks(setTab) // Booharu: lets a Booharu link on one tab open another.
   const [draft, setDraft] = useState<Preferences | null>(preferences)
   const lastSaved = useRef<string | null>(null)
   const pending = useRef<Promise<unknown>>(Promise.resolve())

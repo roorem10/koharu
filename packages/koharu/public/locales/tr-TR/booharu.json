@@ -66,8 +66,30 @@
         "read_translate_clean": "Oku, çevir ve temizle"
       }
     },
+    "pipeline": {
+      "detectColors": "Özgün yazının renklerini kullan",
+      "detectColorsDescription": "Özgün yazının dolgu ve kenarlık renklerini yeni çevrilen metne kopyalar. Mevcut çeviriler renklerini korur.",
+      "detectColorsNote": "Kapalıyken yeni çevrilen metin <a>varsayılan metin renklerini</a> ({{tab}}) kullanır."
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: yalnızca oku. Shift: oku, çevir ve temizle."
+    },
+    "typesetting": {
+      "clear": "Temizle",
+      "clearAll": "Tümünü temizle",
+      "clearFill": "Metin rengini temizle",
+      "clearOutline": "Kenarlığı temizle",
+      "decreaseOutlineWidth": "Kenarlık genişliğini azalt",
+      "description": "Yeni metnin renkleri. {{tool}} aracıyla eklediğiniz metin bunları her zaman alır; yeni çeviriler ise “{{setting}}” kapalıyken ({{tab}}) alır.",
+      "fill": "Metin rengi",
+      "font": "Varsayılan yazı tipi, {{list}} listesindeki ilk yazı tipidir: yeni metin onun bir kopyasını alır; bu yüzden onu sonradan değiştirmek bitmiş sayfaları etkilemez.",
+      "increaseOutlineWidth": "Kenarlık genişliğini artır",
+      "none": "Yok",
+      "outline": "Kenarlık",
+      "outlineColor": "Kenarlık rengi",
+      "outlineWidth": "Kenarlık genişliği",
+      "title": "Varsayılan metin stili",
+      "width": "Genişlik"
     }
   },
   "errors": {

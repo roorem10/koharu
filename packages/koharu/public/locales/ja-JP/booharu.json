@@ -66,8 +66,30 @@
         "read_translate_clean": "OCR・翻訳・クリーンアップ"
       }
     },
+    "pipeline": {
+      "detectColors": "元の文字の色を使う",
+      "detectColorsDescription": "元の文字の塗り色と縁取り色を、新しく翻訳した文字にコピーします。既存の翻訳の色は変更しません。",
+      "detectColorsNote": "オフのときは、新しく翻訳した文字に<a>既定の文字色</a>（{{tab}}）を使います。"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：OCRのみ。Shift：OCR・翻訳・クリーンアップ。"
+    },
+    "typesetting": {
+      "clear": "クリア",
+      "clearAll": "すべてクリア",
+      "clearFill": "文字色をクリア",
+      "clearOutline": "縁取りをクリア",
+      "decreaseOutlineWidth": "縁取り幅を縮小",
+      "description": "新しい文字の色です。{{tool}}ツールで追加した文字には常に使われ、「{{setting}}」がオフのとき（{{tab}}）は新しい翻訳にも使われます。",
+      "fill": "文字色",
+      "font": "既定のフォントは{{list}}の先頭のフォントです。新しい文字にはそのフォントが書き込まれるため、後で変更しても仕上がったページはそのままです。",
+      "increaseOutlineWidth": "縁取り幅を拡大",
+      "none": "なし",
+      "outline": "縁取り",
+      "outlineColor": "縁取りの色",
+      "outlineWidth": "縁取り幅",
+      "title": "既定のテキストスタイル",
+      "width": "幅"
     }
   },
   "errors": {

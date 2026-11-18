@@ -66,8 +66,30 @@
         "read_translate_clean": "识别、翻译并清理"
       }
     },
+    "pipeline": {
+      "detectColors": "使用原文字的颜色",
+      "detectColorsDescription": "将原文字的填充和描边颜色复制到新翻译的文字上。现有译文的颜色保持不变。",
+      "detectColorsNote": "关闭时，新翻译的文字使用<a>默认文字颜色</a>（{{tab}}）。"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：仅识别。Shift：识别、翻译并清理。"
+    },
+    "typesetting": {
+      "clear": "清除",
+      "clearAll": "全部清除",
+      "clearFill": "清除文本颜色",
+      "clearOutline": "清除描边",
+      "decreaseOutlineWidth": "减小描边宽度",
+      "description": "新文字的颜色。用{{tool}}工具添加的文字总会使用这些颜色；“{{setting}}”关闭时（{{tab}}），新译文也会使用。",
+      "fill": "文本颜色",
+      "font": "默认字体是{{list}}中的第一个：新文字会记下它，所以之后更改它不会影响已完成的页面。",
+      "increaseOutlineWidth": "增大描边宽度",
+      "none": "无",
+      "outline": "描边",
+      "outlineColor": "描边颜色",
+      "outlineWidth": "描边宽度",
+      "title": "默认文字样式",
+      "width": "宽度"
     }
   },
   "errors": {

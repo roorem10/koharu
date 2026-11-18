@@ -69,8 +69,30 @@
         "read_translate_clean": "OCR, tradução e limpeza"
       }
     },
+    "pipeline": {
+      "detectColors": "Usar as cores do letreiramento original",
+      "detectColorsDescription": "Copia as cores de preenchimento e de contorno do letreiramento original para o texto recém-traduzido. As traduções existentes mantêm suas cores.",
+      "detectColorsNote": "Quando desativada, o texto recém-traduzido usa as <a>cores de texto padrão</a> ({{tab}})."
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: somente OCR. Shift: OCR, tradução e limpeza."
+    },
+    "typesetting": {
+      "clear": "Limpar",
+      "clearAll": "Limpar tudo",
+      "clearFill": "Limpar cor do texto",
+      "clearOutline": "Limpar contorno",
+      "decreaseOutlineWidth": "Diminuir largura do contorno",
+      "description": "Cores do texto novo. O texto que você adiciona com a ferramenta {{tool}} sempre as recebe; as traduções novas, quando “{{setting}}” está desativado ({{tab}}).",
+      "fill": "Cor do texto",
+      "font": "A fonte padrão é a primeira de {{list}}: o texto novo recebe uma cópia dela, então alterá-la depois não muda as páginas prontas.",
+      "increaseOutlineWidth": "Aumentar largura do contorno",
+      "none": "Nenhum",
+      "outline": "Contorno",
+      "outlineColor": "Cor do contorno",
+      "outlineWidth": "Largura do contorno",
+      "title": "Estilo de texto padrão",
+      "width": "Largura"
     }
   },
   "errors": {

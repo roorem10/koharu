@@ -23,6 +23,9 @@ function koharuStrings(language: string): object {
 
 const pluralForm = /_(zero|one|two|few|many|other)$/
 
+/** The tags in `value`, such as a link's, which Trans renders as components. */
+const tags = (value: string) => Array.from(value.matchAll(/<\/?\w+>/g), ([tag]) => tag).sort()
+
 /** Whether `key` is one of Booharu's own strings, which every language has, rather than an override
  * of one of Koharu's at Koharu's path: its own, its edits' history steps, and its tools' names,
  * which Koharu's tool rail looks up by the tool's id. */
@@ -76,6 +79,17 @@ describe('Booharu strings overlay', () => {
         own.filter((key) => !expected.includes(key) && !isPluralForm(key)),
         language,
       ).toEqual([])
+    }
+  })
+
+  it("keeps the tags of each of Booharu's strings in every language", () => {
+    // A language that drops one shows the text without the link it marks.
+    const english = new Map(strings(booharuStrings['en-US'] ?? {}))
+    for (const language of supportedLanguages) {
+      for (const [key, value] of strings(booharuStrings[language] ?? {})) {
+        const source = english.get(key) ?? english.get(key.replace(pluralForm, '_other'))
+        if (source !== undefined) expect(tags(value), `${language}: ${key}`).toEqual(tags(source))
+      }
     }
   })
 

@@ -66,8 +66,30 @@
         "read_translate_clean": "辨識、翻譯並清理"
       }
     },
+    "pipeline": {
+      "detectColors": "使用原文字的色彩",
+      "detectColorsDescription": "將原文字的填色與描邊色彩複製到新翻譯的文字上。現有譯文的色彩保持不變。",
+      "detectColorsNote": "關閉時，新翻譯的文字使用<a>預設文字色彩</a>（{{tab}}）。"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：僅辨識。Shift：辨識、翻譯並清理。"
+    },
+    "typesetting": {
+      "clear": "清除",
+      "clearAll": "全部清除",
+      "clearFill": "清除文字色彩",
+      "clearOutline": "清除描邊",
+      "decreaseOutlineWidth": "減少描邊寬度",
+      "description": "新文字的色彩。以{{tool}}工具新增的文字一律使用這些色彩；「{{setting}}」關閉時（{{tab}}），新譯文也會使用。",
+      "fill": "文字色彩",
+      "font": "預設字型是{{list}}中的第一個：新文字會記下它，因此之後變更它不會影響已完成的頁面。",
+      "increaseOutlineWidth": "增加描邊寬度",
+      "none": "無",
+      "outline": "描邊",
+      "outlineColor": "描邊色彩",
+      "outlineWidth": "描邊寬度",
+      "title": "預設文字樣式",
+      "width": "寬度"
     }
   },
   "errors": {

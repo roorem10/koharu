@@ -5,6 +5,7 @@ import { type ReactNode, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { OcrBoxPreferences } from '@/components/booharu/boxes/OcrBoxPreferences' // Booharu: the O tool.
+import { ColourDetectionSwitch } from '@/components/booharu/pipeline/ColourDetectionSwitch' // Booharu: colour detection.
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { detectors, inpainters, recognizers, vendorName } from '@/components/preferences/models'
 import {
@@ -147,6 +148,8 @@ export function PipelinePreferences({
           value={translator}
           onChange={(next) => onChange({ ...value, translator: next })}
         />
+        {/* Booharu: whether new translations keep the original lettering's colours, saved at once. */}
+        <ColourDetectionSwitch />
       </Stage>
       {/* Booharu: the O tool's default mode, saved to its own section at once. */}
       <OcrBoxPreferences />

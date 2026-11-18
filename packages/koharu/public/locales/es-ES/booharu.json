@@ -69,8 +69,30 @@
         "read_translate_clean": "Leer, traducir y limpiar"
       }
     },
+    "pipeline": {
+      "detectColors": "Usar los colores de la rotulación original",
+      "detectColorsDescription": "Copia los colores de relleno y contorno de la rotulación original al texto recién traducido. Las traducciones existentes conservan sus colores.",
+      "detectColorsNote": "Si está desactivado, el texto recién traducido usa los <a>colores de texto predeterminados</a> ({{tab}})."
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: solo leer. Mayús: leer, traducir y limpiar."
+    },
+    "typesetting": {
+      "clear": "Borrar",
+      "clearAll": "Borrar todo",
+      "clearFill": "Borrar color del texto",
+      "clearOutline": "Borrar contorno",
+      "decreaseOutlineWidth": "Reducir ancho del contorno",
+      "description": "Colores del texto nuevo. El texto que añades con la herramienta {{tool}} siempre los usa; las traducciones nuevas, cuando “{{setting}}” está desactivado ({{tab}}).",
+      "fill": "Color del texto",
+      "font": "La fuente predeterminada es la primera de {{list}}: el texto nuevo recibe una copia, así que cambiarla después no altera las páginas terminadas.",
+      "increaseOutlineWidth": "Aumentar ancho del contorno",
+      "none": "Ninguno",
+      "outline": "Contorno",
+      "outlineColor": "Color del contorno",
+      "outlineWidth": "Ancho del contorno",
+      "title": "Estilo de texto predeterminado",
+      "width": "Ancho"
     }
   },
   "errors": {

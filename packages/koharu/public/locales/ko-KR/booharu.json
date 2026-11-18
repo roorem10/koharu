@@ -66,8 +66,30 @@
         "read_translate_clean": "OCR, 번역 및 정리"
       }
     },
+    "pipeline": {
+      "detectColors": "원본 글자 색상 사용",
+      "detectColorsDescription": "원본 글자의 채우기 및 테두리 색상을 새로 번역된 텍스트에 복사합니다. 기존 번역의 색상은 유지됩니다.",
+      "detectColorsNote": "이 옵션이 꺼져 있으면 새로 번역된 텍스트는 <a>기본 텍스트 색상</a>({{tab}})을 사용합니다."
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: OCR만. Shift: OCR, 번역 및 정리."
+    },
+    "typesetting": {
+      "clear": "지우기",
+      "clearAll": "모두 지우기",
+      "clearFill": "텍스트 색상 지우기",
+      "clearOutline": "테두리 지우기",
+      "decreaseOutlineWidth": "테두리 너비 줄이기",
+      "description": "새 텍스트의 색상입니다. {{tool}} 도구로 추가한 텍스트에는 항상 적용되고, “{{setting}}” 옵션이 꺼져 있으면({{tab}}) 새 번역에도 적용됩니다.",
+      "fill": "텍스트 색상",
+      "font": "기본 글꼴은 {{list}}의 첫 번째 글꼴입니다. 새 텍스트에는 이 글꼴이 복사되므로, 나중에 바꿔도 완성된 페이지는 그대로입니다.",
+      "increaseOutlineWidth": "테두리 너비 늘리기",
+      "none": "없음",
+      "outline": "테두리",
+      "outlineColor": "테두리 색상",
+      "outlineWidth": "테두리 너비",
+      "title": "기본 텍스트 스타일",
+      "width": "너비"
     }
   },
   "errors": {

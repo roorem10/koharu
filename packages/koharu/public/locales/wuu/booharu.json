@@ -66,8 +66,30 @@
         "read_translate_clean": "识别、翻译搭清理"
       }
     },
+    "pipeline": {
+      "detectColors": "用原来文字个颜色",
+      "detectColorsDescription": "拿原来文字个填充搭描边颜色复制到新翻译个文字浪。已有个译文颜色保持勿变。",
+      "detectColorsNote": "关脱个辰光，新翻译个文字用<a>默认文字颜色</a>（{{tab}}）。"
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：光识别。Shift：识别、翻译搭清理。"
+    },
+    "typesetting": {
+      "clear": "清除",
+      "clearAll": "全部清除",
+      "clearFill": "清除文本颜色",
+      "clearOutline": "清除描边",
+      "decreaseOutlineWidth": "拿描边调细点",
+      "description": "新文字个颜色。用{{tool}}工具加个文字一直用箇眼颜色；“{{setting}}”关脱个辰光（{{tab}}），新译文也用。",
+      "fill": "文本颜色",
+      "font": "默认字体是{{list}}里向第一只：新文字会记牢伊，所以后首改脱伊，做好个页面勿会变。",
+      "increaseOutlineWidth": "拿描边调粗点",
+      "none": "无",
+      "outline": "描边",
+      "outlineColor": "描边颜色",
+      "outlineWidth": "描边宽度",
+      "title": "默认文字样式",
+      "width": "宽度"
     }
   },
   "errors": {
