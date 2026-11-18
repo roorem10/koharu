@@ -18,7 +18,7 @@ use crate::{app::App, commands::Result};
 /// `booharu_apply_text_styles` would answer now, changing nothing.
 #[tauri::command]
 #[specta::specta]
-pub async fn booharu_count_text_styles(
+pub async fn booharu_count_text_style_targets(
     app: State<'_, Arc<App>>,
     scope: StyleScope,
     include_hand_edited: bool,

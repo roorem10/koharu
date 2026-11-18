@@ -1252,9 +1252,9 @@ export const commands = {
   booharuSetReviewNote: (layer: LayerId, note: string | null) =>
     invoke<Change>('booharu_set_review_note', { layer, note }, { headers: headers() }),
   /** How many blocks of `scope` applying the default text look would change, would keep because they were changed by hand, unless `include_hand_edited`, or are locked, and found untranslated: what `booharu_apply_text_styles` would answer now, changing nothing. */
-  booharuCountTextStyles: (scope: StyleScope, includeHandEdited: boolean) =>
+  booharuCountTextStyleTargets: (scope: StyleScope, includeHandEdited: boolean) =>
     invoke<StyleCounts>(
-      'booharu_count_text_styles',
+      'booharu_count_text_style_targets',
       { scope, includeHandEdited },
       { headers: headers() },
     ),

@@ -36,7 +36,7 @@ function openProject() {
 function desktop() {
   settingsDesktop()
   const count = vi
-    .spyOn(commands, 'booharuCountTextStyles')
+    .spyOn(commands, 'booharuCountTextStyleTargets')
     .mockImplementation(async (_, include) => (include ? counted.included : counted.kept))
   const apply = vi
     .spyOn(commands, 'booharuApplyTextStyles')

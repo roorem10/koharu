@@ -46,7 +46,7 @@ export function ApplyStyles() {
   const start = () => {
     const ask = ++asked.current
     setOpening(true)
-    call(commands.booharuCountTextStyles, PROJECT, false)
+    call(commands.booharuCountTextStyleTargets, PROJECT, false)
       .then((counts) => {
         if (ask !== asked.current) return
         setInclude(false)
@@ -61,7 +61,7 @@ export function ApplyStyles() {
     const ask = ++asked.current
     const shown = counted
     setInclude(next)
-    call(commands.booharuCountTextStyles, PROJECT, next).then(
+    call(commands.booharuCountTextStyleTargets, PROJECT, next).then(
       (counts) => {
         if (ask === asked.current) setCounted({ include: next, counts })
       },
