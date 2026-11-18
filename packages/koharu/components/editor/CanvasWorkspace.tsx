@@ -92,6 +92,7 @@ export function CanvasWorkspace() {
   )
 
   useEffect(() => {
+    // Booharu: Koharu's editable() helper was here; controlKeepsKey, in down(), replaces it.
     // The tool Space replaced, put back when it's released, as Photoshop's hand tool.
     let held: CanvasTool | null = null
 

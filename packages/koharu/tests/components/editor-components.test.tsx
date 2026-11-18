@@ -84,6 +84,7 @@ describe('window chrome', () => {
     const user = userEvent.setup()
     render(<TitleBar />)
 
+    // Booharu: Booharu's GitHub first, then Koharu's GitHub and Discord.
     await user.click(screen.getByRole('menuitem', { name: 'Help' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Booharu on GitHub' }))
     expect(nativeOpenUrl).toHaveBeenLastCalledWith('https://github.com/roorem10/koharu')
@@ -104,6 +105,7 @@ describe('window chrome', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Help' }))
     await user.click(await screen.findByRole('menuitem', { name: 'About' }))
 
+    // Booharu: About names Booharu, the Koharu release it's based on, and the owner's handle.
     expect(await screen.findByRole('heading', { name: 'Booharu' })).toBeInTheDocument()
     expect(await screen.findByText('Based on Koharu 0.62.0 by Mayo Takanashi.')).toBeInTheDocument()
     expect(screen.getByText('roorem10')).toBeInTheDocument()
