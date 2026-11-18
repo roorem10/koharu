@@ -155,10 +155,11 @@ pub fn restyle(
 
 /// The patch on a translation's `style.chars` lettering it in `category`'s
 /// font, as the `lettering` module resolves it with `font`, the default
-/// font: its `family` when it has one, its `weight`, 700 or null, and its
-/// `italic`, true or null. A category with no font, nor Normal Dialogue's,
-/// gets a copy of the default font, neither bold nor italic. Never other
-/// keys, and never the marks, so word styles survive a change of category.
+/// font: its `family`, null without one, so a family the translation had
+/// goes, its `weight`, 700 or null, and its `italic`, true or null. A
+/// category with no font, nor Normal Dialogue's, gets a copy of the default
+/// font, neither bold nor italic. Never other keys, and never the marks, so
+/// word styles survive a change of category.
 pub fn category_chars(
     settings: &LetteringSettings,
     font: Option<&str>,
@@ -1460,9 +1461,28 @@ mod tests {
             keys(&restyle(&look, Some("CCWildWords"), false, None, &current)),
             ["family"]
         );
+        // With no default font, a category's font without a family takes
+        // the family away, for Koharu's font chain, as does a category with
+        // no font, nor Normal Dialogue's.
+        let patch = restyle(
+            &look,
+            None,
+            false,
+            Some(LetteringCategory::Whisper),
+            &current,
+        );
+        assert_eq!(
+            Value::Object(patch.clone()),
+            json!({"family": null, "weight": null, "italic": true})
+        );
+        let after = patched(&current, &patch).expect("values");
+        assert_eq!(
+            (after.family, after.weight, after.italic),
+            (None, None, Some(true))
+        );
         assert_eq!(
             Value::Object(category_chars(&look, None, LetteringCategory::Shout)),
-            json!({"weight": null, "italic": null})
+            json!({"family": null, "weight": null, "italic": null})
         );
     }
 }

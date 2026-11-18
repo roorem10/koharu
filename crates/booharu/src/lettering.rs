@@ -806,6 +806,52 @@ mod tests {
     }
 
     #[test]
+    fn with_no_default_font_a_font_without_a_family_takes_the_one_before_away() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        // No default font; Whisper is italic, with no family of its own, and
+        // Normal Dialogue has no font, so Title has none either.
+        let mut settings = lettered();
+        settings
+            .categories
+            .remove(&LetteringCategory::NormalDialogue);
+        settings.categories.insert(
+            LetteringCategory::Whisper,
+            CategoryFont {
+                family: None,
+                bold: false,
+                italic: true,
+            },
+        );
+        let a = fixture.id("a");
+        let mut letter = |category| {
+            let (edit, _) = set_category(
+                &fixture.session.project(),
+                &[a],
+                Some(category),
+                Chooser::User,
+                &settings,
+                None,
+            )?;
+            fixture.session.apply(edit.context("a change")?)?;
+            assert!(!edited(&fixture.layer("a")?).style, "{category:?}");
+            fixture.font("a")
+        };
+        assert_eq!(
+            letter(LetteringCategory::Shout)?,
+            font("Badaboom BB", Some(700))
+        );
+        // Shout's family goes, for Koharu's font chain, rather than staying
+        // in Whisper's italic.
+        assert_eq!(
+            letter(LetteringCategory::Whisper)?,
+            (None, None, Some(true))
+        );
+        letter(LetteringCategory::Shout)?;
+        assert_eq!(letter(LetteringCategory::Title)?, (None, None, None));
+        Ok(())
+    }
+
+    #[test]
     fn info_answers_each_blocks_category_reason_label_and_shape() -> Result<()> {
         let mut fixture = Fixture::new()?;
         let settings = lettered();

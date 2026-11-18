@@ -15,7 +15,8 @@
 //!   italic. An entry without a family takes a copy of the default font as
 //!   its family, with its own bold and italic, as 0.0.4's entry without a
 //!   font fell back on Koharu's font chain, which starts there. Written on a
-//!   translation, a category's font sets its `style.chars` `family`,
+//!   translation, a category's font sets its `style.chars` `family` (null
+//!   when there's no default font to copy either, for Koharu's font chain),
 //!   `weight` (700 when bold, else null), and `italic` (true when italic,
 //!   else null): never other keys and never the marks, so word styles
 //!   survive a change of category.
@@ -243,14 +244,14 @@ pub struct CategoryFont {
 const BOLD: u16 = 700;
 
 impl CategoryFont {
-    /// Its part of a translation's `style.chars`: its family, when it has one,
-    /// its weight, 700 or null, and its italic, true or null.
+    /// Its part of a translation's `style.chars`, as resolved: its family,
+    /// null without one, so the family a translation had goes and Koharu's
+    /// font chain applies, its weight, 700 or null, and its italic, true or
+    /// null.
     #[must_use]
     pub fn chars(&self) -> serde_json::Map<String, serde_json::Value> {
         let mut chars = serde_json::Map::new();
-        if let Some(family) = &self.family {
-            chars.insert("family".to_owned(), family.clone().into());
-        }
+        chars.insert("family".to_owned(), self.family.clone().into());
         chars.insert("weight".to_owned(), self.bold.then_some(BOLD).into());
         chars.insert("italic".to_owned(), self.italic.then_some(true).into());
         chars
@@ -827,15 +828,15 @@ mod tests {
             settings.category_font(LetteringCategory::Shout, None),
             Some(font(None, true, false))
         );
-        // A font's part of a translation's look: weight and italic always,
-        // null when off, and its family when it has one.
+        // A font's part of a translation's look: all three always, null when
+        // off, a family null without one, so the one before goes.
         assert_eq!(
             Value::Object(font(Some("Arial"), true, false).chars()),
             json!({"family": "Arial", "weight": 700, "italic": null})
         );
         assert_eq!(
             Value::Object(font(None, false, true).chars()),
-            json!({"weight": null, "italic": true})
+            json!({"family": null, "weight": null, "italic": true})
         );
     }
 
