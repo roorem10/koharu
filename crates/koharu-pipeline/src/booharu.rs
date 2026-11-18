@@ -6,7 +6,10 @@
 //!
 //! - `queued`, in `Pipeline::run`, takes the snapshot, the run policy of
 //!   `[booharu-runs]` included, or refuses the run when a section it reads
-//!   can't be read.
+//!   can't be read. For a run that translates it also appends the chapter's
+//!   glossary and notes, from its side file and the series it links, to the
+//!   Instructions in the run's config, never in the saved setting, or
+//!   refuses the run when either file can't be read.
 //! - `translated`, in the Translation stage's `written`, gives each new
 //!   translation the default look, its block's lettering category's font
 //!   among it while the run's Pick fonts automatically is on, and records
@@ -20,9 +23,10 @@
 //! - `answered`, in a translation's turn, gives a hosted model's request ten
 //!   minutes to answer.
 
-use std::{future::Future, time::Duration};
+use std::{collections::BTreeSet, future::Future, path::Path, time::Duration};
 
 use booharu_core::{
+    context::{self, Chapter, Extras, MAX_TERMS, SeriesStore},
     runs::{RunPolicy, RunStage},
     settings::Snapshot,
     styles,
@@ -35,21 +39,84 @@ use koharu_llm::rig::{
     operation::Completion,
 };
 use koharu_renderer::RendererConfig;
-use koharu_scene::{LayerId, Op, PageId, Project};
+use koharu_scene::{LayerId, Op, PageId, Project, Session};
+use parking_lot::Mutex;
 use rig_agent::run::PromptError;
 use serde::Serialize;
 
-use crate::{PipelineConfig, Stage};
+use crate::{PipelineConfig, Stage, TranslatorConfig};
 
-/// `config`, the one a run was queued with, with Booharu's settings as
-/// they're saved now: `[booharu-lettering]`, the first of Koharu's Preferred
-/// fonts, and `[booharu-runs]`'s run policy, which the run then follows
-/// whoever queued it. A section that can't be read refuses the run, as a bad
-/// stored value is an error, never replaced by its default.
-pub(crate) fn queued(config: PipelineConfig) -> crate::Result<PipelineConfig> {
+/// `config`, the one a run of `stages` on the project `session` holds was
+/// queued with, with Booharu's settings as they're saved now:
+/// `[booharu-lettering]`, the first of Koharu's Preferred fonts, and
+/// `[booharu-runs]`'s run policy, which the run then follows whoever queued
+/// it; and, when it translates, the chapter's glossary and notes after its
+/// Instructions ([`chapter`]). A section that can't be read refuses the run,
+/// as a bad stored value is an error, never replaced by its default.
+pub(crate) fn queued(
+    config: PipelineConfig,
+    session: &Mutex<Session>,
+    stages: &BTreeSet<Stage>,
+) -> crate::Result<PipelineConfig> {
     let families = koharu_config::get::<RendererConfig>().map(|renderer| renderer.font_families);
     let booharu = snapshot(Snapshot::read(families), RunPolicy::read())?;
-    Ok(PipelineConfig { booharu, ..config })
+    let (path, project) = {
+        let session = session.lock();
+        (session.path().to_owned(), session.project())
+    };
+    let translator = chapter(
+        config.translator,
+        &path,
+        &project,
+        stages,
+        SeriesStore::open,
+    )?;
+    Ok(PipelineConfig {
+        booharu,
+        translator,
+        ..config
+    })
+}
+
+/// `translator` with what a run of `stages` sends with the chapter of the
+/// project file `path`, whose project is `project`, after its Instructions:
+/// the glossary, the background, and the characters, from the chapter's
+/// side file and the series it links, which `store` opens only when it links
+/// one. A run that doesn't translate, or a chapter with nothing to send,
+/// keeps the Instructions byte for byte, so Koharu's translation
+/// conversation goes on as it would. The same inputs give the same text,
+/// as the conversation starts again whenever the instructions change. A
+/// side file or series file that can't be read refuses the run, naming it.
+fn chapter(
+    translator: TranslatorConfig,
+    path: &Path,
+    project: &Project,
+    stages: &BTreeSet<Stage>,
+    store: impl FnOnce() -> anyhow::Result<SeriesStore>,
+) -> crate::Result<TranslatorConfig> {
+    if !stages.contains(&Stage::Translate) {
+        return Ok(translator);
+    }
+    let chapter =
+        Chapter::read(path, store).map_err(|error| crate::Error::invalid(format!("{error:#}")))?;
+    // Text a run detects or reads first isn't known as it's queued.
+    let finds_text = stages.contains(&Stage::Detect) || stages.contains(&Stage::Recognize);
+    let extras = Extras::of(
+        project,
+        &chapter.context,
+        chapter.series.as_ref(),
+        finds_text,
+    );
+    if extras.left_out > 0 {
+        tracing::warn!(
+            "{} glossary terms past the first {MAX_TERMS} were left out of the run",
+            extras.left_out
+        );
+    }
+    Ok(TranslatorConfig {
+        instructions: context::instructions(&translator.instructions, &extras),
+        ..translator
+    })
 }
 
 /// A run's snapshot: `read`, with `policy` in it, or the error of the first
@@ -423,6 +490,7 @@ mod tests {
     use booharu_core::{
         Edited,
         attrs::Auto,
+        context::{ChapterContext, GlossaryEntry},
         edited,
         lettering::{CategoryFont, LetteringCategory},
         runs::RunsSettings,
@@ -659,6 +727,134 @@ mod tests {
         assert_eq!(
             queued(Target::Blocks(vec![blocks["a"]]), &[Stage::Recognize]).await?,
             (vec![Stage::Recognize], false)
+        );
+        Ok(())
+    }
+
+    /// The Instructions a run of `stages` on `page` is sent, the user's own
+    /// being `own`, with the series in the folder `series` beside it.
+    fn sent(page: &Page, own: &str, stages: &[Stage]) -> crate::Result<TranslatorConfig> {
+        let path = page.session.path();
+        let translator = TranslatorConfig {
+            instructions: own.to_owned(),
+            ..TranslatorConfig::default()
+        };
+        chapter(
+            translator,
+            path,
+            &page.session.project(),
+            &stages.iter().copied().collect(),
+            || Ok(SeriesStore::new(path.with_file_name("series"))),
+        )
+    }
+
+    #[test]
+    fn a_translating_run_sends_the_linked_series_terms_after_the_instructions() -> Result<()> {
+        let page = Page::new(&[("a", "text")])?;
+        let path = page.session.path();
+        let own = "Keep honorifics.\n";
+        // A chapter linking no series sends nothing: the Instructions stay
+        // byte for byte, and so does the rest.
+        let unlinked = sent(&page, own, &[Stage::Translate])?;
+        assert_eq!(
+            unlinked,
+            TranslatorConfig {
+                instructions: own.to_owned(),
+                ..TranslatorConfig::default()
+            }
+        );
+
+        let store = SeriesStore::new(path.with_file_name("series"));
+        let mut series = store.create("Blue Archive")?;
+        series.glossary = vec![
+            GlossaryEntry::new("リムル", "Rimuru"),
+            GlossaryEntry {
+                note: "a question".to_owned(),
+                ..GlossaryEntry::new(SOURCE, "Why")
+            },
+        ];
+        store.save(&series)?;
+        ChapterContext::update(path, |chapter| chapter.series = Some(series.id.clone()))?;
+        let linked = sent(&page, own, &[Stage::Inpaint, Stage::Translate])?;
+        assert_eq!(
+            linked.instructions,
+            "Keep honorifics.\n\nGlossary (mandatory: use these translations and keep their \
+             spelling):\n- どうして → Why (a question)"
+        );
+        assert_eq!(
+            TranslatorConfig {
+                instructions: own.to_owned(),
+                ..linked
+            },
+            unlinked,
+            "only the Instructions change"
+        );
+        // A run that doesn't translate is sent nothing.
+        assert_eq!(sent(&page, own, &[Stage::Inpaint])?, unlinked);
+        // One that reads the text first, which isn't known yet, every term.
+        let fresh = sent(&page, own, &[Stage::Recognize, Stage::Translate])?;
+        assert!(
+            fresh.instructions.contains("- リムル → Rimuru"),
+            "{}",
+            fresh.instructions
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_side_file_or_series_that_cant_be_read_refuses_a_translating_run() -> Result<()> {
+        let page = Page::new(&[("a", "text")])?;
+        let path = page.session.path();
+        fs_err::write(context::side_file(path), "{ not json")?;
+        let refused = sent(&page, "", &[Stage::Translate]).expect_err("a broken side file");
+        assert!(
+            matches!(&refused, crate::Error::Invalid(message) if message.contains("test.booharu.json")),
+            "{refused}"
+        );
+        // A run that doesn't translate never reads it.
+        sent(
+            &page,
+            "",
+            &[Stage::Detect, Stage::Recognize, Stage::Inpaint],
+        )?;
+
+        let id = "blue-archive-000000000000";
+        fs_err::write(context::side_file(path), json!({"series": id}).to_string())?;
+        fs_err::create_dir_all(path.with_file_name("series"))?;
+        fs_err::write(
+            path.with_file_name("series").join(format!("{id}.json")),
+            "[",
+        )?;
+        let refused = sent(&page, "", &[Stage::Translate]).expect_err("a broken series");
+        assert!(
+            matches!(&refused, crate::Error::Invalid(message)
+                if message.contains("test.booharu.json") && message.contains(&format!("{id}.json"))),
+            "{refused}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn pipeline_run_refuses_a_translation_its_chapter_cant_be_read_for() -> Result<()> {
+        let Page {
+            _dir: _held,
+            session,
+            blocks: _,
+        } = Page::new(&[("a", "text")])?;
+        fs_err::write(context::side_file(session.path()), "{ not json")?;
+        let session = Arc::new(Mutex::new(session));
+        let pipeline = Pipeline::new(PipelineConfig::default());
+        let request = Request {
+            target: Target::Project,
+            stages: [Stage::Translate].into(),
+            config: None,
+        };
+        let refused = pipeline
+            .run(session, request)
+            .expect_err("a broken side file");
+        assert!(
+            matches!(&refused, crate::Error::Invalid(message) if message.contains("test.booharu.json")),
+            "{refused}"
         );
         Ok(())
     }
