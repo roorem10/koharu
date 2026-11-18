@@ -1,13 +1,16 @@
 'use client'
 
-import type { ComponentType } from 'react'
+import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { call } from '@/lib/backend'
+import { reviewNote } from '@/lib/booharu/attrs'
 import { boxActions, runBoxAction, type Box } from '@/lib/booharu/boxActions'
 import { showInStory } from '@/lib/booharu/boxDetails'
 import { isBlockLayer, plainText } from '@/lib/document'
-import type { PageId } from '@koharu/ipc/protocol'
+import { commands, type PageId } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
+import { Textarea } from '@koharu/ui/components/textarea'
 
 /** What a Box details section shows: a text, and its page. */
 export interface BoxDetailsProps {
@@ -25,6 +28,7 @@ export interface BoxDetailsSection {
 /** Box details' sections, in the order it shows them. A later one goes in as one more entry. */
 export const boxDetailsSections: readonly BoxDetailsSection[] = [
   { id: 'source', title: 'booharu.details.sections.source', Section: SourceSection },
+  { id: 'note', title: 'booharu.details.sections.note', Section: NoteSection },
   { id: 'actions', title: 'booharu.details.sections.actions', Section: ActionsSection },
 ]
 
@@ -60,6 +64,57 @@ function SourceSection({ page, box: { layer } }: BoxDetailsProps) {
         {t('booharu.details.showInStory')}
       </Button>
     </div>
+  )
+}
+
+/** The reviewer's note on the text, saved when the field loses focus as one undo step, and removed
+ * when it's left blank. A locked text, or one in a locked layer, takes no note, as the scene
+ * refuses one, so the section says why in place of the field. */
+function NoteSection({ box: { layer, locked } }: BoxDetailsProps) {
+  const { t } = useTranslation()
+  const note = reviewNote(layer)
+  // What's typed, kept until the note it saved, or another writer's, comes back.
+  const [draft, setDraft] = useState<string | null>(null)
+  const editing = useRef(false)
+  useEffect(() => {
+    if (!editing.current) setDraft(null)
+  }, [note])
+
+  if (locked) {
+    return (
+      <div className='grid gap-1.5'>
+        {note && <p className='text-[12px] leading-4 break-words whitespace-pre-wrap'>{note}</p>}
+        <p className='text-[11px] leading-4 text-muted-foreground'>
+          {t('booharu.details.noteLocked')}
+        </p>
+      </div>
+    )
+  }
+
+  const save = () => {
+    editing.current = false
+    if (draft === null) return
+    const next = draft.trim() ? draft : null
+    if (next === note) {
+      setDraft(null)
+      return
+    }
+    // A failure shows its error, as every command's does, and leaves what was typed.
+    void call(commands.booharuSetReviewNote, layer.id, next).catch(() => undefined)
+  }
+  return (
+    <Textarea
+      aria-label={t('booharu.details.noteLabel')}
+      placeholder={t('booharu.details.notePlaceholder')}
+      value={draft ?? note ?? ''}
+      rows={3}
+      className='min-h-16 resize-y text-[12px]'
+      onFocus={() => {
+        editing.current = true
+      }}
+      onChange={(event) => setDraft(event.currentTarget.value)}
+      onBlur={save}
+    />
   )
 }
 

@@ -34,8 +34,12 @@
       "close": "Cerrar",
       "description": "Inspecciona y edita la información de este cuadro de texto.",
       "empty": "Vacío",
+      "noteLabel": "Nota del cuadro",
+      "noteLocked": "Este cuadro está bloqueado. Desbloquéalo para añadir una nota.",
+      "notePlaceholder": "Deja una nota para la próxima revisión…",
       "sections": {
         "actions": "Acciones",
+        "note": "Nota",
         "source": "Texto original y traducción"
       },
       "showInStory": "Mostrar en Guion",

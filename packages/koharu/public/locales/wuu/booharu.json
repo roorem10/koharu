@@ -31,8 +31,12 @@
       "close": "关闭",
       "description": "查看搭编辑箇只文字框个信息。",
       "empty": "还呒没",
+      "noteLabel": "文字框备注",
+      "noteLocked": "箇只文字框锁牢哉。解锁之后再加备注。",
+      "notePlaceholder": "留条备注畀下一趟检查…",
       "sections": {
         "actions": "操作",
+        "note": "备注",
         "source": "原文搭译文"
       },
       "showInStory": "勒故事里向显示",

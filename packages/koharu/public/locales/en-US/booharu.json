@@ -31,8 +31,12 @@
       "close": "Close",
       "description": "Inspect and edit information for this text box.",
       "empty": "Empty",
+      "noteLabel": "Box note",
+      "noteLocked": "This box is locked. Unlock it to add a note.",
+      "notePlaceholder": "Leave a note for the next pass…",
       "sections": {
         "actions": "Actions",
+        "note": "Note",
         "source": "Source & translation"
       },
       "showInStory": "Show in Story",

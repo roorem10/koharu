@@ -34,8 +34,12 @@
       "close": "Fechar",
       "description": "Inspecione e edite as informações desta caixa de texto.",
       "empty": "Vazio",
+      "noteLabel": "Nota da caixa",
+      "noteLocked": "Esta caixa está bloqueada. Desbloqueie-a para adicionar uma nota.",
+      "notePlaceholder": "Deixe uma nota para a próxima revisão…",
       "sections": {
         "actions": "Ações",
+        "note": "Nota",
         "source": "Texto original e tradução"
       },
       "showInStory": "Mostrar em História",

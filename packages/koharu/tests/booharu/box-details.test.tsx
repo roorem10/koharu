@@ -10,6 +10,7 @@ import { StoryPanel } from '@/components/editor/StoryPanel'
 import { openBoxDetails, useBoxDetails } from '@/lib/booharu/boxDetails'
 import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
+import type { Page } from '@koharu/ipc/protocol'
 
 import { boxesPage, desktop, openProject } from './boxes'
 
@@ -25,6 +26,18 @@ function details(): Promise<HTMLElement> {
 async function closed() {
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 }
+
+/** The boxes page with a reviewer's note on "lo" and one on the locked block. */
+function notedPage(): Page {
+  const page = boxesPage()
+  page.layers[0]!.children![0]!.children![1]!.attributes = {
+    booharu: { review_note: 'Check the tone' },
+  }
+  page.layers[2]!.attributes = { booharu: { review_note: 'Leave as is' } }
+  return page
+}
+
+const lockedReason = 'This box is locked. Unlock it to add a note.'
 
 beforeEach(() => useBoxDetails.setState({ shown: null, reveal: null }))
 
@@ -118,5 +131,53 @@ describe('Booharu Box details', () => {
     expect(show).toHaveBeenCalledWith('page')
     expect(useKoharuStore.getState().selectedPages).toEqual(['page'])
     expect(useKoharuStore.getState().panel).toBe('story')
+  })
+
+  it('saves the note when its field loses focus, and removes it when left blank', async () => {
+    const { note } = desktop()
+    openProject(notedPage())
+    const user = userEvent.setup()
+    mount(<BoxDetailsDialog />)
+
+    act(() => openBoxDetails('page', 'first'))
+    const field = within(await details()).getByRole('textbox', { name: 'Box note' })
+    expect(field).toHaveValue('')
+    // Visiting the field without changing it saves nothing.
+    await user.click(field)
+    await user.tab()
+    await user.type(field, 'Too long for the balloon')
+    expect(note).not.toHaveBeenCalled()
+    await user.tab()
+    expect(note).toHaveBeenCalledOnce()
+    expect(note).toHaveBeenCalledWith('first', 'Too long for the balloon')
+
+    act(() => openBoxDetails('page', 'second'))
+    const noted = within(await details()).getByRole('textbox', { name: 'Box note' })
+    expect(noted).toHaveValue('Check the tone')
+    await user.clear(noted)
+    await user.type(noted, '  ')
+    await user.tab()
+    expect(note).toHaveBeenCalledTimes(2)
+    expect(note).toHaveBeenLastCalledWith('second', null)
+  })
+
+  it('says why a locked text takes no note, and saves none', async () => {
+    const { note } = desktop()
+    openProject(notedPage())
+    mount(<BoxDetailsDialog />)
+
+    // A locked block shows the note it has, read-only.
+    act(() => openBoxDetails('page', 'locked'))
+    let dialog = await details()
+    expect(within(dialog).getByText('Leave as is')).toBeInTheDocument()
+    expect(within(dialog).getByText(lockedReason)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('textbox')).toBeNull()
+
+    // A block in a locked balloon is locked with it.
+    act(() => openBoxDetails('page', 'held-first'))
+    dialog = await details()
+    expect(within(dialog).getByText(lockedReason)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('textbox')).toBeNull()
+    expect(note).not.toHaveBeenCalled()
   })
 })

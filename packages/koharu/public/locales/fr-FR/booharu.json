@@ -34,8 +34,12 @@
       "close": "Fermer",
       "description": "Inspecter et modifier les informations de cette zone de texte.",
       "empty": "Vide",
+      "noteLabel": "Note de la zone de texte",
+      "noteLocked": "Cette zone de texte est verrouillée. Déverrouillez-la pour ajouter une note.",
+      "notePlaceholder": "Laissez une note pour la prochaine relecture…",
       "sections": {
         "actions": "Actions",
+        "note": "Note",
         "source": "Texte source et traduction"
       },
       "showInStory": "Afficher dans l’onglet Histoire",

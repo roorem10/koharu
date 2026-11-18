@@ -94,6 +94,7 @@ export function desktop() {
       halves: ['first', 'first-half'],
       run: 2,
     }),
+    note: vi.spyOn(commands, 'booharuSetReviewNote').mockResolvedValue(change),
     findSplit: vi
       .spyOn(commands, 'booharuFindSplitBalloons')
       .mockResolvedValue([{ page: 'page', balloon: 'split', blocks: ['first', 'second'] }]),

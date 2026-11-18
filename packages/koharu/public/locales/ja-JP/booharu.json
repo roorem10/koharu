@@ -31,8 +31,12 @@
       "close": "閉じる",
       "description": "このテキストボックスの情報を確認・編集します。",
       "empty": "なし",
+      "noteLabel": "ボックスのメモ",
+      "noteLocked": "このボックスはロックされています。メモを追加するにはロックを解除してください。",
+      "notePlaceholder": "次の作業に向けてメモを残す…",
       "sections": {
         "actions": "操作",
+        "note": "メモ",
         "source": "原文と翻訳"
       },
       "showInStory": "ストーリーで表示",

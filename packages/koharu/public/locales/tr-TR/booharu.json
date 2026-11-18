@@ -31,8 +31,12 @@
       "close": "Kapat",
       "description": "Bu metin kutusunun bilgilerini inceleyin ve düzenleyin.",
       "empty": "Boş",
+      "noteLabel": "Kutu notu",
+      "noteLocked": "Bu kutu kilitli. Not eklemek için kilidini açın.",
+      "notePlaceholder": "Sonraki kontrol için not bırakın…",
       "sections": {
         "actions": "İşlemler",
+        "note": "Not",
         "source": "Kaynak metin ve çeviri"
       },
       "showInStory": "Hikâye’de göster",
