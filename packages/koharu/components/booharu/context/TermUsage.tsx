@@ -1,7 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { failure, fixTermEverywhere, useGlossaryUsage, type FullEntry } from '@/lib/booharu/context'
@@ -15,7 +15,8 @@ import { Button } from '@koharu/ui/components/button'
  * again, untranslated ones included, in one Translation run following the glossary as it is now,
  * then says what it did and what it left alone. With nothing to translate it starts no run, and
  * says why. It's read again after every change to a page, and shows nothing while no project is
- * open; `onClose`, when given, puts it away. */
+ * open; `onClose`, when given, puts it away. It scrolls into view as it shows, and once more as its
+ * counts come, as the list it goes with may have scrolled it away. */
 export function TermUsage({ entry, onClose }: { entry: FullEntry; onClose?: () => void }) {
   const { t } = useTranslation()
   const project = useProject().data?.name ?? null
@@ -24,6 +25,9 @@ export function TermUsage({ entry, onClose }: { entry: FullEntry; onClose?: () =
   const usage = useGlossaryUsage(source)
   const [busy, setBusy] = useState(false)
   const [fixed, setFixed] = useState<FixedTerm | null>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const counted = usage.data !== undefined
+  useEffect(() => box.current?.scrollIntoView({ block: 'nearest' }), [counted])
 
   if (project === null) return null
   const data = usage.data ?? null
@@ -38,6 +42,7 @@ export function TermUsage({ entry, onClose }: { entry: FullEntry; onClose?: () =
 
   return (
     <div
+      ref={box}
       role='group'
       aria-label={t('booharu.context.usage', { source })}
       className='grid min-w-0 gap-1.5 rounded-md bg-muted p-2 text-[11px] leading-4'

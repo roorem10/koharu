@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { GlossaryDialog } from '@/components/booharu/context/GlossaryDialog'
 import { RightSidebar } from '@/components/editor/RightSidebar'
@@ -96,11 +96,16 @@ describe('Booharu term usage and Fix it everywhere', () => {
     spies.usage.mockResolvedValue({ blocks: ['a', 'b'], translate: [], hand_edited: 1, locked: 1 })
     const user = userEvent.setup()
     const suggestion = await contextTab(user)
+    const scroll = vi.mocked(Element.prototype.scrollIntoView)
+    scroll.mockClear()
 
     await user.click(suggestion.getByRole('button', { name: 'Accept' }))
 
-    const usage = within(await screen.findByRole('group', { name: 'Where ヒナ is used' }))
+    const group = await screen.findByRole('group', { name: 'Where ヒナ is used' })
+    const usage = within(group)
     expect(await usage.findByText('Used on 2 lines in this project')).toBeInTheDocument()
+    // Above the list, it comes into view, however far down the suggestion was.
+    expect(scroll.mock.contexts).toContain(group)
     expect(usage.getByText('1 hand-edited line will be skipped')).toBeInTheDocument()
     expect(usage.getByText('1 locked line will be skipped')).toBeInTheDocument()
     expect(
