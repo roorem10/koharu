@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { PreferenceRow } from '@/components/preferences/PreferenceFields'
 import { call } from '@/lib/backend'
 import { flushDefaultTextStyle } from '@/lib/booharu/lettering'
-import { queueBooharuWrite } from '@/lib/booharu/preferences'
+import { queueBooharuWrite, useBooharuPreferences } from '@/lib/booharu/preferences'
 import { useProject } from '@/lib/queries'
 import { commands, type StyleCounts, type StyleScope } from '@koharu/ipc/protocol'
 import {
@@ -35,14 +35,18 @@ function afterSaves<T>(command: () => Promise<T>): Promise<T> {
   return queueBooharuWrite(command)
 }
 
-/** Apply to the open project, the default text style's last row: it counts the boxes the style
- * would restyle, keep and find untranslated, and asks with those numbers, counting again when the
- * boxes changed by hand are included; then it applies the style as one undo step and says how many
- * boxes it restyled and kept. Each count and the apply first save the default text style's change
- * still waiting. The pages it changes arrive as every change does. */
-export function ApplyStyles() {
+/** Apply to the open project, the default text style's last row, and the Lettering categories
+ * card's, `categories`: it counts the boxes the look would restyle, keep and find untranslated, and
+ * asks with those numbers, counting again when the boxes changed by hand are included; then it
+ * applies the look as one undo step and says how many boxes it restyled and kept. The look is the
+ * default font, or while Pick fonts automatically is on each box's category font, and the default
+ * colours when colour detection is off, as the row says; the card's row waits for the switch. Each
+ * count and the apply first save the default text style's change still waiting. The pages it
+ * changes arrive as every change does. */
+export function ApplyStyles({ categories = false }: { categories?: boolean }) {
   const { t } = useTranslation()
   const project = useProject().data
+  const auto = useBooharuPreferences().data?.['booharu-lettering'].auto ?? false
   const [open, setOpen] = useState(false)
   const [opening, setOpening] = useState(false)
   const [applying, setApplying] = useState(false)
@@ -111,20 +115,29 @@ export function ApplyStyles() {
   const current = counted !== null && counted.include === include
   const counts = counted?.counts
   const keptLine = counted && kept(counted)
+  /** The card's row, while the switch is off, which would give no category font. */
+  const waiting = categories && !auto
 
   return (
     <>
       <PreferenceRow
         title={t('booharu.typesetting.apply.row')}
-        description={t('booharu.typesetting.apply.description', {
-          setting: t('booharu.pipeline.detectColors'),
-        })}
+        description={
+          waiting
+            ? t('booharu.typesetting.apply.categoriesOff', { setting: t('booharu.lettering.auto') })
+            : t(
+                auto
+                  ? 'booharu.typesetting.apply.categories'
+                  : 'booharu.typesetting.apply.description',
+                { setting: t('booharu.pipeline.detectColors') },
+              )
+        }
       >
         <Button
           type='button'
           size='sm'
           variant='outline'
-          disabled={!project || opening}
+          disabled={!project || opening || waiting}
           aria-busy={opening}
           onClick={start}
         >

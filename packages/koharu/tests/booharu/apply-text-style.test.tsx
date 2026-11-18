@@ -58,6 +58,12 @@ function renderTypesetting() {
   )
 }
 
+/** The default text style's Apply, its last row: the Lettering categories card has one too. */
+async function applyButton() {
+  const section = within(await screen.findByRole('region', { name: 'Default text style' }))
+  return section.findByRole('button', { name: BUTTON })
+}
+
 /** The confirmation, once it shows. */
 async function confirmation() {
   return within(await screen.findByRole('alertdialog'))
@@ -68,7 +74,7 @@ describe('Booharu Apply to the open project', () => {
     desktop()
     renderTypesetting()
 
-    const button = await screen.findByRole('button', { name: BUTTON })
+    const button = await applyButton()
     await waitFor(() => expect(queryClient.getQueryState(projectKey)?.status).toBe('success'))
     expect(button).toBeDisabled()
   })
@@ -80,7 +86,7 @@ describe('Booharu Apply to the open project', () => {
     const user = userEvent.setup()
     renderTypesetting()
 
-    await user.click(await screen.findByRole('button', { name: BUTTON }))
+    await user.click(await applyButton())
     let dialog = await confirmation()
     expect(count).toHaveBeenCalledWith(PROJECT, false)
     expect(dialog.getByText('4 boxes will be restyled.')).toBeInTheDocument()
@@ -109,7 +115,7 @@ describe('Booharu Apply to the open project', () => {
     )
 
     // Asked again, it starts from the boxes changed by hand kept.
-    await user.click(screen.getByRole('button', { name: BUTTON }))
+    await user.click(await applyButton())
     dialog = await confirmation()
     expect(count).toHaveBeenLastCalledWith(PROJECT, false)
     expect(dialog.getByRole('checkbox', { name: INCLUDE })).not.toBeChecked()
@@ -124,7 +130,7 @@ describe('Booharu Apply to the open project', () => {
     const user = userEvent.setup()
     renderTypesetting()
 
-    await user.click(await screen.findByRole('button', { name: BUTTON }))
+    await user.click(await applyButton())
     let dialog = await confirmation()
     expect(dialog.getByText('1 box will be restyled.')).toBeInTheDocument()
     expect(dialog.getByText('1 box you changed by hand or locked is kept.')).toBeInTheDocument()
@@ -132,7 +138,7 @@ describe('Booharu Apply to the open project', () => {
     await user.click(dialog.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
 
-    await user.click(screen.getByRole('button', { name: BUTTON }))
+    await user.click(await applyButton())
     dialog = await confirmation()
     expect(dialog.getByText('0 boxes will be restyled.')).toBeInTheDocument()
     expect(dialog.queryByText(/kept\./)).toBeNull()
@@ -153,7 +159,7 @@ describe('Booharu Apply to the open project', () => {
     )
     // Asked for before the change's own save would come.
     await user.click(region.getByRole('button', { name: 'Increase outline width' }))
-    await user.click(screen.getByRole('button', { name: BUTTON }))
+    await user.click(await applyButton())
     const dialog = await confirmation()
     await user.click(dialog.getByRole('button', { name: 'Apply' }))
     await waitFor(() => expect(apply).toHaveBeenCalledOnce())
@@ -169,7 +175,7 @@ describe('Booharu Apply to the open project', () => {
     const user = userEvent.setup()
     renderTypesetting()
 
-    await user.click(await screen.findByRole('button', { name: BUTTON }))
+    await user.click(await applyButton())
     const dialog = await confirmation()
     count.mockRejectedValueOnce('The project is busy')
     await user.click(dialog.getByRole('checkbox', { name: INCLUDE }))

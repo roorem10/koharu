@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { LetteringPreferences } from '@/components/booharu/lettering/LetteringPreferences' // Booharu: the lettering categories.
 import { DefaultTextStyleSection } from '@/components/booharu/typesetting/DefaultTextStyleSection' // Booharu: the default text style.
 import { FontPicker } from '@/components/controls/FontPicker'
 import { PreferencePage } from '@/components/preferences/PreferenceFields'
@@ -140,6 +141,8 @@ export function TypesettingPreferences({
       </section>
       {/* Booharu: the default text style, saved to its own section, below the font stack it names. */}
       <DefaultTextStyleSection />
+      {/* Booharu: the lettering categories' fonts, below the default text style, whose font is the first Preferred font. */}
+      <LetteringPreferences preferredFonts={fontFamilies} />
     </PreferencePage>
   )
 }
