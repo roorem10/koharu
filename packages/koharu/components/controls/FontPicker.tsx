@@ -12,12 +12,13 @@ import { Check, ChevronDown, Search, X } from 'lucide-react'
 import { useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 
-// Booharu: the favourites.
+// Booharu: the favourites, and the leading row.
 import {
   FavoritesOnlySwitch,
   FontHeading,
   WithFavoriteStar,
 } from '@/components/booharu/fonts/FontFavorites'
+import { NoneOption } from '@/components/booharu/fonts/NoneOption'
 import {
   activeRow,
   fontRows,
@@ -57,7 +58,9 @@ export function FontPicker({
   ariaLabel,
   placeholder,
   onChange,
-  ...booharu // Booharu: favourites and local names, as lib/booharu/fonts.ts's hook gives them.
+  // Booharu: favourites and local names, as lib/booharu/fonts.ts's hook gives them, and a
+  // mount's leading row.
+  ...booharu
 }: {
   value: string
   families: FontFamily[]
@@ -101,19 +104,34 @@ export function FontPicker({
     [orderedFamilies, value],
   )
   // Booharu: the matches, the favourites among them pinned above them, or alone, each with its
-  // first name in another language.
+  // first name in another language, after a mount's leading row while nothing is searched.
   const rows = useMemo(
-    () => fontRows(results, booharu.favorites, booharu.favoritesOnly, booharu.localNames),
-    [results, booharu.favorites, booharu.favoritesOnly, booharu.localNames],
+    () =>
+      fontRows(
+        results,
+        booharu.favorites,
+        booharu.favoritesOnly,
+        booharu.localNames,
+        query ? undefined : booharu.noneLabel,
+      ),
+    [
+      results,
+      booharu.favorites,
+      booharu.favoritesOnly,
+      booharu.localNames,
+      query,
+      booharu.noneLabel,
+    ],
   )
   // Booharu: the family the arrows are on, which they move from, skipping the headings and
   // wrapping around as ModelPicker's do; on a favourite whose pinned row goes, as when it's
-  // unstarred, they stay on its row under All fonts.
-  const options = rows.flatMap((row, index) => ('family' in row ? [index] : []))
+  // unstarred, they stay on its row under All fonts. The leading row is one of them.
+  const options = rows.flatMap((row, index) => ('heading' in row ? [] : [index]))
   const found = activeRow(rows, active)
   const shown = found >= 0 ? found : (options[0] ?? -1)
   const shownRow = rows.at(shown)
   const shownFamily = shownRow && 'family' in shownRow ? shownRow.family : undefined
+  const shownNone = shownRow && 'none' in shownRow ? shownRow.none : undefined
   const move = (by: number) => {
     if (!options.length) return
     const next = options[(options.indexOf(shown) + by + options.length) % options.length]
@@ -162,7 +180,10 @@ export function FontPicker({
             className='min-w-0 flex-1 py-1 [&>img]:max-h-3.5'
           />
         ) : (
-          <span className='truncate'>{value || placeholder || t('fontPicker.choose')}</span>
+          // Booharu: the leading row's label, which an empty value stands for.
+          <span className='truncate'>
+            {value || booharu.noneLabel || placeholder || t('fontPicker.choose')}
+          </span>
         )}
         <ChevronDown className='size-3.5 shrink-0 text-muted-foreground' />
       </PopoverTrigger>
@@ -192,15 +213,17 @@ export function FontPicker({
               aria-expanded={open}
               aria-autocomplete='list'
               aria-controls={`${id}-fonts`}
-              aria-activedescendant={shownFamily ? `${id}-${shown}` : undefined}
+              aria-activedescendant={
+                shownFamily || shownNone !== undefined ? `${id}-${shown}` : undefined
+              }
               onKeyDown={(event) => {
                 if (event.nativeEvent.isComposing) return
                 if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                   event.preventDefault()
                   move(event.key === 'ArrowDown' ? 1 : -1)
-                } else if (event.key === 'Enter' && shownFamily) {
+                } else if (event.key === 'Enter' && (shownFamily || shownNone !== undefined)) {
                   event.preventDefault()
-                  pick(shownFamily.name)
+                  pick(shownFamily?.name ?? '') // The leading row stands for no family.
                 }
               }}
             />
@@ -223,7 +246,9 @@ export function FontPicker({
         >
           <span className='shrink-0'>
             {t('fontPicker.fontCount', {
-              count: booharu.favoritesOnly ? options.length : results.length,
+              count: booharu.favoritesOnly
+                ? rows.filter((row) => 'family' in row).length
+                : results.length,
             })}
           </span>
           {shownFamily && (
@@ -232,6 +257,7 @@ export function FontPicker({
               className='min-w-0 justify-end [&>img]:max-h-3.5 [&>img]:object-right'
             />
           )}
+          {shownNone !== undefined && <span className='min-w-0 truncate'>{shownNone}</span>}
         </div>
         <Separator />
         {/* Booharu: the list takes the rows, the family the arrows are on, which it marks and
@@ -309,6 +335,9 @@ function FontList({
     },
   })
   useImperativeHandle(scroller, () => virtualizer, [virtualizer]) // Booharu: the arrows' scrolling.
+  // Booharu: whether no family matches, and the leading row's height above what says so.
+  const noFamilies = !rows.some((row) => 'family' in row)
+  const lead = rows[0] && 'none' in rows[0] ? rowHeight : 0
 
   return (
     <ScrollArea
@@ -318,12 +347,12 @@ function FontList({
       aria-label={t('fontPicker.fonts')}
       className='relative'
       viewportClassName='overflow-x-hidden'
-      // Booharu: as tall as its rows, which are of two heights.
+      // Booharu: as tall as its rows, which are of two heights, or as the leading row and what
+      // says no family matches.
       style={{
-        height:
-          rows.length === 0
-            ? rowHeight * 2
-            : Math.min(listHeight, Math.max(rowHeight, virtualizer.getTotalSize())),
+        height: noFamilies
+          ? lead + rowHeight * 2
+          : Math.min(listHeight, Math.max(rowHeight, virtualizer.getTotalSize())),
       }}
     >
       <div className='relative' style={{ height: virtualizer.getTotalSize() }}>
@@ -334,6 +363,21 @@ function FontList({
           // Booharu: a section's heading, which the arrows skip.
           if ('heading' in row) {
             return <FontHeading key={virtualRow.key} heading={row.heading} top={virtualRow.start} />
+          }
+          // Booharu: the leading row, which stands for no family.
+          if ('none' in row) {
+            return (
+              <NoneOption
+                key={virtualRow.key}
+                id={`${id}-${virtualRow.index}`}
+                label={row.none}
+                top={virtualRow.start}
+                chosen={!value}
+                active={virtualRow.index === active}
+                onActive={() => onActive(row.key)}
+                onSelect={() => onSelect('')}
+              />
+            )
           }
           const family = row.family
           const selected = normalizeFontName(family.name) === normalizeFontName(value)
@@ -386,8 +430,13 @@ function FontList({
           )
         })}
       </div>
-      {rows.length === 0 && (
-        <Empty role='status' className='absolute inset-1 rounded-md p-2'>
+      {/* Booharu: under the leading row, when there is one. */}
+      {noFamilies && (
+        <Empty
+          role='status'
+          className='absolute inset-1 rounded-md p-2'
+          style={lead ? { top: lead } : undefined}
+        >
           <EmptyTitle className='text-[11px] text-muted-foreground'>
             {/* Booharu: how to star a font, when only the favourites show and there are none, and
                 that Favorites only hides the other fonts, when none of them is here and nothing

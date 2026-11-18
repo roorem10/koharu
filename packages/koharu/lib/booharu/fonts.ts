@@ -10,7 +10,7 @@ import { queryClient } from '@/lib/queries'
 import { commands, type FontFamily } from '@koharu/ipc/protocol'
 
 /** What Booharu adds to Koharu's font picker, each optional, so a picker given none is Koharu's;
- * useBooharuFontPicker gives them all. */
+ * useBooharuFontPicker gives all but the leading row, which a mount gives its own. */
 export type BooharuFontProps = {
   /** The favourite families, by name: those among the matches are pinned under Favorites, above
    * All fonts. */
@@ -25,6 +25,12 @@ export type BooharuFontProps = {
    * 游ゴシック for Yu Gothic: a search finds the family by any of them, and its row shows the
    * first, muted, after its name. */
   localNames?: Readonly<Record<string, readonly string[]>>
+  /** The label of a row before the families that stands for no family of the picker's own, such
+   * as a lettering category's "Same as Normal Dialogue": the arrows and Enter reach it as they
+   * reach a family, picking it gives onChange an empty name, and it shows as chosen, and on the
+   * picker's button, while the value is empty. It shows while nothing is searched, so Enter picks
+   * a search's first match. */
+  noneLabel?: string
 }
 
 /** What Koharu's font list takes of Booharu's: its props, the search line, which a star gives the
@@ -35,23 +41,30 @@ export type BooharuListProps = BooharuFontProps & {
 }
 
 /** A row of the font list: a family, starred when it's a favourite, with the first of its names in
- * other languages, or a section's heading, which the arrows skip. */
+ * other languages, a section's heading, which the arrows skip, or the leading row, labelled
+ * `none`, which stands for no family. */
 export type FontRow =
   | { key: string; family: FontFamily; starred: boolean; localName?: string }
   | { key: string; heading: 'favorites' | 'allFonts' }
+  | { key: string; none: string }
 
 /** What a pinned family's key has before its key under All fonts. */
 const PINNED = 'favorite:'
+/** The leading row's key, which no family's, a name trimmed and in lower case, can be. */
+const NONE = ' none'
 
 /** The font list's rows for `results`, the families matching the search, in name order: the
  * favourites among them pinned under Favorites, then every match under All fonts, or with
  * `favoritesOnly` the favourites alone; with no favourite among them, the matches alone, as Koharu
- * lists them. A pinned family's key is its own under All fonts with `favorite:` before it. */
+ * lists them. A pinned family's key is its own under All fonts with `favorite:` before it. Given
+ * `none`, the leading row's label, which the picker gives while nothing is searched, that row comes
+ * first. */
 export function fontRows(
   results: FontFamily[],
   favorites: readonly string[] = [],
   favoritesOnly = false,
   localNames: BooharuFontProps['localNames'] = {},
+  none?: string,
 ): FontRow[] {
   const starred = new Set(favorites.map(fontKey))
   const all = results.map((family) => {
@@ -64,9 +77,10 @@ export function fontRows(
   const favoriteRows: FontRow[] = pinned.length
     ? [{ key: 'heading:favorites', heading: 'favorites' }, ...pinned]
     : []
-  if (favoritesOnly) return favoriteRows
-  if (!pinned.length) return all
-  return [...favoriteRows, { key: 'heading:allFonts', heading: 'allFonts' }, ...all]
+  const leading: FontRow[] = none === undefined ? [] : [{ key: NONE, none }]
+  if (favoritesOnly) return [...leading, ...favoriteRows]
+  if (!pinned.length) return [...leading, ...all]
+  return [...leading, ...favoriteRows, { key: 'heading:allFonts', heading: 'allFonts' }, ...all]
 }
 
 /** The index among `rows` of the row keyed `active`, or, when that's a pinned family's row and it
