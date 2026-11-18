@@ -86,5 +86,6 @@ pub fn bindings(types: &mut Types) -> Vec<(&'static str, DataType)> {
         PIPELINE.binding(types),
         DOWNLOAD.binding(types),
         crate::booharu::events::NOTICE.binding(types), // Booharu: Booharu's notice.
+        crate::booharu::events::RUN_GROUP.binding(types), // Booharu: a run group's runs.
     ]
 }

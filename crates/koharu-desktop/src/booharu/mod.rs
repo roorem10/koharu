@@ -11,6 +11,7 @@ pub(crate) mod fonts;
 pub(crate) mod mcp;
 pub(crate) mod notes;
 pub(crate) mod ocr_box;
+pub(crate) mod runs;
 pub(crate) mod settings;
 pub(crate) mod styles;
 pub(crate) mod translation;
