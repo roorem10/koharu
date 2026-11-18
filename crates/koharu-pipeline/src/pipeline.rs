@@ -27,6 +27,9 @@ struct Shared {
     events: Events,
     commands: mpsc::UnboundedSender<Command>,
     next: AtomicU64,
+    /// Booharu: how many times every run was stopped, so a carrying-on group
+    /// can tell a Stop that came between two of its runs.
+    stops: AtomicU64,
 }
 
 impl Pipeline {
@@ -42,6 +45,7 @@ impl Pipeline {
             events,
             commands,
             next: AtomicU64::new(0),
+            stops: AtomicU64::new(0), // Booharu: no Stop yet.
         }))
     }
 
@@ -106,7 +110,16 @@ impl Pipeline {
     /// nothing more is written; a model call on the GPU finishes, but a
     /// local translation stops at its next token.
     pub fn stop(&self) {
+        self.0.stops.fetch_add(1, Ordering::Relaxed); // Booharu: counted, for a carrying-on group.
         self.send(Command::Stop);
+    }
+
+    /// Booharu: how many times `stop` was called, so a carrying-on group ends
+    /// at a Stop that came once one of its runs had ended, which stopped no
+    /// run, before it queues the next.
+    #[must_use]
+    pub fn stops(&self) -> u64 {
+        self.0.stops.load(Ordering::Relaxed)
     }
 
     /// Unloads every model once the GPU's current work ends, as ComfyUI's

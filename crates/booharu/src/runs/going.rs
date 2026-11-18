@@ -7,9 +7,10 @@
 //! one goes in the open project answers that one. The next group is queued
 //! once the run before it ends Done or DoneWithProblems, on the pages of it
 //! the project still has; a run that ends Failed or Stopped ends the group,
-//! and so does the project closing or another opening, which stops the run
-//! going. Each run is followed through `Pipeline::history`, which keeps
-//! every event, where the broadcast the interface hears can drop some.
+//! and so do a Stop that came once the run had ended, the project closing,
+//! and another opening, which stops the run going. Each run is followed
+//! through `Pipeline::history`, which keeps every event, where the broadcast
+//! the interface hears can drop some.
 //!
 //! A group's follower is spawned with its first run, on the thread that
 //! queues it, which no caller can cancel, and frees the group's place as it
@@ -62,11 +63,14 @@ static GOING: Mutex<Option<Going>> = Mutex::new(None);
 /// The number of the last group made.
 static MADE: AtomicU64 = AtomicU64::new(0);
 
-/// A group going on: its plan, with the run going now, and the project it
-/// works on.
+/// A group going on: its plan, with the run going now, the project it works
+/// on, and how many times the pipeline had stopped every run as that run was
+/// about to be queued, so a Stop since ends the group, though it came once
+/// the run had ended and stopped nothing.
 struct Going {
     plan: RunPlan,
     project: ProjectId,
+    stops: u64,
 }
 
 /// Carries on with what the pages `target` names still need in the project
@@ -134,6 +138,7 @@ fn go(
         };
         return Ok((plan, None));
     };
+    let stops = host.pipeline().stops();
     let run = host.queue(&session, first)?.context("the project closed")?;
     let plan = RunPlan {
         group,
@@ -144,6 +149,7 @@ fn go(
     *going = Some(Going {
         plan: plan.clone(),
         project,
+        stops,
     });
     // Let go first, as a follower that can't be spawned, on a runtime
     // shutting down, frees the place as it's dropped.
@@ -242,7 +248,8 @@ async fn ended(pipeline: &Pipeline, run: RunId) -> anyhow::Result<Outcome> {
 /// What follows `group`'s run of its `index`th group ending with `outcome`,
 /// in `session`'s project: its next run, queued and announced, with its
 /// group's index; `None` once the group is over, which frees its place, or
-/// went to another project's group. A run that can't be queued ends it too.
+/// went to another project's group. A Stop since the run was queued ends it
+/// as a run that stopped does, and a run that can't be queued ends it too.
 fn advance(
     host: &dyn RunHost,
     session: &Arc<Mutex<Session>>,
@@ -253,6 +260,11 @@ fn advance(
     let mut going = GOING.lock();
     let Some(ours) = going.as_mut().filter(|going| going.plan.group == group) else {
         return Ok(None);
+    };
+    let stops = host.pipeline().stops();
+    let outcome = match stops == ours.stops {
+        true => outcome,
+        false => &Outcome::Stopped,
     };
     let project = session.lock().project();
     let queued = match next_step(&ours.plan.groups, index, outcome, |page| {
@@ -266,6 +278,7 @@ fn advance(
     match queued {
         Ok(Some((at, run))) => {
             ours.plan.run = Some(run);
+            ours.stops = stops;
             host.announce(&ours.plan, at, run);
         }
         _ => *going = None,
@@ -425,6 +438,7 @@ mod tests {
         let going = Going {
             plan: plan.clone(),
             project: ours,
+            stops: 0,
         };
         assert_eq!(answer(Some(&going), ours), Some(plan));
         assert_eq!(answer(Some(&going), other), None);
@@ -619,13 +633,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_group_ends_at_a_run_failed_or_stopped_or_a_run_it_cant_queue() {
+    async fn a_group_ends_at_a_run_failed_or_stopped_a_stop_or_a_run_it_cant_queue() {
         let _placing = PLACING.lock().await;
         let (_dir, session, pages) = chapter(2);
         let host = Host::new();
         let project = session.lock().id();
-        // Places a group of two whose first run ended.
-        let place = || {
+        // Places a group of two whose first run ended, as of `stops`.
+        let place = |stops: u64| {
             let group = MADE.fetch_add(1, Ordering::Relaxed) + 1;
             *GOING.lock() = Some(Going {
                 plan: RunPlan {
@@ -634,11 +648,12 @@ mod tests {
                     run: Some(RunId(0)),
                 },
                 project,
+                stops,
             });
             group
         };
         let ends = |outcome: &Outcome| {
-            let group = place();
+            let group = place(host.pipeline.stops());
             let next = advance(&host, &session, group, 0, outcome);
             assert!(GOING.lock().is_none(), "{outcome:?}");
             next
@@ -657,10 +672,15 @@ mod tests {
         host.broken.store(true, Ordering::Relaxed);
         assert!(ends(&Outcome::Done).is_err());
         host.broken.store(false, Ordering::Relaxed);
+        // A Stop that came once the run had ended, which stopped no run.
+        let group = place(host.pipeline.stops());
+        host.pipeline.stop();
+        let next = advance(&host, &session, group, 0, &Outcome::Done).expect("the end");
+        assert!(next.is_none() && GOING.lock().is_none());
         assert!(host.queued().is_empty() && host.announced().is_empty());
         // Another group that took the place meanwhile keeps it.
-        let group = place();
-        let theirs = place();
+        let group = place(host.pipeline.stops());
+        let theirs = place(host.pipeline.stops());
         let next = advance(&host, &session, group, 0, &Outcome::Done).expect("not ours");
         assert!(next.is_none());
         assert_eq!(
