@@ -19,6 +19,8 @@ use anyhow::ensure;
 use koharu_scene::{Layer, LayerId, Op, Ref, Rgba};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
+use crate::lettering::LetteringCategory;
+
 /// The attribute namespace of every Booharu key.
 pub const NAMESPACE: &str = "booharu";
 
@@ -34,14 +36,15 @@ pub trait Attr: Serialize + DeserializeOwned {
     }
 }
 
-/// `lettering`: `{"category": string, "source": "user" | "model",
+/// `lettering`: `{"category": category id, "source": "user" | "model",
 /// "confidence"?: number}`, on a block: its lettering category, such as
 /// `"shout"`, who chose it, and how sure a model was of its choice, from 0
-/// to 1. A user's choice is never replaced by a model's.
+/// to 1. A user's choice is never replaced by a model's. An id Booharu
+/// doesn't know reads as no label, as a bad value does.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(deny_unknown_fields)]
 pub struct Lettering {
-    pub category: String,
+    pub category: LetteringCategory,
     pub source: LetteringSource,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidence: Option<f32>,
@@ -51,10 +54,8 @@ impl Attr for Lettering {
     const KEY: &'static str = "lettering";
 
     fn valid(&self) -> bool {
-        !self.category.is_empty()
-            && self
-                .confidence
-                .is_none_or(|confidence| (0.0..=1.0).contains(&confidence))
+        self.confidence
+            .is_none_or(|confidence| (0.0..=1.0).contains(&confidence))
     }
 }
 
@@ -346,7 +347,7 @@ mod tests {
     fn every_key_is_set_in_one_edit_and_cleared_in_another() {
         let (_dir, mut session, id) = project();
         let lettering = Lettering {
-            category: "shout".to_owned(),
+            category: LetteringCategory::Shout,
             source: LetteringSource::Model,
             confidence: Some(0.75),
         };
@@ -453,20 +454,22 @@ mod tests {
                 ..Attrs::default()
             }
         );
-        let ops = vec![raw(
-            NAMESPACE,
-            "lettering",
+        for value in [
             json!({"category": "shout", "source": "model", "confidence": 1.5}),
-        )];
-        session.apply(edit(ops)).expect("the attribute");
-        assert_eq!(get::<Lettering>(&layer(&session, id)), None);
+            json!({"category": "tone", "source": "user"}),
+            json!({"category": "", "source": "user"}),
+        ] {
+            let ops = vec![raw(NAMESPACE, "lettering", value.clone())];
+            session.apply(edit(ops)).expect("the attribute");
+            assert_eq!(get::<Lettering>(&layer(&session, id)), None, "{value}");
+        }
     }
 
     #[test]
     fn a_value_out_of_range_is_never_written() {
         let id = LayerId(koharu_scene::Uuid::now_v7());
         let unsure = Lettering {
-            category: "shout".to_owned(),
+            category: LetteringCategory::Shout,
             source: LetteringSource::Model,
             confidence: Some(1.5),
         };

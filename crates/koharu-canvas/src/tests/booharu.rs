@@ -272,6 +272,7 @@ fn pushed(detect_colors: bool, stroke: Option<Rgba>) -> BooharuSettings {
                     stroke_width: 2.0,
                 },
                 detect_colors,
+                ..LetteringSettings::default()
             },
             family: Some(FONT.to_owned()),
             fit: Fit::Best,

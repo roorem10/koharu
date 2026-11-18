@@ -17,7 +17,10 @@ use koharu_scene::Rgba;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned, de::Error as _};
 use serde_json::{Map, Value, map::Entry};
 
-use crate::runs::{RunPolicy, RunsSettings};
+use crate::{
+    lettering::{CategoryFont, LetteringCategory},
+    runs::{RunPolicy, RunsSettings},
+};
 
 /// `[booharu-mcp]`: the MCP server outside AI apps reach Booharu through.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -92,9 +95,10 @@ pub enum OcrBoxMode {
     ReadTranslateClean,
 }
 
-/// `[booharu-lettering]`: how new text looks. Its font isn't one of these
-/// settings: new text gets a copy of the first of Koharu's Preferred fonts,
-/// `[renderer] font_families`.
+/// `[booharu-lettering]`: how new text looks, and the font each lettering
+/// category letters its text in (the `lettering` module). The default font
+/// isn't one of these settings: new text gets a copy of the first of
+/// Koharu's Preferred fonts, `[renderer] font_families`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(default)]
 pub struct LetteringSettings {
@@ -106,6 +110,29 @@ pub struct LetteringSettings {
     /// source. When off, it gets `default`'s instead. Existing translations
     /// keep theirs either way.
     pub detect_colors: bool,
+    /// Pick fonts automatically: whether a block's translation is lettered
+    /// in its category's font, as it's written, as its category changes, and
+    /// by Apply. Off, Booharu writes no category font.
+    pub auto: bool,
+    /// The categories given their own font, by id: a category with none uses
+    /// Normal Dialogue's, and with neither the default font.
+    #[serde(deserialize_with = "crate::lettering::categories")]
+    #[specta(type = BTreeMap<LetteringCategory, CategoryFont>)]
+    pub categories: BTreeMap<LetteringCategory, CategoryFont>,
+    /// Text whose glyphs are under this share of the page's height is small
+    /// text, above 0 and at most 1: 0.012 is 24 pixels on a page 2000 high.
+    #[serde(deserialize_with = "crate::lettering::small_text_share")]
+    #[specta(type = f64)]
+    pub small_text: f64,
+    /// How sure, from 0 to 1, a model must be of a delivery category, such
+    /// as a whisper, for its label to win over small text and the balloon's
+    /// shape.
+    #[serde(
+        deserialize_with = "crate::lettering::confidence",
+        serialize_with = "crate::lettering::decimal"
+    )]
+    #[specta(type = f32)]
+    pub model_confidence: f32,
 }
 
 impl Default for LetteringSettings {
@@ -113,6 +140,10 @@ impl Default for LetteringSettings {
         Self {
             default: DefaultTextStyle::default(),
             detect_colors: true,
+            auto: false,
+            categories: BTreeMap::new(),
+            small_text: 0.012,
+            model_confidence: 0.6,
         }
     }
 }
@@ -394,7 +425,8 @@ fn saved<S: Section>(values: Map<String, Value>) -> anyhow::Result<()> {
 /// whole. A key the section doesn't have fails too, as does one a table in
 /// it doesn't have: the file would drop it, but a caller naming one made a
 /// mistake. A key the section's JSON leaves out, as `skip_serializing_if`
-/// does, counts as one it doesn't have.
+/// does, counts as one it doesn't have, unless it held the key and the value
+/// is null, which removes it, as it removes a category's font.
 fn merged<T: Serialize + DeserializeOwned>(
     mut tables: Map<String, Value>,
     name: &str,
@@ -403,6 +435,7 @@ fn merged<T: Serialize + DeserializeOwned>(
     let Some(Value::Object(table)) = tables.get_mut(name) else {
         return Err(unknown(name));
     };
+    let held = Value::Object(table.clone());
     for (key, value) in &values {
         let Some(slot) = table.get_mut(key) else {
             bail!("[{name}] has no key `{key}`");
@@ -412,7 +445,7 @@ fn merged<T: Serialize + DeserializeOwned>(
     let merged: T = serde_json::from_value(Value::Object(tables))
         .map_err(|error| anyhow!("[{name}]: {error}"))?;
     let read = self::tables(&merged).remove(name).unwrap_or(Value::Null);
-    if let Some(key) = missing(&values, &read) {
+    if let Some(key) = missing(&values, &held, &read) {
         bail!("[{name}] has no key `{key}`");
     }
     Ok(merged)
@@ -437,14 +470,17 @@ fn patch(slot: &mut Value, value: Value) {
 }
 
 /// The first key `values` names, as a dotted path through its tables, that
-/// `read` doesn't hold.
-fn missing(values: &Map<String, Value>, read: &Value) -> Option<String> {
+/// `read` doesn't hold, but for one `held` held that's set to null, which
+/// removes it.
+fn missing(values: &Map<String, Value>, held: &Value, read: &Value) -> Option<String> {
     values
         .iter()
         .find_map(|(key, value)| match (read.get(key), value) {
+            (None, Value::Null) if held.get(key).is_some() => None,
             (None, _) => Some(key.clone()),
             (Some(found), Value::Object(keys)) => {
-                missing(keys, found).map(|path| format!("{key}.{path}"))
+                let held = held.get(key).unwrap_or(&Value::Null);
+                missing(keys, held, found).map(|path| format!("{key}.{path}"))
             }
             _ => None,
         })
@@ -518,6 +554,7 @@ mod tests {
                 stroke_width: 3.0,
             },
             detect_colors: false,
+            ..LetteringSettings::default()
         };
         // TOML has no null: an unset colour is left out.
         let text = toml::to_string(&lettering).expect("a table");
@@ -582,6 +619,7 @@ mod tests {
                     stroke_width: 2.0,
                 },
                 detect_colors: false,
+                ..LetteringSettings::default()
             }
         );
         let refused = preferences.set_section(

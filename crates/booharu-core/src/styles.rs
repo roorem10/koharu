@@ -492,6 +492,7 @@ mod tests {
                 stroke_width: 2.0,
             },
             detect_colors,
+            ..LetteringSettings::default()
         }
     }
 

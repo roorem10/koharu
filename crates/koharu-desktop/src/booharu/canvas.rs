@@ -65,6 +65,7 @@ mod tests {
                 stroke_width: 4.0,
             },
             detect_colors: false,
+            ..LetteringSettings::default()
         };
         let snapshot = Snapshot {
             lettering: lettering.clone(),

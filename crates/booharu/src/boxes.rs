@@ -2320,7 +2320,7 @@ mod tests {
         page.write(found.mask.id, whole, &[255])?;
         page.write(found.cleanup.id, whole, &[1, 2, 3, 255])?;
         let lettering = Lettering {
-            category: "shout".to_owned(),
+            category: booharu_core::lettering::LetteringCategory::Shout,
             source: attrs::LetteringSource::User,
             confidence: None,
         };

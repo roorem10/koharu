@@ -220,6 +220,7 @@ mod tests {
                     stroke_width: 1.5,
                 },
                 detect_colors,
+                ..LetteringSettings::default()
             },
             font: Some("CCWildWords".to_owned()),
             runs: None,

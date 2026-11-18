@@ -1,8 +1,9 @@
 //! What Booharu's pipeline hooks and features share: its settings sections in
 //! the Booharu home's `config.toml` (`settings`), its data on scene layers
 //! (`attrs`), the default look of new text and the hand-edit record
-//! (`styles`), the shapes of balloons (`shape`), the run policy and the Run
-//! menu's presets (`runs`), and its version.
+//! (`styles`), the lettering categories and the font each letters its text
+//! in (`lettering`), the shapes of balloons (`shape`), the run policy and
+//! the Run menu's presets (`runs`), and its version.
 //!
 //! The crate sits just above the scene and the config, never above
 //! koharu-pipeline, koharu-agent, or koharu-desktop, so koharu-pipeline's
@@ -10,6 +11,7 @@
 //! needs the pipeline goes in the `booharu` crate.
 
 pub mod attrs;
+pub mod lettering;
 pub mod runs;
 pub mod settings;
 pub mod shape;

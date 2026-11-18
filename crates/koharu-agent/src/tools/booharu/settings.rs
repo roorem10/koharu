@@ -225,6 +225,10 @@ mod tests {
                 "booharu-lettering": {
                     "default": {"fill": null, "stroke": null, "stroke_width": 1.5},
                     "detect_colors": true,
+                    "auto": false,
+                    "categories": {},
+                    "small_text": 0.012,
+                    "model_confidence": 0.6,
                 },
                 "booharu-fonts": {"favorites": []},
                 "booharu-runs": {
@@ -287,7 +291,14 @@ mod tests {
             json!(saved),
             json!({
                 "section": "booharu-lettering",
-                "saved": {"default": look, "detect_colors": false},
+                "saved": {
+                    "default": look,
+                    "detect_colors": false,
+                    "auto": false,
+                    "categories": {},
+                    "small_text": 0.012,
+                    "model_confidence": 0.6,
+                },
             })
         );
         let wide = json!({"default": {"fill": null, "stroke": null, "stroke_width": 60.0}});

@@ -577,6 +577,7 @@ mod tests {
                     stroke_width: 2.5,
                 },
                 detect_colors,
+                ..LetteringSettings::default()
             },
             font: font.map(str::to_owned),
             runs: None,
