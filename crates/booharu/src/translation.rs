@@ -9,15 +9,22 @@ use anyhow::{Result, bail};
 use koharu_scene::{Content, Edit, LanguageIdentifier, LayerId, Op, Project};
 use serde_json::json;
 
-/// The undo step's label, which the History panel translates.
+/// The undo step's label for a block's first translation, which the History
+/// panel translates.
 pub const LABEL: &str = "booharu_set_translation";
+
+/// Koharu's label for a text retyped in the Story panel, `set_text` as the
+/// interface's `setText` sends it, which the History panel shows as an edited
+/// text.
+const RETYPED: &str = "set_text";
 
 /// The edit setting `block`'s translation in `project` to `text`. A block
 /// without one gets it as the Translation stage writes one it places: in
 /// the block's room in its balloon, or in its source's frame, at the page's
 /// lettering size, in `target`'s language, with the block's clean-up shown
-/// under it. One with a translation keeps its place, lettering, and
-/// language.
+/// under it, labelled [`LABEL`]. One with a translation keeps its place,
+/// lettering, and language, and the step is labelled as the Story panel
+/// labels a retyped text.
 pub fn edit(
     project: &Project,
     block: LayerId,
@@ -31,16 +38,20 @@ pub fn edit(
         layer: block.into(),
         text,
     }];
-    if found.translation.is_none() {
-        // The stage's ops for a translation it places (`written` in
-        // koharu-pipeline's stages/translate), less its c2pa record, which
-        // names the model that made the translation: someone typed this one.
-        ops.push(koharu_pipeline::placement(project, block, target)?);
-        ops.push(Op::UpdateLayer {
-            layer: block.into(),
-            patch: json!({"translation": {"language": target}, "cleanup": {"visible": true}}),
+    if found.translation.is_some() {
+        return Ok(Edit {
+            label: RETYPED.to_owned(),
+            ops,
         });
     }
+    // The stage's ops for a translation it places (`written` in
+    // koharu-pipeline's stages/translate), less its c2pa record, which names
+    // the model that made the translation: someone typed this one.
+    ops.push(koharu_pipeline::placement(project, block, target)?);
+    ops.push(Op::UpdateLayer {
+        layer: block.into(),
+        patch: json!({"translation": {"language": target}, "cleanup": {"visible": true}}),
+    });
     Ok(Edit {
         label: LABEL.to_owned(),
         ops,
@@ -120,7 +131,8 @@ mod tests {
         assert!(layer.attributes.is_empty(), "{:?}", layer.attributes);
 
         // Once it has a translation, wherever the user moved it, only the
-        // text changes, in the language it has.
+        // text changes, in the language it has, and History names the step as
+        // it names a text retyped in the Story panel.
         let moved = json!({"translation": {"frame": {"box": {"bounds": {"x": 100.0, "y": 20.0, "width": 40.0, "height": 120.0}}}}});
         session.apply(Edit {
             label: "test".to_owned(),
@@ -131,6 +143,7 @@ mod tests {
         })?;
         let retyped = edit(&session.project(), block, "Hi".to_owned(), &english)?;
         assert!(matches!(retyped.ops.as_slice(), [Op::SetText { .. }]));
+        assert_eq!(retyped.label, "set_text");
         session.apply(retyped)?;
         let typed = translation(&session, block)?;
         assert_eq!(typed.content.text(), "Hi");
