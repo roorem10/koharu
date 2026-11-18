@@ -72,8 +72,8 @@ export function ApplyStyles() {
     )
   }
 
-  /** The line saying how many boxes `counts` keeps: changed by hand, or, with those included,
-   * locked. */
+  /** The line saying how many boxes `counts` keeps: changed by hand or locked, or, with the boxes
+   * changed by hand included, locked. */
   const kept = ({ include: included, counts }: Counted) =>
     counts.kept_hand_edited > 0
       ? t(included ? 'booharu.typesetting.apply.keptLocked' : 'booharu.typesetting.apply.kept', {

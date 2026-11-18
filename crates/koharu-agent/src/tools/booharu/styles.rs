@@ -51,10 +51,11 @@ impl Tool for ApplyTextStyle {
          `include_hand_edited` is true, and always leaves locked blocks alone; blocks without \
          a translation have nothing to restyle. Answers how many blocks it `changed`, kept as \
          `kept_hand_edited` (changed by hand, or locked), and found `untranslated`: tell the \
-         user how many were kept, and that including hand-edited blocks would restyle them \
-         too. The look it gives counts as chosen by hand, so later automatic steps leave those \
-         blocks alone. booharu_count_text_style_targets answers the same numbers beforehand \
-         without changing anything."
+         user how many were kept, and that including hand-edited blocks would restyle those \
+         changed by hand too, though never the locked ones. The look it gives counts as chosen \
+         by hand, so later automatic steps leave those blocks alone. \
+         booharu_count_text_style_targets answers the same numbers beforehand without changing \
+         anything."
             .to_owned()
     }
 
