@@ -33,8 +33,8 @@ impl Tool for SetTranslation {
         "Set a block's translation to a text, as one undo step. A block without a translation \
          gets one placed first, as the Translation stage places its own in the translator's \
          target language: in the block's room in its balloon, or in its source's frame, at the \
-         page's lettering size. A block with one keeps its place and lettering. Answers what \
-         changed."
+         page's lettering size, with the block's clean-up shown under it. A block with one keeps \
+         its place, lettering, and language. Answers what changed."
             .to_owned()
     }
 
