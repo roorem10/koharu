@@ -14,7 +14,7 @@ use anyhow::{anyhow, bail};
 use koharu_config::Section;
 use koharu_scene::Rgba;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned, de::Error as _};
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, map::Entry};
 
 /// `[booharu-mcp]`: the MCP server outside AI apps reach Booharu through.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -311,11 +311,13 @@ impl BooharuPreferences {
         tables(self).remove(name).ok_or_else(|| unknown(name))
     }
 
-    /// Sets each key `values` names in the section named `name` to its whole
-    /// new value. An unknown section or key, or a bad value, fails and
-    /// changes nothing.
+    /// Sets each key `values` names in the section named `name` to its new
+    /// value, a table among them only in the keys it names, so its others,
+    /// such as `default`'s `stroke` beside a new `fill`, keep theirs. An
+    /// unknown section or key, a key inside one of its tables included, or a
+    /// bad value, fails and changes nothing.
     pub fn set_section(&mut self, name: &str, values: Map<String, Value>) -> anyhow::Result<()> {
-        *self = merged(self, name, values)?;
+        *self = merged(tables(self), name, values)?;
         Ok(())
     }
 
@@ -327,27 +329,67 @@ impl BooharuPreferences {
     }
 }
 
-/// `sections` with each key `values` names in the section `name` set to its
-/// value, read again as the file would read it, so a bad value fails. So
-/// does a key the section doesn't have: the file would ignore it, but a
-/// caller naming one made a mistake. A key the section's JSON leaves out, as
-/// `skip_serializing_if` does, counts as one it doesn't have.
+/// `tables`, sections as JSON keyed by their tables' names, with each key
+/// `values` names in the section `name` set to its value, read as `T` as the
+/// file would read it, so a bad value fails. A table among the values sets
+/// only the keys it names, so its others keep theirs; anything else is set
+/// whole. A key the section doesn't have fails too, as does one a table in
+/// it doesn't have: the file would drop it, but a caller naming one made a
+/// mistake. A key the section's JSON leaves out, as `skip_serializing_if`
+/// does, counts as one it doesn't have.
 fn merged<T: Serialize + DeserializeOwned>(
-    sections: &T,
+    mut tables: Map<String, Value>,
     name: &str,
     values: Map<String, Value>,
 ) -> anyhow::Result<T> {
-    let mut tables = tables(sections);
     let Some(Value::Object(table)) = tables.get_mut(name) else {
         return Err(unknown(name));
     };
-    for (key, value) in values {
-        let Some(slot) = table.get_mut(&key) else {
+    for (key, value) in &values {
+        let Some(slot) = table.get_mut(key) else {
             bail!("[{name}] has no key `{key}`");
         };
-        *slot = value;
+        patch(slot, value.clone());
     }
-    serde_json::from_value(Value::Object(tables)).map_err(|error| anyhow!("[{name}]: {error}"))
+    let merged: T = serde_json::from_value(Value::Object(tables))
+        .map_err(|error| anyhow!("[{name}]: {error}"))?;
+    let read = self::tables(&merged).remove(name).unwrap_or(Value::Null);
+    if let Some(key) = missing(&values, &read) {
+        bail!("[{name}] has no key `{key}`");
+    }
+    Ok(merged)
+}
+
+/// `slot` with `value` merged in: a table key by key, so a key `value`
+/// leaves out keeps its own, and anything else whole.
+fn patch(slot: &mut Value, value: Value) {
+    match (slot, value) {
+        (Value::Object(table), Value::Object(keys)) => {
+            for (key, value) in keys {
+                match table.entry(key) {
+                    Entry::Occupied(mut slot) => patch(slot.get_mut(), value),
+                    Entry::Vacant(slot) => {
+                        slot.insert(value);
+                    }
+                }
+            }
+        }
+        (slot, value) => *slot = value,
+    }
+}
+
+/// The first key `values` names, as a dotted path through its tables, that
+/// `read` doesn't hold.
+fn missing(values: &Map<String, Value>, read: &Value) -> Option<String> {
+    values
+        .iter()
+        .find_map(|(key, value)| match (read.get(key), value) {
+            (None, _) => Some(key.clone()),
+            (Some(found), Value::Object(keys)) => {
+                missing(keys, found).map(|path| format!("{key}.{path}"))
+            }
+            _ => None,
+        })
 }
 
 /// `sections` as JSON, keyed by their tables' names. A section that isn't a
@@ -505,6 +547,53 @@ mod tests {
     }
 
     #[test]
+    fn a_table_changes_only_in_the_keys_it_names() {
+        let white = Rgba([1.0; 4]);
+        let mut preferences = BooharuPreferences::default();
+        preferences.lettering.default = DefaultTextStyle {
+            fill: None,
+            stroke: Some(white),
+            stroke_width: 3.0,
+        };
+        preferences
+            .set_section(
+                "booharu-lettering",
+                values(json!({"default": {"fill": [1, 0, 0, 1]}})),
+            )
+            .expect("a fill");
+        assert_eq!(
+            preferences.lettering.default,
+            DefaultTextStyle {
+                fill: Some(Rgba([1.0, 0.0, 0.0, 1.0])),
+                stroke: Some(white),
+                stroke_width: 3.0,
+            }
+        );
+
+        // A key the table doesn't have, such as 0.0.4's name for the
+        // outline, or a misspelt one, changes nothing.
+        for (change, key) in [
+            (
+                json!({"default": {"outline": [0, 0, 0, 1]}}),
+                "default.outline",
+            ),
+            (
+                json!({"default": {"stroke": null, "stroke_widht": 1}}),
+                "default.stroke_widht",
+            ),
+        ] {
+            let error = preferences
+                .set_section("booharu-lettering", values(change.clone()))
+                .expect_err("an unknown key");
+            assert!(
+                error.to_string().contains(&format!("no key `{key}`")),
+                "{change}: {error}"
+            );
+            assert_eq!(preferences.lettering.default.stroke, Some(white));
+        }
+    }
+
+    #[test]
     fn a_snapshot_left_without_a_section_is_koharus_behaviour() {
         let lettering = LetteringSettings {
             detect_colors: false,
@@ -646,7 +735,7 @@ mod tests {
             a: pair(1, "kept"),
             b: pair(2, "also kept"),
         };
-        let changed = merged(&sections, "booharu-a", values(json!({"number": 3})));
+        let changed = merged(tables(&sections), "booharu-a", values(json!({"number": 3})));
         assert_eq!(
             changed.ok(),
             Some(Sections {

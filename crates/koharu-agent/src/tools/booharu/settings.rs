@@ -66,8 +66,10 @@ impl Tool for GetSettings {
 pub(super) struct SetSettingsArgs {
     /// The section's table name, such as `booharu-mcp`.
     section: String,
-    /// The keys to change, each to its whole new value; the section's other
-    /// keys keep theirs.
+    /// The keys to change, each to its new value. A table among them, such
+    /// as `default`, changes only in the keys it names, so `{"default":
+    /// {"fill": [1, 0, 0, 1]}}` keeps the outline; the section's other keys
+    /// keep theirs too.
     values: Map<String, Value>,
 }
 
@@ -91,7 +93,8 @@ impl Tool for SetSettings {
 
     fn description(&self) -> String {
         "Change keys of one of Booharu's settings sections, named as booharu_get_settings names \
-         them, and save it; an unknown section or key, or an invalid value, saves nothing. \
+         them, and save it; an unknown section or key, a key inside one of its tables \
+         included, or an invalid value, saves nothing. \
          Answers the section as saved, with a note when the change applies only once Booharu \
          restarts. A change to `booharu-lettering` applies to text made from then on, never to \
          translations already made: booharu_apply_text_style gives those the new look. A call \
@@ -269,6 +272,16 @@ mod tests {
             .await;
         assert!(refused.is_err());
         assert_eq!(settings.0.lock().lettering.default.stroke_width, 4.0);
+        // A table changes only in the keys named.
+        let outline = json!({"default": {"stroke": [1.0, 1.0, 1.0, 1.0]}});
+        let saved = SetSettings
+            .call(&mut tools.tool_context(), set("booharu-lettering", outline))
+            .await
+            .expect("an outline");
+        assert_eq!(
+            json!(saved)["saved"]["default"],
+            json!({"fill": [1.0, 0.0, 0.0, 1.0], "stroke": [1.0, 1.0, 1.0, 1.0], "stroke_width": 4.0})
+        );
 
         let favourites = set("booharu-fonts", json!({"favorites": ["Anime Ace"]}));
         let saved = SetSettings
