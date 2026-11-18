@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { retryRuns } from '@/lib/booharu/jobs'
 import { receiveRuns, useKoharuStore } from '@/lib/store'
 
 import { done, every, openChapter, pageFailed, queued, tell } from './jobs'
@@ -93,5 +94,26 @@ describe('Booharu’s record of a run', () => {
         ],
       },
     })
+  })
+
+  it('retries each failed page from its failed stage through the run’s later stages', () => {
+    openChapter('Chapter 1')
+    tell(
+      queued(1, ['detect', 'recognize', 'translate']),
+      pageFailed(1, { page: 'p3', stage: 'recognize', reason: 'the model failed' }),
+      pageFailed(1, { page: 'p4', stage: 'translate', reason: timedOut }),
+      pageFailed(1, { page: 'p1', stage: 'recognize', reason: 'the model failed' }),
+      pageFailed(1, { page: 'p9', stage: 'detect', reason: 'the page was removed' }),
+      queued(2, ['translate'], false),
+      pageFailed(2, { page: 'p1', stage: 'translate', reason: timedOut }),
+    )
+
+    // One run per failed stage, in page order; the page the project no longer has is left out.
+    expect(retryRuns(job(1)!, ['p1', 'p2', 'p3', 'p4'])).toEqual([
+      { stages: ['recognize', 'translate'], pages: ['p1', 'p3'] },
+      { stages: ['translate'], pages: ['p4'] },
+    ])
+    // A run on blocks or an area offers nothing again.
+    expect(retryRuns(job(2)!, ['p1'])).toEqual([])
   })
 })

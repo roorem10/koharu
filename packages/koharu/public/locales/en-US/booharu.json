@@ -86,9 +86,11 @@
         "title": "Run behavior"
       },
       "description": "Retry failures, choose the run order, and save stage presets.",
+      "failedPages": "Failed pages",
       "fewerRetries": "Fewer retries",
       "finishSound": "Play a finish sound",
       "finishSoundDescription": "Chimes when a run over pages ends, with a lower tone when it had problems.",
+      "finishedWithProblems": "Finished with problems",
       "loadError": "Could not load run settings.",
       "loading": "Loading run settings…",
       "moreRetries": "More retries",
@@ -124,6 +126,8 @@
       },
       "retries": "Retries per failed stage",
       "retriesDescription": "Wait 2, 5, then 10 seconds between retries (0–5 retries).",
+      "retryFailedPages": "Retry failed pages",
+      "retrying": "Retrying ({{attempt}}/{{attempts}})",
       "title": "Runs"
     },
     "tools": {

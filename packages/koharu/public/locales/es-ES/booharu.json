@@ -89,9 +89,11 @@
         "title": "Comportamiento de las ejecuciones"
       },
       "description": "Reintenta los fallos, elige el orden de ejecución y guarda preajustes de etapas.",
+      "failedPages": "Páginas con errores",
       "fewerRetries": "Menos reintentos",
       "finishSound": "Reproducir un sonido al terminar",
       "finishSoundDescription": "Suena cuando termina una ejecución sobre páginas, con un tono más grave si hubo problemas.",
+      "finishedWithProblems": "Finalizado con problemas",
       "loadError": "No se han podido cargar los ajustes de ejecución.",
       "loading": "Cargando ajustes de ejecución…",
       "moreRetries": "Más reintentos",
@@ -127,6 +129,8 @@
       },
       "retries": "Reintentos por etapa fallida",
       "retriesDescription": "Espera 2, 5 y luego 10 segundos entre reintentos (0–5 reintentos).",
+      "retryFailedPages": "Reintentar páginas con errores",
+      "retrying": "Reintentando ({{attempt}}/{{attempts}})",
       "title": "Ejecuciones"
     },
     "tools": {

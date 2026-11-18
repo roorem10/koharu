@@ -86,9 +86,11 @@
         "title": "실행 방식"
       },
       "description": "실패한 작업을 다시 시도하고 실행 순서를 선택하며 단계 프리셋을 저장합니다.",
+      "failedPages": "실패한 페이지",
       "fewerRetries": "재시도 횟수 줄이기",
       "finishSound": "완료 소리 재생",
       "finishSoundDescription": "페이지를 처리하는 실행이 끝나면 소리로 알리고, 문제가 있었으면 더 낮은 음으로 알립니다.",
+      "finishedWithProblems": "문제가 있는 상태로 완료됨",
       "loadError": "실행 설정을 불러오지 못했습니다.",
       "loading": "실행 설정 불러오는 중…",
       "moreRetries": "재시도 횟수 늘리기",
@@ -124,6 +126,8 @@
       },
       "retries": "실패한 단계별 재시도 횟수",
       "retriesDescription": "재시도 사이에 2초, 5초, 그다음 10초를 기다립니다 (재시도 0–5회).",
+      "retryFailedPages": "실패한 페이지 다시 시도",
+      "retrying": "다시 시도 중 ({{attempt}}/{{attempts}})",
       "title": "실행"
     },
     "tools": {

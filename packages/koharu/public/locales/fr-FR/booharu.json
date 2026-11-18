@@ -89,9 +89,11 @@
         "title": "Comportement des exécutions"
       },
       "description": "Réessayez les traitements en échec, choisissez l’ordre d’exécution et enregistrez des préréglages d’étapes.",
+      "failedPages": "Pages en échec",
       "fewerRetries": "Moins de tentatives",
       "finishSound": "Jouer un son à la fin",
       "finishSoundDescription": "Retentit à la fin d’une exécution sur des pages, avec un ton plus grave en cas de problème.",
+      "finishedWithProblems": "Terminé avec des problèmes",
       "loadError": "Impossible de charger les paramètres d’exécution.",
       "loading": "Chargement des paramètres d’exécution…",
       "moreRetries": "Plus de tentatives",
@@ -127,6 +129,8 @@
       },
       "retries": "Nouvelles tentatives par étape en échec",
       "retriesDescription": "Attendre 2, 5, puis 10 secondes entre les tentatives (0–5 nouvelles tentatives).",
+      "retryFailedPages": "Réessayer les pages en échec",
+      "retrying": "Nouvelle tentative ({{attempt}}/{{attempts}})",
       "title": "Exécutions"
     },
     "tools": {

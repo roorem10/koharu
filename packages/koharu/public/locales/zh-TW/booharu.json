@@ -86,9 +86,11 @@
         "title": "執行方式"
       },
       "description": "重試失敗的作業、選擇處理順序並儲存階段預設。",
+      "failedPages": "失敗的頁面",
       "fewerRetries": "減少重試次數",
       "finishSound": "完成時播放提示音",
       "finishSoundDescription": "處理頁面的作業結束時播放提示音，有問題時音調較低。",
+      "finishedWithProblems": "已完成，但有問題",
       "loadError": "無法載入作業設定。",
       "loading": "正在載入作業設定…",
       "moreRetries": "增加重試次數",
@@ -124,6 +126,8 @@
       },
       "retries": "每個失敗階段的重試次數",
       "retriesDescription": "重試間隔依序為 2、5、10 秒（可重試 0–5 次）。",
+      "retryFailedPages": "重試失敗的頁面",
+      "retrying": "正在重試（{{attempt}}/{{attempts}}）",
       "title": "處理作業"
     },
     "tools": {

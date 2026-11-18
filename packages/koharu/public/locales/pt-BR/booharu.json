@@ -89,9 +89,11 @@
         "title": "Comportamento das execuções"
       },
       "description": "Repita as tarefas com falha, escolha a ordem de execução e salve predefinições de etapas.",
+      "failedPages": "Páginas com falha",
       "fewerRetries": "Menos tentativas",
       "finishSound": "Reproduzir som ao concluir",
       "finishSoundDescription": "Toca quando uma execução em páginas termina, com um tom mais grave se houve problemas.",
+      "finishedWithProblems": "Concluído com problemas",
       "loadError": "Não foi possível carregar as configurações de execução.",
       "loading": "Carregando configurações de execução…",
       "moreRetries": "Mais tentativas",
@@ -127,6 +129,8 @@
       },
       "retries": "Tentativas por etapa com falha",
       "retriesDescription": "Aguarda 2, 5 e depois 10 segundos entre tentativas (0–5 tentativas).",
+      "retryFailedPages": "Tentar novamente as páginas com falha",
+      "retrying": "Tentando novamente ({{attempt}}/{{attempts}})",
       "title": "Execuções"
     },
     "tools": {

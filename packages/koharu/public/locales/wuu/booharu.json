@@ -86,9 +86,11 @@
         "title": "运行方式"
       },
       "description": "重试失败个操作、选择运行顺序，再保存处理阶段预设。",
+      "failedPages": "失败个页面",
       "fewerRetries": "重试少几趟",
       "finishSound": "完成辰光放提示音",
       "finishSoundDescription": "处理页面个运行结束个辰光会响一记，有问题个辰光音调低一眼。",
+      "finishedWithProblems": "完成哉，不过有问题",
       "loadError": "运行设置加载失败哉。",
       "loading": "来勒加载运行设置…",
       "moreRetries": "重试多几趟",
@@ -124,6 +126,8 @@
       },
       "retries": "每个失败阶段个重试次数",
       "retriesDescription": "重试之间先等 2 秒，再等 5 秒，后首每趟等 10 秒（重试 0–5 趟）。",
+      "retryFailedPages": "重试失败个页面",
+      "retrying": "来勒重试（{{attempt}}/{{attempts}}）",
       "title": "运行"
     },
     "tools": {

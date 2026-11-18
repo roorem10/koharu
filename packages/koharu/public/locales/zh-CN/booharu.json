@@ -86,9 +86,11 @@
         "title": "运行方式"
       },
       "description": "重试失败的任务、选择处理顺序并保存阶段预设。",
+      "failedPages": "失败的页面",
       "fewerRetries": "减少重试次数",
       "finishSound": "完成时播放提示音",
       "finishSoundDescription": "处理页面的任务结束时播放提示音，出现问题时音调更低。",
+      "finishedWithProblems": "已完成，但存在问题",
       "loadError": "无法加载任务设置。",
       "loading": "正在加载任务设置…",
       "moreRetries": "增加重试次数",
@@ -124,6 +126,8 @@
       },
       "retries": "每个失败阶段的重试次数",
       "retriesDescription": "重试间隔依次为 2、5、10 秒（可重试 0–5 次）。",
+      "retryFailedPages": "重试失败的页面",
+      "retrying": "正在重试（{{attempt}}/{{attempts}}）",
       "title": "处理任务"
     },
     "tools": {

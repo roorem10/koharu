@@ -86,9 +86,11 @@
         "title": "実行時の動作"
       },
       "description": "失敗した処理の再試行、実行順序の選択、工程のプリセット保存を行います。",
+      "failedPages": "失敗したページ",
       "fewerRetries": "再試行回数を減らす",
       "finishSound": "完了音を鳴らす",
       "finishSoundDescription": "ページを処理する実行が終わると音で知らせます。問題があった場合は低い音になります。",
+      "finishedWithProblems": "問題ありで完了",
       "loadError": "実行設定を読み込めませんでした。",
       "loading": "実行設定を読み込み中…",
       "moreRetries": "再試行回数を増やす",
@@ -124,6 +126,8 @@
       },
       "retries": "失敗した工程ごとの再試行回数",
       "retriesDescription": "再試行の間に2秒、5秒、10秒の順で待機します（再試行回数：0–5回）。",
+      "retryFailedPages": "失敗したページを再試行",
+      "retrying": "再試行中（{{attempt}}/{{attempts}}）",
       "title": "実行"
     },
     "tools": {

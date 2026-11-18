@@ -4,7 +4,9 @@ import { useMutationState } from '@tanstack/react-query'
 import { CircleAlert, Download, LoaderCircle, Square, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { FailedPages, RetryingNote } from '@/components/booharu/runs/FailedPages' // Booharu: failed pages.
 import { call } from '@/lib/backend'
+import { listsFailedPages, useVisibleJobs } from '@/lib/booharu/jobs' // Booharu: runs it lists.
 import { usePages } from '@/lib/queries'
 import { useKoharuStore, type Job } from '@/lib/store'
 import { commands, type Transfer } from '@koharu/ipc/protocol'
@@ -23,9 +25,8 @@ export function ActivityCenter() {
   }).filter(
     (activity): activity is { id: number; label: string } => typeof activity.label === 'string',
   )
-  const visibleJobs = Object.values(jobs).filter(
-    (job) => job.state === 'running' || job.state === 'failed',
-  )
+  // Booharu: a run done with problems shows too, and each run only in the project it was queued in.
+  const visibleJobs = useVisibleJobs(jobs)
   const runningDownloads = Object.values(downloads).filter(
     (download) => download.state === 'Running',
   )
@@ -109,6 +110,8 @@ function JobItem({ job }: { job: Job }) {
   const pageIndex = job.page ? (pages?.findIndex((page) => page.id === job.page) ?? -1) : -1
   const pageLabel =
     pageIndex >= 0 ? t('navigator.pageNumber', { number: pageIndex + 1 }) : undefined
+  // Booharu: a run with failed pages lists them, to show or retry, in place of its row.
+  if (listsFailedPages(job)) return <FailedPages job={job} />
   if (job.state === 'failed') {
     return (
       <Failure
@@ -147,6 +150,8 @@ function JobItem({ job }: { job: Job }) {
             {pageLabel}
           </p>
         ) : null}
+        {/* Booharu: Retrying (2/3) while one of its pages waits for its next try. */}
+        <RetryingNote job={job} />
         <div className='col-start-2 col-end-4'>
           <Progress value={percent} />
         </div>
