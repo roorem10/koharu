@@ -20,8 +20,10 @@ use crate::{app::App, events};
 
 /// Carries out `effect` off the window's thread, since looking for ink in the
 /// page's scan takes longer than applying an edit, so the page shows the new
-/// block once the session tells its change. What went wrong goes to the
-/// interface as Booharu's notice, a failure to the log as well.
+/// block once the session tells its change; the scan is decoded without the
+/// session's lock, so the window's own edits don't wait on it either. What
+/// went wrong goes to the interface as Booharu's notice, a failure to the log
+/// as well.
 pub(crate) fn carry(app: &Arc<App>, effect: Effect) {
     let Effect::Box {
         page,
@@ -58,7 +60,11 @@ fn add(app: &Arc<App>, page: PageId, rect: Rect, modifiers: BoxModifiers) -> Res
         width: rect.width(),
         height: rect.height(),
     };
-    let change = super::applied(app, |session| boxes::add_box(session, page, rect, mode))?;
+    let session = app.session()?;
+    let scan = boxes::read_scan(|| session.lock(), page)?;
+    let change = super::applied(app, |session| {
+        boxes::add_box(session, page, rect, mode, scan.as_ref())
+    })?;
     let block = boxes::added_box(&change)?;
     app.screen.select(Arc::clone(app), vec![block]);
     app.emit(events::SELECTION, vec![block]);

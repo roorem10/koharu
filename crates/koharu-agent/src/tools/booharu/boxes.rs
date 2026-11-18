@@ -3,6 +3,8 @@
 //! blocks and joining them, and a block split in two, each edit built by
 //! `booharu::boxes`, which the app's commands share, as one undo step.
 
+use std::sync::Arc;
+
 use booharu::boxes::{self, SplitBalloon};
 use booharu_core::settings::OcrBoxMode;
 use koharu_pipeline::RunId;
@@ -73,8 +75,16 @@ impl Tool for AddTextBox {
     ) -> Result<AddedTextBox, Self::Error> {
         let tools = project(context)?;
         let AddTextBoxArgs { page, rect, mode } = args;
+        // Decoded without the session's lock, so the app's edits don't wait
+        // on a big page's scan.
+        let reading = Arc::clone(&tools);
+        let scan =
+            tokio::task::spawn_blocking(move || boxes::read_scan(|| reading.session.lock(), page))
+                .await
+                .map_err(failed)?
+                .map_err(|error| failed(format!("{error:#}")))?;
         let change = apply(&tools, move |session| {
-            boxes::add_box(session, page, rect, mode)
+            boxes::add_box(session, page, rect, mode, scan.as_ref())
         })
         .await?;
         let block = boxes::added_box(&change).map_err(failed)?;

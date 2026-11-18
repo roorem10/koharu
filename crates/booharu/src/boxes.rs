@@ -9,18 +9,21 @@
 //! [`Refusal::Locked`] and no edit, naming the locked layer, where the scene
 //! would fail the edit naming only an op.
 
-use std::collections::{BTreeSet, HashSet};
+use std::{
+    collections::{BTreeSet, HashSet},
+    ops::Deref,
+};
 
 use anyhow::{Context as _, Result, bail, ensure};
 use booharu_core::{
     attrs::{self, Attr, Auto, Flags, Lettering, QcOk, ReadNote, ReviewNote},
     settings::OcrBoxMode,
 };
-use image::{Rgb, RgbImage};
+use image::{DynamicImage, Rgb, RgbImage};
 use koharu_pipeline::{RunId, Stage};
 use koharu_scene::{
-    Block, Bounds, Change, Content, Created, Direction, Edit, Frame, Layer, LayerId, Op, Page,
-    PageId, PixelFormat, Project, Rect, Ref, Role, Session, Tile, Transform,
+    Block, Bounds, Change, Content, Created, Direction, Edit, Frame, Hash, Layer, LayerId, Op,
+    Page, PageId, PixelFormat, Project, Rect, Ref, Role, Session, Tile, Transform,
 };
 use kurbo::{Affine, BezPath, PathEl, Point, Shape as _};
 use serde::{Deserialize, Serialize};
@@ -97,10 +100,41 @@ pub fn split_stages() -> BTreeSet<Stage> {
     BTreeSet::from([Stage::Recognize, Stage::Translate])
 }
 
+/// A page's scan, decoded, which [`add_box`] reads a box against.
+pub struct Scan {
+    /// The file it was decoded from, which the page may have changed since.
+    file: Hash,
+    image: DynamicImage,
+}
+
+/// `page`'s scan, decoded, which [`add_box`] reads a box against; `None`
+/// when the page has none. `lock` locks the session only while the scan's
+/// bytes are read, as the pipeline's stages read a scan: decoding a big page
+/// takes a while, which the session's other users shouldn't wait on.
+pub fn read_scan<S: Deref<Target = Session>>(
+    lock: impl FnOnce() -> S,
+    page: PageId,
+) -> Result<Option<Scan>> {
+    let read = {
+        let session = lock();
+        match session.project().page(page)?.background {
+            Some(background) => Some((background.file, session.file(&background.file)?)),
+            None => None,
+        }
+    };
+    read.map(|(file, bytes)| {
+        Ok(Scan {
+            file,
+            image: image::load_from_memory(&bytes)?,
+        })
+    })
+    .transpose()
+}
+
 /// The edit adding the block a box drawn over `rect` of `page`, in page
 /// pixels, makes, labelled [`ADD_BOX`]; [`added_box`] finds the block in the
-/// edit's change. It decodes the page's scan, so the caller holds the
-/// session's lock that long.
+/// edit's change. `scan` is the page's, as [`read_scan`] decodes it; one the
+/// page has changed since fails the box.
 ///
 /// The box is cut to the page. It is refused as [`Refusal::NothingToRead`]
 /// when the Recognition stage would find no ink there. The block is a text
@@ -111,7 +145,13 @@ pub fn split_stages() -> BTreeSet<Stage> {
 /// panel holding its centre, else on the page, where it is read in order
 /// among what is there. Only `ReadTranslateClean` gives it a mask, the whole
 /// box: the other modes leave it empty, so reading never erases the art.
-pub fn add_box(session: &Session, page: PageId, rect: Bounds, mode: OcrBoxMode) -> Result<Edit> {
+pub fn add_box(
+    session: &Session,
+    page: PageId,
+    rect: Bounds,
+    mode: OcrBoxMode,
+    scan: Option<&Scan>,
+) -> Result<Edit> {
     let project = session.project();
     let found = project.page(page)?;
     ensure!(
@@ -131,7 +171,7 @@ pub fn add_box(session: &Session, page: PageId, rect: Bounds, mode: OcrBoxMode) 
     let rect = kurbo::Rect::from(rect).intersect(size);
     ensure!(rect.area() > 0.0, "the box lies outside the page");
     let masked = mode == OcrBoxMode::ReadTranslateClean;
-    if unreadable(session, &project, found, rect, masked)? {
+    if unreadable(session, &project, found, rect, masked, scan)? {
         return Err(Refusal::NothingToRead.into());
     }
     let parent = holder(&project, page, rect)?;
@@ -1053,22 +1093,28 @@ fn first_text(layer: &Layer) -> Option<kurbo::Rect> {
 /// `page`: the scan there, cropped as the stage crops a block's source frame,
 /// with the glyphs of the page's blocks blanked as it blanks another block's
 /// unless the new block's own mask, the whole box when `masked`, holds them,
-/// is [`blank`]. A page without a scan has nothing to read.
+/// is [`blank`]. A page without a scan has nothing to read, and `scan`, the
+/// page's as [`read_scan`] decoded it, fails the box once the page's scan
+/// has changed.
 fn unreadable(
     session: &Session,
     project: &Project,
     page: &Page,
     rect: kurbo::Rect,
     masked: bool,
+    scan: Option<&Scan>,
 ) -> Result<bool> {
     let Some(background) = page.background else {
         return Ok(true);
     };
-    let scan = image::load_from_memory(&session.file(&background.file)?)?;
-    let Some(cut) = Rect::covering(rect, scan.width(), scan.height()) else {
+    let scan = scan
+        .filter(|scan| scan.file == background.file)
+        .context("the page's scan changed while the box was being read; draw it again")?;
+    let Some(cut) = Rect::covering(rect, scan.image.width(), scan.image.height()) else {
         return Ok(true);
     };
     let mut crop = scan
+        .image
         .crop_imm(cut.x as u32, cut.y as u32, cut.width, cut.height)
         .to_rgb8();
     if !masked {
@@ -1207,7 +1253,7 @@ fn created(change: &Change, label: &str) -> Result<LayerId> {
 mod tests {
     use booharu_core::attrs::Flag;
     use image::ImageFormat;
-    use koharu_scene::{Hash, Text};
+    use koharu_scene::Text;
     use serde_json::Value;
 
     use super::*;
@@ -1344,11 +1390,18 @@ mod tests {
             self.session.history().steps
         }
 
+        fn scan(&self) -> Result<Option<Scan>> {
+            read_scan(|| &self.session, self.page)
+        }
+
+        /// The [`add_box`] edit of a box, read against the page's scan.
+        fn box_edit(&self, rect: Bounds, mode: OcrBoxMode) -> Result<Edit> {
+            add_box(&self.session, self.page, rect, mode, self.scan()?.as_ref())
+        }
+
         /// Adds the box an [`add_box`] edit adds, answering its block.
         fn add_box(&mut self, rect: Bounds, mode: OcrBoxMode) -> Result<LayerId> {
-            let change = self
-                .session
-                .apply(add_box(&self.session, self.page, rect, mode)?)?;
+            let change = self.session.apply(self.box_edit(rect, mode)?)?;
             added_box(&change)
         }
     }
@@ -1521,19 +1574,9 @@ mod tests {
         let squat = page.add_box(page_bounds(60.0, 10.0, 40.0, 45.0), OcrBoxMode::Read)?;
         assert_eq!(page.block(squat)?.source.direction, Direction::Horizontal);
 
-        let outside = add_box(
-            &page.session,
-            page.page,
-            page_bounds(300.0, 0.0, 10.0, 10.0),
-            OcrBoxMode::Read,
-        );
+        let outside = page.box_edit(page_bounds(300.0, 0.0, 10.0, 10.0), OcrBoxMode::Read);
         assert!(outside.is_err_and(|error| error.to_string().contains("outside the page")));
-        let flat = add_box(
-            &page.session,
-            page.page,
-            page_bounds(10.0, 10.0, 0.0, 10.0),
-            OcrBoxMode::Read,
-        );
+        let flat = page.box_edit(page_bounds(10.0, 10.0, 0.0, 10.0), OcrBoxMode::Read);
         assert!(flat.is_err());
         Ok(())
     }
@@ -1541,15 +1584,13 @@ mod tests {
     #[test]
     fn a_box_with_nothing_to_read_adds_nothing() -> Result<()> {
         let mut page = Fixture::new(200, 200, &[rect(10.0, 10.0, 50.0, 50.0)])?;
-        let blank = add_box(
-            &page.session,
-            page.page,
+        let blank = page.box_edit(
             page_bounds(100.0, 100.0, 50.0, 50.0),
             OcrBoxMode::ReadTranslate,
         );
         assert_eq!(refusal(blank), Some(Refusal::NothingToRead));
         let inked = page_bounds(10.0, 10.0, 50.0, 50.0);
-        assert!(add_box(&page.session, page.page, inked, OcrBoxMode::Read).is_ok());
+        assert!(page.box_edit(inked, OcrBoxMode::Read).is_ok());
 
         // Lettering another block's mask holds is left out of the reading,
         // as the Recognition stage leaves it out, unless the box's own mask,
@@ -1557,15 +1598,26 @@ mod tests {
         let other = page.add(None, text_block(inked, Direction::Horizontal, "あ"))?;
         let mask = page.block(other)?.mask.id;
         page.write(mask, pixel_rect(10, 10, 50, 50), &[255])?;
-        let covered = add_box(&page.session, page.page, inked, OcrBoxMode::ReadTranslate);
+        let covered = page.box_edit(inked, OcrBoxMode::ReadTranslate);
         assert_eq!(refusal(covered), Some(Refusal::NothingToRead));
-        let cleaned = add_box(
-            &page.session,
-            page.page,
-            inked,
-            OcrBoxMode::ReadTranslateClean,
-        );
+        let cleaned = page.box_edit(inked, OcrBoxMode::ReadTranslateClean);
         assert!(cleaned.is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn a_box_read_against_a_scan_the_page_changed_since_fails() -> Result<()> {
+        let page = Fixture::new(100, 100, &[rect(10.0, 10.0, 50.0, 50.0)])?;
+        let inked = page_bounds(10.0, 10.0, 50.0, 50.0);
+        let scan = page.scan()?.context("the page's scan")?;
+        let read = |scan| add_box(&page.session, page.page, inked, OcrBoxMode::Read, scan);
+        assert!(read(Some(&scan)).is_ok());
+        let other = Scan {
+            file: Hash::of(b"another scan"),
+            image: scan.image.clone(),
+        };
+        assert!(read(Some(&other)).is_err_and(|error| error.to_string().contains("scan changed")));
+        assert!(read(None).is_err_and(|error| error.to_string().contains("scan changed")));
         Ok(())
     }
 
