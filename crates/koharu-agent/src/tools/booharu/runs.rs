@@ -62,7 +62,13 @@ impl Tool for Run {
          so tell the user which pages they are and why instead of calling again. A call while \
          a group goes on answers that group and queues nothing. With `stages` fewer than every \
          stage, it runs those stages on every page `target` names, as Koharu's Run button does, \
-         as a plan of one group. Needs a project open, as every tool here does."
+         as a plan of one group. On a chapter with a linked series, suggested terms, or a brief, \
+         a plan that would detect or read text and translate it translates last, so the run \
+         sends only the glossary terms the chapter uses: every group without translation \
+         first, then one group of translation alone, on the pages that still need it once the \
+         others went (with fewer stages, on every page named), leaving out any page a run of \
+         the group gave up on; a page's stages are then those of every group it's in. Needs a \
+         project open, as every tool here does."
             .to_owned()
     }
 

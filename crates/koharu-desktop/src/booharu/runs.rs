@@ -2,7 +2,9 @@
 //! stages are on, queues the work the pages still need, as
 //! `booharu::runs` plans it, one group of pages after another, each as an
 //! ordinary run of Koharu's that follows the run policy; with fewer stages,
-//! one ordinary run of them, as Koharu's Run button queues it.
+//! one ordinary run of them, as Koharu's Run button queues it. On a chapter
+//! with a linked series, suggested terms, or a brief, a press that would find
+//! text and translate translates last, its Translation run its last group.
 //!
 //! `booharu::runs::carry_on` plans and follows the groups, for this command
 //! and the agent's `booharu_run` tool alike, and reaches the app as its
@@ -29,8 +31,11 @@ use crate::{
 /// `booharu_run_group`, and answers the plan with its first run; with
 /// nothing left to do, no run and no groups. With fewer stages, one ordinary
 /// run of them on every page `target` names, as Koharu's Run button queues
-/// it, as a plan of one group. While a group goes on in the open project,
-/// answers that one, with its run going now, and queues nothing.
+/// it, as a plan of one group. On a chapter with notes, a plan that would
+/// find text and translate translates last: every group without Translation
+/// first, then one Translation run, leaving out the pages a run gave up on.
+/// While a group goes on in the open project, answers that one, with its run
+/// going now, and queues nothing.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_run(

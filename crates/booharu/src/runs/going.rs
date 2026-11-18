@@ -17,8 +17,19 @@
 //! goes, however it goes: a caller that went away meanwhile, as an agent's
 //! tool call does when its chat is stopped, can't leave a group in place
 //! that no one follows, which every later call would answer.
+//!
+//! A press on a chapter with notes whose plan would find text and translate
+//! translates last, as the module above sets out: its plan's last group is
+//! the Translation run, queued like the others once the run before it ended,
+//! on the pages of it that, carrying on, still need translation then, or,
+//! with fewer stages, on each, as Koharu translates every page a run names.
+//! A page a run of the press gave up on is left out of every later group,
+//! the Translation run's included, and with no page left, the press ends.
+//! Each run is announced with its place among the plan's groups, the
+//! Translation run's last, so the interface chimes once for the press.
 
 use std::{
+    collections::BTreeSet,
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
@@ -27,12 +38,15 @@ use std::{
 };
 
 use anyhow::Context as _;
+use booharu_core::context::SeriesStore;
 use koharu_pipeline::{Event, Outcome, Pipeline, Request, RunId, Stage, Target};
 use koharu_scene::{PageId, ProjectId, Session};
 use parking_lot::{Mutex, MutexGuard};
 use tokio::{runtime::Handle, task::JoinHandle};
 
-use super::{PlanGroup, RunPlan, RunTarget, all_stages, groups};
+use super::{
+    PlanGroup, RunPlan, RunTarget, all_stages, groups, has_notes, to_translate, translate_last,
+};
 
 /// The app as a group's runs reach it. The desktop app queues a run only on
 /// the project open and tells the interface each run; a host outside it,
@@ -71,6 +85,13 @@ struct Going {
     plan: RunPlan,
     project: ProjectId,
     stops: u64,
+    /// Whether its last group is the Translation run of a press carrying on
+    /// that translates last, which takes only the pages of it that still
+    /// need translation once the groups before it went.
+    narrows: bool,
+    /// The pages its runs gave up on so far, which its later groups leave
+    /// out.
+    failed: BTreeSet<PageId>,
 }
 
 /// Carries on with what the pages `target` names still need in the project
@@ -79,9 +100,10 @@ struct Going {
 /// another, each announced through `host`, and answers the plan with its
 /// first run; with nothing left to do, no run and no groups. With fewer
 /// stages, one ordinary run of them on every page `target` names, as
-/// Koharu's Run button queues it, as a plan of one group. While a group goes
-/// on in the project, answers that one, with its run going now, and queues
-/// nothing.
+/// Koharu's Run button queues it, as a plan of one group. On a chapter with
+/// notes, a plan that would find text and translate translates last, its
+/// Translation run its last group. While a group goes on in the project,
+/// answers that one, with its run going now, and queues nothing.
 pub async fn carry_on(
     host: Arc<dyn RunHost>,
     session: Arc<Mutex<Session>>,
@@ -89,19 +111,22 @@ pub async fn carry_on(
     stages: Vec<Stage>,
 ) -> anyhow::Result<RunPlan> {
     let runtime = Handle::current();
-    let (plan, _following) =
-        tokio::task::spawn_blocking(move || start(host, session, &target, &stages, &runtime))
-            .await??;
+    let (plan, _following) = tokio::task::spawn_blocking(move || {
+        start(host, session, &target, &stages, SeriesStore::open, &runtime)
+    })
+    .await??;
     Ok(plan)
 }
 
 /// `carry_on`'s work, on a thread no caller can cancel: the plan, and the
 /// follower of the first run it queued, already spawned on `runtime`.
+/// `store` opens the series folder, when the chapter links a series.
 fn start(
     host: Arc<dyn RunHost>,
     session: Arc<Mutex<Session>>,
     target: &RunTarget,
     stages: &[Stage],
+    store: impl FnOnce() -> anyhow::Result<SeriesStore>,
     runtime: &Handle,
 ) -> anyhow::Result<(RunPlan, Option<JoinHandle<()>>)> {
     let project = session.lock().id();
@@ -110,22 +135,51 @@ fn start(
         return Ok((plan, None));
     }
     let groups = groups(&session.lock(), target, stages)?;
+    let (groups, narrows) = translating(&session, groups, stages, store)?;
     let first = groups
         .first()
         .map(|first| request(first_target(target, stages, first), &first.stages));
-    go(going, host, session, project, groups, first, runtime)
+    go(going, host, session, groups, narrows, first, runtime)
 }
 
-/// Starts a group of `groups` in `project` from `first`, its first group's
-/// run, in the place `going` holds: queues the run, announces it, and spawns
-/// its follower on `runtime` once the place is let go, which the follower
-/// then holds. With no run, a plan of none, which takes no place.
+/// `groups`, the plan of a press on the project `session` holds with
+/// `stages`, as it goes: translating last, when one would find text and
+/// translate on a chapter with notes, as planned otherwise; with whether its
+/// Translation run, carrying on, takes only the pages that still need it
+/// then. With fewer stages it translates every page of its group, as
+/// Koharu translates each page a run names. `store` opens the series
+/// folder, when the chapter links a series.
+fn translating(
+    session: &Mutex<Session>,
+    groups: Vec<PlanGroup>,
+    stages: &[Stage],
+    store: impl FnOnce() -> anyhow::Result<SeriesStore>,
+) -> anyhow::Result<(Vec<PlanGroup>, bool)> {
+    let (path, project) = {
+        let session = session.lock();
+        (session.path().to_owned(), session.project())
+    };
+    let Some(split) = translate_last(&project, &groups) else {
+        return Ok((groups, false));
+    };
+    Ok(match has_notes(&path, store)? {
+        true => (split, all_stages(stages)),
+        false => (groups, false),
+    })
+}
+
+/// Starts a group of `groups` in the project `session` holds from `first`,
+/// its first group's run, in the place `going` holds: queues the run,
+/// announces it, and spawns its follower on `runtime` once the place is let
+/// go, which the follower then holds. With no run, a plan of none, which
+/// takes no place. `narrows` tells whether its last group takes only the
+/// pages that still need translation then.
 fn go(
     mut going: MutexGuard<'_, Option<Going>>,
     host: Arc<dyn RunHost>,
     session: Arc<Mutex<Session>>,
-    project: ProjectId,
     groups: Vec<PlanGroup>,
+    narrows: bool,
     first: Option<Request>,
     runtime: &Handle,
 ) -> anyhow::Result<(RunPlan, Option<JoinHandle<()>>)> {
@@ -138,7 +192,7 @@ fn go(
         };
         return Ok((plan, None));
     };
-    let stops = host.pipeline().stops();
+    let (project, stops) = (session.lock().id(), host.pipeline().stops());
     let run = host.queue(&session, first)?.context("the project closed")?;
     let plan = RunPlan {
         group,
@@ -150,6 +204,8 @@ fn go(
         plan: plan.clone(),
         project,
         stops,
+        narrows,
+        failed: BTreeSet::new(),
     });
     // Let go first, as a follower that can't be spawned, on a runtime
     // shutting down, frees the place as it's dropped.
@@ -249,9 +305,11 @@ async fn ended(pipeline: &Pipeline, run: RunId) -> anyhow::Result<Outcome> {
 
 /// What follows `group`'s run of its `index`th group ending with `outcome`,
 /// in `session`'s project: its next run, queued and announced, with its
-/// group's index; `None` once the group is over, which frees its place, or
-/// went to another project's group. A Stop since the run was queued ends it
-/// as a run that stopped does, and a run that can't be queued ends it too.
+/// group's index, on the pages of it the project still has and no run of
+/// the group gave up on; `None` once the group is over, which frees its
+/// place, or went to another project's group. A Stop since the run was
+/// queued ends it as a run that stopped does, and a run that can't be queued
+/// ends it too.
 fn advance(
     host: &dyn RunHost,
     session: &Arc<Mutex<Session>>,
@@ -268,15 +326,20 @@ fn advance(
         true => outcome,
         false => &Outcome::Stopped,
     };
+    if let Outcome::DoneWithProblems { failures } = outcome {
+        ours.failed
+            .extend(failures.iter().map(|failure| failure.page));
+    }
     let project = session.lock().project();
-    let queued = match next_step(&ours.plan.groups, index, outcome, |page| {
-        project.page(page).is_ok()
-    }) {
+    let step = next_step(&ours.plan.groups, index, outcome, |page| {
+        project.page(page).is_ok() && !ours.failed.contains(&page)
+    });
+    let queued = narrowed(step, ours, session).and_then(|step| match step {
         Step::Queue(at, next) => host
             .queue(session, request(Target::Pages(next.pages), &next.stages))
             .map(|run| run.map(|run| (at, run))),
         Step::End => Ok(None),
-    };
+    });
     match queued {
         Ok(Some((at, run))) => {
             ours.plan.run = Some(run);
@@ -286,6 +349,29 @@ fn advance(
         _ => *going = None,
     }
     queued
+}
+
+/// `step`, the next of the press `going`, as it takes it: when it's the
+/// Translation run a press carrying on translates last with, only on the
+/// pages of it that still need translation now, and with none left the
+/// press ends; any other step as it is.
+fn narrowed(step: Step, going: &Going, session: &Mutex<Session>) -> anyhow::Result<Step> {
+    match step {
+        Step::Queue(at, next) if going.narrows && at + 1 == going.plan.groups.len() => {
+            let pages = to_translate(&session.lock(), &next.pages)?;
+            Ok(match pages.is_empty() {
+                true => Step::End,
+                false => Step::Queue(
+                    at,
+                    PlanGroup {
+                        stages: next.stages,
+                        pages,
+                    },
+                ),
+            })
+        }
+        step => Ok(step),
+    }
 }
 
 /// Frees `group`'s place, unless another group took it.
@@ -348,6 +434,7 @@ fn next_step(
 mod tests {
     use std::sync::atomic::AtomicBool;
 
+    use booharu_core::context::{ChapterContext, GlossaryEntry};
     use koharu_pipeline::{PageFailure, PipelineConfig};
     use koharu_scene::{Edit, Uuid};
     use serde_json::json;
@@ -441,6 +528,8 @@ mod tests {
             plan: plan.clone(),
             project: ours,
             stops: 0,
+            narrows: false,
+            failed: BTreeSet::new(),
         };
         assert_eq!(answer(Some(&going), ours), Some(plan));
         assert_eq!(answer(Some(&going), other), None);
@@ -505,12 +594,45 @@ mod tests {
         }
     }
 
+    /// A group of `stage` alone on `pages`.
+    fn alone(stage: Stage, pages: &[PageId]) -> PlanGroup {
+        PlanGroup {
+            stages: vec![stage],
+            pages: pages.to_vec(),
+        }
+    }
+
+    /// A group of translation on `pages`, which ends without a model on
+    /// pages without text.
+    fn translation(pages: &[PageId]) -> PlanGroup {
+        alone(Stage::Translate, pages)
+    }
+
+    /// The series folder of a chapter that links no series, which it never
+    /// opens.
+    fn unlinked() -> anyhow::Result<SeriesStore> {
+        anyhow::bail!("the chapter links no series")
+    }
+
+    /// Gives the chapter `session` holds a suggested term, which its
+    /// translation runs send.
+    fn noted(session: &Mutex<Session>) {
+        let path = session.lock().path().to_owned();
+        ChapterContext::update(&path, |context| {
+            context
+                .suggestions
+                .push(GlossaryEntry::new("先生", "Sensei"));
+        })
+        .expect("the side file");
+    }
+
     /// The app as the tests' groups reach it, on a pipeline of its own: the
-    /// targets it queued and, for each run it announced, its group and its
-    /// group's index, in order.
+    /// targets it queued and their stages, and, for each run it announced,
+    /// its group and its group's index, in order.
     struct Host {
         pipeline: Pipeline,
         queued: Mutex<Vec<Target>>,
+        asked: Mutex<Vec<Vec<Stage>>>,
         announced: Mutex<Vec<(u64, usize)>>,
         /// Whether `queue` finds the project closed, or fails.
         closed: AtomicBool,
@@ -529,6 +651,7 @@ mod tests {
             Self {
                 pipeline: Pipeline::new(PipelineConfig::default()),
                 queued: Mutex::default(),
+                asked: Mutex::default(),
                 announced: Mutex::default(),
                 closed: AtomicBool::new(false),
                 broken: AtomicBool::new(false),
@@ -538,6 +661,10 @@ mod tests {
 
         fn queued(&self) -> Vec<Target> {
             self.queued.lock().clone()
+        }
+
+        fn asked(&self) -> Vec<Vec<Stage>> {
+            self.asked.lock().clone()
         }
 
         fn announced(&self) -> Vec<(u64, usize)> {
@@ -566,6 +693,8 @@ mod tests {
                 return Ok(None);
             }
             self.queued.lock().push(request.target.clone());
+            let stages = request.stages.iter().copied().collect();
+            self.asked.lock().push(stages);
             Ok(Some(self.pipeline.run(Arc::clone(session), request)?))
         }
 
@@ -591,7 +720,6 @@ mod tests {
         let _placing = PLACING.lock().await;
         let (_dir, session, pages) = chapter(2);
         let host = Arc::new(Host::new());
-        let project = session.lock().id();
         let groups = vec![detection(&pages[..1]), detection(&pages[1..])];
         let first = request(Target::Pages(vec![pages[0]]), &[Stage::Detect]);
         let held: Arc<dyn RunHost> = host.clone();
@@ -600,8 +728,8 @@ mod tests {
             GOING.lock(),
             held,
             Arc::clone(&session),
-            project,
             groups,
+            false,
             Some(first),
             &runtime,
         )
@@ -614,6 +742,7 @@ mod tests {
             Arc::clone(&session),
             &RunTarget::Project {},
             &every_stage(),
+            unlinked,
             &runtime,
         )
         .expect("the plan");
@@ -651,6 +780,8 @@ mod tests {
                 },
                 project,
                 stops,
+                narrows: false,
+                failed: BTreeSet::new(),
             });
             group
         };
@@ -732,5 +863,173 @@ mod tests {
         .await
         .expect("a plan");
         assert!(plan.run.is_none() && plan.groups.is_empty(), "{plan:?}");
+    }
+
+    #[test]
+    fn a_chapter_with_notes_translates_last_and_one_without_runs_as_planned() {
+        let (_dir, session, pages) = chapter(2);
+        let carrying_on = vec![PlanGroup {
+            stages: EVERY.to_vec(),
+            pages: pages.clone(),
+        }];
+        let reading = [Stage::Recognize, Stage::Translate];
+        let preset = vec![PlanGroup {
+            stages: reading.to_vec(),
+            pages: pages.clone(),
+        }];
+        let plans = |stages: &[Stage], groups: &[PlanGroup]| {
+            translating(&session, groups.to_vec(), stages, unlinked).expect("the plan")
+        };
+        assert_eq!(plans(&EVERY, &carrying_on), (carrying_on.clone(), false));
+        assert_eq!(plans(&reading, &preset), (preset.clone(), false));
+        noted(&session);
+        // Carrying on, its Translation run takes only the pages that still
+        // need it then; with fewer stages, every page it names.
+        let read = PlanGroup {
+            stages: EVERY[..3].to_vec(),
+            pages: pages.clone(),
+        };
+        assert_eq!(
+            plans(&EVERY, &carrying_on),
+            (vec![read, translation(&pages)], true)
+        );
+        assert_eq!(
+            plans(&reading, &preset),
+            (
+                vec![alone(Stage::Recognize, &pages), translation(&pages)],
+                false
+            )
+        );
+        // A plan that finds no text it translates runs as planned.
+        let translating_alone = vec![translation(&pages)];
+        assert_eq!(
+            plans(&[Stage::Translate], &translating_alone),
+            (translating_alone, false)
+        );
+    }
+
+    #[test]
+    fn carrying_on_the_translation_run_takes_the_pages_that_still_need_it() {
+        let (_dir, session, pages) = chapter(3);
+        // A text to translate on the second page alone.
+        let op = json!({"op": "add_layer", "page": pages[1], "index": 0, "layer": {
+            "kind": "block",
+            "source": {"frame": {"box": {"bounds": {"x": 10, "y": 10, "width": 40, "height": 40}}},
+                "content": "先生!"},
+        }});
+        session
+            .lock()
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops: vec![serde_json::from_value(op).expect("an op")],
+            })
+            .expect("the block");
+        let going = |narrows| Going {
+            plan: RunPlan {
+                group: 0,
+                groups: vec![detection(&pages), translation(&pages)],
+                run: None,
+            },
+            project: session.lock().id(),
+            stops: 0,
+            narrows,
+            failed: BTreeSet::new(),
+        };
+        let last = |pages: &[PageId]| Step::Queue(1, translation(pages));
+        assert_eq!(
+            narrowed(last(&pages), &going(true), &session).expect("the step"),
+            last(&pages[1..2])
+        );
+        // With fewer stages, every page it names, as Koharu translates them,
+        // and a group before the last as it is.
+        assert_eq!(
+            narrowed(last(&pages), &going(false), &session).expect("the step"),
+            last(&pages)
+        );
+        let first = || Step::Queue(0, detection(&pages));
+        assert_eq!(
+            narrowed(first(), &going(true), &session).expect("the step"),
+            first()
+        );
+        // With no page left that needs translation, the press ends.
+        let none = last(&[pages[0], pages[2]]);
+        assert_eq!(
+            narrowed(none, &going(true), &session).expect("the step"),
+            Step::End
+        );
+    }
+
+    #[tokio::test]
+    async fn a_press_on_a_chapter_with_notes_translates_last_and_chimes_once() {
+        let _placing = PLACING.lock().await;
+        let (_dir, session, pages) = chapter(2);
+        noted(&session);
+        let host = Arc::new(Host::new());
+        let held: Arc<dyn RunHost> = host.clone();
+        let reading = [Stage::Recognize, Stage::Translate];
+        let (plan, following) = start(
+            held,
+            Arc::clone(&session),
+            &RunTarget::Project {},
+            &reading,
+            unlinked,
+            &Handle::current(),
+        )
+        .expect("the plan");
+        assert_eq!(
+            plan.groups,
+            [alone(Stage::Recognize, &pages), translation(&pages)]
+        );
+        following
+            .expect("a follower")
+            .await
+            .expect("followed to the end");
+        assert_eq!(
+            host.asked(),
+            [vec![Stage::Recognize], vec![Stage::Translate]]
+        );
+        assert_eq!(host.queued(), [Target::Project, Target::Pages(pages)]);
+        // Each run with its place among the press's groups, the Translation
+        // run's last, so the interface chimes once, as that run ends.
+        assert_eq!(host.announced(), [(plan.group, 0), (plan.group, 1)]);
+        assert_eq!(plan.groups.len(), 2);
+        assert!(GOING.lock().is_none());
+    }
+
+    #[tokio::test]
+    async fn a_press_translating_last_leaves_out_the_pages_a_run_gave_up_on() {
+        let _placing = PLACING.lock().await;
+        let (_dir, session, pages) = chapter(3);
+        let host = Host::new();
+        let group = MADE.fetch_add(1, Ordering::Relaxed) + 1;
+        *GOING.lock() = Some(Going {
+            plan: RunPlan {
+                group,
+                groups: vec![detection(&pages), translation(&pages)],
+                run: Some(RunId(0)),
+            },
+            project: session.lock().id(),
+            stops: host.pipeline.stops(),
+            narrows: false,
+            failed: BTreeSet::new(),
+        });
+        let problems = Outcome::DoneWithProblems {
+            failures: vec![PageFailure {
+                page: pages[1],
+                stage: Stage::Detect,
+                reason: "the model didn't answer".to_owned(),
+            }],
+        };
+        let (at, run) = advance(&host, &session, group, 0, &problems)
+            .expect("the next run")
+            .expect("queued");
+        assert_eq!(at, 1);
+        assert_eq!(host.queued(), [Target::Pages(vec![pages[0], pages[2]])]);
+        assert_eq!(host.asked(), [vec![Stage::Translate]]);
+        assert_eq!(host.announced(), [(group, 1)]);
+        let outcome = ended(&host.pipeline, run).await.expect("the run's end");
+        assert!(matches!(outcome, Outcome::Done), "{outcome:?}");
+        let next = advance(&host, &session, group, 1, &outcome).expect("the end");
+        assert!(next.is_none() && GOING.lock().is_none());
     }
 }
