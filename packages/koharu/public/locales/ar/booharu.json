@@ -55,9 +55,6 @@
     "stageCount_two": "مرحلتان ({{count}})",
     "stageCount_zero": "لا مراحل ({{count}})"
   },
-  "menu": {
-    "about": "عن البرنامج"
-  },
   "settings": {
     "pipeline": {
       "translator": {

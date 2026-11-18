@@ -11,7 +11,9 @@ import wuu from '@/public/locales/wuu/booharu.json'
 import zhCN from '@/public/locales/zh-CN/booharu.json'
 import zhTW from '@/public/locales/zh-TW/booharu.json'
 
-/** Booharu's interface strings per language, in public/locales/<lng>/booharu.json. Koharu's
+/** Booharu's interface strings per language, in public/locales/<lng>/booharu.json: its own under
+ * `booharu` and `history.steps.booharu_*`, and an override of a Koharu string at Koharu's path
+ * where the language's text must differ, such as to say Booharu or to add a plural form. Koharu's
  * translation.json files stay as upstream ships them; these are merged over them, so a Booharu
  * value wins where both name a key. */
 export const booharuStrings: Record<string, object> = {

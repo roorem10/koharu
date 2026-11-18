@@ -47,9 +47,6 @@
     "stageCount_few": "Этапов: {{count}}",
     "stageCount_many": "Этапов: {{count}}"
   },
-  "menu": {
-    "about": "О программе"
-  },
   "settings": {
     "pipeline": {
       "translator": {

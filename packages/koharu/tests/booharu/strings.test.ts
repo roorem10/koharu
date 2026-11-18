@@ -22,6 +22,11 @@ function koharuStrings(language: string): object {
 
 const pluralForm = /_(zero|one|two|few|many|other)$/
 
+/** Whether `key` is one of Booharu's own strings, which every language has, rather than an override
+ * of one of Koharu's at Koharu's path. */
+const isBooharuKey = (key: string) =>
+  key.startsWith('booharu.') || key.startsWith('history.steps.booharu_')
+
 describe('Booharu strings overlay', () => {
   it('merges objects key by key, lets Booharu values win, and changes neither input', () => {
     const koharu = { menu: { about: 'About', help: 'Help' }, title: 'Koharu' }
@@ -47,20 +52,43 @@ describe('Booharu strings overlay', () => {
     }
   })
 
-  it("gives every language English's Booharu keys, apart from the plural forms it needs", () => {
+  it("gives every language each of Booharu's own keys, apart from the plural forms it needs", () => {
     const english = new Set(strings(resources['en-US'].translation).map(([key]) => key))
     const isPluralForm = (key: string) =>
       pluralForm.test(key) && english.has(key.replace(pluralForm, '_other'))
-    const expected = strings(booharuStrings['en-US']).map(([key]) => key)
+    const booharuKeys = (language: string) =>
+      strings(booharuStrings[language] ?? {})
+        .map(([key]) => key)
+        .filter(isBooharuKey)
+    const expected = booharuKeys('en-US')
 
     for (const language of supportedLanguages) {
-      const own = strings(booharuStrings[language] ?? {}).map(([key]) => key)
+      const own = booharuKeys(language)
       expect(
         expected.filter((key) => !own.includes(key)),
         language,
       ).toEqual([])
       expect(
         own.filter((key) => !expected.includes(key) && !isPluralForm(key)),
+        language,
+      ).toEqual([])
+    }
+  })
+
+  it('overrides only Koharu strings, or plural forms they lack, and copies none', () => {
+    // An override left behind when Koharu renames its key, or one that copies Koharu's text, would
+    // hide Koharu's next wording without anything failing.
+    for (const language of supportedLanguages) {
+      const koharu = new Map(strings(koharuStrings(language)))
+      const isPluralFill = (key: string) =>
+        pluralForm.test(key) && koharu.has(key.replace(pluralForm, '_other'))
+      expect(
+        strings(booharuStrings[language] ?? {})
+          .filter(([key]) => !isBooharuKey(key))
+          .filter(([key, value]) =>
+            koharu.has(key) ? koharu.get(key) === value : !isPluralFill(key),
+          )
+          .map(([key]) => key),
         language,
       ).toEqual([])
     }

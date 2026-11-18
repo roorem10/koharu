@@ -43,9 +43,6 @@
     "selectedCount_many": "{{count}} pages sélectionnées",
     "stageCount_many": "{{count}} étapes"
   },
-  "menu": {
-    "about": "À propos"
-  },
   "settings": {
     "pipeline": {
       "translator": {

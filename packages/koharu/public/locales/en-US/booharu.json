@@ -33,9 +33,6 @@
       "booharu_set_translation": "Add translation"
     }
   },
-  "menu": {
-    "about": "About"
-  },
   "settings": {
     "pipeline": {
       "translator": {

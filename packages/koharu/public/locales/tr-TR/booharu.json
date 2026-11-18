@@ -33,9 +33,6 @@
       "booharu_set_translation": "Çeviri ekle"
     }
   },
-  "menu": {
-    "about": "Hakkında"
-  },
   "settings": {
     "pipeline": {
       "translator": {

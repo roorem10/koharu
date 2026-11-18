@@ -33,9 +33,6 @@
       "booharu_set_translation": "加译文"
     }
   },
-  "menu": {
-    "about": "关于"
-  },
   "settings": {
     "pipeline": {
       "translator": {
