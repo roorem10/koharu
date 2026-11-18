@@ -2,6 +2,7 @@
 
 import { call } from '@/lib/backend'
 import { openBoxDetails } from '@/lib/booharu/boxDetails'
+import { letteringKey, readLettering } from '@/lib/booharu/boxLettering'
 import {
   findLayer,
   findPart,
@@ -11,6 +12,7 @@ import {
   type BlockLayer,
   type TextLayer,
 } from '@/lib/document'
+import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import {
   commands,
@@ -138,6 +140,13 @@ function splitting(selection: BoxSelection): BlockLayer | null {
   return framed && free ? layer : null
 }
 
+/** The selection's one block whose category can change, or none: it isn't locked, as the scene
+ * refuses a label on a locked block. A text layer has no category. */
+function categorized(selection: BoxSelection): BlockLayer | null {
+  const box = only(selection)
+  return box && !box.locked && isBlockLayer(box.layer) ? box.layer : null
+}
+
 /** After a join, as Story after a delete: a joined text that went, or its selected part, leaves the
  * selection, and the text it joined into takes its place. `joins` are each join's texts in reading
  * order, the first kept. */
@@ -196,6 +205,21 @@ export const boxActions: readonly BoxAction[] = [
     run: async (selection) => {
       const block = splitting(selection)
       if (block) await call(commands.booharuSplitBlock, block.id)
+    },
+  },
+  {
+    id: 'category',
+    label: 'booharu.lettering.change',
+    enabled: (selection) => categorized(selection) !== null,
+    run: async (selection) => {
+      const block = categorized(selection)
+      if (!block) return
+      // Read first, so Box details opens with the section's picker there to take the focus.
+      await queryClient.prefetchQuery({
+        queryKey: letteringKey(selection.page),
+        queryFn: () => readLettering(selection.page),
+      })
+      openBoxDetails(selection.page, block.id, 'lettering')
     },
   },
   {

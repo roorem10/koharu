@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { LetteringSection } from '@/components/booharu/lettering/LetteringSection'
 import { call } from '@/lib/backend'
 import { reviewNote } from '@/lib/booharu/attrs'
 import { boxActions, runBoxAction, type Box } from '@/lib/booharu/boxActions'
@@ -18,16 +19,25 @@ export interface BoxDetailsProps {
   box: Box
 }
 
-/** One part of Box details: its heading, an interface string's key, and what it shows of the text. */
+/** One part of Box details: its heading, an interface string's key, what it shows of the text, and
+ * for which texts, every one when left out. */
 export interface BoxDetailsSection {
   id: string
   title: string
   Section: ComponentType<BoxDetailsProps>
+  shows?: (box: Box) => boolean
 }
 
 /** Box details' sections, in the order it shows them. A later one goes in as one more entry. */
 export const boxDetailsSections: readonly BoxDetailsSection[] = [
   { id: 'source', title: 'booharu.details.sections.source', Section: SourceSection },
+  {
+    id: 'lettering',
+    title: 'booharu.details.sections.lettering',
+    Section: LetteringSection,
+    // A text layer has no category: the T tool's text keeps its own font.
+    shows: ({ layer }) => isBlockLayer(layer),
+  },
   { id: 'note', title: 'booharu.details.sections.note', Section: NoteSection },
   { id: 'actions', title: 'booharu.details.sections.actions', Section: ActionsSection },
 ]
@@ -127,14 +137,15 @@ function NoteSection({ box: { layer, locked } }: BoxDetailsProps) {
   )
 }
 
-/** The text's box actions, as its menus list them, Box details itself left out. */
+/** The text's box actions, as its menus list them, those that open Box details left out: Box
+ * details itself, and Change category, whose section is here. */
 function ActionsSection({ page, box }: BoxDetailsProps) {
   const { t } = useTranslation()
   const selection = { page, boxes: [box] }
   return (
     <div className='flex flex-wrap gap-1.5'>
       {boxActions
-        .filter(({ id }) => id !== 'details')
+        .filter(({ id }) => id !== 'details' && id !== 'category')
         .map((action) => (
           <Button
             key={action.id}

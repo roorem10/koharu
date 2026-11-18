@@ -95,6 +95,7 @@ export function desktop() {
       run: 2,
     }),
     note: vi.spyOn(commands, 'booharuSetReviewNote').mockResolvedValue(change),
+    lettering: vi.spyOn(commands, 'booharuGetLettering').mockResolvedValue([]),
     findSplit: vi
       .spyOn(commands, 'booharuFindSplitBalloons')
       .mockResolvedValue([{ page: 'page', balloon: 'split', blocks: ['first', 'second'] }]),

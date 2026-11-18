@@ -45,6 +45,7 @@ const boxItems = [
   'Clean again',
   'Join with balloon',
   'Split',
+  'Change category…',
   'Box details',
   'Join split texts on this page',
 ]
@@ -65,6 +66,7 @@ describe('Booharu box actions in the menus', () => {
       ['Clean again', true],
       ['Join with balloon', true],
       ['Split', true],
+      ['Change category…', true],
       ['Box details', true],
       ['Delete', true],
     ])
@@ -75,8 +77,8 @@ describe('Booharu box actions in the menus', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Join with balloon' }))
     await waitFor(() => expect(join).toHaveBeenCalledWith('second'))
 
-    // A text layer has nothing to read, translate, clean, join or split; a locked block takes
-    // nothing either.
+    // A text layer has nothing to read, translate, clean, join or split, and no category; a locked
+    // block takes nothing either.
     await openRow(user, 'Caption')
     expect((await items()).filter(([, on]) => on).map(([name]) => name)).toEqual([
       'Box details',

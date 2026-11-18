@@ -1,8 +1,16 @@
 'use client'
 
-import { useTranslation } from 'react-i18next'
+import type { ReactNode } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 
-import { categoryName, letteringCategories } from '@/lib/booharu/categories'
+import { choiceName, letteringChoices, type LetteringChoice } from '@/lib/booharu/boxLettering'
+import {
+  categoryName,
+  letteringCategories,
+  letteringCategoriesSection,
+} from '@/lib/booharu/categories'
+import { useBooharuPreferences } from '@/lib/booharu/preferences'
+import { openSettingsSection } from '@/lib/booharu/settingsLink'
 import type { LetteringCategory } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
 import {
@@ -15,6 +23,7 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from '@koharu/ui/components/combobox'
+import { cn } from '@koharu/ui/lib/utils'
 
 /** A searchable picker of the lettering categories, named `label`: a button naming the chosen one,
  * `value`, which opens the list of every category in Settings' order under a search line, as the
@@ -33,7 +42,6 @@ export function CategoryPicker({
   onChange: (category: LetteringCategory) => void
 }) {
   const { t } = useTranslation()
-  const search = t('booharu.lettering.search')
 
   return (
     <Combobox
@@ -55,22 +63,108 @@ export function CategoryPicker({
           <ComboboxValue />
         </span>
       </ComboboxTrigger>
-      <ComboboxContent>
-        <ComboboxInput
-          showTrigger={false}
-          aria-label={search}
-          placeholder={search}
-          className='text-[11px]'
-        />
-        <ComboboxEmpty>{t('booharu.lettering.noMatch')}</ComboboxEmpty>
-        <ComboboxList>
-          {(category: LetteringCategory) => (
-            <ComboboxItem key={category} value={category} className='text-[12px]'>
-              {t(categoryName(category))}
-            </ComboboxItem>
-          )}
-        </ComboboxList>
-      </ComboboxContent>
+      <CategoryOptions />
     </Combobox>
+  )
+}
+
+/** A block's category picker, opened by `children`, its `ComboboxTrigger`, which names the
+ * category the block is lettered in: Automatic and every category under a search line, which
+ * filters and moves through them as CategoryPicker's does, `value` marked as chosen, with `footer`
+ * under the list. A pick calls `onChange`, even of the choice already made: Automatic clears the
+ * agent's label, and while Pick fonts automatically is on, a category picked again gives the block
+ * its font as Settings has it now. `readOnly`, as for a locked block, it opens to be read and takes
+ * no pick. */
+export function BlockCategoryPicker({
+  value,
+  readOnly,
+  onChange,
+  footer,
+  className,
+  children,
+}: {
+  value: LetteringChoice
+  readOnly?: boolean
+  onChange: (choice: LetteringChoice) => void
+  footer?: ReactNode
+  /** The list's own classes, such as a width wider than a small trigger. */
+  className?: string
+  children: ReactNode
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <Combobox
+      items={letteringChoices}
+      value={value}
+      itemToStringLabel={(choice: LetteringChoice) => t(choiceName(choice))}
+      autoHighlight
+      readOnly={readOnly}
+      onValueChange={(choice) => {
+        if (choice) onChange(choice)
+      }}
+    >
+      {children}
+      <CategoryOptions footer={footer} className={className} />
+    </Combobox>
+  )
+}
+
+/** A category picker's list: its search line, then each choice by its name, or a line saying
+ * nothing matches, and `footer` under them. */
+function CategoryOptions({ footer, className }: { footer?: ReactNode; className?: string }) {
+  const { t } = useTranslation()
+  const search = t('booharu.lettering.search')
+
+  return (
+    <ComboboxContent className={className}>
+      <ComboboxInput
+        showTrigger={false}
+        aria-label={search}
+        placeholder={search}
+        className='text-[11px]'
+      />
+      <ComboboxEmpty>{t('booharu.lettering.noMatch')}</ComboboxEmpty>
+      <ComboboxList>
+        {(choice: LetteringChoice) => (
+          <ComboboxItem key={choice} value={choice} className='text-[12px]'>
+            {t(choiceName(choice))}
+          </ComboboxItem>
+        )}
+      </ComboboxList>
+      {footer}
+    </ComboboxContent>
+  )
+}
+
+/** The classes of a line under a block's category picker's list, such as AutoFontsOff's. */
+export const pickerFooter = 'border-t border-border/60 px-2.5 py-2'
+
+/** What a block's category picker says while Pick fonts automatically, `[booharu-lettering]`
+ * `auto`, is off, as it reads the settings each time it shows: that fonts follow categories only
+ * with it on, with a link to the switch in Settings > Typesetting. Nothing while it's on, or still
+ * being read. */
+export function AutoFontsOff({ className }: { className?: string }) {
+  const { t, i18n } = useTranslation()
+  const auto = useBooharuPreferences().data?.['booharu-lettering'].auto
+  if (auto !== false) return null
+  return (
+    <p className={cn('text-[10px] leading-4 text-muted-foreground', className)}>
+      <Trans
+        t={t}
+        i18n={i18n}
+        i18nKey='booharu.lettering.autoOff'
+        values={{ setting: t('booharu.lettering.auto'), tab: t('settings.tabs.typesetting') }}
+        components={{
+          a: (
+            <button
+              type='button'
+              className='text-primary underline underline-offset-2 hover:text-foreground'
+              onClick={() => openSettingsSection('typesetting', letteringCategoriesSection)}
+            />
+          ),
+        }}
+      />
+    </p>
   )
 }

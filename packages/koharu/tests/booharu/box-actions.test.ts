@@ -29,6 +29,7 @@ const none = {
   clean: false,
   join: false,
   split: false,
+  category: false,
   details: false,
 }
 const runs = { read: true, translate: true, clean: true }
@@ -49,12 +50,19 @@ describe('Booharu box actions', () => {
 
   it('enables each action only for a selection it can act on', () => {
     // A text block in a balloon with another: all of them.
-    expect(enabled(['first'])).toEqual({ ...runs, join: true, split: true, details: true })
+    expect(enabled(['first'])).toEqual({
+      ...runs,
+      join: true,
+      split: true,
+      category: true,
+      details: true,
+    })
     // Its part stands for it.
     expect(enabled(['second-mask'])).toEqual(enabled(['second']))
     // Several blocks: the runs only.
     expect(enabled(['first', 'free'])).toEqual({ ...none, ...runs })
-    // A text layer: Box details only, and a text layer beside a block leaves the runs to it.
+    // A text layer: Box details only, as it has no category, and a text layer beside a block leaves
+    // the runs to it.
     expect(enabled(['caption'])).toEqual({ ...none, details: true })
     expect(enabled(['caption', 'free'])).toEqual({ ...none, ...runs })
     // A locked block, or one in a locked balloon, or a locked one among others: no change at all.
@@ -62,10 +70,11 @@ describe('Booharu box actions', () => {
     expect(enabled(['held-first'])).toEqual({ ...none, details: true })
     expect(enabled(['free', 'locked'])).toEqual(none)
     // A balloon with one text block, or a block in none, has nothing to join with.
-    expect(enabled(['alone'])).toEqual({ ...runs, join: false, split: true, details: true })
-    expect(enabled(['free'])).toEqual({ ...runs, join: false, split: true, details: true })
+    const alone = { ...runs, join: false, split: true, category: true, details: true }
+    expect(enabled(['alone'])).toEqual(alone)
+    expect(enabled(['free'])).toEqual(alone)
     // A sound effect isn't joined with a balloon's text, but it is split, as the desktop splits it.
-    expect(enabled(['bang'])).toEqual({ ...runs, join: false, split: true, details: true })
+    expect(enabled(['bang'])).toEqual(alone)
     expect(enabled([])).toEqual(none)
   })
 
@@ -89,7 +98,7 @@ describe('Booharu box actions', () => {
   })
 
   it('runs each one with its command, on the blocks alone', async () => {
-    const { run: pipeline, join, split } = desktop()
+    const { run: pipeline, join, split, lettering } = desktop()
 
     await run('read', ['first', 'caption', 'free-cleanup'])
     await run('translate', ['second'])
@@ -111,5 +120,14 @@ describe('Booharu box actions', () => {
 
     await run('details', ['caption'])
     expect(useBoxDetails.getState().shown).toEqual({ page: 'page', layer: 'caption' })
+
+    // Change category reads the page's lettering, then opens Box details on its section.
+    await run('category', ['second-mask'])
+    expect(lettering).toHaveBeenCalledWith('page')
+    expect(useBoxDetails.getState().shown).toEqual({
+      page: 'page',
+      layer: 'second',
+      section: 'lettering',
+    })
   })
 })

@@ -17,12 +17,27 @@ import {
   DialogTitle,
 } from '@koharu/ui/components/dialog'
 
-/** Box details: one text's sections, from `boxDetailsSections`, opened from a Story row's ? tag and
- * menu and from the Edit menu. It follows the text through every change, reading its page as Story
- * does, and closes when the text goes, as a join can take it, and with the project. */
+/** What takes the focus as Box details opens in `popup` on `section`: the section's first control,
+ * else the section; with no section, or one it doesn't show, the dialog's first control, as
+ * without. */
+function sectionFocus(popup: HTMLElement | null, section: string | undefined): HTMLElement | true {
+  const shown = section ? popup?.querySelector<HTMLElement>(`[data-section="${section}"]`) : null
+  if (!shown) return true
+  return (
+    shown.querySelector<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
+    ) ?? shown
+  )
+}
+
+/** Box details: one text's sections, from `boxDetailsSections`, those it shows for the text, opened
+ * from a Story row's ? tag and menu and from the Edit menu, and on a section from a box action
+ * that goes to one. It follows the text through every change, reading its page as Story does, and
+ * closes when the text goes, as a join can take it, and with the project. */
 export function BoxDetailsDialog() {
   const { t } = useTranslation()
   const sections = useId()
+  const popup = useRef<HTMLDivElement>(null)
   const shown = useBoxDetails((state) => state.shown)
   // What it showed last, kept while it closes.
   const [last, setLast] = useState(shown)
@@ -55,7 +70,9 @@ export function BoxDetailsDialog() {
       }}
     >
       <DialogContent
+        ref={popup}
         showCloseButton={false}
+        initialFocus={() => sectionFocus(popup.current, target?.section)}
         className='flex max-h-[calc(100dvh-4rem)] flex-col gap-3 overflow-hidden p-4 sm:max-w-md'
       >
         <DialogTitle className='pr-8 text-[13px] font-semibold'>
@@ -78,14 +95,22 @@ export function BoxDetailsDialog() {
         </DialogClose>
         {target && box && (
           <div className='-mx-4 grid min-h-0 gap-4 overflow-y-auto px-4 pb-1'>
-            {boxDetailsSections.map(({ id, title, Section }) => (
-              <section key={id} aria-labelledby={`${sections}-${id}`} className='grid gap-1.5'>
-                <h3 id={`${sections}-${id}`} className='text-[11px] font-semibold'>
-                  {t(title)}
-                </h3>
-                <Section key={box.layer.id} page={target.page} box={box} />
-              </section>
-            ))}
+            {boxDetailsSections
+              .filter(({ shows }) => shows?.(box) ?? true)
+              .map(({ id, title, Section }) => (
+                <section
+                  key={id}
+                  data-section={id}
+                  tabIndex={-1}
+                  aria-labelledby={`${sections}-${id}`}
+                  className='grid gap-1.5 outline-none'
+                >
+                  <h3 id={`${sections}-${id}`} className='text-[11px] font-semibold'>
+                    {t(title)}
+                  </h3>
+                  <Section key={box.layer.id} page={target.page} box={box} />
+                </section>
+              ))}
           </div>
         )}
       </DialogContent>
