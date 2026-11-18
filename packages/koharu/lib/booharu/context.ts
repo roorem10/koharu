@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-import { call } from '@/lib/backend'
+import { call, refreshPreferences } from '@/lib/backend'
 import { projectKey, refresh, useProject } from '@/lib/queries'
 import {
   commands,
@@ -12,7 +12,10 @@ import {
   type Character,
   type FixedTerm,
   type GlossaryEntry,
+  type InstructionImport,
+  type InstructionPreview,
   type Series,
+  type SeriesImport,
   type TermKind,
 } from '@koharu/ipc/protocol'
 
@@ -350,4 +353,47 @@ export function useGlossaryUsage(source: string) {
  * and left alone. */
 export function fixTermEverywhere(source: string): Promise<FixedTerm> {
   return afterWrites(() => call(commands.booharuFixTermEverywhere, source))
+}
+
+/** Exports the series `id` to a file the user picks, once the writes before it end, so the file
+ * holds every change made. Answers whether it was written, false when the user cancelled. */
+export function exportSeries(id: string): Promise<boolean> {
+  return afterWrites(() => call(commands.booharuExportSeries, id))
+}
+
+/** Asks the user for a series file, Booharu 0.0.4's or 0.0.5's, and answers its series with whether
+ * one of its id is saved already; none when the user cancelled. */
+export function previewSeriesImport(): Promise<SeriesImport | null> {
+  return afterWrites(() => call(commands.booharuPreviewSeriesImport))
+}
+
+/** Saves `series`, from a file being imported: in place of the series of its id with `replace`,
+ * else beside it, with a new id when that one is taken. Answers it as saved. */
+export async function importSeries(series: Series, replace: boolean): Promise<FullSeries> {
+  return fillSeries(await queueWrite(() => call(commands.booharuImportSeries, series, replace)))
+}
+
+/** The Instructions as saved, with the terms their lines write, for Import from instructions. */
+export function previewInstructionGlossary(): Promise<InstructionPreview> {
+  return call(commands.booharuPreviewInstructionGlossary)
+}
+
+/** Imports the terms on the lines `lines` of `instructions`, the Instructions as previewed, into
+ * the series `series` as locked terms, skipping sources it has; with `remove`, the desktop saves the
+ * Instructions without those lines, refusing when they changed since the preview. Koharu tells no
+ * change of its preferences, so they're read again then, whether it worked or not: Settings shows
+ * the Instructions as saved, and never saves the old text back. */
+export async function importInstructionGlossary(
+  series: string,
+  lines: number[],
+  remove: boolean,
+  instructions: string,
+): Promise<InstructionImport> {
+  try {
+    return await queueWrite(() =>
+      call(commands.booharuImportInstructionGlossary, series, lines, remove, instructions),
+    )
+  } finally {
+    if (remove) await refreshPreferences().catch(() => undefined)
+  }
 }

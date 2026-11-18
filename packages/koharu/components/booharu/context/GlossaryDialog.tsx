@@ -1,10 +1,12 @@
 'use client'
 
-import { Lock, Plus, Trash2, X } from 'lucide-react'
+import { Download, FileText, Lock, Plus, Trash2, Upload, X } from 'lucide-react'
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { CommitInput } from '@/components/booharu/context/CommitInput'
+import { InstructionImportDialog } from '@/components/booharu/context/InstructionImport'
+import { SeriesImportDialog } from '@/components/booharu/context/SeriesImport'
 import { SeriesPicker } from '@/components/booharu/context/SeriesPicker'
 import { TermForm } from '@/components/booharu/context/TermForm'
 import { TermUsage } from '@/components/booharu/context/TermUsage'
@@ -13,11 +15,14 @@ import {
   changeCharacter,
   changeSeries,
   deleteSeries,
+  exportSeries,
   failure,
   kindName,
   matchesSearch,
   newCharacter,
   newTerm,
+  previewInstructionGlossary,
+  previewSeriesImport,
   putTerm,
   removeTerm,
   renameSeries,
@@ -28,6 +33,7 @@ import {
   type FullEntry,
   type FullSeries,
 } from '@/lib/booharu/context'
+import type { InstructionPreview, SeriesImport } from '@koharu/ipc/protocol'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,12 +53,14 @@ import {
   DialogTitle,
 } from '@koharu/ui/components/dialog'
 import { Input } from '@koharu/ui/components/input'
+import { toast } from '@koharu/ui/components/toast'
 
 /** The glossary editor, Booharu 0.0.4's glossary dialog: a series picked or made here, starting on
  * `initial`, such as the series the open chapter follows, with its name, its notes, its characters
  * and its terms, each change saved at once over what its file holds then, so a change another
- * writer made meanwhile, such as a term the agent added, stays. Opened from the Context tab and
- * from Settings > Pipeline's Glossary row; `onClose` closes it. */
+ * writer made meanwhile, such as a term the agent added, stays; Import series, from a file Booharu
+ * 0.0.4 or 0.0.5 wrote, and for the series shown Export series and Import from instructions.
+ * Opened from the Context tab and from Settings > Pipeline's Glossary row; `onClose` closes it. */
 export function GlossaryDialog({
   initial,
   onClose,
@@ -63,11 +71,27 @@ export function GlossaryDialog({
   const { t } = useTranslation()
   const listed = useSeriesList().data
   const [selected, setSelected] = useState(initial)
+  // The file Import series picked, while its preview shows.
+  const [importing, setImporting] = useState<SeriesImport | null>(null)
+  // The Instructions' terms, while Import from instructions shows them.
+  const [instructions, setInstructions] = useState<InstructionPreview | null>(null)
+  // A file dialog, or a read of the Instructions, under way, which the buttons wait for.
+  const [asking, setAsking] = useState(false)
   // A series deleted or gone since, as the agent can delete one, shows as none picked.
   const current =
     selected !== null && (listed === undefined || listed.some((series) => series.id === selected))
       ? selected
       : null
+
+  /** Runs `ask`, which opens a file dialog or reads the Instructions, the buttons waiting for it. A
+   * failure shows its error, as every failed command's does. */
+  const askWith = <T,>(ask: () => Promise<T>, then: (answer: T) => void) => {
+    setAsking(true)
+    ask()
+      .then(then)
+      .catch(() => undefined)
+      .finally(() => setAsking(false))
+  }
 
   return (
     <Dialog
@@ -99,12 +123,82 @@ export function GlossaryDialog({
           <X />
         </DialogClose>
         <SeriesPicker value={current} onChange={async (id) => setSelected(id)} />
+        <div className='flex flex-wrap gap-1.5'>
+          <Button
+            type='button'
+            size='sm'
+            variant='outline'
+            className='h-7 text-[11px]'
+            disabled={asking}
+            onClick={() =>
+              askWith(previewSeriesImport, (found) => {
+                if (found) setImporting(found)
+              })
+            }
+          >
+            <Upload /> {t('booharu.context.importSeries')}
+          </Button>
+          {current !== null && (
+            <>
+              <Button
+                type='button'
+                size='sm'
+                variant='outline'
+                className='h-7 text-[11px]'
+                disabled={asking}
+                onClick={() => {
+                  const name = listed?.find((series) => series.id === current)?.name ?? ''
+                  askWith(
+                    () => exportSeries(current),
+                    (written) => {
+                      if (written) {
+                        toast.add({
+                          type: 'success',
+                          title: t('booharu.context.exported', { name }),
+                        })
+                      }
+                    },
+                  )
+                }}
+              >
+                <Download /> {t('booharu.context.exportSeries')}
+              </Button>
+              <Button
+                type='button'
+                size='sm'
+                variant='outline'
+                className='h-7 text-[11px]'
+                disabled={asking}
+                onClick={() => askWith(previewInstructionGlossary, setInstructions)}
+              >
+                <FileText /> {t('booharu.context.importInstructions')}
+              </Button>
+            </>
+          )}
+        </div>
         {current === null ? (
           <p className='text-[11px] text-muted-foreground'>
             {t('booharu.context.chooseSeriesHint')}
           </p>
         ) : (
           <SeriesEditor key={current} id={current} onDeleted={() => setSelected(null)} />
+        )}
+        {importing && (
+          <SeriesImportDialog
+            found={importing}
+            onClose={() => setImporting(null)}
+            onImported={(series) => {
+              setImporting(null)
+              setSelected(series.id)
+            }}
+          />
+        )}
+        {instructions && current !== null && (
+          <InstructionImportDialog
+            series={current}
+            preview={instructions}
+            onClose={() => setInstructions(null)}
+          />
         )}
       </DialogContent>
     </Dialog>
