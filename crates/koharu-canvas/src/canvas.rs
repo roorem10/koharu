@@ -150,11 +150,12 @@ impl Canvas {
     pub fn show(&mut self, snapshot: Snapshot) {
         // The project changed under a gesture, by another writer: it would
         // write over that change, so it's dropped, as the editor's was.
-        if self
-            .snapshot
-            .as_ref()
-            .is_some_and(|old| old.frame().revision() != snapshot.frame().revision())
-        {
+        if self.snapshot.as_ref().is_some_and(|old| {
+            old.frame().revision() != snapshot.frame().revision()
+                // Booharu: unless it's an O tool box on the page it's drawn over.
+                && !(crate::booharu::outlasts(self.gesture.as_ref().map(|active| &active.gesture))
+                    && old.page().id == snapshot.page().id)
+        }) {
             self.gesture = None;
         }
         let other = self
@@ -244,7 +245,10 @@ impl Canvas {
     /// in progress is cancelled, and typing into another layer is committed;
     /// returns what that commit does.
     pub fn select(&mut self, layers: Vec<LayerId>) -> Vec<Effect> {
-        self.cancel();
+        // Booharu: an O tool box outlasts a selection, which it doesn't read.
+        if !crate::booharu::outlasts(self.gesture.as_ref().map(|active| &active.gesture)) {
+            self.cancel();
+        }
         let typed = self.typing.as_ref().map(Typing::target);
         let effects = match typed {
             Some(Some(layer)) if layers == [layer] => Vec::new(),

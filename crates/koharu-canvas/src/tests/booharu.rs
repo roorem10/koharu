@@ -179,6 +179,41 @@ fn a_cancelled_drag_draws_no_box() {
 }
 
 #[test]
+fn a_box_outlasts_another_change_to_its_page_and_a_selection() {
+    let Some(mut fixture) = o_tool() else {
+        return;
+    };
+    fixture
+        .canvas
+        .input(down((50.0, 50.0), NONE))
+        .expect("input");
+    fixture.canvas.input(drag(1, (100.0, 90.0))).expect("input");
+    // The last box's block is added, selected and read while this one is
+    // drawn.
+    let page = fixture.page;
+    other_writer(
+        &mut fixture,
+        vec![json!({"op": "add_layer", "page": page, "index": 0, "layer": {"kind": "raster"}})],
+    );
+    let added = layers(&fixture);
+    assert!(fixture.canvas.select(added).is_empty());
+    let mut effects = fixture
+        .canvas
+        .input(drag(1, (150.0, 120.0)))
+        .expect("input");
+    effects.extend(
+        fixture
+            .canvas
+            .input(lift((150.0, 120.0), NONE))
+            .expect("input"),
+    );
+    assert_eq!(
+        boxes(&effects),
+        page_rect(&fixture, Rect::new(50.0, 50.0, 150.0, 120.0))
+    );
+}
+
+#[test]
 fn the_box_shows_dashed_in_the_selection_colour_while_dragged() {
     let Some(mut fixture) = o_tool() else {
         return;

@@ -38,6 +38,15 @@ pub struct BoxModifiers {
 /// one.
 const SMALLEST: f64 = 4.0;
 
+/// Whether `gesture`, the one in progress, outlasts a change it didn't make:
+/// a new revision of the page it's on, or another selection. Only an O tool
+/// box does, as it reads neither and writes nothing until it lifts, so the
+/// next box drawn while the last one's block is added, selected and read
+/// isn't dropped.
+pub(crate) fn outlasts(gesture: Option<&gesture::Gesture>) -> bool {
+    matches!(gesture, Some(gesture::Gesture::Booharu(_)))
+}
+
 /// A press with the O tool starts a box.
 pub(crate) fn press(sample: Sample) -> Press {
     Press::starts(gesture::Gesture::Booharu(OcrBox {
