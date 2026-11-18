@@ -87,8 +87,10 @@ if (-not $SkipDependencies) {
     Invoke-Checked 'bun' @('install', '--frozen-lockfile', '--ignore-scripts')
 }
 Invoke-Checked 'bun' @('run', '--filter', '@koharu/app', 'build')
-# Direct Cargo builds must opt into Tauri's bundled frontend protocol.
-Invoke-Checked 'cargo' @('build', '-p', 'koharu', '--release', '--features', 'tauri/custom-protocol')
+# Direct Cargo builds must opt into Tauri's bundled frontend protocol. --locked builds exactly what
+# Cargo.lock holds, so the CEF read from it above is the one the program is built for: a lock that
+# no longer fits Cargo.toml fails here instead of being rewritten for another CEF.
+Invoke-Checked 'cargo' @('build', '-p', 'koharu', '--release', '--locked', '--features', 'tauri/custom-protocol')
 
 $out = Join-Path $root 'dist'
 $stage = Join-Path $out 'Booharu'

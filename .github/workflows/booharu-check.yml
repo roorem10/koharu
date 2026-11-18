@@ -56,10 +56,12 @@ jobs:
           cache-on-failure: true
       - name: Formatting
         run: cargo fmt -- --check
+      # --locked: a Cargo.lock that no longer fits Cargo.toml fails here, before
+      # a Windows build, which also builds with --locked, would.
       - name: Compile everything, tests included
-        run: cargo check --workspace --tests
+        run: cargo check --workspace --tests --locked
       - name: Rust tests
-        run: cargo test --workspace --tests --no-fail-fast
+        run: cargo test --workspace --tests --no-fail-fast --locked
 
   ui:
     name: Interface types and tests
