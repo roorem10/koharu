@@ -33,11 +33,18 @@ export function ColorWell(props: ColorWellProps) {
   const { value, label, size = 'default', disabled = false, allowTransparent = false } = props
   const [draft, setDraft] = useState(value ?? '#000000')
   const [transparent, setTransparent] = useState(value === null)
+  // Booharu: a picker drag can move the colour without its end event firing, for example when it
+  // ends in the black corner (koharu#866). The dragged colour waits here, apart from `value`, so
+  // closing the picker applies it and Escape discards it. Every other way of settling the colour
+  // (a finished drag, a typed hex code, Transparent, the eyedropper or a new value from outside)
+  // clears it, so it never overrides a later choice.
+  const [pending, setPending] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const sampling = useColorSampling()
   const accessibleLabel = label ?? t('colorPicker.brushColor')
 
   useEffect(() => {
+    setPending(null) // Booharu: a new value from outside settles the colour.
     if (value === null) {
       setTransparent(true)
     } else {
@@ -49,6 +56,7 @@ export function ColorWell(props: ColorWellProps) {
   const set = (color: string) => {
     const normalized = normalize(color)
     setDraft(normalized)
+    setPending(null) // Booharu: a committed colour settles any unfinished drag.
     setTransparent(false)
     if (props.allowTransparent) props.onChange(normalized)
     else props.onChange(normalized)
@@ -56,12 +64,28 @@ export function ColorWell(props: ColorWellProps) {
 
   const clear = () => {
     if (!props.allowTransparent) return
+    setPending(null) // Booharu: Transparent settles any unfinished drag.
     setTransparent(true)
     props.onChange(null)
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      // Booharu: closing the picker applies a drag whose end event never came, and Escape
+      // discards it and shows the committed colour again.
+      onOpenChange={(next, details) => {
+        if (!next && pending !== null) {
+          if (details.reason === 'escape-key') {
+            setPending(null)
+            if (value !== null) setDraft(value)
+          } else {
+            set(pending)
+          }
+        }
+        setOpen(next)
+      }}
+    >
       <Tooltip>
         <TooltipTrigger
           render={
@@ -104,7 +128,11 @@ export function ColorWell(props: ColorWellProps) {
         <div>
           <HexColorPicker
             color={draft}
-            onChange={(color) => setDraft(normalize(color))}
+            onChange={(color) => {
+              const normalized = normalize(color)
+              setDraft(normalized)
+              setPending(normalized) // Booharu: kept until the drag ends or the picker closes.
+            }}
             onChangeEnd={set}
           />
         </div>
@@ -122,6 +150,10 @@ export function ColorWell(props: ColorWellProps) {
               variant='outline'
               aria-label={t('colorPicker.sampleCanvas')}
               onClick={() => {
+                // Booharu: sampling replaces an unfinished drag; a sample commits through `set`,
+                // and cancelling the eyedropper leaves the committed colour.
+                setPending(null)
+                if (value !== null) setDraft(value)
                 setOpen(false)
                 sampling.request(set)
               }}
