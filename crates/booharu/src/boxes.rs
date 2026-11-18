@@ -62,7 +62,8 @@ pub enum Refusal {
 pub struct SplitBalloon {
     pub page: PageId,
     pub balloon: LayerId,
-    /// Its text blocks, in reading order; sound effects are left out.
+    /// Its text blocks, in reading order; sound effects and hidden blocks
+    /// are left out.
     pub blocks: Vec<LayerId>,
 }
 
@@ -197,7 +198,8 @@ pub fn find_split_balloons(project: &Project, page: Option<PageId>) -> Result<Ve
 /// blank, a line each, the translation placed in its balloon as the
 /// Translation stage places one. The others' masks and clean-ups merge into
 /// its own, so the lettering they cleaned stays clean, and they go. A
-/// balloon holding one text block has nothing to join.
+/// balloon holding one text block has nothing to join, and a hidden block,
+/// which isn't drawn, is no part of its balloon's text.
 pub fn join_balloon(session: &Session, block: LayerId) -> Result<Edit> {
     let project = session.project();
     let layer = project.layer(block)?;
@@ -207,6 +209,10 @@ pub fn join_balloon(session: &Session, block: LayerId) -> Result<Edit> {
     ensure!(
         found.role == Role::Text,
         "block {block} is a sound effect, which isn't joined with a balloon's text"
+    );
+    ensure!(
+        layer.visible,
+        "block {block} is hidden, so it isn't joined with its balloon's text"
     );
     let (page, holder) = project.parent(block)?;
     let balloon = holder
@@ -383,11 +389,14 @@ struct Group<'p> {
     blocks: Vec<(LayerId, &'p Block)>,
 }
 
-/// The text blocks `balloon` holds, in tree order, which is reading order.
+/// The text blocks `balloon` holds, in tree order, which is reading order,
+/// a hidden one left out: it isn't drawn, so it's no part of the balloon's
+/// text, and a join leaves it as it is.
 fn texts(balloon: &Layer) -> Vec<(LayerId, &Block)> {
     balloon
         .children
         .iter()
+        .filter(|layer| layer.visible)
         .filter_map(|layer| match &layer.content {
             Content::Block(block) if block.role == Role::Text => Some((layer.id, &**block)),
             _ => None,
@@ -1642,6 +1651,45 @@ mod tests {
         ] {
             assert!(result.is_err_and(|error| error.to_string().contains("nothing to join")));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn a_hidden_block_is_no_part_of_its_balloons_text() -> Result<()> {
+        let Split {
+            mut page,
+            balloon,
+            blocks: [first, blank, last],
+            sfx,
+        } = split_balloon()?;
+        page.update(first, json!({"visible": false}))?;
+        assert_eq!(
+            find_split_balloons(&page.session.project(), Some(page.page))?,
+            [SplitBalloon {
+                page: page.page,
+                balloon,
+                blocks: vec![blank, last],
+            }]
+        );
+        assert!(
+            join_balloon(&page.session, first)
+                .is_err_and(|error| error.to_string().contains("hidden"))
+        );
+
+        // The first shown is kept, and the hidden one stays as it was.
+        page.session.apply(join_balloon(&page.session, last)?)?;
+        let project = page.session.project();
+        let children: Vec<LayerId> = project
+            .layer(balloon)?
+            .children
+            .iter()
+            .map(|layer| layer.id)
+            .collect();
+        assert_eq!(children, [first, blank, sfx]);
+        assert_eq!(page.block(first)?.source.content.text(), "あ");
+        assert_eq!(page.block(blank)?.source.content.text(), "う");
+        // One text shows, with nothing to join it with.
+        assert!(find_split_balloons(&project, None)?.is_empty());
         Ok(())
     }
 

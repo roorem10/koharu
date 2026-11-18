@@ -102,8 +102,9 @@ impl Tool for FindSplitBalloons {
     fn description(&self) -> String {
         "The balloons whose text is split over two or more text blocks, on a page or, without \
          one, on every page in order: each with its page and its text blocks in reading order, \
-         sound effects left out. Joining makes a balloon's blocks one: tell the user which \
-         balloons are split and ask before joining them, unless they asked for the join."
+         sound effects and hidden blocks left out. Joining makes a balloon's blocks one: tell \
+         the user which balloons are split and ask before joining them, unless they asked for \
+         the join."
             .to_owned()
     }
 

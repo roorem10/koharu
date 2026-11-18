@@ -871,7 +871,10 @@ export type Span = {
 export type SplitBalloon = {
   page: PageId
   balloon: LayerId
-  /**  Its text blocks, in reading order; sound effects are left out. */
+  /**
+   *  Its text blocks, in reading order; sound effects and hidden blocks
+   *  are left out.
+   */
   blocks: LayerId[]
 }
 

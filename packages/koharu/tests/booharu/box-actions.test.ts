@@ -69,6 +69,16 @@ describe('Booharu box actions', () => {
     expect(enabled([])).toEqual(none)
   })
 
+  it('leaves a hidden block out of a join, as the desktop does', () => {
+    const hidden = boxesPage()
+    hidden.layers[0]!.children![0]!.children![0]!.visible = false
+    const join = boxActions.find(({ id }) => id === 'join')!
+    // The hidden block takes no join, and the one text left showing has nothing to join with.
+    for (const id of ['first', 'second']) {
+      expect(join.enabled({ page: page.id, boxes: selectedBoxes(hidden.layers, [id]) })).toBe(false)
+    }
+  })
+
   it('refuses a join when any text of the balloon is locked', () => {
     const lockedText = boxesPage()
     const split = lockedText.layers[0]!.children![0]!

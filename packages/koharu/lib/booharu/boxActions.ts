@@ -50,11 +50,11 @@ export function selectedBoxes(layers: Layer[], selected: LayerId[]): Box[] {
   })
 }
 
-/** The texts a balloon holds, in tree order, which is reading order, its sound effects left out:
- * the blocks a join makes one, as the desktop's join takes them. */
+/** The texts a balloon holds, in tree order, which is reading order, its sound effects and hidden
+ * blocks left out: the blocks a join makes one, as the desktop's join takes them. */
 export function balloonTexts(balloon: Layer): BlockLayer[] {
   return (balloon.children ?? []).filter(
-    (child): child is BlockLayer => isBlockLayer(child) && child.role !== 'sfx',
+    (child): child is BlockLayer => isBlockLayer(child) && child.role !== 'sfx' && child.visible,
   )
 }
 
@@ -94,11 +94,12 @@ function rerun(selection: BoxSelection, stage: Stage): Promise<unknown> {
 }
 
 /** The texts a join of the selection's one text block would make one, its balloon's in reading
- * order, the first kept; none unless the balloon holds another, and nothing the join changes is
- * locked, which would refuse it all. */
+ * order, the first kept; none unless the balloon holds another, the block shows, and nothing the
+ * join changes is locked, which would refuse it all. */
 function joining(selection: BoxSelection): BlockLayer[] | null {
   const box = only(selection)
   if (!box || box.locked || !isBlockLayer(box.layer) || box.layer.role === 'sfx') return null
+  if (!box.layer.visible) return null
   if (box.parent?.kind !== 'balloon') return null
   const texts = balloonTexts(box.parent)
   const kept = texts[0]
