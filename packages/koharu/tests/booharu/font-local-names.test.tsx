@@ -72,6 +72,27 @@ describe('Booharu local font names', () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith('Yu Gothic')
   })
 
+  it('reads them again for the next picker, as a family downloaded since has names', async () => {
+    favoritesDesktop()
+    const read = vi
+      .spyOn(commands, 'booharuGetFontLocalNames')
+      .mockResolvedValueOnce({ SimSun: localNames.SimSun })
+      .mockResolvedValueOnce(localNames)
+    const user = userEvent.setup()
+    renderPicker({ families }, { booharu: true })
+    await user.click(screen.getByRole('button', { name: 'Font' }))
+    expect(await screen.findByText('宋体')).toBeInTheDocument()
+    expect(screen.queryByText('游ゴシック')).not.toBeInTheDocument()
+
+    cleanup()
+    renderPicker({ families }, { booharu: true })
+    await user.click(screen.getByRole('button', { name: 'Font' }))
+    expect(await screen.findByText('游ゴシック')).toBeInTheDocument()
+    await user.type(search(), '游ゴシック')
+    expect(listed()).toEqual(['Yu Gothic'])
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
   it("shows nothing when the names can't be read, and the next picker reads them again", async () => {
     favoritesDesktop()
     const read = vi

@@ -108,13 +108,15 @@ async function toggleFontFavorite(family: string, favorite: boolean): Promise<vo
   }
 }
 
-/** The names font families go by in other languages, as the desktop answers them: read once a run,
- * as the desktop reads them. The pickers work without them until they come; a failed read shows
- * nothing, as a failed font preview shows nothing, and the next picker to show reads them again. */
+/** The names font families go by in other languages, as the desktop answers them: read again each
+ * time a view with pickers opens, as a bundled family downloaded since has names the last read
+ * lacked. The pickers work without them until they come, and with the last read's while the next
+ * is on its way; a failed read shows nothing, as a failed font preview shows nothing. */
 const localNamesQuery = queryOptions({
   queryKey: ['booharu', 'font-local-names'] as const,
   queryFn: () => commands.booharuGetFontLocalNames(),
   gcTime: Number.POSITIVE_INFINITY,
+  refetchOnMount: 'always',
 })
 
 /** Whether the font pickers show only the favourites: one choice for every picker, kept for the
