@@ -4,12 +4,13 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { call, refreshPreferences } from '@/lib/backend'
-import { projectKey, refresh, useProject } from '@/lib/queries'
+import { projectKey, queryClient, refresh, useProject } from '@/lib/queries'
 import {
   commands,
   events,
   type ChapterState,
   type Character,
+  type FirstStartNote,
   type FixedTerm,
   type GlossaryEntry,
   type InstructionImport,
@@ -396,4 +397,28 @@ export async function importInstructionGlossary(
   } finally {
     if (remove) await refreshPreferences().catch(() => undefined)
   }
+}
+
+/** The key of the note on a first start. */
+export const firstStartNoteKey = ['booharu', 'first-start-note'] as const
+
+/** The note on a first start: whether to show it, and where Booharu 0.0.4's series are, read once
+ * a session. It names the app's query client itself, as Koharu's home page needs no query provider
+ * around it, and its own tests render it without one; a failed read shows no note. */
+export function useFirstStartNote() {
+  return useQuery(
+    {
+      queryKey: firstStartNoteKey,
+      queryFn: () => commands.booharuGetFirstStartNote(),
+    },
+    queryClient,
+  )
+}
+
+/** Dismisses the note on a first start for good; it goes once the desktop has saved that. */
+export async function dismissFirstStartNote(): Promise<void> {
+  await call(commands.booharuDismissFirstStartNote)
+  queryClient.setQueryData<FirstStartNote>(firstStartNoteKey, (note) =>
+    note ? { ...note, show: false } : note,
+  )
 }

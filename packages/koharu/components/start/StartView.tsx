@@ -4,6 +4,7 @@ import { Folder, FolderPlus, Plus, Settings, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { FirstStartNote } from '@/components/booharu/context/FirstStartNote' // Booharu: the note on a first start.
 import { call } from '@/lib/backend'
 import { pageKey, projectKey, refresh } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
@@ -123,6 +124,8 @@ export function StartView() {
                 <TooltipContent side='bottom'>{t('menu.settings')}</TooltipContent>
               </Tooltip>
             </header>
+            {/* Booharu: the note on a first start, where Booharu 0.0.4's glossaries are. */}
+            <FirstStartNote />
 
             <div className='mt-7 grid min-h-[390px] overflow-hidden rounded-2xl border border-border/80 bg-[var(--surface-panel)] md:grid-cols-[300px_minmax(0,1fr)]'>
               <aside className='flex flex-col border-b border-border/80 bg-[var(--surface-titlebar)]/55 p-6 md:border-r md:border-b-0'>

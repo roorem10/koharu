@@ -60,7 +60,8 @@ import { toast } from '@koharu/ui/components/toast'
  * and its terms, each change saved at once over what its file holds then, so a change another
  * writer made meanwhile, such as a term the agent added, stays; Import series, from a file Booharu
  * 0.0.4 or 0.0.5 wrote, and for the series shown Export series and Import from instructions.
- * Opened from the Context tab and from Settings > Pipeline's Glossary row; `onClose` closes it. */
+ * Opened from the Context tab, from Settings > Pipeline's Glossary row and from the note on a first
+ * start; `onClose` closes it. */
 export function GlossaryDialog({
   initial,
   onClose,
