@@ -54,7 +54,8 @@ impl Tool for GetSettings {
          tried again, `on_page_failure`, `continue` with the other pages or `stop` the run, \
          `order`, `pages` (each page through its stages) or `stages` (one stage at a time over \
          every page, using less graphics memory), and `finish_sound`, whether a run over pages \
-         chimes as it ends. The default font is the first of Koharu's Preferred fonts, not a \
+         chimes as it ends; `booharu-start` has `fresh_start_note_seen`, whether the note on a \
+         first start saying where Booharu 0.0.4's series are was dismissed. The default font is the first of Koharu's Preferred fonts, not a \
          Booharu setting. Needs a project open, as every tool here does."
             .to_owned()
     }
@@ -257,6 +258,7 @@ mod tests {
                     "order": "pages",
                     "finish_sound": true,
                 },
+                "booharu-start": {"fresh_start_note_seen": false},
             })
         );
 

@@ -221,6 +221,19 @@ impl Section for FontSettings {
     const NAME: &'static str = "booharu-fonts";
 }
 
+/// `[booharu-start]`: what Booharu showed once as it started.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
+pub struct StartSettings {
+    /// Whether the note on a first start, saying Booharu 0.0.4's series
+    /// weren't copied and where to import them from, was dismissed.
+    pub fresh_start_note_seen: bool,
+}
+
+impl Section for StartSettings {
+    const NAME: &'static str = "booharu-start";
+}
+
 /// Family names, none of them blank.
 fn families<'de, D: Deserializer<'de>>(deserializer: D) -> Result<BTreeSet<String>, D::Error> {
     let families = BTreeSet::<String>::deserialize(deserializer)?;
@@ -294,6 +307,8 @@ pub struct BooharuPreferences {
     pub fonts: FontSettings,
     #[serde(rename = "booharu-runs")]
     pub runs: RunsSettings,
+    #[serde(rename = "booharu-start")]
+    pub start: StartSettings,
 }
 
 impl BooharuPreferences {
@@ -306,6 +321,7 @@ impl BooharuPreferences {
             lettering: koharu_config::get()?,
             fonts: koharu_config::get()?,
             runs: koharu_config::get()?,
+            start: koharu_config::get()?,
         })
     }
 
@@ -322,12 +338,14 @@ impl BooharuPreferences {
             lettering,
             fonts,
             runs,
+            start,
         } = self;
         koharu_config::update(|section: &mut McpSettings| *section = mcp)?;
         koharu_config::update(|section: &mut OcrBoxSettings| *section = ocr_box)?;
         koharu_config::update(|section: &mut LetteringSettings| *section = lettering)?;
         koharu_config::update(|section: &mut FontSettings| *section = fonts)?;
         koharu_config::update(|section: &mut RunsSettings| *section = runs)?;
+        koharu_config::update(|section: &mut StartSettings| *section = start)?;
         Self::get()
     }
 
@@ -387,12 +405,13 @@ type Saver = fn(Map<String, Value>) -> anyhow::Result<()>;
 /// How the section named `name` is saved alone; none for a name Booharu has
 /// no section of.
 fn saver(name: &str) -> Option<Saver> {
-    let savers: [(&str, Saver); 5] = [
+    let savers: [(&str, Saver); 6] = [
         (McpSettings::NAME, saved::<McpSettings>),
         (OcrBoxSettings::NAME, saved::<OcrBoxSettings>),
         (LetteringSettings::NAME, saved::<LetteringSettings>),
         (FontSettings::NAME, saved::<FontSettings>),
         (RunsSettings::NAME, saved::<RunsSettings>),
+        (StartSettings::NAME, saved::<StartSettings>),
     ];
     savers
         .into_iter()
@@ -530,6 +549,8 @@ mod tests {
         assert!(lettering.detect_colors);
         let fonts: FontSettings = toml::from_str("").expect("the defaults");
         assert!(fonts.favorites.is_empty());
+        let start: StartSettings = toml::from_str("").expect("the defaults");
+        assert!(!start.fresh_start_note_seen);
         // In whichever order serde_json keeps a map's keys.
         let mut names = BooharuPreferences::names();
         names.sort();
@@ -541,6 +562,7 @@ mod tests {
                 McpSettings::NAME,
                 OcrBoxSettings::NAME,
                 RunsSettings::NAME,
+                StartSettings::NAME,
             ]
         );
     }

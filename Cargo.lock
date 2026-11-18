@@ -1196,6 +1196,8 @@ name = "booharu-core"
 version = "0.85.2"
 dependencies = [
  "anyhow",
+ "atomicwrites",
+ "fs-err",
  "image",
  "imageproc",
  "koharu-config",

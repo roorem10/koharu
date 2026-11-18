@@ -2,7 +2,7 @@
 name = "booharu-core"
 version.workspace = true
 edition.workspace = true
-description = "Booharu's settings sections and layer attributes, which its pipeline hooks and features share."
+description = "Booharu's settings sections, layer attributes, and series glossaries, which its pipeline hooks and features share."
 license.workspace = true
 authors.workspace = true
 readme.workspace = true
@@ -13,6 +13,8 @@ publish.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+atomicwrites = { workspace = true }
+fs-err = { workspace = true }
 koharu-config = { workspace = true }
 koharu-scene = { workspace = true }
 kurbo = { workspace = true }
