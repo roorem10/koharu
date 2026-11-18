@@ -7,4 +7,5 @@
 //! booharu-core, so what a pipeline hook needs goes there instead, and this
 //! crate stays free of a dependency cycle.
 
+pub mod boxes;
 pub mod translation;

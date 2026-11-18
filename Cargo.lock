@@ -1174,10 +1174,16 @@ name = "booharu"
 version = "0.85.2"
 dependencies = [
  "anyhow",
+ "booharu-core",
+ "image",
  "koharu-pipeline",
  "koharu-scene",
+ "kurbo",
+ "serde",
  "serde_json",
+ "specta",
  "tempfile",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
