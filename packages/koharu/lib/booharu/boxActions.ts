@@ -108,15 +108,15 @@ function joining(selection: BoxSelection): BlockLayer[] | null {
   return kept.mask?.locked || kept.cleanup?.locked ? null : texts
 }
 
-/** The selection's one text block a split cuts in two, or none: it and its parts unlocked, its
- * source in a frame to cut. */
+/** The selection's one block a split cuts in two, a sound effect's as well as a text's, as the
+ * desktop splits either, or none: it and its parts unlocked, its source in a frame to cut. */
 function splitting(selection: BoxSelection): BlockLayer | null {
   const box = only(selection)
   if (!box || box.locked || !isBlockLayer(box.layer)) return null
   const { layer } = box
   const framed = typeof layer.source.frame === 'object'
   const free = !layer.mask?.locked && !layer.cleanup?.locked
-  return layer.role !== 'sfx' && framed && free ? layer : null
+  return framed && free ? layer : null
 }
 
 /** After a join, as Story after a delete: a joined text that went, or its selected part, leaves the

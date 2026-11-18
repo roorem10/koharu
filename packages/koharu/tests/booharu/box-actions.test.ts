@@ -64,8 +64,8 @@ describe('Booharu box actions', () => {
     // A balloon with one text block, or a block in none, has nothing to join with.
     expect(enabled(['alone'])).toEqual({ ...runs, join: false, split: true, details: true })
     expect(enabled(['free'])).toEqual({ ...runs, join: false, split: true, details: true })
-    // A sound effect is neither joined nor split.
-    expect(enabled(['bang'])).toEqual({ ...runs, join: false, split: false, details: true })
+    // A sound effect isn't joined with a balloon's text, but it is split, as the desktop splits it.
+    expect(enabled(['bang'])).toEqual({ ...runs, join: false, split: true, details: true })
     expect(enabled([])).toEqual(none)
   })
 
