@@ -4,14 +4,22 @@
 //! accepting or dismissing it, linking a chapter to a series, and Import
 //! from instructions. booharu-core's `context` holds the files and the text
 //! a run sends with its chapter.
+//!
+//! The agent's tools work by name and source where the interface works by
+//! id: the chapter as the agent reads it ([`notes`]) and in short with each
+//! of its requests ([`outline`]), a series linked by its name
+//! ([`link_named`]), a term saved in or removed from the linked series
+//! ([`save_term`], [`delete_term`]), a suggestion accepted or dismissed by
+//! its source, the Instructions' terms offered with those the series holds
+//! already, and a series exported to or imported from a file it names.
 
 use std::{collections::BTreeSet, path::Path};
 
-use anyhow::{Context as _, Result, ensure};
+use anyhow::{Context as _, Result, bail, ensure};
 use booharu_core::{
     context::{
-        ChapterContext, GlossaryEntry, Series, SeriesStore, TermKind, instruction_terms, occurs,
-        same_source,
+        Chapter, ChapterBrief, ChapterContext, Extras, GlossaryEntry, MAX_TERMS, Series,
+        SeriesStore, TermKind, found_terms, instruction_terms, occurs, same_source, valid_id,
     },
     edited,
 };
@@ -265,6 +273,450 @@ pub fn import_instructions(
         added,
         skipped: terms.len() as u32 - added,
         instructions,
+    })
+}
+
+/// The chapter as the agent reads it: the series it links, its suggested
+/// terms and brief, the terms found in its text, and what a translation run
+/// on it sends.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChapterNotes {
+    /// The series the chapter links, whole: its name, notes, characters, and
+    /// glossary; none when it links none, or its file is gone.
+    pub series: Option<Series>,
+    /// Whether the chapter links a series whose file is gone.
+    pub missing: bool,
+    /// The terms suggested for the chapter, which its translation follows
+    /// as the series' terms until they're accepted or dismissed.
+    pub suggestions: Vec<GlossaryEntry>,
+    /// What Read chapter found the chapter to be about.
+    pub brief: Option<ChapterBrief>,
+    /// The series' terms and the suggestions whose source occurs in the
+    /// source of a block, as far as the text is known ([`found_terms`]).
+    pub found: Vec<GlossaryEntry>,
+    /// What a run translating the chapter now adds after the Instructions,
+    /// word for word; empty when it adds nothing.
+    pub extras: String,
+    /// Whether the chapter's text isn't known yet, as a page was never
+    /// through detection or a block waits to be read, so that run sends
+    /// every term rather than those found.
+    pub fresh: bool,
+    /// How many terms past the first 60 that run leaves out.
+    pub left_out: u32,
+}
+
+/// The chapter of the project file `path`, whose project is `project`, as
+/// the agent reads it, with the series it links from the store `store`
+/// opens, which only a linked series needs. A side file or series file that
+/// doesn't read fails, naming it.
+pub fn notes(
+    path: &Path,
+    project: &Project,
+    store: impl FnOnce() -> Result<SeriesStore>,
+) -> Result<ChapterNotes> {
+    let Chapter {
+        context,
+        series,
+        missing,
+    } = Chapter::read(path, store)?;
+    let extras = Extras::of(project, &context, series.as_ref(), false);
+    Ok(ChapterNotes {
+        found: found_terms(project, &context, series.as_ref()),
+        extras: extras.text(),
+        fresh: extras.fresh,
+        left_out: extras.left_out,
+        series,
+        missing,
+        suggestions: context.suggestions,
+        brief: context.brief,
+    })
+}
+
+/// The chapter in short, which goes with each of the agent's requests: the
+/// name of the series it links, its brief, and the glossary terms found in
+/// its text.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChapterOutline {
+    /// None when the chapter links no series, or its file is gone.
+    pub series: Option<String>,
+    /// Whether the chapter links a series whose file is gone.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub missing: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub brief: Option<ChapterBrief>,
+    /// The terms found in the chapter's text ([`found_terms`]), at most 60.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub glossary: Vec<OutlinedTerm>,
+    /// How many terms found past the first 60 were left out.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub more: u32,
+}
+
+/// A glossary term as the agent's outline lists it.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct OutlinedTerm {
+    pub source: String,
+    pub target: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub note: String,
+    pub kind: TermKind,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub locked: bool,
+}
+
+/// The chapter of the project file `path`, whose project is `project`, in
+/// short, with the series it links from the store `store` opens, which only
+/// a linked series needs. A side file or series file that doesn't read
+/// fails, naming it.
+pub fn outline(
+    path: &Path,
+    project: &Project,
+    store: impl FnOnce() -> Result<SeriesStore>,
+) -> Result<ChapterOutline> {
+    let Chapter {
+        context,
+        series,
+        missing,
+    } = Chapter::read(path, store)?;
+    let found = found_terms(project, &context, series.as_ref());
+    Ok(ChapterOutline {
+        more: found.len().saturating_sub(MAX_TERMS) as u32,
+        glossary: found
+            .into_iter()
+            .take(MAX_TERMS)
+            .map(|term| OutlinedTerm {
+                source: term.source,
+                target: term.target,
+                note: term.note,
+                kind: term.kind,
+                locked: term.locked,
+            })
+            .collect(),
+        series: series.map(|series| series.name),
+        missing,
+        brief: context.brief,
+    })
+}
+
+fn is_zero(count: &u32) -> bool {
+    *count == 0
+}
+
+/// What linking a chapter to a series by its name did.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LinkedSeries {
+    pub id: String,
+    pub name: String,
+    /// Whether the series was made for the link.
+    pub created: bool,
+    /// Whether the link changed: false when the chapter linked it already.
+    pub changed: bool,
+}
+
+/// Links the chapter of the project file `project` to the series in `store`
+/// named `name`, ignoring case and the whitespace around it; with `create`,
+/// makes one so named when there's none. Fails, linking nothing, when
+/// there's none and `create` is off, naming the series there are, or when
+/// two or more have the name.
+pub fn link_named(
+    project: &Path,
+    store: &SeriesStore,
+    name: &str,
+    create: bool,
+) -> Result<LinkedSeries> {
+    let (series, created) = match named(store, name)? {
+        Some(series) => (series, false),
+        None if create => (store.create(name)?, true),
+        None => {
+            let names: Vec<String> = store
+                .list()?
+                .into_iter()
+                .map(|series| format!("\"{}\"", series.name))
+                .collect();
+            let there = match names.is_empty() {
+                true => "there are none yet".to_owned(),
+                false => format!("the series are {}", names.join(", ")),
+            };
+            bail!("there's no series named \"{}\"; {there}", name.trim());
+        }
+    };
+    let changed = link(project, store, Some(&series.id))?;
+    Ok(LinkedSeries {
+        id: series.id,
+        name: series.name,
+        created,
+        changed,
+    })
+}
+
+/// The series in `store` with the id or the name `named`, a name ignoring
+/// case and the whitespace around it; with none named, the series the
+/// chapter of the project file `project` links. Fails when there's no such
+/// series, two or more have the name, or the chapter links none.
+pub fn find_series(project: &Path, store: &SeriesStore, named: Option<&str>) -> Result<Series> {
+    let Some(name) = named else {
+        return store.get(&linked(project)?);
+    };
+    if valid_id(name.trim())
+        && let Some(series) = store.find(name.trim())?
+    {
+        return Ok(series);
+    }
+    self::named(store, name)?
+        .with_context(|| format!("there's no series named \"{}\"", name.trim()))
+}
+
+/// The series in `store` named `name`, ignoring case and the whitespace
+/// around it; none when there's none. Two or more so named fail, naming
+/// their ids.
+fn named(store: &SeriesStore, name: &str) -> Result<Option<Series>> {
+    let wanted = name.trim().to_lowercase();
+    ensure!(!wanted.is_empty(), "a series needs a name");
+    let mut found: Vec<Series> = store
+        .list()?
+        .into_iter()
+        .filter(|series| series.name.trim().to_lowercase() == wanted)
+        .collect();
+    if found.len() > 1 {
+        let ids: Vec<&str> = found.iter().map(|series| series.id.as_str()).collect();
+        bail!(
+            "{} series are named \"{}\" ({}); rename one in the glossary editor first",
+            found.len(),
+            name.trim(),
+            ids.join(", ")
+        );
+    }
+    Ok(found.pop())
+}
+
+/// The id of the series the chapter of the project file `project` links;
+/// fails when it links none.
+fn linked(project: &Path) -> Result<String> {
+    ChapterContext::load(project)?
+        .series
+        .context("the chapter is linked to no series; link one first")
+}
+
+/// A term as a caller saves it in a series: what it leaves out, a term the
+/// series has with its source keeps, and a new one takes as
+/// [`GlossaryEntry::new`] gives it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TermEdit {
+    pub source: String,
+    pub target: String,
+    pub kind: Option<TermKind>,
+    pub note: Option<String>,
+    pub locked: Option<bool>,
+}
+
+/// What saving a term in a series did.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct SavedTerm {
+    /// The series' name.
+    pub series: String,
+    /// The term as saved.
+    pub term: GlossaryEntry,
+    /// Whether it took the place of a term with its source.
+    pub replaced: bool,
+}
+
+/// Saves `edit` in the series the chapter of the project file `project`
+/// links, in `store`: in place of its term with the same source, ignoring
+/// case and whitespace, keeping that term's place and id and whatever `edit`
+/// leaves out, and dropping any other with that source ([`Series::put`]);
+/// else after the others. Fails, saving nothing, when the chapter links no
+/// series, its file is gone, or the term lacks a source or a target.
+pub fn save_term(project: &Path, store: &SeriesStore, edit: TermEdit) -> Result<SavedTerm> {
+    let id = linked(project)?;
+    let entry = GlossaryEntry::new(&edit.source, &edit.target);
+    ensure!(
+        !entry.source.is_empty() && !entry.target.is_empty(),
+        "a term needs a source and a target"
+    );
+    store.update(&id, |series| {
+        let held = series.term(&entry.source).cloned();
+        let source = entry.source.clone();
+        let term = GlossaryEntry {
+            kind: edit
+                .kind
+                .or(held.as_ref().map(|term| term.kind))
+                .unwrap_or_default(),
+            note: edit
+                .note
+                .map(|note| note.trim().to_owned())
+                .or_else(|| held.as_ref().map(|term| term.note.clone()))
+                .unwrap_or_default(),
+            locked: edit
+                .locked
+                .or(held.as_ref().map(|term| term.locked))
+                .unwrap_or_default(),
+            ..entry
+        };
+        series.put(term);
+        SavedTerm {
+            series: series.name.clone(),
+            term: series.term(&source).cloned().unwrap_or_default(),
+            replaced: held.is_some(),
+        }
+    })
+}
+
+/// Removes every term with the source `source`, ignoring case and
+/// whitespace, from the series the chapter of the project file `project`
+/// links, in `store`, and answers how many it removed. Fails when the
+/// chapter links no series, or its file is gone.
+pub fn delete_term(project: &Path, store: &SeriesStore, source: &str) -> Result<usize> {
+    store.update(&linked(project)?, |series| series.remove_term(source))
+}
+
+/// Accepts the suggestion of the chapter of the project file `project` with
+/// the source `source`, ignoring case and whitespace, as it holds it, into
+/// the series the chapter links, in `store`, as [`accept`] does. Answers the
+/// series' term as saved.
+pub fn accept_source(project: &Path, store: &SeriesStore, source: &str) -> Result<SavedTerm> {
+    let entry = ChapterContext::load(project)?
+        .suggestion(source)
+        .cloned()
+        .with_context(|| format!("the chapter has no suggested term \"{}\"", source.trim()))?;
+    let source = entry.source.clone();
+    let replaced = store.get(&linked(project)?)?.term(&source).is_some();
+    let series = accept(project, store, entry)?;
+    Ok(SavedTerm {
+        term: series.term(&source).cloned().unwrap_or_default(),
+        series: series.name,
+        replaced,
+    })
+}
+
+/// Dismisses every suggestion of the chapter of the project file `project`
+/// with the source `source`, ignoring case and whitespace, and answers how
+/// many it dismissed.
+pub fn dismiss_source(project: &Path, source: &str) -> Result<usize> {
+    ChapterContext::update(project, |chapter| {
+        let before = chapter.suggestions.len();
+        chapter
+            .suggestions
+            .retain(|term| !same_source(&term.source, source));
+        before - chapter.suggestions.len()
+    })
+}
+
+/// The terms the lines of the Instructions write, as Import from
+/// instructions offers them to the agent.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct InstructionOffer {
+    /// The name of the series the chapter links, which they'd go into; none
+    /// when it links none, or its file is gone.
+    pub series: Option<String>,
+    pub terms: Vec<OfferedTerm>,
+}
+
+/// A term a line of the Instructions writes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct OfferedTerm {
+    /// The line, counted from 0.
+    pub line: u32,
+    pub source: String,
+    pub target: String,
+    /// Whether the linked series has a term with its source already, which
+    /// importing it skips.
+    pub held: bool,
+}
+
+/// The terms the lines of `instructions` write, each with whether the
+/// series the chapter of the project file `project` links, in `store`, has
+/// one with its source already.
+pub fn offer_instructions(
+    project: &Path,
+    store: &SeriesStore,
+    instructions: &str,
+) -> Result<InstructionOffer> {
+    let series = match ChapterContext::load(project)?.series {
+        Some(id) => store.find(&id)?,
+        None => None,
+    };
+    let terms = instruction_terms(instructions)
+        .into_iter()
+        .map(|term| OfferedTerm {
+            held: series
+                .as_ref()
+                .is_some_and(|series| series.term(&term.source).is_some()),
+            line: term.line,
+            source: term.source,
+            target: term.target,
+        })
+        .collect();
+    Ok(InstructionOffer {
+        series: series.map(|series| series.name),
+        terms,
+    })
+}
+
+/// Imports the terms on the lines `lines` of `instructions`, the
+/// Instructions as saved now, into the series the chapter of the project
+/// file `project` links, in `store`, as [`import_instructions`] does. The
+/// caller saves the Instructions it answers only while they're still
+/// `instructions`.
+pub fn import_linked_instructions(
+    project: &Path,
+    store: &SeriesStore,
+    instructions: &str,
+    lines: &[u32],
+    remove: bool,
+) -> Result<InstructionImport> {
+    let id = linked(project)?;
+    import_instructions(store, &id, instructions, instructions, lines, remove)
+}
+
+/// Writes `series` to the file `path`, an absolute path, as an export in
+/// Booharu 0.0.4's shape, which 0.0.4 imports too. A file already there is
+/// replaced only with `overwrite`.
+pub fn export_series(series: &Series, path: &Path, overwrite: bool) -> Result<()> {
+    ensure!(
+        path.is_absolute(),
+        "\"{}\" isn't an absolute path",
+        path.display()
+    );
+    ensure!(
+        overwrite || !path.exists(),
+        "{} is there already",
+        path.display()
+    );
+    series.write_file(path)
+}
+
+/// What importing a series file did.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ImportedSeries {
+    /// The series' id as saved: a new one when it was kept beside the
+    /// series of its file's id.
+    pub id: String,
+    pub name: String,
+    /// How many terms it has.
+    pub terms: u32,
+    /// Whether a series of its file's id was saved already, which the import
+    /// replaced or kept beside it.
+    pub existed: bool,
+}
+
+/// Imports the series file `path`, an absolute path to a Booharu 0.0.4 or
+/// 0.0.5 export or series file, into `store`: in place of the series of its
+/// id with `replace`, else, when that id is taken, beside it with a new id.
+/// A file that isn't a series fails, importing nothing.
+pub fn import_series(store: &SeriesStore, path: &Path, replace: bool) -> Result<ImportedSeries> {
+    ensure!(
+        path.is_absolute(),
+        "\"{}\" isn't an absolute path",
+        path.display()
+    );
+    let series = Series::read_file(path)?;
+    let existed = store.exists(&series.id)?;
+    let series = store.import(series, replace)?;
+    Ok(ImportedSeries {
+        terms: series.glossary.len() as u32,
+        id: series.id,
+        name: series.name,
+        existed,
     })
 }
 
@@ -522,6 +974,226 @@ mod tests {
         let kept =
             import_instructions(&store, &series.id, instructions, instructions, &[4], false)?;
         assert_eq!((kept.added, kept.instructions), (1, None));
+        Ok(())
+    }
+
+    #[test]
+    fn the_agent_reads_the_chapter_whole_and_in_short() -> Result<()> {
+        let chapter = Chapter::new(vec![block("hina", None, 0, "ヒナ先生!")])?;
+        let (path, store) = (chapter.path(), chapter.store());
+        let project = chapter.session.project();
+        let opened = || Ok(chapter.store());
+        let none = notes(path, &project, opened)?;
+        assert!(none.series.is_none() && none.found.is_empty() && none.extras.is_empty());
+        assert_eq!(
+            json!(outline(path, &project, opened)?),
+            json!({"series": null})
+        );
+
+        let mut series = store.create("Blue Archive")?;
+        series.notes = "Students of Kivotos.".to_owned();
+        series.glossary = vec![
+            GlossaryEntry {
+                locked: true,
+                note: "a title".to_owned(),
+                ..GlossaryEntry::new("先生", "Sensei")
+            },
+            GlossaryEntry::new("リムル", "Rimuru"),
+        ];
+        store.save(&series)?;
+        link(path, &store, Some(&series.id))?;
+        suggest(path, &store, GlossaryEntry::new("ヒナ", "Hina"))?;
+        let read = notes(path, &project, opened)?;
+        assert_eq!(read.series.as_ref(), Some(&series));
+        let found: Vec<&str> = read.found.iter().map(|term| &*term.source).collect();
+        assert_eq!(found, ["先生", "ヒナ"]);
+        assert_eq!(read.suggestions.len(), 1);
+        assert!(!read.fresh);
+        assert!(
+            read.extras.contains("- 先生 → Sensei (a title)")
+                && read.extras.contains("Students of Kivotos.")
+                && !read.extras.contains("Rimuru"),
+            "{}",
+            read.extras
+        );
+        assert_eq!(
+            json!(outline(path, &project, opened)?),
+            json!({"series": "Blue Archive", "glossary": [
+                {"source": "先生", "target": "Sensei", "note": "a title", "kind": "other",
+                    "locked": true},
+                {"source": "ヒナ", "target": "Hina", "kind": "other"},
+            ]})
+        );
+        // A series whose file is gone.
+        store.delete(&series.id)?;
+        let gone = outline(path, &project, opened)?;
+        assert!(gone.missing && gone.series.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn a_series_is_linked_by_its_name_or_made() -> Result<()> {
+        let chapter = Chapter::new(Vec::new())?;
+        let (path, store) = (chapter.path(), chapter.store());
+        let none = link_named(path, &store, "Blue Archive", false).expect_err("none");
+        assert!(
+            format!("{none:#}").contains("there are none yet"),
+            "{none:#}"
+        );
+        let made = link_named(path, &store, " Blue Archive ", true)?;
+        assert!(made.created && made.changed && made.name == "Blue Archive");
+        let again = link_named(path, &store, "blue archive", true)?;
+        assert_eq!(
+            (again.id.as_str(), again.created, again.changed),
+            (&*made.id, false, false)
+        );
+        assert_eq!(ChapterContext::load(path)?.series, Some(made.id.clone()));
+        let other = link_named(path, &store, "Slime", false).expect_err("none");
+        assert!(
+            format!("{other:#}").contains("\"Blue Archive\""),
+            "{other:#}"
+        );
+        // By id, by name, or the linked one.
+        let series = store.get(&made.id)?;
+        assert_eq!(find_series(path, &store, None)?, series);
+        assert_eq!(find_series(path, &store, Some(&made.id))?, series);
+        assert_eq!(find_series(path, &store, Some("BLUE ARCHIVE"))?, series);
+        // Two of one name are told apart by the user, not guessed.
+        store.create("blue archive")?;
+        assert!(link_named(path, &store, "Blue Archive", false).is_err());
+        assert!(find_series(path, &store, Some("Blue Archive")).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn a_term_saved_keeps_what_it_leaves_out() -> Result<()> {
+        let chapter = Chapter::new(Vec::new())?;
+        let (path, store) = (chapter.path(), chapter.store());
+        let edit = |source: &str, target: &str| TermEdit {
+            source: source.to_owned(),
+            target: target.to_owned(),
+            ..TermEdit::default()
+        };
+        assert!(
+            save_term(path, &store, edit("ヒナ", "Hina")).is_err(),
+            "no series"
+        );
+        let series = store.create("Blue Archive")?;
+        link(path, &store, Some(&series.id))?;
+        let saved = save_term(
+            path,
+            &store,
+            TermEdit {
+                kind: Some(TermKind::Name),
+                note: Some(" the prefect ".to_owned()),
+                locked: Some(true),
+                ..edit(" ヒナ ", "Hina")
+            },
+        )?;
+        assert!(!saved.replaced && saved.series == "Blue Archive");
+        let first = saved.term;
+        assert_eq!(
+            (first.note.as_str(), first.kind, first.locked),
+            ("the prefect", TermKind::Name, true)
+        );
+        let saved = save_term(path, &store, edit("ヒ ナ", "Hina-san"))?;
+        assert!(saved.replaced);
+        assert_eq!(
+            saved.term,
+            GlossaryEntry {
+                source: "ヒ ナ".to_owned(),
+                target: "Hina-san".to_owned(),
+                ..first
+            }
+        );
+        assert_eq!(store.get(&series.id)?.glossary, [saved.term]);
+        assert!(save_term(path, &store, edit("先生", " ")).is_err());
+        assert_eq!(delete_term(path, &store, "ヒナ")?, 1);
+        assert_eq!(delete_term(path, &store, "ヒナ")?, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_suggestion_is_accepted_or_dismissed_by_its_source() -> Result<()> {
+        let chapter = Chapter::new(Vec::new())?;
+        let (path, store) = (chapter.path(), chapter.store());
+        let series = store.create("Blue Archive")?;
+        link(path, &store, Some(&series.id))?;
+        suggest(path, &store, GlossaryEntry::new("ヒナ", "Hina"))?;
+        suggest(path, &store, GlossaryEntry::new("アコ", "Ako"))?;
+        let accepted = accept_source(path, &store, "ヒ ナ")?;
+        assert_eq!(
+            (accepted.term.target.as_str(), accepted.replaced),
+            ("Hina", false)
+        );
+        assert_eq!(store.get(&series.id)?.glossary, [accepted.term]);
+        assert!(
+            accept_source(path, &store, "ヒナ").is_err(),
+            "accepted already"
+        );
+        assert_eq!(dismiss_source(path, "アコ")?, 1);
+        assert_eq!(dismiss_source(path, "アコ")?, 0);
+        assert!(ChapterContext::load(path)?.suggestions.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn the_instructions_terms_are_offered_with_those_the_series_holds() -> Result<()> {
+        let chapter = Chapter::new(Vec::new())?;
+        let (path, store) = (chapter.path(), chapter.store());
+        let instructions = "Use natural English.\nヒナ=Hina\n魔王 = Demon King";
+        let offer = offer_instructions(path, &store, instructions)?;
+        assert_eq!(offer.series, None);
+        assert!(offer.terms.iter().all(|term| !term.held));
+        assert!(import_linked_instructions(path, &store, instructions, &[1], false).is_err());
+        let mut series = store.create("Blue Archive")?;
+        series.glossary.push(GlossaryEntry::new("魔王", "Overlord"));
+        store.save(&series)?;
+        link(path, &store, Some(&series.id))?;
+        let offer = offer_instructions(path, &store, instructions)?;
+        assert_eq!(offer.series.as_deref(), Some("Blue Archive"));
+        let held: Vec<(u32, bool)> = offer
+            .terms
+            .iter()
+            .map(|term| (term.line, term.held))
+            .collect();
+        assert_eq!(held, [(1, false), (2, true)]);
+        let imported = import_linked_instructions(path, &store, instructions, &[1, 2], true)?;
+        assert_eq!((imported.added, imported.skipped), (1, 1));
+        assert_eq!(
+            imported.instructions.as_deref(),
+            Some("Use natural English.")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_series_exports_to_a_new_file_and_imports_beside_its_own() -> Result<()> {
+        let chapter = Chapter::new(Vec::new())?;
+        let store = chapter.store();
+        let mut series = store.create("Blue Archive")?;
+        series.glossary.push(GlossaryEntry::new("先生", "Sensei"));
+        store.save(&series)?;
+        let file = chapter.dir.path().join("Blue Archive.json");
+        export_series(&series, &file, false)?;
+        assert_eq!(Series::read_file(&file)?, series);
+        assert!(
+            export_series(&series, &file, false).is_err(),
+            "there already"
+        );
+        export_series(&series, &file, true)?;
+        assert!(export_series(&series, Path::new("Blue Archive.json"), true).is_err());
+
+        let kept = import_series(&store, &file, false)?;
+        assert!(kept.existed && kept.id != series.id && kept.terms == 1);
+        assert_eq!(store.list()?.len(), 2);
+        let replaced = import_series(&store, &file, true)?;
+        assert_eq!(
+            (replaced.id.as_str(), replaced.existed),
+            (&*series.id, true)
+        );
+        assert_eq!(store.list()?.len(), 2);
+        assert!(import_series(&store, Path::new("Blue Archive.json"), false).is_err());
         Ok(())
     }
 }
