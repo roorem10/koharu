@@ -95,6 +95,13 @@ pub trait BooharuHost: Send + Sync {
     /// desktop app tells its interface; outside the app, no one.
     fn context_changed(&self) {}
 
+    /// Tells whoever shows Koharu's settings that a tool saved the
+    /// translator's Instructions, as Import from instructions does, as the
+    /// desktop app tells its interface, which reads its settings again so
+    /// its next save of them keeps the Instructions as saved; outside the
+    /// app, no one.
+    fn instructions_changed(&self) {}
+
     /// The series folder the glossary tools read and write: the Booharu
     /// home's `series`, which the app's glossary editor shows.
     fn series(&self) -> anyhow::Result<SeriesStore> {

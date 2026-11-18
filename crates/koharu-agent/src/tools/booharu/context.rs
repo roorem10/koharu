@@ -523,6 +523,9 @@ impl Tool for ImportInstructionGlossary {
                         "the terms were imported, but the Instructions changed meanwhile and \
                          stay as they are"
                     );
+                    // So the app's Settings, and its other saves of them,
+                    // never put the lines back.
+                    host.instructions_changed();
                     true
                 }
                 None => false,
@@ -790,12 +793,14 @@ mod tests {
     /// The app as the glossary tools reach it: its series in a folder of
     /// the test's, its Instructions in memory, the runs it was asked to
     /// start, which it never starts, as a translation would load a model,
-    /// and how many writes it was told of.
+    /// how many writes it was told of, and how many saves of the
+    /// Instructions.
     struct Glossary {
         series: SeriesStore,
         instructions: Mutex<String>,
         started: Mutex<Vec<(Target, BTreeSet<Stage>)>>,
         told: AtomicUsize,
+        instructions_told: AtomicUsize,
     }
 
     impl BooharuHost for Glossary {
@@ -817,6 +822,10 @@ mod tests {
 
         fn context_changed(&self) {
             self.told.fetch_add(1, Ordering::Relaxed);
+        }
+
+        fn instructions_changed(&self) {
+            self.instructions_told.fetch_add(1, Ordering::Relaxed);
         }
 
         fn series(&self) -> anyhow::Result<SeriesStore> {
@@ -889,6 +898,7 @@ mod tests {
                 instructions: Mutex::default(),
                 started: Mutex::default(),
                 told: AtomicUsize::new(0),
+                instructions_told: AtomicUsize::new(0),
             });
             let tools = Tools::new(
                 Arc::new(Mutex::new(session)),
@@ -1189,6 +1199,8 @@ mod tests {
         let id = linked_id(&chapter);
         let terms = chapter.store().get(&id).expect("the series").glossary;
         assert_eq!(terms.len(), 1, "nothing imported");
+        let instructions_told = || chapter.app.instructions_told.load(Ordering::Relaxed);
+        assert_eq!(instructions_told(), 0);
 
         instructions.clone_into(&mut chapter.app.instructions.lock());
         let args = json!({"apply": true, "lines": [1, 2], "remove": true, "version": version});
@@ -1201,6 +1213,10 @@ mod tests {
             json!({"series": "Blue Archive", "added": 1, "skipped": 1, "removed": true})
         );
         assert_eq!(*chapter.app.instructions.lock(), "Use natural English.");
+        // The app is told the Instructions were saved, so its interface reads
+        // them again and its next save of the settings never puts the lines
+        // back.
+        assert_eq!(instructions_told(), 1);
     }
 
     /// The id of the series the chapter is linked to.

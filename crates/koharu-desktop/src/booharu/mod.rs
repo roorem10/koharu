@@ -3,7 +3,7 @@
 //! canvas's Booharu effect does, the Booharu settings pushed to the canvas,
 //! the MCP server's start on Booharu's own port, and the host Booharu's
 //! agent tools reach the app through, which tells the interface when they
-//! write a series or the chapter's notes.
+//! write a series or the chapter's notes, or save the Instructions.
 
 pub(crate) mod boxes;
 pub(crate) mod canvas;
@@ -86,6 +86,12 @@ impl BooharuHost for DesktopHost {
     fn context_changed(&self) {
         if let Some(handle) = self.0.handle() {
             events::CONTEXT_CHANGED.tell(&handle, ());
+        }
+    }
+
+    fn instructions_changed(&self) {
+        if let Some(handle) = self.0.handle() {
+            events::INSTRUCTIONS_CHANGED.tell(&handle, ());
         }
     }
 }

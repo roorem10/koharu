@@ -1880,7 +1880,7 @@ export const commands = {
   /** The Instructions as saved now, `[pipeline]`'s translator instructions, with the terms their lines write, for Import from instructions. */
   booharuPreviewInstructionGlossary: () =>
     invoke<InstructionPreview>('booharu_preview_instruction_glossary', {}, { headers: headers() }),
-  /** Imports the terms on the lines `lines`, counted from 0, of `instructions`, the Instructions as previewed, into the series `series` as locked terms, skipping a source it already has; with `remove`, saves the Instructions without those lines, which the interface then reads again. Fails, changing nothing, when the saved Instructions are no longer the ones previewed. */
+  /** Imports the terms on the lines `lines`, counted from 0, of `instructions`, the Instructions as previewed, into the series `series` as locked terms, skipping a source it already has; with `remove`, saves the Instructions without those lines and tells the interface, which then reads its settings again. Fails, changing nothing, when the saved Instructions are no longer the ones previewed. */
   booharuImportInstructionGlossary: (
     series: string,
     lines: number[],
@@ -1942,4 +1942,6 @@ export const events = {
     listen<BooharuRunGroup>('booharu_run_group', (event) => handler(event.payload)),
   booharuContextChanged: (handler: (payload: null) => void): Promise<UnlistenFn> =>
     listen<null>('booharu_context_changed', (event) => handler(event.payload)),
+  booharuInstructionsChanged: (handler: (payload: null) => void): Promise<UnlistenFn> =>
+    listen<null>('booharu_instructions_changed', (event) => handler(event.payload)),
 }

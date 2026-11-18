@@ -6,7 +6,8 @@
 //! first start saying where Booharu 0.0.4's series are. The files and the
 //! rules are booharu-core's `context` and the `booharu` crate's, which the
 //! agent's tools share. Every write of a series file or of the open
-//! project's side file tells the interface `booharu_context_changed`.
+//! project's side file tells the interface `booharu_context_changed`, and
+//! every save of the Instructions `booharu_instructions_changed`.
 
 use std::{path::PathBuf, sync::Arc};
 
@@ -25,7 +26,7 @@ use specta::Type;
 use tauri::{State, Window};
 use tauri_runtime_cef::CefRuntime;
 
-use super::events::CONTEXT_CHANGED;
+use super::events::{CONTEXT_CHANGED, INSTRUCTIONS_CHANGED};
 use crate::{app::App, commands::Result};
 
 /// The open project's chapter as its side file and the series it links
@@ -282,9 +283,9 @@ pub fn booharu_preview_instruction_glossary() -> Result<InstructionPreview> {
 /// Imports the terms on the lines `lines`, counted from 0, of
 /// `instructions`, the Instructions as previewed, into the series `series`
 /// as locked terms, skipping a source it already has; with `remove`, saves
-/// the Instructions without those lines, which the interface then reads
-/// again. Fails, changing nothing, when the saved Instructions are no longer
-/// the ones previewed.
+/// the Instructions without those lines and tells the interface, which then
+/// reads its settings again. Fails, changing nothing, when the saved
+/// Instructions are no longer the ones previewed.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_import_instruction_glossary(
@@ -324,6 +325,7 @@ pub async fn booharu_import_instruction_glossary(
                  they are"
             );
             app.pipeline.set_config(koharu_config::get()?);
+            app.emit(INSTRUCTIONS_CHANGED, ());
         }
         Ok(imported)
     })

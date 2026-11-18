@@ -14,7 +14,8 @@ import {
   useSeriesList,
 } from '@/lib/booharu/context'
 import { queryClient } from '@/lib/queries'
-import { events } from '@koharu/ipc/protocol'
+import { useKoharuStore } from '@/lib/store'
+import { commands, events, type Preferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
 import { blueLock, contextDesktop, openChapter, term } from './context'
@@ -92,6 +93,7 @@ describe('Booharu context data', () => {
       tell = () => handler(null)
       return stop
     })
+    vi.spyOn(events, 'booharuInstructionsChanged').mockResolvedValue(stop)
     renderHook(() => useBooharuContextChanges(), { wrapper })
     const list = renderHook(() => useSeriesList(), { wrapper })
     const chapter = renderHook(() => useChapterContext(), { wrapper })
@@ -109,6 +111,42 @@ describe('Booharu context data', () => {
     expect(chapter.result.current.data?.context.suggestions).toEqual([])
     await waitFor(() => expect(list.result.current.data?.[0]?.name).toBe('Blue Lock: Episode Nagi'))
     expect(spies.chapter).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads Koharu’s settings again as the desktop tells the agent saved the Instructions', async () => {
+    contextDesktop()
+    // The Instructions as the interface read them, then as the agent's import left them.
+    const settings = (instructions: string): Preferences => ({
+      pipeline: { translator: { instructions } },
+      renderer: { font_families: [] },
+      agent: {},
+      providers: {},
+    })
+    useKoharuStore.setState({ preferences: settings('Keep honorifics.\n潔 = Isagi') })
+    const read = vi
+      .spyOn(commands, 'getPreferences')
+      .mockResolvedValue(settings('Keep honorifics.'))
+    let tell: () => void = () => undefined
+    const stop = vi.fn()
+    vi.spyOn(events, 'booharuContextChanged').mockResolvedValue(stop)
+    vi.spyOn(events, 'booharuInstructionsChanged').mockImplementation(async (handler) => {
+      tell = () => handler(null)
+      return stop
+    })
+    const hook = renderHook(() => useBooharuContextChanges(), { wrapper })
+    await waitFor(() => expect(events.booharuInstructionsChanged).toHaveBeenCalledOnce())
+    expect(read).not.toHaveBeenCalled()
+
+    tell()
+
+    // Every later save of the cached settings, such as the Run popover's choice of model, then
+    // keeps the Instructions without the imported lines.
+    await waitFor(() =>
+      expect(useKoharuStore.getState().preferences).toEqual(settings('Keep honorifics.')),
+    )
+    expect(read).toHaveBeenCalledOnce()
+    hook.unmount()
+    await waitFor(() => expect(stop).toHaveBeenCalledTimes(2))
   })
 
   it('shows a side file that does not read as the read’s error, without a toast', async () => {

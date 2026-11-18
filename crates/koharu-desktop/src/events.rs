@@ -88,5 +88,6 @@ pub fn bindings(types: &mut Types) -> Vec<(&'static str, DataType)> {
         crate::booharu::events::NOTICE.binding(types), // Booharu: Booharu's notice.
         crate::booharu::events::RUN_GROUP.binding(types), // Booharu: a run group's runs.
         crate::booharu::events::CONTEXT_CHANGED.binding(types), // Booharu: a series or chapter changed.
+        crate::booharu::events::INSTRUCTIONS_CHANGED.binding(types), // Booharu: an import saved the Instructions.
     ]
 }

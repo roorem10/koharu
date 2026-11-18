@@ -41,3 +41,9 @@ pub const RUN_GROUP: Event<BooharuRunGroup> = Event::new("booharu_run_group");
 /// command or the agent: whatever shows the series glossary or the chapter's
 /// notes reads them again.
 pub const CONTEXT_CHANGED: Event<()> = Event::new("booharu_context_changed");
+
+/// The translator's Instructions were saved by Import from instructions, the
+/// command's or the agent's, rather than by the Settings page: the interface
+/// reads Koharu's settings again, so its next save of them keeps the
+/// Instructions as they are now.
+pub const INSTRUCTIONS_CHANGED: Event<()> = Event::new("booharu_instructions_changed");

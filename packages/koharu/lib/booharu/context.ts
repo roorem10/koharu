@@ -242,16 +242,24 @@ export function refreshContext(): Promise<void> {
 
 /** Reads the series and the chapter again whenever the desktop tells `booharu_context_changed`,
  * after a write to a series file or the open project's side file, by the interface or by the
- * agent, until the interface unmounts. */
+ * agent; and Koharu's settings again whenever it tells `booharu_instructions_changed`, after Import
+ * from instructions saved the Instructions, the agent's too, as Koharu tells no change of its
+ * settings, so Settings shows them as saved and no save of the cached settings, such as the Run
+ * popover's choice of model, puts the imported lines back. Until the interface unmounts. */
 export function useBooharuContextChanges(): void {
   useEffect(() => {
     let active = true
-    const listening = events.booharuContextChanged(() => {
-      if (active) void refreshContext().catch(() => undefined)
-    })
+    const listening = [
+      events.booharuContextChanged(() => {
+        if (active) void refreshContext().catch(() => undefined)
+      }),
+      events.booharuInstructionsChanged(() => {
+        if (active) void refreshPreferences().catch(() => undefined)
+      }),
+    ].map((listener) => listener.catch(() => null))
     return () => {
       active = false
-      void listening.then((stop) => stop()).catch(() => undefined)
+      for (const listener of listening) void listener.then((stop) => stop?.())
     }
   }, [])
 }
