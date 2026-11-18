@@ -1196,6 +1196,8 @@ name = "booharu-core"
 version = "0.85.2"
 dependencies = [
  "anyhow",
+ "image",
+ "imageproc",
  "koharu-config",
  "koharu-scene",
  "kurbo",

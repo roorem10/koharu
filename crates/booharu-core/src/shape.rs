@@ -499,6 +499,63 @@ mod tests {
     }
 
     #[test]
+    fn existing_page_round_bubbles_keep_tails_without_becoming_spiky() {
+        use imageproc::contours::{BorderType, find_contours_with_threshold};
+
+        // White interior contours exercise real outlines without loading a
+        // detector model.
+        let image = image::load_from_memory(include_bytes!(
+            "../../koharu-ml/benches/fixtures/object_detection/1.jpg"
+        ))
+        .expect("the fixture page")
+        .to_rgb8();
+        let mask = image::GrayImage::from_fn(image.width(), image.height(), |x, y| {
+            let white = image.get_pixel(x, y).0.iter().all(|&c| c > 235);
+            image::Luma([if white { 255 } else { 0 }])
+        });
+        let contours = find_contours_with_threshold::<i32>(&mask, 128);
+        for (x, y) in [
+            (300.0, 190.0),
+            (370.0, 345.0),
+            (115.0, 865.0),
+            (650.0, 900.0),
+        ] {
+            let outline = contours
+                .iter()
+                .filter(|contour| contour.border_type == BorderType::Outer)
+                .map(|contour| {
+                    let point = |p: &imageproc::point::Point<i32>| {
+                        Point::new(f64::from(p.x), f64::from(p.y))
+                    };
+                    contour.points.iter().map(point).collect::<Vec<_>>()
+                })
+                .filter(|points| {
+                    let bounds = closed(points).bounding_box();
+                    bounds.x0 < x
+                        && x < bounds.x1
+                        && bounds.y0 < y
+                        && y < bounds.y1
+                        && (44.0..180.0).contains(&bounds.width())
+                        && (70.0..260.0).contains(&bounds.height())
+                        && signed_area(points).abs() > 2000.0
+                })
+                .min_by(|a, b| signed_area(a).abs().total_cmp(&signed_area(b).abs()))
+                .expect("the fixture's bubble");
+            // As 0.0.4 measured the traced outline, then as an outline in
+            // the scene is measured, simplified first, which drops most of
+            // a pixel outline's stair-steps.
+            assert_eq!(shape(&outline), BubbleShape::Round, "({x}, {y})");
+            assert!(simplified(&outline).len() < outline.len() / 2, "({x}, {y})");
+            let measures = measure(&closed(&outline)).expect("measures");
+            assert_eq!(
+                classify(&measures, &ShapeThresholds::default()),
+                BubbleShape::Round,
+                "({x}, {y}): {measures:?}"
+            );
+        }
+    }
+
+    #[test]
     fn degenerate_polygons_are_unmeasurable() {
         assert_eq!(measure_polygon(&[]), None);
         assert_eq!(measure_polygon(&[Point::ZERO; 4]), None);
