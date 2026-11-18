@@ -62,12 +62,22 @@ export function isTextEntry(target: EventTarget | null): boolean {
   )
 }
 
+/** Whether `target` is inside an open dialog, such as Box details or Settings (Base UI gives its
+ * popup the role dialog or alertdialog). */
+export function inDialog(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element && target.closest('[role="dialog"], [role="alertdialog"]') !== null
+  )
+}
+
 /** Whether the canvas's shortcuts leave `event` to the control it reached. Text entry keeps every
- * key. Any other input, such as a slider, a checkbox or a colour input, keeps its own keys too:
- * Space, the arrows, Enter, Delete, Escape, and every Ctrl, Cmd or Alt chord. Only a bare printable
- * character other than Space, which means nothing to such an input, goes on to switch tools. */
+ * key, and so does everything inside a dialog: Space presses its focused button, and Delete never
+ * removes the layers behind it, as Koharu's canvas did from a dialog's buttons. Any other input,
+ * such as a slider, a checkbox or a colour input, keeps its own keys too: Space, the arrows, Enter,
+ * Delete, Escape, and every Ctrl, Cmd or Alt chord. Only a bare printable character other than
+ * Space, which means nothing to such an input, goes on to switch tools. */
 export function controlKeepsKey(event: KeyboardEvent): boolean {
-  if (isTextEntry(event.target)) return true
+  if (isTextEntry(event.target) || inDialog(event.target)) return true
   if (!(event.target instanceof HTMLInputElement)) return false
   const toolKey = event.key.length === 1 && event.key !== ' '
   return !toolKey || event.ctrlKey || event.metaKey || event.altKey

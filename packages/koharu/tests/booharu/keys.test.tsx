@@ -117,6 +117,20 @@ describe('Booharu tool keys in a focused control', () => {
       expect(controlKeepsKey(press(target, { key: 'z', ctrlKey: true }))).toBe(false)
     }
   })
+
+  it('leaves every key to a button in a dialog, so Space presses it and Delete removes nothing', () => {
+    for (const role of ['dialog', 'alertdialog']) {
+      const dialog = document.createElement('div')
+      dialog.setAttribute('role', role)
+      const button = document.createElement('button')
+      dialog.append(button)
+      document.body.append(dialog)
+      for (const init of [{ key: 'v' }, { key: 'o' }, ...controlKeys]) {
+        expect(controlKeepsKey(press(button, init)), `${role} ${JSON.stringify(init)}`).toBe(true)
+      }
+      dialog.remove()
+    }
+  })
 })
 
 describe('Booharu tool keys on the canvas', () => {
