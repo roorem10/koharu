@@ -24,6 +24,11 @@
 //! redraws only under a mask, and writes the clean-up, which can't be
 //! locked. Inside a stage nothing changes: a page that needs translation is
 //! translated whole, as Koharu does.
+//!
+//! `carry_on`, from `going`, queues the groups one after another, for the
+//! desktop command and the agent tool alike.
+
+mod going;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -35,6 +40,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use strum::VariantArray as _;
+
+pub use self::going::{RunHost, carry_on};
 
 /// The `c2pa` step Koharu's Recognition stage records.
 const OCR: &str = "ocr";
