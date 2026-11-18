@@ -93,8 +93,10 @@ impl Tool for SetSettings {
         "Change keys of one of Booharu's settings sections, named as booharu_get_settings names \
          them, and save it; an unknown section or key, or an invalid value, saves nothing. \
          Answers the section as saved, with a note when the change applies only once Booharu \
-         restarts. A call an outside app makes over MCP can't change `booharu-mcp`. Needs a \
-         project open, as every tool here does."
+         restarts. A change to `booharu-lettering` applies to text made from then on, never to \
+         translations already made: booharu_apply_text_style gives those the new look. A call \
+         an outside app makes over MCP can't change `booharu-mcp`. Needs a project open, as \
+         every tool here does."
             .to_owned()
     }
 
@@ -235,6 +237,45 @@ mod tests {
             "{error:?}"
         );
         assert_eq!(port(&settings), 50000);
+    }
+
+    #[tokio::test]
+    async fn the_default_look_and_the_favourites_are_saved_and_checked() {
+        let settings = Arc::new(Settings::default());
+        let (_dir, tools) = open(&settings);
+        let set = |section: &str, values: Value| SetSettingsArgs {
+            section: section.to_owned(),
+            values: serde_json::from_value(values).expect("keys"),
+        };
+        let look = json!({"fill": [1.0, 0.0, 0.0, 1.0], "stroke": null, "stroke_width": 4.0});
+        let lettering = set(
+            "booharu-lettering",
+            json!({"default": look, "detect_colors": false}),
+        );
+        let saved = SetSettings
+            .call(&mut tools.tool_context(), lettering)
+            .await
+            .expect("a new look");
+        assert_eq!(
+            json!(saved),
+            json!({
+                "section": "booharu-lettering",
+                "saved": {"default": look, "detect_colors": false},
+            })
+        );
+        let wide = json!({"default": {"fill": null, "stroke": null, "stroke_width": 60.0}});
+        let refused = SetSettings
+            .call(&mut tools.tool_context(), set("booharu-lettering", wide))
+            .await;
+        assert!(refused.is_err());
+        assert_eq!(settings.0.lock().lettering.default.stroke_width, 4.0);
+
+        let favourites = set("booharu-fonts", json!({"favorites": ["Anime Ace"]}));
+        let saved = SetSettings
+            .call(&mut tools.tool_context(), favourites)
+            .await
+            .expect("new favourites");
+        assert_eq!(json!(saved)["saved"], json!({"favorites": ["Anime Ace"]}));
     }
 
     /// An outside app's call, as it reaches Booharu's MCP server: its own

@@ -8,7 +8,7 @@
 //!
 //! | Tool | Does | Only reads |
 //! |---|---|---|
-//! | `booharu_get_project_overview` | each page's size and blocks, how many are translated, and the Booharu attributes on its layers; the translator's settings and whether its vendor is connected, the typesetting defaults, the font families, and Booharu's settings | yes |
+//! | `booharu_get_project_overview` | each page's size and blocks, how many are translated, the Booharu attributes on its layers, and which parts of its blocks were changed by hand; the translator's settings and whether its vendor is connected, the typesetting defaults, the font families, the look new text gets, and Booharu's settings | yes |
 //! | `booharu_get_settings` | every Booharu settings section, by its table name | yes |
 //! | `booharu_set_settings` | changes keys of one section, saved whole or not at all; an outside app can't change `booharu-mcp` | no |
 //! | `booharu_set_translation` | sets a block's translation, placing it first as the Translation stage does when the block has none, as one undo step | no |
@@ -18,11 +18,14 @@
 //! | `booharu_join_page_balloons` | joins every split balloon of a page, as one undo step | no |
 //! | `booharu_split_block` | splits a block in two across its lines, as one undo step, and starts the run reading and translating both halves | no |
 //! | `booharu_set_review_note` | sets or clears the reviewer's note on a block or a text, as one undo step | no |
+//! | `booharu_apply_text_style` | gives the translations of some blocks, pages, or the whole project the default text look again, keeping hand-edited blocks unless told otherwise, as one undo step, and answers how many it changed, kept, and found untranslated | no |
+//! | `booharu_count_text_style_targets` | how many blocks `booharu_apply_text_style` would change, keep, and find untranslated | yes |
 
 mod boxes;
 mod notes;
 mod project;
 mod settings;
+mod styles;
 mod translation;
 
 use std::{collections::BTreeSet, sync::Arc};
@@ -77,6 +80,8 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(boxes::JoinPageBalloons);
     tools.add_tool(boxes::SplitBlock);
     tools.add_tool(notes::SetReviewNote);
+    tools.add_tool(styles::ApplyTextStyle);
+    tools.add_tool(styles::CountTextStyleTargets);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one
