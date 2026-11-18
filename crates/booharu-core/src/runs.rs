@@ -73,13 +73,13 @@ pub const MAX_RETRIES: u8 = 5;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(default)]
 pub struct RunsSettings {
-    /// At most [`MAX_PRESETS`], each with a name, unique once trimmed and
-    /// never blank, and at least one stage.
+    /// At most 100, `MAX_PRESETS`, each with a name, unique once trimmed
+    /// and never blank, and at least one stage.
     #[serde(deserialize_with = "presets")]
     #[specta(type = Vec<RunPreset>)]
     pub presets: Vec<RunPreset>,
-    /// How often a failed page stage is tried again, from 0 to
-    /// [`MAX_RETRIES`].
+    /// How often a failed page stage is tried again, from 0 to 5,
+    /// `MAX_RETRIES`.
     #[serde(deserialize_with = "retries")]
     #[specta(type = u8)]
     pub retries: u8,

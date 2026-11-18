@@ -44,11 +44,11 @@ const INPAINTING: &str = "inpainting";
 const TRANSLATION: &str = "translation";
 
 /// What the Run button carries on with: every page, or the pages chosen.
-/// Each variant has fields, even none, so an unknown one fails: serde reads
-/// a tagged unit variant past any.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RunTarget {
+    // Fields, even none, so an unknown one fails: serde reads a tagged unit
+    // variant past any.
     Project {},
     Pages { pages: Vec<PageId> },
 }
