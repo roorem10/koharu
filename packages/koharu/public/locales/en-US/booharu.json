@@ -46,6 +46,14 @@
       "titleFor": "Box details for {{name}}",
       "translation": "Translation"
     },
+    "fonts": {
+      "addFavorite": "Add {{family}} to favorites",
+      "allFonts": "All fonts",
+      "favorites": "Favorites",
+      "favoritesOnly": "Favorites only",
+      "noFavorites": "Star fonts to add them here",
+      "removeFavorite": "Remove {{family}} from favorites"
+    },
     "menu": {
       "booharuGithub": "Booharu on GitHub",
       "koharuDiscord": "Koharu Discord",

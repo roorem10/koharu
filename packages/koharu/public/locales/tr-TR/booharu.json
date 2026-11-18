@@ -46,6 +46,14 @@
       "titleFor": "{{name}} için kutu ayrıntıları",
       "translation": "Çeviri"
     },
+    "fonts": {
+      "addFavorite": "{{family}} yazı tipini favorilere ekle",
+      "allFonts": "Tüm yazı tipleri",
+      "favorites": "Favoriler",
+      "favoritesOnly": "Yalnızca favoriler",
+      "noFavorites": "Yazı tiplerini buraya eklemek için yıldızlayın",
+      "removeFavorite": "{{family}} yazı tipini favorilerden kaldır"
+    },
     "menu": {
       "booharuGithub": "GitHub'da Booharu",
       "koharuDiscord": "Koharu Discord",

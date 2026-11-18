@@ -52,6 +52,14 @@
       "titleFor": "تفاصيل المربع لـ {{name}}",
       "translation": "الترجمة"
     },
+    "fonts": {
+      "addFavorite": "إضافة {{family}} إلى المفضلة",
+      "allFonts": "كل الخطوط",
+      "favorites": "المفضلة",
+      "favoritesOnly": "المفضلة فقط",
+      "noFavorites": "أضف نجمة إلى الخطوط لإظهارها هنا",
+      "removeFavorite": "إزالة {{family}} من المفضلة"
+    },
     "menu": {
       "booharuGithub": "Booharu على GitHub",
       "koharuDiscord": "Discord الخاص بـ Koharu",

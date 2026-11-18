@@ -46,6 +46,14 @@
       "titleFor": "{{name}} 个文字框详情",
       "translation": "译文"
     },
+    "fonts": {
+      "addFavorite": "收藏{{family}}",
+      "allFonts": "全部字体",
+      "favorites": "收藏字体",
+      "favoritesOnly": "单看收藏",
+      "noFavorites": "帮字体标星，伊就会显示勒此地",
+      "removeFavorite": "取消收藏{{family}}"
+    },
     "menu": {
       "booharuGithub": "GitHub 浪个 Booharu",
       "koharuDiscord": "Koharu 个 Discord",

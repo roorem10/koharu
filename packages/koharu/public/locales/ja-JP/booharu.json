@@ -46,6 +46,14 @@
       "titleFor": "{{name}}のボックス詳細",
       "translation": "翻訳"
     },
+    "fonts": {
+      "addFavorite": "{{family}}をお気に入りに追加",
+      "allFonts": "すべてのフォント",
+      "favorites": "お気に入り",
+      "favoritesOnly": "お気に入りのみ",
+      "noFavorites": "フォントにスターを付けるとここに表示されます",
+      "removeFavorite": "{{family}}をお気に入りから削除"
+    },
     "menu": {
       "booharuGithub": "GitHub の Booharu",
       "koharuDiscord": "Koharu の Discord",

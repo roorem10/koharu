@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { fontFamilies, highlighted, renderPicker, search } from './fonts'
+import { fontFamilies, highlighted, listed, renderPicker, search } from './fonts'
 
 describe('Booharu font picker keys', () => {
   it('moves through the fonts with Up and Down, wrapping around, and picks one with Enter', async () => {
@@ -107,10 +107,13 @@ describe('Booharu font picker keys', () => {
       'true',
     )
     expect(screen.getByRole('status')).toHaveTextContent('4 fonts')
+    // Without Booharu's props, none of its favourites.
+    expect(listed()).toEqual(['Anime Ace', 'CCMeanwhile', 'Komika Text', 'Wild Words'])
+    expect(screen.queryByRole('button', { name: 'Favorites only' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /favorites$/ })).not.toBeInTheDocument()
+
     await user.type(search(), 'WildWords')
-    expect(
-      screen.getAllByRole('option').map((option) => option.getAttribute('aria-label')),
-    ).toEqual(['Wild Words'])
+    expect(listed()).toEqual(['Wild Words'])
     await user.clear(search())
     await user.type(search(), 'missing family')
     expect(screen.getByText('No fonts match this search')).toBeInTheDocument()

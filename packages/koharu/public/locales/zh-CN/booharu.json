@@ -46,6 +46,14 @@
       "titleFor": "{{name}} 的文本框详情",
       "translation": "译文"
     },
+    "fonts": {
+      "addFavorite": "收藏{{family}}",
+      "allFonts": "全部字体",
+      "favorites": "收藏字体",
+      "favoritesOnly": "仅收藏",
+      "noFavorites": "为字体加星标即可在此显示",
+      "removeFavorite": "取消收藏{{family}}"
+    },
     "menu": {
       "booharuGithub": "GitHub 上的 Booharu",
       "koharuDiscord": "Koharu 的 Discord",

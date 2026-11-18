@@ -49,6 +49,14 @@
       "titleFor": "Détails de la zone de texte pour {{name}}",
       "translation": "Traduction"
     },
+    "fonts": {
+      "addFavorite": "Ajouter {{family}} aux favoris",
+      "allFonts": "Toutes les polices",
+      "favorites": "Favoris",
+      "favoritesOnly": "Favoris uniquement",
+      "noFavorites": "Ajoutez une étoile aux polices pour les afficher ici",
+      "removeFavorite": "Retirer {{family}} des favoris"
+    },
     "menu": {
       "booharuGithub": "Booharu sur GitHub",
       "koharuDiscord": "Discord de Koharu",

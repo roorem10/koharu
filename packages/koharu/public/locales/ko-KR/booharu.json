@@ -46,6 +46,14 @@
       "titleFor": "{{name}}의 상자 세부 정보",
       "translation": "번역"
     },
+    "fonts": {
+      "addFavorite": "{{family}} 즐겨찾기에 추가",
+      "allFonts": "모든 글꼴",
+      "favorites": "즐겨찾기",
+      "favoritesOnly": "즐겨찾기만",
+      "noFavorites": "글꼴에 별표를 추가하면 여기에 표시됩니다",
+      "removeFavorite": "{{family}} 즐겨찾기에서 제거"
+    },
     "menu": {
       "booharuGithub": "GitHub의 Booharu",
       "koharuDiscord": "Koharu Discord",

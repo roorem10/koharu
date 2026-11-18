@@ -50,6 +50,14 @@
       "titleFor": "Сведения о блоке {{name}}",
       "translation": "Перевод"
     },
+    "fonts": {
+      "addFavorite": "Добавить {{family}} в избранное",
+      "allFonts": "Все шрифты",
+      "favorites": "Избранное",
+      "favoritesOnly": "Только избранное",
+      "noFavorites": "Добавьте шрифты в избранное, чтобы они появились здесь",
+      "removeFavorite": "Удалить {{family}} из избранного"
+    },
     "menu": {
       "booharuGithub": "Booharu на GitHub",
       "koharuDiscord": "Discord Koharu",

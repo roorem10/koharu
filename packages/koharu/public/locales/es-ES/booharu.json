@@ -49,6 +49,14 @@
       "titleFor": "Detalles del cuadro de {{name}}",
       "translation": "Traducción"
     },
+    "fonts": {
+      "addFavorite": "Añadir {{family}} a favoritos",
+      "allFonts": "Todas las fuentes",
+      "favorites": "Favoritos",
+      "favoritesOnly": "Solo favoritos",
+      "noFavorites": "Marca fuentes con una estrella para añadirlas aquí",
+      "removeFavorite": "Quitar {{family}} de favoritos"
+    },
     "menu": {
       "booharuGithub": "Booharu en GitHub",
       "koharuDiscord": "Discord de Koharu",
