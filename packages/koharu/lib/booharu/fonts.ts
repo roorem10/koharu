@@ -32,6 +32,9 @@ export type FontRow =
   | { key: string; family: FontFamily; starred: boolean; localName?: string }
   | { key: string; heading: 'favorites' | 'allFonts' }
 
+/** What a pinned family's key has before its key under All fonts. */
+const PINNED = 'favorite:'
+
 /** The font list's rows for `results`, the families matching the search, in name order: the
  * favourites among them pinned under Favorites, then every match under All fonts, or with
  * `favoritesOnly` the favourites alone; with no favourite among them, the matches alone, as Koharu
@@ -49,13 +52,23 @@ export function fontRows(
   })
   const pinned: FontRow[] = all
     .filter((row) => row.starred)
-    .map((row) => ({ ...row, key: `favorite:${row.key}` }))
+    .map((row) => ({ ...row, key: `${PINNED}${row.key}` }))
   const favoriteRows: FontRow[] = pinned.length
     ? [{ key: 'heading:favorites', heading: 'favorites' }, ...pinned]
     : []
   if (favoritesOnly) return favoriteRows
   if (!pinned.length) return all
   return [...favoriteRows, { key: 'heading:allFonts', heading: 'allFonts' }, ...all]
+}
+
+/** The index among `rows` of the row keyed `active`, or, when that's a pinned family's row and it
+ * has gone, as when the family is unstarred, of the family's row under All fonts; -1 when neither
+ * is there. */
+export function activeRow(rows: FontRow[], active: string | null): number {
+  const found = rows.findIndex((row) => row.key === active)
+  if (found >= 0 || !active?.startsWith(PINNED)) return found
+  const own = active.slice(PINNED.length)
+  return rows.findIndex((row) => row.key === own)
 }
 
 /** A family's name as the font picker compares names, as Koharu's FontPicker normalizes them. */

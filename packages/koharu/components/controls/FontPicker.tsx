@@ -25,7 +25,7 @@ import {
   FavoriteStars,
   FontHeading,
 } from '@/components/booharu/fonts/FontFavorites'
-import { fontRows, type BooharuFontProps, type FontRow } from '@/lib/booharu/fonts'
+import { activeRow, fontRows, type BooharuFontProps, type FontRow } from '@/lib/booharu/fonts'
 import { useFontPreview } from '@/lib/queries'
 import type { FontFamily } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
@@ -108,9 +108,10 @@ export function FontPicker({
     [results, booharu.favorites, booharu.favoritesOnly, booharu.localNames],
   )
   // Booharu: the family the arrows are on, which they move from, skipping the headings and
-  // wrapping around as ModelPicker's do.
+  // wrapping around as ModelPicker's do; on a favourite whose pinned row goes, as when it's
+  // unstarred, they stay on its row under All fonts.
   const options = rows.flatMap((row, index) => ('family' in row ? [index] : []))
-  const found = rows.findIndex((row) => row.key === active)
+  const found = activeRow(rows, active)
   const shown = found >= 0 ? found : (options[0] ?? -1)
   const shownRow = rows.at(shown)
   const shownFamily = shownRow && 'family' in shownRow ? shownRow.family : undefined

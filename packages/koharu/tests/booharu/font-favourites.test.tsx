@@ -49,6 +49,28 @@ describe('Booharu font favourites', () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith('Wild Words')
   })
 
+  it('keeps the arrows on a favourite whose pinned row goes as it is unstarred', async () => {
+    favoritesDesktop(['Komika Text', 'Wild Words'])
+    const user = userEvent.setup()
+    const { onChange } = renderPicker({ value: 'Anime Ace' }, { booharu: true })
+    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await screen.findByText('Favorites')
+
+    // Up from the font in use, to Wild Words pinned under Favorites.
+    await user.keyboard('{ArrowUp}')
+    expect(highlighted()).toBe(screen.getAllByRole('option', { name: 'Wild Words' })[0])
+    await user.click(
+      screen.getAllByRole('button', { name: 'Remove Wild Words from favorites' })[0]!,
+    )
+
+    await waitFor(() =>
+      expect(screen.getAllByRole('option', { name: 'Wild Words' })).toHaveLength(1),
+    )
+    expect(highlighted()).toHaveAccessibleName('Wild Words')
+    await user.keyboard('{Enter}')
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('Wild Words')
+  })
+
   it('stars a font through the desktop at once, and takes the star back when that fails', async () => {
     const { set } = favoritesDesktop()
     const shown = vi.spyOn(toast, 'add')
