@@ -1,6 +1,8 @@
 //! Renders Koharu scene pages with vello: layout, retained layer content,
 //! and the GPU passes that draw it.
 
+// Booharu: each font family's names in other languages, for its font picker.
+pub mod booharu;
 mod config;
 pub mod fonts;
 mod frame;

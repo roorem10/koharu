@@ -79,6 +79,33 @@ pub(super) fn preview(family: &Family) -> Result<Vec<u8>> {
     download(&nearest(family, Attributes::default()).preview)
 }
 
+/// Booharu: each family of the catalog with a face already on disk, by its
+/// name, with the file of the first of its faces stored, for the names it
+/// gives its family in other languages. It never downloads, not even the
+/// index: with no index on disk, there are none.
+pub(crate) fn stored_faces() -> Vec<(String, std::path::PathBuf)> {
+    if !DATASET.exists("index.json") {
+        return Vec::new();
+    }
+    let Ok(families) = families() else {
+        return Vec::new();
+    };
+    families
+        .values()
+        .filter_map(|family| {
+            let face = family
+                .faces
+                .iter()
+                .find(|face| DATASET.exists(&face.file))?;
+            // On disk, so it resolves without a download.
+            let [path] = DOWNLOADS
+                .block_on(DATASET.resolve([face.file.as_str()]))
+                .ok()?;
+            Some((family.name.clone(), path))
+        })
+        .collect()
+}
+
 /// `family` as the font list shows it.
 pub(super) fn listed(family: &Family) -> FontFamily {
     FontFamily {

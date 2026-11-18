@@ -19,6 +19,8 @@ mod preview;
 use self::library::Request;
 pub use self::preview::preview;
 pub(crate) use self::{font::Font, library::Library};
+// Booharu: the bundled faces already on disk, for their names in other languages.
+pub(crate) use self::catalog::stored_faces;
 
 /// Families a text falls back on after the platform's fallback for its
 /// scripts, for the symbols and emoji that one lacks.
