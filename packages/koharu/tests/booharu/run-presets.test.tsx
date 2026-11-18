@@ -81,6 +81,7 @@ describe('Booharu run presets in the Run menu', () => {
           { name: 'Read + translate', stages: ['recognize', 'translate'] },
         ],
       },
+      'booharu-start': { fresh_start_note_seen: false },
     })
     // The menu goes back to its root view, where the new preset shows as the stages on.
     const saved = await within(screen.getByRole('group', { name: 'Presets' })).findByRole(

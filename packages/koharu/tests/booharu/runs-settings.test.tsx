@@ -73,6 +73,7 @@ describe('Booharu Runs settings', () => {
         presets: [...builtInRuns.presets, { name: 'Clean only', stages: ['inpaint'] }],
         on_page_failure: 'stop',
       },
+      'booharu-start': { fresh_start_note_seen: false },
     })
     // The file's state shows once the save ends, the other writer's preset with it.
     expect(await screen.findByRole('group', { name: 'Clean only' })).toBeInTheDocument()

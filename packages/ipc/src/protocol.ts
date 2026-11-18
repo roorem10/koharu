@@ -169,6 +169,7 @@ export type BooharuPreferences = {
   'booharu-lettering': LetteringSettings
   'booharu-fonts': FontSettings
   'booharu-runs': RunsSettings
+  'booharu-start': StartSettings
 }
 
 /**
@@ -283,6 +284,80 @@ export type Change = {
   history: History
 }
 
+/**
+ *  The chapter in short, as Read chapter writes it: what happens, and who
+ *  is in it.
+ */
+export type ChapterBrief = {
+  summary?: string
+  characters?: ChapterCharacter[]
+  /**
+   *  Whether the user wrote the summary, which reading the chapter again
+   *  keeps.
+   */
+  edited?: boolean
+  /**  When the chapter was read, as an RFC 3339 time. */
+  read_at?: string | null
+}
+
+/**  A character in the chapter, and the pages they're on, counted from 1. */
+export type ChapterCharacter = {
+  name?: string
+  original?: string
+  pages?: number[]
+}
+
+/**  What a chapter keeps beside its project. */
+export type ChapterContext = {
+  version?: number
+  /**
+   *  The id of the series the chapter follows. A series whose file is gone
+   *  reads as none.
+   */
+  series?: string | null
+  /**  What Read chapter found the chapter to be about. */
+  brief?: ChapterBrief | null
+  /**
+   *  Terms suggested for the chapter, by Read chapter or the agent, which
+   *  its translation follows as the series' terms until accepted into the
+   *  series or dismissed.
+   */
+  suggestions?: GlossaryEntry[]
+}
+
+/**
+ *  The open project's chapter as its side file and the series it links
+ *  hold it now, with the glossary a translation run on it would send.
+ */
+export type ChapterState = {
+  /**
+   *  The side file: the linked series' id, the brief, and the suggested
+   *  terms.
+   */
+  context: ChapterContext
+  /**
+   *  The series the chapter links; none when it links none or its file is
+   *  gone.
+   */
+  series: Series | null
+  /**  Whether the chapter links a series whose file is gone. */
+  missing: boolean
+  /**
+   *  The terms a run translating the chapter now sends, locked first: the
+   *  series' terms and the suggestions its text uses, each source once, at
+   *  most 60.
+   */
+  glossary: GlossaryEntry[]
+  /**
+   *  Whether the chapter's text isn't known yet, as a page was never
+   *  through detection or a block waits to be read, so a run sends every
+   *  term instead of those its text uses.
+   */
+  fresh: boolean
+  /**  How many terms past the first 60 a run leaves out. */
+  left_out: number
+}
+
 /**  One of the values a character's style holds. */
 export type CharKey =
   | 'family'
@@ -315,6 +390,18 @@ export type CharStyle = {
   outer_stroke?: Rgba | null
   /**  Booharu: the second border's width, outward from the first border. */
   outer_stroke_width?: number | null
+}
+
+/**
+ *  A character of the series: their name as translated, as the pages write
+ *  it, and how they speak.
+ */
+export type Character = {
+  id?: string
+  name?: string
+  original?: string
+  /**  Their voice: how they speak, the pronouns they use. */
+  notes?: string
 }
 
 /**  The app's theme colours the canvas draws with. */
@@ -422,6 +509,21 @@ export type ExportFormat = 'png' | 'psd' | 'cbz'
 
 export type FillRule = 'non_zero' | 'even_odd'
 
+/**
+ *  The note on a first start: Booharu doesn't copy Booharu 0.0.4's series,
+ *  and says where they are to import them from.
+ */
+export type FirstStartNote = {
+  /**  Whether to show it: it wasn't dismissed. */
+  show: boolean
+  /**
+   *  0.0.4's series folder, `PreviewData\settings\series` beside the
+   *  running program, when it's there; none when it isn't, so the note
+   *  names it beside 0.0.4's `Booharu.exe` instead.
+   */
+  folder: string | null
+}
+
 /**  How a box's text meets the box. */
 export type Fit =
   /**
@@ -442,6 +544,20 @@ export type Fit =
    *  down to half its size, and then on until it fits.
    */
   | 'best'
+
+/**
+ *  What Fix it everywhere did: the run it queued, and how many blocks it
+ *  translates again and left alone.
+ */
+export type FixedTerm = {
+  /**  The run translating them again; none when no block was left to. */
+  run: RunId | null
+  translated: number
+  /**  Blocks whose translation was changed by hand, left alone. */
+  kept_hand_edited: number
+  /**  Blocks locked, or in a locked layer, left alone. */
+  kept_locked: number
+}
 
 /**  One of a family's faces, by the weight and slant a text asks for. */
 export type FontFace = {
@@ -494,6 +610,47 @@ export type Frame =
       }
     } & { box?: never })
 
+/**
+ *  A glossary term: its source as the pages write it, the translation every
+ *  page keeps to, and a note on it.
+ */
+export type GlossaryEntry = {
+  /**  Random, unique in its series. */
+  id?: string
+  source?: string
+  target?: string
+  note?: string
+  kind?: TermKind
+  /**
+   *  Whether the term is fixed: a locked term goes before unlocked ones
+   *  and wins over one with the same source, and Booharu's automatic steps
+   *  never replace it.
+   */
+  locked?: boolean
+}
+
+/**
+ *  Where a glossary term is used in a project: the blocks whose source it
+ *  occurs in, ignoring case and whitespace, and which of them Fix it
+ *  everywhere translates again.
+ */
+export type GlossaryUsage = {
+  /**
+   *  Every block using it, page by page, each page's in the order it holds
+   *  them.
+   */
+  blocks: LayerId[]
+  /**
+   *  Those Fix it everywhere translates again: neither locked nor with a
+   *  translation changed by hand, untranslated ones among them.
+   */
+  translate: LayerId[]
+  /**  How many have a translation changed by hand, which it leaves alone. */
+  hand_edited: number
+  /**  How many are locked, or in a locked layer, which no stage can write. */
+  locked: number
+}
+
 /**  A folder of layers, drawn first to last. */
 export type Group = Record<string, never>
 
@@ -545,6 +702,41 @@ export type InpainterConfig = {
    *  area's can; LaMa, which takes none, ignores it.
    */
   prompt?: string
+}
+
+/**  What Import from instructions did. */
+export type InstructionImport = {
+  /**  The series as saved. */
+  series: Series
+  /**  How many terms it added. */
+  added: number
+  /**
+   *  How many it skipped, as the series already had a term with their
+   *  source.
+   */
+  skipped: number
+  /**
+   *  The Instructions without the imported terms' lines, which the caller
+   *  saves; none when they stay as they are.
+   */
+  instructions: string | null
+}
+
+/**
+ *  The Instructions as saved now, and the terms their lines write, which
+ *  Import from instructions offers.
+ */
+export type InstructionPreview = {
+  instructions: string
+  terms: InstructionTerm[]
+}
+
+/**  A term on a line of the Instructions. */
+export type InstructionTerm = {
+  /**  The line it's on, counting from 0, as `str::lines` counts them. */
+  line: number
+  source: string
+  target: string
 }
 
 /**
@@ -1174,6 +1366,38 @@ export type RunsSettings = {
   finish_sound?: boolean
 }
 
+/**  A series' glossary, characters, and notes, as 0.0.4 kept them. */
+export type Series = {
+  /**
+   *  Its file's name without `.json`: 1 to 80 of `a`–`z`, `0`–`9`, and
+   *  `-`, a slug of its first name and 12 random hex digits.
+   */
+  id?: string
+  /**  Never blank. */
+  name?: string
+  /**
+   *  What every chapter's translation reads as background, never
+   *  translating it.
+   */
+  notes?: string
+  /**
+   *  Its terms, in the order they were added. One source may come twice,
+   *  as 0.0.4's files could hold it: the first locked one is used, else the
+   *  first.
+   */
+  glossary?: GlossaryEntry[]
+  characters?: Character[]
+}
+
+/**
+ *  A series file picked for import, and whether a series of its id is
+ *  already saved, which the import replaces or keeps beside it.
+ */
+export type SeriesImport = {
+  series: Series
+  exists: boolean
+}
+
 /**  A vector path with an optional fill and stroke, in page coordinates. */
 export type Shape = {
   path: Path
@@ -1244,6 +1468,15 @@ export type SplitBlock = {
 
 /**  A stage, in the order a page's stages run. */
 export type Stage = 'detect' | 'recognize' | 'inpaint' | 'translate'
+
+/**  `[booharu-start]`: what Booharu showed once as it started. */
+export type StartSettings = {
+  /**
+   *  Whether the note on a first start, saying Booharu 0.0.4's series
+   *  weren't copied and where to import them from, was dismissed.
+   */
+  fresh_start_note_seen?: boolean
+}
 
 export type State = 'Running' | 'Finished' | { Failed: string }
 
@@ -1327,6 +1560,9 @@ export type Target =
         prompt: string | null
       }
     } & { blocks?: never; pages?: never })
+
+/**  What kind of term a glossary term is. */
+export type TermKind = 'name' | 'place' | 'term' | 'honorific' | 'other'
 
 /**
  *  Styled text in a frame. `content` is set when its layer is added; after
@@ -1606,6 +1842,71 @@ export const commands = {
   /** The lettering of every block on `page`, in reading order: the category it's lettered in and why, its label, its balloon's shape with what decided it, none outside any balloon, and whether its text or style was changed by hand. */
   booharuGetLettering: (page: PageId) =>
     invoke<BlockLettering[]>('booharu_get_lettering', { page }, { headers: headers() }),
+  /** Every series, by name, ignoring case. A file that doesn't read is left out and logged. */
+  booharuListSeries: () => invoke<Series[]>('booharu_list_series', {}, { headers: headers() }),
+  /** Makes a series named `name`, trimmed, with nothing in it, and saves it. A blank name fails. */
+  booharuCreateSeries: (name: string) =>
+    invoke<Series>('booharu_create_series', { name }, { headers: headers() }),
+  /** The series `id`. One whose file is gone, or doesn't read, fails. */
+  booharuGetSeries: (id: string) =>
+    invoke<Series>('booharu_get_series', { id }, { headers: headers() }),
+  /** Saves `series` whole, in place of its file, and answers it as saved. A blank name, a term without a source or a target, or an id that isn't a series id fails, saving nothing. */
+  booharuSaveSeries: (series: Series) =>
+    invoke<Series>('booharu_save_series', { series }, { headers: headers() }),
+  /** Names the series `id` `name`, trimmed, and answers it as saved; a blank name fails. */
+  booharuRenameSeries: (id: string, name: string) =>
+    invoke<Series>('booharu_rename_series', { id, name }, { headers: headers() }),
+  /** Deletes the series `id`. Chapters linking it then link none, and keep their own notes. */
+  booharuDeleteSeries: (id: string) =>
+    invoke<null>('booharu_delete_series', { id }, { headers: headers() }),
+  /** Links the open project's chapter to the series `series`, or to none, and answers the chapter then. A series that isn't saved, or doesn't read, fails, linking nothing. */
+  booharuLinkSeries: (series: string | null) =>
+    invoke<ChapterState>('booharu_link_series', { series }, { headers: headers() }),
+  /** The open project's chapter: its side file, the series it links, and the glossary a translation run on it would send. A side file or a linked series' file that doesn't read fails, naming it. */
+  booharuGetChapterContext: () =>
+    invoke<ChapterState>('booharu_get_chapter_context', {}, { headers: headers() }),
+  /** Accepts the open chapter's suggestion `entry` names by its id into the series the chapter links, as `entry` holds it, the user's changes included, in place of the series' term with its source; the suggestion leaves the chapter. Answers the chapter then. Fails, changing nothing, when the suggestion is gone, the chapter links no series, or the term lacks a source or a target. */
+  booharuAcceptSuggestion: (entry: GlossaryEntry) =>
+    invoke<ChapterState>('booharu_accept_suggestion', { entry }, { headers: headers() }),
+  /** Dismisses the open chapter's suggestion `id`, and answers the chapter then. */
+  booharuDismissSuggestion: (id: string) =>
+    invoke<ChapterState>('booharu_dismiss_suggestion', { id }, { headers: headers() }),
+  /** Where the term `source` is used in the open project: the blocks whose source it occurs in, ignoring case and whitespace, those Fix it everywhere would translate again, and how many it would leave alone as hand-edited or locked. */
+  booharuGlossaryUsage: (source: string) =>
+    invoke<GlossaryUsage>('booharu_glossary_usage', { source }, { headers: headers() }),
+  /** Fix it everywhere for the term `source`: translates again, in one ordinary Translation run, every block of the open project using it that's neither locked nor has a translation changed by hand, untranslated ones included, so each follows the glossary as it is now. Answers the run, none when no block was left to translate, and how many blocks it translates and left alone. */
+  booharuFixTermEverywhere: (source: string) =>
+    invoke<FixedTerm>('booharu_fix_term_everywhere', { source }, { headers: headers() }),
+  /** The Instructions as saved now, `[pipeline]`'s translator instructions, with the terms their lines write, for Import from instructions. */
+  booharuPreviewInstructionGlossary: () =>
+    invoke<InstructionPreview>('booharu_preview_instruction_glossary', {}, { headers: headers() }),
+  /** Imports the terms on the lines `lines`, counted from 0, of `instructions`, the Instructions as previewed, into the series `series` as locked terms, skipping a source it already has; with `remove`, saves the Instructions without those lines, which the interface then reads again. Fails, changing nothing, when the saved Instructions are no longer the ones previewed. */
+  booharuImportInstructionGlossary: (
+    series: string,
+    lines: number[],
+    remove: boolean,
+    instructions: string,
+  ) =>
+    invoke<InstructionImport>(
+      'booharu_import_instruction_glossary',
+      { series, lines, remove, instructions },
+      { headers: headers() },
+    ),
+  /** Exports the series `id` to a file the user picks, `<series name>.json` to start with, in Booharu 0.0.4's shape, which 0.0.4 imports too. Answers whether it was written, false when the user cancelled. */
+  booharuExportSeries: (id: string) =>
+    invoke<boolean>('booharu_export_series', { id }, { headers: headers() }),
+  /** Asks the user for a series file to import, a Booharu 0.0.4 or 0.0.5 export or series file, starting in 0.0.4's series folder when it's beside the running program, and answers its series once checked, with whether a series of its id is saved already; none when the user cancelled. A file that isn't a series fails. */
+  booharuPreviewSeriesImport: () =>
+    invoke<SeriesImport | null>('booharu_preview_series_import', {}, { headers: headers() }),
+  /** Saves `series`, a file's being imported: in place of the series of its id with `replace`, else, when that id is taken, beside it with a new id. Answers it as saved. */
+  booharuImportSeries: (series: Series, replace: boolean) =>
+    invoke<Series>('booharu_import_series', { series, replace }, { headers: headers() }),
+  /** Whether to show the note on a first start, and where Booharu 0.0.4's series are, when they're beside the running program. */
+  booharuGetFirstStartNote: () =>
+    invoke<FirstStartNote>('booharu_get_first_start_note', {}, { headers: headers() }),
+  /** Dismisses the note on a first start for good, saving `[booharu-start]` `fresh_start_note_seen` alone. */
+  booharuDismissFirstStartNote: () =>
+    invoke<null>('booharu_dismiss_first_start_note', {}, { headers: headers() }),
 }
 
 export const events = {
@@ -1639,4 +1940,6 @@ export const events = {
     listen<BooharuNotice>('booharu_notice', (event) => handler(event.payload)),
   booharuRunGroup: (handler: (payload: BooharuRunGroup) => void): Promise<UnlistenFn> =>
     listen<BooharuRunGroup>('booharu_run_group', (event) => handler(event.payload)),
+  booharuContextChanged: (handler: (payload: null) => void): Promise<UnlistenFn> =>
+    listen<null>('booharu_context_changed', (event) => handler(event.payload)),
 }

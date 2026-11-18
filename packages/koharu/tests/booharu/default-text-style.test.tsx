@@ -83,6 +83,7 @@ describe('Booharu default text style', () => {
       },
       'booharu-fonts': { favorites: [] },
       'booharu-runs': builtInRuns,
+      'booharu-start': { fresh_start_note_seen: false },
     })
     expect(shown.getByText('#FF0000')).toBeInTheDocument()
     expect(shown.getByText('None')).toBeInTheDocument()

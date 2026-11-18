@@ -22,6 +22,7 @@ const OTHERS = {
   },
   'booharu-fonts': { favorites: [] },
   'booharu-runs': builtInRuns,
+  'booharu-start': { fresh_start_note_seen: false },
 } satisfies Partial<BooharuPreferences>
 
 /** The Booharu settings the desktop's file holds, which another writer, such as the agent's

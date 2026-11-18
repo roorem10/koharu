@@ -42,6 +42,7 @@ export function settingsDesktop(lettering: LetteringSettings = builtInLettering)
       'booharu-lettering': structuredClone(lettering),
       'booharu-fonts': { favorites: [] },
       'booharu-runs': structuredClone(builtInRuns),
+      'booharu-start': { fresh_start_note_seen: false },
     },
   }
   const saves: BooharuPreferences[] = []

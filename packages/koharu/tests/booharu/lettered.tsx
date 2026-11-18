@@ -105,6 +105,7 @@ export function letteredDesktop(auto = false) {
     'booharu-lettering': { ...builtInLettering, auto },
     'booharu-fonts': { favorites: [] },
     'booharu-runs': builtInRuns,
+    'booharu-start': { fresh_start_note_seen: false },
   }
   vi.spyOn(commands, 'booharuGetPreferences').mockResolvedValue(preferences)
   const setCategory = vi.spyOn(commands, 'booharuSetLetteringCategory').mockResolvedValue(counts)
