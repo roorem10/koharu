@@ -132,4 +132,46 @@ describe('Booharu’s record of a run', () => {
     // A run on blocks or an area offers nothing again.
     expect(retryRuns(job(2)!, ['p1'])).toEqual([])
   })
+
+  it('retries a stage the run dropped as it gave a page up, but not one the page finished', () => {
+    openChapter('Chapter 1')
+    const order = ['p1', 'p2', 'p3', 'p4']
+    // Translate + clean up: a hosted translation runs ahead of the clean-up, so page 2's gave up
+    // before its clean-up ran, which left the run with it; page 3's clean-up had finished.
+    const failures = [
+      { page: 'p2', stage: 'translate' as const, reason: timedOut },
+      { page: 'p3', stage: 'translate' as const, reason: timedOut },
+    ]
+    tell(
+      queued(1, ['inpaint', 'translate']),
+      { kind: 'finished', run: 1, page: 'p3', stage: 'inpaint' },
+      ...failures.map((failure) => pageFailed(1, failure)),
+      { kind: 'finished', run: 1, page: 'p1', stage: 'inpaint' },
+      done(1, failures),
+    )
+    expect(retryRuns(job(1)!, order)).toEqual([
+      { stages: ['inpaint', 'translate'], pages: ['p2'] },
+      { stages: ['translate'], pages: ['p3'] },
+    ])
+
+    // Every stage: page 1's clean-up failed while its reading waited for another try, and page 4's
+    // failed after its reading finished. A page's translation is done again after its clean-up.
+    const cleanUps = [
+      { page: 'p1', stage: 'inpaint' as const, reason: 'CUDA out of memory' },
+      { page: 'p4', stage: 'inpaint' as const, reason: 'CUDA out of memory' },
+    ]
+    tell(
+      queued(2),
+      { kind: 'finished', run: 2, page: 'p1', stage: 'detect' },
+      { kind: 'finished', run: 2, page: 'p4', stage: 'detect' },
+      { kind: 'finished', run: 2, page: 'p4', stage: 'recognize' },
+      { kind: 'finished', run: 2, page: 'p4', stage: 'translate' },
+      ...cleanUps.map((failure) => pageFailed(2, failure)),
+      done(2, cleanUps),
+    )
+    expect(retryRuns(job(2)!, order)).toEqual([
+      { stages: ['recognize', 'inpaint', 'translate'], pages: ['p1'] },
+      { stages: ['inpaint', 'translate'], pages: ['p4'] },
+    ])
+  })
 })

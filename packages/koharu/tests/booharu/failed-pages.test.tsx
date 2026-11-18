@@ -7,7 +7,7 @@ import { ActivityCenter } from '@/components/editor/ActivityCenter'
 import { InferenceControl } from '@/components/editor/InferenceControl'
 import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { commands } from '@koharu/ipc/protocol'
+import { commands, type Stage } from '@koharu/ipc/protocol'
 
 import { done, openChapter, pageFailed, queued, tell } from './jobs'
 import { settingsDesktop } from './settings'
@@ -33,15 +33,23 @@ function renderActivity() {
 }
 
 /** Run 1 of every stage in Chapter 1, done with problems: page 3 and page 1 failed reading, and
- * page 2 translating. */
+ * page 2 translating, once its other stages had finished. */
 function doneWithProblems() {
   const failures = [
     { page: 'p3', stage: 'recognize' as const, reason: 'the model failed' },
     { page: 'p2', stage: 'translate' as const, reason: timedOut },
     { page: 'p1', stage: 'recognize' as const, reason: 'the model failed' },
   ]
+  const finished = (stage: Stage) => ({ kind: 'finished' as const, run: 1, page: 'p2', stage })
   openChapter('Chapter 1')
-  tell(queued(1), ...failures.map((failure) => pageFailed(1, failure)), done(1, failures))
+  tell(
+    queued(1),
+    finished('detect'),
+    finished('recognize'),
+    finished('inpaint'),
+    ...failures.map((failure) => pageFailed(1, failure)),
+    done(1, failures),
+  )
 }
 
 describe('Booharu failed pages in the Activity center', () => {

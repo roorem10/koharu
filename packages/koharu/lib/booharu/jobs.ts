@@ -36,23 +36,33 @@ export interface RunRecord {
   /** The pages it gave up on, and for a run that failed, the page that ended it, in the order
    * they failed. */
   failures: PageFailure[]
+  /** For a run over pages, the stages each page finished, so Retry failed pages runs again a stage
+   * the run dropped as it gave the page up, and not one it finished. */
+  finished: Partial<Record<PageId, Stage[]>>
 }
 
 /** The record of a run whose Queued the interface missed: its stages and target unknown, so it
  * neither chimes nor offers its pages again, and it shows in any project. */
-const missed: RunRecord = { stages: [], pages: false, project: null, retrying: [], failures: [] }
+const missed: RunRecord = {
+  stages: [],
+  pages: false,
+  project: null,
+  retrying: [],
+  failures: [],
+  finished: {},
+}
 
 /** `job` with Booharu's record of the run kept through `event`, after Koharu's fold of it:
  * Queued's stages and whether it works on pages, with the project open; each page stage waiting
- * for its next try, until that stage starts or finishes, or its page is given up on; and the
- * failed pages, which a run done with problems lists as it ends, and a run that failed adds its
- * page to. */
+ * for its next try, until that stage starts or finishes, or its page is given up on; the stages
+ * each page finished; and the failed pages, which a run done with problems lists as it ends, and a
+ * run that failed adds its page to. */
 export function foldRun(job: Job, event: PipelineEvent): Job {
   if (event.kind === 'queued') {
     const { stages, pages } = event
     return {
       ...job,
-      booharu: { stages, pages, project: openProject(), retrying: [], failures: [] },
+      booharu: { stages, pages, project: openProject(), retrying: [], failures: [], finished: {} },
     }
   }
   const record = job.booharu ?? missed
@@ -74,7 +84,13 @@ export function foldRun(job: Job, event: PipelineEvent): Job {
     case 'finished': {
       const { page, stage } = event
       const retrying = waiting(page, stage)
-      return retrying.length === record.retrying.length ? job : change({ retrying })
+      const finished =
+        event.kind === 'finished' && record.pages
+          ? { ...record.finished, [page]: [...(record.finished[page] ?? []), stage] }
+          : record.finished
+      return retrying.length === record.retrying.length && finished === record.finished
+        ? job
+        : change({ retrying, finished })
     }
     case 'page_failed': {
       const { page, stage, reason } = event
@@ -147,24 +163,56 @@ export function listsFailedPages(job: Job): boolean {
 /** A run Retry failed pages queues: `stages` on `pages`. */
 export type RetryRun = { stages: Stage[]; pages: PageId[] }
 
-/** The runs Retry failed pages queues for `job`: one for each stage a page failed at, in stage
- * order, on the pages that failed at it, of `order`, the project's pages in order, so a page the
- * project no longer has is left out; each from that stage on through `job`'s later stages, so
- * those it finished aren't done again. None for a run on blocks or an area. */
+/** The stages a page's stage waits for in a run, as Koharu's run graph orders them: detection
+ * before every other stage, and recognition before translation. A page that got to a stage had
+ * finished these, whatever events the interface heard. */
+const waitsFor: Record<Stage, readonly Stage[]> = {
+  detect: [],
+  recognize: ['detect'],
+  inpaint: ['detect'],
+  translate: ['detect', 'recognize'],
+}
+
+/** The stages Retry failed pages runs for a page of `record`'s run that failed at `stage`, having
+ * finished `done`: from `stage` on through the run's later stages, so a later stage it finished
+ * is done again on what the retry makes; and an earlier stage of the run it never finished and
+ * `stage` doesn't wait for, which the run dropped as it gave the page up, such as its clean-up
+ * when its translation failed first. */
+function retryStages(record: RunRecord, stage: Stage, done: readonly Stage[]): Stage[] {
+  const at = pipelineStages.indexOf(stage)
+  return pipelineStages.filter(
+    (other, index) =>
+      other === stage ||
+      (record.stages.includes(other) &&
+        (index > at || (!waitsFor[stage].includes(other) && !done.includes(other)))),
+  )
+}
+
+/** The runs Retry failed pages queues for `job`, for its failed pages in `order`, the project's
+ * pages in order, so a page the project no longer has is left out: one for each set of stages
+ * `retryStages` gives them, in stage order, on the pages that need it. None for a run on blocks
+ * or an area. */
 export function retryRuns(job: Job, order: readonly PageId[]): RetryRun[] {
   const record = job.booharu
   if (!record?.pages) return []
-  return pipelineStages.flatMap((stage, at) => {
-    const atStage = new Set(
-      record.failures.filter((failure) => failure.stage === stage).map((failure) => failure.page),
-    )
-    const pages = order.filter((page) => atStage.has(page))
-    if (!pages.length) return []
-    const stages = pipelineStages.filter(
-      (later, from) => from >= at && (later === stage || record.stages.includes(later)),
-    )
-    return [{ stages, pages }]
-  })
+  const failedAt = new Map<PageId, Stage>()
+  for (const { page, stage } of record.failures) {
+    const before = failedAt.get(page)
+    if (!before || pipelineStages.indexOf(stage) < pipelineStages.indexOf(before)) {
+      failedAt.set(page, stage)
+    }
+  }
+  const runs = new Map<string, RetryRun>()
+  for (const page of order) {
+    const stage = failedAt.get(page)
+    if (!stage) continue
+    const stages = retryStages(record, stage, record.finished[page] ?? [])
+    const run = runs.get(stages.join())
+    if (run) run.pages.push(page)
+    else runs.set(stages.join(), { stages, pages: [page] })
+  }
+  const first = (run: RetryRun) => pipelineStages.indexOf(run.stages[0] ?? 'detect')
+  return [...runs.values()].sort((a, b) => first(a) - first(b))
 }
 
 /** The open project's pages, in order. */
