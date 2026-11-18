@@ -74,6 +74,11 @@ describe('Booharu failed pages in the Activity center', () => {
       'Page 1OCRthe model failed',
     ])
     expect(within(rows[1]!).getByText(timedOut)).toHaveClass('line-clamp-2')
+    // Several such runs scroll within the editor rather than grow past its top.
+    expect(screen.getByRole('complementary', { name: 'Activity' })).toHaveClass(
+      'max-h-[calc(100%-3rem)]',
+      'overflow-y-auto',
+    )
     // Chapter 2's failed run shows only while Chapter 2 is open.
     expect(screen.queryByText('the disk is full')).toBeNull()
 

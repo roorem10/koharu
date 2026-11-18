@@ -38,7 +38,8 @@ export function ActivityCenter() {
   return (
     <aside
       aria-label={t('activity.title')}
-      className='absolute right-3 bottom-9 z-30 flex w-72 max-w-[calc(100%-1.5rem)] flex-col rounded-2xl border border-border/50 bg-popover shadow-md'
+      // Booharu: scrolls once taller than the editor, as runs done with problems list their pages.
+      className='absolute right-3 bottom-9 z-30 flex max-h-[calc(100%-3rem)] w-72 max-w-[calc(100%-1.5rem)] flex-col overflow-y-auto rounded-2xl border border-border/50 bg-popover shadow-md'
     >
       <div className='border-b px-3 py-2'>
         <span className='text-[10px] font-semibold tracking-[0.1em] uppercase'>
