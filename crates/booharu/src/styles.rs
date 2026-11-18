@@ -40,7 +40,7 @@ pub const LABEL: &str = "booharu_apply_text_style";
 /// The blocks Apply looks at: `{"kind": "blocks", "blocks": [...]}`,
 /// `{"kind": "pages", "pages": [...]}`, or `{"kind": "project"}`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, specta::Type, JsonSchema)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum StyleScope {
     /// These blocks.
     Blocks { blocks: Vec<LayerId> },

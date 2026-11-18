@@ -319,5 +319,12 @@ mod tests {
         let args = json!({"scope": {"kind": "pages", "pages": []}});
         let read = serde_json::from_value::<TextStyleArgs>(args).expect("the arguments");
         assert!(!read.include_hand_edited);
+        // A scope naming pages it doesn't take would restyle the whole
+        // project, so the schema refuses it before the call.
+        let schema = ApplyTextStyle.parameters();
+        let pages = json!({"scope": {"kind": "project", "pages": []}});
+        assert!(crate::tools::refusal(&schema, &pages).is_some());
+        let project = json!({"scope": {"kind": "project"}});
+        assert_eq!(crate::tools::refusal(&schema, &project), None);
     }
 }
