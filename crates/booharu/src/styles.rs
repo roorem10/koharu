@@ -5,13 +5,16 @@
 //!
 //! A translation gets the look a new one would with nothing of its own
 //! ([`booharu_core::styles::restyle`]): the default font, the first of
-//! Koharu's Preferred fonts, in place of its family, and with
-//! `detect_colors` off the default colours and outline in place of its own;
-//! with it on, Apply never recolours. A block changed by hand
-//! ([`booharu_core::edited`]) is kept unless the caller includes those, and
-//! a locked block, or one inside a locked layer, is always kept, so a lock
-//! never fails the edit. An included block also loses its marks for the
-//! keys Apply writes, so the look shows on every character.
+//! Koharu's Preferred fonts, in place of its family, or while Pick fonts
+//! automatically is on its block's category's font in place of its family,
+//! weight, and italic, and with `detect_colors` off the default colours and
+//! outline in place of its own; with it on, Apply never recolours. A block
+//! changed by hand ([`booharu_core::edited`]) is kept unless the caller
+//! includes those, and a locked block, or one inside a locked layer, is
+//! always kept, so a lock never fails the edit. An included block also
+//! loses its marks for the keys Apply writes, so the look shows on every
+//! character, but for a category's font, which never touches the marks, so
+//! word styles survive it.
 //!
 //! Each block Apply changes gets its hand-edit record in the same edit: the
 //! keys Apply wrote take their new values and the others keep theirs, so a
@@ -23,7 +26,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, ensure};
 use booharu_core::{
     attrs::{self, Auto, Origin},
-    edited,
+    edited, lettering,
     settings::LetteringSettings,
     styles,
 };
@@ -160,9 +163,12 @@ fn planned<'p>(
             continue;
         }
         let current = &translation.style.chars;
-        let patch = styles::restyle(settings, font, block.role == Role::Sfx, current);
+        let category = lettering::auto_category(project.parent(layer.id)?.0, layer.id, settings);
+        let sfx = block.role == Role::Sfx;
+        let patch = styles::restyle(settings, font, sfx, category, current);
         let after = styles::patched(current, &patch)?;
-        let spans = unmarked(&translation.content, &patch)?;
+        let marked = |key: &String| category.is_none() || !FONT.contains(&key.as_str());
+        let spans = unmarked(&translation.content, patch.keys().filter(|key| marked(key)))?;
         if after == *current && spans.is_none() {
             continue;
         }
@@ -210,7 +216,7 @@ fn blocks<'p>(project: &'p Project, scope: &StyleScope) -> Result<Vec<&'p Layer>
 
 /// Whether `layer`, or a layer holding it, is locked, which an edit of it
 /// fails on.
-fn locked(project: &Project, layer: &Layer) -> Result<bool> {
+pub(crate) fn locked(project: &Project, layer: &Layer) -> Result<bool> {
     let mut at = Some(layer);
     while let Some(layer) = at {
         if layer.locked {
@@ -221,10 +227,19 @@ fn locked(project: &Project, layer: &Layer) -> Result<bool> {
     Ok(false)
 }
 
-/// `content`'s spans without their marks for the keys `patch` writes, so its
-/// values show on every character; none when no span has one.
-fn unmarked(content: &RichText, patch: &Map<String, Value>) -> Result<Option<Vec<Span>>> {
-    let cleared: Map<String, Value> = patch.keys().map(|key| (key.clone(), Value::Null)).collect();
+/// The keys a category's font writes, whose marks it leaves.
+const FONT: [&str; 3] = ["family", "weight", "italic"];
+
+/// `content`'s spans without their marks for `keys`, so the values Apply
+/// writes for them show on every character; none when no span has one.
+fn unmarked<'k>(
+    content: &RichText,
+    keys: impl IntoIterator<Item = &'k String>,
+) -> Result<Option<Vec<Span>>> {
+    let cleared: Map<String, Value> = keys
+        .into_iter()
+        .map(|key| (key.clone(), Value::Null))
+        .collect();
     let mut found = false;
     let mut spans = Vec::with_capacity(content.0.len());
     for span in &content.0 {
@@ -384,7 +399,8 @@ mod tests {
                 });
                 ops.push(placed.clone());
                 ops.extend(styles::translated(
-                    project.layer(block)?,
+                    &project,
+                    block,
                     "Why?",
                     &placed,
                     settings,
@@ -695,6 +711,111 @@ mod tests {
             counts(1, 0, 0)
         );
         assert_eq!(Auto::of(&fixture.layer("a")?).origin, Origin::Automatic);
+        Ok(())
+    }
+
+    #[test]
+    fn with_the_switch_on_apply_letters_each_block_in_its_categorys_font() -> Result<()> {
+        use booharu_core::lettering::{CategoryFont, LetteringCategory};
+        let mut fixture = Fixture::new()?;
+        fixture.translate(&["a", "b", "e"], &look(true, None))?;
+        // b's font changed by hand, and a word of it marked light.
+        fixture.restyle("b", json!({"family": "Comic Sans"}))?;
+        let b = fixture.id("b");
+        let spans = vec![
+            Span {
+                insert: "Why".to_owned(),
+                attributes: CharStyle {
+                    weight: Some(300),
+                    ..CharStyle::default()
+                },
+            },
+            Span {
+                insert: "?".to_owned(),
+                attributes: CharStyle::default(),
+            },
+        ];
+        fixture.edit(vec![Op::SetRichText {
+            layer: b.into(),
+            spans,
+        }])?;
+        // a and b float outside any balloon; e is Koharu's sound effect.
+        let lettered = LetteringSettings {
+            auto: true,
+            categories: BTreeMap::from([
+                (
+                    LetteringCategory::Floating,
+                    CategoryFont {
+                        family: Some("Wild Float".to_owned()),
+                        bold: true,
+                        italic: false,
+                    },
+                ),
+                (
+                    LetteringCategory::Sfx,
+                    CategoryFont {
+                        family: None,
+                        bold: false,
+                        italic: true,
+                    },
+                ),
+            ]),
+            ..look(true, None)
+        };
+        type Font = (Option<String>, Option<u16>, Option<bool>);
+        let font = |fixture: &Fixture, name: &str| -> Result<Font> {
+            let chars = fixture.translation(name)?.style.chars;
+            Ok((chars.family, chars.weight, chars.italic))
+        };
+
+        // b's hand-changed font is kept unless the user confirms.
+        let kept = fixture.apply(&StyleScope::Project, false, &lettered, Origin::Automatic)?;
+        assert_eq!(kept, counts(2, 1, 2));
+        assert_eq!(
+            font(&fixture, "a")?,
+            (Some("Wild Float".to_owned()), Some(700), None)
+        );
+        assert_eq!(
+            font(&fixture, "e")?,
+            (Some(NEW.to_owned()), None, Some(true))
+        );
+        assert_eq!(font(&fixture, "b")?.0.as_deref(), Some("Comic Sans"));
+        for name in ["a", "e"] {
+            let found = fixture.layer(name)?;
+            assert_eq!(edited(&found), Edited::default(), "{name}");
+            let style = Auto::of(&found).style.context("a style")?;
+            assert_eq!(
+                (style.family, style.weight, style.italic),
+                font(&fixture, name)?,
+                "{name}"
+            );
+        }
+
+        // Confirmed: b takes the category's font, and its word keeps its
+        // mark, as a category's font never touches the marks.
+        let included = fixture.apply(&StyleScope::Project, true, &lettered, Origin::Automatic)?;
+        assert_eq!(included, counts(1, 0, 2));
+        assert_eq!(
+            font(&fixture, "b")?,
+            (Some("Wild Float".to_owned()), Some(700), None)
+        );
+        assert_eq!(
+            fixture.translation("b")?.content.0[0].attributes.weight,
+            Some(300)
+        );
+
+        // Off again, Apply is stage 3's: the default font, the category's
+        // weight left as it is.
+        let off = LetteringSettings {
+            auto: false,
+            ..lettered
+        };
+        let restyled = fixture.apply(&StyleScope::Project, true, &off, Origin::Automatic)?;
+        assert_eq!(restyled, counts(2, 0, 2));
+        assert_eq!(
+            font(&fixture, "a")?,
+            (Some(NEW.to_owned()), Some(700), None)
+        );
         Ok(())
     }
 }

@@ -2104,7 +2104,8 @@ mod tests {
             placed.clone(),
         ];
         ops.extend(booharu_core::styles::translated(
-            project.layer(block)?,
+            &project,
+            block,
             text,
             &placed,
             &booharu_core::settings::LetteringSettings::default(),

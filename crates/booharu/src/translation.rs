@@ -24,8 +24,9 @@ const RETYPED: &str = "set_text";
 /// the block's room in its balloon, or in its source's frame, at the page's
 /// lettering size, in `target`'s language, with the block's clean-up shown
 /// under it, labelled [`LABEL`]. It gets the default look of `look`, as a
-/// new translation does: the default font, and with colour detection off
-/// the default colours in place of the measured ones. Unlike the stage's,
+/// new translation does: the default font, or its category's while Pick
+/// fonts automatically is on, and with colour detection off the default
+/// colours in place of the measured ones. Unlike the stage's,
 /// it gets no hand-edit record: it was typed by hand. One with a
 /// translation keeps its place, lettering, and language, and the step is
 /// labelled as the Story panel labels a retyped text.
@@ -55,7 +56,13 @@ pub fn edit(
     // naming the model that made the translation and Booharu's hand-edit
     // one: someone typed this one.
     let placed = koharu_pipeline::placement(project, block, target)?;
-    let looked = styles::typed(layer, &placed, &look.lettering, look.font.as_deref())?;
+    let looked = styles::typed(
+        project,
+        block,
+        &placed,
+        &look.lettering,
+        look.font.as_deref(),
+    )?;
     ops.push(placed);
     ops.extend(looked);
     ops.push(Op::UpdateLayer {

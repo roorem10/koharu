@@ -7,7 +7,11 @@
 //!   `[booharu-lettering]`: with `detect_colors` on, Booharu writes none, and
 //!   a new translation keeps the colours Koharu measured; with it off, the
 //!   default look's replace them. An existing translation is restyled only by
-//!   Apply, in the `booharu` crate.
+//!   Apply and by a change of category, in the `booharu` crate.
+//! - While Pick fonts automatically is on, a new translation's font is its
+//!   block's lettering category's in place of the default font: its family,
+//!   weight, and italic, as the `lettering` module resolves it. Off, nothing
+//!   here writes a category font.
 //! - Each automatic write records itself in the block's [`Auto`], in the
 //!   same edit: the source wording the Recognition stage wrote, the
 //!   translation the Translation stage wrote, and the style values a step
@@ -16,12 +20,13 @@
 use std::collections::BTreeSet;
 
 use anyhow::{Result, bail, ensure};
-use koharu_scene::{CharStyle, Color, Content, Hash, Layer, Op, Rgba, Role};
+use koharu_scene::{CharStyle, Color, Content, Hash, Layer, LayerId, Op, Project, Rgba, Role};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::{
     attrs::{self, Auto, AutoStyle, Origin},
+    lettering::{self, CategoryFont, LetteringCategory},
     settings::{DefaultTextStyle, LetteringSettings},
 };
 
@@ -67,23 +72,41 @@ pub fn default_chars(settings: &LetteringSettings, font: Option<&str>) -> CharSt
 /// Koharu leaves them, placed or copied from its source, and `own` what its
 /// style set before, which is kept, as placement keeps it.
 ///
-/// It gets the default `font` when it has no family. With `detect_colors`
-/// on, Koharu's colours stay. With it off, the default fill and outline
-/// replace Koharu's, null where the look sets none, except that a sound
-/// effect the look gives no outline gets Koharu's legibility stroke against
-/// its new fill (T13).
+/// It gets the default `font` when it has no family. With `category`, its
+/// block's lettering category while Pick fonts automatically is on, it gets
+/// that category's font instead ([`category_chars`]), its weight and italic
+/// where it has none of its own; none, as with the switch off, writes no
+/// category font. With `detect_colors` on, Koharu's colours stay. With it
+/// off, the default fill and outline replace Koharu's, null where the look
+/// sets none, except that a sound effect the look gives no outline gets
+/// Koharu's legibility stroke against its new fill (T13).
 pub fn new_translation(
     settings: &LetteringSettings,
     font: Option<&str>,
     sfx: bool,
+    category: Option<LetteringCategory>,
     own: &CharStyle,
     placed: &CharStyle,
 ) -> Map<String, Value> {
     let mut patch = Map::new();
-    if placed.family.is_none()
-        && let Some(font) = font
-    {
-        patch.insert("family".to_owned(), json!(font));
+    // A translation keeping a family of its own keeps its whole font.
+    if placed.family.is_none() {
+        match category {
+            Some(category) => {
+                let kept = |key: &str| match key {
+                    "weight" => placed.weight.is_some(),
+                    "italic" => placed.italic.is_some(),
+                    _ => false,
+                };
+                let chars = category_chars(settings, font, category);
+                patch.extend(chars.into_iter().filter(|(key, _)| !kept(key)));
+            }
+            None => {
+                if let Some(font) = font {
+                    patch.insert("family".to_owned(), json!(font));
+                }
+            }
+        }
     }
     if settings.detect_colors {
         return patch;
@@ -102,20 +125,52 @@ pub fn new_translation(
 
 /// The patch on a translation's `style.chars` giving it the default look
 /// again, as Apply does: as a new translation would get it with nothing of
-/// its own, the default font in place of its family, and with
+/// its own, the default font in place of its family, or with `category`,
+/// its block's lettering category while Pick fonts automatically is on, that
+/// category's font in place of its family, weight, and italic, and with
 /// `detect_colors` off the default colours in place of its own. With it on,
-/// its colours stay, and with no default font, its family.
+/// its colours stay, and with no default font and no category, its family.
 pub fn restyle(
     settings: &LetteringSettings,
     font: Option<&str>,
     sfx: bool,
+    category: Option<LetteringCategory>,
     current: &CharStyle,
 ) -> Map<String, Value> {
     let placed = CharStyle {
         family: None,
+        weight: None,
+        italic: None,
         ..current.clone()
     };
-    new_translation(settings, font, sfx, &CharStyle::default(), &placed)
+    new_translation(
+        settings,
+        font,
+        sfx,
+        category,
+        &CharStyle::default(),
+        &placed,
+    )
+}
+
+/// The patch on a translation's `style.chars` lettering it in `category`'s
+/// font, as the `lettering` module resolves it with `font`, the default
+/// font: its `family` when it has one, its `weight`, 700 or null, and its
+/// `italic`, true or null. A category with no font, nor Normal Dialogue's,
+/// gets a copy of the default font, neither bold nor italic. Never other
+/// keys, and never the marks, so word styles survive a change of category.
+pub fn category_chars(
+    settings: &LetteringSettings,
+    font: Option<&str>,
+    category: LetteringCategory,
+) -> Map<String, Value> {
+    settings
+        .category_font(category, font)
+        .unwrap_or_else(|| CategoryFont {
+            family: font.map(str::to_owned),
+            ..CategoryFont::default()
+        })
+        .chars()
 }
 
 /// The outline the default look gives text with the character values
@@ -167,22 +222,27 @@ pub fn patched(chars: &CharStyle, patch: &Map<String, Value>) -> Result<CharStyl
     Ok(serde_json::from_value(Value::Object(merged))?)
 }
 
-/// What the Translation stage adds to its ops for `layer`, a block it gives
-/// the translation `text` placed by `placed`, placement's op, both read
-/// before the edit, as placement reads the project: after placement's op in
-/// the same edit, the default look as a patch on the translation's style
-/// when it writes anything, then the hand-edit record, written on every
-/// translation, styled or not, so a translation the run wrote never counts
-/// as typed by hand, while the style values one typed by hand had, and the
-/// run left, stay hand edits.
+/// What the Translation stage adds to its ops for `block` in `project`, a
+/// block it gives the translation `text` placed by `placed`, placement's op,
+/// both read before the edit, as placement reads the project: after
+/// placement's op in the same edit, the default look as a patch on the
+/// translation's style when it writes anything, its category's font while
+/// Pick fonts automatically is on, then the hand-edit record, written on
+/// every translation, styled or not, so a translation the run wrote never
+/// counts as typed by hand, while the style values one typed by hand had,
+/// and the run left, stay hand edits. The values the look writes, a
+/// category's family, weight, and italic among them, are recorded as
+/// automatic.
 pub fn translated(
-    layer: &Layer,
+    project: &Project,
+    block: LayerId,
     text: &str,
     placed: &Op,
     settings: &LetteringSettings,
     font: Option<&str>,
 ) -> Result<Vec<Op>> {
-    let looked = looked(layer, placed, settings, font)?;
+    let layer = project.layer(block)?;
+    let looked = looked(project, block, placed, settings, font)?;
     let mut record = Auto::of(layer);
     // A new translation's style owes nothing to one the block had before,
     // nor to whoever chose that one's. One no stage wrote was made by hand,
@@ -201,18 +261,20 @@ pub fn translated(
     Ok(ops)
 }
 
-/// The op giving a translation typed by hand into `layer`, a block with
-/// none, in the Story panel or through the agent, the default look, as
-/// [`new_translation`] gives one, after `placed`, placement's op for it,
+/// The op giving a translation typed by hand into `block` in `project`, a
+/// block with none, in the Story panel or through the agent, the default
+/// look, its category's font among it while Pick fonts automatically is on,
+/// as [`new_translation`] gives one, after `placed`, placement's op for it,
 /// both read before the edit; none when it writes nothing. It gets no
 /// record: it's hand-made.
 pub fn typed(
-    layer: &Layer,
+    project: &Project,
+    block: LayerId,
     placed: &Op,
     settings: &LetteringSettings,
     font: Option<&str>,
 ) -> Result<Option<Op>> {
-    Ok(looked(layer, placed, settings, font)?.op)
+    Ok(looked(project, block, placed, settings, font)?.op)
 }
 
 /// The op recording on `layer`, a block read before the edit, that the
@@ -255,14 +317,17 @@ struct Looked {
 }
 
 fn looked(
-    layer: &Layer,
+    project: &Project,
+    id: LayerId,
     placed: &Op,
     settings: &LetteringSettings,
     font: Option<&str>,
 ) -> Result<Looked> {
+    let layer = project.layer(id)?;
     let Content::Block(block) = &layer.content else {
         bail!("layer {} isn't a block", layer.id);
     };
+    let category = lettering::auto_category(project.parent(id)?.0, id, settings);
     let placement = match placed {
         Op::UpdateLayer {
             layer: target,
@@ -288,7 +353,7 @@ fn looked(
         .unwrap_or_default();
     let placed = patched(&own, &placement)?;
     let sfx = block.role == Role::Sfx;
-    let look = new_translation(settings, font, sfx, &own, &placed);
+    let look = new_translation(settings, font, sfx, category, &own, &placed);
     let after = patched(&placed, &look)?;
     let written = placement.keys().chain(look.keys()).cloned().collect();
     let op = (!look.is_empty()).then(|| Op::UpdateLayer {
@@ -540,6 +605,7 @@ mod tests {
             &detected,
             Some("CCWildWords"),
             false,
+            None,
             &CharStyle::default(),
             &measured(),
         );
@@ -554,9 +620,19 @@ mod tests {
             ..CharStyle::default()
         };
         let placed = patched(&own, &Map::new()).expect("values");
-        assert!(new_translation(&detected, Some("CCWildWords"), false, &own, &placed).is_empty());
         assert!(
-            new_translation(&detected, None, false, &CharStyle::default(), &measured()).is_empty()
+            new_translation(&detected, Some("CCWildWords"), false, None, &own, &placed).is_empty()
+        );
+        assert!(
+            new_translation(
+                &detected,
+                None,
+                false,
+                None,
+                &CharStyle::default(),
+                &measured()
+            )
+            .is_empty()
         );
     }
 
@@ -565,11 +641,11 @@ mod tests {
         let none = CharStyle::default();
         // On: nothing but the font, whatever the default look holds.
         let on = settings(true, Some(RED), Some(BLACK));
-        assert!(new_translation(&on, None, false, &none, &measured()).is_empty());
+        assert!(new_translation(&on, None, false, None, &none, &measured()).is_empty());
 
         // Off: the default colours and outline replace the measured ones.
         let off = settings(false, Some(RED), Some(BLACK));
-        let patch = new_translation(&off, None, false, &none, &measured());
+        let patch = new_translation(&off, None, false, None, &none, &measured());
         let after = patched(&measured(), &patch).expect("values");
         assert_eq!(
             (after.fill, after.stroke, after.stroke_width, after.size),
@@ -578,7 +654,7 @@ mod tests {
 
         // Null where the look sets none: Koharu's black, and no outline.
         let bare = settings(false, None, None);
-        let patch = new_translation(&bare, None, false, &none, &measured());
+        let patch = new_translation(&bare, None, false, None, &none, &measured());
         assert_eq!(keys(&patch), ["fill", "stroke", "stroke_width"]);
         let after = patched(&measured(), &patch).expect("values");
         assert_eq!(
@@ -595,7 +671,7 @@ mod tests {
             fill: Some(YELLOW),
             ..measured()
         };
-        let patch = new_translation(&off, None, false, &own, &placed);
+        let patch = new_translation(&off, None, false, None, &own, &placed);
         assert_eq!(keys(&patch), ["stroke", "stroke_width"]);
     }
 
@@ -606,7 +682,7 @@ mod tests {
         let light = settings(false, Some(YELLOW), None);
         let after = patched(
             &measured(),
-            &new_translation(&light, None, true, &none, &measured()),
+            &new_translation(&light, None, true, None, &none, &measured()),
         )
         .expect("values");
         assert_eq!(
@@ -617,7 +693,7 @@ mod tests {
         let unset = settings(false, None, None);
         let after = patched(
             &measured(),
-            &new_translation(&unset, None, true, &none, &measured()),
+            &new_translation(&unset, None, true, None, &none, &measured()),
         )
         .expect("values");
         assert_eq!(
@@ -628,14 +704,14 @@ mod tests {
         let outlined = settings(false, Some(YELLOW), Some(RED));
         let after = patched(
             &measured(),
-            &new_translation(&outlined, None, true, &none, &measured()),
+            &new_translation(&outlined, None, true, None, &none, &measured()),
         )
         .expect("values");
         assert_eq!((after.stroke, after.stroke_width), (Some(RED), Some(2.0)));
         // Dialogue gets no legibility outline.
         let after = patched(
             &measured(),
-            &new_translation(&light, None, false, &none, &measured()),
+            &new_translation(&light, None, false, None, &none, &measured()),
         )
         .expect("values");
         assert_eq!((after.stroke, after.stroke_width), (None, None));
@@ -647,7 +723,7 @@ mod tests {
         };
         let after = patched(
             &sizeless,
-            &new_translation(&light, None, true, &none, &sizeless),
+            &new_translation(&light, None, true, None, &none, &sizeless),
         )
         .expect("values");
         assert_eq!((after.stroke, after.stroke_width), (Some(BLACK), Some(3.0)));
@@ -655,8 +731,11 @@ mod tests {
             fill: Some(BLUE),
             ..CharStyle::default()
         };
-        let after =
-            patched(&bare, &new_translation(&light, None, true, &none, &bare)).expect("values");
+        let after = patched(
+            &bare,
+            &new_translation(&light, None, true, None, &none, &bare),
+        )
+        .expect("values");
         assert_eq!((after.stroke, after.stroke_width), (None, None));
     }
 
@@ -687,14 +766,14 @@ mod tests {
         };
         // On: only the font, in place of its own.
         let on = settings(true, Some(RED), None);
-        let patch = restyle(&on, Some("CCWildWords"), false, &current);
+        let patch = restyle(&on, Some("CCWildWords"), false, None, &current);
         assert_eq!(keys(&patch), ["family"]);
-        assert!(restyle(&on, None, false, &current).is_empty());
+        assert!(restyle(&on, None, false, None, &current).is_empty());
         // Off: the default colours too.
         let off = settings(false, Some(RED), None);
         let after = patched(
             &current,
-            &restyle(&off, Some("CCWildWords"), false, &current),
+            &restyle(&off, Some("CCWildWords"), false, None, &current),
         )
         .expect("values");
         assert_eq!(
@@ -795,7 +874,7 @@ mod tests {
         look: &LetteringSettings,
         font: Option<&str>,
     ) {
-        let before = layer(session, block);
+        let project = session.project();
         let placed = placement(session, block);
         let mut ops = vec![
             Op::SetText {
@@ -804,7 +883,7 @@ mod tests {
             },
             placed.clone(),
         ];
-        ops.extend(translated(&before, text, &placed, look, font).expect("the hook's ops"));
+        ops.extend(translated(&project, block, text, &placed, look, font).expect("the hook's ops"));
         ops.push(Op::SetAttribute {
             layer: block.into(),
             namespace: C2PA.to_owned(),
@@ -1137,10 +1216,10 @@ mod tests {
     #[test]
     fn a_typed_translation_gets_the_look_and_no_record() {
         let (_dir, session, block) = page("どうして", &["detection", "ocr"]);
-        let found = layer(&session, block);
         let look = settings(false, Some(RED), None);
         let op = typed(
-            &found,
+            &session.project(),
+            block,
             &placement(&session, block),
             &look,
             Some("CCWildWords"),
@@ -1158,15 +1237,232 @@ mod tests {
         );
         let on = settings(true, None, None);
         assert!(
-            typed(&found, &placement(&session, block), &on, None)
-                .expect("the look")
-                .is_none()
+            typed(
+                &session.project(),
+                block,
+                &placement(&session, block),
+                &on,
+                None
+            )
+            .expect("the look")
+            .is_none()
         );
         // Placement's op for another layer is refused.
         let other = Op::UpdateLayer {
             layer: LayerId(koharu_scene::Uuid::now_v7()).into(),
             patch: json!({}),
         };
-        assert!(typed(&found, &other, &look, None).is_err());
+        assert!(typed(&session.project(), block, &other, &look, None).is_err());
+    }
+
+    /// `look` with Pick fonts automatically on and the category fonts
+    /// `fonts`.
+    fn lettered(
+        look: LetteringSettings,
+        fonts: &[(LetteringCategory, Option<&str>, bool, bool)],
+    ) -> LetteringSettings {
+        LetteringSettings {
+            auto: true,
+            categories: fonts
+                .iter()
+                .map(|(category, family, bold, italic)| {
+                    let font = CategoryFont {
+                        family: family.map(str::to_owned),
+                        bold: *bold,
+                        italic: *italic,
+                    };
+                    (*category, font)
+                })
+                .collect(),
+            ..look
+        }
+    }
+
+    /// Labels `block` with `category`, chosen by a user.
+    fn label(session: &mut Session, block: LayerId, category: LetteringCategory) {
+        let label = attrs::Lettering {
+            category,
+            source: attrs::LetteringSource::User,
+            confidence: None,
+        };
+        apply(session, vec![attrs::set(block, &label).expect("a label")]);
+    }
+
+    #[test]
+    fn with_the_switch_on_a_new_translation_gets_its_categorys_font_recorded_as_automatic() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        label(&mut session, block, LetteringCategory::Shout);
+        let look = lettered(
+            settings(false, Some(RED), None),
+            &[(LetteringCategory::Shout, Some("Badaboom BB"), true, false)],
+        );
+        translate(&mut session, block, "Why?", &look, Some("CCWildWords"));
+
+        // The category's font in place of the default font, beside the
+        // default colours.
+        let chars = translation(&session, block).style.chars;
+        assert_eq!(
+            (chars.family.as_deref(), chars.weight, chars.italic),
+            (Some("Badaboom BB"), Some(700), None)
+        );
+        assert_eq!((chars.fill, chars.stroke), (Some(RED), None));
+        // Recorded as what the step wrote, so it's no hand edit.
+        let found = layer(&session, block);
+        let style = Auto::of(&found).style.expect("a style");
+        assert_eq!(
+            (style.family.as_deref(), style.weight, style.italic),
+            (Some("Badaboom BB"), Some(700), None)
+        );
+        assert_eq!(edited(&found), Edited::default());
+
+        // Translated again, it keeps the font it has, as a translation keeps
+        // its family, though the category's font changed since.
+        let changed = lettered(
+            settings(false, Some(RED), None),
+            &[(LetteringCategory::Shout, Some("Another"), false, true)],
+        );
+        translate(&mut session, block, "Why!?", &changed, Some("CCWildWords"));
+        let chars = translation(&session, block).style.chars;
+        assert_eq!(
+            (chars.family.as_deref(), chars.weight, chars.italic),
+            (Some("Badaboom BB"), Some(700), None)
+        );
+        assert_eq!(edited(&layer(&session, block)), Edited::default());
+    }
+
+    #[test]
+    fn a_category_without_a_font_takes_normal_dialogues_then_the_default_font() {
+        // Not in a balloon: floating, which has no font of its own.
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let normal = lettered(
+            settings(true, None, None),
+            &[(
+                LetteringCategory::NormalDialogue,
+                Some("Comic Neue"),
+                false,
+                true,
+            )],
+        );
+        translate(&mut session, block, "Why?", &normal, Some("CCWildWords"));
+        let chars = translation(&session, block).style.chars;
+        assert_eq!(
+            (chars.family.as_deref(), chars.weight, chars.italic),
+            (Some("Comic Neue"), None, Some(true))
+        );
+        assert_eq!(edited(&layer(&session, block)), Edited::default());
+
+        // With neither, the default font.
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let bare = lettered(settings(true, None, None), &[]);
+        translate(&mut session, block, "Why?", &bare, Some("CCWildWords"));
+        let chars = translation(&session, block).style.chars;
+        assert_eq!(
+            (chars.family.as_deref(), chars.weight, chars.italic),
+            (Some("CCWildWords"), None, None)
+        );
+        // An entry without a family takes the default font too, with its
+        // bold.
+        let floating = lettered(
+            settings(true, None, None),
+            &[(LetteringCategory::Floating, None, true, false)],
+        );
+        let none = CharStyle::default();
+        let patch = new_translation(
+            &floating,
+            Some("CCWildWords"),
+            false,
+            Some(LetteringCategory::Floating),
+            &none,
+            &measured(),
+        );
+        assert_eq!(
+            Value::Object(patch),
+            json!({"family": "CCWildWords", "weight": 700, "italic": null})
+        );
+    }
+
+    #[test]
+    fn with_the_switch_off_no_category_font_is_written() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        label(&mut session, block, LetteringCategory::Shout);
+        let off = LetteringSettings {
+            auto: false,
+            ..lettered(
+                settings(true, None, None),
+                &[(LetteringCategory::Shout, Some("Badaboom BB"), true, true)],
+            )
+        };
+        let op = typed(
+            &session.project(),
+            block,
+            &placement(&session, block),
+            &off,
+            Some("CCWildWords"),
+        )
+        .expect("the look");
+        assert_eq!(
+            op.map(|op| json!(op)["patch"].clone()),
+            Some(json!({"translation": {"style": {"chars": {"family": "CCWildWords"}}}}))
+        );
+        // A typed translation gets the category's font with it on.
+        let on = LetteringSettings { auto: true, ..off };
+        let op = typed(
+            &session.project(),
+            block,
+            &placement(&session, block),
+            &on,
+            Some("CCWildWords"),
+        )
+        .expect("the look");
+        assert_eq!(
+            op.map(|op| json!(op)["patch"].clone()),
+            Some(json!({"translation": {"style": {"chars": {
+                "family": "Badaboom BB", "weight": 700, "italic": true,
+            }}}}))
+        );
+    }
+
+    #[test]
+    fn apply_gives_the_category_font_in_place_of_the_font_it_has() {
+        let current = CharStyle {
+            family: Some("Comic Neue".to_owned()),
+            weight: Some(700),
+            italic: Some(true),
+            ..measured()
+        };
+        let look = lettered(
+            settings(true, None, None),
+            &[(LetteringCategory::Whisper, None, false, true)],
+        );
+        let patch = restyle(
+            &look,
+            Some("CCWildWords"),
+            false,
+            Some(LetteringCategory::Whisper),
+            &current,
+        );
+        assert_eq!(
+            Value::Object(patch.clone()),
+            json!({"family": "CCWildWords", "weight": null, "italic": true})
+        );
+        let after = patched(&current, &patch).expect("values");
+        assert_eq!(
+            (
+                after.family.as_deref(),
+                after.weight,
+                after.italic,
+                after.fill
+            ),
+            (Some("CCWildWords"), None, Some(true), Some(BLUE))
+        );
+        // Without a category, stage 3's restyle: the weight stays.
+        assert_eq!(
+            keys(&restyle(&look, Some("CCWildWords"), false, None, &current)),
+            ["family"]
+        );
+        assert_eq!(
+            Value::Object(category_chars(&look, None, LetteringCategory::Shout)),
+            json!({"weight": null, "italic": null})
+        );
     }
 }

@@ -5,7 +5,7 @@
 //! canvas needs are one `BooharuSettings`, which the host pushes at startup
 //! and whenever the settings they come from are saved.
 
-use booharu_core::{settings::LetteringSettings, styles};
+use booharu_core::{lettering, settings::LetteringSettings, styles};
 use koharu_scene::{CharStyle, Content, Fit, Frame, Layer, LayerId, Page, PageId, Role, Text};
 use kurbo::{Point, Rect, Size};
 use ui_events::keyboard::Modifiers;
@@ -59,7 +59,8 @@ pub(crate) fn drafted(mut text: Text, settings: &BooharuSettings) -> Text {
 /// `base`, the source of `layer`, a block on `page` with no translation,
 /// standing in for the translation typed into it, with the default look of
 /// `settings` a new translation gets, as Booharu's Translation stage hook
-/// gives it: the default font when it has no family, and with colour
+/// gives it: the default font when it has no family, or the block's
+/// category's while Pick fonts automatically is on, and with colour
 /// detection off the default colours in place of its source's, a sound
 /// effect keeping a legibility outline when the default sets none. With
 /// detection on, its source's colours stay.
@@ -72,10 +73,12 @@ pub(crate) fn untranslated(
     let defaults = &settings.text;
     let sfx = role(&page.layers, layer) == Some(Role::Sfx);
     let own = CharStyle::default();
+    let category = lettering::auto_category(page, layer, &defaults.lettering);
     let patch = styles::new_translation(
         &defaults.lettering,
         defaults.family.as_deref(),
         sfx,
+        category,
         &own,
         &base.style.chars,
     );

@@ -100,8 +100,9 @@ impl From<Stage> for RunStage {
 /// The ops that follow placement's, `placed`, in the Translation stage's
 /// edit for `block`'s new translation `text`, both read before the edit, as
 /// placement reads the project: the run's default look, when it changes
-/// anything, then the hand-edit record, on every translation the stage
-/// writes. None when placement failed, which fails the stage.
+/// anything, with the block's category font while the run's Pick fonts
+/// automatically is on, then the hand-edit record, on every translation the
+/// stage writes. None when placement failed, which fails the stage.
 pub(crate) fn translated(
     project: &Project,
     block: LayerId,
@@ -113,7 +114,8 @@ pub(crate) fn translated(
         return Ok(Vec::new());
     };
     styles::translated(
-        project.layer(block)?,
+        project,
+        block,
         text,
         placed,
         &booharu.lettering,
