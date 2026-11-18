@@ -1077,15 +1077,21 @@ const REACH: u32 = 2;
 /// scan's grain and a soft shading's change over `REACH` pixels, below even a
 /// grey letter's stroke against its paper.
 const EDGE: u8 = 48;
-/// How many edge pixels make something to read; fewer are a speck of dust.
-const INK: usize = 16;
+/// The fewest edge pixels that make something to read: a speck of dust
+/// three pixels across makes fewer.
+const INK: usize = 24;
+/// The share of a box's pixels that must be edges for it to hold something
+/// to read, one in this many: in a wide box, a speck of dust a few pixels
+/// across makes fewer, and even a short stroke of lettering more.
+const SHARE: usize = 1000;
 
-/// Whether `crop` is nearly one colour, holding nothing to read: fewer than
-/// `INK` of its pixels differ by `EDGE` from the one `REACH` across or down.
-/// A soft shading changes too little from one pixel to the next to count,
-/// unlike a letter's stroke.
+/// Whether `crop` is nearly one colour, holding nothing to read: fewer of
+/// its pixels than `INK`, or than one in `SHARE`, differ by `EDGE` from the
+/// one `REACH` across or down. A soft shading changes too little from one
+/// pixel to the next to count, unlike a letter's stroke.
 fn blank(crop: &RgbImage) -> bool {
     let (width, height) = crop.dimensions();
+    let ink = INK.max(width as usize * height as usize / SHARE);
     let differs =
         |a: &Rgb<u8>, b: &Rgb<u8>| a.0.iter().zip(b.0).any(|(&a, b)| a.abs_diff(b) >= EDGE);
     let mut edges = 0;
@@ -1094,7 +1100,7 @@ fn blank(crop: &RgbImage) -> bool {
         let down = y + REACH < height && differs(pixel, crop.get_pixel(x, y + REACH));
         if across || down {
             edges += 1;
-            if edges == INK {
+            if edges == ink {
                 return false;
             }
         }
@@ -1360,6 +1366,36 @@ mod tests {
             }
         }
         assert!(!blank(&grey_strokes));
+    }
+
+    #[test]
+    fn a_speck_of_dust_is_nothing_to_read() {
+        /// A `size` square of paper with a dark `dot` square in its middle.
+        fn dotted(size: u32, dot: u32) -> RgbImage {
+            let middle = (size - dot) / 2..(size + dot) / 2;
+            RgbImage::from_fn(size, size, |x, y| {
+                Rgb(match middle.contains(&x) && middle.contains(&y) {
+                    true => [20; 3],
+                    false => [250; 3],
+                })
+            })
+        }
+        // Dust in a wide box, up to a few pixels across.
+        for dot in [3, 4, 5] {
+            assert!(blank(&dotted(200, dot)), "a dot {dot} pixels across");
+        }
+        // A short stroke in the same box is lettering.
+        let mut stroke = dotted(200, 0);
+        for x in 100..102 {
+            for y in 90..105 {
+                stroke.put_pixel(x, y, Rgb([20; 3]));
+            }
+        }
+        assert!(!blank(&stroke));
+        // In a box drawn close around it, a dot four pixels across, such as
+        // a middle dot, is something to read, and one three across isn't.
+        assert!(!blank(&dotted(30, 4)));
+        assert!(blank(&dotted(30, 3)));
     }
 
     #[test]
