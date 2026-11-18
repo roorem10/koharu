@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { call } from '@/lib/backend'
 import { categoryName, letteringCategories } from '@/lib/booharu/categories'
 import i18n from '@/lib/i18n'
-import { pagesKey } from '@/lib/queries'
+import { pagesKey, queryClient } from '@/lib/queries'
 import {
   commands,
   type BlockLettering,
@@ -46,10 +46,11 @@ export function letteringKey(page: PageId) {
   return [...pagesKey, page, 'booharu', 'lettering'] as const
 }
 
-/** The lettering of every block on `page`, as the desktop answers it. A failed read shows no error:
- * one of a page just removed fails, as the page's views go, and they then show nothing of it. */
-export function readLettering(page: PageId): Promise<BlockLettering[]> {
-  return commands.booharuGetLettering(page)
+/** Reads the lettering of every block on `page` now, as a command does, a failure showing its error
+ * and rejecting, and keeps it for the views showing the page. */
+export async function fetchLettering(page: PageId): Promise<void> {
+  const lettering = await call(commands.booharuGetLettering, page)
+  queryClient.setQueryData(letteringKey(page), lettering)
 }
 
 function byBlock(lettering: BlockLettering[]): Map<LayerId, BlockLettering> {
@@ -57,24 +58,31 @@ function byBlock(lettering: BlockLettering[]): Map<LayerId, BlockLettering> {
 }
 
 /** The lettering of every block on `page`, by block, read while a view showing it is mounted and
- * again after every change; none while `page` is. */
+ * again after every change; none while `page` is. A failed read shows no error toast: one of a page
+ * just removed fails, as the page's views go, and they then show nothing of it. Box details says
+ * why one failed otherwise, as for a `[booharu-lettering]` the settings refuse. */
 export function useLettering(page: PageId | null | undefined) {
   return useQuery({
     queryKey: letteringKey(page ?? ''),
-    queryFn: () => readLettering(page ?? ''),
+    queryFn: () => commands.booharuGetLettering(page ?? ''),
     enabled: !!page,
     select: byBlock,
   })
 }
 
-/** `block`'s lettering on `page`: undefined while it's being read, null when the page has no such
- * block. */
+/** `block`'s lettering on `page`, as a view shows it. `lettering` is undefined while it's being
+ * read, and when the read failed with nothing read before, and null when the page has no such
+ * block; `error` is that failure's message, and null otherwise, as when a read again fails and what
+ * was read before stays. */
 export function useBlockLettering(
   page: PageId | null | undefined,
   block: LayerId,
-): BlockLettering | null | undefined {
-  const lettering = useLettering(page).data
-  return lettering && (lettering.get(block) ?? null)
+): { lettering: BlockLettering | null | undefined; error: string | null } {
+  const { data, error } = useLettering(page)
+  if (data) return { lettering: data.get(block) ?? null, error: null }
+  if (error === null) return { lettering: undefined, error: null }
+  // The desktop rejects with its message, a string.
+  return { lettering: undefined, error: error instanceof Error ? error.message : String(error) }
 }
 
 /** Sets the lettering category of `blocks` as the user picks it, `choice`, Automatic clearing their

@@ -129,7 +129,8 @@
       "suggested_other": "Suggested fonts for {{count}} categories",
       "tag": "Lettering category: {{category}} ({{reason}})",
       "tagFor": "Lettering category for {{name}}: {{category}} ({{reason}})",
-      "title": "Lettering categories"
+      "title": "Lettering categories",
+      "unread": "Couldn't read the lettering category: {{error}}"
     },
     "menu": {
       "booharuGithub": "Booharu on GitHub",

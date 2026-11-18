@@ -20,7 +20,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/t
  * and ? tag: a block's category, marked with a hand when the user picked it, its tooltip saying why
  * it has it and its bubble's shape. Clicking it opens the block's category picker, so a change takes
  * two clicks; a locked block's picker opens only to be read, saying why. `name` names the text as
- * the row does. A text layer has no category, and no tag. */
+ * the row does. A text layer has no category, and no tag, nor has a block whose category couldn't
+ * be read, as Box details says. */
 export function CategoryTag({
   page,
   layer,
@@ -49,9 +50,10 @@ function BlockTag({
   locked: boolean
 }) {
   const { t } = useTranslation()
-  const lettering = useBlockLettering(page, block)
-  // The row keeps the tag's line while it's read, so its fields don't move when it shows.
-  if (lettering === undefined) return <span aria-hidden className='h-4' />
+  const { lettering, error } = useBlockLettering(page, block)
+  // The row keeps the tag's line while it's read, so its fields don't move when it shows; a read
+  // that failed shows no tag, and Box details says why.
+  if (lettering === undefined) return error === null ? <span aria-hidden className='h-4' /> : null
   if (lettering === null) return null
 
   const category = t(categoryName(lettering.category))

@@ -134,7 +134,8 @@
       "suggested_other": "Se sugirieron fuentes para {{count}} categorías",
       "tag": "Categoría de rotulación: {{category}} ({{reason}})",
       "tagFor": "Categoría de rotulación de {{name}}: {{category}} ({{reason}})",
-      "title": "Categorías de rotulación"
+      "title": "Categorías de rotulación",
+      "unread": "No se ha podido leer la categoría de rotulación: {{error}}"
     },
     "menu": {
       "booharuGithub": "Booharu en GitHub",

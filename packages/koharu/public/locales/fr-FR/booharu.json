@@ -134,7 +134,8 @@
       "suggested_other": "Polices suggérées pour {{count}} catégories",
       "tag": "Catégorie de lettrage : {{category}} ({{reason}})",
       "tagFor": "Catégorie de lettrage pour {{name}} : {{category}} ({{reason}})",
-      "title": "Catégories de lettrage"
+      "title": "Catégories de lettrage",
+      "unread": "Impossible de lire la catégorie de lettrage : {{error}}"
     },
     "menu": {
       "booharuGithub": "Booharu sur GitHub",

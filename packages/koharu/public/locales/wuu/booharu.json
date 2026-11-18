@@ -129,7 +129,8 @@
       "suggested_other": "已经替 {{count}} 只类别推荐字体",
       "tag": "文字排版类别：{{category}}（{{reason}}）",
       "tagFor": "{{name}} 个文字排版类别：{{category}}（{{reason}}）",
-      "title": "文字排版类别"
+      "title": "文字排版类别",
+      "unread": "文字排版类别读勿出：{{error}}"
     },
     "menu": {
       "booharuGithub": "GitHub 浪个 Booharu",

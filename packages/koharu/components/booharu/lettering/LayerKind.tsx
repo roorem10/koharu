@@ -9,8 +9,8 @@ import { usePage } from '@/lib/queries'
 import type { Layer, LayerId } from '@koharu/ipc/protocol'
 
 /** A Layers row's second line: a block's lettering category, as 0.0.4's rows named a text's kind,
- * else `kind`, Koharu's name for the layer's kind, for any other layer and while the category is
- * read. */
+ * else `kind`, Koharu's name for the layer's kind, for any other layer, while the category is read
+ * and when it couldn't be, which Box details says. */
 export function LayerKind({ layer, kind }: { layer: Layer; kind: string }) {
   return isBlockLayer(layer) ? <BlockKind block={layer.id} kind={kind} /> : kind
 }
@@ -18,6 +18,6 @@ export function LayerKind({ layer, kind }: { layer: Layer; kind: string }) {
 /** The category of `block`, on the page the canvas shows, which Layers lists. */
 function BlockKind({ block, kind }: { block: LayerId; kind: string }) {
   const { t } = useTranslation()
-  const lettering = useBlockLettering(usePage().data?.id, block)
+  const { lettering } = useBlockLettering(usePage().data?.id, block)
   return lettering ? t(categoryName(lettering.category)) : kind
 }

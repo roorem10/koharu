@@ -143,7 +143,8 @@
       "suggested_zero": "لم يُقترح خط لأي فئة ({{count}})",
       "tag": "فئة التنضيد: {{category}} ({{reason}})",
       "tagFor": "فئة التنضيد لـ {{name}}: {{category}} ({{reason}})",
-      "title": "فئات التنضيد"
+      "title": "فئات التنضيد",
+      "unread": "تعذّرت قراءة فئة التنضيد: {{error}}"
     },
     "menu": {
       "booharuGithub": "Booharu على GitHub",

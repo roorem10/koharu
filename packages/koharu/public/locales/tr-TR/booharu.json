@@ -129,7 +129,8 @@
       "suggested_other": "{{count}} kategori için yazı tipi önerildi",
       "tag": "Dizgi kategorisi: {{category}} ({{reason}})",
       "tagFor": "{{name}} için dizgi kategorisi: {{category}} ({{reason}})",
-      "title": "Dizgi kategorileri"
+      "title": "Dizgi kategorileri",
+      "unread": "Dizgi kategorisi okunamadı: {{error}}"
     },
     "menu": {
       "booharuGithub": "GitHub'da Booharu",

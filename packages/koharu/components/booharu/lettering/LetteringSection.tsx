@@ -21,10 +21,18 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/t
  * it's lettered in, which opens Automatic and every category to pick from; why it has that
  * category; and its bubble's shape. While Pick fonts automatically is off it says a category
  * gives no font, and for a locked block, which takes no pick, why. Nothing shows until the block's
- * lettering is read. */
+ * lettering is read, and a read that failed says why, as for a `[booharu-lettering]` the settings
+ * refuse. */
 export function LetteringSection({ page, box: { layer, locked } }: BoxDetailsProps) {
   const { t } = useTranslation()
-  const lettering = useBlockLettering(page, layer.id)
+  const { lettering, error } = useBlockLettering(page, layer.id)
+  if (error !== null) {
+    return (
+      <p className='text-[11px] leading-4 break-words text-destructive'>
+        {t('booharu.lettering.unread', { error })}
+      </p>
+    )
+  }
   if (!lettering) return null
 
   return (

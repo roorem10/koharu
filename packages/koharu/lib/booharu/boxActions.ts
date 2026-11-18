@@ -2,7 +2,7 @@
 
 import { call } from '@/lib/backend'
 import { openBoxDetails } from '@/lib/booharu/boxDetails'
-import { letteringKey, readLettering } from '@/lib/booharu/boxLettering'
+import { fetchLettering } from '@/lib/booharu/boxLettering'
 import {
   findLayer,
   findPart,
@@ -12,7 +12,6 @@ import {
   type BlockLayer,
   type TextLayer,
 } from '@/lib/document'
-import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import {
   commands,
@@ -214,11 +213,9 @@ export const boxActions: readonly BoxAction[] = [
     run: async (selection) => {
       const block = categorized(selection)
       if (!block) return
-      // Read first, so Box details opens with the section's picker there to take the focus.
-      await queryClient.prefetchQuery({
-        queryKey: letteringKey(selection.page),
-        queryFn: () => readLettering(selection.page),
-      })
+      // Read first, so Box details opens with the section's picker there to take the focus; a read
+      // that fails shows its error, as a command's does, and opens nothing.
+      await fetchLettering(selection.page)
       openBoxDetails(selection.page, block.id, 'lettering')
     },
   },

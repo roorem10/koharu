@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BoxDetailsDialog } from '@/components/booharu/details/BoxDetailsDialog'
 import { StoryPanel } from '@/components/editor/StoryPanel'
 import { openBoxDetails, useBoxDetails } from '@/lib/booharu/boxDetails'
-import { setLetteringCategory } from '@/lib/booharu/boxLettering'
+import { letteringKey, setLetteringCategory } from '@/lib/booharu/boxLettering'
 import { booharuPreferencesKey } from '@/lib/booharu/preferences'
 import { resources, supportedLanguages } from '@/lib/i18n'
 import { queryClient } from '@/lib/queries'
@@ -66,6 +66,33 @@ describe("Booharu's lettering category in Box details", () => {
     section = await letteringSection()
     expect(section.getByText('No bubble')).toBeInTheDocument()
     expect(section.queryByText(/^Bubble shape/)).toBeNull()
+  })
+
+  it('says why the category couldn’t be read, where Story shows no tag', async () => {
+    const { lettering: read } = letteredDesktop()
+    const refused = "shout's font family can't be blank: leave it out for the default font"
+    read.mockRejectedValue(refused)
+    mount(
+      <>
+        <StoryPanel />
+        <BoxDetailsDialog />
+      </>,
+    )
+
+    // Story's rows show no tag, nor keep the line a tag takes while it's read.
+    expect(await screen.findByRole('textbox', { name: 'Hel source text' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(queryClient.getQueryState(letteringKey('page'))?.status).toBe('error')
+      expect(document.querySelector('span.h-4[aria-hidden="true"]')).toBeNull()
+    })
+    expect(screen.queryAllByRole('combobox', { name: /^Lettering category for/ })).toEqual([])
+
+    openBoxDetails('page', 'first')
+    const section = await letteringSection()
+    expect(
+      await section.findByText(`Couldn't read the lettering category: ${refused}`),
+    ).toBeInTheDocument()
+    expect(section.queryByRole('combobox', { name: 'Lettering category' })).toBeNull()
   })
 
   it('leaves the Lettering section out for a text layer', async () => {

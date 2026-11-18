@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { boxActions, selectedBoxes, type BoxSelection } from '@/lib/booharu/boxActions'
 import { useBoxDetails } from '@/lib/booharu/boxDetails'
 import { useKoharuStore } from '@/lib/store'
+import { toast } from '@koharu/ui/components/toast'
 
 import { boxesPage, desktop } from './boxes'
 
@@ -129,5 +130,18 @@ describe('Booharu box actions', () => {
       layer: 'second',
       section: 'lettering',
     })
+  })
+
+  it('shows why Change category couldn’t read the lettering, and opens nothing', async () => {
+    const { lettering } = desktop()
+    const refused = "small text under 0 of the page's height isn't above 0 and at most 1"
+    lettering.mockRejectedValue(refused)
+    const shown = vi.spyOn(toast, 'add')
+
+    await expect(run('category', ['second'])).rejects.toThrow(refused)
+    expect(shown).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error', description: refused }),
+    )
+    expect(useBoxDetails.getState().shown).toBeNull()
   })
 })

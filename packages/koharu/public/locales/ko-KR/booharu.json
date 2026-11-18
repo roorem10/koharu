@@ -129,7 +129,8 @@
       "suggested_other": "범주 {{count}}개에 글꼴을 추천했습니다",
       "tag": "레터링 범주: {{category}} ({{reason}})",
       "tagFor": "{{name}}의 레터링 범주: {{category}} ({{reason}})",
-      "title": "레터링 범주"
+      "title": "레터링 범주",
+      "unread": "레터링 범주를 읽지 못했습니다: {{error}}"
     },
     "menu": {
       "booharuGithub": "GitHub의 Booharu",

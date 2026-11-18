@@ -129,7 +129,8 @@
       "suggested_other": "已为 {{count}} 个类别推荐字体",
       "tag": "排字类别：{{category}}（{{reason}}）",
       "tagFor": "{{name}} 的排字类别：{{category}}（{{reason}}）",
-      "title": "排字类别"
+      "title": "排字类别",
+      "unread": "无法读取排字类别：{{error}}"
     },
     "menu": {
       "booharuGithub": "GitHub 上的 Booharu",

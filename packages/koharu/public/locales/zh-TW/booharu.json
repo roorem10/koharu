@@ -129,7 +129,8 @@
       "suggested_other": "已為 {{count}} 個類別推薦字型",
       "tag": "排字類別：{{category}}（{{reason}}）",
       "tagFor": "{{name}} 的排字類別：{{category}}（{{reason}}）",
-      "title": "排字類別"
+      "title": "排字類別",
+      "unread": "無法讀取排字類別：{{error}}"
     },
     "menu": {
       "booharuGithub": "GitHub 上的 Booharu",

@@ -134,7 +134,8 @@
       "suggested_other": "Fontes sugeridas para {{count}} categorias",
       "tag": "Categoria de letreiramento: {{category}} ({{reason}})",
       "tagFor": "Categoria de letreiramento de {{name}}: {{category}} ({{reason}})",
-      "title": "Categorias de letreiramento"
+      "title": "Categorias de letreiramento",
+      "unread": "Não foi possível ler a categoria de letreiramento: {{error}}"
     },
     "menu": {
       "booharuGithub": "Booharu no GitHub",

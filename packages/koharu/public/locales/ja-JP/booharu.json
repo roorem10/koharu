@@ -129,7 +129,8 @@
       "suggested_other": "{{count}}個のカテゴリにフォントを設定しました",
       "tag": "写植カテゴリ：{{category}}（{{reason}}）",
       "tagFor": "{{name}}の写植カテゴリ：{{category}}（{{reason}}）",
-      "title": "写植カテゴリ"
+      "title": "写植カテゴリ",
+      "unread": "写植カテゴリを読み込めませんでした：{{error}}"
     },
     "menu": {
       "booharuGithub": "GitHub の Booharu",
