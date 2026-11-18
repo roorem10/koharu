@@ -61,7 +61,7 @@
       "defaultModeDescription": "Alt를 누른 채 놓으면 OCR만, Shift를 누른 채 놓으면 OCR, 번역, 정리를 수행합니다.",
       "description": "O 도구로 그린 상자는 텍스트 블록이 됩니다. 항상 OCR을 수행하며, 번역과 정리까지 할지는 동작에 따라 정해집니다.",
       "modes": {
-        "read": "OCR",
+        "read": "OCR만",
         "read_translate": "OCR 및 번역",
         "read_translate_clean": "OCR, 번역 및 정리"
       }
@@ -102,6 +102,6 @@
     "title": "Booharu 준비 중"
   },
   "tools": {
-    "ocr_box": "상자 안의 텍스트 읽기"
+    "ocr_box": "OCR 상자"
   }
 }

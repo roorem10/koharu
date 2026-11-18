@@ -58,8 +58,8 @@ describe('Booharu O tool settings', () => {
     const user = userEvent.setup()
     renderPipeline()
 
-    expect(screen.getByRole('heading', { name: 'Read text in a box' })).toBeInTheDocument()
-    const select = await modeSelect('Read')
+    expect(screen.getByRole('heading', { name: 'OCR box' })).toBeInTheDocument()
+    const select = await modeSelect('Read only')
     // Another writer changes another section after the page read the file.
     file.preferences['booharu-mcp'] = { port: 50000 }
 
@@ -82,7 +82,7 @@ describe('Booharu O tool settings', () => {
     const user = userEvent.setup()
     renderPipeline()
 
-    const select = await modeSelect('Read')
+    const select = await modeSelect('Read only')
     await user.click(select)
     await user.click(await screen.findByRole('option', { name: 'Read and translate' }))
     await waitFor(() =>
@@ -100,6 +100,6 @@ describe('Booharu O tool settings', () => {
         expect.objectContaining({ type: 'error', description: 'config.toml is read-only' }),
       ),
     )
-    await waitFor(() => expect(shownMode(select)).toBe('Read'))
+    await waitFor(() => expect(shownMode(select)).toBe('Read only'))
   })
 })

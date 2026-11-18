@@ -29,13 +29,13 @@ describe('Booharu O tool in the tool rail', () => {
     )
 
     const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
-    const index = names.indexOf('Read text in a box')
-    expect(names.slice(index - 1, index + 2)).toEqual(['Remove', 'Read text in a box', 'Pan'])
+    const index = names.indexOf('OCR box')
+    expect(names.slice(index - 1, index + 2)).toEqual(['Remove', 'OCR box', 'Pan'])
 
-    const tool = screen.getByRole('button', { name: 'Read text in a box' })
+    const tool = screen.getByRole('button', { name: 'OCR box' })
     await user.hover(tool)
     const hint = await screen.findByText('Alt: read only. Shift: read, translate and clean.')
-    expect(hint.parentElement).toHaveTextContent(/^Read text in a boxO/)
+    expect(hint.parentElement).toHaveTextContent(/^OCR boxO/)
     // app/booharu.css wraps the tooltip's row for the hint by this parent.
     expect(hint.parentElement).toHaveAttribute('data-slot', 'tooltip-content')
 

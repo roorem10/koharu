@@ -61,7 +61,7 @@
       "defaultModeDescription": "Altを押しながら離すとOCRのみ、Shiftを押しながら離すとOCR・翻訳・クリーンアップを実行します。",
       "description": "Oツールで描いたボックスはテキストブロックになります。必ずOCRされ、翻訳とクリーンアップも行うかどうかは操作で決まります。",
       "modes": {
-        "read": "OCR",
+        "read": "OCRのみ",
         "read_translate": "OCRと翻訳",
         "read_translate_clean": "OCR・翻訳・クリーンアップ"
       }
@@ -105,6 +105,6 @@
     "title": "Booharu を準備しています"
   },
   "tools": {
-    "ocr_box": "ボックス内の文字を読み取る"
+    "ocr_box": "OCRボックス"
   }
 }

@@ -61,7 +61,7 @@
       "defaultModeDescription": "Yalnızca okumak için Alt basılıyken bırakın; okumak, çevirmek ve temizlemek için Shift basılıyken bırakın.",
       "description": "O aracıyla çizilen kutu bir metin bloğu olur. Kutu her zaman okunur; ayrıca çevrilip temizlenip temizlenmeyeceğine seçilen işlem karar verir.",
       "modes": {
-        "read": "Oku",
+        "read": "Yalnızca oku",
         "read_translate": "Oku ve çevir",
         "read_translate_clean": "Oku, çevir ve temizle"
       }
@@ -102,6 +102,6 @@
     "title": "Booharu hazırlanıyor"
   },
   "tools": {
-    "ocr_box": "Kutudaki metni oku"
+    "ocr_box": "OCR kutusu"
   }
 }

@@ -64,7 +64,7 @@
       "defaultModeDescription": "Suelta con Alt para solo leer, o con Mayús para leer, traducir y limpiar.",
       "description": "Un cuadro dibujado con la herramienta O se convierte en un bloque de texto. Siempre se lee, y la acción decide si además se traduce y se limpia.",
       "modes": {
-        "read": "Leer",
+        "read": "Solo leer",
         "read_translate": "Leer y traducir",
         "read_translate_clean": "Leer, traducir y limpiar"
       }
@@ -113,6 +113,6 @@
     "title": "Preparando Booharu"
   },
   "tools": {
-    "ocr_box": "Leer el texto de un cuadro"
+    "ocr_box": "Cuadro de OCR"
   }
 }

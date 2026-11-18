@@ -64,7 +64,7 @@
       "defaultModeDescription": "Relâchez avec Alt pour lire uniquement, ou avec Maj pour lire, traduire et nettoyer.",
       "description": "Une zone tracée avec l’outil O devient un bloc de texte. Elle est toujours lue, et l’action choisie décide si elle est aussi traduite et nettoyée.",
       "modes": {
-        "read": "Lire",
+        "read": "Lire uniquement",
         "read_translate": "Lire et traduire",
         "read_translate_clean": "Lire, traduire et nettoyer"
       }
@@ -112,6 +112,6 @@
     "title": "Préparation de Booharu"
   },
   "tools": {
-    "ocr_box": "Lire le texte d’une zone"
+    "ocr_box": "Zone OCR"
   }
 }

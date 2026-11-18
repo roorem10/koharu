@@ -64,7 +64,7 @@
       "defaultModeDescription": "Solte com Alt para fazer apenas OCR; com Shift para fazer OCR, traduzir e limpar.",
       "description": "Uma caixa desenhada com a ferramenta O vira um bloco de texto. Ela sempre passa por OCR, e a ação decide se também é traduzida e limpa.",
       "modes": {
-        "read": "OCR",
+        "read": "Somente OCR",
         "read_translate": "OCR e tradução",
         "read_translate_clean": "OCR, tradução e limpeza"
       }
@@ -113,6 +113,6 @@
     "title": "Preparando o Booharu"
   },
   "tools": {
-    "ocr_box": "Ler o texto de uma caixa"
+    "ocr_box": "Caixa de OCR"
   }
 }

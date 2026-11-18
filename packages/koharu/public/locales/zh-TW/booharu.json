@@ -61,7 +61,7 @@
       "defaultModeDescription": "放開滑鼠時按住 Alt 僅辨識；按住 Shift 則辨識、翻譯並清理。",
       "description": "用 O 工具畫出的框會成為文字區塊。框內文字一定會被辨識，是否再翻譯和清理由所選操作決定。",
       "modes": {
-        "read": "辨識",
+        "read": "僅辨識",
         "read_translate": "辨識並翻譯",
         "read_translate_clean": "辨識、翻譯並清理"
       }
@@ -102,6 +102,6 @@
     "title": "正在準備 Booharu"
   },
   "tools": {
-    "ocr_box": "辨識框內文字"
+    "ocr_box": "OCR 框"
   }
 }

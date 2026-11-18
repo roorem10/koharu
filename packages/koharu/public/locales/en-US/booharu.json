@@ -61,7 +61,7 @@
       "defaultModeDescription": "Hold Alt as you let go to read only, or Shift to read, translate and clean.",
       "description": "A box drawn with the O tool becomes a text block. It's always read, and its action decides whether it's also translated and cleaned.",
       "modes": {
-        "read": "Read",
+        "read": "Read only",
         "read_translate": "Read and translate",
         "read_translate_clean": "Read, translate and clean"
       }
@@ -102,6 +102,6 @@
     "title": "Preparing Booharu"
   },
   "tools": {
-    "ocr_box": "Read text in a box"
+    "ocr_box": "OCR box"
   }
 }
