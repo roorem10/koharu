@@ -608,6 +608,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_run_whose_last_page_fails_ends_done_with_problems() {
+        let chapter = Chapter::new(1);
+        chapter
+            .script
+            .tries(0, Stage::Detect, vec![Try::Fail(dropped)]);
+        let continuing = policy(0, OnPageFailure::Continue, RunOrder::Pages);
+        let run = chapter.run(0, &[Stage::Detect, Stage::Recognize], continuing);
+        let told = chapter.told(run).await;
+        let page = chapter.pages[0];
+        assert_eq!(given_up(&told), [(page, Stage::Detect)]);
+        assert_eq!(
+            ended(&told),
+            Some(&Outcome::DoneWithProblems {
+                failures: vec![PageFailure {
+                    page,
+                    stage: Stage::Detect,
+                    reason: "detect failed: the connection dropped".to_owned(),
+                }],
+            })
+        );
+        assert!(chapter.tried(0, Stage::Recognize).is_empty());
+    }
+
+    #[tokio::test]
     async fn a_page_that_fails_its_recognition_batch_fails_alone() {
         // A page holding a locked block, whose edit the project refuses.
         fn locked() -> anyhow::Error {
