@@ -245,11 +245,20 @@ function carryOnTarget(target: Target): RunTarget | null {
   return target.pages ? { kind: 'pages', pages: target.pages } : null
 }
 
+/** Whether `stages` find text, through detection or recognition, and translate it: on a chapter
+ * with a glossary or notes, `booharu_run` then translates last, once every page's text is known,
+ * so the run sends only the glossary terms the chapter uses. */
+function findsAndTranslates(stages: Stage[]): boolean {
+  return stages.includes('translate') && (stages.includes('detect') || stages.includes('recognize'))
+}
+
 /** What the Run button does with `stages` on `target`, the project or the pages chosen. With every
  * stage on, it carries on with the work the pages still need, through `booharu_run`, or, with none
- * left, says so, offering Run all stages again, which is `run`. With fewer, it's `run`, Koharu's
- * own run of them. The click readies the finish chime. A refusal or an error shows as every failed
- * command's does. */
+ * left, says so, offering Run all stages again, which is `run`. With fewer that find text and
+ * translate it, such as a preset's, it goes through `booharu_run` too, which runs them as Koharu
+ * does, or on a chapter with a glossary or notes translates last. With others, it's `run`,
+ * Koharu's own run of them. The click readies the finish chime. A refusal or an error shows as
+ * every failed command's does. */
 export async function runOrCarryOn(
   target: Target,
   stages: Stage[],
@@ -257,12 +266,14 @@ export async function runOrCarryOn(
 ): Promise<void> {
   prepareFinishSound()
   const carried = carryOnTarget(target)
-  if (!carried || pipelineStages.some((stage) => !stages.includes(stage))) {
+  const every = pipelineStages.every((stage) => stages.includes(stage))
+  if (!carried || !(every || findsAndTranslates(stages))) {
     await run()
     return
   }
   const plan = await call(commands.booharuRun, carried, stages)
-  if (plan.run !== null) return
+  // With fewer stages there's always a run, unless the pages are gone.
+  if (plan.run !== null || !every) return
   const shown = toast.add({
     type: 'info',
     title: i18n.t('booharu.runs.alreadyDone'),

@@ -55,6 +55,26 @@ describe('Booharu’s Run button', () => {
     expect(carryOn).not.toHaveBeenCalled()
   })
 
+  it('goes through booharu_run with fewer stages that read and translate, to translate last', async () => {
+    const { carryOn, run, user } = renderCommandBar({ group: 3, groups: [], run: null })
+    act(() => useKoharuStore.setState({ processingStages: ['translate', 'recognize'] }))
+
+    await user.click(runButton())
+    await waitFor(() =>
+      expect(carryOn).toHaveBeenCalledWith({ kind: 'project' }, ['recognize', 'translate']),
+    )
+
+    act(() => useKoharuStore.setState({ processingStages: ['detect', 'translate'] }))
+    await user.click(runButton())
+    await waitFor(() =>
+      expect(carryOn).toHaveBeenLastCalledWith({ kind: 'project' }, ['detect', 'translate']),
+    )
+    await act(async () => undefined)
+    // Fewer stages carry nothing on, so a plan without a run offers nothing.
+    expect(screen.queryByText('These pages are already done.')).toBeNull()
+    expect(run).not.toHaveBeenCalled()
+  })
+
   it('says when the pages are already done, offering to run every stage again', async () => {
     const { carryOn, run, user } = renderCommandBar({ group: 2, groups: [], run: null })
 
