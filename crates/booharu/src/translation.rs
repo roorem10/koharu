@@ -1,11 +1,12 @@
 //! A block's translation as someone types it, in the Story panel or through
 //! the agent: one undo step that sets its text and writes a block's first
-//! translation as the Translation stage writes one it places. The scene's
-//! `set_text` alone gives a block's first translation a default text, point
-//! text at the page's corner in no language (#128), which the scene's own
-//! tests hold it to.
+//! translation as the Translation stage writes one it places, with the
+//! default look a new translation gets. The scene's `set_text` alone gives
+//! a block's first translation a default text, point text at the page's
+//! corner in no language (#128), which the scene's own tests hold it to.
 
 use anyhow::{Result, bail};
+use booharu_core::{settings::Snapshot, styles};
 use koharu_scene::{Content, Edit, LanguageIdentifier, LayerId, Op, Project};
 use serde_json::json;
 
@@ -22,16 +23,21 @@ const RETYPED: &str = "set_text";
 /// without one gets it as the Translation stage writes one it places: in
 /// the block's room in its balloon, or in its source's frame, at the page's
 /// lettering size, in `target`'s language, with the block's clean-up shown
-/// under it, labelled [`LABEL`]. One with a translation keeps its place,
-/// lettering, and language, and the step is labelled as the Story panel
-/// labels a retyped text.
+/// under it, labelled [`LABEL`]. It gets the default look of `look`, as a
+/// new translation does: the default font, and with colour detection off
+/// the default colours in place of the measured ones. Unlike the stage's,
+/// it gets no hand-edit record: it was typed by hand. One with a
+/// translation keeps its place, lettering, and language, and the step is
+/// labelled as the Story panel labels a retyped text.
 pub fn edit(
     project: &Project,
     block: LayerId,
     text: String,
     target: &LanguageIdentifier,
+    look: &Snapshot,
 ) -> Result<Edit> {
-    let Content::Block(found) = &project.layer(block)?.content else {
+    let layer = project.layer(block)?;
+    let Content::Block(found) = &layer.content else {
         bail!("layer {block} isn't a block");
     };
     let mut ops = vec![Op::SetText {
@@ -45,9 +51,13 @@ pub fn edit(
         });
     }
     // The stage's ops for a translation it places (`written` in
-    // koharu-pipeline's stages/translate), less its c2pa record, which names
-    // the model that made the translation: someone typed this one.
-    ops.push(koharu_pipeline::placement(project, block, target)?);
+    // koharu-pipeline's stages/translate), less its records, its c2pa one
+    // naming the model that made the translation and Booharu's hand-edit
+    // one: someone typed this one.
+    let placed = koharu_pipeline::placement(project, block, target)?;
+    let looked = styles::typed(layer, &placed, &look.lettering, look.font.as_deref())?;
+    ops.push(placed);
+    ops.extend(looked);
     ops.push(Op::UpdateLayer {
         layer: block.into(),
         patch: json!({"translation": {"language": target}, "cleanup": {"visible": true}}),
@@ -61,7 +71,12 @@ pub fn edit(
 #[cfg(test)]
 mod tests {
     use anyhow::Context as _;
-    use koharu_scene::{Created, Session, Text};
+    use booharu_core::{
+        attrs::{self, Auto},
+        edited,
+        settings::{DefaultTextStyle, LetteringSettings},
+    };
+    use koharu_scene::{Created, Rgba, Session, Text};
 
     use super::*;
 
@@ -107,6 +122,7 @@ mod tests {
             block,
             "Hello".to_owned(),
             &english,
+            &Snapshot::default(),
         )?)?;
 
         let history = session.history();
@@ -141,7 +157,13 @@ mod tests {
                 patch: moved,
             }],
         })?;
-        let retyped = edit(&session.project(), block, "Hi".to_owned(), &english)?;
+        let retyped = edit(
+            &session.project(),
+            block,
+            "Hi".to_owned(),
+            &english,
+            &Snapshot::default(),
+        )?;
         assert!(matches!(retyped.ops.as_slice(), [Op::SetText { .. }]));
         assert_eq!(retyped.label, "set_text");
         session.apply(retyped)?;
@@ -149,6 +171,96 @@ mod tests {
         assert_eq!(typed.content.text(), "Hi");
         assert_eq!(typed.bounds().map(|bounds| bounds.x0), Some(100.0));
         assert_eq!(typed.language, english);
+        Ok(())
+    }
+
+    #[test]
+    fn a_typed_translation_gets_the_default_look_and_stays_the_users() -> Result<()> {
+        const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
+        const WHITE: Rgba = Rgba([1.0; 4]);
+        const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
+        let dir = tempfile::tempdir()?;
+        let mut session = Session::create(dir.path().join("test.khr"))?;
+        // Two blocks found and read by Koharu's stages, lettered in blue
+        // outlined in white.
+        let found = |x: f64| {
+            json!({"kind": "block", "source": {
+                "frame": {"box": {"bounds": {"x": x, "y": 20.0, "width": 40.0, "height": 120.0}}},
+                "content": "どうして",
+                "style": {"chars": {"size": 32.0, "fill": BLUE, "stroke": WHITE, "stroke_width": 3.0}},
+            }, "attributes": {"c2pa": {
+                "detection": {"action": "c2pa.created"},
+                "ocr": {"action": "c2pa.created"},
+            }}})
+        };
+        let change = session.apply(Edit {
+            label: "test".to_owned(),
+            ops: vec![
+                op(json!({"op": "add_page", "id": "$p", "index": 0, "size": {"width": 400, "height": 400}}))?,
+                op(json!({"op": "add_layer", "id": "$on", "page": "$p", "index": 0, "layer": found(10.0)}))?,
+                op(json!({"op": "add_layer", "id": "$off", "page": "$p", "index": 1, "layer": found(60.0)}))?,
+            ],
+        })?;
+        let id = |label: &str| {
+            change.created.iter().find_map(|created| match created {
+                Created::Layer {
+                    id,
+                    label: Some(found),
+                } if found == label => Some(*id),
+                _ => None,
+            })
+        };
+        let (on, off) = (id("on").context("on")?, id("off").context("off")?);
+        let english: LanguageIdentifier = "en".parse()?;
+        let look = |detect_colors: bool| Snapshot {
+            lettering: LetteringSettings {
+                default: DefaultTextStyle {
+                    fill: Some(RED),
+                    stroke: None,
+                    stroke_width: 1.5,
+                },
+                detect_colors,
+            },
+            font: Some("CCWildWords".to_owned()),
+        };
+
+        // Detection on: the default font, and the measured colours stay.
+        let typed = edit(
+            &session.project(),
+            on,
+            "Why?".to_owned(),
+            &english,
+            &look(true),
+        )?;
+        session.apply(typed)?;
+        let chars = translation(&session, on)?.style.chars;
+        assert_eq!(chars.family.as_deref(), Some("CCWildWords"));
+        assert_eq!(
+            (chars.fill, chars.stroke, chars.stroke_width),
+            (Some(BLUE), Some(WHITE), Some(3.0))
+        );
+        // Off: the default colours in their place, none for the outline.
+        let typed = edit(
+            &session.project(),
+            off,
+            "Why?".to_owned(),
+            &english,
+            &look(false),
+        )?;
+        session.apply(typed)?;
+        let chars = translation(&session, off)?.style.chars;
+        assert_eq!(
+            (chars.family.as_deref(), chars.fill, chars.stroke),
+            (Some("CCWildWords"), Some(RED), None)
+        );
+
+        // Typed by hand: no record, so the text is the user's.
+        let project = session.project();
+        for block in [on, off] {
+            let layer = project.layer(block)?;
+            assert_eq!(attrs::get::<Auto>(layer), None);
+            assert!(edited(layer).text);
+        }
         Ok(())
     }
 }

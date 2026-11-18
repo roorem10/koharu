@@ -1814,6 +1814,7 @@ mod tests {
                 block,
                 text.to_owned(),
                 &english,
+                &booharu_core::settings::Snapshot::default(),
             )?)?;
         }
         // The lettering each block cleaned: the last's mask and clean-up,
@@ -1919,8 +1920,13 @@ mod tests {
     /// Translates `block` as `text`, its clean-up shown under it.
     fn translate(page: &mut Fixture, block: LayerId, text: &str) -> Result<()> {
         let english: koharu_scene::LanguageIdentifier = "en".parse()?;
-        let edit =
-            crate::translation::edit(&page.session.project(), block, text.to_owned(), &english)?;
+        let edit = crate::translation::edit(
+            &page.session.project(),
+            block,
+            text.to_owned(),
+            &english,
+            &booharu_core::settings::Snapshot::default(),
+        )?;
         page.session.apply(edit)?;
         Ok(())
     }
@@ -2216,6 +2222,7 @@ mod tests {
             block,
             "Hello".to_owned(),
             &english,
+            &booharu_core::settings::Snapshot::default(),
         )?)?;
         let found = page.block(block)?;
         let lies = found.source.bounds().context("a frame")?;

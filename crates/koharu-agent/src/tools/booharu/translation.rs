@@ -1,9 +1,11 @@
 //! A block's translation set by the agent as the Story panel sets one: a
 //! block without a translation gets it placed into its own frame first, in
 //! the same undo step, where the scene's `set_text` alone would leave it at
-//! the page's corner.
+//! the page's corner, with the default look a new translation gets.
 
+use booharu_core::settings::Snapshot;
 use koharu_pipeline::PipelineConfig;
+use koharu_renderer::RendererConfig;
 use koharu_scene::{Change, LayerId};
 use rig_core::tool::{Tool, ToolContext, ToolExecutionError};
 use schemars::JsonSchema;
@@ -33,8 +35,11 @@ impl Tool for SetTranslation {
         "Set a block's translation to a text, as one undo step. A block without a translation \
          gets one placed first, as the Translation stage places its own in the translator's \
          target language: in the block's room in its balloon, or in its source's frame, at the \
-         page's lettering size, with the block's clean-up shown under it. A block with one keeps \
-         its place, lettering, and language. Answers what changed."
+         page's lettering size, with the block's clean-up shown under it, and with the default \
+         look new translations get: the first Preferred font, and with colour detection off \
+         the default colours. A block with one keeps its place, lettering, and language. A \
+         translation set this way counts as typed by hand, so booharu_apply_text_style leaves \
+         it alone unless told to include such blocks. Answers what changed."
             .to_owned()
     }
 
@@ -52,9 +57,17 @@ impl Tool for SetTranslation {
         // translation is placed only where the edit finds none.
         tokio::task::spawn_blocking(move || -> anyhow::Result<Change> {
             let target = koharu_config::get::<PipelineConfig>()?.translator.target;
+            let families =
+                koharu_config::get::<RendererConfig>().map(|config| config.font_families);
+            let look = Snapshot::read(families);
             let mut session = tools.session.lock();
-            let edit =
-                booharu::translation::edit(&session.project(), args.block, args.text, &target)?;
+            let edit = booharu::translation::edit(
+                &session.project(),
+                args.block,
+                args.text,
+                &target,
+                &look,
+            )?;
             Ok(session.apply(edit)?)
         })
         .await
