@@ -5,6 +5,7 @@ import { useTheme } from 'next-themes'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { BooharuTabPage, booharuSettingsTabs } from '@/components/booharu/settings/BooharuTabs' // Booharu: its own tabs.
 import { PipelinePreferences } from '@/components/preferences/PipelinePreferences'
 import {
   PreferencePage,
@@ -33,6 +34,7 @@ const tabs = [
   ['pipeline', Cpu],
   ['providers', KeyRound],
   ['typesetting', Type],
+  ...booharuSettingsTabs, // Booharu: its own tabs, after Koharu's, such as Runs.
 ] as const
 type Tab = (typeof tabs)[number][0]
 
@@ -148,6 +150,8 @@ export function SettingsPage() {
                 onChange={(renderer) => setDraft({ ...draft, renderer })}
               />
             )}
+            {/* Booharu: the page of a Booharu tab, which saves its own settings section. */}
+            <BooharuTabPage tab={tab} />
           </div>
         </ScrollArea>
       </main>

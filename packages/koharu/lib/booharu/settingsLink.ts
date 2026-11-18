@@ -8,7 +8,7 @@ export const booharuTabs = ['runs'] as const
 export type BooharuTab = (typeof booharuTabs)[number]
 
 /** The Settings page's tabs, by SettingsPage's names for them. */
-export type SettingsTab = 'appearance' | 'pipeline' | 'providers' | 'typesetting'
+export type SettingsTab = 'appearance' | 'pipeline' | 'providers' | 'typesetting' | BooharuTab
 
 /** The tab setter of the Settings page, while it's mounted. */
 let showTab: ((tab: SettingsTab) => void) | null = null
