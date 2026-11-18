@@ -118,7 +118,8 @@ export function FontPicker({
     if (!options.length) return
     const next = options[(options.indexOf(shown) + by + options.length) % options.length]
     setActive(rows[next].key)
-    scroller.current?.scrollToIndex(next, { align: 'auto' })
+    // The first family brings the list's top into view, with the heading above it.
+    scroller.current?.scrollToIndex(next === options[0] ? 0 : next, { align: 'auto' })
   }
   const pick = (family: string) => {
     onChange(family)

@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { fontFamilies, highlighted, listed, renderPicker, search } from './fonts'
+import { favoritesDesktop, fontFamilies, highlighted, listed, renderPicker, search } from './fonts'
 
 describe('Booharu font picker keys', () => {
   it('moves through the fonts with Up and Down, wrapping around, and picks one with Enter', async () => {
@@ -66,7 +66,25 @@ describe('Booharu font picker keys', () => {
   })
 
   describe('in a long list', () => {
-    const scrollTo = vi.fn()
+    // jsdom lays nothing out and doesn't scroll, so the list's viewport is made 248 px high, over
+    // rows `height` px high in all (38 px each, 24 px for a heading), and made to scroll when told.
+    const scrollTo = vi.fn(function (this: HTMLElement, to?: ScrollToOptions | number, y = 0) {
+      const top = typeof to === 'number' ? y : (to?.top ?? 0)
+      Object.defineProperty(this, 'scrollTop', { configurable: true, value: top })
+      queueMicrotask(() => this.dispatchEvent(new Event('scroll')))
+    })
+    const names = Array.from({ length: 40 }, (_, index) => `Font ${index + 1}`)
+    const layOut = (height: number) => {
+      HTMLElement.prototype.scrollTo = scrollTo
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+        configurable: true,
+        get: () => height,
+      })
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+        configurable: true,
+        get: () => 248,
+      })
+    }
     afterEach(() => {
       for (const key of ['scrollTo', 'scrollHeight', 'clientHeight'] as const) {
         delete (HTMLElement.prototype as Partial<HTMLElement>)[key]
@@ -74,19 +92,8 @@ describe('Booharu font picker keys', () => {
     })
 
     it('scrolls to the font the arrows move to', async () => {
-      // jsdom lays nothing out and doesn't scroll: the list's viewport is 248 px high, and 40 rows
-      // 38 px each.
-      HTMLElement.prototype.scrollTo = scrollTo
-      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
-        configurable: true,
-        get: () => 40 * 38,
-      })
-      Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
-        configurable: true,
-        get: () => 248,
-      })
+      layOut(40 * 38)
       const user = userEvent.setup()
-      const names = Array.from({ length: 40 }, (_, index) => `Font ${index + 1}`)
       renderPicker({ families: fontFamilies(...names) })
       await user.click(screen.getByRole('button', { name: 'Font' }))
       expect(highlighted()).toHaveAccessibleName('Font 1')
@@ -94,6 +101,21 @@ describe('Booharu font picker keys', () => {
       await user.keyboard('{ArrowUp}')
       expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: 40 * 38 - 248 }))
       expect(highlighted()).toHaveAccessibleName('Font 40')
+    })
+
+    it('shows the heading above the first font when the arrows come around to it', async () => {
+      layOut(24 + 38 + 24 + 40 * 38)
+      favoritesDesktop(['Font 2'])
+      const user = userEvent.setup()
+      renderPicker({ families: fontFamilies(...names) }, { booharu: true })
+      await user.click(screen.getByRole('button', { name: 'Font' }))
+      await screen.findByText('Favorites')
+      await user.keyboard('{ArrowUp}')
+      expect(highlighted()).toHaveAccessibleName('Font 40')
+
+      await user.keyboard('{ArrowDown}')
+      expect(highlighted()).toBe(screen.getAllByRole('option', { name: 'Font 2' })[0])
+      expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: 0 }))
     })
   })
 
