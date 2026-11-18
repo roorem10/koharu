@@ -3,10 +3,12 @@
 
 use std::collections::BTreeMap;
 
+use anyhow::Context as _;
 use booharu_core::{
     attrs::{self, Attrs},
     settings::BooharuPreferences,
 };
+use koharu_config::secrets::SecretString;
 use koharu_pipeline::{PipelineConfig, TranslatorConfig};
 use koharu_renderer::{RendererConfig, fonts};
 use koharu_scene::{Content, LayerId, PageId, Project, Size};
@@ -31,9 +33,12 @@ impl Tool for GetProjectOverview {
         "What working on the project needs, in one read: each page in order with its id, its \
          size, how many blocks it has and how many of them have a translation, and Booharu's \
          attributes of each of its layers that has any, by layer id; the translator's model, \
-         target language, and instructions; the typesetting defaults, such as the font families \
-         a text falls back on; the name of every font family a text can be set in; and \
-         Booharu's settings. A part that can't be read gives its error instead."
+         target language, and instructions, with `connected`: whether the model's vendor has its \
+         API key or sign-in stored, as the Providers settings show it, never the key itself \
+         (Koharu's own models need neither, nor may a server named by its base URL); the \
+         typesetting defaults, such as the font families a text falls back on; the name of every \
+         font family a text can be set in; and Booharu's settings. A part that can't be read \
+         gives its error instead."
             .to_owned()
     }
 
@@ -57,7 +62,14 @@ impl Tool for GetProjectOverview {
             Ok(Overview {
                 pages: pages(&project).map_err(failed)?,
                 translator: koharu_config::get::<PipelineConfig>()
-                    .map(|pipeline| pipeline.translator)
+                    .map(|pipeline| {
+                        let settings = pipeline.translator;
+                        let connected = connected(&settings.model, koharu_config::secrets::get);
+                        Translator {
+                            settings,
+                            connected: connected.into(),
+                        }
+                    })
                     .into(),
                 typesetting: koharu_config::get::<RendererConfig>().into(),
                 fonts: fonts.into(),
@@ -74,13 +86,37 @@ impl Tool for GetProjectOverview {
 #[derive(Serialize)]
 pub(super) struct Overview {
     pages: Vec<PageOverview>,
-    translator: Part<TranslatorConfig>,
+    translator: Part<Translator>,
     typesetting: Part<RendererConfig>,
     fonts: Part<Vec<String>>,
     /// Booharu's settings sections by table name, from the app; none outside
     /// it, as in the `serve` example.
     #[serde(skip_serializing_if = "Option::is_none")]
     settings: Option<Part<BooharuPreferences>>,
+}
+
+/// The translator's settings, and whether its model's vendor is connected.
+#[derive(Serialize)]
+struct Translator {
+    #[serde(flatten)]
+    settings: TranslatorConfig,
+    /// Whether the vendor has its API key or sign-in stored, as the Providers
+    /// settings show it; never the key itself.
+    connected: Part<bool>,
+}
+
+/// Whether the vendor of `model`, a `vendor/model` reference, is connected,
+/// as koharu-desktop's `list_vendors` tells the Providers settings: once
+/// `stored`, reading the secret kept under a vendor's name, has its API key or
+/// sign-in. Koharu's own models need neither.
+fn connected(
+    model: &str,
+    stored: impl FnOnce(&str) -> koharu_config::Result<Option<SecretString>>,
+) -> anyhow::Result<bool> {
+    let (vendor, _) = model
+        .split_once('/')
+        .with_context(|| format!("`{model}` names no model: expected `vendor/model`"))?;
+    Ok(vendor == koharu_llm::KOHARU || stored(vendor)?.is_some())
 }
 
 #[derive(Serialize)]
@@ -152,6 +188,43 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    /// The overview's translator part for `model`, with `stored` reading the
+    /// secrets.
+    fn translator(
+        model: &str,
+        stored: impl FnOnce(&str) -> koharu_config::Result<Option<SecretString>>,
+    ) -> Value {
+        json!(Translator {
+            settings: TranslatorConfig {
+                model: model.to_owned(),
+                ..TranslatorConfig::default()
+            },
+            connected: connected(model, stored).into(),
+        })
+    }
+
+    #[test]
+    fn the_translator_says_whether_its_vendor_is_connected_but_never_its_key() {
+        let gemini =
+            |vendor: &str| Ok((vendor == "gemini").then(|| SecretString::from("sk-gemini")));
+        let read = translator("gemini/gemini-2.5-pro", gemini);
+        assert_eq!(read["model"], json!("gemini/gemini-2.5-pro"));
+        assert_eq!(read["connected"], json!(true));
+        assert!(!read.to_string().contains("sk-gemini"), "{read}");
+        assert_eq!(
+            translator("openai/gpt-5", gemini)["connected"],
+            json!(false)
+        );
+
+        // Koharu's own models need no key, so a store that can't answer
+        // isn't asked.
+        let locked = |_: &str| Err(koharu_config::Error::NoHome);
+        let local = translator("koharu/index-translate-9b", locked);
+        assert_eq!(local["connected"], json!(true));
+        let unknown = translator("openai/gpt-5", locked);
+        assert!(unknown["connected"]["error"].is_string(), "{unknown}");
+    }
 
     #[test]
     fn the_overview_counts_a_pages_blocks_and_lists_their_booharu_attributes() {

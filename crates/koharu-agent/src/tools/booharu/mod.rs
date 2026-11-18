@@ -8,7 +8,7 @@
 //!
 //! | Tool | Does | Only reads |
 //! |---|---|---|
-//! | `booharu_get_project_overview` | each page's size and blocks, how many are translated, and the Booharu attributes on its layers; the translator's settings, the typesetting defaults, the font families, and Booharu's settings | yes |
+//! | `booharu_get_project_overview` | each page's size and blocks, how many are translated, and the Booharu attributes on its layers; the translator's settings and whether its vendor is connected, the typesetting defaults, the font families, and Booharu's settings | yes |
 //! | `booharu_get_settings` | every Booharu settings section, by its table name | yes |
 //! | `booharu_set_settings` | changes keys of one section, saved whole or not at all; an outside app can't change `booharu-mcp` | no |
 //! | `booharu_set_translation` | sets a block's translation, placing it first as the Translation stage does when the block has none, as one undo step | no |
