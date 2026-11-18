@@ -93,7 +93,7 @@ pub fn new_translation(
         patch.insert("fill".to_owned(), json!(look.fill));
     }
     if own.stroke.is_none() {
-        let (stroke, width) = outline(look, sfx, own.fill.or(look.fill), placed.size);
+        let (stroke, width) = outline(look, sfx, own.fill.or(look.fill), placed);
         patch.insert("stroke".to_owned(), json!(stroke));
         patch.insert("stroke_width".to_owned(), json!(width));
     }
@@ -118,20 +118,27 @@ pub fn restyle(
     new_translation(settings, font, sfx, &CharStyle::default(), &placed)
 }
 
-/// The outline the default look gives text of `size` filled with `fill`:
-/// its own, or for a sound effect Koharu's legibility stroke, as placement
-/// gives one: a sixteenth of the size, black around a light fill and white
-/// around any other, the renderer's black included. None without a size to
-/// scale it by.
+/// The outline the default look gives text with the character values
+/// `placed`, filled with `fill`: its own, or for a sound effect Koharu's
+/// legibility stroke, as placement gives one, black around a light fill and
+/// white around any other, the renderer's black included, a sixteenth of its
+/// size, or without a size as wide as the outline Koharu gave it. None
+/// without either.
 fn outline(
     look: &DefaultTextStyle,
     sfx: bool,
     fill: Option<Rgba>,
-    size: Option<f64>,
+    placed: &CharStyle,
 ) -> (Option<Rgba>, Option<f64>) {
-    match (look.stroke, size) {
-        (Some(stroke), _) => (Some(stroke), Some(look.stroke_width)),
-        (None, Some(size)) if sfx => {
+    if let Some(stroke) = look.stroke {
+        return (Some(stroke), Some(look.stroke_width));
+    }
+    let width = placed
+        .size
+        .map(|size| size / 16.0)
+        .or(placed.stroke.and(placed.stroke_width));
+    match width {
+        Some(width) if sfx => {
             let light = fill
                 .is_some_and(|fill| Color::from(fill).discard_alpha().relative_luminance() > 0.5);
             let stroke = if light {
@@ -139,7 +146,7 @@ fn outline(
             } else {
                 [1.0; 4]
             };
-            (Some(Rgba(stroke)), Some(size / 16.0))
+            (Some(Rgba(stroke)), Some(width))
         }
         _ => (None, None),
     }
@@ -603,6 +610,25 @@ mod tests {
             &new_translation(&light, None, false, &none, &measured()),
         )
         .expect("values");
+        assert_eq!((after.stroke, after.stroke_width), (None, None));
+        // Without a size, an effect's outline keeps the width Koharu gave
+        // it, and with neither it gets none, as placement gives none.
+        let sizeless = CharStyle {
+            size: None,
+            ..measured()
+        };
+        let after = patched(
+            &sizeless,
+            &new_translation(&light, None, true, &none, &sizeless),
+        )
+        .expect("values");
+        assert_eq!((after.stroke, after.stroke_width), (Some(BLACK), Some(3.0)));
+        let bare = CharStyle {
+            fill: Some(BLUE),
+            ..CharStyle::default()
+        };
+        let after =
+            patched(&bare, &new_translation(&light, None, true, &none, &bare)).expect("values");
         assert_eq!((after.stroke, after.stroke_width), (None, None));
     }
 
