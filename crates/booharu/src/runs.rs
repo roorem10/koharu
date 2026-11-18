@@ -5,8 +5,11 @@
 //! A page's needs come from the records Koharu's stages leave in each
 //! block's `c2pa` attributes:
 //!
-//! - a page with no blocks needs every stage from detection, which replaces
-//!   only unlocked blocks;
+//! - a scanned page with no blocks needs every stage from detection, which
+//!   replaces only unlocked blocks, unless detection already ran there: it
+//!   records itself on everything it adds (panels and balloons as well as
+//!   blocks), so a page it found no text on, or whose blocks were all
+//!   deleted by hand, reads as done while one of those carries its record;
 //! - a block with a blank source and no recognition record needs
 //!   recognition, and the translation a block with that source would;
 //! - a block with no inpainting record needs inpainting;
@@ -43,6 +46,9 @@ use strum::VariantArray as _;
 
 pub use self::going::{RunHost, carry_on};
 
+/// The `c2pa` step Koharu's Detection stage records on every panel,
+/// balloon, and block it adds.
+const DETECTION: &str = "detection";
 /// The `c2pa` step Koharu's Recognition stage records.
 const OCR: &str = "ocr";
 /// The `c2pa` step Koharu's Inpainting stage records.
@@ -167,7 +173,10 @@ fn needs(session: &Session, page: &Page) -> Result<BTreeSet<Stage>> {
     let scanned = page.background.is_some();
     let blocks = blocks(page);
     if blocks.is_empty() {
-        return Ok(match scanned {
+        // Detection that ran and found no text leaves its panels and
+        // balloons; running it again would find the same, or bring back
+        // blocks deleted by hand.
+        return Ok(match scanned && !detected(&page.layers) {
             true => Stage::VARIANTS.iter().copied().collect(),
             false => BTreeSet::new(),
         });
@@ -225,6 +234,14 @@ fn blocks(page: &Page) -> Vec<(&Layer, &Block, bool)> {
     let mut blocks = Vec::new();
     walk(&page.layers, false, &mut blocks);
     blocks
+}
+
+/// Whether Koharu's Detection stage left its record on any of `layers` or
+/// the layers in them.
+fn detected(layers: &[Layer]) -> bool {
+    layers
+        .iter()
+        .any(|layer| recorded(layer, DETECTION) || detected(&layer.children))
 }
 
 /// Whether `block` has no translation, wasn't translated, and wasn't given
@@ -488,6 +505,42 @@ mod tests {
         // typed wording is translated.
         assert_eq!(chapter.needs("blank")?, NOTHING);
         assert_eq!(chapter.needs("typed")?, [Stage::Translate]);
+        Ok(())
+    }
+
+    /// The op adding a `kind` layer (a panel or a balloon) named `name` to
+    /// `page`, inside layer `parent` if one is named, with the `c2pa`
+    /// record detection leaves when `detected`.
+    fn outlined(page: &str, name: &str, kind: &str, parent: Option<&str>, detected: bool) -> Value {
+        let c2pa = match detected {
+            true => json!({"detection": {"action": "c2pa.created"}}),
+            false => json!({}),
+        };
+        json!({"op": "add_layer", "id": format!("${name}"), "page": format!("${page}"),
+            "parent": parent.map(|parent| format!("${parent}")), "index": 0,
+            "layer": {"kind": kind, "outline": "M10 10L390 10L390 390L10 390Z",
+            "attributes": {"c2pa": c2pa}}})
+    }
+
+    #[test]
+    fn a_page_detection_found_no_text_on_needs_nothing() -> Result<()> {
+        let chapter = Chapter::new(
+            &[("panels", true), ("balloon", true), ("drawn", true)],
+            vec![
+                // What detection leaves on a page with panels and no text.
+                outlined("panels", "p1", "panel", None, true),
+                // A balloon detection found, in a panel drawn by hand, after
+                // its blocks were deleted.
+                outlined("balloon", "p2", "panel", None, false),
+                outlined("balloon", "b2", "balloon", Some("p2"), true),
+                // Only a panel drawn by hand: detection never ran here.
+                outlined("drawn", "p3", "panel", None, false),
+            ],
+        )?;
+        assert_eq!(chapter.needs("panels")?, NOTHING);
+        assert_eq!(chapter.needs("balloon")?, NOTHING);
+        assert_eq!(chapter.needs("drawn")?, EVERY);
+        assert!(chapter.plan(&["panels", "balloon"])?.is_empty());
         Ok(())
     }
 

@@ -58,7 +58,7 @@ impl Tool for Run {
          is still left, as a new `group`, answering no run when nothing is. Stop when it \
          answers no run, or a new `group` in which every page has the same stages it had in the \
          plan before: another run would leave those pages as they are, such as a page where \
-         detection finds no text, or one that failed every try, whose `page_failed` said why, \
+         detection finds nothing at all, or one that failed every try, whose `page_failed` said why, \
          so tell the user which pages they are and why instead of calling again. A call while \
          a group goes on answers that group and queues nothing. With `stages` fewer than every \
          stage, it runs those stages on every page `target` names, as Koharu's Run button does, \
