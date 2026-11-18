@@ -3,9 +3,9 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { CanvasWorkspace } from '@/components/editor/CanvasWorkspace'
-import { controlKeepsKey } from '@/lib/booharu/keys'
+import { controlKeepsKey, keyActions, reservedKeys } from '@/lib/booharu/keys'
 import { queryClient } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
+import { toolKeys, useKoharuStore } from '@/lib/store'
 import { commands } from '@koharu/ipc/protocol'
 
 /** Keys a focused control keeps: Space, the arrows, Enter, Delete, Escape, and the canvas's own
@@ -59,6 +59,33 @@ function textEntries(): HTMLElement[] {
 afterEach(() => {
   cleanup()
   document.body.replaceChildren()
+})
+
+describe('Booharu key registry', () => {
+  it("gives no Booharu action a key Koharu's canvas fixes, nor two actions one key", () => {
+    const keys = Object.values(keyActions).map(({ key }) => key)
+    expect(keys.filter((key) => reservedKeys.has(key))).toEqual([])
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+
+  it("reserves Koharu's fixed keys and every one of its tools' letters", () => {
+    const fixed = ['ctrl+z', 'ctrl+shift+z', 'ctrl+a', 'ctrl+d', 'ctrl+0']
+    for (const key of [...fixed, 'delete', 'backspace', 'escape', 'space', 'a', 'm', 'l']) {
+      expect(reservedKeys.has(key), key).toBe(true)
+    }
+    // Koharu's handler selects a tool by its letter with or without Shift, whatever tools a Koharu
+    // release adds; only Booharu's own tool keys are left to Booharu.
+    for (const [tool, key] of Object.entries(toolKeys)) {
+      const koharu = tool !== 'ocr_box'
+      expect(reservedKeys.has(key), tool).toBe(koharu)
+      expect(reservedKeys.has(`shift+${key}`), tool).toBe(koharu)
+    }
+  })
+
+  it('maps O to the O tool, the key Koharu reads from toolKeys', () => {
+    expect(keyActions.ocrBoxTool).toEqual({ key: 'o', tool: 'ocr_box' })
+    expect(toolKeys.ocr_box).toBe(keyActions.ocrBoxTool.key)
+  })
 })
 
 describe('Booharu tool keys in a focused control', () => {
@@ -138,6 +165,22 @@ describe('Booharu tool keys on the canvas', () => {
     expect(useKoharuStore.getState().tool).toBe('draw')
     fireEvent.keyDown(slider!, { key: 'v' })
     expect(useKoharuStore.getState().tool).toBe('select')
+  })
+
+  it('selects the O tool with O, from the page and from a focused slider', () => {
+    const { view } = renderWorkspace()
+    fireEvent.keyDown(document.body, { key: 'o' })
+    expect(useKoharuStore.getState().tool).toBe('ocr_box')
+    fireEvent.keyDown(document.body, { key: 'v' })
+    expect(useKoharuStore.getState().tool).toBe('select')
+
+    const slider = view.container.querySelector<HTMLInputElement>('footer input[type="range"]')
+    act(() => slider!.focus())
+    fireEvent.keyDown(slider!, { key: 'o' })
+    expect(useKoharuStore.getState().tool).toBe('ocr_box')
+    // A chord stays the slider's: Alt+V leaves the O tool selected.
+    fireEvent.keyDown(slider!, { key: 'v', altKey: true })
+    expect(useKoharuStore.getState().tool).toBe('ocr_box')
   })
 
   it('leaves every key to a text field, a select and editable text', () => {
