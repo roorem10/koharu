@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use booharu::boxes::{self, Refusal};
 use booharu_core::settings::{OcrBoxMode, OcrBoxSettings};
 use koharu_canvas::{
@@ -51,7 +51,7 @@ pub(crate) fn carry(app: &Arc<App>, effect: Effect) {
 /// Adds the box over `rect` of `page` as one undo step, selects its block,
 /// and starts the run of the stages the mode `modifiers` pick.
 fn add(app: &Arc<App>, page: PageId, rect: Rect, modifiers: BoxModifiers) -> Result<()> {
-    let mode = mode(modifiers, settled(koharu_config::get()));
+    let mode = mode(modifiers, koharu_config::get)?;
     let rect = Bounds {
         x: rect.x0,
         y: rect.y0,
@@ -68,60 +68,66 @@ fn add(app: &Arc<App>, page: PageId, rect: Rect, modifiers: BoxModifiers) -> Res
 
 /// What a box drawn with `modifiers` held as the pointer lifted goes
 /// through, as Booharu 0.0.4's O tool chose: Alt only reads it, Shift also
-/// cleans it, Alt winning when both are held, and with neither, `default`.
-fn mode(modifiers: BoxModifiers, default: OcrBoxMode) -> OcrBoxMode {
-    match modifiers {
+/// cleans it, Alt winning when both are held, and with neither, the default
+/// mode the O tool's settings, read by `settings` only then, give. Settings
+/// that can't be read refuse the box, as a bad stored value is never taken
+/// for its default.
+fn mode(
+    modifiers: BoxModifiers,
+    settings: impl FnOnce() -> koharu_config::Result<OcrBoxSettings>,
+) -> Result<OcrBoxMode> {
+    Ok(match modifiers {
         BoxModifiers { alt: true, .. } => OcrBoxMode::Read,
         BoxModifiers { shift: true, .. } => OcrBoxMode::ReadTranslateClean,
-        BoxModifiers { .. } => default,
-    }
-}
-
-/// The mode `read`'s settings give a box drawn with neither modifier, or
-/// the default one when they couldn't be read, which the log says.
-fn settled(read: koharu_config::Result<OcrBoxSettings>) -> OcrBoxMode {
-    match read {
-        Ok(settings) => settings.default_mode,
-        Err(error) => {
-            tracing::warn!(
-                "couldn't read the O tool's settings, so it takes its default mode: {error:#}"
-            );
-            OcrBoxMode::default()
+        BoxModifiers { .. } => {
+            settings()
+                .context("the O tool's default action in [booharu-ocr-box] can't be read")?
+                .default_mode
         }
-    }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn held(alt: bool, shift: bool) -> BoxModifiers {
+        BoxModifiers { alt, shift }
+    }
+
     #[test]
-    fn alt_reads_shift_cleans_and_neither_takes_the_settings_mode() {
-        let held = |alt, shift| BoxModifiers { alt, shift };
-        for default in [
+    fn alt_reads_shift_cleans_and_neither_takes_the_settings_mode() -> Result<()> {
+        for default_mode in [
             OcrBoxMode::Read,
             OcrBoxMode::ReadTranslate,
             OcrBoxMode::ReadTranslateClean,
         ] {
-            assert_eq!(mode(held(true, false), default), OcrBoxMode::Read);
+            let settings = || Ok(OcrBoxSettings { default_mode });
+            assert_eq!(mode(held(true, false), settings)?, OcrBoxMode::Read);
             assert_eq!(
-                mode(held(false, true), default),
+                mode(held(false, true), settings)?,
                 OcrBoxMode::ReadTranslateClean
             );
-            assert_eq!(mode(held(true, true), default), OcrBoxMode::Read);
-            assert_eq!(mode(held(false, false), default), default);
+            assert_eq!(mode(held(true, true), settings)?, OcrBoxMode::Read);
+            assert_eq!(mode(held(false, false), settings)?, default_mode);
         }
+        Ok(())
     }
 
     #[test]
-    fn unreadable_settings_give_the_default_mode() {
-        let read = OcrBoxSettings {
-            default_mode: OcrBoxMode::Read,
-        };
-        assert_eq!(settled(Ok(read)), OcrBoxMode::Read);
-        assert_eq!(
-            settled(Err(koharu_config::Error::NoHome)),
-            OcrBoxMode::ReadTranslate
+    fn unreadable_settings_refuse_a_box_that_needs_them() -> Result<()> {
+        let unreadable = || Err(koharu_config::Error::NoHome);
+        let error = mode(held(false, false), unreadable).expect_err("no mode");
+        assert!(
+            format!("{error:#}").contains("[booharu-ocr-box] can't be read"),
+            "{error:#}"
         );
+        // A modifier picks the mode without them.
+        assert_eq!(mode(held(true, false), unreadable)?, OcrBoxMode::Read);
+        assert_eq!(
+            mode(held(false, true), unreadable)?,
+            OcrBoxMode::ReadTranslateClean
+        );
+        Ok(())
     }
 }
