@@ -1169,7 +1169,7 @@ export const commands = {
   /** Every balloon on `page`, or on every page when none is given, whose text is split over two or more text blocks, its blocks in reading order. */
   booharuFindSplitBalloons: (page: PageId | null) =>
     invoke<SplitBalloon[]>('booharu_find_split_balloons', { page }, { headers: headers() }),
-  /** Joins the text blocks of the balloon holding `block` into the first one read, as one undo step: it keeps its place, its source's frame becomes the box around them all, its wording and its translation every block's that isn't blank, a line each, and the others' masks and clean-ups merge into its own before they go. A text left as scanned, as translating leaves one the model gave back unchanged, gives the translation its wording once the joined clean-up covers it. A locked block or balloon refuses it. */
+  /** Joins the text blocks of the balloon holding `block` into the first one read, as one undo step: it keeps its place, its source's frame becomes the box around them all, its wording and its translation every block's that isn't blank, a line each, and the others' masks and clean-ups merge into its own before they go, their reviewer's notes and flags joining its own. A text left as scanned, as translating leaves one the model gave back unchanged, gives the translation its wording once the joined clean-up covers it. A locked block or balloon refuses it. */
   booharuJoinBalloon: (block: LayerId) =>
     invoke<Change>('booharu_join_balloon', { block }, { headers: headers() }),
   /** Joins every balloon of `page` whose text is split over two or more text blocks, each as `booharu_join_balloon` joins one, all as one undo step. */

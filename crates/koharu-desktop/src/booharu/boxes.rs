@@ -28,10 +28,10 @@ pub async fn booharu_find_split_balloons(
 /// read, as one undo step: it keeps its place, its source's frame becomes
 /// the box around them all, its wording and its translation every block's
 /// that isn't blank, a line each, and the others' masks and clean-ups merge
-/// into its own before they go. A text left as scanned, as translating
-/// leaves one the model gave back unchanged, gives the translation its
-/// wording once the joined clean-up covers it. A locked block or balloon
-/// refuses it.
+/// into its own before they go, their reviewer's notes and flags joining
+/// its own. A text left as scanned, as translating leaves one the model
+/// gave back unchanged, gives the translation its wording once the joined
+/// clean-up covers it. A locked block or balloon refuses it.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_join_balloon(app: State<'_, Arc<App>>, block: LayerId) -> Result<Change> {

@@ -13,7 +13,7 @@ use std::collections::{BTreeSet, HashSet};
 
 use anyhow::{Context as _, Result, bail, ensure};
 use booharu_core::{
-    attrs::{self, Attr, Auto, Lettering, QcOk, ReadNote, ReviewNote},
+    attrs::{self, Attr, Auto, Flags, Lettering, QcOk, ReadNote, ReviewNote},
     settings::OcrBoxMode,
 };
 use image::{Rgb, RgbImage};
@@ -197,12 +197,13 @@ pub fn find_split_balloons(project: &Project, page: Option<PageId>) -> Result<Ve
 /// and its source wording and its translation every block's that isn't
 /// blank, a line each, the translation placed in its balloon as the
 /// Translation stage places one. The others' masks and clean-ups merge into
-/// its own, so the lettering they cleaned stays clean, and they go. The
-/// joined clean-up shows when any of theirs showed over lettering, and a
-/// text left as scanned, as the Translation stage leaves one the model gave
-/// back unchanged, then gives the translation its source wording in its
-/// place. A balloon holding one text block has nothing to join, and a hidden
-/// block, which isn't drawn, is no part of its balloon's text.
+/// its own, so the lettering they cleaned stays clean, and they go, their
+/// reviewer's notes and flags joining its own. The joined clean-up shows
+/// when any of theirs showed over lettering, and a text left as scanned, as
+/// the Translation stage leaves one the model gave back unchanged, then
+/// gives the translation its source wording in its place. A balloon holding
+/// one text block has nothing to join, and a hidden block, which isn't
+/// drawn, is no part of its balloon's text.
 pub fn join_balloon(session: &Session, block: LayerId) -> Result<Edit> {
     let project = session.project();
     let layer = project.layer(block)?;
@@ -622,6 +623,7 @@ fn join(
     let others: Vec<&Block> = rest.iter().map(|(_, block)| *block).collect();
     ops.extend(merged(session, first, &others)?);
     ops.extend(dropped(project.layer(*kept)?, &(*kept).into()));
+    ops.extend(carried(project, group)?);
     ops.extend(rest.iter().map(|(id, _)| Op::RemoveLayer {
         layer: (*id).into(),
     }));
@@ -685,6 +687,51 @@ fn merged(session: &Session, kept: &Block, others: &[&Block]) -> Result<Vec<Op>>
             rect: shifted(area, cleanup_offset),
             pixels: cleanup,
         });
+    }
+    Ok(ops)
+}
+
+/// The ops giving `group`'s first block, which a join keeps, the reviewer's
+/// notes and the flags of every block, as their texts are joined: the notes
+/// a line each in reading order, and the flags one after another, each once;
+/// none while only the first has any.
+fn carried(project: &Project, group: &Group) -> Result<Vec<Op>> {
+    let layers = group
+        .blocks
+        .iter()
+        .map(|(id, _)| project.layer(*id))
+        .collect::<koharu_scene::Result<Vec<_>>>()?;
+    let [kept, rest @ ..] = layers.as_slice() else {
+        return Ok(Vec::new());
+    };
+    let note = |layer: &Layer| {
+        attrs::get::<ReviewNote>(layer)
+            .map(|ReviewNote(note)| note)
+            .filter(|note| !note.trim().is_empty())
+    };
+    let flags = |layer: &Layer| {
+        attrs::get::<Flags>(layer)
+            .map(|Flags(flags)| flags)
+            .unwrap_or_default()
+    };
+    let mut ops = Vec::new();
+    if rest.iter().any(|layer| note(layer).is_some()) {
+        let mut notes: Vec<String> = Vec::new();
+        for found in layers.iter().filter_map(|layer| note(layer)) {
+            if !notes.contains(&found) {
+                notes.push(found);
+            }
+        }
+        ops.push(attrs::set(kept.id, &ReviewNote(notes.join("\n")))?);
+    }
+    if rest.iter().any(|layer| !flags(layer).is_empty()) {
+        let mut all = Vec::new();
+        for flag in layers.iter().flat_map(|layer| flags(layer)) {
+            if !all.contains(&flag) {
+                all.push(flag);
+            }
+        }
+        ops.push(attrs::set(kept.id, &Flags(all))?);
     }
     Ok(ops)
 }
@@ -1097,6 +1144,7 @@ fn created(change: &Change, label: &str) -> Result<LayerId> {
 
 #[cfg(test)]
 mod tests {
+    use booharu_core::attrs::Flag;
     use image::ImageFormat;
     use koharu_scene::{Hash, Text};
     use serde_json::Value;
@@ -1786,6 +1834,42 @@ mod tests {
                 .is_err_and(|error| error.to_string().contains("translate them first"))
         );
         assert_eq!(page.steps().len(), steps);
+        Ok(())
+    }
+
+    #[test]
+    fn a_join_keeps_every_texts_notes_and_flags() -> Result<()> {
+        let Split {
+            mut page,
+            blocks: [first, blank, last],
+            ..
+        } = split_balloon()?;
+        let flag = |message: &str| Flag {
+            kind: "review".to_owned(),
+            message: message.to_owned(),
+        };
+        page.session.apply(edit(vec![
+            attrs::set(first, &ReviewNote("Check the tone".to_owned()))?,
+            attrs::set(last, &ReviewNote("A pun on kami".to_owned()))?,
+            attrs::set(blank, &Flags(vec![flag("Missing text?")]))?,
+            attrs::set(last, &Flags(vec![flag("Glossary")]))?,
+        ]))?;
+        let before = page.session.project();
+
+        page.session.apply(join_balloon(&page.session, first)?)?;
+
+        let joined = page.session.project().layer(first)?.clone();
+        assert_eq!(
+            attrs::get::<ReviewNote>(&joined),
+            Some(ReviewNote("Check the tone\nA pun on kami".to_owned()))
+        );
+        assert_eq!(
+            attrs::get::<Flags>(&joined),
+            Some(Flags(vec![flag("Missing text?"), flag("Glossary")]))
+        );
+        // One undo gives each text its own again.
+        page.session.undo()?;
+        assert!(page.session.project() == before);
         Ok(())
     }
 
