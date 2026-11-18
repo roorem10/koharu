@@ -23,8 +23,20 @@
 //! | `booharu_run` | carries on with what the pages still need, as the Run button does with every stage on, one group of pages after another, or runs fewer stages on the pages named, and answers the plan with its first run | no |
 //! | `booharu_set_lettering_category` | sets blocks' lettering categories as the agent's labels, never over a user's, and while Pick fonts automatically is on their category fonts, never over a hand-changed font, as one undo step | no |
 //! | `booharu_get_text_styles` | the default text look, the default font, Pick fonts automatically, and each category's font with where it comes from; for a page or blocks, each block's category with why, its label, its balloon's shape, and whether it was changed by hand | yes |
+//! | `booharu_get_chapter_context` | the open chapter's linked series whole, its suggested terms and brief, the glossary terms found in its text, and word for word what a translation run on it adds after the Instructions | yes |
+//! | `booharu_link_series` | links the chapter to a series by its name, ignoring case, making one when asked | no |
+//! | `booharu_save_glossary_entry` | adds a term to the linked series, or replaces its term with the same source, keeping what the call leaves out | no |
+//! | `booharu_delete_glossary_entry` | deletes the linked series' term with a source | no |
+//! | `booharu_add_glossary_entry` | suggests a term for the chapter, as Read chapter does, unless the series or the suggestions have its source; never replaces a term | no |
+//! | `booharu_accept_glossary_suggestion` | accepts a suggestion, by its source, into the linked series | no |
+//! | `booharu_dismiss_glossary_suggestion` | dismisses a suggestion, by its source | no |
+//! | `booharu_import_instruction_glossary` | reads the terms the Instructions' lines write, or imports those named into the linked series as locked terms and can delete their lines, as Import from instructions does | no |
+//! | `booharu_fix_term_everywhere` | translates again, in one Translation run, every line using a term but hand-edited and locked ones, as Fix it everywhere does | no |
+//! | `booharu_export_series` | writes a series to a file at an absolute path, in 0.0.4's shape, replacing a file there only when told to | no |
+//! | `booharu_import_series` | imports a series file at an absolute path, replacing the series of its id or keeping both | no |
 
 mod boxes;
+mod context;
 mod lettering;
 mod notes;
 mod project;
@@ -33,13 +45,14 @@ mod settings;
 mod styles;
 mod translation;
 
-pub(crate) use self::runs::WAIT;
+pub(crate) use self::{context::outlined, runs::WAIT};
 
 use std::{collections::BTreeSet, sync::Arc};
 
-use booharu_core::settings::BooharuPreferences;
-use koharu_pipeline::{Request, RunId, Stage, Target};
+use booharu_core::{context::SeriesStore, settings::BooharuPreferences};
+use koharu_pipeline::{Pipeline, PipelineConfig, Request, RunId, Stage, Target};
 use koharu_scene::{Change, Edit, LayerId, Session};
+use parking_lot::Mutex;
 use rig_agent::tool::ToolSet;
 use rig_core::tool::ToolExecutionError;
 use serde_json::{Map, Value};
@@ -81,6 +94,61 @@ pub trait BooharuHost: Send + Sync {
     /// a tool wrote a series file or the open project's side file, as the
     /// desktop app tells its interface; outside the app, no one.
     fn context_changed(&self) {}
+
+    /// The series folder the glossary tools read and write: the Booharu
+    /// home's `series`, which the app's glossary editor shows.
+    fn series(&self) -> anyhow::Result<SeriesStore> {
+        SeriesStore::open()
+    }
+
+    /// The translator's Instructions as saved now, `[pipeline]
+    /// translator.instructions`, which Import from instructions reads.
+    fn instructions(&self) -> anyhow::Result<String> {
+        Ok(koharu_config::get::<PipelineConfig>()?
+            .translator
+            .instructions)
+    }
+
+    /// Saves `kept` as the translator's Instructions while they're still
+    /// `read`, in one read and write under the settings file's lock, so a
+    /// save in between is never undone, and gives `pipeline`, the tools'
+    /// own, which in the app is the app's, the settings then, as the app's
+    /// Settings page gives them to it; answers whether it saved.
+    fn save_instructions(
+        &self,
+        pipeline: &Pipeline,
+        read: &str,
+        kept: &str,
+    ) -> anyhow::Result<bool> {
+        let mut saved = false;
+        koharu_config::update(|config: &mut PipelineConfig| {
+            if config.translator.instructions == read {
+                kept.clone_into(&mut config.translator.instructions);
+                saved = true;
+            }
+        })?;
+        if saved {
+            pipeline.set_config(koharu_config::get()?);
+        }
+        Ok(saved)
+    }
+
+    /// Starts `request`, a run one of the tools starts for the user, such
+    /// as Fix it everywhere's, on the project `session` holds where the app
+    /// runs Koharu's runs: through `runs`, while that project is the one
+    /// open, as the Run button's go; with no `runs`, on `pipeline`, the
+    /// tools' own. `None` once the project closed.
+    fn start_run(
+        &self,
+        pipeline: &Pipeline,
+        session: &Arc<Mutex<Session>>,
+        request: Request,
+    ) -> anyhow::Result<Option<RunId>> {
+        match self.runs() {
+            Some(runs) => runs.queue(session, request),
+            None => Ok(Some(pipeline.run(Arc::clone(session), request)?)),
+        }
+    }
 }
 
 impl Tools {
@@ -114,6 +182,17 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(runs::Run);
     tools.add_tool(lettering::SetLetteringCategory);
     tools.add_tool(lettering::GetTextStyles);
+    tools.add_tool(context::GetChapterContext);
+    tools.add_tool(context::LinkSeries);
+    tools.add_tool(context::SaveGlossaryEntry);
+    tools.add_tool(context::DeleteGlossaryEntry);
+    tools.add_tool(context::AddGlossaryEntry);
+    tools.add_tool(context::AcceptGlossarySuggestion);
+    tools.add_tool(context::DismissGlossarySuggestion);
+    tools.add_tool(context::ImportInstructionGlossary);
+    tools.add_tool(context::FixTermEverywhere);
+    tools.add_tool(context::ExportSeries);
+    tools.add_tool(context::ImportSeries);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one

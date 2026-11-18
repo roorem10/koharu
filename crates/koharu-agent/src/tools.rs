@@ -82,7 +82,8 @@ impl Tools {
     /// The project's outline, which goes with each of the agent's requests.
     pub fn context(&self) -> anyhow::Result<Value> {
         let answer = self.session.lock().query(Query::GetProject)?;
-        Ok(serde_json::to_value(answer)?)
+        // Booharu: the chapter's linked series, brief, and glossary terms found, under `booharu`.
+        Ok(booharu::outlined(self, serde_json::to_value(answer)?))
     }
 }
 
