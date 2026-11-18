@@ -144,6 +144,18 @@ export type BooharuPreferences = {
   'booharu-ocr-box': OcrBoxSettings
   'booharu-lettering': LetteringSettings
   'booharu-fonts': FontSettings
+  'booharu-runs': RunsSettings
+}
+
+/**
+ *  A run a carrying-on group queued: the run of the `index`th of the
+ *  `count` groups `booharu_run` planned, counted from 0.
+ */
+export type BooharuRunGroup = {
+  group: number
+  run: RunId
+  index: number
+  count: number
 }
 
 /**  A rectangle in page pixels, for text frames. */
@@ -612,6 +624,16 @@ export type Offset = {
   y: number
 }
 
+/**  What a run does once a page stage has failed every try it had. */
+export type OnPageFailure =
+  /**
+   *  The page fails alone and the run goes on with its other pages,
+   *  ending as done with problems, with the failed pages listed.
+   */
+  | 'continue'
+  /**  The failure ends the run, as Koharu's first failure does. */
+  | 'stop'
+
 /**
  *  One op of an edit. Variants skipped by schemars carry bytes or the rich
  *  editor's spans, which tools never send.
@@ -700,6 +722,8 @@ export type Outcome =
   /**  The first failure ends the run; what it finished stays. */
   | { kind: 'failed'; page: PageId; stage: Stage; reason: string }
   | { kind: 'stopped' }
+  /**  Booharu: the run finished every page it could; these pages failed. */
+  | { kind: 'done_with_problems'; failures: PageFailure[] }
 
 /**
  *  A page: its size, the scan under it, and its layers with everything
@@ -718,6 +742,17 @@ export type PageChanges = {
   removed: PageId[]
   reordered: boolean
   changed: PageId[]
+}
+
+/**
+ *  A page a run gave up on while it went on with its other pages, as
+ *  `Outcome::DoneWithProblems` lists it: the stage that failed every try it
+ *  had, and why.
+ */
+export type PageFailure = {
+  page: PageId
+  stage: Stage
+  reason: string
 }
 
 /**  A page; stored, so it survives undo. */
@@ -763,10 +798,42 @@ export type PipelineEvent =
    *  The run's first event: the page stages it does, each of which starts
    *  and finishes once unless the run ends first.
    */
-  | { kind: 'queued'; run: RunId; steps: number }
+  | {
+      kind: 'queued'
+      run: RunId
+      steps: number
+      /**
+       *  Booharu: the stages it runs, in stage order, so a page that failed
+       *  can be run again from its failed stage through the later ones.
+       */
+      stages: Stage[]
+      /**
+       *  Booharu: whether it works on pages, the project's or some, rather
+       *  than on blocks or an area, so only a run over pages chimes.
+       */
+      pages: boolean
+    }
   | { kind: 'started'; run: RunId; page: PageId; stage: Stage }
   | { kind: 'finished'; run: RunId; page: PageId; stage: Stage }
   | { kind: 'ended'; run: RunId; outcome: Outcome }
+  /**
+   *  Booharu: a page stage failed and waits to be tried again: `attempt`
+   *  is the try it waits for, counting its first as 1, of `attempts`.
+   */
+  | { kind: 'retrying'; run: RunId; page: PageId; stage: Stage; attempt: number; attempts: number }
+  /**
+   *  Booharu: a page failed at `stage` once its tries were used up, and the
+   *  run goes on with its other pages.
+   */
+  | { kind: 'page_failed'; run: RunId; page: PageId; stage: Stage; reason: string }
+
+/**  Pages that need the same stages, which one run works on. */
+export type PlanGroup = {
+  /**  In stage order. */
+  stages: Stage[]
+  /**  In page order. */
+  pages: PageId[]
+}
 
 export type Preferences = {
   pipeline: PipelineConfig
@@ -874,6 +941,72 @@ export type Role = 'text' | 'sfx'
 
 /**  A run, numbered in the order runs were asked for. */
 export type RunId = number
+
+/**  The order a run's page stages go in. */
+export type RunOrder =
+  /**
+   *  Koharu's own: up to three pages in flight, each going through its
+   *  stages while the next starts.
+   */
+  | 'pages'
+  /**
+   *  One stage at a time: every page is detected, then every page read,
+   *  and so on, each stage's model alone in memory, for a graphics card
+   *  with little of it.
+   */
+  | 'stages'
+
+/**
+ *  What carrying on queues: the runs of `groups`, one after another, which
+ *  every `booharu_run_group` event of `group` announces, the first of them
+ *  `run`. No run and no groups when nothing is left to do.
+ */
+export type RunPlan = {
+  group: number
+  groups: PlanGroup[]
+  run: RunId | null
+}
+
+/**
+ *  A named set of stages, which picking in the Run menu switches on, and
+ *  the others off, starting nothing. A key it doesn't have fails, as no
+ *  caller's check of the keys it names reaches inside a list.
+ */
+export type RunPreset = {
+  /**  Its name, unique among the presets once trimmed, and never blank. */
+  name: string
+  /**  Its stages, at least one, in stage order. */
+  stages: RunStage[]
+}
+
+/**
+ *  A stage of a run, in the order a page's stages run: koharu-pipeline's
+ *  `Stage`, which this crate can't name, with the same names in the same
+ *  order, so a preset holds what the Run menu's switches send.
+ */
+export type RunStage = 'detect' | 'recognize' | 'inpaint' | 'translate'
+
+/**  What the Run button carries on with: every page, or the pages chosen. */
+export type RunTarget = { kind: 'project' } | { kind: 'pages'; pages: PageId[] }
+
+/**  `[booharu-runs]`: the Run menu's presets and the run policy. */
+export type RunsSettings = {
+  /**
+   *  At most 100, `MAX_PRESETS`, each with a name, unique once trimmed
+   *  and never blank, and at least one stage.
+   */
+  presets?: RunPreset[]
+  /**
+   *  How often a failed page stage is tried again, from 0 to 5,
+   *  `MAX_RETRIES`.
+   */
+  retries?: number
+  /**  What a run does once a page stage has failed every try. */
+  on_page_failure?: OnPageFailure
+  order?: RunOrder
+  /**  Whether a run over pages chimes as it ends, whoever started it. */
+  finish_sound?: boolean
+}
 
 /**  A vector path with an optional fill and stroke, in page coordinates. */
 export type Shape = {
@@ -1278,6 +1411,9 @@ export const commands = {
       {},
       { headers: headers() },
     ),
+  /** Carries on with what the pages `target` names still need when `stages` holds every stage: queues one ordinary run for each group of the pages that need the same stages, one after another, each announced as `booharu_run_group`, and answers the plan with its first run; with nothing left to do, no run and no groups. With fewer stages, one ordinary run of them on every page `target` names, as Koharu's Run button queues it, as a plan of one group. While a group goes on in the open project, answers that one, with its run going now, and queues nothing. */
+  booharuRun: (target: RunTarget, stages: Stage[]) =>
+    invoke<RunPlan>('booharu_run', { target, stages }, { headers: headers() }),
 }
 
 export const events = {
@@ -1309,4 +1445,6 @@ export const events = {
     listen<Transfer>('download', (event) => handler(event.payload)),
   booharuNotice: (handler: (payload: BooharuNotice) => void): Promise<UnlistenFn> =>
     listen<BooharuNotice>('booharu_notice', (event) => handler(event.payload)),
+  booharuRunGroup: (handler: (payload: BooharuRunGroup) => void): Promise<UnlistenFn> =>
+    listen<BooharuRunGroup>('booharu_run_group', (event) => handler(event.payload)),
 }

@@ -10,7 +10,7 @@ import { useKoharuStore } from '@/lib/store'
 import { commands, type Preferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
-import { settingsDesktop } from './settings'
+import { builtInRuns, settingsDesktop } from './settings'
 
 const SWITCH = "Use the original lettering's colors"
 
@@ -56,6 +56,7 @@ describe('Booharu colour detection switch', () => {
         detect_colors: false,
       },
       'booharu-fonts': { favorites: [] },
+      'booharu-runs': builtInRuns,
     })
     await waitFor(() => expect(toggle).not.toBeChecked())
   })

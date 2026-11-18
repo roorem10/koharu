@@ -8,6 +8,8 @@ import { queryClient } from '@/lib/queries'
 import { commands, type BooharuPreferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
+import { builtInRuns } from './settings'
+
 /** The sections these tests leave alone, as the desktop answers them. */
 const OTHERS = {
   'booharu-lettering': {
@@ -15,6 +17,7 @@ const OTHERS = {
     detect_colors: true,
   },
   'booharu-fonts': { favorites: [] },
+  'booharu-runs': builtInRuns,
 } satisfies Partial<BooharuPreferences>
 
 /** The Booharu settings the desktop's file holds, which another writer, such as the agent's

@@ -1,12 +1,29 @@
 import { vi } from 'vitest'
 
-import { commands, type BooharuPreferences, type LetteringSettings } from '@koharu/ipc/protocol'
+import {
+  commands,
+  type BooharuPreferences,
+  type LetteringSettings,
+  type RunsSettings,
+} from '@koharu/ipc/protocol'
 
 /** `[booharu-lettering]` as the desktop answers it while the file sets nothing. */
 export const builtInLettering = {
   default: { fill: null, stroke: null, stroke_width: 1.5 },
   detect_colors: true,
 } satisfies LetteringSettings
+
+/** `[booharu-runs]` as the desktop answers it while the file sets nothing. */
+export const builtInRuns = {
+  presets: [
+    { name: 'Detect + OCR', stages: ['detect', 'recognize'] },
+    { name: 'Translate + clean up', stages: ['inpaint', 'translate'] },
+  ],
+  retries: 2,
+  on_page_failure: 'continue',
+  order: 'pages',
+  finish_sound: true,
+} satisfies RunsSettings
 
 /** The desktop with every command answering null, and the Booharu settings its file holds, which
  * another writer, such as the agent's settings tool, may change while a page shows them; `saves`
@@ -20,6 +37,7 @@ export function settingsDesktop(lettering: LetteringSettings = builtInLettering)
       'booharu-ocr-box': { default_mode: 'read' },
       'booharu-lettering': structuredClone(lettering),
       'booharu-fonts': { favorites: [] },
+      'booharu-runs': structuredClone(builtInRuns),
     },
   }
   const saves: BooharuPreferences[] = []

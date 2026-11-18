@@ -206,7 +206,16 @@ function fold(job: Job | undefined, event: PipelineEvent): Job {
             page: event.outcome.page,
             error: event.outcome.reason,
           }
-        : { ...current, state: event.outcome.kind, error: null }
+        : {
+            ...current,
+            // Booharu: done with problems shows as done until the Activity center lists the failed pages.
+            state: event.outcome.kind === 'done_with_problems' ? 'done' : event.outcome.kind,
+            error: null,
+          }
+    // Booharu: a page waiting for its next try, or given up on, changes no count yet.
+    case 'retrying':
+    case 'page_failed':
+      return current
   }
 }
 
