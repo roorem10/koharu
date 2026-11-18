@@ -21,7 +21,7 @@ const styled = {
 
 /** Settings > Typesetting, where the default text style sits below Preferred fonts. */
 function renderTypesetting() {
-  render(
+  return render(
     <QueryClientProvider client={queryClient}>
       <TypesettingPreferences
         value={{ font_families: ['CCWildWords'] }}
@@ -157,6 +157,27 @@ describe('Booharu default text style', () => {
     })
     expect(width).toHaveValue('50')
     expect(shown.getByText('#FFFFFF')).toBeInTheDocument()
+  })
+
+  it('saves a change still waiting at once when the section goes, such as when another tab opens', async () => {
+    const { saves } = settingsDesktop()
+    const user = userEvent.setup()
+    const { unmount } = renderTypesetting()
+
+    const shown = await section()
+    await user.click(shown.getByRole('button', { name: 'Increase outline width' }))
+    unmount()
+    // Long before the change's own save would come.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(saves).toHaveLength(1)
+    expect(saves[0]!['booharu-lettering'].default).toEqual({
+      fill: null,
+      stroke: [...WHITE],
+      stroke_width: 2,
+    })
+    await settle()
+    expect(saves).toHaveLength(1)
   })
 
   it("shows a failed save's error, then the file's style", async () => {

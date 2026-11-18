@@ -38,9 +38,10 @@ export function isBuiltIn(look: DefaultLook): boolean {
  * `change`, which takes one: changes wait until none has come for a moment, as Koharu's settings
  * do, then are saved together over what the file holds just before, replacing only the keys they
  * name, so a key or section another writer changed meanwhile stays as that writer left it. A
- * change still waiting when the section goes is saved then. Once the last save ends, what the file
- * holds shows again, so after a failed save, whose error shows as every failed command's does, the
- * section shows the file's values. */
+ * change still waiting when the section goes is saved then, and `flush` saves one at once, as
+ * Apply does before it counts. Once the last save ends, what the file holds shows again, so after a
+ * failed save, whose error shows as every failed command's does, the section shows the file's
+ * values. */
 export function useDefaultTextStyle() {
   const preferences = useBooharuPreferences()
   const [unsaved, setUnsaved] = useState<Partial<DefaultLook> | null>(null)
@@ -88,7 +89,7 @@ export function useDefaultTextStyle() {
     stroke_width: saved?.stroke_width ?? builtInLook.stroke_width,
     ...unsaved,
   }
-  return { look, loaded: preferences.data !== undefined, change }
+  return { look, loaded: preferences.data !== undefined, change, flush }
 }
 
 /** Whether new translations keep the colours of the original lettering, `detect_colors` of

@@ -25,7 +25,7 @@ let saving: Promise<unknown> = Promise.resolve()
 /** Runs `write`, a write to the Booharu settings file, once the writes queued before it end. A
  * command that changes one key of a section, such as a font's star, goes through here too, so a
  * save, which writes every section as it read them just before, never puts back a value it
- * changed in between. */
+ * changed in between; so does one that reads what they write, such as Apply's count. */
 export function queueBooharuWrite<T>(write: () => Promise<T>): Promise<T> {
   const done = saving.catch(() => undefined).then(write)
   saving = done

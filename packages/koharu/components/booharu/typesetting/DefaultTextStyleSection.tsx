@@ -37,7 +37,7 @@ const WHITE = '#FFFFFF'
  * drawn in and the outline None. Changes save on their own, as Koharu's settings do. */
 export function DefaultTextStyleSection() {
   const { t } = useTranslation()
-  const { look, loaded, change } = useDefaultTextStyle()
+  const { look, loaded, change, flush } = useDefaultTextStyle()
   const titleId = useId()
   const widthId = useId()
   const fill = look.fill ? rgbaToHex(look.fill) : BLACK
@@ -175,7 +175,7 @@ export function DefaultTextStyleSection() {
             </Button>
           </div>
         </PreferenceRow>
-        <ApplyStyles />
+        <ApplyStyles flush={flush} />
       </div>
     </section>
   )

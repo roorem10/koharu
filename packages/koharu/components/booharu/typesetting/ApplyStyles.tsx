@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { PreferenceRow } from '@/components/preferences/PreferenceFields'
 import { call } from '@/lib/backend'
+import { queueBooharuWrite } from '@/lib/booharu/preferences'
 import { useProject } from '@/lib/queries'
 import { commands, type StyleCounts, type StyleScope } from '@koharu/ipc/protocol'
 import {
@@ -26,11 +27,19 @@ const PROJECT: StyleScope = { kind: 'project' }
 /** What the desktop counted, and whether the boxes changed by hand were included. */
 type Counted = { include: boolean; counts: StyleCounts }
 
+/** Runs `command` once `flush` has saved the default text style's change still waiting and every
+ * settings write queued before has ended, so it counts or applies the look the section shows. */
+function afterSaves<T>(flush: () => void, command: () => Promise<T>): Promise<T> {
+  flush()
+  return queueBooharuWrite(command)
+}
+
 /** Apply to the open project, the default text style's last row: it counts the boxes the style
  * would restyle, keep and find untranslated, and asks with those numbers, counting again when the
  * boxes changed by hand are included; then it applies the style as one undo step and says how many
- * boxes it restyled and kept. The pages it changes arrive as every change does. */
-export function ApplyStyles() {
+ * boxes it restyled and kept. Each count and the apply first save the section's change still
+ * waiting, through `flush`. The pages it changes arrive as every change does. */
+export function ApplyStyles({ flush }: { flush: () => void }) {
   const { t } = useTranslation()
   const project = useProject().data
   const [open, setOpen] = useState(false)
@@ -46,7 +55,7 @@ export function ApplyStyles() {
   const start = () => {
     const ask = ++asked.current
     setOpening(true)
-    call(commands.booharuCountTextStyleTargets, PROJECT, false)
+    afterSaves(flush, () => call(commands.booharuCountTextStyleTargets, PROJECT, false))
       .then((counts) => {
         if (ask !== asked.current) return
         setInclude(false)
@@ -61,7 +70,7 @@ export function ApplyStyles() {
     const ask = ++asked.current
     const shown = counted
     setInclude(next)
-    call(commands.booharuCountTextStyleTargets, PROJECT, next).then(
+    afterSaves(flush, () => call(commands.booharuCountTextStyleTargets, PROJECT, next)).then(
       (counts) => {
         if (ask === asked.current) setCounted({ include: next, counts })
       },
@@ -85,7 +94,7 @@ export function ApplyStyles() {
     if (!counted) return
     const included = counted.include
     setApplying(true)
-    call(commands.booharuApplyTextStyles, PROJECT, included)
+    afterSaves(flush, () => call(commands.booharuApplyTextStyles, PROJECT, included))
       .then((done) => {
         setOpen(false)
         toast.add({

@@ -32,16 +32,18 @@ function openProject() {
   queryClient.setQueryData(projectKey, project)
 }
 
-/** The desktop, counting and applying the default text style as `counted` says. */
+/** The desktop, counting and applying the default text style as `counted` says, and the outline
+ * width the settings file held for each count and each apply in `widths`. */
 function desktop() {
-  settingsDesktop()
-  const count = vi
-    .spyOn(commands, 'booharuCountTextStyleTargets')
-    .mockImplementation(async (_, include) => (include ? counted.included : counted.kept))
-  const apply = vi
-    .spyOn(commands, 'booharuApplyTextStyles')
-    .mockImplementation(async (_, include) => (include ? counted.included : counted.kept))
-  return { count, apply }
+  const { file } = settingsDesktop()
+  const widths: Array<number | undefined> = []
+  const answer = async (_: unknown, include: boolean) => {
+    widths.push(file.preferences['booharu-lettering'].default?.stroke_width)
+    return include ? counted.included : counted.kept
+  }
+  const count = vi.spyOn(commands, 'booharuCountTextStyleTargets').mockImplementation(answer)
+  const apply = vi.spyOn(commands, 'booharuApplyTextStyles').mockImplementation(answer)
+  return { count, apply, widths }
 }
 
 /** Settings > Typesetting, where Apply is the default text style's last row. */
@@ -137,6 +139,27 @@ describe('Booharu Apply to the open project', () => {
     expect(dialog.getByText('5 boxes have no translation yet.')).toBeInTheDocument()
     expect(dialog.getByRole('button', { name: 'Apply' })).toBeDisabled()
     expect(apply).not.toHaveBeenCalled()
+  })
+
+  it('counts and applies the look the section shows, a change made just before saved first', async () => {
+    const { count, apply, widths } = desktop()
+    openProject()
+    const user = userEvent.setup()
+    renderTypesetting()
+
+    const region = within(await screen.findByRole('region', { name: 'Default text style' }))
+    await waitFor(() =>
+      expect(region.getByRole('button', { name: 'Increase outline width' })).toBeEnabled(),
+    )
+    // Asked for before the change's own save would come.
+    await user.click(region.getByRole('button', { name: 'Increase outline width' }))
+    await user.click(screen.getByRole('button', { name: BUTTON }))
+    const dialog = await confirmation()
+    await user.click(dialog.getByRole('button', { name: 'Apply' }))
+    await waitFor(() => expect(apply).toHaveBeenCalledOnce())
+
+    expect(count).toHaveBeenCalledOnce()
+    expect(widths).toEqual([2, 2])
   })
 
   it('leaves the box and the numbers as they were when counting again fails', async () => {
