@@ -14,6 +14,8 @@ import {
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { PresetButtons } from '@/components/booharu/runs/PresetButtons' // Booharu: run presets.
+import { SaveAsPreset } from '@/components/booharu/runs/SaveAsPreset' // Booharu: run presets.
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { OutputPicker } from '@/components/controls/OutputPicker'
 import { call, refreshModels, savePreferences } from '@/lib/backend'
@@ -212,6 +214,8 @@ function RuntimeSelector({
               value={outputLabel}
               onClick={() => setView('output')}
             />
+            {/* Booharu: the run presets, which switch the stages on and start nothing. */}
+            <PresetButtons />
             <div className='my-1 border-t border-border/70' />
             <Button
               type='button'
@@ -276,6 +280,8 @@ function RuntimeSelector({
                 onSelect={toggleStage}
               />
             ))}
+            {/* Booharu: saves the stages switched on as a run preset, named in place. */}
+            <SaveAsPreset onSaved={() => setView('root')} />
           </SelectorPanel>
         )}
 
