@@ -92,16 +92,20 @@ describe('Booharu finish chime', () => {
     expect(played[2]?.peak).toBe(0.025)
   })
 
-  it('stays silent for a run on blocks or an area, and with the finish sound off', async () => {
+  it('stays silent for a run on blocks or an area, and once the finish sound is off', async () => {
     const { file } = settingsDesktop()
     tell(queued(1, ['translate'], false), done(1))
     await settled()
     expect(heard()).toEqual([])
 
-    file.preferences['booharu-runs'].finish_sound = false
     tell(queued(2, every), done(2))
     await settled()
-    expect(heard()).toEqual([])
+    expect(heard()).toEqual(['high'])
+    // The agent's settings tool turns the sound off: the next ending reads the file again.
+    file.preferences['booharu-runs'].finish_sound = false
+    tell(queued(3, every), done(3))
+    await settled()
+    expect(heard()).toEqual(['high'])
   })
 
   it('chimes once for a carrying-on group, as it ends, lower if any of its runs had problems', async () => {

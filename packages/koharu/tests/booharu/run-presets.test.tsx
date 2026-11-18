@@ -91,6 +91,23 @@ describe('Booharu run presets in the Run menu', () => {
     expect(commands.runPipeline).not.toHaveBeenCalled()
   })
 
+  it('reads the presets again as the menu opens, as the agent may have changed them', async () => {
+    const { file } = settingsDesktop()
+    const user = userEvent.setup()
+    await openRunMenu(user)
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Presets' })).toBeNull())
+    // The agent's settings tool adds a preset while the menu is closed.
+    file.preferences['booharu-runs'].presets = [
+      ...builtInRuns.presets,
+      { name: 'Clean only', stages: ['inpaint'] },
+    ]
+
+    await user.click(screen.getByRole('button', { name: i18n.t('inference.selector') }))
+    const presets = within(await screen.findByRole('group', { name: 'Presets' }))
+    expect(await presets.findByRole('button', { name: 'Clean only' })).toBeInTheDocument()
+  })
+
   it('shows a built-in preset’s name in the language shown only while it is the built-in one', async () => {
     const { file } = settingsDesktop()
     // The second built-in preset has had its stages changed: it's the user's own now.

@@ -9,6 +9,7 @@ import { call } from '@/lib/backend'
 import {
   booharuPreferencesKey,
   booharuPreferencesQuery,
+  queueBooharuWrite,
   saveBooharuSection,
   useBooharuPreferences,
 } from '@/lib/booharu/preferences'
@@ -204,11 +205,17 @@ export function useRunsSettings() {
 const selectPresets = (preferences: BooharuPreferences) =>
   complete(preferences['booharu-runs']).presets
 
-/** The run presets as the settings file holds them: read once, then shared with the settings
- * pages, which read the file again as they open, and refreshed by every save. A read that failed
- * has shown its error, and isn't tried again each time a view needing them opens. */
+/** The run presets as the settings file holds them, shared with the settings pages and refreshed
+ * by every save: read again each time a view showing them opens, as the agent's settings tool may
+ * have changed them since, the last list showing meanwhile. A read that failed has shown its
+ * error, and isn't tried again each time a view needing them opens. */
 export function useRunPresets(): RunPreset[] | undefined {
-  return useQuery({ ...booharuPreferencesQuery, select: selectPresets, retryOnMount: false }).data
+  return useQuery({
+    ...booharuPreferencesQuery,
+    select: selectPresets,
+    refetchOnMount: 'always',
+    retryOnMount: false,
+  }).data
 }
 
 /** Switches the Run menu's stages to `preset`'s, in the order they run, and starts nothing. The
@@ -218,12 +225,13 @@ export function applyPreset(preset: RunPreset): void {
   useKoharuStore.getState().setProcessingStages(inStageOrder(preset.stages))
 }
 
-/** Whether a run over pages chimes as it ends: the finish sound as the last read or save of the
- * Booharu settings left it, or as the file holds it while nothing has read them. A read that fails
- * shows its error as every failed command's does, and leaves the chime silent. */
+/** Whether a run over pages chimes as it ends: the finish sound as the file holds it then, read in
+ * turn with the settings' saves, so a change the agent's settings tool made counts, and no save is
+ * seen half done. A read that fails shows its error as every failed command's does, and leaves the
+ * chime silent. */
 export async function finishSoundOn(): Promise<boolean> {
   try {
-    const preferences = await queryClient.fetchQuery(booharuPreferencesQuery)
+    const preferences = await queueBooharuWrite(() => call(commands.booharuGetPreferences))
     return complete(preferences['booharu-runs']).finish_sound
   } catch {
     return false
