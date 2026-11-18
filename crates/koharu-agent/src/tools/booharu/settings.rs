@@ -28,7 +28,8 @@ impl Tool for GetSettings {
 
     fn description(&self) -> String {
         "Booharu's settings, each section under its table name with every key's value: \
-         `booharu-mcp` has the `port` the MCP server outside apps reach Booharu through listens on."
+         `booharu-mcp` has the `port` the MCP server outside apps reach Booharu through listens \
+         on. Needs a project open, as every tool here does."
             .to_owned()
     }
 
@@ -85,7 +86,8 @@ impl Tool for SetSettings {
         "Change keys of one of Booharu's settings sections, named as booharu_get_settings names \
          them, and save it; an unknown section or key, or an invalid value, saves nothing. \
          Answers the section as saved, with a note when the change applies only once Booharu \
-         restarts. A call an outside app makes over MCP can't change `booharu-mcp`."
+         restarts. A call an outside app makes over MCP can't change `booharu-mcp`. Needs a \
+         project open, as every tool here does."
             .to_owned()
     }
 
@@ -126,7 +128,9 @@ impl Tool for SetSettings {
     }
 }
 
-/// The app, through which the settings are read and saved.
+/// The app, through which the settings are read and saved, as the open
+/// project's tools reach it: the MCP server has them only while a project is
+/// open.
 fn host(context: &ToolContext) -> Result<Arc<dyn BooharuHost>, ToolExecutionError> {
     project(context)?.booharu.clone().ok_or_else(|| {
         ToolExecutionError::other("Booharu's settings aren't available here, outside the app")
