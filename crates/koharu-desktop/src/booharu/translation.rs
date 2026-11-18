@@ -30,11 +30,10 @@ pub async fn booharu_set_translation(
         tokio::task::spawn_blocking(move || -> anyhow::Result<Change> {
             let target = koharu_config::get::<PipelineConfig>()?.translator.target;
             // A new translation's default look, as Booharu's settings hold it
-            // now; one that can't be read is logged, and the translation gets
-            // Koharu's look.
+            // now; one that can't be read fails the edit.
             let families =
                 koharu_config::get::<RendererConfig>().map(|config| config.font_families);
-            let look = Snapshot::read(families);
+            let look = Snapshot::read(families)?;
             let session = app.session()?;
             let mut session = session.lock();
             let edit = booharu::translation::edit(&session.project(), block, text, &target, &look)?;

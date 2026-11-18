@@ -11,7 +11,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use anyhow::{anyhow, bail};
+use anyhow::{Context as _, anyhow, bail};
 use koharu_config::Section;
 use koharu_scene::Rgba;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned, de::Error as _};
@@ -200,8 +200,8 @@ fn families<'de, D: Deserializer<'de>>(deserializer: D) -> Result<BTreeSet<Strin
 /// Booharu's settings as one read takes them, for what keeps one set of
 /// values throughout: a pipeline run, from when it's queued, whichever way it
 /// came; the canvas, until the next save; a translation typed by hand. Its
-/// default is Koharu's own behaviour: no font written, and the colours
-/// Koharu gives kept.
+/// default, which only a caller that read nothing holds, is Koharu's own
+/// behaviour: no font written, and the colours Koharu gives kept.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Snapshot {
     /// `[booharu-lettering]`: how new text looks.
@@ -213,40 +213,30 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// The settings as the file holds them now, with `families`, Koharu's
-    /// Preferred fonts as `[renderer] font_families` reads them now.
-    pub fn read(families: koharu_config::Result<Vec<String>>) -> Self {
+    /// Preferred fonts as `[renderer] font_families` reads them now. A bad
+    /// stored value fails, never replaced by its default, so nothing is
+    /// lettered with a look nobody chose.
+    pub fn read(families: koharu_config::Result<Vec<String>>) -> anyhow::Result<Self> {
         Self::of(koharu_config::get(), families)
     }
 
-    /// The snapshot of `lettering` and `families` as they were read. One
-    /// that couldn't be is logged and left out, so a bad stored value never
-    /// stops the work silently: without `[booharu-lettering]` it's Koharu's
-    /// own behaviour, and without the Preferred fonts no font is written.
+    /// The snapshot of `lettering` and `families` as they were read, or the
+    /// error of the first that couldn't be.
     fn of(
         lettering: koharu_config::Result<LetteringSettings>,
         families: koharu_config::Result<Vec<String>>,
-    ) -> Self {
-        let lettering = match lettering {
-            Ok(lettering) => lettering,
-            Err(error) => {
-                tracing::error!(
-                    "new text keeps Koharu's look, as [{}] can't be read: {error}",
-                    LetteringSettings::NAME
-                );
-                return Self::default();
-            }
-        };
-        let font = match families {
-            Ok(families) => crate::styles::first_font(&families).map(str::to_owned),
-            Err(error) => {
-                tracing::error!(
-                    "new text gets no default font, as Koharu's Preferred fonts can't be read: \
-                     {error}"
-                );
-                None
-            }
-        };
-        Self { lettering, font }
+    ) -> anyhow::Result<Self> {
+        let lettering = lettering.with_context(|| {
+            format!(
+                "Booharu's default text style can't be read from [{}]",
+                LetteringSettings::NAME
+            )
+        })?;
+        let families = families.context("Koharu's Preferred fonts can't be read")?;
+        Ok(Self {
+            lettering,
+            font: crate::styles::first_font(&families).map(str::to_owned),
+        })
     }
 }
 
@@ -647,36 +637,39 @@ mod tests {
     }
 
     #[test]
-    fn a_snapshot_left_without_a_section_is_koharus_behaviour() {
+    fn a_snapshot_fails_on_a_section_it_cant_read() {
         let lettering = LetteringSettings {
             detect_colors: false,
             ..LetteringSettings::default()
         };
         let families = || Ok(vec![" ".to_owned(), "CCWildWords".to_owned()]);
         assert_eq!(
-            Snapshot::of(Ok(lettering.clone()), families()),
-            Snapshot {
+            Snapshot::of(Ok(lettering.clone()), families()).ok(),
+            Some(Snapshot {
                 lettering: lettering.clone(),
                 font: Some("CCWildWords".to_owned()),
-            }
+            })
         );
-        // A bad lettering section takes the font with it: no Booharu look.
+        // A bad stored value is an error, never Koharu's look or no font.
         fn bad<T>() -> koharu_config::Result<T> {
             Err(koharu_config::Error::Invalid {
                 path: "config.toml".into(),
-                message: "a bad value".to_owned(),
+                message: "an outline 60 pixels wide".to_owned(),
             })
         }
-        assert_eq!(Snapshot::of(bad(), families()), Snapshot::default());
-        // Unreadable Preferred fonts leave out only the font.
-        assert_eq!(
-            Snapshot::of(Ok(lettering.clone()), bad()),
-            Snapshot {
-                lettering,
-                font: None,
-            }
+        let error = Snapshot::of(bad(), families()).expect_err("a bad text style");
+        assert!(
+            format!("{error:#}").contains("[booharu-lettering]")
+                && format!("{error:#}").contains("60 pixels"),
+            "{error:#}"
         );
-        // Koharu's own: no font, and the colours Koharu gives kept.
+        let error = Snapshot::of(Ok(lettering), bad()).expect_err("bad Preferred fonts");
+        assert!(
+            format!("{error:#}").contains("Preferred fonts"),
+            "{error:#}"
+        );
+        // Koharu's own, for what read nothing: no font, and the colours
+        // Koharu gives kept.
         let default = Snapshot::default();
         assert!(default.lettering.detect_colors && default.font.is_none());
     }

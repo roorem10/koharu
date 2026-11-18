@@ -4,7 +4,8 @@
 //! its config's snapshot, and never again mid-stage, so every page of a run
 //! uses the same values, whether the Run button, the agent, or MCP queued it.
 //!
-//! - `queued`, in `Pipeline::run`, takes the snapshot.
+//! - `queued`, in `Pipeline::run`, takes the snapshot, or refuses the run
+//!   when a section it reads can't be read.
 //! - `translated`, in the Translation stage's `written`, gives each new
 //!   translation the default look and records what the stage wrote, and
 //!   `given_back` records a translation it cleared, given back unchanged.
@@ -18,14 +19,13 @@ use crate::PipelineConfig;
 
 /// `config`, the one a run was queued with, with Booharu's settings as
 /// they're saved now: `[booharu-lettering]` and the first of Koharu's
-/// Preferred fonts. A section that can't be read is logged, and the run
-/// goes on with Koharu's behaviour for what it decides.
-pub(crate) fn queued(config: PipelineConfig) -> PipelineConfig {
+/// Preferred fonts. A section that can't be read refuses the run, as a bad
+/// stored value is an error, never replaced by its default.
+pub(crate) fn queued(config: PipelineConfig) -> crate::Result<PipelineConfig> {
     let families = koharu_config::get::<RendererConfig>().map(|renderer| renderer.font_families);
-    PipelineConfig {
-        booharu: Snapshot::read(families),
-        ..config
-    }
+    let booharu =
+        Snapshot::read(families).map_err(|error| crate::Error::invalid(format!("{error:#}")))?;
+    Ok(PipelineConfig { booharu, ..config })
 }
 
 /// The ops that follow placement's, `placed`, in the Translation stage's

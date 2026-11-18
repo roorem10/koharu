@@ -59,7 +59,7 @@ impl Tool for SetTranslation {
             let target = koharu_config::get::<PipelineConfig>()?.translator.target;
             let families =
                 koharu_config::get::<RendererConfig>().map(|config| config.font_families);
-            let look = Snapshot::read(families);
+            let look = Snapshot::read(families)?;
             let mut session = tools.session.lock();
             let edit = booharu::translation::edit(
                 &session.project(),

@@ -12,16 +12,20 @@ use koharu_scene::Fit;
 use crate::screen::Screen;
 
 /// Pushes the settings as the file holds them now to `screen`'s window.
+/// When a section can't be read, the canvas keeps the settings it has, and
+/// the error is logged; the Settings page shows it too, as it reads the
+/// section.
 pub(crate) fn push(screen: &Screen) {
-    screen.set_booharu(settings());
+    match settings() {
+        Ok(settings) => screen.set_booharu(settings),
+        Err(error) => tracing::error!("the canvas keeps its Booharu settings: {error:#}"),
+    }
 }
 
-/// The canvas's Booharu settings as the file holds them now. A section that
-/// can't be read is logged, and Koharu's behaviour stands in for it, as a
-/// pipeline run's snapshot does.
-fn settings() -> BooharuSettings {
+/// The canvas's Booharu settings as the file holds them now.
+fn settings() -> anyhow::Result<BooharuSettings> {
     let families = koharu_config::get::<RendererConfig>().map(|config| config.font_families);
-    of(Snapshot::read(families))
+    Ok(of(Snapshot::read(families)?))
 }
 
 /// The canvas's Booharu settings from `snapshot`: its look for new text, and
@@ -70,8 +74,8 @@ mod tests {
     }
 
     #[test]
-    fn sections_that_cant_be_read_leave_koharus_look_and_best_fit() {
-        // A bad section's snapshot is Koharu's behaviour.
+    fn koharus_look_still_fits_a_drawn_box_at_best() {
+        // The snapshot of Koharu's own behaviour.
         assert_eq!(
             of(Snapshot::default()).text,
             TextDefaults {
