@@ -35,8 +35,15 @@ impl Tool for GetSettings {
          0 to 1, or null for Koharu's black and no outline, and its `stroke_width` from 0 to \
          50, which new text gets, and `detect_colors`, whether a new translation keeps the \
          colours Koharu measured (true) or gets the default look's (false); `booharu-fonts` has \
-         the font picker's `favorites`, family names. New text's font is the first of Koharu's \
-         Preferred fonts, not a Booharu setting. Needs a project open, as every tool here does."
+         the font picker's `favorites`, family names; `booharu-runs` has the Run menu's \
+         `presets`, each a `name` and its `stages` (`detect`, `recognize`, `inpaint`, \
+         `translate`), which set the menu's stage switches and start nothing, and how runs over \
+         pages go, whoever starts them: `retries`, from 0 to 5, how often a failed page stage is \
+         tried again, `on_page_failure`, `continue` with the other pages or `stop` the run, \
+         `order`, `pages` (each page through its stages) or `stages` (one stage at a time over \
+         every page, using less graphics memory), and `finish_sound`, whether a run over pages \
+         chimes as it ends. New text's font is the first of Koharu's Preferred fonts, not a \
+         Booharu setting. Needs a project open, as every tool here does."
             .to_owned()
     }
 
@@ -218,6 +225,16 @@ mod tests {
                     "detect_colors": true,
                 },
                 "booharu-fonts": {"favorites": []},
+                "booharu-runs": {
+                    "presets": [
+                        {"name": "Detect + OCR", "stages": ["detect", "recognize"]},
+                        {"name": "Translate + clean up", "stages": ["inpaint", "translate"]},
+                    ],
+                    "retries": 2,
+                    "on_page_failure": "continue",
+                    "order": "pages",
+                    "finish_sound": true,
+                },
             })
         );
 

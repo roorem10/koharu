@@ -222,6 +222,7 @@ mod tests {
                 detect_colors,
             },
             font: Some("CCWildWords".to_owned()),
+            runs: None,
         };
 
         // Detection on: the default font, and the measured colours stay.

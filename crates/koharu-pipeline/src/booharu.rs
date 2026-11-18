@@ -4,28 +4,70 @@
 //! its config's snapshot, and never again mid-stage, so every page of a run
 //! uses the same values, whether the Run button, the agent, or MCP queued it.
 //!
-//! - `queued`, in `Pipeline::run`, takes the snapshot, or refuses the run
-//!   when a section it reads can't be read.
+//! - `queued`, in `Pipeline::run`, takes the snapshot, the run policy of
+//!   `[booharu-runs]` included, or refuses the run when a section it reads
+//!   can't be read.
 //! - `translated`, in the Translation stage's `written`, gives each new
 //!   translation the default look and records what the stage wrote, and
 //!   `given_back` records a translation it cleared, given back unchanged.
 //! - `recognized`, in the Recognition stage, records the wording it read.
 
-use booharu_core::{settings::Snapshot, styles};
+use booharu_core::{
+    runs::{RunPolicy, RunStage},
+    settings::Snapshot,
+    styles,
+};
 use koharu_renderer::RendererConfig;
 use koharu_scene::{LayerId, Op, Project};
 
-use crate::PipelineConfig;
+use crate::{PipelineConfig, Stage};
 
 /// `config`, the one a run was queued with, with Booharu's settings as
-/// they're saved now: `[booharu-lettering]` and the first of Koharu's
-/// Preferred fonts. A section that can't be read refuses the run, as a bad
+/// they're saved now: `[booharu-lettering]`, the first of Koharu's Preferred
+/// fonts, and `[booharu-runs]`'s run policy, which the run then follows
+/// whoever queued it. A section that can't be read refuses the run, as a bad
 /// stored value is an error, never replaced by its default.
 pub(crate) fn queued(config: PipelineConfig) -> crate::Result<PipelineConfig> {
     let families = koharu_config::get::<RendererConfig>().map(|renderer| renderer.font_families);
-    let booharu =
-        Snapshot::read(families).map_err(|error| crate::Error::invalid(format!("{error:#}")))?;
+    let booharu = snapshot(Snapshot::read(families), RunPolicy::read())?;
     Ok(PipelineConfig { booharu, ..config })
+}
+
+/// A run's snapshot: `read`, with `policy` in it, or the error of the first
+/// that couldn't be read, which refuses the run as an invalid request.
+fn snapshot(
+    read: anyhow::Result<Snapshot>,
+    policy: anyhow::Result<RunPolicy>,
+) -> crate::Result<Snapshot> {
+    let invalid = |error: anyhow::Error| crate::Error::invalid(format!("{error:#}"));
+    let read = read.map_err(invalid)?;
+    Ok(Snapshot {
+        runs: Some(policy.map_err(invalid)?),
+        ..read
+    })
+}
+
+// A preset's stage is a stage of Koharu's, by the same name.
+impl From<RunStage> for Stage {
+    fn from(stage: RunStage) -> Self {
+        match stage {
+            RunStage::Detect => Self::Detect,
+            RunStage::Recognize => Self::Recognize,
+            RunStage::Inpaint => Self::Inpaint,
+            RunStage::Translate => Self::Translate,
+        }
+    }
+}
+
+impl From<Stage> for RunStage {
+    fn from(stage: Stage) -> Self {
+        match stage {
+            Stage::Detect => Self::Detect,
+            Stage::Recognize => Self::Recognize,
+            Stage::Inpaint => Self::Inpaint,
+            Stage::Translate => Self::Translate,
+        }
+    }
 }
 
 /// The ops that follow placement's, `placed`, in the Translation stage's
@@ -74,6 +116,7 @@ mod tests {
         Edited,
         attrs::Auto,
         edited,
+        runs::RunsSettings,
         settings::{DefaultTextStyle, LetteringSettings},
         styles::text_hash,
     };
@@ -231,7 +274,54 @@ mod tests {
                 detect_colors,
             },
             font: font.map(str::to_owned),
+            runs: None,
         }
+    }
+
+    #[test]
+    fn a_queued_run_takes_the_run_policy_or_is_refused() -> Result<()> {
+        let policy = RunsSettings {
+            retries: 4,
+            ..RunsSettings::default()
+        }
+        .policy();
+        let read = snapshot(true, None, None, Some("CCWildWords"));
+        let queued = super::snapshot(Ok(read.clone()), Ok(policy))?;
+        assert_eq!(
+            queued,
+            Snapshot {
+                runs: Some(policy),
+                ..read.clone()
+            }
+        );
+        // A bad [booharu-runs] refuses the run, naming the section.
+        let bad = anyhow::anyhow!("9 retries aren't between 0 and 5")
+            .context("Booharu's run settings can't be read from [booharu-runs]");
+        let refused = super::snapshot(Ok(read), Err(bad)).expect_err("a bad policy");
+        assert!(
+            matches!(&refused, crate::Error::Invalid(message)
+                if message.contains("[booharu-runs]") && message.contains("9 retries")),
+            "{refused}"
+        );
+        // A config a caller made, as upstream's tests and examples make one,
+        // runs Koharu's way.
+        assert_eq!(PipelineConfig::default().booharu.runs, None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_presets_stages_are_koharus_by_the_same_names_in_the_same_order() {
+        use strum::VariantArray as _;
+        for &stage in Stage::VARIANTS {
+            let preset = RunStage::from(stage);
+            assert_eq!(Stage::from(preset), stage);
+            assert_eq!(
+                serde_json::to_value(preset).ok(),
+                serde_json::to_value(stage).ok()
+            );
+        }
+        let presets: Vec<RunStage> = Stage::VARIANTS.iter().map(|&stage| stage.into()).collect();
+        assert!(presets.is_sorted());
     }
 
     fn colours(chars: &CharStyle) -> (Option<Rgba>, Option<Rgba>, Option<f64>) {

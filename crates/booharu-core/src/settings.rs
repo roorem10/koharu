@@ -17,6 +17,8 @@ use koharu_scene::Rgba;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned, de::Error as _};
 use serde_json::{Map, Value, map::Entry};
 
+use crate::runs::{RunPolicy, RunsSettings};
+
 /// `[booharu-mcp]`: the MCP server outside AI apps reach Booharu through.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(default)]
@@ -201,7 +203,8 @@ fn families<'de, D: Deserializer<'de>>(deserializer: D) -> Result<BTreeSet<Strin
 /// values throughout: a pipeline run, from when it's queued, whichever way it
 /// came; the canvas, until the next save; a translation typed by hand. Its
 /// default, which only a caller that read nothing holds, is Koharu's own
-/// behaviour: no font written, and the colours Koharu gives kept.
+/// behaviour: no font written, the colours Koharu gives kept, and the first
+/// failure ending a run.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Snapshot {
     /// `[booharu-lettering]`: how new text looks.
@@ -209,13 +212,18 @@ pub struct Snapshot {
     /// The default font new text gets a copy of, the first of Koharu's
     /// Preferred fonts; none to write none.
     pub font: Option<String>,
+    /// `[booharu-runs]`'s run policy, which `Pipeline::run` reads into the
+    /// snapshot of each run it queues, and nothing else reads; none, as
+    /// [`read`](Self::read) leaves it, runs as Koharu does.
+    pub runs: Option<RunPolicy>,
 }
 
 impl Snapshot {
     /// The settings as the file holds them now, with `families`, Koharu's
-    /// Preferred fonts as `[renderer] font_families` reads them now. A bad
-    /// stored value fails, never replaced by its default, so nothing is
-    /// lettered with a look nobody chose.
+    /// Preferred fonts as `[renderer] font_families` reads them now, and no
+    /// run policy, which only a queued run reads. A bad stored value fails,
+    /// never replaced by its default, so nothing is lettered with a look
+    /// nobody chose.
     pub fn read(families: koharu_config::Result<Vec<String>>) -> anyhow::Result<Self> {
         Self::of(koharu_config::get(), families)
     }
@@ -236,6 +244,7 @@ impl Snapshot {
         Ok(Self {
             lettering,
             font: crate::styles::first_font(&families).map(str::to_owned),
+            runs: None,
         })
     }
 }
@@ -252,6 +261,8 @@ pub struct BooharuPreferences {
     pub lettering: LetteringSettings,
     #[serde(rename = "booharu-fonts")]
     pub fonts: FontSettings,
+    #[serde(rename = "booharu-runs")]
+    pub runs: RunsSettings,
 }
 
 impl BooharuPreferences {
@@ -263,6 +274,7 @@ impl BooharuPreferences {
             ocr_box: koharu_config::get()?,
             lettering: koharu_config::get()?,
             fonts: koharu_config::get()?,
+            runs: koharu_config::get()?,
         })
     }
 
@@ -278,11 +290,13 @@ impl BooharuPreferences {
             ocr_box,
             lettering,
             fonts,
+            runs,
         } = self;
         koharu_config::update(|section: &mut McpSettings| *section = mcp)?;
         koharu_config::update(|section: &mut OcrBoxSettings| *section = ocr_box)?;
         koharu_config::update(|section: &mut LetteringSettings| *section = lettering)?;
         koharu_config::update(|section: &mut FontSettings| *section = fonts)?;
+        koharu_config::update(|section: &mut RunsSettings| *section = runs)?;
         Self::get()
     }
 
@@ -342,11 +356,12 @@ type Saver = fn(Map<String, Value>) -> anyhow::Result<()>;
 /// How the section named `name` is saved alone; none for a name Booharu has
 /// no section of.
 fn saver(name: &str) -> Option<Saver> {
-    let savers: [(&str, Saver); 4] = [
+    let savers: [(&str, Saver); 5] = [
         (McpSettings::NAME, saved::<McpSettings>),
         (OcrBoxSettings::NAME, saved::<OcrBoxSettings>),
         (LetteringSettings::NAME, saved::<LetteringSettings>),
         (FontSettings::NAME, saved::<FontSettings>),
+        (RunsSettings::NAME, saved::<RunsSettings>),
     ];
     savers
         .into_iter()
@@ -456,6 +471,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::runs::RunOrder;
 
     fn values(values: Value) -> Map<String, Value> {
         match values {
@@ -487,7 +503,8 @@ mod tests {
                 FontSettings::NAME,
                 LetteringSettings::NAME,
                 McpSettings::NAME,
-                OcrBoxSettings::NAME
+                OcrBoxSettings::NAME,
+                RunsSettings::NAME,
             ]
         );
     }
@@ -648,6 +665,7 @@ mod tests {
             Some(Snapshot {
                 lettering: lettering.clone(),
                 font: Some("CCWildWords".to_owned()),
+                runs: None,
             })
         );
         // A bad stored value is an error, never Koharu's look or no font.
@@ -668,10 +686,11 @@ mod tests {
             format!("{error:#}").contains("Preferred fonts"),
             "{error:#}"
         );
-        // Koharu's own, for what read nothing: no font, and the colours
-        // Koharu gives kept.
+        // Koharu's own, for what read nothing: no font, the colours Koharu
+        // gives kept, and no run policy.
         let default = Snapshot::default();
         assert!(default.lettering.detect_colors && default.font.is_none());
+        assert_eq!(default.runs, None);
     }
 
     #[test]
@@ -733,6 +752,45 @@ mod tests {
         );
         assert!(refused.is_err());
         assert_eq!(preferences.ocr_box.default_mode, OcrBoxMode::Read);
+    }
+
+    #[test]
+    fn the_run_settings_change_by_their_section() {
+        let mut preferences = BooharuPreferences::default();
+        preferences
+            .set_section(
+                "booharu-runs",
+                values(json!({"retries": 4, "order": "stages"})),
+            )
+            .expect("a policy");
+        let runs = &preferences.runs;
+        assert_eq!((runs.retries, runs.order), (4, RunOrder::Stages));
+        assert_eq!(runs.presets, RunsSettings::default().presets);
+        // A list is set whole.
+        let presets = json!([{"name": "OCR", "stages": ["recognize", "detect"]}]);
+        preferences
+            .set_section("booharu-runs", values(json!({"presets": presets})))
+            .expect("presets");
+        assert_eq!(
+            preferences
+                .section("booharu-runs")
+                .ok()
+                .map(|runs| runs["presets"].clone()),
+            Some(json!([{"name": "OCR", "stages": ["detect", "recognize"]}]))
+        );
+        let refused = [
+            json!({"retries": 6}),
+            json!({"on_page_failure": "skip"}),
+            json!({"presets": [{"name": " ", "stages": ["detect"]}]}),
+            json!({"presets": [{"name": "A", "stages": []}]}),
+            json!({"presets": [{"name": "A", "stages": ["detect"], "colour": 1}]}),
+        ];
+        for change in refused {
+            let changed = preferences.set_section("booharu-runs", values(change.clone()));
+            assert!(changed.is_err(), "took {change}");
+            assert_eq!(preferences.runs.retries, 4);
+            assert_eq!(preferences.runs.presets.len(), 1);
+        }
     }
 
     #[test]

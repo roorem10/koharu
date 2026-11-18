@@ -37,7 +37,9 @@ fn settings() -> anyhow::Result<BooharuSettings> {
 /// a box drawn with the T tool fitting its text at the largest size it
 /// holds, as Booharu 0.0.4's did, whatever the sections held.
 fn of(snapshot: Snapshot) -> BooharuSettings {
-    let Snapshot { lettering, font } = snapshot;
+    let Snapshot {
+        lettering, font, ..
+    } = snapshot;
     BooharuSettings {
         text: TextDefaults {
             lettering,
@@ -67,6 +69,7 @@ mod tests {
         let snapshot = Snapshot {
             lettering: lettering.clone(),
             font: Some("Anime Ace".to_owned()),
+            runs: None,
         };
         assert_eq!(
             of(snapshot).text,
