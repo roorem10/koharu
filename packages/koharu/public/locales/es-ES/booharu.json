@@ -35,7 +35,7 @@
       "description": "Inspecciona y edita la información de este cuadro de texto.",
       "empty": "Vacío",
       "noteLabel": "Nota del cuadro",
-      "noteLocked": "Este cuadro está bloqueado. Desbloquéalo para añadir una nota.",
+      "noteLocked": "Este texto, o una capa que lo contiene, está bloqueado. Quita el bloqueo en Capas para cambiar su nota.",
       "notePlaceholder": "Deja una nota para la próxima revisión…",
       "sections": {
         "actions": "Acciones",

@@ -32,7 +32,7 @@
       "description": "查看搭编辑箇只文字框个信息。",
       "empty": "还呒没",
       "noteLabel": "文字框备注",
-      "noteLocked": "箇只文字框锁牢哉。解锁之后再加备注。",
+      "noteLocked": "箇段文字，或者包含伊个图层锁牢哉。到“图层”里向解锁，再好改备注。",
       "notePlaceholder": "留条备注畀下一趟检查…",
       "sections": {
         "actions": "操作",

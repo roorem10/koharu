@@ -35,7 +35,7 @@
       "description": "Inspecter et modifier les informations de cette zone de texte.",
       "empty": "Vide",
       "noteLabel": "Note de la zone de texte",
-      "noteLocked": "Cette zone de texte est verrouillée. Déverrouillez-la pour ajouter une note.",
+      "noteLocked": "Ce texte, ou un calque qui le contient, est verrouillé. Déverrouillez-le dans le panneau Calques pour modifier sa note.",
       "notePlaceholder": "Laissez une note pour la prochaine relecture…",
       "sections": {
         "actions": "Actions",

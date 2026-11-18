@@ -37,7 +37,8 @@ function notedPage(): Page {
   return page
 }
 
-const lockedReason = 'This box is locked. Unlock it to add a note.'
+const lockedReason =
+  "This text, or a layer it's in, is locked. Unlock it in Layers to change its note."
 
 beforeEach(() => useBoxDetails.setState({ shown: null, reveal: null }))
 

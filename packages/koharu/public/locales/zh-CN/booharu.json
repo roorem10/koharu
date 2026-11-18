@@ -32,7 +32,7 @@
       "description": "查看并编辑此文本框的信息。",
       "empty": "暂无",
       "noteLabel": "文本框备注",
-      "noteLocked": "此文本框已锁定。解锁后才能添加备注。",
+      "noteLocked": "此文本或包含它的图层已锁定。请在“图层”中解锁后再修改备注。",
       "notePlaceholder": "为下一轮检查留下备注…",
       "sections": {
         "actions": "操作",

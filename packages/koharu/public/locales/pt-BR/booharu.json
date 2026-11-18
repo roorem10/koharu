@@ -35,7 +35,7 @@
       "description": "Inspecione e edite as informações desta caixa de texto.",
       "empty": "Vazio",
       "noteLabel": "Nota da caixa",
-      "noteLocked": "Esta caixa está bloqueada. Desbloqueie-a para adicionar uma nota.",
+      "noteLocked": "Este texto, ou uma camada que o contém, está bloqueado. Desbloqueie em Camadas para alterar a nota.",
       "notePlaceholder": "Deixe uma nota para a próxima revisão…",
       "sections": {
         "actions": "Ações",

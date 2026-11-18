@@ -32,7 +32,7 @@
       "description": "Inspect and edit information for this text box.",
       "empty": "Empty",
       "noteLabel": "Box note",
-      "noteLocked": "This box is locked. Unlock it to add a note.",
+      "noteLocked": "This text, or a layer it's in, is locked. Unlock it in Layers to change its note.",
       "notePlaceholder": "Leave a note for the next pass…",
       "sections": {
         "actions": "Actions",

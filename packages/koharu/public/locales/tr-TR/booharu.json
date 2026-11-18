@@ -32,7 +32,7 @@
       "description": "Bu metin kutusunun bilgilerini inceleyin ve düzenleyin.",
       "empty": "Boş",
       "noteLabel": "Kutu notu",
-      "noteLocked": "Bu kutu kilitli. Not eklemek için kilidini açın.",
+      "noteLocked": "Bu metin ya da onu içeren bir katman kilitli. Notunu değiştirmek için Katmanlar panelinde kilidi açın.",
       "notePlaceholder": "Sonraki kontrol için not bırakın…",
       "sections": {
         "actions": "İşlemler",

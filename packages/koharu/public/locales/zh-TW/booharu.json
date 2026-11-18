@@ -32,7 +32,7 @@
       "description": "檢視並編輯此文字框的資訊。",
       "empty": "尚無",
       "noteLabel": "文字框備註",
-      "noteLocked": "此文字框已鎖定。解鎖後才能新增備註。",
+      "noteLocked": "此文字或包含它的圖層已鎖定。請在「圖層」中解鎖後再修改備註。",
       "notePlaceholder": "為下一輪檢查留下備註…",
       "sections": {
         "actions": "操作",
