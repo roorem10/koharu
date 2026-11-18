@@ -232,7 +232,7 @@ impl Screen {
             if let Some(canvas) = &mut main.canvas {
                 canvas.set_booharu(settings.clone());
             }
-            main.settings.booharu = settings;
+            main.booharu = settings;
         });
     }
 
@@ -339,6 +339,9 @@ struct Main {
     viewport: Rect,
     /// What the interface set, for a canvas made later.
     settings: Settings,
+    /// Booharu: Booharu's settings, as the app pushed them last, for a canvas
+    /// made later.
+    booharu: koharu_canvas::booharu::BooharuSettings,
     /// The camera as the interface last heard it.
     camera: Option<Camera>,
     /// Where the selection lies on the page, as the interface last heard it.
@@ -373,15 +376,12 @@ struct Shared {
     pacer: Pacer,
 }
 
-// Booharu: not `Copy`, as Booharu's settings hold a font's name.
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Default)]
 struct Settings {
     tool: Tool,
     brush: Brush,
     colors: Colors,
     story: Story,
-    /// Booharu: Booharu's settings, as the app pushed them last.
-    booharu: koharu_canvas::booharu::BooharuSettings,
 }
 
 impl Main {
@@ -412,19 +412,15 @@ impl Main {
     }
 
     fn set_canvas(&mut self, canvas: Option<Canvas>) {
-        // Booharu: the settings cloned, as they're no longer `Copy`.
-        let (viewport, scale, settings) = (
-            self.physical_viewport(),
-            self.scale(),
-            self.settings.clone(),
-        );
+        let (viewport, scale, settings) = (self.physical_viewport(), self.scale(), self.settings);
+        let booharu = self.booharu.clone(); // Booharu: Booharu's settings, for the new canvas.
         self.canvas = canvas.map(|mut canvas| {
             canvas.set_viewport(viewport, scale);
             canvas.set_tool(settings.tool);
             canvas.set_brush(settings.brush);
             canvas.set_colors(settings.colors);
             canvas.set_story(settings.story);
-            canvas.set_booharu(settings.booharu); // Booharu: and Booharu's settings.
+            canvas.set_booharu(booharu); // Booharu: and Booharu's settings.
             canvas
         });
         if self.canvas.is_none() {
@@ -754,6 +750,7 @@ pub fn open(
         canvas: None,
         viewport: Rect::ZERO,
         settings: Settings::default(),
+        booharu: Default::default(), // Booharu: Koharu's own look until the first push.
         camera: None,
         selection: None,
         area: None,
