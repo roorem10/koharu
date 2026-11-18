@@ -34,6 +34,9 @@ kurbo = { workspace = true }
 parking_lot = { workspace = true }
 petgraph = { workspace = true }
 rayon = { workspace = true }
+# Booharu: the error a translation request gives, whose HTTP status tells a
+# hosted reply koharu-llm already sent again from one worth another try.
+rig-agent = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 specta = { workspace = true }

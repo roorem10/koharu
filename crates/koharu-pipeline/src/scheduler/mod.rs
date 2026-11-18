@@ -92,7 +92,7 @@ pub(crate) struct Scheduler {
     runs: Vec<Run>,
     /// A permit for each page in flight, which its task holds.
     ahead: Arc<Semaphore>,
-    tasks: JoinSet<Result<(), String>>,
+    tasks: JoinSet<Result<(), crate::booharu::Failure>>, // Booharu: with its class.
     running: HashMap<task::Id, Running>,
     conversations: Conversations,
     /// When the models no setting uses leave: `KEEP` after a run last ended.
@@ -177,7 +177,8 @@ impl Scheduler {
         }
     }
 
-    fn done(&mut self, joined: Result<(task::Id, Result<(), String>), JoinError>) {
+    // Booharu: a failure with its class.
+    fn done(&mut self, joined: Result<(task::Id, Result<(), crate::booharu::Failure>), JoinError>) {
         let id = match &joined {
             Ok((id, _)) => *id,
             Err(error) => error.id(),
@@ -188,7 +189,8 @@ impl Scheduler {
             .expect("every task is recorded when it starts");
         let result = match joined {
             Ok((_, result)) => result,
-            Err(error) => Err(format!("{stage} failed: {error}")),
+            // Booharu: with its class.
+            Err(error) => Err(crate::booharu::Failure::panicked(stage, &error)),
         };
         let runs = std::mem::take(&mut self.runs);
         let mut ended = false;
@@ -217,7 +219,8 @@ impl Scheduler {
                     }
                 }
             }
-            Err(reason) => {
+            Err(failure) => {
+                let reason = &failure.reason; // Booharu: the failure's wording.
                 for run in runs {
                     if jobs.iter().any(|&(id, _)| id == run.id) {
                         ended = true;

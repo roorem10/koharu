@@ -11,14 +11,23 @@
 //!   translation the default look and records what the stage wrote, and
 //!   `given_back` records a translation it cleared, given back unchanged.
 //! - `recognized`, in the Recognition stage, records the wording it read.
+//! - `Failure`, from `stages::run`, is a stage task's failure as the run
+//!   reports it, with the class the run policy goes by, which the scheduler's
+//!   `booharu` module follows: another try, the page given up on, or the run
+//!   ended.
 
 use booharu_core::{
     runs::{RunPolicy, RunStage},
     settings::Snapshot,
     styles,
 };
+use koharu_llm::rig::{
+    error::{ErrorReport, ProviderError},
+    http_client,
+};
 use koharu_renderer::RendererConfig;
 use koharu_scene::{LayerId, Op, PageId, Project};
+use rig_agent::run::PromptError;
 use serde::Serialize;
 
 use crate::{PipelineConfig, Stage};
@@ -116,6 +125,95 @@ pub(crate) fn given_back(project: &Project, block: LayerId) -> anyhow::Result<Op
 /// `block`, in its hand-edit record, which keeps its other parts.
 pub(crate) fn recognized(project: &Project, block: LayerId, text: &str) -> anyhow::Result<Op> {
     styles::recognized(project.layer(block)?, text)
+}
+
+/// A stage task's failure: the reason its run reports, as Koharu words it,
+/// and what kind of failure it was, read from the error before it was worded,
+/// which the run policy goes by.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Failure {
+    pub(crate) reason: String,
+    pub(crate) class: Class,
+}
+
+/// What kind of failure a stage's was, as the run policy treats it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Class {
+    /// The page's input is invalid, as a translation's placement finds it,
+    /// or the project refused the page's edit, naming a layer that's gone or
+    /// locked: another try fails the same way.
+    Invalid,
+    /// The project couldn't be read, written, or saved: the run ends, whatever
+    /// its policy.
+    Write,
+    /// A model couldn't load: another try, with nothing freed meanwhile, fails
+    /// the same way.
+    Load,
+    /// A hosted model's rate limit or server error, which koharu-llm already
+    /// sent three more times, so another page try would send it four more.
+    HostedRetried,
+    /// Anything else, which another try may get past: a dropped connection,
+    /// an answer broken, blank, or short of a text, or a model's own error.
+    Retryable,
+}
+
+impl Failure {
+    /// A stage task that panicked, worded as Koharu words it, which another
+    /// try may get past as it may a model's own error.
+    pub(crate) fn panicked(stage: Stage, error: &tokio::task::JoinError) -> Self {
+        Self {
+            reason: format!("{stage} failed: {error}"),
+            class: Class::Retryable,
+        }
+    }
+}
+
+/// The class of `error`, a stage's, read from the first cause in its chain
+/// that says: Koharu's own invalid request, scene, and load errors, a scene
+/// error from the session, then the HTTP status of a hosted model's reply,
+/// however rig carries it; anything else is worth another try.
+pub(crate) fn class(error: &anyhow::Error) -> Class {
+    for cause in error.chain() {
+        match cause.downcast_ref::<crate::Error>() {
+            Some(crate::Error::Invalid(_)) => return Class::Invalid,
+            Some(crate::Error::Scene(error)) => return scene(error),
+            Some(crate::Error::Load { .. }) => return Class::Load,
+            Some(crate::Error::Stage { .. }) | None => {}
+        }
+        if let Some(error) = cause.downcast_ref::<koharu_scene::Error>() {
+            return scene(error);
+        }
+        let status = if let Some(error) = cause.downcast_ref::<PromptError>() {
+            error.provider_response_status()
+        } else if let Some(error) = cause.downcast_ref::<ProviderError>() {
+            error.provider_response_status()
+        } else if let Some(report) = cause.downcast_ref::<ErrorReport>() {
+            report.provider_response_status()
+        } else if let Some(http_client::Error::InvalidStatusCodeWithDetails { status, .. }) =
+            cause.downcast_ref::<http_client::Error>()
+        {
+            Some(*status)
+        } else {
+            None
+        };
+        // What koharu-llm's client sends again: a 429 or a 5xx.
+        if status.is_some_and(|status| status.as_u16() == 429 || status.is_server_error()) {
+            return Class::HostedRetried;
+        }
+    }
+    Class::Retryable
+}
+
+/// The class of a scene error: an edit the project refused, one naming a
+/// layer that's gone or locked, or wrong in itself, is the page's own, and
+/// the run can go on without the page; any other, a file or database error
+/// or a project that can't be opened, leaves every page unwritten.
+fn scene(error: &koharu_scene::Error) -> Class {
+    use koharu_scene::Error::{Invalid, Locked, NotFound, Rejected};
+    match error {
+        NotFound(_) | Invalid { .. } | Locked { .. } | Rejected(_) => Class::Invalid,
+        _ => Class::Write,
+    }
 }
 
 #[cfg(test)]
@@ -520,5 +618,87 @@ mod tests {
         assert_eq!(edited(&layer), Edited::default());
         assert_eq!(Auto::of(&layer).text, Some(text_hash("Why?")));
         Ok(())
+    }
+
+    #[test]
+    fn a_stage_failure_is_classed_by_what_another_try_could_do() {
+        use koharu_llm::rig::{
+            error::ErrorKind,
+            http_client::{HeaderMap, StatusCode},
+        };
+
+        let report = |status: u16| {
+            PromptError::Report(
+                ErrorReport::new(ErrorKind::ProviderResponse, "the server is busy")
+                    .with_http_status(status),
+            )
+        };
+        let replied = |status: StatusCode| http_client::Error::InvalidStatusCodeWithDetails {
+            status,
+            body: "slow down".to_owned(),
+            headers: HeaderMap::new(),
+        };
+        let load = crate::Error::Load {
+            model: "lama-manga".to_owned(),
+            device: "CUDA".to_owned(),
+            free: bytesize::ByteSize(0),
+            reserved: bytesize::ByteSize(0),
+            active: bytesize::ByteSize(0),
+            source: anyhow::anyhow!("out of memory"),
+        };
+        let full = || koharu_scene::Error::Io(std::io::Error::other("the disk is full"));
+        let locked = koharu_scene::Error::Locked {
+            op: 2,
+            layer: "01a1ee94-9e1f-7088-bee4-f54661aa2bd2"
+                .parse()
+                .expect("an id"),
+        };
+        let cases: Vec<(anyhow::Error, Class)> = vec![
+            (
+                crate::Error::invalid("a balloon's outline isn't a path").into(),
+                Class::Invalid,
+            ),
+            // The page's edit, refused.
+            (locked.into(), Class::Invalid),
+            (
+                koharu_scene::Error::NotFound("layer 01a1".to_owned()).into(),
+                Class::Invalid,
+            ),
+            // The project, unwritten.
+            (full().into(), Class::Write),
+            (
+                anyhow::Error::from(crate::Error::Scene(full()))
+                    .context("the page couldn't be written"),
+                Class::Write,
+            ),
+            (load.into(), Class::Load),
+            // A rate limit or a server error koharu-llm's client sent again,
+            // however rig carries it.
+            (report(503).into(), Class::HostedRetried),
+            (report(429).into(), Class::HostedRetried),
+            (
+                anyhow::Error::from(ProviderError::from(replied(StatusCode::BAD_GATEWAY)))
+                    .context("couldn't summarize the conversation"),
+                Class::HostedRetried,
+            ),
+            (
+                replied(StatusCode::TOO_MANY_REQUESTS).into(),
+                Class::HostedRetried,
+            ),
+            // What the client doesn't send again is worth a page try.
+            (report(408).into(), Class::Retryable),
+            (report(400).into(), Class::Retryable),
+            (
+                PromptError::Report(ErrorReport::new(ErrorKind::Http, "connection reset")).into(),
+                Class::Retryable,
+            ),
+            (
+                anyhow::anyhow!("the answer leaves text 2 blank"),
+                Class::Retryable,
+            ),
+        ];
+        for (error, expected) in cases {
+            assert_eq!(class(&error), expected, "{error:#}");
+        }
     }
 }

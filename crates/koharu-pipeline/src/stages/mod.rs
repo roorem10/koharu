@@ -185,7 +185,8 @@ pub(crate) struct Inputs {
 }
 
 /// Runs `task`'s stage: its failure, if any, as the run reports it.
-pub(crate) async fn run(task: Task, inputs: Inputs) -> Result<(), String> {
+// Booharu: with the class the run policy goes by.
+pub(crate) async fn run(task: Task, inputs: Inputs) -> Result<(), crate::booharu::Failure> {
     let stage = task.stage;
     let config = &inputs.config;
     let result = match stage {
@@ -201,11 +202,16 @@ pub(crate) async fn run(task: Task, inputs: Inputs) -> Result<(), String> {
     };
     match result {
         Err(error) if !error.is::<Stopped>() => {
+            let class = crate::booharu::class(&error); // Booharu: read before it's worded.
             let error = anyhow::Error::from(Error::Stage {
                 stage,
                 source: error,
             });
-            Err(format!("{error:#}"))
+            // Booharu: with its class.
+            Err(crate::booharu::Failure {
+                reason: format!("{error:#}"),
+                class,
+            })
         }
         _ => Ok(()),
     }
