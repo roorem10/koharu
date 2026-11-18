@@ -151,6 +151,8 @@ async fn main() -> Result<()> {
                 break;
             }
             Event::Queued { .. } | Event::Ended { .. } => {}
+            // Booharu: told again in how the run ended.
+            Event::Retrying { .. } | Event::PageFailed { .. } => {}
         }
     }
 

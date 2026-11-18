@@ -18,7 +18,8 @@ use booharu_core::{
     styles,
 };
 use koharu_renderer::RendererConfig;
-use koharu_scene::{LayerId, Op, Project};
+use koharu_scene::{LayerId, Op, PageId, Project};
+use serde::Serialize;
 
 use crate::{PipelineConfig, Stage};
 
@@ -45,6 +46,16 @@ fn snapshot(
         runs: Some(policy.map_err(invalid)?),
         ..read
     })
+}
+
+/// A page a run gave up on while it went on with its other pages, as
+/// `Outcome::DoneWithProblems` lists it: the stage that failed every try it
+/// had, and why.
+#[derive(Clone, Debug, PartialEq, Serialize, specta::Type)]
+pub struct PageFailure {
+    pub page: PageId,
+    pub stage: Stage,
+    pub reason: String,
 }
 
 // A preset's stage is a stage of Koharu's, by the same name.
@@ -109,7 +120,7 @@ pub(crate) fn recognized(project: &Project, block: LayerId, text: &str) -> anyho
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
     use anyhow::{Context as _, Result};
     use booharu_core::{
@@ -122,10 +133,11 @@ mod tests {
     };
     use icu_locale_core::langid;
     use koharu_scene::{CharStyle, Content, Created, Edit, Layer, Rgba, Session, Text};
+    use parking_lot::Mutex;
     use serde_json::json;
 
     use super::*;
-    use crate::{TranslatorConfig, stages::translate::written};
+    use crate::{Event, Pipeline, Request, Target, TranslatorConfig, stages::translate::written};
 
     const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
     const WHITE: Rgba = Rgba([1.0; 4]);
@@ -306,6 +318,40 @@ mod tests {
         // A config a caller made, as upstream's tests and examples make one,
         // runs Koharu's way.
         assert_eq!(PipelineConfig::default().booharu.runs, None);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn a_run_tells_its_stages_and_whether_it_works_on_pages() -> Result<()> {
+        // A page with no scan, so no stage here loads a model.
+        let Page {
+            _dir: _held,
+            session,
+            blocks,
+        } = Page::new(&[("a", "text")])?;
+        let session = Arc::new(Mutex::new(session));
+        let pipeline = Pipeline::new(PipelineConfig::default());
+        let queued = async |target: Target, stages: &[Stage]| -> Result<(Vec<Stage>, bool)> {
+            let request = Request {
+                target,
+                stages: stages.iter().copied().collect(),
+                config: None,
+            };
+            let run = pipeline.run(Arc::clone(&session), request)?;
+            let told = pipeline.history(run, Duration::from_secs(5)).await?;
+            match told.first() {
+                Some(Event::Queued { stages, pages, .. }) => Ok((stages.clone(), *pages)),
+                other => anyhow::bail!("the run's first event is {other:?}"),
+            }
+        };
+        assert_eq!(
+            queued(Target::Project, &[Stage::Inpaint, Stage::Detect]).await?,
+            (vec![Stage::Detect, Stage::Inpaint], true)
+        );
+        assert_eq!(
+            queued(Target::Blocks(vec![blocks["a"]]), &[Stage::Recognize]).await?,
+            (vec![Stage::Recognize], false)
+        );
         Ok(())
     }
 

@@ -42,6 +42,12 @@ pub enum Event {
     Queued {
         run: RunId,
         steps: usize,
+        /// Booharu: the stages it runs, in stage order, so a page that failed
+        /// can be run again from its failed stage through the later ones.
+        stages: Vec<Stage>,
+        /// Booharu: whether it works on pages, the project's or some, rather
+        /// than on blocks or an area, so only a run over pages chimes.
+        pages: bool,
     },
     Started {
         run: RunId,
@@ -57,6 +63,23 @@ pub enum Event {
         run: RunId,
         outcome: Outcome,
     },
+    /// Booharu: a page stage failed and waits to be tried again: `attempt`
+    /// is the try it waits for, counting its first as 1, of `attempts`.
+    Retrying {
+        run: RunId,
+        page: PageId,
+        stage: Stage,
+        attempt: u32,
+        attempts: u32,
+    },
+    /// Booharu: a page failed at `stage` once its tries were used up, and the
+    /// run goes on with its other pages.
+    PageFailed {
+        run: RunId,
+        page: PageId,
+        stage: Stage,
+        reason: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, specta::Type)]
@@ -70,6 +93,10 @@ pub enum Outcome {
         reason: String,
     },
     Stopped,
+    /// Booharu: the run finished every page it could; these pages failed.
+    DoneWithProblems {
+        failures: Vec<crate::booharu::PageFailure>,
+    },
 }
 
 /// Where events go: every run's history and spans, then whoever listens.
@@ -107,13 +134,17 @@ impl Events {
         let (Event::Queued { run, .. }
         | Event::Started { run, .. }
         | Event::Finished { run, .. }
-        | Event::Ended { run, .. }) = &event;
+        | Event::Ended { run, .. }
+        // Booharu: a page stage tried again, and a page given up on.
+        | Event::Retrying { run, .. }
+        | Event::PageFailed { run, .. }) = &event;
         {
             let mut runs = self.runs.lock();
             let record = runs.entry(*run).or_insert_with(Record::new);
             match &event {
                 // Sent by `Pipeline::run`, on its caller's thread.
-                Event::Queued { run, steps } => {
+                Event::Queued { run, steps, .. } => {
+                    // Booharu: `..` passes over Booharu's fields.
                     record.span = Some(info_span!(
                         "pipeline run",
                         sentry.op = "pipeline.run",
@@ -137,6 +168,11 @@ impl Events {
                 Event::Finished { page, stage, .. } => {
                     record.stages.remove(&(*page, *stage));
                 }
+                // Booharu: a page stage waiting to be tried again, or given
+                // up on, isn't running; a retry starts it again.
+                Event::Retrying { page, stage, .. } | Event::PageFailed { page, stage, .. } => {
+                    record.stages.remove(&(*page, *stage));
+                }
                 Event::Ended { outcome, .. } => {
                     record.ended.send_replace(true);
                     // A failed or stopped run leaves stages it never finished.
@@ -148,6 +184,8 @@ impl Events {
                                 Outcome::Done => "done",
                                 Outcome::Failed { .. } => "failed",
                                 Outcome::Stopped => "stopped",
+                                // Booharu: finished with failed pages.
+                                Outcome::DoneWithProblems { .. } => "done_with_problems",
                             },
                         );
                     }

@@ -72,6 +72,12 @@ impl Pipeline {
         self.0.events.send(Event::Queued {
             run: id,
             steps: plan.pages() * request.stages.len(),
+            // Booharu: its stages, and whether it works on pages.
+            stages: request.stages.iter().copied().collect(),
+            pages: matches!(
+                request.target,
+                crate::Target::Project | crate::Target::Pages(_)
+            ),
         });
         let run = Run::new(id, session, project.id(), config, plan, &request.stages);
         self.send(Command::Run(run));
