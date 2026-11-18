@@ -6,9 +6,10 @@
 //!
 //! [`BooharuPreferences`] holds every section, keyed by its table's name as
 //! Koharu's `Preferences` keys its own: the desktop's settings commands read
-//! and save it whole, and the settings tool reaches one section by its name.
+//! and save it whole, and the settings tool changes one section by its name,
+//! saving that section alone.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{anyhow, bail};
 use koharu_config::Section;
@@ -321,12 +322,64 @@ impl BooharuPreferences {
         Ok(())
     }
 
+    /// Sets each key `values` names in the section named `name`, as
+    /// [`set_section`](Self::set_section) does, in the section as the file
+    /// holds it, and saves that section alone, in one read and write of it
+    /// under the settings file's lock: what another writer saved meanwhile,
+    /// such as a font's star, stays. Answers every section as the file holds
+    /// them then. An unknown section or key, or a bad value, stored or given,
+    /// writes nothing.
+    pub fn save_section(name: &str, values: Map<String, Value>) -> anyhow::Result<Self> {
+        let save = saver(name).ok_or_else(|| unknown(name))?;
+        // Every section is read and checked first, as `save` does.
+        Self::get()?;
+        save(values)?;
+        Self::get()
+    }
+
     /// Fails on a value its section doesn't take, as reading it from the
     /// file would.
     fn check(&self) -> anyhow::Result<()> {
         serde_json::from_value::<Self>(serde_json::to_value(self)?)?;
         Ok(())
     }
+}
+
+/// The save of each section alone, by its table's name, as
+/// [`BooharuPreferences::save_section`] makes it.
+type Saver = fn(Map<String, Value>) -> anyhow::Result<()>;
+
+/// How the section named `name` is saved alone; none for a name Booharu has
+/// no section of.
+fn saver(name: &str) -> Option<Saver> {
+    let savers: [(&str, Saver); 4] = [
+        (McpSettings::NAME, saved::<McpSettings>),
+        (OcrBoxSettings::NAME, saved::<OcrBoxSettings>),
+        (LetteringSettings::NAME, saved::<LetteringSettings>),
+        (FontSettings::NAME, saved::<FontSettings>),
+    ];
+    savers
+        .into_iter()
+        .find_map(|(section, save)| (section == name).then_some(save))
+}
+
+/// Sets each key `values` names in the section `S` as the file holds it, as
+/// [`merged`] sets them, and writes it, in one read and write under the
+/// settings file's lock. A bad value writes nothing.
+fn saved<S: Section>(values: Map<String, Value>) -> anyhow::Result<()> {
+    let mut outcome = Ok(());
+    koharu_config::update(|section: &mut S| {
+        let held = tables(&BTreeMap::from([(S::NAME, &*section)]));
+        match merged::<BTreeMap<String, S>>(held, S::NAME, values) {
+            Ok(mut merged) => {
+                if let Some(merged) = merged.remove(S::NAME) {
+                    *section = merged;
+                }
+            }
+            Err(error) => outcome = Err(error),
+        }
+    })?;
+    outcome
 }
 
 /// `tables`, sections as JSON keyed by their tables' names, with each key
@@ -626,6 +679,14 @@ mod tests {
         // Koharu's own: no font, and the colours Koharu gives kept.
         let default = Snapshot::default();
         assert!(default.lettering.detect_colors && default.font.is_none());
+    }
+
+    #[test]
+    fn every_section_is_saved_alone_by_its_name() {
+        for name in BooharuPreferences::names() {
+            assert!(saver(&name).is_some(), "[{name}] can't be saved alone");
+        }
+        assert!(saver("booharu-nope").is_none());
     }
 
     #[test]

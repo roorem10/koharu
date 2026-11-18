@@ -93,8 +93,8 @@ impl Tool for SetSettings {
 
     fn description(&self) -> String {
         "Change keys of one of Booharu's settings sections, named as booharu_get_settings names \
-         them, and save it; an unknown section or key, a key inside one of its tables \
-         included, or an invalid value, saves nothing. \
+         them, and save that section alone; an unknown section or key, a key inside one of its \
+         tables included, or an invalid value, saves nothing. \
          Answers the section as saved, with a note when the change applies only once Booharu \
          restarts. A change to `booharu-lettering` applies to text made from then on, never to \
          translations already made: booharu_apply_text_style gives those the new look. A call \
@@ -122,9 +122,7 @@ impl Tool for SetSettings {
         let host = host(context)?;
         let SetSettingsArgs { section, values } = args;
         tokio::task::spawn_blocking(move || -> anyhow::Result<Saved> {
-            let mut preferences = host.preferences()?;
-            preferences.set_section(&section, values)?;
-            let saved = host.save_preferences(preferences)?.section(&section)?;
+            let saved = host.save_section(&section, values)?.section(&section)?;
             let note = BooharuPreferences::read_at_launch(&section).then_some(
                 "Booharu reads this section as it starts: the change applies once it restarts.",
             );
@@ -169,10 +167,13 @@ mod tests {
             Ok(self.0.lock().clone())
         }
 
-        fn save_preferences(
+        fn save_section(
             &self,
-            preferences: BooharuPreferences,
+            name: &str,
+            values: Map<String, Value>,
         ) -> anyhow::Result<BooharuPreferences> {
+            let mut preferences = self.preferences()?;
+            preferences.set_section(name, values)?;
             *self.0.lock() = serde_json::from_value(serde_json::to_value(preferences)?)?;
             self.preferences()
         }

@@ -10,7 +10,7 @@
 //! |---|---|---|
 //! | `booharu_get_project_overview` | each page's size and blocks, how many are translated, the Booharu attributes on its layers, and which parts of its blocks were changed by hand; the translator's settings and whether its vendor is connected, the typesetting defaults, the font families, the look new text gets, and Booharu's settings | yes |
 //! | `booharu_get_settings` | every Booharu settings section, by its table name | yes |
-//! | `booharu_set_settings` | changes keys of one section, saved whole or not at all; an outside app can't change `booharu-mcp` | no |
+//! | `booharu_set_settings` | changes keys of one section and saves that section alone, all of them or none; an outside app can't change `booharu-mcp` | no |
 //! | `booharu_set_translation` | sets a block's translation, placing it first as the Translation stage does when the block has none, as one undo step | no |
 //! | `booharu_add_text_box` | adds a text block over a box the automatic run missed, as the O tool does, and starts the run reading it, and as its mode says translating and cleaning it | no |
 //! | `booharu_find_split_balloons` | the balloons whose text is split over two or more text blocks, on a page or every page | yes |
@@ -35,6 +35,7 @@ use koharu_pipeline::{Request, RunId, Stage, Target};
 use koharu_scene::{Change, Edit, LayerId, Session};
 use rig_agent::tool::ToolSet;
 use rig_core::tool::ToolExecutionError;
+use serde_json::{Map, Value};
 
 use super::{Tools, failed};
 
@@ -46,11 +47,15 @@ pub trait BooharuHost: Send + Sync {
     /// value is an error.
     fn preferences(&self) -> anyhow::Result<BooharuPreferences>;
 
-    /// Saves every Booharu settings section, or none when one holds a bad
-    /// value, and answers them as the file holds them now.
-    fn save_preferences(
+    /// Sets each key `values` names in the Booharu settings section named
+    /// `name` and saves that section alone, as
+    /// `BooharuPreferences::save_section` does, so whatever another writer
+    /// saved meanwhile stays; nothing when a section, key or value is bad.
+    /// Answers every section as the file holds them then.
+    fn save_section(
         &self,
-        preferences: BooharuPreferences,
+        name: &str,
+        values: Map<String, Value>,
     ) -> anyhow::Result<BooharuPreferences>;
 }
 

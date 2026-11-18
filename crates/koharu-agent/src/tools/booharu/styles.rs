@@ -181,7 +181,11 @@ mod tests {
             Ok(preferences)
         }
 
-        fn save_preferences(&self, _: BooharuPreferences) -> anyhow::Result<BooharuPreferences> {
+        fn save_section(
+            &self,
+            _: &str,
+            _: serde_json::Map<String, Value>,
+        ) -> anyhow::Result<BooharuPreferences> {
             anyhow::bail!("nothing here saves settings")
         }
     }

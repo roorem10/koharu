@@ -57,11 +57,12 @@ impl BooharuHost for DesktopHost {
         BooharuPreferences::get()
     }
 
-    fn save_preferences(
+    fn save_section(
         &self,
-        preferences: BooharuPreferences,
+        name: &str,
+        values: serde_json::Map<String, serde_json::Value>,
     ) -> anyhow::Result<BooharuPreferences> {
-        let saved = preferences.save()?;
+        let saved = BooharuPreferences::save_section(name, values)?;
         canvas::push(&self.0);
         Ok(saved)
     }
