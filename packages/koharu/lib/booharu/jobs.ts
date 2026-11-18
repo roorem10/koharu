@@ -1,7 +1,8 @@
 'use client'
 
+import { chime } from '@/lib/booharu/chime'
 import { projectKey, queryClient, type ProjectView } from '@/lib/queries'
-import type { Job } from '@/lib/store'
+import { useKoharuStore, type Job } from '@/lib/store'
 import type { Outcome, PageFailure, PageId, PipelineEvent, Stage } from '@koharu/ipc/protocol'
 
 // lib/store.ts imports this module, which reaches the store again through its own imports: safe, as
@@ -87,6 +88,14 @@ function failuresAtEnd(failures: PageFailure[], outcome: Outcome): PageFailure[]
     default:
       return failures
   }
+}
+
+/** What follows `event` as it's told, after its fold, which a run told again as the editor loads
+ * doesn't get: a run that ended chimes, as lib/booharu/chime.ts says. */
+export function toldLive(event: PipelineEvent): void {
+  if (event.kind !== 'ended') return
+  const job = useKoharuStore.getState().jobs[String(event.run)]
+  if (job) chime(job, event.outcome)
 }
 
 /** The open project's name, as the editor last read it; null while none is known. */

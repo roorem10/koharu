@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 
-import { foldRun, type RunRecord } from '@/lib/booharu/jobs' // Booharu: its record of runs.
+import { foldRun, toldLive, type RunRecord } from '@/lib/booharu/jobs' // Booharu: its record of runs.
 import type {
   Bounds,
   LayerId,
@@ -182,6 +182,7 @@ export function receivePipeline(event: PipelineEvent): void {
   useKoharuStore.setState((state) => ({
     jobs: { ...state.jobs, [String(event.run)]: fold(state.jobs[String(event.run)], event) },
   }))
+  toldLive(event) // Booharu: a run that ended chimes, as its settings say.
 }
 
 // Booharu: its record of the run, which its own fold keeps after Koharu's.

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { TFunction } from 'i18next'
 import { useCallback, useRef, useState } from 'react'
 
+import { prepareFinishSound } from '@/components/booharu/runs/sound'
 import {
   booharuPreferencesKey,
   booharuPreferencesQuery,
@@ -199,7 +200,21 @@ export function useRunPresets(): RunPreset[] | undefined {
   return useQuery({ ...booharuPreferencesQuery, select: selectPresets, retryOnMount: false }).data
 }
 
-/** Switches the Run menu's stages to `preset`'s, in the order they run, and starts nothing. */
+/** Switches the Run menu's stages to `preset`'s, in the order they run, and starts nothing. The
+ * click readies the finish chime, for the run it sets up. */
 export function applyPreset(preset: RunPreset): void {
+  prepareFinishSound()
   useKoharuStore.getState().setProcessingStages(inStageOrder(preset.stages))
+}
+
+/** Whether a run over pages chimes as it ends: the finish sound as the last read or save of the
+ * Booharu settings left it, or as the file holds it while nothing has read them. A read that fails
+ * shows its error as every failed command's does, and leaves the chime silent. */
+export async function finishSoundOn(): Promise<boolean> {
+  try {
+    const preferences = await queryClient.fetchQuery(booharuPreferencesQuery)
+    return complete(preferences['booharu-runs']).finish_sound
+  } catch {
+    return false
+  }
 }
