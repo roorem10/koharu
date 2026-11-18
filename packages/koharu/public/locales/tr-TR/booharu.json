@@ -27,6 +27,21 @@
       "split": "Böl",
       "translate": "Yeniden çevir"
     },
+    "details": {
+      "close": "Kapat",
+      "description": "Bu metin kutusunun bilgilerini inceleyin ve düzenleyin.",
+      "empty": "Boş",
+      "sections": {
+        "actions": "İşlemler",
+        "source": "Kaynak metin ve çeviri"
+      },
+      "showInStory": "Hikâye’de göster",
+      "source": "Kaynak metin",
+      "text": "Metin",
+      "title": "Kutu ayrıntıları",
+      "titleFor": "{{name}} için kutu ayrıntıları",
+      "translation": "Çeviri"
+    },
     "menu": {
       "booharuGithub": "GitHub'da Booharu",
       "koharuDiscord": "Koharu Discord",

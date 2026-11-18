@@ -30,6 +30,21 @@
       "split": "Diviser",
       "translate": "Retraduire"
     },
+    "details": {
+      "close": "Fermer",
+      "description": "Inspecter et modifier les informations de cette zone de texte.",
+      "empty": "Vide",
+      "sections": {
+        "actions": "Actions",
+        "source": "Texte source et traduction"
+      },
+      "showInStory": "Afficher dans l’onglet Histoire",
+      "source": "Texte source",
+      "text": "Texte",
+      "title": "Détails de la zone de texte",
+      "titleFor": "Détails de la zone de texte pour {{name}}",
+      "translation": "Traduction"
+    },
     "menu": {
       "booharuGithub": "Booharu sur GitHub",
       "koharuDiscord": "Discord de Koharu",

@@ -27,6 +27,21 @@
       "split": "Split",
       "translate": "Translate again"
     },
+    "details": {
+      "close": "Close",
+      "description": "Inspect and edit information for this text box.",
+      "empty": "Empty",
+      "sections": {
+        "actions": "Actions",
+        "source": "Source & translation"
+      },
+      "showInStory": "Show in Story",
+      "source": "Source text",
+      "text": "Text",
+      "title": "Box details",
+      "titleFor": "Box details for {{name}}",
+      "translation": "Translation"
+    },
     "menu": {
       "booharuGithub": "Booharu on GitHub",
       "koharuDiscord": "Koharu Discord",

@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { boxActions, selectedBoxes, type BoxSelection } from '@/lib/booharu/boxActions'
+import { useBoxDetails } from '@/lib/booharu/boxDetails'
 import { useKoharuStore } from '@/lib/store'
 
 import { boxesPage, desktop } from './boxes'
@@ -28,8 +29,11 @@ const none = {
   clean: false,
   join: false,
   split: false,
+  details: false,
 }
 const runs = { read: true, translate: true, clean: true }
+
+beforeEach(() => useBoxDetails.setState({ shown: null, reveal: null }))
 
 describe('Booharu box actions', () => {
   it('takes a selected mask or clean-up for its block, and leaves other layers out', () => {
@@ -45,23 +49,23 @@ describe('Booharu box actions', () => {
 
   it('enables each action only for a selection it can act on', () => {
     // A text block in a balloon with another: all of them.
-    expect(enabled(['first'])).toEqual({ ...runs, join: true, split: true })
+    expect(enabled(['first'])).toEqual({ ...runs, join: true, split: true, details: true })
     // Its part stands for it.
     expect(enabled(['second-mask'])).toEqual(enabled(['second']))
     // Several blocks: the runs only.
     expect(enabled(['first', 'free'])).toEqual({ ...none, ...runs })
-    // A text layer: none, and a text layer beside a block leaves the runs to it.
-    expect(enabled(['caption'])).toEqual(none)
+    // A text layer: Box details only, and a text layer beside a block leaves the runs to it.
+    expect(enabled(['caption'])).toEqual({ ...none, details: true })
     expect(enabled(['caption', 'free'])).toEqual({ ...none, ...runs })
     // A locked block, or one in a locked balloon, or a locked one among others: no change at all.
-    expect(enabled(['locked'])).toEqual(none)
-    expect(enabled(['held-first'])).toEqual(none)
+    expect(enabled(['locked'])).toEqual({ ...none, details: true })
+    expect(enabled(['held-first'])).toEqual({ ...none, details: true })
     expect(enabled(['free', 'locked'])).toEqual(none)
     // A balloon with one text block, or a block in none, has nothing to join with.
-    expect(enabled(['alone'])).toEqual({ ...runs, join: false, split: true })
-    expect(enabled(['free'])).toEqual({ ...runs, join: false, split: true })
+    expect(enabled(['alone'])).toEqual({ ...runs, join: false, split: true, details: true })
+    expect(enabled(['free'])).toEqual({ ...runs, join: false, split: true, details: true })
     // A sound effect is neither joined nor split.
-    expect(enabled(['bang'])).toEqual({ ...runs, join: false, split: false })
+    expect(enabled(['bang'])).toEqual({ ...runs, join: false, split: false, details: true })
     expect(enabled([])).toEqual(none)
   })
 
@@ -94,5 +98,8 @@ describe('Booharu box actions', () => {
     await run('join', ['second'])
     expect(join).toHaveBeenCalledWith('second')
     expect(useKoharuStore.getState().selectedLayers).toEqual(['first', 'free'])
+
+    await run('details', ['caption'])
+    expect(useBoxDetails.getState().shown).toEqual({ page: 'page', layer: 'caption' })
   })
 })

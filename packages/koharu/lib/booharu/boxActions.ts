@@ -1,6 +1,7 @@
 'use client'
 
 import { call } from '@/lib/backend'
+import { openBoxDetails } from '@/lib/booharu/boxDetails'
 import {
   findLayer,
   findPart,
@@ -57,7 +58,7 @@ export function balloonTexts(balloon: Layer): BlockLayer[] {
   )
 }
 
-/** One per-box action, listed once for the Story row menu and the Edit menu alike:
+/** One per-box action, listed once for the Story row menu, the Edit menu and Box details alike:
  * its name, when it can act on a selection, and what it does. */
 export interface BoxAction {
   id: string
@@ -175,6 +176,15 @@ export const boxActions: readonly BoxAction[] = [
     run: async (selection) => {
       const block = splitting(selection)
       if (block) await call(commands.booharuSplitBlock, block.id)
+    },
+  },
+  {
+    id: 'details',
+    label: 'booharu.details.title',
+    enabled: (selection) => only(selection) !== null,
+    run: async (selection) => {
+      const box = only(selection)
+      if (box) openBoxDetails(selection.page, box.layer.id)
     },
   },
 ]

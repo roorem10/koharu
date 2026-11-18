@@ -97,6 +97,7 @@ export function desktop() {
     findSplit: vi
       .spyOn(commands, 'booharuFindSplitBalloons')
       .mockResolvedValue([{ page: 'page', balloon: 'split', blocks: ['first', 'second'] }]),
+    show: vi.spyOn(commands, 'show').mockResolvedValue(null),
   }
 }
 

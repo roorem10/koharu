@@ -31,6 +31,21 @@
       "split": "Разделить",
       "translate": "Перевести заново"
     },
+    "details": {
+      "close": "Закрыть",
+      "description": "Просматривайте и изменяйте сведения об этом текстовом блоке.",
+      "empty": "Пусто",
+      "sections": {
+        "actions": "Действия",
+        "source": "Исходный текст и перевод"
+      },
+      "showInStory": "Показать во вкладке «Сценарий»",
+      "source": "Исходный текст",
+      "text": "Текст",
+      "title": "Сведения о блоке",
+      "titleFor": "Сведения о блоке {{name}}",
+      "translation": "Перевод"
+    },
     "menu": {
       "booharuGithub": "Booharu на GitHub",
       "koharuDiscord": "Discord Koharu",

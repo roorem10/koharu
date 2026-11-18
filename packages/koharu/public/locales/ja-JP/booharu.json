@@ -27,6 +27,21 @@
       "split": "分割",
       "translate": "再翻訳"
     },
+    "details": {
+      "close": "閉じる",
+      "description": "このテキストボックスの情報を確認・編集します。",
+      "empty": "なし",
+      "sections": {
+        "actions": "操作",
+        "source": "原文と翻訳"
+      },
+      "showInStory": "ストーリーで表示",
+      "source": "原文",
+      "text": "テキスト",
+      "title": "ボックス詳細",
+      "titleFor": "{{name}}のボックス詳細",
+      "translation": "翻訳"
+    },
     "menu": {
       "booharuGithub": "GitHub の Booharu",
       "koharuDiscord": "Koharu の Discord",

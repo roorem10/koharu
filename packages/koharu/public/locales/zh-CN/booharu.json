@@ -27,6 +27,21 @@
       "split": "拆分",
       "translate": "重新翻译"
     },
+    "details": {
+      "close": "关闭",
+      "description": "查看并编辑此文本框的信息。",
+      "empty": "暂无",
+      "sections": {
+        "actions": "操作",
+        "source": "原文与译文"
+      },
+      "showInStory": "在故事中显示",
+      "source": "原文",
+      "text": "文本",
+      "title": "文本框详情",
+      "titleFor": "{{name}} 的文本框详情",
+      "translation": "译文"
+    },
     "menu": {
       "booharuGithub": "GitHub 上的 Booharu",
       "koharuDiscord": "Koharu 的 Discord",

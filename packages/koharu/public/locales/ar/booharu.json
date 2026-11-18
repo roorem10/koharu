@@ -33,6 +33,21 @@
       "split": "تقسيم",
       "translate": "إعادة الترجمة"
     },
+    "details": {
+      "close": "إغلاق",
+      "description": "فحص معلومات مربع النص هذا وتعديلها.",
+      "empty": "فارغ",
+      "sections": {
+        "actions": "الإجراءات",
+        "source": "النص المصدر والترجمة"
+      },
+      "showInStory": "عرض في القصة",
+      "source": "النص المصدر",
+      "text": "نص",
+      "title": "تفاصيل المربع",
+      "titleFor": "تفاصيل المربع لـ {{name}}",
+      "translation": "الترجمة"
+    },
     "menu": {
       "booharuGithub": "Booharu على GitHub",
       "koharuDiscord": "Discord الخاص بـ Koharu",

@@ -30,6 +30,21 @@
       "split": "Dividir",
       "translate": "Volver a traducir"
     },
+    "details": {
+      "close": "Cerrar",
+      "description": "Inspecciona y edita la información de este cuadro de texto.",
+      "empty": "Vacío",
+      "sections": {
+        "actions": "Acciones",
+        "source": "Texto original y traducción"
+      },
+      "showInStory": "Mostrar en Guion",
+      "source": "Texto original",
+      "text": "Texto",
+      "title": "Detalles del cuadro",
+      "titleFor": "Detalles del cuadro de {{name}}",
+      "translation": "Traducción"
+    },
     "menu": {
       "booharuGithub": "Booharu en GitHub",
       "koharuDiscord": "Discord de Koharu",

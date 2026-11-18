@@ -2,10 +2,11 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { TitleBar } from '@/components/app/TitleBar'
 import { StoryPanel } from '@/components/editor/StoryPanel'
+import { useBoxDetails } from '@/lib/booharu/boxDetails'
 import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 
@@ -44,8 +45,11 @@ const boxItems = [
   'Clean again',
   'Join with balloon',
   'Split',
+  'Box details',
   'Join split texts on this page',
 ]
+
+beforeEach(() => useBoxDetails.setState({ shown: null, reveal: null }))
 
 describe('Booharu box actions in the menus', () => {
   it("lists a Story row's box actions above Delete and runs them on its text", async () => {
@@ -61,6 +65,7 @@ describe('Booharu box actions in the menus', () => {
       ['Clean again', true],
       ['Join with balloon', true],
       ['Split', true],
+      ['Box details', true],
       ['Delete', true],
     ])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Translate again' }))
@@ -73,10 +78,13 @@ describe('Booharu box actions in the menus', () => {
     // A text layer has nothing to read, translate, clean, join or split; a locked block takes
     // nothing either.
     await openRow(user, 'Caption')
-    expect((await items()).filter(([, on]) => on).map(([name]) => name)).toEqual(['Delete'])
+    expect((await items()).filter(([, on]) => on).map(([name]) => name)).toEqual([
+      'Box details',
+      'Delete',
+    ])
     await user.keyboard('{Escape}')
     await openRow(user, 'Locked')
-    expect((await items()).filter(([, on]) => on).map(([name]) => name)).toEqual([])
+    expect((await items()).filter(([, on]) => on).map(([name]) => name)).toEqual(['Box details'])
   })
 
   it('lists the box actions for the selection in the Edit menu', async () => {

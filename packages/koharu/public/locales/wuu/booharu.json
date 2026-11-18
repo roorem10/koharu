@@ -27,6 +27,21 @@
       "split": "拆分",
       "translate": "重新翻译"
     },
+    "details": {
+      "close": "关闭",
+      "description": "查看搭编辑箇只文字框个信息。",
+      "empty": "还呒没",
+      "sections": {
+        "actions": "操作",
+        "source": "原文搭译文"
+      },
+      "showInStory": "勒故事里向显示",
+      "source": "原文",
+      "text": "文本",
+      "title": "文字框详情",
+      "titleFor": "{{name}} 个文字框详情",
+      "translation": "译文"
+    },
     "menu": {
       "booharuGithub": "GitHub 浪个 Booharu",
       "koharuDiscord": "Koharu 个 Discord",

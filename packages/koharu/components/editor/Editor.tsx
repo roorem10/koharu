@@ -1,5 +1,6 @@
 'use client'
 
+import { BoxDetailsDialog } from '@/components/booharu/details/BoxDetailsDialog' // Booharu: Box details.
 import { ColorSamplingProvider } from '@/components/controls/ColorSampling'
 import { ActivityCenter } from '@/components/editor/ActivityCenter'
 import { CanvasWorkspace } from '@/components/editor/CanvasWorkspace'
@@ -25,6 +26,8 @@ export function Editor() {
     <ColorSamplingProvider>
       <div className='relative min-h-0 flex-1 bg-transparent'>
         <ActivityCenter />
+        {/* Booharu: one text's Box details, opened from Story and the Edit menu. */}
+        <BoxDetailsDialog />
         <ResizablePanelGroup
           id='editor'
           orientation='horizontal'

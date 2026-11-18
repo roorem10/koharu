@@ -27,6 +27,21 @@
       "split": "분할",
       "translate": "다시 번역"
     },
+    "details": {
+      "close": "닫기",
+      "description": "이 텍스트 상자의 정보를 확인하고 편집합니다.",
+      "empty": "없음",
+      "sections": {
+        "actions": "작업",
+        "source": "원문 및 번역"
+      },
+      "showInStory": "스토리에서 보기",
+      "source": "원문",
+      "text": "텍스트",
+      "title": "상자 세부 정보",
+      "titleFor": "{{name}}의 상자 세부 정보",
+      "translation": "번역"
+    },
     "menu": {
       "booharuGithub": "GitHub의 Booharu",
       "koharuDiscord": "Koharu Discord",
