@@ -19,12 +19,16 @@ export type BooharuFontProps = {
   favoritesOnly?: boolean
   /** Turns Favorites only on or off: the search line gets a switch for it. */
   onFavoritesOnlyChange?: (favoritesOnly: boolean) => void
+  /** The names each family goes by in other languages, by the name it's listed by, such as
+   * 游ゴシック for Yu Gothic: a search finds the family by any of them, and its row shows the
+   * first, muted, after its name. */
+  localNames?: Readonly<Record<string, readonly string[]>>
 }
 
-/** A row of the font list: a family, starred when it's a favourite, or a section's heading, which
- * the arrows skip. */
+/** A row of the font list: a family, starred when it's a favourite, with the first of its names in
+ * other languages, or a section's heading, which the arrows skip. */
 export type FontRow =
-  | { key: string; family: FontFamily; starred: boolean }
+  | { key: string; family: FontFamily; starred: boolean; localName?: string }
   | { key: string; heading: 'favorites' | 'allFonts' }
 
 /** The font list's rows for `results`, the families matching the search, in name order: the
@@ -35,11 +39,12 @@ export function fontRows(
   results: FontFamily[],
   favorites: readonly string[] = [],
   favoritesOnly = false,
+  localNames: BooharuFontProps['localNames'] = {},
 ): FontRow[] {
   const starred = new Set(favorites.map(fontKey))
   const all = results.map((family) => {
     const key = fontKey(family.name)
-    return { key, family, starred: starred.has(key) }
+    return { key, family, starred: starred.has(key), localName: localNames[family.name]?.[0] }
   })
   const pinned: FontRow[] = all
     .filter((row) => row.starred)
@@ -99,6 +104,15 @@ async function toggleFontFavorite(family: string, favorite: boolean): Promise<vo
   }
 }
 
+/** The names font families go by in other languages, as the desktop answers them: read once a run,
+ * as the desktop reads them. The pickers work without them until they come; a failed read shows
+ * nothing, as a failed font preview shows nothing, and the next picker to show reads them again. */
+const localNamesQuery = queryOptions({
+  queryKey: ['booharu', 'font-local-names'] as const,
+  queryFn: () => commands.booharuGetFontLocalNames(),
+  gcTime: Number.POSITIVE_INFINITY,
+})
+
 /** Whether the font pickers show only the favourites: one choice for every picker, kept for the
  * session only. */
 const useFavoritesOnly = create<{ favoritesOnly: boolean }>()(() => ({ favoritesOnly: false }))
@@ -109,15 +123,18 @@ export function setFavoritesOnly(favoritesOnly: boolean): void {
 
 const noFavorites: readonly string[] = []
 
-/** Booharu's props for Koharu's font picker, which a mount spreads into it: the favourites, read
- * once and shared by every picker, with their stars, and the Favorites only switch. */
+/** Booharu's props for Koharu's font picker, which a mount spreads into it: the favourites, shared
+ * by every picker, with their stars, the Favorites only switch, and the families' names in other
+ * languages. */
 export function useBooharuFontPicker(): BooharuFontProps {
   const favorites = useQuery(favoritesQuery).data
+  const localNames = useQuery(localNamesQuery).data
   const favoritesOnly = useFavoritesOnly((state) => state.favoritesOnly)
   return {
     favorites: favorites ?? noFavorites,
     onToggleFavorite: toggleFontFavorite,
     favoritesOnly,
     onFavoritesOnlyChange: setFavoritesOnly,
+    localNames: localNames ?? undefined, // A desktop answering null, as a stub may, has none.
   }
 }

@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { DefaultTextStyleSection } from '@/components/booharu/typesetting/DefaultTextStyleSection' // Booharu: the default text style.
 import { FontPicker } from '@/components/controls/FontPicker'
 import { PreferencePage } from '@/components/preferences/PreferenceFields'
-import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: the font pickers' favourites.
+import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: favourites and local names.
 import { useFonts } from '@/lib/queries'
 import type { RendererConfig } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
@@ -21,7 +21,7 @@ export function TypesettingPreferences({
 }) {
   const { t } = useTranslation()
   const fonts = useFonts()
-  const booharuFonts = useBooharuFontPicker() // Booharu: the font pickers' favourites.
+  const booharuFonts = useBooharuFontPicker() // Booharu: favourites and local names.
   const families = fonts.data ?? []
   const fontFamilies = useMemo(() => value.font_families ?? [], [value.font_families])
   const selectedNames = useMemo(() => new Set(fontFamilies.map(normalizeFontName)), [fontFamilies])
@@ -85,7 +85,7 @@ export function TypesettingPreferences({
                         families={choices}
                         ariaLabel={t('settings.typesetting.familyLabel', { index: index + 1 })}
                         onChange={(next) => replaceFamily(index, next)}
-                        {...booharuFonts} // Booharu: the font pickers' favourites.
+                        {...booharuFonts} // Booharu: favourites and local names.
                       />
                     </div>
                     <Button
@@ -126,7 +126,7 @@ export function TypesettingPreferences({
                 onChange={(family) =>
                   onChange({ ...value, font_families: [...fontFamilies, family] })
                 }
-                {...booharuFonts} // Booharu: the font pickers' favourites.
+                {...booharuFonts} // Booharu: favourites and local names.
               />
             </div>
             <span aria-hidden='true' className='size-7 shrink-0' />

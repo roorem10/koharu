@@ -58,7 +58,7 @@ export function FontPicker({
   ariaLabel,
   placeholder,
   onChange,
-  ...booharu // Booharu: the favourites, as lib/booharu/fonts.ts's useBooharuFontPicker gives them.
+  ...booharu // Booharu: favourites and local names, as lib/booharu/fonts.ts's hook gives them.
 }: {
   value: string
   families: FontFamily[]
@@ -89,20 +89,23 @@ export function FontPicker({
     return orderedFamilies.filter(
       (family) =>
         !normalized ||
-        [family.name, ...family.faces.map((face) => face.post_script_name)].some((name) =>
-          normalizeFontName(name).includes(normalized),
-        ),
+        [
+          family.name,
+          ...family.faces.map((face) => face.post_script_name),
+          ...(booharu.localNames?.[family.name] ?? []), // Booharu: its names in other languages.
+        ].some((name) => normalizeFontName(name).includes(normalized)),
     )
-  }, [orderedFamilies, query])
+  }, [orderedFamilies, query, booharu.localNames])
   const selectedFamily = useMemo(
     () =>
       orderedFamilies.find((family) => normalizeFontName(family.name) === normalizeFontName(value)),
     [orderedFamilies, value],
   )
-  // Booharu: the matches, the favourites among them pinned above them, or alone.
+  // Booharu: the matches, the favourites among them pinned above them, or alone, each with its
+  // first name in another language.
   const rows = useMemo(
-    () => fontRows(results, booharu.favorites, booharu.favoritesOnly),
-    [results, booharu.favorites, booharu.favoritesOnly],
+    () => fontRows(results, booharu.favorites, booharu.favoritesOnly, booharu.localNames),
+    [results, booharu.favorites, booharu.favoritesOnly, booharu.localNames],
   )
   // Booharu: the family the arrows are on, which they move from, skipping the headings and
   // wrapping around as ModelPicker's do.
@@ -355,6 +358,8 @@ function FontList({
                 <FontPreviewLabel family={family} className='h-4.5 w-full min-w-0' />
                 <span className='min-w-0 truncate text-[8px] leading-none text-muted-foreground'>
                   {family.name}
+                  {/* Booharu: its first name in another language, muted, as 0.0.4 showed it. */}
+                  {row.localName && <span className='ml-1 opacity-70'>{row.localName}</span>}
                 </span>
               </div>
               {selected && <Check className='size-3.5 shrink-0' />}

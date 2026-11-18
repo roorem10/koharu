@@ -18,7 +18,7 @@ import { ColorWell } from '@/components/controls/ColorWell'
 import { FontPicker } from '@/components/controls/FontPicker'
 import { ContextBar } from '@/components/editor/ContextBar'
 import { call, dispatch } from '@/lib/backend'
-import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: the font picker's favourites.
+import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: favourites and local names.
 import {
   expandLayerSelection,
   isBlockLayer,
@@ -93,7 +93,7 @@ export function TypeBar() {
     (state) => state.preferences?.renderer.font_families?.[0] ?? FALLBACK_FONT,
   )
   const availableFonts = useFonts().data
-  const booharuFonts = useBooharuFontPicker() // Booharu: the font picker's favourites.
+  const booharuFonts = useBooharuFontPicker() // Booharu: favourites and local names.
   const targets = useMemo(() => {
     if (!page) return []
     const leaves = expandLayerSelection(page.layers, selectedIds)
@@ -220,7 +220,7 @@ export function TypeBar() {
           value={family}
           families={families}
           size='sm'
-          {...booharuFonts} // Booharu: the font picker's favourites.
+          {...booharuFonts} // Booharu: favourites and local names.
           onChange={(next) => {
             const nextFamily = families.find((candidate) => sameFont(candidate.name, next))
             const nextItalic = italic && hasItalic(nextFamily)
