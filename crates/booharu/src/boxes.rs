@@ -20,7 +20,7 @@ use image::{Rgb, RgbImage};
 use koharu_pipeline::{RunId, Stage};
 use koharu_scene::{
     Block, Bounds, Change, Content, Created, Direction, Edit, Frame, Layer, LayerId, Op, Page,
-    PageId, PixelFormat, Project, Rect, Ref, Role, Session, Text, Tile, Transform,
+    PageId, PixelFormat, Project, Rect, Ref, Role, Session, Tile, Transform,
 };
 use kurbo::{Affine, BezPath, PathEl, Point, Shape as _};
 use serde::{Deserialize, Serialize};
@@ -197,9 +197,12 @@ pub fn find_split_balloons(project: &Project, page: Option<PageId>) -> Result<Ve
 /// and its source wording and its translation every block's that isn't
 /// blank, a line each, the translation placed in its balloon as the
 /// Translation stage places one. The others' masks and clean-ups merge into
-/// its own, so the lettering they cleaned stays clean, and they go. A
-/// balloon holding one text block has nothing to join, and a hidden block,
-/// which isn't drawn, is no part of its balloon's text.
+/// its own, so the lettering they cleaned stays clean, and they go. The
+/// joined clean-up shows when any of theirs showed over lettering, and a
+/// text left as scanned, as the Translation stage leaves one the model gave
+/// back unchanged, then gives the translation its source wording in its
+/// place. A balloon holding one text block has nothing to join, and a hidden
+/// block, which isn't drawn, is no part of its balloon's text.
 pub fn join_balloon(session: &Session, block: LayerId) -> Result<Edit> {
     let project = session.project();
     let layer = project.layer(block)?;
@@ -481,6 +484,15 @@ fn joined(session: &Session, project: &Project, page: PageId, groups: &[Group]) 
 /// `union`. Its translation fills its balloon, as the Translation stage
 /// places a balloon's only text, or `union` when the balloon is `shared`
 /// with a text reaching into it, which the stage would leave its own room.
+///
+/// The joined clean-up shows when any block's clean-up showed over its
+/// lettering, so that lettering stays clean, and it then covers every
+/// block's. A block whose clean-up was hidden, as the Translation stage hides
+/// one whose text the model left unchanged, so its lettering showed, then
+/// gives the joined translation its source wording in its place; with no
+/// translation to hold that wording, the join is refused. When no clean-up
+/// showed over lettering, the joined one is hidden, so every block's
+/// lettering shows as it did.
 fn join(
     session: &Session,
     project: &Project,
@@ -522,21 +534,41 @@ fn join(
             "language": language,
         }}),
     }];
-    let translated: Vec<&Text> = group
+    // Which blocks have a clean-up to cover their lettering with, and
+    // whether any showed it.
+    let cleaned: Vec<bool> = group
         .blocks
         .iter()
-        .filter_map(|(_, block)| block.translation.as_ref())
+        .map(|(_, block)| cleans(session, block))
+        .collect::<Result<_>>()?;
+    let covered = group
+        .blocks
+        .iter()
+        .zip(&cleaned)
+        .any(|((_, block), &cleaned)| cleaned && block.cleanup.visible);
+    // Each block's line of the joined translation: its translation, or the
+    // source wording of lettering the joined clean-up covers anew.
+    let wording: Vec<String> = group
+        .blocks
+        .iter()
+        .zip(&cleaned)
+        .filter_map(|((_, block), &cleaned)| match &block.translation {
+            Some(translation) => Some(translation.content.text()),
+            None => {
+                (covered && cleaned && !block.cleanup.visible).then(|| block.source.content.text())
+            }
+        })
         .collect();
-    if let Some(translation) = translated.first() {
-        let target = translation.language.clone();
+    let target = group
+        .blocks
+        .iter()
+        .find_map(|(_, block)| block.translation.as_ref())
+        .map(|translation| translation.language.clone());
+    let translated = target.is_some();
+    if let Some(target) = target {
         ops.push(Op::SetText {
             layer: (*kept).into(),
-            text: lines(
-                translated
-                    .iter()
-                    .map(|translation| translation.content.text())
-                    .collect(),
-            ),
+            text: lines(wording),
         });
         // The stage's lettering for the kept block, in the frame its joined
         // source has.
@@ -564,9 +596,28 @@ fn join(
         if first.translation.is_none() {
             ops.push(Op::UpdateLayer {
                 layer: (*kept).into(),
-                patch: json!({"translation": {"language": target}, "cleanup": {"visible": true}}),
+                patch: json!({"translation": {"language": target}}),
             });
         }
+    } else {
+        ensure!(
+            lines(wording).is_empty(),
+            "balloon {}'s texts are partly cleaned and none is translated, so joining them would \
+             erase lettering; translate them first",
+            group.balloon.id
+        );
+    }
+    // With no clean-up to show, a translated block's shows, as the
+    // Translation stage leaves one.
+    let shown = match cleaned.contains(&true) {
+        true => covered,
+        false => translated || first.cleanup.visible,
+    };
+    if shown != first.cleanup.visible {
+        ops.push(Op::UpdateLayer {
+            layer: (*kept).into(),
+            patch: json!({"cleanup": {"visible": shown}}),
+        });
     }
     let others: Vec<&Block> = rest.iter().map(|(_, block)| *block).collect();
     ops.extend(merged(session, first, &others)?);
@@ -636,6 +687,17 @@ fn merged(session: &Session, kept: &Block, others: &[&Block]) -> Result<Vec<Op>>
         });
     }
     Ok(ops)
+}
+
+/// Whether `block` has a clean-up to cover its lettering with: pixels in its
+/// mask and in its clean-up, which shows only inside the mask.
+fn cleans(session: &Session, block: &Block) -> Result<bool> {
+    for part in [block.mask.id, block.cleanup.id] {
+        if session.tiles(part, None)?.tiles.is_empty() {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 /// The ops writing `part`'s tiles to `target`, a half's copy of it, with
@@ -1036,7 +1098,7 @@ fn created(change: &Change, label: &str) -> Result<LayerId> {
 #[cfg(test)]
 mod tests {
     use image::ImageFormat;
-    use koharu_scene::Hash;
+    use koharu_scene::{Hash, Text};
     use serde_json::Value;
 
     use super::*;
@@ -1592,6 +1654,138 @@ mod tests {
         // One undo puts everything back.
         page.session.undo()?;
         assert!(page.session.project() == before);
+        Ok(())
+    }
+
+    /// A balloon holding two vertical text blocks, right to left, reading
+    /// `first` and `second`, each with its lettering cleaned: its mask and
+    /// clean-up full over where it lies.
+    fn two_cleaned(first: &str, second: &str) -> Result<(Fixture, [LayerId; 2])> {
+        let mut page = Fixture::new(400, 400, &[rect(0.0, 0.0, 400.0, 400.0)])?;
+        let balloon = page.add(
+            None,
+            json!({"kind": "balloon", "outline": outline(0.0, 0.0, 200.0, 200.0)}),
+        )?;
+        let mut blocks = Vec::new();
+        for (x, text) in [(120, first), (10, second)] {
+            let bounds = page_bounds(f64::from(x), 20.0, 40.0, 100.0);
+            let block = page.add(Some(balloon), text_block(bounds, Direction::Vertical, text))?;
+            let found = page.block(block)?;
+            let lies = pixel_rect(x, 20, 40, 100);
+            page.write(found.mask.id, lies, &[255])?;
+            page.write(found.cleanup.id, lies, &[1, 2, 3, 255])?;
+            blocks.push(block);
+        }
+        Ok((page, [blocks[0], blocks[1]]))
+    }
+
+    /// Translates `block` as `text`, its clean-up shown under it.
+    fn translate(page: &mut Fixture, block: LayerId, text: &str) -> Result<()> {
+        let english: koharu_scene::LanguageIdentifier = "en".parse()?;
+        let edit =
+            crate::translation::edit(&page.session.project(), block, text.to_owned(), &english)?;
+        page.session.apply(edit)?;
+        Ok(())
+    }
+
+    /// Leaves `block` as the Translation stage leaves a text the model gave
+    /// back unchanged: untranslated, its clean-up hidden, so its lettering
+    /// shows.
+    fn unchanged(page: &mut Fixture, block: LayerId) -> Result<()> {
+        page.update(
+            block,
+            json!({"translation": null, "cleanup": {"visible": false}}),
+        )
+    }
+
+    fn joined_translation(page: &Fixture, block: LayerId) -> Result<Option<String>> {
+        Ok(page
+            .block(block)?
+            .translation
+            .map(|translation| translation.content.text()))
+    }
+
+    #[test]
+    fn a_join_carries_the_wording_of_lettering_its_clean_up_covers() -> Result<()> {
+        // A heart the model left as it was, read after a translated text:
+        // the joined clean-up covers it, so the translation carries it.
+        let (mut page, [first, second]) = two_cleaned("どうして", "♡")?;
+        translate(&mut page, first, "Why?")?;
+        unchanged(&mut page, second)?;
+        page.session.apply(join_balloon(&page.session, first)?)?;
+        assert_eq!(
+            joined_translation(&page, first)?.as_deref(),
+            Some("Why?\n♡")
+        );
+        let joined = page.block(first)?;
+        assert!(joined.cleanup.visible);
+        let cleanup = page
+            .session
+            .pixels(joined.cleanup.id, pixel_rect(10, 20, 40, 100))?;
+        assert!(
+            cleanup
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|pixel| *pixel == [1, 2, 3, 255])
+        );
+
+        // The same read first, in the block the join keeps.
+        let (mut page, [first, second]) = two_cleaned("!!", "どうして")?;
+        unchanged(&mut page, first)?;
+        translate(&mut page, second, "Why?")?;
+        page.session.apply(join_balloon(&page.session, second)?)?;
+        assert_eq!(
+            joined_translation(&page, first)?.as_deref(),
+            Some("!!\nWhy?")
+        );
+        assert!(page.block(first)?.cleanup.visible);
+
+        // A text whose clean-up holds nothing, such as a box drawn to read
+        // it, still shows its lettering: the translation doesn't repeat it.
+        let (mut page, [first, second]) = two_cleaned("どうして", "♡")?;
+        translate(&mut page, first, "Why?")?;
+        unchanged(&mut page, second)?;
+        page.write(
+            page.block(second)?.mask.id,
+            pixel_rect(10, 20, 40, 100),
+            &[0],
+        )?;
+        page.session.apply(join_balloon(&page.session, first)?)?;
+        assert_eq!(joined_translation(&page, first)?.as_deref(), Some("Why?"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_joined_clean_up_shows_when_any_showed() -> Result<()> {
+        // The kept text's clean-up hidden by hand: the other's lettering
+        // stays clean, so the joined clean-up shows over both.
+        let (mut page, [first, second]) = two_cleaned("あ", "う")?;
+        translate(&mut page, first, "Ah")?;
+        translate(&mut page, second, "Oh")?;
+        page.update(first, json!({"cleanup": {"visible": false}}))?;
+        page.session.apply(join_balloon(&page.session, first)?)?;
+        assert_eq!(joined_translation(&page, first)?.as_deref(), Some("Ah\nOh"));
+        assert!(page.block(first)?.cleanup.visible);
+
+        // None showed: every text's lettering shows as it did.
+        let (mut page, [first, second]) = two_cleaned("!!", "♡")?;
+        unchanged(&mut page, first)?;
+        unchanged(&mut page, second)?;
+        page.session.apply(join_balloon(&page.session, second)?)?;
+        assert_eq!(joined_translation(&page, first)?, None);
+        assert!(!page.block(first)?.cleanup.visible);
+
+        // One cleaned and one left as scanned, with no translation to carry
+        // the scanned one's wording: refused.
+        let (mut page, [first, second]) = two_cleaned("あ", "♡")?;
+        unchanged(&mut page, second)?;
+        let steps = page.steps().len();
+        assert!(
+            join_balloon(&page.session, first)
+                .is_err_and(|error| error.to_string().contains("translate them first"))
+        );
+        assert_eq!(page.steps().len(), steps);
         Ok(())
     }
 

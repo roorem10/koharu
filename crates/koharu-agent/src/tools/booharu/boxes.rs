@@ -152,7 +152,9 @@ impl Tool for JoinBalloonBlocks {
          undo step. It keeps its place and its id; its source's frame becomes the box around \
          them all, and its wording and its translation every block's that isn't blank, a line \
          each, the translation placed in the balloon as the Translation stage places one; the \
-         others' masks and clean-ups merge into its own before they go. Unless the user asked \
+         others' masks and clean-ups merge into its own before they go, and a text left as \
+         scanned, as the Translation stage leaves one the model gave back unchanged, gives the \
+         translation its wording once the joined clean-up covers it. Unless the user asked \
          for this join, tell them which balloons are split, as booharu_find_split_balloons finds \
          them, and ask first. A balloon of one text block has nothing to join, and a locked \
          block or balloon refuses it. Answers what changed."
