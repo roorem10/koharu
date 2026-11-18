@@ -41,6 +41,7 @@ export const toolKeys: Record<CanvasTool, string> = {
   color_picker: 'i',
   remove: 'j',
   pan: 'h',
+  ocr_box: 'o', // Booharu: the O tool, a box read as a text block.
 }
 
 export interface CanvasBrush {

@@ -124,11 +124,24 @@ export type Block = {
 }
 
 /**
+ *  Why a box drawn with the O tool added nothing, or what failed reading it,
+ *  for the interface to say in the user's language.
+ */
+export type BooharuNotice =
+  /**  The box holds no ink to read. */
+  | { kind: 'nothing_to_read' }
+  /**  The box would change a locked layer. */
+  | { kind: 'locked' }
+  /**  The box couldn't be added, read, translated, or cleaned. */
+  | { kind: 'failed'; message: string }
+
+/**
  *  Every Booharu settings section, each under its table's name. Koharu's
  *  own stay in its `Preferences`.
  */
 export type BooharuPreferences = {
   'booharu-mcp': McpSettings
+  'booharu-ocr-box': OcrBoxSettings
 }
 
 /**  A rectangle in page pixels, for text frames. */
@@ -531,6 +544,28 @@ export type NewLayer = {
 /**  Why a gesture did nothing, for the app to say in the user's language. */
 export type Notice = 'eraser_needs_raster'
 
+/**
+ *  What a box drawn with the O tool goes through, Booharu 0.0.4's three
+ *  modes: it's always read. Only a box that is cleaned gets a mask, the whole
+ *  box, so reading it never erases the art inside.
+ */
+export type OcrBoxMode =
+  /**  Read only. */
+  | 'read'
+  /**  Read, then translated. */
+  | 'read_translate'
+  /**  Read, cleaned under the whole box, then translated. */
+  | 'read_translate_clean'
+
+/**
+ *  `[booharu-ocr-box]`: the O tool, whose box drawn on a page becomes a text
+ *  block that is read, and as its mode says translated and cleaned.
+ */
+export type OcrBoxSettings = {
+  /**  What a drawn box goes through when the drawing picks no other mode. */
+  default_mode?: OcrBoxMode
+}
+
 export type Offset = {
   x: number
   y: number
@@ -829,6 +864,25 @@ export type Span = {
   attributes?: CharStyle
 }
 
+/**
+ *  A balloon whose text is split over two or more text blocks, which a
+ *  join makes one.
+ */
+export type SplitBalloon = {
+  page: PageId
+  balloon: LayerId
+  /**  Its text blocks, in reading order; sound effects are left out. */
+  blocks: LayerId[]
+}
+
+/**  A block split in two, and the run reading and translating both halves. */
+export type SplitBlock = {
+  change: Change
+  /**  The halves in reading order: the block itself, then its copy. */
+  halves: LayerId[]
+  run: RunId
+}
+
 /**  A stage, in the order a page's stages run. */
 export type Stage = 'detect' | 'recognize' | 'inpaint' | 'translate'
 
@@ -932,6 +986,11 @@ export type Tool =
   | 'color_picker'
   | 'remove'
   | 'pan'
+  /**
+   *  Booharu: the O tool. A box drawn with it becomes a text block that is
+   *  read, and as chosen translated and cleaned.
+   */
+  | 'ocr_box'
 
 /**  One transfer's whole state. */
 export type Transfer = {
@@ -1104,6 +1163,21 @@ export const commands = {
   /** Sets `block`'s translation to `text` as one undo step, placing a new one as the Translation stage places its own, in the translator's target language. */
   booharuSetTranslation: (block: LayerId, text: string) =>
     invoke<Change>('booharu_set_translation', { block, text }, { headers: headers() }),
+  /** Every balloon on `page`, or on every page when none is given, whose text is split over two or more text blocks, its blocks in reading order. */
+  booharuFindSplitBalloons: (page: PageId | null) =>
+    invoke<SplitBalloon[]>('booharu_find_split_balloons', { page }, { headers: headers() }),
+  /** Joins the text blocks of the balloon holding `block` into the first one read, as one undo step: it keeps its place, its source's frame becomes the box around them all, its wording and its translation every block's that isn't blank, a line each, and the others' masks and clean-ups merge into its own before they go. A locked block or balloon refuses it. */
+  booharuJoinBalloon: (block: LayerId) =>
+    invoke<Change>('booharu_join_balloon', { block }, { headers: headers() }),
+  /** Joins every balloon of `page` whose text is split over two or more text blocks, each as `booharu_join_balloon` joins one, all as one undo step. */
+  booharuJoinPage: (page: PageId) =>
+    invoke<Change>('booharu_join_page', { page }, { headers: headers() }),
+  /** Splits `block` in two across its lines as one undo step, the half read first keeping the block's id and a copy after it taking the other, each with its own mask and clean-up and no wording, then reads and translates both halves again. Answers the change, the halves in reading order, and the run reading them. */
+  booharuSplitBlock: (block: LayerId) =>
+    invoke<SplitBlock>('booharu_split_block', { block }, { headers: headers() }),
+  /** Sets the reviewer's note on `layer`, a block or a text layer, to `note` as one undo step, or removes it when `note` is null or blank. A locked layer, or one inside a locked layer, refuses it. */
+  booharuSetReviewNote: (layer: LayerId, note: string | null) =>
+    invoke<Change>('booharu_set_review_note', { layer, note }, { headers: headers() }),
 }
 
 export const events = {
@@ -1133,4 +1207,6 @@ export const events = {
     listen<PipelineEvent>('pipeline', (event) => handler(event.payload)),
   download: (handler: (payload: Transfer) => void): Promise<UnlistenFn> =>
     listen<Transfer>('download', (event) => handler(event.payload)),
+  booharuNotice: (handler: (payload: BooharuNotice) => void): Promise<UnlistenFn> =>
+    listen<BooharuNotice>('booharu_notice', (event) => handler(event.payload)),
 }

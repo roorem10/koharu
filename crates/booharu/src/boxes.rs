@@ -56,8 +56,8 @@ pub enum Refusal {
     Locked { layer: LayerId },
 }
 
-/// A balloon whose text is split over two or more text blocks, which
-/// [`join_balloon`] joins into one.
+/// A balloon whose text is split over two or more text blocks, which a
+/// join makes one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct SplitBalloon {
     pub page: PageId,
