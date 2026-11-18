@@ -460,8 +460,8 @@ pub fn edited(layer: &Layer) -> Edited {
 }
 
 /// Whether a Koharu stage recorded in `layer`'s `c2pa` attributes making
-/// its part `step`.
-fn recorded(layer: &Layer, step: &str) -> bool {
+/// its part `step`: `detection`, `ocr`, `inpainting`, or `translation`.
+pub fn recorded(layer: &Layer, step: &str) -> bool {
     layer
         .attributes
         .get(C2PA)

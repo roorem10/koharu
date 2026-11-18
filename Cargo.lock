@@ -1183,6 +1183,7 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+ "strum",
  "tempfile",
  "thiserror 2.0.21",
 ]
