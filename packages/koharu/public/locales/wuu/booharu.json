@@ -24,6 +24,11 @@
       "koharuDiscord": "Koharu 个 Discord",
       "koharuGithub": "GitHub 浪个 Koharu"
     },
+    "notice": {
+      "failed": "框加勿上：{{message}}",
+      "locked": "箇只框锁牢哉，先解锁。",
+      "nothing_to_read": "箇只框里向呒没好识别个文字。"
+    },
     "ocrBox": {
       "defaultMode": "默认操作",
       "defaultModeDescription": "放开鼠标辰光，按牢 Alt 光识别；按牢 Shift 会识别、翻译搭清理。",

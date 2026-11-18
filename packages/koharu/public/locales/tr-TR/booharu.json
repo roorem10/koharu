@@ -24,6 +24,11 @@
       "koharuDiscord": "Koharu Discord",
       "koharuGithub": "GitHub'da Koharu"
     },
+    "notice": {
+      "failed": "Kutu eklenemedi: {{message}}",
+      "locked": "Bu kutu kilitli. Önce kilidini açın.",
+      "nothing_to_read": "Bu kutuda okunacak bir şey yok."
+    },
     "ocrBox": {
       "defaultMode": "Varsayılan işlem",
       "defaultModeDescription": "Yalnızca okumak için Alt basılıyken bırakın; okumak, çevirmek ve temizlemek için Shift basılıyken bırakın.",

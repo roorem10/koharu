@@ -30,6 +30,11 @@
       "koharuDiscord": "Discord الخاص بـ Koharu",
       "koharuGithub": "Koharu على GitHub"
     },
+    "notice": {
+      "failed": "تعذّرت إضافة المربع: {{message}}",
+      "locked": "هذا المربع مقفل. ألغِ قفله أولًا.",
+      "nothing_to_read": "لا يوجد ما يُقرأ في هذا المربع."
+    },
     "ocrBox": {
       "defaultMode": "الإجراء الافتراضي",
       "defaultModeDescription": "أفلت مع الضغط على Alt للقراءة فقط، أو على Shift للقراءة والترجمة والتنظيف.",

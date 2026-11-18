@@ -24,6 +24,11 @@
       "koharuDiscord": "Koharu 的 Discord",
       "koharuGithub": "GitHub 上的 Koharu"
     },
+    "notice": {
+      "failed": "无法添加该框：{{message}}",
+      "locked": "该框已锁定，请先解锁。",
+      "nothing_to_read": "该框内没有可识别的文字。"
+    },
     "ocrBox": {
       "defaultMode": "默认操作",
       "defaultModeDescription": "松开鼠标时按住 Alt 仅识别；按住 Shift 则识别、翻译并清理。",

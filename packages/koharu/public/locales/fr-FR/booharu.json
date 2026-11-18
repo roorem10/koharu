@@ -27,6 +27,11 @@
       "koharuDiscord": "Discord de Koharu",
       "koharuGithub": "Koharu sur GitHub"
     },
+    "notice": {
+      "failed": "Impossible d’ajouter la zone : {{message}}",
+      "locked": "Cette zone est verrouillée. Déverrouillez-la d’abord.",
+      "nothing_to_read": "Rien à lire dans cette zone."
+    },
     "ocrBox": {
       "defaultMode": "Action par défaut",
       "defaultModeDescription": "Relâchez avec Alt pour lire uniquement, ou avec Maj pour lire, traduire et nettoyer.",

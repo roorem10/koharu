@@ -24,6 +24,11 @@
       "koharuDiscord": "Koharu の Discord",
       "koharuGithub": "GitHub の Koharu"
     },
+    "notice": {
+      "failed": "ボックスを追加できませんでした：{{message}}",
+      "locked": "そのボックスはロックされています。先にロックを解除してください。",
+      "nothing_to_read": "そのボックスには読み取れる文字がありません。"
+    },
     "ocrBox": {
       "defaultMode": "既定の操作",
       "defaultModeDescription": "Altを押しながら離すとOCRのみ、Shiftを押しながら離すとOCR・翻訳・クリーンアップを実行します。",

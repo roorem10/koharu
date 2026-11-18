@@ -27,6 +27,11 @@
       "koharuDiscord": "Discord de Koharu",
       "koharuGithub": "Koharu en GitHub"
     },
+    "notice": {
+      "failed": "No se ha podido añadir el cuadro: {{message}}",
+      "locked": "Ese cuadro está bloqueado. Desbloquéalo primero.",
+      "nothing_to_read": "No hay nada que leer en ese cuadro."
+    },
     "ocrBox": {
       "defaultMode": "Acción predeterminada",
       "defaultModeDescription": "Suelta con Alt para solo leer, o con Mayús para leer, traducir y limpiar.",

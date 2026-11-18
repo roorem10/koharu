@@ -28,6 +28,11 @@
       "koharuDiscord": "Discord Koharu",
       "koharuGithub": "Koharu на GitHub"
     },
+    "notice": {
+      "failed": "Не удалось добавить рамку: {{message}}",
+      "locked": "Эта рамка заблокирована. Сначала разблокируйте её.",
+      "nothing_to_read": "В этой рамке нечего распознавать."
+    },
     "ocrBox": {
       "defaultMode": "Действие по умолчанию",
       "defaultModeDescription": "Отпустите кнопку мыши с зажатым Alt, чтобы только распознать текст, или с Shift, чтобы распознать, перевести и очистить.",

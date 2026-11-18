@@ -27,6 +27,11 @@
       "koharuDiscord": "Discord do Koharu",
       "koharuGithub": "Koharu no GitHub"
     },
+    "notice": {
+      "failed": "Não foi possível adicionar a caixa: {{message}}",
+      "locked": "Essa caixa está bloqueada. Desbloqueie-a primeiro.",
+      "nothing_to_read": "Não há nada para ler nessa caixa."
+    },
     "ocrBox": {
       "defaultMode": "Ação padrão",
       "defaultModeDescription": "Solte com Alt para fazer apenas OCR; com Shift para fazer OCR, traduzir e limpar.",

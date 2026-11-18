@@ -7,6 +7,7 @@ import { I18nextProvider } from 'react-i18next'
 import { StartupView } from '@/components/app/StartupView'
 import ClientOnly from '@/components/ClientOnly'
 import { refreshModels, refreshPreferences } from '@/lib/backend'
+import { useBooharuNotices } from '@/lib/booharu/notices' // Booharu: its notices, as toasts.
 import { usePageMenuGuard } from '@/lib/booharu/usePageMenuGuard' // Booharu: the menu guard.
 import i18n from '@/lib/i18n'
 import {
@@ -104,6 +105,7 @@ export function Providers({ children }: { children: ReactNode }) {
   }, [])
 
   usePageMenuGuard() // Booharu: no browser page menu outside text fields.
+  useBooharuNotices() // Booharu: its own notices, such as why a drawn box added nothing.
 
   return (
     <QueryClientProvider client={queryClient}>
