@@ -30,8 +30,13 @@ impl Tool for GetSettings {
         "Booharu's settings, each section under its table name with every key's value: \
          `booharu-mcp` has the `port` the MCP server outside apps reach Booharu through listens \
          on; `booharu-ocr-box` has the `default_mode` a box drawn with the O tool goes through, \
-         `read`, `read_translate`, or `read_translate_clean`. Needs a project open, as every \
-         tool here does."
+         `read`, `read_translate`, or `read_translate_clean`; `booharu-lettering` has the \
+         `default` text look, its `fill` and `stroke` colours as [red, green, blue, alpha] from \
+         0 to 1, or null for Koharu's black and no outline, and its `stroke_width` from 0 to \
+         50, which new text gets, and `detect_colors`, whether a new translation keeps the \
+         colours Koharu measured (true) or gets the default look's (false); `booharu-fonts` has \
+         the font picker's `favorites`, family names. New text's font is the first of Koharu's \
+         Preferred fonts, not a Booharu setting. Needs a project open, as every tool here does."
             .to_owned()
     }
 
@@ -198,6 +203,11 @@ mod tests {
             json!({
                 "booharu-mcp": {"port": 47821},
                 "booharu-ocr-box": {"default_mode": "read_translate"},
+                "booharu-lettering": {
+                    "default": {"fill": null, "stroke": null, "stroke_width": 1.5},
+                    "detect_colors": true,
+                },
+                "booharu-fonts": {"favorites": []},
             })
         );
 
