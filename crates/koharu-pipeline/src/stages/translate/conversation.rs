@@ -15,11 +15,13 @@ use super::{TranslatorConfig, model};
 pub(crate) struct Conversation {
     /// The model, the target, and the prompt its history was written with.
     with: Option<(String, LanguageIdentifier, String)>,
-    pub(super) context: Context,
+    // Booharu: crate-wide, for the page before `crate::booharu::seed` adds.
+    pub(crate) context: Context,
     /// A hosted model, connected for its first page.
     hosted: Option<DynModel<Completion>>,
     /// The last page's texts and their translations.
-    pub(super) last: Option<(Vec<String>, Vec<String>)>,
+    // Booharu: crate-wide, as the page before `crate::booharu::seed` adds is.
+    pub(crate) last: Option<(Vec<String>, Vec<String>)>,
 }
 
 impl Conversation {

@@ -10,7 +10,7 @@
 mod conversation;
 mod model;
 mod placement;
-mod turn;
+pub(crate) mod turn; // Booharu: crate-wide, for the page before's messages.
 
 use anyhow::{Context as _, Result, ensure};
 use base64::Engine as _;
@@ -132,6 +132,7 @@ pub(crate) async fn translate(
     };
     let conversation = &mut *conversation;
     conversation.keep(&translator);
+    crate::booharu::seed(conversation, &member.session, member.page); // Booharu: the page before.
     let model = match key(Stage::Translate, config) {
         // A local model loads on the GPU thread, which only hands it over:
         // its engine runs on a thread of its own, so the turn waits off the

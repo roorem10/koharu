@@ -163,7 +163,9 @@ fn remembered(messages: Vec<Message>) -> Vec<Message> {
 
 /// A key for each of `count` texts, numbered from 1 and padded to one width,
 /// so they sort in reading order wherever an object's keys are sorted.
-fn keys(count: usize) -> Vec<String> {
+// Booharu: crate-wide, so the page before `crate::booharu::seed` adds is
+// numbered as a turn numbers its page.
+pub(crate) fn keys(count: usize) -> Vec<String> {
     let width = count.to_string().len();
     (1..=count)
         .map(|number| format!("{number:0width$}"))
@@ -171,7 +173,9 @@ fn keys(count: usize) -> Vec<String> {
 }
 
 /// The page as a JSON object of `keys` to `texts`, a text a line, in order.
-fn numbered<'t>(keys: &[String], texts: impl Iterator<Item = &'t str>) -> String {
+// Booharu: crate-wide, so the page before `crate::booharu::seed` adds is
+// written as a turn writes its page.
+pub(crate) fn numbered<'t>(keys: &[String], texts: impl Iterator<Item = &'t str>) -> String {
     let lines = keys
         .iter()
         .zip(texts)

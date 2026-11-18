@@ -16,6 +16,11 @@
 //!   what the stage wrote, and `given_back` records a translation it
 //!   cleared, given back unchanged.
 //! - `recognized`, in the Recognition stage, records the wording it read.
+//! - `seed`, right after the Translation stage's `keep`, starts a project's
+//!   translation conversation that holds nothing yet, as one does the first
+//!   time the project translates and again once its model, target, or
+//!   instructions changed, with the page before the one it translates as
+//!   the user left it.
 //! - `Failure`, from `stages::run`, is a stage task's failure as the run
 //!   reports it, with the class the run policy goes by, which the scheduler's
 //!   `booharu` module follows: another try, the page given up on, or the run
@@ -33,6 +38,7 @@ use booharu_core::{
 };
 use koharu_llm::rig::{
     catalog::ModelSpec,
+    completion::{Message, Usage},
     driver::DynModel,
     error::{ErrorReport, ProviderError},
     http_client,
@@ -44,7 +50,10 @@ use parking_lot::Mutex;
 use rig_agent::run::PromptError;
 use serde::Serialize;
 
-use crate::{PipelineConfig, Stage, TranslatorConfig};
+use crate::{
+    PipelineConfig, Stage, TranslatorConfig,
+    stages::translate::{Conversation, turn},
+};
 
 /// `config`, the one a run of `stages` on the project `session` holds was
 /// queued with, with Booharu's settings as they're saved now:
@@ -203,6 +212,62 @@ pub(crate) fn given_back(project: &Project, block: LayerId) -> anyhow::Result<Op
 /// `block`, in its hand-edit record, which keeps its other parts.
 pub(crate) fn recognized(project: &Project, block: LayerId, text: &str) -> anyhow::Result<Op> {
     styles::recognized(project.layer(block)?, text)
+}
+
+/// Starts `conversation`, a project's translation conversation, with the
+/// page before `page`, the one its turn translates, in the project `session`
+/// holds, as the user left it, when the conversation holds nothing yet: the
+/// first time the project translates since it opened, and once `keep`
+/// started it again because the model, the target, or the instructions
+/// changed, the chapter's glossary and notes among them. The page goes in as
+/// one exchange, in the shapes a turn records its own: its texts numbered as
+/// a turn sends them, without the scan, and their translations as they are
+/// now, hand fixes included, as the answer; with no usage, so the context
+/// estimates it as it would any turn it fits; and as the conversation's last
+/// page, which the next turn's echo check compares its answer with. Nothing
+/// for the first page, a page before with no translated text, or a
+/// conversation under way, which so never gets a second.
+pub(crate) fn seed(conversation: &mut Conversation, session: &Mutex<Session>, page: PageId) {
+    if conversation.last.is_some() || !conversation.context.messages().is_empty() {
+        return;
+    }
+    let Some((texts, translations)) = before(&session.lock().project(), page) else {
+        return;
+    };
+    let keys = turn::keys(texts.len());
+    let exchange = vec![
+        Message::user(turn::numbered(&keys, texts.iter().map(String::as_str))),
+        Message::assistant(turn::numbered(
+            &keys,
+            translations.iter().map(String::as_str),
+        )),
+    ];
+    conversation.context.record([(exchange, Usage::default())]);
+    conversation.last = Some((texts, translations));
+}
+
+/// The page before `page` in `project`'s page order, as its translation
+/// conversation would have had it: each of its blocks with a source and a
+/// translation, in the order a turn lists a page's blocks, the source as a
+/// turn sends it and the translation as it is now, trimmed as an answer is;
+/// `None` for the first page, or one before it with no such block.
+fn before(project: &Project, page: PageId) -> Option<(Vec<String>, Vec<String>)> {
+    let pages: Vec<PageId> = project.pages().map(|page| page.id).collect();
+    let at = pages.iter().position(|&id| id == page)?;
+    let before = *pages.get(at.checked_sub(1)?)?;
+    let (texts, translations): (Vec<String>, Vec<String>) = project
+        .blocks(before)
+        .ok()?
+        .into_iter()
+        .filter_map(|(_, block)| {
+            let text = block.source.content.text();
+            let translation = block.translation.as_ref()?.content.text();
+            let translation = translation.trim();
+            (!text.trim().is_empty() && !translation.is_empty())
+                .then(|| (text, translation.to_owned()))
+        })
+        .unzip();
+    (!texts.is_empty()).then_some((texts, translations))
 }
 
 /// A stage task's failure: the reason its run reports, as Koharu words it,
@@ -855,6 +920,214 @@ mod tests {
         assert!(
             matches!(&refused, crate::Error::Invalid(message) if message.contains("test.booharu.json")),
             "{refused}"
+        );
+        Ok(())
+    }
+
+    /// A chapter of pages without a scan, each holding a block, found and
+    /// read, for each of its `(source, translation)`, the translation the
+    /// Translation stage's; and its pages and each page's blocks, in order.
+    struct Chapter {
+        _dir: tempfile::TempDir,
+        session: Mutex<Session>,
+        pages: Vec<PageId>,
+        blocks: Vec<Vec<LayerId>>,
+    }
+
+    impl Chapter {
+        fn new(pages: &[&[(&str, Option<&str>)]]) -> Result<Self> {
+            let dir = tempfile::tempdir()?;
+            let mut session = Session::create(dir.path().join("test.khr"))?;
+            let mut ops = Vec::new();
+            for (index, blocks) in pages.iter().enumerate() {
+                let page = format!("$p{index}");
+                ops.push(json!({"op": "add_page", "id": page, "index": index,
+                    "size": {"width": 400, "height": 400}}));
+                for (at, (source, translation)) in blocks.iter().enumerate() {
+                    let id = format!("$p{index}b{at}");
+                    let mut layer = found("text", (10.0 + 50.0 * at as f64, 20.0));
+                    layer["source"]["content"] = json!(source);
+                    ops.push(
+                        json!({"op": "add_layer", "id": id, "page": page, "index": at,
+                        "layer": layer}),
+                    );
+                    if let Some(text) = translation {
+                        ops.push(json!({"op": "set_text", "layer": id, "text": text}));
+                        ops.push(
+                            json!({"op": "set_attribute", "layer": id, "namespace": "c2pa",
+                            "key": "translation", "value": {"action": "c2pa.translated"}}),
+                        );
+                    }
+                }
+            }
+            let change = session.apply(Edit {
+                label: "test".to_owned(),
+                ops: ops
+                    .into_iter()
+                    .map(serde_json::from_value)
+                    .collect::<Result<_, _>>()?,
+            })?;
+            let (mut made, mut layers) = (BTreeMap::new(), BTreeMap::new());
+            for created in change.created {
+                match created {
+                    Created::Page {
+                        id,
+                        label: Some(label),
+                    } => {
+                        made.insert(label, id);
+                    }
+                    Created::Layer {
+                        id,
+                        label: Some(label),
+                    } => {
+                        layers.insert(label, id);
+                    }
+                    _ => {}
+                }
+            }
+            let blocks = pages.iter().enumerate().map(|(index, blocks)| {
+                let at = 0..blocks.len();
+                at.map(|at| layers[&format!("p{index}b{at}")]).collect()
+            });
+            Ok(Self {
+                _dir: dir,
+                session: Mutex::new(session),
+                pages: (0..pages.len())
+                    .map(|index| made[&format!("p{index}")])
+                    .collect(),
+                blocks: blocks.collect(),
+            })
+        }
+
+        /// The project's translation conversation, new, as the first
+        /// translation since the project opened finds it, and as `keep`
+        /// leaves one it started again.
+        fn conversation(&self) -> Result<tokio::sync::OwnedMutexGuard<Conversation>> {
+            let id = self.session.lock().id();
+            crate::stages::translate::Conversations::default()
+                .lock(id)
+                .context("a conversation no one holds")
+        }
+    }
+
+    /// `conversation`'s history, as the next turn sends it and the context
+    /// fits it.
+    fn history(conversation: &Conversation) -> Vec<Message> {
+        let messages = conversation.context.messages().iter();
+        messages.map(|message| Message::clone(message)).collect()
+    }
+
+    /// Records a page's turn in `conversation` as a turn records it once its
+    /// answer passed.
+    fn turn(conversation: &mut Conversation, text: &str, translation: &str) {
+        let exchange = vec![
+            Message::user(format!("{{\n  \"1\": {}\n}}", json!(text))),
+            Message::assistant(format!("{{\"1\": {}}}", json!(translation))),
+        ];
+        conversation.context.record([(exchange, Usage::default())]);
+        conversation.last = Some((vec![text.to_owned()], vec![translation.to_owned()]));
+    }
+
+    #[test]
+    fn a_fresh_conversation_starts_with_the_page_before_as_the_user_left_it() -> Result<()> {
+        let chapter = Chapter::new(&[
+            &[
+                ("ヒナです。", Some("It's Hina.")),
+                // Nothing read, nothing translated: neither goes in.
+                ("", None),
+                ("どうして", None),
+                ("先生!", Some("Teacher!")),
+            ],
+            &[("ここに", None)],
+        ])?;
+        // The user fixed the last line by hand.
+        chapter.session.lock().apply(Edit {
+            label: "test".to_owned(),
+            ops: vec![Op::SetText {
+                layer: chapter.blocks[0][3].into(),
+                text: " Sensei! ".to_owned(),
+            }],
+        })?;
+        let mut conversation = chapter.conversation()?;
+        seed(&mut conversation, &chapter.session, chapter.pages[1]);
+        // One exchange in the shapes a turn records: the page's texts
+        // numbered as a turn sends them, then their translations as they are
+        // now, the hand fix among them.
+        assert_eq!(
+            history(&conversation),
+            [
+                Message::user("{\n  \"1\": \"ヒナです。\",\n  \"2\": \"先生!\"\n}"),
+                Message::assistant("{\n  \"1\": \"It's Hina.\",\n  \"2\": \"Sensei!\"\n}"),
+            ]
+        );
+        // And the last page, which the next answer mustn't echo.
+        assert_eq!(
+            conversation.last,
+            Some((
+                vec!["ヒナです。".to_owned(), "先生!".to_owned()],
+                vec!["It's Hina.".to_owned(), "Sensei!".to_owned()],
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_conversation_under_way_gets_no_second_seed() -> Result<()> {
+        let chapter = Chapter::new(&[
+            &[("ヒナです。", Some("It's Hina."))],
+            &[("ここに", Some("Here."))],
+            &[("まだ", None)],
+        ])?;
+        let mut conversation = chapter.conversation()?;
+        seed(&mut conversation, &chapter.session, chapter.pages[1]);
+        let seeded = (history(&conversation), conversation.last.clone());
+        assert_eq!(seeded.0.len(), 2);
+        // The next page's turn keeps the conversation going: no seed.
+        seed(&mut conversation, &chapter.session, chapter.pages[2]);
+        assert_eq!((history(&conversation), conversation.last.clone()), seeded);
+
+        // Nor does one a turn went into.
+        let mut conversation = chapter.conversation()?;
+        turn(&mut conversation, "ヒナです。", "It's Hina.");
+        let kept = (history(&conversation), conversation.last.clone());
+        seed(&mut conversation, &chapter.session, chapter.pages[1]);
+        assert_eq!((history(&conversation), conversation.last.clone()), kept);
+        Ok(())
+    }
+
+    #[test]
+    fn the_first_page_and_one_after_an_untranslated_page_get_no_seed() -> Result<()> {
+        let chapter = Chapter::new(&[
+            &[("ヒナです。", Some("It's Hina."))],
+            &[("ここに", None), ("", None)],
+            &[("まだ", None)],
+        ])?;
+        for page in [chapter.pages[0], chapter.pages[2]] {
+            let mut conversation = chapter.conversation()?;
+            seed(&mut conversation, &chapter.session, page);
+            assert!(history(&conversation).is_empty());
+            assert_eq!(conversation.last, None);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn the_seed_is_history_the_context_fits_as_any_turn() -> Result<()> {
+        let chapter = Chapter::new(&[&[("ヒナです。", Some("It's Hina."))], &[("ここに", None)]])?;
+        let mut conversation = chapter.conversation()?;
+        seed(&mut conversation, &chapter.session, chapter.pages[1]);
+        // The page's own turn goes in after it, so the seed is the oldest
+        // exchange of the history the context measures before each turn and
+        // cuts from when it's full, as it would a page's turn.
+        turn(&mut conversation, "ここに", "Here.");
+        assert_eq!(
+            history(&conversation),
+            [
+                Message::user("{\n  \"1\": \"ヒナです。\"\n}"),
+                Message::assistant("{\n  \"1\": \"It's Hina.\"\n}"),
+                Message::user("{\n  \"1\": \"ここに\"\n}"),
+                Message::assistant("{\"1\": \"Here.\"}"),
+            ]
         );
         Ok(())
     }
