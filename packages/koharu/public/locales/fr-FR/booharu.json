@@ -27,6 +27,16 @@
       "koharuDiscord": "Discord de Koharu",
       "koharuGithub": "Koharu sur GitHub"
     },
+    "ocrBox": {
+      "defaultMode": "Action par défaut",
+      "defaultModeDescription": "Relâchez avec Alt pour lire uniquement, ou avec Maj pour lire, traduire et nettoyer.",
+      "description": "Une zone tracée avec l’outil O devient un bloc de texte. Elle est toujours lue, et l’action choisie décide si elle est aussi traduite et nettoyée.",
+      "modes": {
+        "read": "Lire",
+        "read_translate": "Lire et traduire",
+        "read_translate_clean": "Lire, traduire et nettoyer"
+      }
+    },
     "tools": {
       "ocrBoxModifiers": "Alt : lire uniquement. Maj : lire, traduire et nettoyer."
     }

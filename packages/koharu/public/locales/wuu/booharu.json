@@ -24,6 +24,16 @@
       "koharuDiscord": "Koharu 个 Discord",
       "koharuGithub": "GitHub 浪个 Koharu"
     },
+    "ocrBox": {
+      "defaultMode": "默认操作",
+      "defaultModeDescription": "放开鼠标辰光，按牢 Alt 光识别；按牢 Shift 会识别、翻译搭清理。",
+      "description": "用 O 工具画个框会变成文本块。框里向个文字总归会识别，要勿要再翻译搭清理，由拣个操作决定。",
+      "modes": {
+        "read": "识别",
+        "read_translate": "识别搭翻译",
+        "read_translate_clean": "识别、翻译搭清理"
+      }
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：光识别。Shift：识别、翻译搭清理。"
     }

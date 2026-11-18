@@ -30,6 +30,16 @@
       "koharuDiscord": "Discord الخاص بـ Koharu",
       "koharuGithub": "Koharu على GitHub"
     },
+    "ocrBox": {
+      "defaultMode": "الإجراء الافتراضي",
+      "defaultModeDescription": "أفلت مع الضغط على Alt للقراءة فقط، أو على Shift للقراءة والترجمة والتنظيف.",
+      "description": "يصبح المربع المرسوم بأداة O كتلة نص. يُقرأ دائمًا، ويحدّد الإجراء ما إذا كان سيُترجم ويُنظّف أيضًا.",
+      "modes": {
+        "read": "قراءة",
+        "read_translate": "قراءة وترجمة",
+        "read_translate_clean": "قراءة وترجمة وتنظيف"
+      }
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: قراءة فقط. Shift: قراءة وترجمة وتنظيف."
     }

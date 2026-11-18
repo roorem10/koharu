@@ -24,6 +24,16 @@
       "koharuDiscord": "Koharu Discord",
       "koharuGithub": "GitHub'da Koharu"
     },
+    "ocrBox": {
+      "defaultMode": "Varsayılan işlem",
+      "defaultModeDescription": "Yalnızca okumak için Alt basılıyken bırakın; okumak, çevirmek ve temizlemek için Shift basılıyken bırakın.",
+      "description": "O aracıyla çizilen kutu bir metin bloğu olur. Kutu her zaman okunur; ayrıca çevrilip temizlenip temizlenmeyeceğine seçilen işlem karar verir.",
+      "modes": {
+        "read": "Oku",
+        "read_translate": "Oku ve çevir",
+        "read_translate_clean": "Oku, çevir ve temizle"
+      }
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: yalnızca oku. Shift: oku, çevir ve temizle."
     }

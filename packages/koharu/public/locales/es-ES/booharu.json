@@ -27,6 +27,16 @@
       "koharuDiscord": "Discord de Koharu",
       "koharuGithub": "Koharu en GitHub"
     },
+    "ocrBox": {
+      "defaultMode": "Acción predeterminada",
+      "defaultModeDescription": "Suelta con Alt para solo leer, o con Mayús para leer, traducir y limpiar.",
+      "description": "Un cuadro dibujado con la herramienta O se convierte en un bloque de texto. Siempre se lee, y la acción decide si además se traduce y se limpia.",
+      "modes": {
+        "read": "Leer",
+        "read_translate": "Leer y traducir",
+        "read_translate_clean": "Leer, traducir y limpiar"
+      }
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: solo leer. Mayús: leer, traducir y limpiar."
     }

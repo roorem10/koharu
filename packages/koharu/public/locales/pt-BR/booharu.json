@@ -27,6 +27,16 @@
       "koharuDiscord": "Discord do Koharu",
       "koharuGithub": "Koharu no GitHub"
     },
+    "ocrBox": {
+      "defaultMode": "Ação padrão",
+      "defaultModeDescription": "Solte com Alt para fazer apenas OCR; com Shift para fazer OCR, traduzir e limpar.",
+      "description": "Uma caixa desenhada com a ferramenta O vira um bloco de texto. Ela sempre passa por OCR, e a ação decide se também é traduzida e limpa.",
+      "modes": {
+        "read": "OCR",
+        "read_translate": "OCR e tradução",
+        "read_translate_clean": "OCR, tradução e limpeza"
+      }
+    },
     "tools": {
       "ocrBoxModifiers": "Alt: somente OCR. Shift: OCR, tradução e limpeza."
     }

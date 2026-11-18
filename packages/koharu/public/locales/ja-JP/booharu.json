@@ -24,6 +24,16 @@
       "koharuDiscord": "Koharu の Discord",
       "koharuGithub": "GitHub の Koharu"
     },
+    "ocrBox": {
+      "defaultMode": "既定の操作",
+      "defaultModeDescription": "Altを押しながら離すとOCRのみ、Shiftを押しながら離すとOCR・翻訳・クリーンアップを実行します。",
+      "description": "Oツールで描いたボックスはテキストブロックになります。必ずOCRされ、翻訳とクリーンアップも行うかどうかは操作で決まります。",
+      "modes": {
+        "read": "OCR",
+        "read_translate": "OCRと翻訳",
+        "read_translate_clean": "OCR・翻訳・クリーンアップ"
+      }
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：OCRのみ。Shift：OCR・翻訳・クリーンアップ。"
     }

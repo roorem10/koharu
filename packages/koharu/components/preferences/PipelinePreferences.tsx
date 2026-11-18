@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react'
 import { type ReactNode, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { OcrBoxPreferences } from '@/components/booharu/boxes/OcrBoxPreferences' // Booharu: the O tool.
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { detectors, inpainters, recognizers, vendorName } from '@/components/preferences/models'
 import {
@@ -147,6 +148,8 @@ export function PipelinePreferences({
           onChange={(next) => onChange({ ...value, translator: next })}
         />
       </Stage>
+      {/* Booharu: the O tool's default mode, saved to its own section at once. */}
+      <OcrBoxPreferences />
     </PreferencePage>
   )
 }

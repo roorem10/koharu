@@ -24,6 +24,16 @@
       "koharuDiscord": "Koharu 的 Discord",
       "koharuGithub": "GitHub 上的 Koharu"
     },
+    "ocrBox": {
+      "defaultMode": "默认操作",
+      "defaultModeDescription": "松开鼠标时按住 Alt 仅识别；按住 Shift 则识别、翻译并清理。",
+      "description": "用 O 工具画出的框会成为文本块。框内文字总会被识别，是否再翻译和清理由所选操作决定。",
+      "modes": {
+        "read": "识别",
+        "read_translate": "识别并翻译",
+        "read_translate_clean": "识别、翻译并清理"
+      }
+    },
     "tools": {
       "ocrBoxModifiers": "Alt：仅识别。Shift：识别、翻译并清理。"
     }
