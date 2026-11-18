@@ -63,6 +63,10 @@ release that follow.
   it, so a text typed with the text tool is selected the moment it's added.
 - **The brush stays the host's.** A request such as Alt and the wheel asks the
   host to change the brush, and the host decides.
+- **Booharu: a small frame moves from its middle.** A side's or a corner's
+  reach is at most a third of the frame across it, so a press in the middle of
+  any frame, however small, moves it rather than resizing it. This answers
+  Koharu issue #1064.
 
 ## Sources
 

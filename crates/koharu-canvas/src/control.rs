@@ -208,7 +208,19 @@ impl Control {
     pub fn handle_at(&self, at: Point, view: &View) -> Option<Handle> {
         let reach = view.page_length(REACH);
         let [nw, ne, se, sw] = self.corners();
+        // Booharu: a side's or a corner's reach is at most a third of the
+        // frame across it, so a press in the middle of any frame, however
+        // small, moves it rather than resizing it. This answers Koharu issue
+        // #1064 and could be offered upstream.
+        let (across, down) = (nw.distance(ne) / 3.0, nw.distance(sw) / 3.0);
         self.handles().into_iter().find(|&handle| {
+            // Booharu: each handle's reach, capped as above.
+            let reach = match handle {
+                Handle::East | Handle::West => reach.min(across),
+                Handle::North | Handle::South => reach.min(down),
+                Handle::Rotate => reach,
+                _ => reach.min(across).min(down),
+            };
             let side = match handle {
                 Handle::North => Some(Line::new(nw, ne)),
                 Handle::East => Some(Line::new(ne, se)),
@@ -278,5 +290,75 @@ impl Control {
             self.rotates,
             self.locked,
         )
+    }
+}
+
+// Booharu: the reach of a small frame's handles, Koharu issue #1064.
+#[cfg(test)]
+mod tests {
+    use koharu_scene::Uuid;
+    use kurbo::{Size, TranslateScale};
+
+    use super::*;
+
+    /// A frame `width` by `height` device-independent pixels on screen,
+    /// resizing by `resize`, seen zoomed out to a quarter, so each of those
+    /// pixels is four of the page's.
+    fn frame(width: f64, height: f64, resize: Resize) -> (Control, View) {
+        let mut view = View::default();
+        view.set_viewport(Rect::new(0.0, 0.0, 1000.0, 1000.0), 1.0);
+        view.set_page(Size::new(4000.0, 4000.0), false);
+        view.set_camera(TranslateScale::scale(0.25));
+        let local = Rect::new(0.0, 0.0, width * 4.0, height * 4.0);
+        let transform = Affine::translate((40.0, 40.0));
+        let control = Control::new(LayerId(Uuid::nil()), local, transform, resize, true, false);
+        (control, view)
+    }
+
+    /// The page point `(x, y)` device-independent pixels from the frame's
+    /// top-left corner.
+    fn at(x: f64, y: f64) -> Point {
+        Point::new(40.0 + x * 4.0, 40.0 + y * 4.0)
+    }
+
+    #[test]
+    fn a_small_frame_moves_from_its_middle() {
+        for resize in [Resize::Edges, Resize::All] {
+            // Every handle's 7 pixels would reach a 10 by 10 box's middle.
+            let (control, view) = frame(10.0, 10.0, resize);
+            assert_eq!(control.handle_at(at(5.0, 5.0), &view), None);
+            assert_eq!(
+                control.handle_at(at(0.0, 0.0), &view),
+                Some(Handle::NorthWest)
+            );
+            assert_eq!(control.handle_at(at(10.0, 5.0), &view), Some(Handle::East));
+
+            // A column, as a vertical line of text: its middle moves it, and
+            // its ends keep their whole reach.
+            let (control, view) = frame(6.0, 40.0, resize);
+            assert_eq!(control.handle_at(at(3.0, 20.0), &view), None);
+            assert_eq!(control.handle_at(at(3.0, 5.0), &view), Some(Handle::North));
+        }
+    }
+
+    #[test]
+    fn a_large_frame_keeps_its_handles_reach() {
+        for resize in [Resize::Edges, Resize::All] {
+            let (control, view) = frame(200.0, 200.0, resize);
+            // Five pixels from a corner, and from two sides' middles.
+            assert_eq!(
+                control.handle_at(at(3.0, 4.0), &view),
+                Some(Handle::NorthWest)
+            );
+            assert_eq!(
+                control.handle_at(at(195.0, 100.0), &view),
+                Some(Handle::East)
+            );
+            assert_eq!(
+                control.handle_at(at(100.0, 195.0), &view),
+                Some(Handle::South)
+            );
+            assert_eq!(control.handle_at(at(100.0, 100.0), &view), None);
+        }
     }
 }
