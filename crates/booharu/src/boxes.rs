@@ -135,6 +135,7 @@ pub fn add_box(session: &Session, page: PageId, rect: Bounds, mode: OcrBoxMode) 
         unlocked(&project, parent.id)?;
     }
     let siblings = parent.map_or(&found.layers, |parent| &parent.children);
+    let in_balloon = parent.is_some_and(|parent| matches!(parent.content, Content::Balloon(_)));
     let vertical = rect.height() >= 1.15 * rect.width();
     let direction = if vertical {
         Direction::Vertical
@@ -146,7 +147,7 @@ pub fn add_box(session: &Session, page: PageId, rect: Bounds, mode: OcrBoxMode) 
         "id": format!("${BOX}"),
         "page": page,
         "parent": parent.map(|parent| parent.id),
-        "index": reading_index(siblings, rect, vertical),
+        "index": reading_index(siblings, rect, vertical, in_balloon),
         "layer": {"kind": "block", "role": "text", "source": {
             "frame": {"box": {"bounds": bounds(rect)}},
             "direction": direction,
@@ -959,23 +960,34 @@ fn clipped(polygon: &[Point], rect: kurbo::Rect) -> Vec<Point> {
 
 /// Where among `siblings` a block at `rect` goes to be read in order: just
 /// before the first sibling whose first text it is read before, else last.
-/// Vertical text reads right to left then top to bottom, horizontal text top
-/// to bottom then left to right, as Booharu 0.0.4 ordered a balloon's boxes.
-/// A sibling holding no text is no part of the reading.
-fn reading_index(siblings: &[Layer], rect: kurbo::Rect, vertical: bool) -> usize {
+/// Among a balloon's texts, `in_balloon`, vertical text reads right to left
+/// then top to bottom, and horizontal text top to bottom then left to right,
+/// as Booharu 0.0.4 ordered a balloon's boxes. Among a panel's or the page's
+/// balloons and texts, as a manga page reads, those sharing a row read right
+/// to left and the rows top to bottom, so a vertical line low on the page
+/// isn't read before a balloon above it. A sibling holding no text is no
+/// part of the reading.
+fn reading_index(siblings: &[Layer], rect: kurbo::Rect, vertical: bool, in_balloon: bool) -> usize {
     siblings
         .iter()
         .position(|sibling| {
             first_text(sibling).is_some_and(|text| {
-                let order = match vertical {
-                    true => text
+                let order = match (in_balloon, vertical) {
+                    (true, true) => text
                         .x0
                         .total_cmp(&rect.x0)
                         .then(rect.y0.total_cmp(&text.y0)),
-                    false => rect
+                    (true, false) => rect
                         .y0
                         .total_cmp(&text.y0)
                         .then(rect.x0.total_cmp(&text.x0)),
+                    // One row: the one further right first.
+                    (false, _) if rect.y0 < text.y1 && text.y0 < rect.y1 => text
+                        .center()
+                        .x
+                        .total_cmp(&rect.center().x)
+                        .then(rect.y0.total_cmp(&text.y0)),
+                    (false, _) => rect.y0.total_cmp(&text.y0),
                 };
                 order.is_lt()
             })
@@ -1565,6 +1577,44 @@ mod tests {
             .map(|layer| layer.id)
             .collect();
         assert_eq!(layers, [balloon, top, between, bottom]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_box_beside_balloons_is_read_by_rows_right_to_left() -> Result<()> {
+        let mut page = Fixture::new(800, 1000, &[rect(0.0, 0.0, 800.0, 1000.0)])?;
+        let panel = page.add(
+            None,
+            json!({"kind": "panel", "outline": outline(0.0, 0.0, 800.0, 1000.0)}),
+        )?;
+        let balloon = |page: &mut Fixture, x: f64, y: f64| -> Result<LayerId> {
+            let balloon = page.add(
+                Some(panel),
+                json!({"kind": "balloon", "outline": outline(x - 20.0, y - 20.0, 80.0, 240.0)}),
+            )?;
+            let text = page_bounds(x, y, 40.0, 200.0);
+            page.add(Some(balloon), text_block(text, Direction::Vertical, "あ"))?;
+            Ok(balloon)
+        };
+        // One balloon at the top right, one lower at the left.
+        let right = balloon(&mut page, 600.0, 50.0)?;
+        let left = balloon(&mut page, 100.0, 300.0)?;
+
+        // A vertical line low on the right, in no balloon, is read after
+        // both, though it lies right of them.
+        let low = page.add_box(page_bounds(650.0, 700.0, 40.0, 200.0), OcrBoxMode::Read)?;
+        // One in the left balloon's row, right of it, is read before it.
+        let beside = page.add_box(page_bounds(400.0, 320.0, 40.0, 150.0), OcrBoxMode::Read)?;
+        assert_eq!(page.holder(low)?, Some(panel));
+        let children: Vec<LayerId> = page
+            .session
+            .project()
+            .layer(panel)?
+            .children
+            .iter()
+            .map(|layer| layer.id)
+            .collect();
+        assert_eq!(children, [right, beside, left, low]);
         Ok(())
     }
 
