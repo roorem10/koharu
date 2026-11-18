@@ -2,7 +2,12 @@
 //! text the T tool adds and of a translation typed into a block with none,
 //! on the canvas's harness.
 
-use booharu_core::settings::{DefaultTextStyle, LetteringSettings};
+use std::collections::BTreeMap;
+
+use booharu_core::{
+    lettering::{CategoryFont, LetteringCategory},
+    settings::{DefaultTextStyle, LetteringSettings},
+};
 use koharu_scene::{CharStyle, Fit};
 
 use super::*;
@@ -391,6 +396,56 @@ fn a_translation_typed_into_a_block_with_none_takes_a_new_translations_look() {
             ..source
         }
     );
+}
+
+#[test]
+fn a_translation_typed_into_a_block_takes_its_categorys_font_while_the_switch_is_on() {
+    // A block the user labelled Shout, and one floating outside any
+    // balloon, as `untranslated`'s are lettered.
+    let block = |x: f64, attributes: Value| {
+        json!({"kind": "block", "role": "text", "attributes": attributes, "source": {
+            "frame": {"box": {"bounds": {"x": x, "y": 50.0, "width": 100.0, "height": 100.0}}},
+            "content": "やあ",
+            "style": {"chars": {"size": 32.0, "fill": BLUE, "stroke": WHITE, "stroke_width": 3.0}},
+        }})
+    };
+    let shout = json!({"booharu": {"lettering": {"category": "shout", "source": "user"}}});
+    let Some(mut fixture) = unscaled(vec![
+        json!({"op": "add_layer", "page": "$page", "index": 0, "layer": block(50.0, shout)}),
+        json!({"op": "add_layer", "page": "$page", "index": 1, "layer": block(250.0, json!({}))}),
+    ]) else {
+        return;
+    };
+    let [labelled, floating] = layers(&fixture)[..] else {
+        panic!("two blocks");
+    };
+    // Pick fonts automatically on, Shout in a bold Booharu Shout, and no
+    // font for Normal Dialogue, so the floating block's category has none.
+    let mut settings = pushed(true, Some(WHITE));
+    settings.text.lettering.auto = true;
+    settings.text.lettering.categories = BTreeMap::from([(
+        LetteringCategory::Shout,
+        CategoryFont {
+            family: Some("Booharu Shout".to_owned()),
+            bold: true,
+            italic: false,
+        },
+    )]);
+    fixture.canvas.set_booharu(settings);
+    let font = |chars: CharStyle| (chars.family, chars.weight, chars.italic);
+
+    // The category comes from the page the canvas holds.
+    assert_eq!(
+        font(type_translation(&mut fixture, labelled, (100.0, 100.0))),
+        (Some("Booharu Shout".to_owned()), Some(700), None)
+    );
+    assert_eq!(
+        font(type_translation(&mut fixture, floating, (300.0, 100.0))),
+        (Some(FONT.to_owned()), None, None)
+    );
+    // The T tool's own text has no category (T17), only the default look.
+    let text = type_new(&mut fixture, (10.0, 210.0), (110.0, 260.0));
+    assert_eq!(font(chars(&text)), (Some(FONT.to_owned()), None, None));
 }
 
 #[test]

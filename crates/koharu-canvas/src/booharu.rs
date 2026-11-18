@@ -29,9 +29,12 @@ pub struct BooharuSettings {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextDefaults {
     /// `[booharu-lettering]`: the default colours and outline, which the T
-    /// tool's text always gets, having nothing measured to go by, and the
+    /// tool's text always gets, having nothing measured to go by; the
     /// colour detection switch, which decides whether a translation typed
-    /// into a block with none keeps its source's colours or gets those.
+    /// into a block with none keeps its source's colours or gets those; and
+    /// the lettering categories' fonts, which such a translation gets its
+    /// block's in place of the default font while Pick fonts automatically
+    /// is on. The T tool's text has no category.
     pub lettering: LetteringSettings,
     /// The default font, the first of Koharu's Preferred fonts, which new
     /// text without a family gets a copy of; none to write none, so Koharu's
@@ -198,9 +201,14 @@ impl OcrBox {
 
 #[cfg(test)]
 mod tests {
-    use booharu_core::settings::DefaultTextStyle;
+    use std::collections::BTreeMap;
+
+    use booharu_core::{
+        lettering::{CategoryFont, LetteringCategory},
+        settings::DefaultTextStyle,
+    };
     use koharu_scene::{Bounds, Created, Edit, Op, Rgba, Session};
-    use serde_json::json;
+    use serde_json::{Value, json};
 
     use super::*;
 
@@ -274,59 +282,76 @@ mod tests {
         }
     }
 
-    /// A page holding a dialogue block and a sound effect, neither
-    /// translated, each lettered in blue outlined 3 pixels wide in white at
-    /// size 32; and their ids.
-    fn page() -> (Page, LayerId, LayerId) {
+    /// A page 400 by 400 holding `layers`, as add_layer ops' JSON on the page
+    /// `$p`, and the ids of the layers labelled.
+    fn page_of(layers: Vec<Value>) -> (Page, impl Fn(&str) -> LayerId) {
         let dir = tempfile::tempdir().expect("a folder");
         let mut session = Session::create(dir.path().join("test.khr")).expect("a project");
-        let block = |role: &str| {
-            json!({"kind": "block", "role": role, "source": {
-                "frame": {"box": {"bounds": {"x": 10.0, "y": 20.0, "width": 40.0, "height": 120.0}}},
-                "content": "どうして",
-                "style": {"chars": {"size": 32.0, "fill": BLUE, "stroke": WHITE, "stroke_width": 3.0}},
-            }})
-        };
-        let ops = [
-            json!({"op": "add_page", "id": "$p", "index": 0, "size": {"width": 400, "height": 400}}),
-            json!({"op": "add_layer", "id": "$talk", "page": "$p", "index": 0, "layer": block("text")}),
-            json!({"op": "add_layer", "id": "$boom", "page": "$p", "index": 1, "layer": block("sfx")}),
-        ];
+        let page = json!({"op": "add_page", "id": "$p", "index": 0, "size": {"width": 400, "height": 400}});
         let change = session
             .apply(Edit {
                 label: "test".to_owned(),
-                ops: ops
-                    .into_iter()
+                ops: std::iter::once(page)
+                    .chain(layers)
                     .map(|op| serde_json::from_value::<Op>(op).expect("an op"))
                     .collect(),
             })
             .expect("an edit");
-        let id = |wanted: &str| {
-            change
-                .created
-                .iter()
-                .find_map(|created| match created {
-                    Created::Layer {
-                        id,
-                        label: Some(label),
-                    } if label == wanted => Some(*id),
-                    _ => None,
-                })
-                .expect("the block")
-        };
+        let ids: Vec<(String, LayerId)> = change
+            .created
+            .iter()
+            .filter_map(|created| match created {
+                Created::Layer {
+                    id,
+                    label: Some(label),
+                } => Some((label.clone(), *id)),
+                Created::Layer { .. } | Created::Page { .. } => None,
+            })
+            .collect();
         let project = session.project();
         let page = project.page(change.pages.added[0]).expect("the page");
-        (page.clone(), id("talk"), id("boom"))
+        let id = move |wanted: &str| {
+            ids.iter()
+                .find_map(|(label, id)| (label == wanted).then_some(*id))
+                .expect("the layer")
+        };
+        (page.clone(), id)
+    }
+
+    /// The add_layer op of the block `label` of `role`, untranslated,
+    /// lettered in blue outlined 3 pixels wide in white at size 32 in a box
+    /// 40 by 120 at `x`, 20, with `attributes`.
+    fn block(label: &str, role: &str, x: f64, attributes: Value) -> Value {
+        json!({"op": "add_layer", "id": format!("${label}"), "page": "$p", "index": 0, "layer": {
+            "kind": "block", "role": role, "attributes": attributes, "source": {
+                "frame": {"box": {"bounds": {"x": x, "y": 20.0, "width": 40.0, "height": 120.0}}},
+                "content": "どうして",
+                "style": {"chars": {"size": 32.0, "fill": BLUE, "stroke": WHITE, "stroke_width": 3.0}},
+            },
+        }})
+    }
+
+    /// A page holding a dialogue block and a sound effect, neither
+    /// translated, each lettered in blue outlined 3 pixels wide in white at
+    /// size 32; and their ids.
+    fn page() -> (Page, LayerId, LayerId) {
+        let (page, id) = page_of(vec![
+            block("talk", "text", 10.0, json!({})),
+            block("boom", "sfx", 10.0, json!({})),
+        ]);
+        (page, id("talk"), id("boom"))
     }
 
     /// The source of `layer` on `page`, standing in for a translation typed
     /// into it, with the look `untranslated` gives it under `settings`.
     fn typed(page: &Page, layer: LayerId, settings: &BooharuSettings) -> CharStyle {
-        let Some(Content::Block(block)) = page
-            .layers
-            .iter()
-            .find(|found| found.id == layer)
-            .map(|found| &found.content)
+        fn find(layers: &[Layer], id: LayerId) -> Option<&Layer> {
+            layers.iter().find_map(|layer| match layer.id == id {
+                true => Some(layer),
+                false => find(&layer.children, id),
+            })
+        }
+        let Some(Content::Block(block)) = find(&page.layers, layer).map(|found| &found.content)
         else {
             panic!("no block {layer}");
         };
@@ -380,5 +405,102 @@ mod tests {
                 ..source
             }
         );
+    }
+
+    /// `pushed`'s settings, with detection on, with Pick fonts automatically
+    /// `auto`: Shout in a bold Booharu Shout, Whisper italic in the default
+    /// font, and SFX in Booharu Boom, and no font for Normal Dialogue, so a
+    /// category without one of its own has none.
+    fn categories(auto: bool) -> BooharuSettings {
+        let font = |family: Option<&str>, bold, italic| CategoryFont {
+            family: family.map(str::to_owned),
+            bold,
+            italic,
+        };
+        let mut settings = pushed(true, Some(WHITE));
+        settings.text.lettering.auto = auto;
+        settings.text.lettering.categories = BTreeMap::from([
+            (
+                LetteringCategory::Shout,
+                font(Some("Booharu Shout"), true, false),
+            ),
+            (LetteringCategory::Whisper, font(None, false, true)),
+            (
+                LetteringCategory::Sfx,
+                font(Some("Booharu Boom"), false, false),
+            ),
+        ]);
+        settings
+    }
+
+    #[test]
+    fn a_translation_typed_into_a_block_takes_its_categorys_font_while_the_switch_is_on() {
+        // A spiky balloon holding a block, and outside it a block the user
+        // labelled Whisper, Koharu's sound effect, and a floating block.
+        let mut spiky = String::new();
+        for i in 0..24 {
+            let angle = f64::from(i) * std::f64::consts::TAU / 24.0;
+            let radius = if i % 2 == 0 { 120.0 } else { 72.0 };
+            let (x, y) = (200.0 + radius * angle.cos(), 270.0 + radius * angle.sin());
+            spiky.push_str(&format!("{}{x} {y} ", if i == 0 { "M" } else { "L" }));
+        }
+        let whisper = json!({"booharu": {"lettering": {"category": "whisper", "source": "user"}}});
+        let mut inside = block("inside", "text", 180.0, json!({}));
+        inside["parent"] = json!("$spiky");
+        inside["layer"]["source"]["frame"]["box"]["bounds"]["y"] = json!(210.0);
+        let (page, id) = page_of(vec![
+            json!({"op": "add_layer", "id": "$spiky", "page": "$p", "index": 0,
+                "layer": {"kind": "balloon", "outline": spiky + "Z"}}),
+            inside,
+            block("labelled", "text", 10.0, whisper),
+            block("boom", "sfx", 60.0, json!({})),
+            block("floating", "text", 110.0, json!({})),
+        ]);
+        let source = CharStyle {
+            size: Some(32.0),
+            fill: Some(BLUE),
+            stroke: Some(WHITE),
+            stroke_width: Some(3.0),
+            ..CharStyle::default()
+        };
+        let font = |family: &str, weight: Option<u16>, italic: Option<bool>| CharStyle {
+            family: Some(family.to_owned()),
+            weight,
+            italic,
+            ..source.clone()
+        };
+
+        // On, resolved from the page as the Story panel's typed translation
+        // resolves it: the spiky balloon's block is a shout; the labelled
+        // block a whisper, in the default font made italic; the sound effect
+        // SFX; and the floating block's category has no font, nor Normal
+        // Dialogue, so it keeps the default look's.
+        let on = categories(true);
+        assert_eq!(
+            typed(&page, id("inside"), &on),
+            font("Booharu Shout", Some(700), None)
+        );
+        assert_eq!(
+            typed(&page, id("labelled"), &on),
+            font(FONT, None, Some(true))
+        );
+        assert_eq!(
+            typed(&page, id("boom"), &on),
+            font("Booharu Boom", None, None)
+        );
+        assert_eq!(typed(&page, id("floating"), &on), font(FONT, None, None));
+
+        // Off, the default look alone, whatever the category.
+        let off = categories(false);
+        for name in ["inside", "labelled", "boom", "floating"] {
+            assert_eq!(
+                typed(&page, id(name), &off),
+                font(FONT, None, None),
+                "{name}"
+            );
+        }
+
+        // The T tool's free text has no category (T17): the default look.
+        assert_eq!(drafted(boxed(), &on), drafted(boxed(), &off));
     }
 }
