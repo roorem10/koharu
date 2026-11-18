@@ -118,6 +118,8 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         crate::booharu::fonts::booharu_set_font_favorite,
         crate::booharu::fonts::booharu_get_font_local_names,
         crate::booharu::runs::booharu_run,
+        crate::booharu::lettering::booharu_set_lettering_category,
+        crate::booharu::lettering::booharu_get_lettering,
     ];
     move |invoke: Invoke<CefRuntime>| {
         let message = &invoke.message;
@@ -200,5 +202,7 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         crate::booharu::fonts::booharu_set_font_favorite,
         crate::booharu::fonts::booharu_get_font_local_names,
         crate::booharu::runs::booharu_run,
+        crate::booharu::lettering::booharu_set_lettering_category,
+        crate::booharu::lettering::booharu_get_lettering,
     ](types)
 }

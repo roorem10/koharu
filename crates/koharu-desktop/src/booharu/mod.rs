@@ -8,6 +8,7 @@ pub(crate) mod boxes;
 pub(crate) mod canvas;
 pub(crate) mod events;
 pub(crate) mod fonts;
+pub(crate) mod lettering;
 pub(crate) mod mcp;
 pub(crate) mod notes;
 pub(crate) mod ocr_box;

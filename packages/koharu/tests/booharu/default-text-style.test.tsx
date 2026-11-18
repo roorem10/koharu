@@ -15,8 +15,8 @@ const WHITE = [1, 1, 1, 1] as const
 
 /** A default text style with red text and a white outline 3 px wide. */
 const styled = {
+  ...builtInLettering,
   default: { fill: [...RED], stroke: [...WHITE], stroke_width: 3 },
-  detect_colors: true,
 } satisfies LetteringSettings
 
 /** Settings > Typesetting, where the default text style sits below Preferred fonts. */
@@ -77,6 +77,7 @@ describe('Booharu default text style', () => {
       'booharu-mcp': { port: 50000 },
       'booharu-ocr-box': { default_mode: 'read' },
       'booharu-lettering': {
+        ...builtInLettering,
         default: { fill: [...RED], stroke: null, stroke_width: 1.5 },
         detect_colors: false,
       },

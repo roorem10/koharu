@@ -75,7 +75,7 @@ pub async fn booharu_apply_text_styles(
 
 /// The saved default look, and the default font: the first of Koharu's
 /// Preferred fonts, none when it lists none.
-fn look() -> anyhow::Result<(LetteringSettings, Option<String>)> {
+pub(super) fn look() -> anyhow::Result<(LetteringSettings, Option<String>)> {
     let settings = koharu_config::get::<LetteringSettings>()?;
     let families = koharu_config::get::<RendererConfig>()?.font_families;
     Ok((settings, first_font(&families).map(str::to_owned)))

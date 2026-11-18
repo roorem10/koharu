@@ -15,6 +15,10 @@ const OTHERS = {
   'booharu-lettering': {
     default: { fill: null, stroke: null, stroke_width: 1.5 },
     detect_colors: true,
+    auto: false,
+    categories: {},
+    small_text: 0.012,
+    model_confidence: 0.6,
   },
   'booharu-fonts': { favorites: [] },
   'booharu-runs': builtInRuns,

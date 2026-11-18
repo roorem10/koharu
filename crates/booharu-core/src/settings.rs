@@ -96,9 +96,9 @@ pub enum OcrBoxMode {
 }
 
 /// `[booharu-lettering]`: how new text looks, and the font each lettering
-/// category letters its text in (the `lettering` module). The default font
-/// isn't one of these settings: new text gets a copy of the first of
-/// Koharu's Preferred fonts, `[renderer] font_families`.
+/// category letters its text in. The default font isn't one of these
+/// settings: new text gets a copy of the first of Koharu's Preferred fonts,
+/// `[renderer] font_families`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(default)]
 pub struct LetteringSettings {

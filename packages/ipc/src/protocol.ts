@@ -123,6 +123,30 @@ export type Block = {
   cleanup?: Layer<Raster>
 }
 
+/**  A block's lettering category as the interface shows it. */
+export type BlockLettering = {
+  block: LayerId
+  /**  The category it's lettered in. */
+  category: LetteringCategory
+  /**  Why it has that category. */
+  reason: CategoryReason
+  /**
+   *  Its label, who chose it and how sure a model was; none when it has
+   *  none, or one that doesn't read.
+   */
+  label: Lettering | null
+  /**  Its balloon's shape and what decided it; none outside any balloon. */
+  shape: BlockShape | null
+  /**  Whether its translation's text or style was changed by hand. */
+  hand_edited: boolean
+}
+
+/**  A block's balloon's shape, and what decided it. */
+export type BlockShape = {
+  shape: BubbleShape
+  measures: ShapeMeasures
+}
+
 /**
  *  Why a box drawn with the O tool added nothing, or what failed reading it,
  *  for the interface to say in the user's language.
@@ -173,6 +197,15 @@ export type Brush = {
   color: Rgba
 }
 
+/**  The shape of a balloon's outline. */
+export type BubbleShape =
+  /**  A rounded balloon, speech's. */
+  | 'round'
+  /**  A rectangular box, narration's. */
+  | 'rectangle'
+  /**  A balloon with spikes, a shout's. */
+  | 'spiky'
+
 /**
  *  Where the page shows, for the interface over the canvas: a page point `p`
  *  sits at `p * zoom + (x, y)` in device-independent pixels from the
@@ -183,6 +216,55 @@ export type Camera = {
   x: number
   y: number
 }
+
+/**
+ *  What a change of category did to its blocks. A block can count in more
+ *  than one: a model's choice changes the label of a block whose style was
+ *  changed by hand, which counts in `changed` and in `kept_hand_edited`.
+ */
+export type CategoryCounts = {
+  /**  Blocks whose label, font, or record changed. */
+  changed: number
+  /**  Blocks left out because they, or a layer holding them, are locked. */
+  locked: number
+  /**  Blocks a model's choice left out because a user chose their category. */
+  kept_user_label: number
+  /**
+   *  Blocks whose font a model's choice kept because their style was
+   *  changed by hand.
+   */
+  kept_hand_edited: number
+  /**  Blocks without a translation, which take only their label. */
+  untranslated: number
+}
+
+/**
+ *  A category's own font in `[booharu-lettering] categories`. An entry
+ *  holds at least one of its three, as a category with none has no entry.
+ */
+export type CategoryFont = {
+  /**  The font family, never blank; none for a copy of the default font. */
+  family?: string | null
+  /**  Whether it's lettered bold, at weight 700. */
+  bold?: boolean
+  /**  Whether it's lettered italic. */
+  italic?: boolean
+}
+
+/**  Why a block has its category. */
+export type CategoryReason =
+  /**  A user chose it. */
+  | 'user'
+  /**  A model chose it. */
+  | 'model'
+  /**  Koharu detected the block as a sound effect. */
+  | 'sfx'
+  /**  Its text is small. */
+  | 'small_text'
+  /**  Its balloon's shape. */
+  | 'shape'
+  /**  It's in no balloon. */
+  | 'floating'
 
 /**  What one edit, undo, or redo changed. */
 export type Change = {
@@ -528,7 +610,63 @@ export type Layer<
 export type LayerId = string
 
 /**
- *  `[booharu-lettering]`: how new text looks. Its font isn't one of these
+ *  `lettering`: `{"category": category id, "source": "user" | "model",
+ *  "confidence"?: number}`, on a block: its lettering category, such as
+ *  `"shout"`, who chose it, and how sure a model was of its choice, from 0
+ *  to 1. A user's choice is never replaced by a model's. An id Booharu
+ *  doesn't know reads as no label, as a bad value does.
+ */
+export type Lettering = {
+  category: LetteringCategory
+  source: LetteringSource
+  confidence?: number | null
+}
+
+/**
+ *  What kind of text a block holds, which decides the font it's lettered in.
+ *  The order is Settings' order.
+ */
+export type LetteringCategory =
+  /**  Speech in a round balloon: the default kind. */
+  | 'normal_dialogue'
+  /**  A character's thoughts. */
+  | 'thoughts'
+  /**  Text outside any balloon. */
+  | 'floating'
+  /**  An aside in small letters. */
+  | 'small_text'
+  /**  Narration, in a rectangular box. */
+  | 'narration_box'
+  /**  A shout, in a spiky balloon. */
+  | 'shout'
+  /**  A weak or panicked shout. */
+  | 'weak_shout'
+  /**  A sound effect. */
+  | 'sfx'
+  /**  A moan. */
+  | 'moan'
+  /**  A title. */
+  | 'title'
+  /**  Text on a phone's screen. */
+  | 'phone_text'
+  /**  A whisper. */
+  | 'whisper'
+  /**  Shy or hesitant speech. */
+  | 'shy'
+  /**  Crying or trembling speech. */
+  | 'crying'
+  /**  Menacing or sinister speech. */
+  | 'menacing'
+  /**  Handwriting. */
+  | 'handwritten'
+  /**  A sign or printed text. */
+  | 'sign'
+  /**  An electronic voice, such as a speaker's or a robot's. */
+  | 'electronic_voice'
+
+/**
+ *  `[booharu-lettering]`: how new text looks, and the font each lettering
+ *  category letters its text in. The default font isn't one of these
  *  settings: new text gets a copy of the first of Koharu's Preferred fonts,
  *  `[renderer] font_families`.
  */
@@ -545,7 +683,32 @@ export type LetteringSettings = {
    *  keep theirs either way.
    */
   detect_colors?: boolean
+  /**
+   *  Pick fonts automatically: whether a block's translation is lettered
+   *  in its category's font, as it's written, as its category changes, and
+   *  by Apply. Off, Booharu writes no category font.
+   */
+  auto?: boolean
+  /**
+   *  The categories given their own font, by id: a category with none uses
+   *  Normal Dialogue's, and with neither the default font.
+   */
+  categories?: Partial<{ [key in LetteringCategory]: CategoryFont }>
+  /**
+   *  Text whose glyphs are under this share of the page's height is small
+   *  text, above 0 and at most 1: 0.012 is 24 pixels on a page 2000 high.
+   */
+  small_text?: number
+  /**
+   *  How sure, from 0 to 1, a model must be of a delivery category, such
+   *  as a whisper, for its label to win over small text and the balloon's
+   *  shape.
+   */
+  model_confidence?: number
 }
+
+/**  Who chose a [`Lettering`] category. */
+export type LetteringSource = 'user' | 'model'
 
 /**
  *  Grey pixels that limit its parent's visibility, as Photoshop's and Clip
@@ -1016,6 +1179,22 @@ export type Shape = {
   stroke?: Stroke | null
 }
 
+/**  What decided a balloon's shape. */
+export type ShapeMeasures = {
+  /**
+   *  Its area over that of the smallest rotated rectangle around it, from
+   *  0 to 1.
+   */
+  rectangularity: number
+  /**  Its area over that of its convex hull, from 0 to 1. */
+  solidity: number
+  /**
+   *  How many dips in its outline go deeper than 8% of that rectangle's
+   *  short side.
+   */
+  spikes: number
+}
+
 /**
  *  What a sign-in asks of the user: to sign in on a page, entering a code
  *  there for a device code.
@@ -1414,6 +1593,16 @@ export const commands = {
   /** Carries on with what the pages `target` names still need when `stages` holds every stage: queues one ordinary run for each group of the pages that need the same stages, one after another, each announced as `booharu_run_group`, and answers the plan with its first run; with nothing left to do, no run and no groups. With fewer stages, one ordinary run of them on every page `target` names, as Koharu's Run button queues it, as a plan of one group. While a group goes on in the open project, answers that one, with its run going now, and queues nothing. */
   booharuRun: (target: RunTarget, stages: Stage[]) =>
     invoke<RunPlan>('booharu_run', { target, stages }, { headers: headers() }),
+  /** Sets the lettering category of `blocks` as the user picks it, or Automatic for none, which clears their labels, as one undo step labelled `booharu_set_lettering_category`: each block's label, and while Pick fonts automatically is on, its translation's category font, even one changed by hand. Locked blocks, and blocks in locked layers, are left out. Answers how many blocks it changed, left out as locked, and found untranslated, which take only their label; with nothing to change, it makes no undo step. */
+  booharuSetLetteringCategory: (blocks: LayerId[], category: LetteringCategory | null) =>
+    invoke<CategoryCounts>(
+      'booharu_set_lettering_category',
+      { blocks, category },
+      { headers: headers() },
+    ),
+  /** The lettering of every block on `page`, in reading order: the category it's lettered in and why, its label, its balloon's shape with what decided it, none outside any balloon, and whether its text or style was changed by hand. */
+  booharuGetLettering: (page: PageId) =>
+    invoke<BlockLettering[]>('booharu_get_lettering', { page }, { headers: headers() }),
 }
 
 export const events = {

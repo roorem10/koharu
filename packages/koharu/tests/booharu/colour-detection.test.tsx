@@ -10,7 +10,7 @@ import { useKoharuStore } from '@/lib/store'
 import { commands, type Preferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
-import { builtInRuns, settingsDesktop } from './settings'
+import { builtInLettering, builtInRuns, settingsDesktop } from './settings'
 
 const SWITCH = "Use the original lettering's colors"
 
@@ -52,6 +52,7 @@ describe('Booharu colour detection switch', () => {
       'booharu-mcp': { port: 50000 },
       'booharu-ocr-box': { default_mode: 'read' },
       'booharu-lettering': {
+        ...builtInLettering,
         default: { fill: [1, 0, 0, 1], stroke: null, stroke_width: 1.5 },
         detect_colors: false,
       },

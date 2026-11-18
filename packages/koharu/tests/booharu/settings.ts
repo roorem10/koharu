@@ -11,6 +11,10 @@ import {
 export const builtInLettering = {
   default: { fill: null, stroke: null, stroke_width: 1.5 },
   detect_colors: true,
+  auto: false,
+  categories: {},
+  small_text: 0.012,
+  model_confidence: 0.6,
 } satisfies LetteringSettings
 
 /** `[booharu-runs]` as the desktop answers it while the file sets nothing. */
