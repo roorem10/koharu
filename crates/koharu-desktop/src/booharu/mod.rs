@@ -66,4 +66,8 @@ impl BooharuHost for DesktopHost {
         canvas::push(&self.0);
         Ok(saved)
     }
+
+    fn font_families(&self) -> anyhow::Result<Vec<String>> {
+        Ok(koharu_config::get::<koharu_renderer::RendererConfig>()?.font_families)
+    }
 }

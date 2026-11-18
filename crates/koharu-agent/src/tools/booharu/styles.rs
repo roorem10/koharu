@@ -140,16 +140,18 @@ impl Tool for CountTextStyleTargets {
     }
 }
 
-/// The default look as the app holds it now, `[booharu-lettering]`, read as
-/// the file holds it outside the app, and the default font, the first of
-/// Koharu's Preferred fonts, none when they list none. A section that can't
+/// The default look as the app holds it now, `[booharu-lettering]`, and the
+/// default font, the first of Koharu's Preferred fonts, none when they list
+/// none; outside the app, both as the file holds them. A section that can't
 /// be read is an error, so nothing is restyled by a value never chosen.
 pub(super) fn look(tools: &Tools) -> anyhow::Result<(LetteringSettings, Option<String>)> {
-    let settings = match &tools.booharu {
-        Some(host) => host.preferences()?.lettering,
-        None => koharu_config::get::<LetteringSettings>()?,
+    let (settings, families) = match &tools.booharu {
+        Some(host) => (host.preferences()?.lettering, host.font_families()?),
+        None => (
+            koharu_config::get::<LetteringSettings>()?,
+            koharu_config::get::<RendererConfig>()?.font_families,
+        ),
     };
-    let families = koharu_config::get::<RendererConfig>()?.font_families;
     Ok((settings, first_font(&families).map(str::to_owned)))
 }
 
@@ -170,7 +172,8 @@ mod tests {
     const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
     const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
 
-    /// The app, whose default look is red text with colour detection off.
+    /// The app, whose default look is red text with colour detection off,
+    /// and whose first Preferred font is Anime Ace.
     struct Red;
 
     impl BooharuHost for Red {
@@ -187,6 +190,10 @@ mod tests {
             _: serde_json::Map<String, Value>,
         ) -> anyhow::Result<BooharuPreferences> {
             anyhow::bail!("nothing here saves settings")
+        }
+
+        fn font_families(&self) -> anyhow::Result<Vec<String>> {
+            Ok(vec!["Anime Ace".to_owned(), "Wild Words".to_owned()])
         }
     }
 
@@ -293,11 +300,10 @@ mod tests {
             .style
             .chars
         };
-        let families = koharu_config::get::<RendererConfig>().expect("the renderer's settings");
         assert_eq!(
             chars("auto"),
             CharStyle {
-                family: first_font(&families.font_families).map(str::to_owned),
+                family: Some("Anime Ace".to_owned()),
                 size: Some(32.0),
                 fill: Some(RED),
                 ..CharStyle::default()

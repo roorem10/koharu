@@ -177,6 +177,10 @@ mod tests {
             *self.0.lock() = serde_json::from_value(serde_json::to_value(preferences)?)?;
             self.preferences()
         }
+
+        fn font_families(&self) -> anyhow::Result<Vec<String>> {
+            Ok(Vec::new())
+        }
     }
 
     /// Tools on an empty project, in an app whose settings `settings` keeps.

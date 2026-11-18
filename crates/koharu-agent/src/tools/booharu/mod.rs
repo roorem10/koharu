@@ -57,6 +57,10 @@ pub trait BooharuHost: Send + Sync {
         name: &str,
         values: Map<String, Value>,
     ) -> anyhow::Result<BooharuPreferences>;
+
+    /// Koharu's Preferred fonts, `[renderer] font_families`, as the app holds
+    /// them now; the first is the default font new text gets.
+    fn font_families(&self) -> anyhow::Result<Vec<String>>;
 }
 
 impl Tools {
