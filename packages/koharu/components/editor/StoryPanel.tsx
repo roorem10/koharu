@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { call, dispatch } from '@/lib/backend'
+import { setTranslation } from '@/lib/booharu/translation' // Booharu: a block's first translation.
 import {
   findLayer,
   isBlockLayer,
@@ -331,7 +332,10 @@ function StoryText({
               disabled={locked}
               className={`${field} border-primary/25`}
               value={plainText(layer.translation)}
-              onCommit={(text) => dispatch(setText, layer.id, text)}
+              // Booharu: a block's first translation goes in its frame, not the page's corner (#128).
+              onCommit={(text) =>
+                dispatch(layer.translation ? setText : setTranslation, layer.id, text)
+              }
             />
           </>
         ) : (
