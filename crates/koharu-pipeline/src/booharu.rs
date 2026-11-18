@@ -8,8 +8,10 @@
 //!   `[booharu-runs]` included, or refuses the run when a section it reads
 //!   can't be read.
 //! - `translated`, in the Translation stage's `written`, gives each new
-//!   translation the default look and records what the stage wrote, and
-//!   `given_back` records a translation it cleared, given back unchanged.
+//!   translation the default look, its block's lettering category's font
+//!   among it while the run's Pick fonts automatically is on, and records
+//!   what the stage wrote, and `given_back` records a translation it
+//!   cleared, given back unchanged.
 //! - `recognized`, in the Recognition stage, records the wording it read.
 //! - `Failure`, from `stages::run`, is a stage task's failure as the run
 //!   reports it, with the class the run policy goes by, which the scheduler's
@@ -422,6 +424,7 @@ mod tests {
         Edited,
         attrs::Auto,
         edited,
+        lettering::{CategoryFont, LetteringCategory},
         runs::RunsSettings,
         settings::{DefaultTextStyle, LetteringSettings},
         styles::text_hash,
@@ -429,7 +432,7 @@ mod tests {
     use icu_locale_core::langid;
     use koharu_scene::{CharStyle, Content, Created, Edit, Layer, Rgba, Session, Text};
     use parking_lot::Mutex;
-    use serde_json::json;
+    use serde_json::{Value, json};
 
     use super::*;
     use crate::{Event, Pipeline, Request, Target, TranslatorConfig, stages::translate::written};
@@ -450,32 +453,41 @@ mod tests {
     struct Page {
         _dir: tempfile::TempDir,
         session: Session,
+        /// The layers labelled, by label.
         blocks: BTreeMap<String, LayerId>,
+    }
+
+    /// A block of `role` as [`Page::new`] makes each, its source's box 40 by
+    /// 120 at `x`, `y`.
+    fn found(role: &str, (x, y): (f64, f64)) -> Value {
+        json!({"kind": "block", "role": role, "source": {
+            "frame": {"box": {"bounds": {"x": x, "y": y, "width": 40.0, "height": 120.0}}},
+            "content": SOURCE,
+            "style": {"chars": {"size": 32.0, "fill": BLUE, "stroke": WHITE, "stroke_width": 3.0}},
+        }, "attributes": {"c2pa": {
+            "detection": {"action": "c2pa.created"},
+            "ocr": {"action": "c2pa.created"},
+        }}})
     }
 
     impl Page {
         fn new(blocks: &[(&str, &str)]) -> Result<Self> {
+            let layers = blocks.iter().enumerate().map(|(index, (label, role))| {
+                let x = 10.0 + 50.0 * index as f64;
+                json!({"op": "add_layer", "id": format!("${label}"), "page": "$p", "index": index, "layer": found(role, (x, 20.0))})
+            });
+            Self::of(layers.collect())
+        }
+
+        /// The page holding `layers`, add_layer ops' JSON on the page `$p`.
+        fn of(layers: Vec<Value>) -> Result<Self> {
             let dir = tempfile::tempdir()?;
             let mut session = Session::create(dir.path().join("test.khr"))?;
-            let mut ops = vec![
-                json!({"op": "add_page", "id": "$p", "index": 0, "size": {"width": 400, "height": 400}}),
-            ];
-            for (index, (label, role)) in blocks.iter().enumerate() {
-                let x = 10.0 + 50.0 * index as f64;
-                let block = json!({"kind": "block", "role": role, "source": {
-                    "frame": {"box": {"bounds": {"x": x, "y": 20.0, "width": 40.0, "height": 120.0}}},
-                    "content": SOURCE,
-                    "style": {"chars": {"size": 32.0, "fill": BLUE, "stroke": WHITE, "stroke_width": 3.0}},
-                }, "attributes": {"c2pa": {
-                    "detection": {"action": "c2pa.created"},
-                    "ocr": {"action": "c2pa.created"},
-                }}});
-                ops.push(json!({"op": "add_layer", "id": format!("${label}"), "page": "$p", "index": index, "layer": block}));
-            }
+            let page = json!({"op": "add_page", "id": "$p", "index": 0, "size": {"width": 400, "height": 400}});
             let change = session.apply(Edit {
                 label: "test".to_owned(),
-                ops: ops
-                    .into_iter()
+                ops: std::iter::once(page)
+                    .chain(layers)
                     .map(serde_json::from_value)
                     .collect::<Result<_, _>>()?,
             })?;
@@ -791,6 +803,133 @@ mod tests {
         }])?;
         let retyped = edited(&page.layer("a")?);
         assert_eq!((retyped.text, retyped.style), (true, false));
+        Ok(())
+    }
+
+    /// `snapshot`'s with detection on and CCWildWords the default font, and
+    /// Pick fonts automatically `auto`: Shout in a bold Badaboom BB,
+    /// Floating italic in the default font, SFX in Wild Words, and Whisper
+    /// in a bold italic Comic Neue.
+    fn lettered(auto: bool) -> Snapshot {
+        let font = |family: Option<&str>, bold, italic| CategoryFont {
+            family: family.map(str::to_owned),
+            bold,
+            italic,
+        };
+        let mut booharu = snapshot(true, None, None, Some("CCWildWords"));
+        booharu.lettering.auto = auto;
+        booharu.lettering.categories = BTreeMap::from([
+            (
+                LetteringCategory::Shout,
+                font(Some("Badaboom BB"), true, false),
+            ),
+            (LetteringCategory::Floating, font(None, false, true)),
+            (
+                LetteringCategory::Sfx,
+                font(Some("Wild Words"), false, false),
+            ),
+            (
+                LetteringCategory::Whisper,
+                font(Some("Comic Neue"), true, true),
+            ),
+        ]);
+        booharu
+    }
+
+    /// A page of four blocks as [`Page::new`] makes them: `shout`, in a
+    /// spiky balloon, as detection leaves a block in its balloon; and
+    /// outside it `floating`, `boom`, Koharu's sound effect, and `labelled`,
+    /// which the user labelled Whisper.
+    fn categorized() -> Result<Page> {
+        let mut star = String::new();
+        for i in 0..24 {
+            let angle = f64::from(i) * std::f64::consts::TAU / 24.0;
+            let radius = if i % 2 == 0 { 110.0 } else { 66.0 };
+            let (x, y) = (200.0 + radius * angle.cos(), 280.0 + radius * angle.sin());
+            star.push_str(&format!("{}{x} {y} ", if i == 0 { "M" } else { "L" }));
+        }
+        let mut labelled = found("text", (110.0, 20.0));
+        labelled["attributes"]["booharu"] =
+            json!({"lettering": {"category": "whisper", "source": "user"}});
+        Page::of(vec![
+            json!({"op": "add_layer", "id": "$spiky", "page": "$p", "index": 0,
+                "layer": {"kind": "balloon", "outline": star + "Z"}}),
+            json!({"op": "add_layer", "id": "$shout", "page": "$p", "parent": "$spiky", "index": 0,
+                "layer": found("text", (180.0, 220.0))}),
+            json!({"op": "add_layer", "id": "$floating", "page": "$p", "index": 1,
+                "layer": found("text", (10.0, 20.0))}),
+            json!({"op": "add_layer", "id": "$boom", "page": "$p", "index": 2,
+                "layer": found("sfx", (60.0, 20.0))}),
+            json!({"op": "add_layer", "id": "$labelled", "page": "$p", "index": 3, "layer": labelled}),
+        ])
+    }
+
+    /// The translations [`categorized`]'s blocks are given.
+    const SAID: [(&str, &str); 4] = [
+        ("shout", "No!"),
+        ("floating", "Hey"),
+        ("boom", "Bam"),
+        ("labelled", "Psst"),
+    ];
+
+    #[test]
+    fn with_the_switch_on_each_new_translation_gets_its_categorys_font_as_automatic() -> Result<()>
+    {
+        let mut page = categorized()?;
+        page.translate(&SAID, &lettered(true))?;
+        let font = |family: &str, weight: Option<u16>, italic: Option<bool>| {
+            (Some(family.to_owned()), weight, italic)
+        };
+        // The spiky balloon's block is a shout, the floating block takes
+        // Floating's italic in the default font, the sound effect SFX's, and
+        // the labelled block its label's, whatever its place.
+        for (label, wanted) in [
+            ("shout", font("Badaboom BB", Some(700), None)),
+            ("floating", font("CCWildWords", None, Some(true))),
+            ("boom", font("Wild Words", None, None)),
+            ("labelled", font("Comic Neue", Some(700), Some(true))),
+        ] {
+            let chars = page.chars(label)?;
+            assert_eq!(
+                (chars.family, chars.weight, chars.italic),
+                wanted,
+                "{label}"
+            );
+            // Booharu's values, recorded as automatic ones, so Apply and a
+            // change of category may letter the block again.
+            let layer = page.layer(label)?;
+            let style = Auto::of(&layer).style.context("a style")?;
+            assert_eq!(
+                (style.family, style.weight, style.italic),
+                wanted,
+                "{label}"
+            );
+            assert_eq!(edited(&layer), Edited::default(), "{label}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn with_the_switch_off_a_new_translation_gets_stage_3s_look_whatever_its_category() -> Result<()>
+    {
+        let mut off = categorized()?;
+        off.translate(&SAID, &lettered(false))?;
+        let mut plain = categorized()?;
+        plain.translate(&SAID, &snapshot(true, None, None, Some("CCWildWords")))?;
+        for (label, _) in SAID {
+            let chars = off.chars(label)?;
+            assert_eq!(chars, plain.chars(label)?, "{label}");
+            assert_eq!(
+                (chars.family.as_deref(), chars.weight, chars.italic),
+                (Some("CCWildWords"), None, None),
+                "{label}"
+            );
+            assert_eq!(
+                Auto::of(&off.layer(label)?),
+                Auto::of(&plain.layer(label)?),
+                "{label}"
+            );
+        }
         Ok(())
     }
 
