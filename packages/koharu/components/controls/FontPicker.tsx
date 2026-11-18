@@ -1,5 +1,7 @@
 'use client'
 
+// Booharu: the list's range and scrolling, the check on the font in use, and the ids and refs the
+// arrows go through.
 import {
   defaultRangeExtractor,
   observeElementRect,
@@ -92,7 +94,7 @@ export function FontPicker({
           ...(booharu.localNames?.[family.name] ?? []), // Booharu: its names in other languages.
         ].some((name) => normalizeFontName(name).includes(normalized)),
     )
-  }, [orderedFamilies, query, booharu.localNames])
+  }, [orderedFamilies, query, booharu.localNames]) // Booharu: and the local names.
   const selectedFamily = useMemo(
     () =>
       orderedFamilies.find((family) => normalizeFontName(family.name) === normalizeFontName(value)),
@@ -232,6 +234,8 @@ export function FontPicker({
           )}
         </div>
         <Separator />
+        {/* Booharu: the list takes the rows, the family the arrows are on, which it marks and
+            scrolls to, and the favourites, and opens afresh when Favorites only changes too. */}
         {open && (
           <FontList
             key={`${booharu.favoritesOnly ?? false}:${query}`}
@@ -278,6 +282,7 @@ function FontList({
 }) {
   const { t } = useTranslation()
   const list = useRef<HTMLDivElement>(null)
+  // Booharu: rows of two heights, keyed by their rows, opening on the family the arrows are on.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => list.current,
@@ -303,16 +308,17 @@ function FontList({
         : [...shown, active].sort((left, right) => left - right)
     },
   })
-  useImperativeHandle(scroller, () => virtualizer, [virtualizer])
+  useImperativeHandle(scroller, () => virtualizer, [virtualizer]) // Booharu: the arrows' scrolling.
 
   return (
     <ScrollArea
       viewportRef={list}
       role='listbox'
-      id={`${id}-fonts`}
+      id={`${id}-fonts`} // Booharu: the list the search line controls.
       aria-label={t('fontPicker.fonts')}
       className='relative'
       viewportClassName='overflow-x-hidden'
+      // Booharu: as tall as its rows, which are of two heights.
       style={{
         height:
           rows.length === 0
@@ -322,6 +328,7 @@ function FontList({
     >
       <div className='relative' style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {
+          // Booharu: a row, a family's or a section's heading.
           const row = rows[virtualRow.index]
           if (!row) return null
           // Booharu: a section's heading, which the arrows skip.
