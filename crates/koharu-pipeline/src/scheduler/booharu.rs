@@ -8,6 +8,10 @@
 //!   help: an invalid page, a model that couldn't load, a hosted reply
 //!   koharu-llm already sent again, and a project that couldn't be written,
 //!   which ends the run whatever its policy.
+//! - A recognition batch's failure is none of its pages' own until a page
+//!   fails alone: each of its pages is read again alone, after its wait when
+//!   it's tried again, and at once, with no try counted, when it wouldn't be,
+//!   so only the page that fails alone is given up on or stops the run.
 //! - A page that failed every try is given up on, and the run goes on with
 //!   its other pages, ending done with problems; or it ends the run, as
 //!   Koharu's first failure does, as the policy says.
@@ -32,11 +36,13 @@ use crate::{
     gpu::{Key, Turn},
 };
 
-/// A job's tries that failed, and when it may go again after the last.
+/// A job's tries that failed, when it may go again after the last, and
+/// whether it's read alone, as its recognition batch failed.
 #[derive(Debug, Default)]
 pub(super) struct Tries {
     failed: u32,
     at: Option<Instant>,
+    alone: bool,
 }
 
 /// The policy `run` follows; none for Koharu's way.
@@ -128,10 +134,12 @@ fn give_up(graph: &mut StableDiGraph<Job, ()>, page: PageId) {
 }
 
 impl Scheduler {
-    /// Whether `candidate` is a page tried again, which recognition reads
-    /// alone, so another page's failure in its batch can't fail it again.
+    /// Whether `candidate` is a page tried again, or one whose recognition
+    /// batch failed, which recognition reads alone, so another page's failure
+    /// in its batch can't fail it again.
     pub(super) fn alone(&self, candidate: Candidate) -> bool {
-        self.runs[candidate.run].graph[candidate.job].tries.failed > 0
+        let tries = &self.runs[candidate.run].graph[candidate.job].tries;
+        tries.failed > 0 || tries.alone
     }
 
     /// What `run`, holding some of `jobs`, those of a task at `stage` that
@@ -139,9 +147,12 @@ impl Scheduler {
     /// pages again after a wait, while it has tries left and another could
     /// help; or gives up on the pages and goes on with its other pages,
     /// ending done with problems once it has nothing left, which `ended`
-    /// then tells. `run` back for Koharu's way, ending at once: a run without
-    /// a policy, a project that couldn't be written, or a run that stops at
-    /// a page that failed every try.
+    /// then tells. A batch's pages that wouldn't be tried again are read
+    /// again alone instead, at once and with no try counted, but after a
+    /// model that couldn't load, which fails them all. `run` back for
+    /// Koharu's way, ending at once: a run without a policy, a project that
+    /// couldn't be written, or a run that stops at a page that failed every
+    /// try.
     pub(super) fn failed(
         &mut self,
         mut run: Run,
@@ -159,6 +170,9 @@ impl Scheduler {
         let attempts = u32::from(policy.retries) + 1;
         let again =
             |job: &Job| failure.class == Class::Retryable && job.tries.failed + 1 < attempts;
+        // A recognition batch, of this run's pages or others' too, failed
+        // with whichever of its pages failed first.
+        let batch = jobs.len() > 1 && failure.class != Class::Load;
         let mut ours = Vec::new();
         for &(id, job) in jobs {
             if id != run.id || !run.graph.contains_node(job) {
@@ -177,6 +191,7 @@ impl Scheduler {
             }
         }
         if policy.on_page_failure == OnPageFailure::Stop
+            && !batch
             && ours.iter().any(|&job| !again(&run.graph[job]))
         {
             return Some(run);
@@ -187,6 +202,10 @@ impl Scheduler {
             let tried_again = again(&run.graph[job]);
             let job = &mut run.graph[job];
             job.running = false;
+            if batch && !tried_again {
+                job.tries.alone = true;
+                continue;
+            }
             job.tries.failed += 1;
             if !tried_again {
                 given_up.push(job.page);
@@ -586,6 +605,73 @@ mod tests {
             .flat_map(|(_, pages, _)| pages)
             .collect();
         assert_eq!(translated, [0, 2, 3]);
+    }
+
+    #[tokio::test]
+    async fn a_page_that_fails_its_recognition_batch_fails_alone() {
+        // A page holding a locked block, whose edit the project refuses.
+        fn locked() -> anyhow::Error {
+            koharu_scene::Error::Locked {
+                op: 0,
+                layer: koharu_scene::LayerId(koharu_scene::Uuid::from_u128(7)),
+            }
+            .into()
+        }
+        let reading = [Stage::Recognize, Stage::Translate];
+        // A page's failure, the retries it has, and how its reason begins.
+        type Case = (fn() -> anyhow::Error, u8, &'static str);
+        // Refused, or out of tries, the batch's other pages are read alone
+        // at once, with no try counted, and go on.
+        let cases: [Case; 2] = [
+            (locked, 2, "recognize failed: op 0: layer"),
+            (dropped, 0, "recognize failed: the connection dropped"),
+        ];
+        for (error, allowed, reason) in cases {
+            let chapter = Chapter::new(3);
+            chapter.script.tries(
+                1,
+                Stage::Recognize,
+                vec![Try::Fail(error), Try::Fail(error)],
+            );
+            let continuing = policy(allowed, OnPageFailure::Continue, RunOrder::Pages);
+            let run = chapter.run(0, &reading, continuing);
+            let told = chapter.told(run).await;
+            assert!(retries(&told).is_empty(), "{told:#?}");
+            assert_eq!(given_up(&told), [(chapter.pages[1], Stage::Recognize)]);
+            let Some(Outcome::DoneWithProblems { failures }) = ended(&told) else {
+                panic!("{told:#?}");
+            };
+            assert!(
+                failures.len() == 1 && failures[0].reason.starts_with(reason),
+                "{failures:?}"
+            );
+            let read: Vec<Vec<usize>> = chapter
+                .ran()
+                .into_iter()
+                .filter(|(stage, ..)| *stage == Stage::Recognize)
+                .map(|(_, pages, _)| pages)
+                .collect();
+            assert_eq!(read, [vec![0, 1, 2], vec![0], vec![1], vec![2]]);
+            assert_eq!(chapter.tried(0, Stage::Translate).len(), 1);
+            assert_eq!(chapter.tried(2, Stage::Translate).len(), 1);
+        }
+
+        // A run that stops at a failed page stops at the page that failed
+        // alone, not at the first of its batch.
+        let chapter = Chapter::new(3);
+        chapter.script.tries(
+            1,
+            Stage::Recognize,
+            vec![Try::Fail(locked), Try::Fail(locked)],
+        );
+        let stopping = policy(2, OnPageFailure::Stop, RunOrder::Pages);
+        let run = chapter.run(0, &reading, stopping);
+        let told = chapter.told(run).await;
+        assert!(
+            matches!(ended(&told), Some(Outcome::Failed { page, stage: Stage::Recognize, .. })
+                if *page == chapter.pages[1]),
+            "{told:#?}"
+        );
     }
 
     #[tokio::test]
