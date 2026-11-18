@@ -220,6 +220,8 @@ async fn follow(
             Ok(Ok(Some(queued))) => (index, run) = queued,
             Ok(Ok(None)) => return,
             Ok(Err(error)) => {
+                // Told only here: the interface isn't, and the group ends
+                // silent; the next call plans the rest and answers this.
                 tracing::warn!("couldn't queue run group {group}'s next run: {error:#}");
                 return;
             }

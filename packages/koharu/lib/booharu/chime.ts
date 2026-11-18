@@ -40,7 +40,8 @@ export type Tone = 'done' | 'problems'
  * stopped stays silent, and so does a run on blocks or an area. A run of a carrying-on group chimes
  * for the group instead, once, as the group ends: with its last run, or the run that failed and
  * ended it, with problems when any of its runs had them, and never once a run stopped it. A group
- * that ends otherwise, as when the pages of its later groups were removed while it went, isn't
+ * that ends otherwise, as when the pages of its later groups were removed while it went, or its
+ * next run couldn't be queued, which only the app's log tells until the next Run shows why, isn't
  * told to end, and ends silent. */
 export function ending(job: Job, outcome: Outcome): Tone | null {
   let problems = outcome.kind === 'done_with_problems' || outcome.kind === 'failed'
