@@ -45,10 +45,14 @@ describe("Booharu's lettering category in Box details", () => {
     const picker = section.getByRole('combobox', { name: 'Lettering category' })
     expect(picker).toHaveTextContent('Normal Dialogue')
     expect(section.getByText("From its bubble's shape")).toBeInTheDocument()
-    await user.hover(section.getByText('Bubble shape: Round'))
-    expect(
-      await screen.findByText('Rectangularity 93% · Solidity 95% · Deep dips 0'),
-    ).toBeInTheDocument()
+    // The measures are the shape line's description, for a screen reader, and its tooltip.
+    const measures = 'Rectangularity 93% · Solidity 95% · Deep dips 0'
+    const shape = section.getByText('Bubble shape: Round')
+    expect(shape).toHaveAccessibleDescription(measures)
+    await user.hover(shape)
+    await waitFor(() =>
+      expect(document.querySelector('[data-slot="tooltip-content"]')).toHaveTextContent(measures),
+    )
     // Pick fonts automatically is on: no hint, once the settings are read.
     await waitFor(() =>
       expect(queryClient.getQueryState(booharuPreferencesKey)?.status).toBe('success'),

@@ -1,6 +1,7 @@
 'use client'
 
 import { Hand } from 'lucide-react'
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -18,10 +19,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/t
 
 /** A Story row's lettering category tag, at the top of its text column, beside its reading number
  * and ? tag: a block's category, marked with a hand when the user picked it, its tooltip saying why
- * it has it and its bubble's shape. Clicking it opens the block's category picker, so a change takes
- * two clicks; a locked block's picker opens only to be read, saying why. `name` names the text as
- * the row does. A text layer has no category, and no tag, nor has a block whose category couldn't
- * be read, as Box details says. */
+ * it has it and its bubble's shape, which its description also gives a screen reader. Clicking it
+ * opens the block's category picker, so a change takes two clicks; a locked block's picker opens
+ * only to be read, saying why. `name` names the text as the row does. A text layer has no
+ * category, and no tag, nor has a block whose category couldn't be read, as Box details says. */
 export function CategoryTag({
   page,
   layer,
@@ -50,6 +51,7 @@ function BlockTag({
   locked: boolean
 }) {
   const { t } = useTranslation()
+  const description = useId()
   const { lettering, error } = useBlockLettering(page, block)
   // The row keeps the tag's line while it's read, so its fields don't move when it shows; a read
   // that failed shows no tag, and Box details says why.
@@ -60,6 +62,9 @@ function BlockTag({
   const reason = t(`booharu.lettering.reasons.${lettering.reason}`)
   const hand = lettering.reason === 'user'
   const { shape } = lettering
+  const bubble = shape
+    ? t('booharu.lettering.bubbleShape', { shape: t(`booharu.lettering.shapes.${shape.shape}`) })
+    : t('booharu.lettering.noBubble')
   return (
     <BlockCategoryPicker
       value={chosen(lettering)}
@@ -86,6 +91,7 @@ function BlockTag({
                   ? t('booharu.lettering.tagFor', { name, category, reason })
                   : t('booharu.lettering.tag', { category, reason })
               }
+              aria-describedby={description}
               data-hand={hand}
               className='h-4 max-w-full min-w-0 gap-0.5 justify-self-start rounded-full px-1.5 text-[9px] leading-none font-medium text-muted-foreground hover:border-primary/40 hover:text-foreground data-[hand=true]:border-primary/40 data-[hand=true]:bg-primary/10 data-[hand=true]:text-foreground [&>svg]:size-2.5'
             />
@@ -97,16 +103,14 @@ function BlockTag({
         <TooltipContent side='left'>
           <span className='grid gap-0.5'>
             <span>{reason}</span>
-            <span>
-              {shape
-                ? t('booharu.lettering.bubbleShape', {
-                    shape: t(`booharu.lettering.shapes.${shape.shape}`),
-                  })
-                : t('booharu.lettering.noBubble')}
-            </span>
+            <span>{bubble}</span>
           </span>
         </TooltipContent>
       </Tooltip>
+      {/* The tooltip mounts only while it shows, so a screen reader hears the shape from here. */}
+      <span id={description} className='sr-only'>
+        {bubble}
+      </span>
     </BlockCategoryPicker>
   )
 }

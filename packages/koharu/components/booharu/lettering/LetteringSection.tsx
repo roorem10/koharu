@@ -68,10 +68,11 @@ export function LetteringSection({ page, box: { layer, locked } }: BoxDetailsPro
 }
 
 /** A block's bubble's shape, as "Bubble shape: Round", with the measures that decided it in its
- * tooltip, which focus shows too; "No bubble" for a block outside any. */
+ * tooltip, which focus shows too, and in its description, for a screen reader; "No bubble" for a
+ * block outside any. */
 export function ShapeLine({ shape }: { shape: BlockShape | null }) {
   const { t } = useTranslation()
-  const tooltip = useId()
+  const description = useId()
   if (!shape) {
     return (
       <p className='text-[11px] leading-4 text-muted-foreground'>
@@ -80,28 +81,33 @@ export function ShapeLine({ shape }: { shape: BlockShape | null }) {
     )
   }
   const { rectangularity, solidity, spikes } = shape.measures
+  const measures = t('booharu.lettering.measures', {
+    rectangularity: percent(rectangularity),
+    solidity: percent(solidity),
+    spikes,
+  })
   return (
-    <Tooltip>
-      <TooltipTrigger
-        aria-describedby={tooltip}
-        render={
-          <span
-            tabIndex={0}
-            className='justify-self-start text-[11px] leading-4 text-muted-foreground outline-none focus-visible:underline'
-          />
-        }
-      >
-        {t('booharu.lettering.bubbleShape', {
-          shape: t(`booharu.lettering.shapes.${shape.shape}`),
-        })}
-      </TooltipTrigger>
-      <TooltipContent side='left' id={tooltip}>
-        {t('booharu.lettering.measures', {
-          rectangularity: percent(rectangularity),
-          solidity: percent(solidity),
-          spikes,
-        })}
-      </TooltipContent>
-    </Tooltip>
+    <>
+      <Tooltip>
+        <TooltipTrigger
+          aria-describedby={description}
+          render={
+            <span
+              tabIndex={0}
+              className='justify-self-start text-[11px] leading-4 text-muted-foreground outline-none focus-visible:underline'
+            />
+          }
+        >
+          {t('booharu.lettering.bubbleShape', {
+            shape: t(`booharu.lettering.shapes.${shape.shape}`),
+          })}
+        </TooltipTrigger>
+        <TooltipContent side='left'>{measures}</TooltipContent>
+      </Tooltip>
+      {/* The tooltip mounts only while it shows, so the description stays mounted on its own. */}
+      <span id={description} className='sr-only'>
+        {measures}
+      </span>
+    </>
   )
 }

@@ -35,6 +35,9 @@ describe("Booharu's lettering category in Story and Layers", () => {
       "Lettering category for Hel: Normal Dialogue (From its bubble's shape)",
     )
     expect(hel).toHaveAttribute('data-hand', 'false')
+    // A screen reader hears the bubble's shape too, with the tooltip closed.
+    expect(hel).toHaveAccessibleDescription('Bubble shape: Round')
+    expect(await tagOf('Free')).toHaveAccessibleDescription('No bubble')
     expect(
       screen
         .getAllByRole('combobox', { name: /^Lettering category for/ })
@@ -52,8 +55,8 @@ describe("Booharu's lettering category in Story and Layers", () => {
 
     // Its tooltip says why, and the bubble's shape.
     await user.hover(hel)
-    expect(await screen.findByText("From its bubble's shape")).toBeInTheDocument()
-    expect(screen.getByText('Bubble shape: Round')).toBeInTheDocument()
+    const reason = await screen.findByText("From its bubble's shape")
+    expect(reason.nextElementSibling).toHaveTextContent('Bubble shape: Round')
     await user.unhover(hel)
 
     // A click opens Automatic and every category, the user's pick marked; a second click picks.
