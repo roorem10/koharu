@@ -76,6 +76,11 @@ pub trait BooharuHost: Send + Sync {
     fn runs(&self) -> Option<Arc<dyn booharu::runs::RunHost>> {
         None
     }
+
+    /// Tells whoever shows the series glossary and the chapter's notes that
+    /// a tool wrote a series file or the open project's side file, as the
+    /// desktop app tells its interface; outside the app, no one.
+    fn context_changed(&self) {}
 }
 
 impl Tools {

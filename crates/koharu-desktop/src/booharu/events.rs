@@ -36,3 +36,8 @@ pub struct BooharuRunGroup {
 /// Each run a carrying-on group queues, so the interface knows a group's
 /// runs whoever started it.
 pub const RUN_GROUP: Event<BooharuRunGroup> = Event::new("booharu_run_group");
+
+/// A series file, or the open project's side file, was written, by a
+/// command or the agent: whatever shows the series glossary or the chapter's
+/// notes reads them again.
+pub const CONTEXT_CHANGED: Event<()> = Event::new("booharu_context_changed");

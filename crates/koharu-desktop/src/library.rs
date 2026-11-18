@@ -57,6 +57,7 @@ impl Library {
 
     pub fn delete(&self, name: &str) -> Result<()> {
         let path = self.path(name)?;
+        booharu_core::context::remove_side_files(&path)?; // Booharu: first, so none outlives it.
         Session::remove(&path).with_context(|| format!("failed to delete {}", path.display()))
     }
 

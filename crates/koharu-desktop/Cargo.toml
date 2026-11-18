@@ -67,5 +67,9 @@ webp = { workspace = true }
 wgpu = { workspace = true }
 zip = { workspace = true }
 
+[dev-dependencies]
+# Booharu: a projects folder for a test of deleting a project's side files.
+tempfile = { workspace = true }
+
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true }

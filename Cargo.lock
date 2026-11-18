@@ -5768,6 +5768,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "tauri-runtime-cef",
  "tauri-winit",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tracing",
