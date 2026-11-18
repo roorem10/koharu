@@ -314,9 +314,11 @@ export function changeSeries(
 }
 
 /** Accepts the open chapter's suggestion `entry`, as it holds it, into the series the chapter
- * links, in place of the series' term with its source. */
-export function acceptSuggestion(entry: FullEntry): Promise<ChapterState> {
-  return queueWrite(() => call(commands.booharuAcceptSuggestion, entry))
+ * links, in place of the series' term with its source: a locked one only with `replaceLocked`, the
+ * user's choice in the term form, which says what saving replaces; else the desktop refuses, naming
+ * that term, and the suggestion stays. */
+export function acceptSuggestion(entry: FullEntry, replaceLocked = false): Promise<ChapterState> {
+  return queueWrite(() => call(commands.booharuAcceptSuggestion, entry, replaceLocked))
 }
 
 /** Dismisses the open chapter's suggestion `id`. */

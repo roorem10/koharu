@@ -345,10 +345,12 @@ impl Tool for AcceptGlossarySuggestion {
     fn description(&self) -> String {
         "Accept the open chapter's suggested term with the `source`, ignoring case and \
          whitespace, into the glossary of the series the chapter is linked to, as it was \
-         suggested, in place of the series' term with that source when it has one; the \
-         suggestion then leaves the chapter. Fails when the chapter has no such suggestion or is \
-         linked to no series. Answers the series' name, the term as saved, and whether it \
-         `replaced` one."
+         suggested, in place of the series' term with that source when it has an unlocked one; \
+         the suggestion then leaves the chapter. A locked term is one the user fixed: when the \
+         series' term with that source is locked, it fails, changing nothing, so tell the user \
+         both, and booharu_save_glossary_entry replaces the term only when they ask. Fails too \
+         when the chapter has no such suggestion or is linked to no series. Answers the series' \
+         name, the term as saved, and whether it `replaced` one."
             .to_owned()
     }
 
@@ -1005,6 +1007,40 @@ mod tests {
             .collect();
         assert_eq!(suggested, [("シャーレ", "Schale", TermKind::Place, false)]);
         assert_eq!(chapter.told() - told, 1, "told of its one write");
+    }
+
+    #[tokio::test]
+    async fn accepting_a_suggestion_never_replaces_a_locked_term() {
+        let chapter = Chapter::new(Vec::new());
+        let args = json!({"name": "Blue Archive", "create": true});
+        chapter.call(LinkSeries, args).await.expect("linked");
+        let args = json!({"source": "先生", "target": "Teacher"});
+        let added = chapter
+            .call(AddGlossaryEntry, args)
+            .await
+            .expect("an answer");
+        assert!(added.suggested);
+        // The user then locks a term of that source.
+        let args = json!({"source": "先生", "target": "Sensei", "locked": true});
+        chapter.call(SaveGlossaryEntry, args).await.expect("saved");
+
+        let args = json!({"source": " 先 生 "});
+        let refused = chapter
+            .call(AcceptGlossarySuggestion, args)
+            .await
+            .expect_err("a locked term");
+        assert!(refused.message().contains("is locked"), "{refused}");
+        let id = linked_id(&chapter);
+        let glossary = chapter.store().get(&id).expect("the series").glossary;
+        let kept: Vec<(&str, bool)> = glossary
+            .iter()
+            .map(|term| (&*term.target, term.locked))
+            .collect();
+        assert_eq!(kept, [("Sensei", true)]);
+        let suggestions = ChapterContext::load(&file(&chapter.tools))
+            .expect("the side file")
+            .suggestions;
+        assert_eq!(suggestions.len(), 1, "the suggestion stays");
     }
 
     #[tokio::test]

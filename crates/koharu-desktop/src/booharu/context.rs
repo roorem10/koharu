@@ -193,19 +193,27 @@ pub async fn booharu_get_chapter_context(app: State<'_, Arc<App>>) -> Result<Cha
 
 /// Accepts the open chapter's suggestion `entry` names by its id into the
 /// series the chapter links, as `entry` holds it, the user's changes
-/// included, in place of the series' term with its source; the suggestion
-/// leaves the chapter. Answers the chapter then. Fails, changing nothing,
-/// when the suggestion is gone, the chapter links no series, or the term
-/// lacks a source or a target.
+/// included, in place of the series' term with its source, a locked one
+/// only with `replace_locked`, the user's choice in the term form, which
+/// says what saving replaces; the suggestion leaves the chapter. Answers the
+/// chapter then. Fails, changing nothing, when the suggestion is gone, the
+/// chapter links no series, the series' term with its source is locked and
+/// `replace_locked` is off, or the term lacks a source or a target.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_accept_suggestion(
     app: State<'_, Arc<App>>,
     entry: GlossaryEntry,
+    replace_locked: bool,
 ) -> Result<ChapterState> {
     let app = Arc::clone(&app);
     Ok(tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
-        context::accept(&project_file(&app)?, &SeriesStore::open()?, entry)?;
+        context::accept(
+            &project_file(&app)?,
+            &SeriesStore::open()?,
+            entry,
+            replace_locked,
+        )?;
         app.emit(CONTEXT_CHANGED, ());
         chapter(&app)
     })

@@ -167,11 +167,19 @@ pub fn suggest(project: &Path, store: &SeriesStore, entry: GlossaryEntry) -> Res
 /// that `entry` names by its id into the series the chapter links, in
 /// `store`, as `entry` holds it, the user's changes included, trimmed: in
 /// place of the series' term with its source, keeping that term's place and
-/// id, or after the others ([`Series::put`]). The suggestion then leaves the
-/// chapter. Fails, changing nothing, when the chapter has no such suggestion
-/// or links no series, the series is gone, or the term lacks a source or a
-/// target. Answers the series as saved.
-pub fn accept(project: &Path, store: &SeriesStore, entry: GlossaryEntry) -> Result<Series> {
+/// id, or after the others ([`Series::put`]). A locked term with its source,
+/// one the user fixed, is replaced only with `replace_locked`, the user's
+/// choice in the term form, which says what saving replaces; else it fails,
+/// naming that term, as Booharu 0.0.4 never let a suggestion over a term.
+/// The suggestion then leaves the chapter. Fails, changing nothing, when the
+/// chapter has no such suggestion or links no series, the series is gone, or
+/// the term lacks a source or a target. Answers the series as saved.
+pub fn accept(
+    project: &Path,
+    store: &SeriesStore,
+    entry: GlossaryEntry,
+    replace_locked: bool,
+) -> Result<Series> {
     let chapter = ChapterContext::load(project)?;
     ensure!(
         chapter.suggestions.iter().any(|term| term.id == entry.id),
@@ -190,9 +198,20 @@ pub fn accept(project: &Path, store: &SeriesStore, entry: GlossaryEntry) -> Resu
         ..entry
     };
     let series = store.update(&id, |series| {
+        if !replace_locked && let Some(held) = series.term(&entry.source).filter(|term| term.locked)
+        {
+            bail!(
+                "the series' term \"{}\" → \"{}\" is locked, so the suggestion \"{}\" → \"{}\" \
+                 doesn't replace it; edit the suggestion to save it over that term, or dismiss it",
+                held.source,
+                held.target,
+                entry.source,
+                entry.target
+            );
+        }
         series.put(entry);
-        series.clone()
-    })?;
+        Ok(series.clone())
+    })??;
     dismiss(project, &suggestion)?;
     Ok(series)
 }
@@ -578,8 +597,8 @@ pub fn delete_term(project: &Path, store: &SeriesStore, source: &str) -> Result<
 
 /// Accepts the suggestion of the chapter of the project file `project` with
 /// the source `source`, ignoring case and whitespace, as it holds it, into
-/// the series the chapter links, in `store`, as [`accept`] does. Answers the
-/// series' term as saved.
+/// the series the chapter links, in `store`, as [`accept`] does, never over
+/// a locked term. Answers the series' term as saved.
 pub fn accept_source(project: &Path, store: &SeriesStore, source: &str) -> Result<SavedTerm> {
     let entry = ChapterContext::load(project)?
         .suggestion(source)
@@ -587,7 +606,7 @@ pub fn accept_source(project: &Path, store: &SeriesStore, source: &str) -> Resul
         .with_context(|| format!("the chapter has no suggested term \"{}\"", source.trim()))?;
     let source = entry.source.clone();
     let replaced = store.get(&linked(project)?)?.term(&source).is_some();
-    let series = accept(project, store, entry)?;
+    let series = accept(project, store, entry, false)?;
     Ok(SavedTerm {
         term: series.term(&source).cloned().unwrap_or_default(),
         series: series.name,
@@ -902,7 +921,7 @@ mod tests {
         )?);
         let suggestion = ChapterContext::load(path)?.suggestions[0].clone();
         assert_eq!(suggestion.source, "先 生");
-        assert!(accept(path, &store, suggestion.clone()).is_err());
+        assert!(accept(path, &store, suggestion.clone(), false).is_err());
         assert!(link(path, &store, Some("blue-archive-000000000000")).is_err());
         assert!(link(path, &store, Some(&series.id))?);
         assert!(!link(path, &store, Some(&series.id))?);
@@ -915,7 +934,7 @@ mod tests {
             locked: true,
             ..suggestion
         };
-        let saved = accept(path, &store, edited.clone())?;
+        let saved = accept(path, &store, edited.clone(), false)?;
         assert_eq!(saved, store.get(&series.id)?);
         assert_eq!(saved.glossary.len(), 2);
         assert_eq!(
@@ -929,7 +948,7 @@ mod tests {
         );
         assert!(ChapterContext::load(path)?.suggestions.is_empty());
         // Accepted once, it's gone.
-        assert!(accept(path, &store, edited).is_err());
+        assert!(accept(path, &store, edited, true).is_err());
         // A term the series has is no suggestion.
         assert!(!suggest(
             path,
@@ -938,6 +957,57 @@ mod tests {
         )?);
         assert!(suggest(path, &store, GlossaryEntry::new("ヒナ", "")).is_err());
         assert!(link(path, &store, None)?);
+        Ok(())
+    }
+
+    #[test]
+    fn a_suggestion_replaces_a_locked_term_only_when_the_user_chose_to() -> Result<()> {
+        let chapter = Chapter::new(Vec::new())?;
+        let (path, store) = (chapter.path(), chapter.store());
+        let series = store.create("Blue Archive")?;
+        link(path, &store, Some(&series.id))?;
+        // Suggested before the user saved a locked term of its source.
+        assert!(suggest(
+            path,
+            &store,
+            GlossaryEntry::new("先生", "Teacher")
+        )?);
+        let locked = GlossaryEntry {
+            locked: true,
+            note: "a title".to_owned(),
+            ..GlossaryEntry::new("先 生", "Sensei")
+        };
+        store.update(&series.id, |series| series.glossary.push(locked.clone()))?;
+        let suggestion = ChapterContext::load(path)?.suggestions[0].clone();
+
+        // Neither the agent nor a click on Accept puts it over that term.
+        let refused = accept_source(path, &store, "先生").expect_err("a locked term");
+        assert!(
+            format!("{refused:#}").contains("\"先 生\" → \"Sensei\" is locked"),
+            "{refused:#}"
+        );
+        assert!(accept(path, &store, suggestion.clone(), false).is_err());
+        assert_eq!(
+            store.get(&series.id)?.glossary,
+            std::slice::from_ref(&locked)
+        );
+        assert_eq!(
+            ChapterContext::load(path)?.suggestions,
+            std::slice::from_ref(&suggestion),
+            "the suggestion stays"
+        );
+
+        // The user's choice in the term form, which says what it replaces,
+        // does.
+        let saved = accept(path, &store, suggestion.clone(), true)?;
+        assert_eq!(
+            saved.glossary,
+            [GlossaryEntry {
+                id: locked.id,
+                ..suggestion
+            }]
+        );
+        assert!(ChapterContext::load(path)?.suggestions.is_empty());
         Ok(())
     }
 

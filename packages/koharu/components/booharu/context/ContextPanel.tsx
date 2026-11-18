@@ -15,6 +15,7 @@ import {
   kindName,
   linkSeries,
   matchesSearch,
+  replacedTerm,
   useChapterContext,
   type FullEntry,
 } from '@/lib/booharu/context'
@@ -44,8 +45,10 @@ interface Listed {
  * links is gone; and the glossary its translations follow, searchable, the series' terms then the
  * terms suggested for the chapter, each suggestion to accept into the series, to edit and accept,
  * or to dismiss, a term accepted showing where it's used, with Re-translate those lines; then Open
- * full glossary, the glossary editor. A side file that doesn't read shows its error, which names
- * it. Everything is read again after every change to the chapter, its series or its pages. */
+ * full glossary, the glossary editor. Accepting a suggestion whose source the series has opens the
+ * term form, which says what saving replaces, rather than replacing that term at a click. A side
+ * file that doesn't read shows its error, which names it. Everything is read again after every
+ * change to the chapter, its series or its pages. */
 export function ContextPanel() {
   const { t } = useTranslation()
   const heading = useId()
@@ -159,6 +162,12 @@ export function ContextPanel() {
                         disabled={!linked || pending === entry.id}
                         onClick={() => {
                           const unlocked = { ...entry, locked: false }
+                          // A term of its source the series has goes only once the form,
+                          // which says so, is saved.
+                          if (linked && replacedTerm(linked.glossary, unlocked)) {
+                            setEditing(unlocked)
+                            return
+                          }
                           settle(
                             entry.id,
                             acceptSuggestion(unlocked).then(() => showUse(unlocked)),
@@ -207,7 +216,12 @@ export function ContextPanel() {
           initial={editing}
           glossary={linked?.glossary}
           onClose={() => setEditing(null)}
-          onSave={(entry) => acceptSuggestion(entry).then(() => showUse(entry))}
+          onSave={(entry) =>
+            // Over a locked term only when the form said it replaces one.
+            acceptSuggestion(entry, replacedTerm(linked?.glossary ?? [], entry) !== null).then(() =>
+              showUse(entry),
+            )
+          }
         />
       )}
       {glossaryOpen && (

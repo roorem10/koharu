@@ -9,7 +9,7 @@ import { resources, supportedLanguages } from '@/lib/i18n'
 import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 
-import { contextDesktop, haikyu, openChapter } from './context'
+import { contextDesktop, haikyu, openChapter, term } from './context'
 
 /** The right pane, its Context tab shown. */
 async function contextTab(user: ReturnType<typeof userEvent.setup>) {
@@ -81,14 +81,10 @@ describe('Booharu Context tab', () => {
     await user.click((await row('ヒナ')).getByRole('button', { name: 'Accept' }))
 
     await waitFor(() =>
-      expect(spies.accept).toHaveBeenCalledWith({
-        id: 's1',
-        source: 'ヒナ',
-        target: 'Hina',
-        note: '',
-        kind: 'name',
-        locked: false,
-      }),
+      expect(spies.accept).toHaveBeenCalledWith(
+        { id: 's1', source: 'ヒナ', target: 'Hina', note: '', kind: 'name', locked: false },
+        false,
+      ),
     )
     expect(files.chapter.suggestions).toEqual([])
     // It shows as the series' own once the chapter is read again.
@@ -113,9 +109,38 @@ describe('Booharu Context tab', () => {
     await waitFor(() =>
       expect(spies.accept).toHaveBeenCalledWith(
         expect.objectContaining({ id: 's1', source: 'ヒナ', target: 'Hinata', locked: true }),
+        false,
       ),
     )
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('accepts a suggestion over a term of its source only through the form, which says so', async () => {
+    // Suggested before the user locked 潔 → Isagi in the series.
+    const { spies } = contextDesktop({
+      suggestions: [term('s2', '潔', 'Yoichi', { kind: 'name' })],
+    })
+    const user = userEvent.setup()
+    await contextTab(user)
+
+    const list = await screen.findByRole('list', { name: 'Glossary' })
+    const suggested = within(list)
+      .getAllByRole('listitem')
+      .find((item) => item.textContent?.startsWith('潔 → Yoichi'))
+    await user.click(within(suggested!).getByRole('button', { name: 'Accept' }))
+    const form = within(await screen.findByRole('dialog', { name: 'Glossary entry' }))
+    expect(form.getByText('Saving replaces 潔 → Isagi.')).toBeInTheDocument()
+    expect(form.getByRole('textbox', { name: 'Translation' })).toHaveValue('Yoichi')
+    expect(spies.accept).not.toHaveBeenCalled()
+
+    await user.click(form.getByRole('button', { name: 'Save' }))
+    // The user chose to replace the locked term, as the form said saving does.
+    await waitFor(() =>
+      expect(spies.accept).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 's2', source: '潔', target: 'Yoichi', locked: false }),
+        true,
+      ),
+    )
   })
 
   it('dismisses a suggestion through the desktop', async () => {

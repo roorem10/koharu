@@ -1865,9 +1865,13 @@ export const commands = {
   /** The open project's chapter: its side file, the series it links, and the glossary a translation run on it would send. A side file or a linked series' file that doesn't read fails, naming it. */
   booharuGetChapterContext: () =>
     invoke<ChapterState>('booharu_get_chapter_context', {}, { headers: headers() }),
-  /** Accepts the open chapter's suggestion `entry` names by its id into the series the chapter links, as `entry` holds it, the user's changes included, in place of the series' term with its source; the suggestion leaves the chapter. Answers the chapter then. Fails, changing nothing, when the suggestion is gone, the chapter links no series, or the term lacks a source or a target. */
-  booharuAcceptSuggestion: (entry: GlossaryEntry) =>
-    invoke<ChapterState>('booharu_accept_suggestion', { entry }, { headers: headers() }),
+  /** Accepts the open chapter's suggestion `entry` names by its id into the series the chapter links, as `entry` holds it, the user's changes included, in place of the series' term with its source, a locked one only with `replace_locked`, the user's choice in the term form, which says what saving replaces; the suggestion leaves the chapter. Answers the chapter then. Fails, changing nothing, when the suggestion is gone, the chapter links no series, the series' term with its source is locked and `replace_locked` is off, or the term lacks a source or a target. */
+  booharuAcceptSuggestion: (entry: GlossaryEntry, replaceLocked: boolean) =>
+    invoke<ChapterState>(
+      'booharu_accept_suggestion',
+      { entry, replaceLocked },
+      { headers: headers() },
+    ),
   /** Dismisses the open chapter's suggestion `id`, and answers the chapter then. */
   booharuDismissSuggestion: (id: string) =>
     invoke<ChapterState>('booharu_dismiss_suggestion', { id }, { headers: headers() }),
