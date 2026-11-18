@@ -23,6 +23,14 @@
       "secondBorderWidth": "Ширина второй обводки",
       "swapFillOutline": "Поменять цвета заливки и обводки"
     },
+    "boxes": {
+      "clean": "Очистить заново",
+      "join": "Объединить с облачком",
+      "joinPage": "Объединить разделённые тексты на этой странице",
+      "read": "Распознать заново",
+      "split": "Разделить",
+      "translate": "Перевести заново"
+    },
     "menu": {
       "booharuGithub": "Booharu на GitHub",
       "koharuDiscord": "Discord Koharu",

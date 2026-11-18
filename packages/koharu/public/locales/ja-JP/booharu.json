@@ -19,6 +19,14 @@
       "secondBorderWidth": "外側の縁取り幅",
       "swapFillOutline": "塗りと縁取りの色を入れ替える"
     },
+    "boxes": {
+      "clean": "クリーンアップを再実行",
+      "join": "フキダシと結合",
+      "joinPage": "このページの分割されたテキストを結合",
+      "read": "OCRを再実行",
+      "split": "分割",
+      "translate": "再翻訳"
+    },
     "menu": {
       "booharuGithub": "GitHub の Booharu",
       "koharuDiscord": "Koharu の Discord",

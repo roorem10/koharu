@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AboutDialog } from '@/components/app/AboutDialog'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
+import { BoxMenuItems } from '@/components/booharu/boxes/BoxActionItems' // Booharu: box actions.
 import { call, dispatch } from '@/lib/backend'
 import { useCommand, useImportPages, usePage, useProject } from '@/lib/queries'
 import { deleteSelection } from '@/lib/scene'
@@ -169,6 +170,8 @@ export function TitleBar() {
                 {t('menu.delete')}
                 <MenubarShortcut>Del</MenubarShortcut>
               </MenubarItem>
+              {/* Booharu: the selection's box actions, and joining the page's split texts. */}
+              <BoxMenuItems page={page} Item={MenubarItem} Separator={MenubarSeparator} />
               <MenubarSeparator />
               {/* Frees the GPU, as Photoshop's Edit → Purge frees memory. */}
               <MenubarItem onClick={() => dispatch(commands.unload)}>

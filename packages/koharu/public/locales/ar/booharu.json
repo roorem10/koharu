@@ -25,6 +25,14 @@
       "secondBorderWidth": "عرض الحدود الثانية",
       "swapFillOutline": "تبديل لوني التعبئة والحد"
     },
+    "boxes": {
+      "clean": "إعادة التنظيف",
+      "join": "دمج مع الفقاعة",
+      "joinPage": "دمج النصوص المقسّمة في هذه الصفحة",
+      "read": "إعادة القراءة",
+      "split": "تقسيم",
+      "translate": "إعادة الترجمة"
+    },
     "menu": {
       "booharuGithub": "Booharu على GitHub",
       "koharuDiscord": "Discord الخاص بـ Koharu",

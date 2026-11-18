@@ -22,6 +22,14 @@
       "secondBorderWidth": "Ancho del segundo contorno",
       "swapFillOutline": "Intercambiar colores de relleno y contorno"
     },
+    "boxes": {
+      "clean": "Volver a limpiar",
+      "join": "Unir con el globo",
+      "joinPage": "Unir los textos divididos de esta página",
+      "read": "Volver a leer",
+      "split": "Dividir",
+      "translate": "Volver a traducir"
+    },
     "menu": {
       "booharuGithub": "Booharu en GitHub",
       "koharuDiscord": "Discord de Koharu",

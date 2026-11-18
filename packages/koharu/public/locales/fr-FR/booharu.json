@@ -22,6 +22,14 @@
       "secondBorderWidth": "Épaisseur du second contour",
       "swapFillOutline": "Permuter les couleurs du texte et du contour"
     },
+    "boxes": {
+      "clean": "Nettoyer à nouveau",
+      "join": "Fusionner avec la bulle",
+      "joinPage": "Fusionner les textes divisés de cette page",
+      "read": "Relire",
+      "split": "Diviser",
+      "translate": "Retraduire"
+    },
     "menu": {
       "booharuGithub": "Booharu sur GitHub",
       "koharuDiscord": "Discord de Koharu",

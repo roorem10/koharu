@@ -5,6 +5,7 @@ import { Languages, MoreHorizontal } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { StoryBoxActions } from '@/components/booharu/boxes/BoxActionItems' // Booharu: box actions.
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { call, dispatch } from '@/lib/backend'
 import { setTranslation } from '@/lib/booharu/translation' // Booharu: a block's first translation.
@@ -297,6 +298,8 @@ function StoryText({
             align='start'
             className='w-auto min-w-20 border border-border/50 p-0.5 shadow-sm ring-0'
           >
+            {/* Booharu: the text's box actions, above Delete. */}
+            <StoryBoxActions page={page} layer={layer.id} />
             <DropdownMenuItem
               variant='destructive'
               disabled={locked}

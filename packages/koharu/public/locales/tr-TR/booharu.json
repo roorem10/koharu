@@ -19,6 +19,14 @@
       "secondBorderWidth": "İkinci kenarlık genişliği",
       "swapFillOutline": "Dolgu ve dış çizgi renklerini değiştir"
     },
+    "boxes": {
+      "clean": "Yeniden temizle",
+      "join": "Balonla birleştir",
+      "joinPage": "Bu sayfadaki bölünmüş metinleri birleştir",
+      "read": "Yeniden oku",
+      "split": "Böl",
+      "translate": "Yeniden çevir"
+    },
     "menu": {
       "booharuGithub": "GitHub'da Booharu",
       "koharuDiscord": "Koharu Discord",

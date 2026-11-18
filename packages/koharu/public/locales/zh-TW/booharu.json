@@ -19,6 +19,14 @@
       "secondBorderWidth": "第二描邊寬度",
       "swapFillOutline": "交換填色與描邊色彩"
     },
+    "boxes": {
+      "clean": "重新清理",
+      "join": "合併至對白框",
+      "joinPage": "合併此頁上分割的文字",
+      "read": "重新辨識",
+      "split": "分割",
+      "translate": "重新翻譯"
+    },
     "menu": {
       "booharuGithub": "GitHub 上的 Booharu",
       "koharuDiscord": "Koharu 的 Discord",
