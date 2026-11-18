@@ -15,7 +15,7 @@ import {
 import { ProviderPreferences } from '@/components/preferences/ProviderPreferences'
 import { TypesettingPreferences } from '@/components/preferences/TypesettingPreferences'
 import { refreshModels, refreshPreferences, savePreferences } from '@/lib/backend'
-import { useSettingsLinks } from '@/lib/booharu/settingsLink' // Booharu: links between tabs.
+import { isBooharuTab, useSettingsLinks } from '@/lib/booharu/settingsLink' // Booharu: links between tabs, and its own tabs.
 import { supportedLanguages } from '@/lib/i18n'
 import { useKoharuStore } from '@/lib/store'
 import type { Preferences } from '@koharu/ipc/protocol'
@@ -130,7 +130,8 @@ export function SettingsPage() {
         <ScrollArea className='min-h-0 flex-1'>
           <div className='mx-auto w-full max-w-4xl px-10 py-10'>
             {tab === 'appearance' && <AppearancePreferences />}
-            {tab !== 'appearance' && !draft && <LoadingPreferences />}
+            {/* Booharu: a Booharu tab shows none of Koharu's settings, so it doesn't wait for them. */}
+            {tab !== 'appearance' && !isBooharuTab(tab) && !draft && <LoadingPreferences />}
             {tab === 'pipeline' && draft && (
               <PipelinePreferences
                 value={draft.pipeline}

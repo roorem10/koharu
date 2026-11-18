@@ -207,4 +207,24 @@ describe('Booharu Runs settings', () => {
     )
     expect(await screen.findByRole('group', { name: 'Translate + clean up' })).toBeInTheDocument()
   })
+
+  it("shows the run settings without waiting for Koharu's own settings", async () => {
+    settingsDesktop()
+    vi.spyOn(commands, 'getPreferences').mockRejectedValue('config.toml is unreadable')
+    vi.spyOn(commands, 'listModels').mockResolvedValue([])
+    useKoharuStore.setState({ settingsOpen: true, preferences: null })
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    )
+    // Koharu's tabs wait for its settings.
+    await user.click(screen.getByRole('button', { name: 'Pipeline' }))
+    expect(screen.getByText('Loading preferences…')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Runs' }))
+    await screen.findByRole('group', { name: 'Detect + OCR' })
+    expect(screen.queryByText('Loading preferences…')).toBeNull()
+  })
 })
