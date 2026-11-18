@@ -24,7 +24,7 @@ use booharu_core::{
     edited,
 };
 use koharu_pipeline::{RunId, Stage, Target};
-use koharu_scene::{Content, Layer, LayerId, Project};
+use koharu_scene::{Content, Hash, Layer, LayerId, Project};
 use serde::Serialize;
 
 /// Where a glossary term is used in a project: the blocks whose source it
@@ -616,6 +616,10 @@ pub struct InstructionOffer {
     /// when it links none, or its file is gone.
     pub series: Option<String>,
     pub terms: Vec<OfferedTerm>,
+    /// The version of the Instructions the terms were read from
+    /// ([`instructions_version`]), which importing them names, so it never
+    /// imports the lines of Instructions changed since.
+    pub version: String,
 }
 
 /// A term a line of the Instructions writes.
@@ -656,21 +660,39 @@ pub fn offer_instructions(
     Ok(InstructionOffer {
         series: series.map(|series| series.name),
         terms,
+        version: instructions_version(instructions),
     })
+}
+
+/// The version of `instructions`, whole: the first 8 bytes of its BLAKE3
+/// hash as 16 hex digits, the same in every build. Instructions changed in
+/// any way, even a line moved, have another.
+pub fn instructions_version(instructions: &str) -> String {
+    Hash::of(instructions.as_bytes()).as_bytes()[..8]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 /// Imports the terms on the lines `lines` of `instructions`, the
 /// Instructions as saved now, into the series the chapter of the project
-/// file `project` links, in `store`, as [`import_instructions`] does. The
-/// caller saves the Instructions it answers only while they're still
-/// `instructions`.
+/// file `project` links, in `store`, as [`import_instructions`] does, while
+/// they're still the `version` the lines were read from
+/// ([`offer_instructions`]): Instructions changed since fail, importing
+/// nothing, as a line's number may name another term now. The caller saves
+/// the Instructions it answers only while they're still `instructions`.
 pub fn import_linked_instructions(
     project: &Path,
     store: &SeriesStore,
     instructions: &str,
+    version: &str,
     lines: &[u32],
     remove: bool,
 ) -> Result<InstructionImport> {
+    ensure!(
+        instructions_version(instructions) == version.trim(),
+        "the Instructions changed since they were read; read them again"
+    );
     let id = linked(project)?;
     import_instructions(store, &id, instructions, instructions, lines, remove)
 }
@@ -1156,7 +1178,12 @@ mod tests {
         let offer = offer_instructions(path, &store, instructions)?;
         assert_eq!(offer.series, None);
         assert!(offer.terms.iter().all(|term| !term.held));
-        assert!(import_linked_instructions(path, &store, instructions, &[1], false).is_err());
+        let version = offer.version;
+        assert_eq!(version, instructions_version(instructions));
+        assert_eq!(version.len(), 16);
+        assert!(
+            import_linked_instructions(path, &store, instructions, &version, &[1], false).is_err()
+        );
         let mut series = store.create("Blue Archive")?;
         series.glossary.push(GlossaryEntry::new("魔王", "Overlord"));
         store.save(&series)?;
@@ -1169,7 +1196,20 @@ mod tests {
             .map(|term| (term.line, term.held))
             .collect();
         assert_eq!(held, [(1, false), (2, true)]);
-        let imported = import_linked_instructions(path, &store, instructions, &[1, 2], true)?;
+
+        // Line 1 deleted since they were read: line 1 now writes another
+        // term, which is never imported in its place.
+        let edited = "Use natural English.\n魔王 = Demon King";
+        let refused = import_linked_instructions(path, &store, edited, &offer.version, &[1], true)
+            .expect_err("changed since they were read");
+        assert!(
+            format!("{refused:#}").contains("read them again"),
+            "{refused:#}"
+        );
+        assert_eq!(store.get(&series.id)?, series);
+
+        let imported =
+            import_linked_instructions(path, &store, instructions, &offer.version, &[1, 2], true)?;
         assert_eq!((imported.added, imported.skipped), (1, 1));
         assert_eq!(
             imported.instructions.as_deref(),

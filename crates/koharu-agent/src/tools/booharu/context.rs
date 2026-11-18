@@ -425,6 +425,11 @@ pub(super) struct ImportInstructionGlossaryArgs {
     /// Instructions.
     #[serde(default)]
     remove: bool,
+    /// With `apply`, the `version` of the Instructions reading the terms
+    /// answered, so the lines of Instructions changed since are never
+    /// imported.
+    #[serde(default)]
+    version: Option<String>,
 }
 
 /// What Import from instructions answers the agent: the terms offered, or
@@ -457,14 +462,15 @@ impl Tool for ImportInstructionGlossary {
          does. With `apply` false, reads the Instructions as saved now and answers the terms \
          their lines write, each with its `line`, counted from 0, its `source` and `target`, and \
          whether the series has a term with that source already (`held`), which importing \
-         skips, with the series' name; it changes nothing. With `apply` true, imports the terms \
-         on `lines`, read from the Instructions as saved now, as locked terms of kind `term`, \
-         skipping a source the series has; with `remove`, also deletes those lines, skipped \
-         ones included, from the Instructions, unless they changed meanwhile, which leaves them \
-         as they are. Read the terms first, show them to the user, and import only the lines \
-         they want, removing them only when they agree. Fails when the chapter is linked to no \
-         series. Answers how many terms were `added` and `skipped`, and whether the lines were \
-         `removed`."
+         skips, with the series' name and the Instructions' `version`; it changes nothing. With \
+         `apply` true, imports the terms on `lines` of the Instructions of that `version`, as \
+         locked terms of kind `term`, skipping a source the series has; with `remove`, also \
+         deletes those lines, skipped ones included, from the Instructions. Instructions \
+         changed since that `version` was read are refused, importing nothing, as a line may \
+         hold another term now: read the terms again and show them to the user again. Read the \
+         terms first, show them to the user, and import only the lines they want, removing \
+         them only when they agree. Fails when the chapter is linked to no series. Answers how \
+         many terms were `added` and `skipped`, and whether the lines were `removed`."
             .to_owned()
     }
 
@@ -477,11 +483,21 @@ impl Tool for ImportInstructionGlossary {
         context: &mut ToolContext,
         args: ImportInstructionGlossaryArgs,
     ) -> Result<InstructionAnswer, Self::Error> {
-        if args.apply && args.lines.is_empty() {
-            return Err(ToolExecutionError::invalid_args(
-                "name the `lines` to import, as reading the terms answered them",
-            ));
-        }
+        let version = match (args.apply, args.version) {
+            (false, _) => String::new(),
+            (true, _) if args.lines.is_empty() => {
+                return Err(ToolExecutionError::invalid_args(
+                    "name the `lines` to import, as reading the terms answered them",
+                ));
+            }
+            (true, Some(version)) => version,
+            (true, None) => {
+                return Err(ToolExecutionError::invalid_args(
+                    "name the `version` reading the terms answered, so lines of Instructions \
+                     changed since are never imported",
+                ));
+            }
+        };
         blocking(context, move |tools, host| {
             let (path, store, read) = (file(tools), host.series()?, host.instructions()?);
             if !args.apply {
@@ -493,6 +509,7 @@ impl Tool for ImportInstructionGlossary {
                 &path,
                 &store,
                 &read,
+                &version,
                 &args.lines,
                 args.remove,
             )?;
@@ -1142,17 +1159,39 @@ mod tests {
             .call(ImportInstructionGlossary, json!({"apply": false}))
             .await
             .expect("the terms");
+        let version = context::instructions_version(instructions);
         assert_eq!(
             json!(read),
             json!({"series": "Blue Archive", "terms": [
                 {"line": 1, "source": "ヒナ", "target": "Hina", "held": false},
                 {"line": 2, "source": "先生", "target": "Sensei", "held": true},
-            ]})
+            ], "version": version})
         );
-        let args = json!({"apply": true});
+        let args = json!({"apply": true, "version": version});
         let refused = chapter.call(ImportInstructionGlossary, args).await;
         assert!(refused.is_err(), "no lines named");
-        let args = json!({"apply": true, "lines": [1, 2], "remove": true});
+        let args = json!({"apply": true, "lines": [1]});
+        let refused = chapter.call(ImportInstructionGlossary, args).await;
+        assert!(refused.is_err(), "no version named");
+
+        // The user changes the Instructions in Settings after the agent read
+        // the terms: line 1 now writes アコ, which is never imported in ヒナ's
+        // place, nor deleted.
+        let edited = "Use natural English.\nアコ = Ako";
+        edited.clone_into(&mut chapter.app.instructions.lock());
+        let args = json!({"apply": true, "lines": [1], "remove": true, "version": version});
+        let stale = chapter
+            .call(ImportInstructionGlossary, args)
+            .await
+            .expect_err("changed since they were read");
+        assert!(stale.message().contains("read them again"), "{stale}");
+        assert_eq!(*chapter.app.instructions.lock(), edited);
+        let id = linked_id(&chapter);
+        let terms = chapter.store().get(&id).expect("the series").glossary;
+        assert_eq!(terms.len(), 1, "nothing imported");
+
+        instructions.clone_into(&mut chapter.app.instructions.lock());
+        let args = json!({"apply": true, "lines": [1, 2], "remove": true, "version": version});
         let imported = chapter
             .call(ImportInstructionGlossary, args)
             .await
@@ -1162,6 +1201,14 @@ mod tests {
             json!({"series": "Blue Archive", "added": 1, "skipped": 1, "removed": true})
         );
         assert_eq!(*chapter.app.instructions.lock(), "Use natural English.");
+    }
+
+    /// The id of the series the chapter is linked to.
+    fn linked_id(chapter: &Chapter) -> String {
+        ChapterContext::load(&file(&chapter.tools))
+            .expect("the side file")
+            .series
+            .expect("a linked series")
     }
 
     /// An outside app lists Booharu's tools as it reaches Booharu's MCP
