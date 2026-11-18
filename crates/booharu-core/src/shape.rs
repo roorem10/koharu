@@ -89,8 +89,12 @@ pub fn classify(measures: &ShapeMeasures, thresholds: &ShapeThresholds) -> Bubbl
     }
 }
 
-/// How finely an outline's curves are flattened, in page pixels: well under
-/// the 0.1% of its length that simplifying it then drops.
+/// How finely an outline's curves are flattened, in page pixels. Simplifying
+/// then drops what lies within 0.1% of the outline's length, which is coarser
+/// than this for an outline longer than 250 pixels, a balloon about 80
+/// across; on a smaller one this is the coarser of the two, though still far
+/// too fine to move its measures, as a dip counts only past 8% of the short
+/// side of the smallest rectangle around it.
 const FLATNESS: f64 = 0.25;
 
 /// What decides the shape of `outline`, a closed path in page pixels:
