@@ -4,12 +4,14 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { StartView } from '@/components/start/StartView'
+import { saveBooharuSection } from '@/lib/booharu/preferences'
 import { resources, supportedLanguages } from '@/lib/i18n'
 import { queryClient } from '@/lib/queries'
 import { commands } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
 import { contextDesktop } from './context'
+import { settingsDesktop } from './settings'
 
 const title = 'Booharu 0.0.5 starts with fresh settings'
 const folder = 'D:\\Booharu\\PreviewData\\settings\\series'
@@ -97,6 +99,38 @@ describe('Booharu first-start note', () => {
     )
     expect(screen.getByRole('region', { name: title })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeEnabled()
+  })
+
+  it('dismisses in turn with a settings save, so the save never puts the note back', async () => {
+    const { file } = settingsDesktop()
+    const { dismiss } = desktop()
+    // A section save under way: it read every section before the dismiss, and saves them all.
+    let release = () => {}
+    vi.spyOn(commands, 'booharuSavePreferences').mockImplementation(
+      (preferences) =>
+        new Promise((resolve) => {
+          release = () => {
+            file.preferences = structuredClone(preferences)
+            resolve(structuredClone(preferences))
+          }
+        }),
+    )
+    const saving = saveBooharuSection('booharu-runs', (section) => section)
+    const user = userEvent.setup()
+    await home()
+
+    await user.click(
+      within(await screen.findByRole('region', { name: title })).getByRole('button', {
+        name: 'Dismiss',
+      }),
+    )
+    await waitFor(() => expect(commands.booharuSavePreferences).toHaveBeenCalledOnce())
+    expect(dismiss).not.toHaveBeenCalled()
+
+    release()
+    await saving
+    await waitFor(() => expect(dismiss).toHaveBeenCalledOnce())
+    await waitFor(() => expect(screen.queryByRole('region', { name: title })).toBeNull())
   })
 
   it('opens the glossary editor, where Import series is', async () => {

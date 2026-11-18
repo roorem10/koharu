@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { call, refreshPreferences } from '@/lib/backend'
+import { queueBooharuWrite } from '@/lib/booharu/preferences'
 import { projectKey, queryClient, refresh, useProject } from '@/lib/queries'
 import {
   commands,
@@ -415,9 +416,11 @@ export function useFirstStartNote() {
   )
 }
 
-/** Dismisses the note on a first start for good; it goes once the desktop has saved that. */
+/** Dismisses the note on a first start for good; it goes once the desktop has saved that. The
+ * desktop saves `[booharu-start]` alone, in turn with the settings pages' section saves, so none of
+ * those, which save every section as they read them, puts the note back. */
 export async function dismissFirstStartNote(): Promise<void> {
-  await call(commands.booharuDismissFirstStartNote)
+  await queueBooharuWrite(() => call(commands.booharuDismissFirstStartNote))
   queryClient.setQueryData<FirstStartNote>(firstStartNoteKey, (note) =>
     note ? { ...note, show: false } : note,
   )
