@@ -1,6 +1,7 @@
 //! What Booharu's pipeline hooks and features share: its settings sections in
 //! the Booharu home's `config.toml` (`settings`), its data on scene layers
-//! (`attrs`), and its version.
+//! (`attrs`), the default look of new text and the hand-edit record
+//! (`styles`), and its version.
 //!
 //! The crate sits just above the scene and the config, never above
 //! koharu-pipeline, koharu-agent, or koharu-desktop, so koharu-pipeline's
@@ -9,6 +10,9 @@
 
 pub mod attrs;
 pub mod settings;
+pub mod styles;
+
+pub use styles::{Edited, edited};
 
 /// Booharu's version, such as `0.0.5`, which the repository's `FORK_VERSION`
 /// holds as `Booharu 0.0.5`. Koharu's crates carry Koharu's version, so this

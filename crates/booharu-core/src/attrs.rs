@@ -15,12 +15,9 @@
 //!   describe a block's text, so a join or split that rewrites a block drops
 //!   them.
 
-use std::collections::BTreeMap;
-
 use anyhow::ensure;
-use koharu_scene::{Layer, LayerId, Op, Ref};
+use koharu_scene::{Layer, LayerId, Op, Ref, Rgba};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use serde_json::Value;
 
 /// The attribute namespace of every Booharu key.
 pub const NAMESPACE: &str = "booharu";
@@ -69,15 +66,80 @@ pub enum LetteringSource {
     Model,
 }
 
-/// `auto`: `{field: value}`, the hand-edit record: what Booharu's automatic
-/// steps last wrote on the layer, by field, so a later step tells a hand
-/// edit, a field whose value now differs, from its own. Hand edits win.
+/// `auto`: `{"origin"?: "agent", "source"?: hash, "text"?: hash, "style"?:
+/// {family, weight, italic, fill, stroke, stroke_width, outer_stroke,
+/// outer_stroke_width}}`, on a block: the hand-edit record, what Booharu's
+/// automatic steps last wrote there, so `styles::edited` tells a hand edit,
+/// a part that now differs, from their own. Hand edits win. Each part is
+/// left out until a step writes it; later stages add their own, such as the
+/// marks and the category they applied, which is why it takes keys it
+/// doesn't know.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
-#[serde(transparent)]
-pub struct Auto(pub BTreeMap<String, Value>);
+pub struct Auto {
+    /// Who chose the style: Booharu's automatic steps, or the agent on
+    /// purpose, which makes it the agent's choice, kept as a hand edit is.
+    #[serde(default, skip_serializing_if = "Origin::is_automatic")]
+    pub origin: Origin,
+    /// The source wording the Recognition stage wrote, as its
+    /// `styles::text_hash`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// The translation the Translation stage wrote, as its
+    /// `styles::text_hash`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    /// The style values an automatic step left on the translation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<AutoStyle>,
+}
 
 impl Attr for Auto {
     const KEY: &'static str = "auto";
+
+    fn valid(&self) -> bool {
+        let hashed = |hash: &Option<String>| {
+            hash.as_ref().is_none_or(|hash| {
+                hash.len() == 16
+                    && hash
+                        .chars()
+                        .all(|digit| matches!(digit, '0'..='9' | 'a'..='f'))
+            })
+        };
+        hashed(&self.source) && hashed(&self.text)
+    }
+}
+
+/// Who chose an [`Auto`] record's style.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum Origin {
+    /// One of Booharu's automatic steps, which a later one may redo.
+    #[default]
+    Automatic,
+    /// The agent, on purpose, as a person restyles a box by hand: a later
+    /// automatic step leaves it.
+    Agent,
+}
+
+impl Origin {
+    fn is_automatic(&self) -> bool {
+        *self == Self::Automatic
+    }
+}
+
+/// The character style values an automatic step left on a translation, each
+/// null when unset: the keys a hand restyle changes.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
+pub struct AutoStyle {
+    pub family: Option<String>,
+    pub weight: Option<u16>,
+    pub italic: Option<bool>,
+    pub fill: Option<Rgba>,
+    pub stroke: Option<Rgba>,
+    pub stroke_width: Option<f64>,
+    pub outer_stroke: Option<Rgba>,
+    pub outer_stroke_width: Option<f64>,
 }
 
 /// `qc_ok`: `[string]`, on a block: the QC checks the user marked as fine, by
@@ -243,7 +305,7 @@ pub fn clear<A: Attr>(layer: impl Into<Ref>) -> Op {
 #[cfg(test)]
 mod tests {
     use koharu_scene::{Created, Edit, Session};
-    use serde_json::json;
+    use serde_json::{Value, json};
 
     use super::*;
 
@@ -288,7 +350,16 @@ mod tests {
             source: LetteringSource::Model,
             confidence: Some(0.75),
         };
-        let auto = Auto(BTreeMap::from([("size".to_owned(), json!(24))]));
+        let auto = Auto {
+            origin: Origin::Agent,
+            source: Some("0123456789abcdef".to_owned()),
+            text: None,
+            style: Some(AutoStyle {
+                family: Some("CCWildWords".to_owned()),
+                stroke_width: Some(1.5),
+                ..AutoStyle::default()
+            }),
+        };
         let qc_ok = QcOk(vec!["overflow".to_owned(), "glossary:Shale".to_owned()]);
         let flags = Flags(vec![Flag {
             kind: "review".to_owned(),
@@ -367,6 +438,7 @@ mod tests {
                 json!({"category": "shout", "source": "robot"}),
             ),
             raw(NAMESPACE, "qc_ok", json!("overflow")),
+            raw(NAMESPACE, "auto", json!({"text": "Hello"})),
             raw(NAMESPACE, "skew", json!({"x": 1.0})),
             raw(NAMESPACE, "original_scan", json!(false)),
             raw(NAMESPACE, "review_note", json!(5)),
@@ -400,6 +472,11 @@ mod tests {
         };
         assert!(set(id, &unsure).is_err());
         assert!(set(id, &OriginalScan(false)).is_err());
+        let unhashed = Auto {
+            text: Some("0123456789ABCDEF".to_owned()),
+            ..Auto::default()
+        };
+        assert!(set(id, &unhashed).is_err());
         let skew = Skew {
             x: f64::NAN,
             y: 0.0,
