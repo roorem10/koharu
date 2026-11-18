@@ -1,8 +1,13 @@
 'use client'
 
-import { observeElementRect, useVirtualizer } from '@tanstack/react-virtual'
-import { ChevronDown, Search, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  defaultRangeExtractor,
+  observeElementRect,
+  useVirtualizer,
+  type Virtualizer,
+} from '@tanstack/react-virtual'
+import { Check, ChevronDown, Search, X } from 'lucide-react'
+import { useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useFontPreview } from '@/lib/queries'
@@ -22,6 +27,9 @@ import { cn } from '@koharu/ui/lib/utils'
 
 const rowHeight = 38
 const listHeight = 248
+
+/** Booharu: the list's scrolling, which brings the family the arrows move to into view. */
+type Scroller = Virtualizer<HTMLDivElement, Element>
 
 export function FontPicker({
   value,
@@ -44,6 +52,11 @@ export function FontPicker({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const input = useRef<HTMLInputElement>(null)
+  // Booharu: the family the arrows move to and Enter picks, by its name, as ModelPicker's arrows
+  // and Enter go through its models; null for the first. The pointer moves it too.
+  const id = useId()
+  const [active, setActive] = useState<string | null>(null)
+  const scroller = useRef<Scroller>(null)
   const orderedFamilies = useMemo(
     () =>
       [...families].sort((left, right) =>
@@ -66,6 +79,23 @@ export function FontPicker({
       orderedFamilies.find((family) => normalizeFontName(family.name) === normalizeFontName(value)),
     [orderedFamilies, value],
   )
+  // Booharu: the family the arrows are on, which they move from, wrapping around as ModelPicker's
+  // do.
+  const shown = Math.max(
+    0,
+    results.findIndex((family) => normalizeFontName(family.name) === active),
+  )
+  const shownFamily = results.at(shown)
+  const move = (by: number) => {
+    if (!results.length) return
+    const next = (shown + by + results.length) % results.length
+    setActive(normalizeFontName(results[next].name))
+    scroller.current?.scrollToIndex(next, { align: 'auto' })
+  }
+  const pick = (family: string) => {
+    onChange(family)
+    setOpen(false)
+  }
 
   return (
     <Popover
@@ -73,6 +103,8 @@ export function FontPicker({
       onOpenChange={(next) => {
         setOpen(next)
         if (!next) setQuery('')
+        // Booharu: the arrows start from the font in use.
+        if (next) setActive(normalizeFontName(value))
       }}
     >
       <PopoverTrigger
@@ -117,7 +149,27 @@ export function FontPicker({
               aria-label={t('fontPicker.search')}
               placeholder={t('fontPicker.search')}
               className='h-6 px-0 text-[11px]'
-              onChange={(event) => setQuery(event.currentTarget.value)}
+              onChange={(event) => {
+                setQuery(event.currentTarget.value)
+                setActive(null) // Booharu: the arrows start again from the first match.
+              }}
+              // Booharu: a combobox whose arrows move through the families and whose Enter picks
+              // one, but not while an IME is composing, whose candidates they choose.
+              role='combobox'
+              aria-expanded={open}
+              aria-autocomplete='list'
+              aria-controls={`${id}-fonts`}
+              aria-activedescendant={shownFamily ? `${id}-${shown}` : undefined}
+              onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) return
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                  event.preventDefault()
+                  move(event.key === 'ArrowDown' ? 1 : -1)
+                } else if (event.key === 'Enter' && shownFamily) {
+                  event.preventDefault()
+                  pick(shownFamily.name)
+                }
+              }}
             />
             {query && (
               <InputGroupAddon align='inline-end' className='gap-0.5 pr-0.5'>
@@ -128,19 +180,31 @@ export function FontPicker({
             )}
           </InputGroup>
         </div>
-        <div className='flex h-6 items-center px-2 text-[9px] text-muted-foreground'>
-          {t('fontPicker.fontCount', { count: results.length })}
+        {/* Booharu: the count, and the family the arrows are on in its own face, read out as they
+            change. */}
+        <div
+          role='status'
+          className='flex h-6 items-center justify-between gap-2 px-2 text-[9px] text-muted-foreground'
+        >
+          <span className='shrink-0'>{t('fontPicker.fontCount', { count: results.length })}</span>
+          {shownFamily && (
+            <FontPreviewLabel
+              family={shownFamily}
+              className='min-w-0 justify-end [&>img]:max-h-3.5 [&>img]:object-right'
+            />
+          )}
         </div>
         <Separator />
         {open && (
           <FontList
             key={query}
+            id={id}
             families={results}
             value={value}
-            onSelect={(family) => {
-              onChange(family)
-              setOpen(false)
-            }}
+            active={shown}
+            scroller={scroller}
+            onActive={(family) => setActive(normalizeFontName(family))}
+            onSelect={pick}
           />
         )}
       </PopoverContent>
@@ -149,19 +213,27 @@ export function FontPicker({
 }
 
 function FontList({
+  id,
   families,
   value,
+  active,
+  scroller,
+  onActive,
   onSelect,
 }: {
+  /** Booharu: names the list and its options, for the search line's active descendant. */
+  id: string
   families: FontFamily[]
   value: string
+  /** Booharu: the family the arrows are on, which the list opens on and marks and `scroller`
+   * scrolls to; `onActive` moves it to the family the pointer or the focus is on. */
+  active: number
+  scroller: Ref<Scroller>
+  onActive: (family: string) => void
   onSelect: (family: string) => void
 }) {
   const { t } = useTranslation()
   const list = useRef<HTMLDivElement>(null)
-  const selectedIndex = families.findIndex(
-    (family) => normalizeFontName(family.name) === normalizeFontName(value),
-  )
   const virtualizer = useVirtualizer({
     count: families.length,
     getScrollElement: () => list.current,
@@ -170,19 +242,29 @@ function FontList({
     overscan: 6,
     initialOffset: Math.max(
       0,
-      selectedIndex * rowHeight - Math.floor((listHeight / rowHeight - 1) / 2) * rowHeight,
+      active * rowHeight - Math.floor((listHeight / rowHeight - 1) / 2) * rowHeight,
     ),
     initialRect: { width: 240, height: listHeight },
     observeElementRect: (instance, callback) =>
       observeElementRect(instance, (rect) =>
         callback({ width: rect.width || 240, height: rect.height || listHeight }),
       ),
+    // Booharu: the family the arrows are on stays in the list out of view too, so the search
+    // line's active descendant is always there.
+    rangeExtractor: (range) => {
+      const rows = defaultRangeExtractor(range)
+      return active >= range.count || rows.includes(active)
+        ? rows
+        : [...rows, active].sort((left, right) => left - right)
+    },
   })
+  useImperativeHandle(scroller, () => virtualizer, [virtualizer])
 
   return (
     <ScrollArea
       viewportRef={list}
       role='listbox'
+      id={`${id}-fonts`}
       aria-label={t('fontPicker.fonts')}
       className='relative'
       viewportClassName='overflow-x-hidden'
@@ -205,11 +287,18 @@ function FontList({
               role='option'
               aria-label={family.name}
               aria-selected={selected}
-              className={cn(
-                'absolute inset-x-0 top-0 flex h-9.5 w-full items-center px-2 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none',
-                selected && 'bg-accent text-accent-foreground',
-              )}
+              // Booharu: the family the arrows are on is marked, and the one in use checked, as
+              // ModelPicker marks and checks its models.
+              id={`${id}-${virtualRow.index}`}
+              data-active={virtualRow.index === active}
+              className='absolute inset-x-0 top-0 flex h-9.5 w-full items-center gap-2 px-2 text-left focus-visible:outline-none data-[active=true]:bg-accent data-[active=true]:text-accent-foreground'
               style={{ transform: `translateY(${virtualRow.start}px)` }}
+              // Booharu: only the pointer's own moves move the mark, as in ModelPicker: rows
+              // passing under a still pointer as the list scrolls move nothing.
+              onPointerMove={(event) => {
+                if (event.movementX || event.movementY) onActive(family.name)
+              }}
+              onFocus={() => onActive(family.name)}
               onClick={() => onSelect(family.name)}
             >
               <div className='flex min-w-0 flex-1 flex-col justify-center gap-px'>
@@ -218,6 +307,7 @@ function FontList({
                   {family.name}
                 </span>
               </div>
+              {selected && <Check className='size-3.5 shrink-0' />}
             </button>
           )
         })}
