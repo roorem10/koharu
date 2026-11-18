@@ -49,15 +49,20 @@ impl Tool for Run {
          find what each page `target` names still needs, from the records Koharu's stages leave \
          on its blocks, and queue one ordinary run for each group of pages that need the same \
          stages, the groups one after another, each run following Booharu's run settings \
-         (`booharu-runs`). Answers the plan at once: `groups`, each with its `stages` and \
-         `pages`, and `run`, the first group's run, or none when nothing is left to do. Follow \
-         it with wait on `run`; once that run has ended, call booharu_run again: while the \
-         group goes on, it answers the same plan with the run going now, and once the group is \
-         over, it carries on with whatever is still left, answering no run when nothing is. A \
-         run that fails or is stopped ends its group. A call while a group goes on answers that \
-         group and queues nothing. With `stages` fewer than every stage, it runs those stages \
-         on every page `target` names, as Koharu's Run button does, as a plan of one group. \
-         Needs a project open, as every tool here does."
+         (`booharu-runs`). Answers the plan at once: its `group` number, `groups`, each with \
+         its `stages` and `pages`, and `run`, the first group's run, or none when nothing is \
+         left to do. Follow it with wait on `run`. A run that ended failed or stopped ends its \
+         group: tell the user so rather than call again. Once a run ended otherwise, call \
+         booharu_run again: while its group goes on, it answers the same `group` with the run \
+         going now, which you wait on in turn; once the group is over, it plans again from what \
+         is still left, as a new `group`, answering no run when nothing is. Stop when it \
+         answers no run, or a new `group` in which every page has the same stages it had in the \
+         plan before: another run would leave those pages as they are, such as a page where \
+         detection finds no text, or one that failed every try, whose `page_failed` said why, \
+         so tell the user which pages they are and why instead of calling again. A call while \
+         a group goes on answers that group and queues nothing. With `stages` fewer than every \
+         stage, it runs those stages on every page `target` names, as Koharu's Run button does, \
+         as a plan of one group. Needs a project open, as every tool here does."
             .to_owned()
     }
 
