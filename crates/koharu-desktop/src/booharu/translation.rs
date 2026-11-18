@@ -15,8 +15,7 @@ use crate::{app::App, commands::Result};
 
 /// Sets `block`'s translation to `text` as one undo step, placing a new one
 /// as the Translation stage places its own, in the translator's target
-/// language, with the default look as Booharu's settings hold it now; one
-/// that can't be read is logged, and the translation gets Koharu's look.
+/// language.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_set_translation(
@@ -30,6 +29,9 @@ pub async fn booharu_set_translation(
     Ok(
         tokio::task::spawn_blocking(move || -> anyhow::Result<Change> {
             let target = koharu_config::get::<PipelineConfig>()?.translator.target;
+            // A new translation's default look, as Booharu's settings hold it
+            // now; one that can't be read is logged, and the translation gets
+            // Koharu's look.
             let families =
                 koharu_config::get::<RendererConfig>().map(|config| config.font_families);
             let look = Snapshot::read(families);
