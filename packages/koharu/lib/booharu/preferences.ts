@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 
 import { call } from '@/lib/backend'
 import { queryClient } from '@/lib/queries'
@@ -9,14 +9,16 @@ import { commands, type BooharuPreferences } from '@koharu/ipc/protocol'
 /** Every Booharu settings section, a `[booharu-<area>]` table each, as the file holds them. */
 export const booharuPreferencesKey = ['booharu', 'preferences'] as const
 
+/** The read of every Booharu settings section, which every view showing one shares. */
+export const booharuPreferencesQuery = queryOptions({
+  queryKey: booharuPreferencesKey,
+  queryFn: () => call(commands.booharuGetPreferences),
+})
+
 /** Every Booharu settings section, read again each time a settings page showing one opens: the
  * agent's settings tool may have changed one since. */
 export function useBooharuPreferences() {
-  return useQuery({
-    queryKey: booharuPreferencesKey,
-    queryFn: () => call(commands.booharuGetPreferences),
-    refetchOnMount: 'always',
-  })
+  return useQuery({ ...booharuPreferencesQuery, refetchOnMount: 'always' })
 }
 
 /** The last write to the Booharu settings, which the next one waits for. */
