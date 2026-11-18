@@ -36,6 +36,7 @@
       "notePlaceholder": "Leave a note for the next pass…",
       "sections": {
         "actions": "Actions",
+        "lettering": "Lettering",
         "note": "Note",
         "source": "Source & translation"
       },
@@ -58,8 +59,11 @@
     "lettering": {
       "auto": "Pick fonts automatically",
       "autoDescription": "New translations, and boxes whose category changes, get their category's font.",
+      "autoOff": "Fonts follow categories only while <a>{{setting}}</a> is on ({{tab}}).",
+      "automatic": "Automatic",
       "bold": "Bold",
       "boldFor": "{{category}}: Bold",
+      "bubbleShape": "Bubble shape: {{shape}}",
       "categories": {
         "crying": "Crying / Trembling",
         "electronic_voice": "Electronic voice",
@@ -81,15 +85,29 @@
         "whisper": "Whisper"
       },
       "category": "Lettering category",
+      "change": "Change category…",
       "defaultFont": "Default font",
       "description": "Choose fonts by how a line is presented or delivered. Each box takes the category picked for it, or else one read from the page: a sound effect, small original lettering, or the shape of its bubble.",
       "font": "Font",
       "fontFor": "{{category}}: Font",
       "italic": "Italic",
       "italicFor": "{{category}}: Italic",
+      "keptLocked_one": "{{count}} locked box kept its category.",
+      "keptLocked_other": "{{count}} locked boxes kept their category.",
+      "locked": "This text, or a layer it's in, is locked. Unlock it in Layers to change its category.",
+      "measures": "Rectangularity {{rectangularity}}% · Solidity {{solidity}}% · Deep dips {{spikes}}",
+      "noBubble": "No bubble",
       "noMatch": "No categories match",
       "own": "Categories with their own font",
       "ownNone": "None yet: a category without its own font is lettered as Normal Dialogue is, and Normal Dialogue without one in the default font.",
+      "reasons": {
+        "floating": "Not in a bubble",
+        "model": "Chosen by the agent",
+        "sfx": "Detected as a sound effect",
+        "shape": "From its bubble's shape",
+        "small_text": "Small original lettering",
+        "user": "Set by hand"
+      },
       "sameAsDefault": "Same as the default font",
       "sameAsDialogue": "Same as Normal Dialogue",
       "search": "Search categories",
@@ -99,11 +117,18 @@
         "round": "Also used for round bubbles.",
         "spiky": "Also used for spiky bubbles."
       },
+      "shapes": {
+        "rectangle": "Rectangle",
+        "round": "Round",
+        "spiky": "Spiky"
+      },
       "suggest": "Suggest fonts",
       "suggestDescription": "Fill categories without a font from your starting font list, using only available fonts. Existing choices stay as you set them.",
       "suggestedNone": "Nothing to suggest: the categories on the starting list already have a font, or none of its fonts is available.",
       "suggested_one": "Suggested a font for {{count}} category",
       "suggested_other": "Suggested fonts for {{count}} categories",
+      "tag": "Lettering category: {{category}} ({{reason}})",
+      "tagFor": "Lettering category for {{name}}: {{category}} ({{reason}})",
       "title": "Lettering categories"
     },
     "menu": {
@@ -233,6 +258,7 @@
       "booharu_apply_text_style": "Apply text style",
       "booharu_join_balloon": "Join texts",
       "booharu_join_page": "Join split texts",
+      "booharu_set_lettering_category": "Change lettering category",
       "booharu_set_review_note": "Edit note",
       "booharu_set_translation": "Add translation",
       "booharu_split_block": "Split text"

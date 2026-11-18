@@ -36,6 +36,7 @@
       "notePlaceholder": "Sonraki kontrol için not bırakın…",
       "sections": {
         "actions": "İşlemler",
+        "lettering": "Dizgi",
         "note": "Not",
         "source": "Kaynak metin ve çeviri"
       },
@@ -58,8 +59,11 @@
     "lettering": {
       "auto": "Yazı tiplerini otomatik seç",
       "autoDescription": "Yeni çeviriler ve kategorisi değişen kutular, kategorilerinin yazı tipini alır.",
+      "autoOff": "Yazı tipleri kategorileri yalnızca <a>{{setting}}</a> açıkken izler ({{tab}}).",
+      "automatic": "Otomatik",
       "bold": "Kalın",
       "boldFor": "{{category}}: Kalın",
+      "bubbleShape": "Balon şekli: {{shape}}",
       "categories": {
         "crying": "Ağlama / titreme",
         "electronic_voice": "Elektronik ses",
@@ -81,15 +85,29 @@
         "whisper": "Fısıltı"
       },
       "category": "Dizgi kategorisi",
+      "change": "Kategoriyi değiştir…",
       "defaultFont": "Varsayılan yazı tipi",
       "description": "Yazı tiplerini satırın sunuluşuna veya söylenişine göre seçin. Her kutu kendisi için seçilen kategoriyi, seçilmemişse sayfadan anlaşılan bir kategoriyi alır: ses efekti, küçük orijinal yazı veya balonunun şekli.",
       "font": "Yazı tipi",
       "fontFor": "{{category}}: Yazı tipi",
       "italic": "İtalik",
       "italicFor": "{{category}}: İtalik",
+      "keptLocked_one": "Kilitli {{count}} kutu kategorisini korudu.",
+      "keptLocked_other": "Kilitli {{count}} kutu kategorisini korudu.",
+      "locked": "Bu metin ya da onu içeren bir katman kilitli. Kategorisini değiştirmek için Katmanlar panelinde kilidi açın.",
+      "measures": "Dikdörtgenlik %{{rectangularity}} · Doluluk %{{solidity}} · Derin girintiler {{spikes}}",
+      "noBubble": "Balon yok",
       "noMatch": "Eşleşen kategori yok",
       "own": "Kendi yazı tipi olan kategoriler",
       "ownNone": "Henüz yok: kendi yazı tipi olmayan bir kategori normal diyalog gibi, kendi yazı tipi olmayan normal diyalog ise varsayılan yazı tipiyle dizilir.",
+      "reasons": {
+        "floating": "Balonun dışında",
+        "model": "Ajan tarafından seçildi",
+        "sfx": "Ses efekti olarak algılandı",
+        "shape": "Balon şeklinden",
+        "small_text": "Küçük orijinal yazı",
+        "user": "Elle ayarlandı"
+      },
       "sameAsDefault": "Varsayılan yazı tipiyle aynı",
       "sameAsDialogue": "Normal diyalogla aynı",
       "search": "Kategori ara",
@@ -99,11 +117,18 @@
         "round": "Yuvarlak balonlarda da kullanılır.",
         "spiky": "Sivri balonlarda da kullanılır."
       },
+      "shapes": {
+        "rectangle": "Dikdörtgen",
+        "round": "Yuvarlak",
+        "spiky": "Sivri"
+      },
       "suggest": "Yazı tipi öner",
       "suggestDescription": "Yazı tipi olmayan kategorileri başlangıç yazı tipi listenizden, yalnızca kullanılabilir yazı tipleriyle doldurun. Mevcut seçimleriniz korunur.",
       "suggestedNone": "Önerilecek bir şey yok: başlangıç listesindeki kategorilerin zaten yazı tipi var veya listedeki yazı tiplerinin hiçbiri kullanılamıyor.",
       "suggested_one": "{{count}} kategori için yazı tipi önerildi",
       "suggested_other": "{{count}} kategori için yazı tipi önerildi",
+      "tag": "Dizgi kategorisi: {{category}} ({{reason}})",
+      "tagFor": "{{name}} için dizgi kategorisi: {{category}} ({{reason}})",
       "title": "Dizgi kategorileri"
     },
     "menu": {
@@ -233,6 +258,7 @@
       "booharu_apply_text_style": "Metin stilini uygula",
       "booharu_join_balloon": "Metinleri birleştir",
       "booharu_join_page": "Bölünmüş metinleri birleştir",
+      "booharu_set_lettering_category": "Dizgi kategorisini değiştir",
       "booharu_set_review_note": "Notu düzenle",
       "booharu_set_translation": "Çeviri ekle",
       "booharu_split_block": "Metni böl"

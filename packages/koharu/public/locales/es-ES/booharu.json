@@ -39,6 +39,7 @@
       "notePlaceholder": "Deja una nota para la próxima revisión…",
       "sections": {
         "actions": "Acciones",
+        "lettering": "Rotulación",
         "note": "Nota",
         "source": "Texto original y traducción"
       },
@@ -61,8 +62,11 @@
     "lettering": {
       "auto": "Elegir fuentes automáticamente",
       "autoDescription": "Las traducciones nuevas y los cuadros cuya categoría cambia reciben la fuente de su categoría.",
+      "autoOff": "Las fuentes siguen las categorías solo con <a>{{setting}}</a> activado ({{tab}}).",
+      "automatic": "Automática",
       "bold": "Negrita",
       "boldFor": "{{category}}: negrita",
+      "bubbleShape": "Forma del bocadillo: {{shape}}",
       "categories": {
         "crying": "Llanto / temblor",
         "electronic_voice": "Voz electrónica",
@@ -84,15 +88,30 @@
         "whisper": "Susurro"
       },
       "category": "Categoría de rotulación",
+      "change": "Cambiar categoría…",
       "defaultFont": "Fuente predeterminada",
       "description": "Elige fuentes según cómo se presenta o se expresa cada línea. Cada cuadro toma la categoría elegida para él o, si no, una deducida de la página: un efecto de sonido, una rotulación original pequeña o la forma de su bocadillo.",
       "font": "Fuente",
       "fontFor": "{{category}}: fuente",
       "italic": "Cursiva",
       "italicFor": "{{category}}: cursiva",
+      "keptLocked_many": "{{count}} cuadros bloqueados conservaron su categoría.",
+      "keptLocked_one": "{{count}} cuadro bloqueado conservó su categoría.",
+      "keptLocked_other": "{{count}} cuadros bloqueados conservaron su categoría.",
+      "locked": "Este texto, o una capa que lo contiene, está bloqueado. Quita el bloqueo en Capas para cambiar su categoría.",
+      "measures": "Rectangularidad {{rectangularity}} % · Solidez {{solidity}} % · Entrantes profundos {{spikes}}",
+      "noBubble": "Sin bocadillo",
       "noMatch": "Ninguna categoría coincide",
       "own": "Categorías con fuente propia",
       "ownNone": "Ninguna todavía: una categoría sin fuente propia se rotula como Diálogo normal, y Diálogo normal sin fuente propia, con la fuente predeterminada.",
+      "reasons": {
+        "floating": "Fuera de un bocadillo",
+        "model": "Elegido por el agente",
+        "sfx": "Detectado como efecto de sonido",
+        "shape": "Por la forma del bocadillo",
+        "small_text": "Rotulación original pequeña",
+        "user": "Definido a mano"
+      },
       "sameAsDefault": "Igual que la fuente predeterminada",
       "sameAsDialogue": "Igual que Diálogo normal",
       "search": "Buscar categorías",
@@ -102,12 +121,19 @@
         "round": "También se usa para bocadillos redondos.",
         "spiky": "También se usa para bocadillos dentados."
       },
+      "shapes": {
+        "rectangle": "Rectangular",
+        "round": "Redondo",
+        "spiky": "Dentado"
+      },
       "suggest": "Sugerir fuentes",
       "suggestDescription": "Rellena las categorías sin fuente a partir de tu lista inicial de fuentes, usando solo las disponibles. Las opciones existentes se mantienen tal como las has definido.",
       "suggestedNone": "No hay nada que sugerir: las categorías de la lista inicial ya tienen fuente o ninguna de sus fuentes está disponible.",
       "suggested_many": "Se sugirieron fuentes para {{count}} categorías",
       "suggested_one": "Se sugirió una fuente para {{count}} categoría",
       "suggested_other": "Se sugirieron fuentes para {{count}} categorías",
+      "tag": "Categoría de rotulación: {{category}} ({{reason}})",
+      "tagFor": "Categoría de rotulación de {{name}}: {{category}} ({{reason}})",
       "title": "Categorías de rotulación"
     },
     "menu": {
@@ -245,6 +271,7 @@
       "booharu_apply_text_style": "Aplicar estilo de texto",
       "booharu_join_balloon": "Unir textos",
       "booharu_join_page": "Unir textos divididos",
+      "booharu_set_lettering_category": "Cambiar categoría de rotulación",
       "booharu_set_review_note": "Editar nota",
       "booharu_set_translation": "Añadir traducción",
       "booharu_split_block": "Dividir texto"

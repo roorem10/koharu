@@ -39,6 +39,7 @@
       "notePlaceholder": "Laissez une note pour la prochaine relecture…",
       "sections": {
         "actions": "Actions",
+        "lettering": "Lettrage",
         "note": "Note",
         "source": "Texte source et traduction"
       },
@@ -61,8 +62,11 @@
     "lettering": {
       "auto": "Choisir les polices automatiquement",
       "autoDescription": "Les nouvelles traductions, et les cadres dont la catégorie change, reçoivent la police de leur catégorie.",
+      "autoOff": "Les polices ne suivent les catégories que si <a>{{setting}}</a> est activé ({{tab}}).",
+      "automatic": "Automatique",
       "bold": "Gras",
       "boldFor": "{{category}} : gras",
+      "bubbleShape": "Forme de bulle : {{shape}}",
       "categories": {
         "crying": "Pleurs / tremblements",
         "electronic_voice": "Voix électronique",
@@ -84,15 +88,30 @@
         "whisper": "Chuchotement"
       },
       "category": "Catégorie de lettrage",
+      "change": "Changer de catégorie…",
       "defaultFont": "Police par défaut",
       "description": "Choisissez les polices selon la présentation ou le ton d’une réplique. Chaque cadre prend la catégorie choisie pour lui ou, à défaut, une catégorie déduite de la page : un effet sonore, un petit lettrage d’origine ou la forme de sa bulle.",
       "font": "Police",
       "fontFor": "{{category}} : police",
       "italic": "Italique",
       "italicFor": "{{category}} : italique",
+      "keptLocked_many": "{{count}} cadres verrouillés ont gardé leur catégorie.",
+      "keptLocked_one": "{{count}} cadre verrouillé a gardé sa catégorie.",
+      "keptLocked_other": "{{count}} cadres verrouillés ont gardé leur catégorie.",
+      "locked": "Ce texte, ou un calque qui le contient, est verrouillé. Déverrouillez-le dans le panneau Calques pour modifier sa catégorie.",
+      "measures": "Rectangularité {{rectangularity}} % · Solidité {{solidity}} % · Creux profonds {{spikes}}",
+      "noBubble": "Sans bulle",
       "noMatch": "Aucune catégorie ne correspond",
       "own": "Catégories avec leur propre police",
       "ownNone": "Aucune pour l’instant : une catégorie sans police propre est lettrée comme Dialogue normal, et Dialogue normal sans police propre, avec la police par défaut.",
+      "reasons": {
+        "floating": "Hors bulle",
+        "model": "Choisi par l’agent",
+        "sfx": "Détecté comme effet sonore",
+        "shape": "D’après la forme de la bulle",
+        "small_text": "Petit lettrage d’origine",
+        "user": "Défini à la main"
+      },
       "sameAsDefault": "Identique à la police par défaut",
       "sameAsDialogue": "Identique à Dialogue normal",
       "search": "Rechercher des catégories",
@@ -102,12 +121,19 @@
         "round": "Également utilisé pour les bulles rondes.",
         "spiky": "Également utilisé pour les bulles dentelées."
       },
+      "shapes": {
+        "rectangle": "Rectangle",
+        "round": "Ronde",
+        "spiky": "Dentelée"
+      },
       "suggest": "Suggérer des polices",
       "suggestDescription": "Remplissez les catégories sans police à partir de votre liste de polices de départ, en utilisant uniquement les polices disponibles. Vos choix existants sont conservés.",
       "suggestedNone": "Rien à suggérer : les catégories de la liste de départ ont déjà une police, ou aucune de ses polices n’est disponible.",
       "suggested_many": "Polices suggérées pour {{count}} catégories",
       "suggested_one": "Police suggérée pour {{count}} catégorie",
       "suggested_other": "Polices suggérées pour {{count}} catégories",
+      "tag": "Catégorie de lettrage : {{category}} ({{reason}})",
+      "tagFor": "Catégorie de lettrage pour {{name}} : {{category}} ({{reason}})",
       "title": "Catégories de lettrage"
     },
     "menu": {
@@ -245,6 +271,7 @@
       "booharu_apply_text_style": "Appliquer le style de texte",
       "booharu_join_balloon": "Fusionner des textes",
       "booharu_join_page": "Fusionner les textes divisés",
+      "booharu_set_lettering_category": "Modifier la catégorie de lettrage",
       "booharu_set_review_note": "Modifier la note",
       "booharu_set_translation": "Ajouter une traduction",
       "booharu_split_block": "Diviser le texte"

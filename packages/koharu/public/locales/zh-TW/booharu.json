@@ -36,6 +36,7 @@
       "notePlaceholder": "為下一輪檢查留下備註…",
       "sections": {
         "actions": "操作",
+        "lettering": "排字",
         "note": "備註",
         "source": "原文與譯文"
       },
@@ -58,8 +59,11 @@
     "lettering": {
       "auto": "自動選擇字型",
       "autoDescription": "新譯文以及類別有變更的文字框會使用其類別的字型。",
+      "autoOff": "只有開啟<a>{{setting}}</a>時，字型才會隨類別變化（{{tab}}）。",
+      "automatic": "自動",
       "bold": "粗體",
       "boldFor": "{{category}}：粗體",
+      "bubbleShape": "對話框形狀：{{shape}}",
       "categories": {
         "crying": "哭泣／顫抖",
         "electronic_voice": "電子語音",
@@ -81,15 +85,29 @@
         "whisper": "低語"
       },
       "category": "排字類別",
+      "change": "變更排字類別…",
       "defaultFont": "預設字型",
       "description": "依台詞的呈現方式或說話方式選擇字型。每個文字框使用為它選定的類別，否則依頁面判斷：音效、原文的小字，或對話框的形狀。",
       "font": "字型",
       "fontFor": "{{category}}：字型",
       "italic": "斜體",
       "italicFor": "{{category}}：斜體",
+      "keptLocked_one": "{{count}} 個已鎖定的文字框保留了原類別。",
+      "keptLocked_other": "{{count}} 個已鎖定的文字框保留了原類別。",
+      "locked": "此文字或包含它的圖層已鎖定。請在「圖層」中解鎖後再修改類別。",
+      "measures": "矩形度 {{rectangularity}}% · 實心度 {{solidity}}% · 深凹陷數 {{spikes}}",
+      "noBubble": "無對話框",
       "noMatch": "沒有符合的類別",
       "own": "有專屬字型的類別",
       "ownNone": "尚無：沒有專屬字型的類別依一般對話排字，一般對話沒有專屬字型時使用預設字型。",
+      "reasons": {
+        "floating": "不在對話框內",
+        "model": "由代理選擇",
+        "sfx": "偵測為音效",
+        "shape": "依對話框形狀",
+        "small_text": "原文為小字",
+        "user": "手動設定"
+      },
       "sameAsDefault": "與預設字型相同",
       "sameAsDialogue": "與一般對話相同",
       "search": "搜尋類別",
@@ -99,11 +117,18 @@
         "round": "也用於圓形對話框。",
         "spiky": "也用於尖刺形對話框。"
       },
+      "shapes": {
+        "rectangle": "矩形",
+        "round": "圓形",
+        "spiky": "鋸齒形"
+      },
       "suggest": "推薦字型",
       "suggestDescription": "從起始字型清單中選擇可用字型，填入還沒有字型的類別。現有選擇保持不變。",
       "suggestedNone": "沒有可推薦的字型：起始清單中的類別已有字型，或清單中的字型都無法使用。",
       "suggested_one": "已為 {{count}} 個類別推薦字型",
       "suggested_other": "已為 {{count}} 個類別推薦字型",
+      "tag": "排字類別：{{category}}（{{reason}}）",
+      "tagFor": "{{name}} 的排字類別：{{category}}（{{reason}}）",
       "title": "排字類別"
     },
     "menu": {
@@ -233,6 +258,7 @@
       "booharu_apply_text_style": "套用文字樣式",
       "booharu_join_balloon": "合併文字",
       "booharu_join_page": "合併分割的文字",
+      "booharu_set_lettering_category": "變更排字類別",
       "booharu_set_review_note": "編輯備註",
       "booharu_set_translation": "新增譯文",
       "booharu_split_block": "分割文字"

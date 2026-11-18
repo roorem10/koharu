@@ -39,6 +39,7 @@
       "notePlaceholder": "Deixe uma nota para a próxima revisão…",
       "sections": {
         "actions": "Ações",
+        "lettering": "Letreiramento",
         "note": "Nota",
         "source": "Texto original e tradução"
       },
@@ -61,8 +62,11 @@
     "lettering": {
       "auto": "Escolher fontes automaticamente",
       "autoDescription": "Traduções novas e caixas cuja categoria muda recebem a fonte da sua categoria.",
+      "autoOff": "As fontes seguem as categorias só com <a>{{setting}}</a> ativado ({{tab}}).",
+      "automatic": "Automático",
       "bold": "Negrito",
       "boldFor": "{{category}}: negrito",
+      "bubbleShape": "Forma do balão: {{shape}}",
       "categories": {
         "crying": "Choro / tremor",
         "electronic_voice": "Voz eletrônica",
@@ -84,15 +88,30 @@
         "whisper": "Sussurro"
       },
       "category": "Categoria de letreiramento",
+      "change": "Alterar categoria…",
       "defaultFont": "Fonte padrão",
       "description": "Escolha fontes conforme a apresentação ou a entonação de cada fala. Cada caixa usa a categoria escolhida para ela ou, se não houver, uma deduzida da página: um efeito sonoro, letras originais pequenas ou o formato do balão.",
       "font": "Fonte",
       "fontFor": "{{category}}: fonte",
       "italic": "Itálico",
       "italicFor": "{{category}}: itálico",
+      "keptLocked_many": "{{count}} caixas bloqueadas mantiveram a categoria.",
+      "keptLocked_one": "{{count}} caixa bloqueada manteve a categoria.",
+      "keptLocked_other": "{{count}} caixas bloqueadas mantiveram a categoria.",
+      "locked": "Este texto, ou uma camada que o contém, está bloqueado. Desbloqueie em Camadas para alterar a categoria.",
+      "measures": "Retangularidade {{rectangularity}}% · Solidez {{solidity}}% · Reentrâncias profundas {{spikes}}",
+      "noBubble": "Sem balão",
       "noMatch": "Nenhuma categoria corresponde",
       "own": "Categorias com fonte própria",
       "ownNone": "Nenhuma ainda: uma categoria sem fonte própria é letreirada como o diálogo normal, e o diálogo normal sem fonte própria, com a fonte padrão.",
+      "reasons": {
+        "floating": "Fora de um balão",
+        "model": "Escolhida pelo agente",
+        "sfx": "Detectado como efeito sonoro",
+        "shape": "Pela forma do balão",
+        "small_text": "Letras pequenas no original",
+        "user": "Definida à mão"
+      },
       "sameAsDefault": "Igual à fonte padrão",
       "sameAsDialogue": "Igual ao diálogo normal",
       "search": "Pesquisar categorias",
@@ -102,12 +121,19 @@
         "round": "Também usada em balões redondos.",
         "spiky": "Também usada em balões pontudos."
       },
+      "shapes": {
+        "rectangle": "Retangular",
+        "round": "Redondo",
+        "spiky": "Pontudo"
+      },
       "suggest": "Sugerir fontes",
       "suggestDescription": "Preenche as categorias sem fonte com sua lista inicial de fontes, usando apenas fontes disponíveis. As escolhas existentes são mantidas.",
       "suggestedNone": "Nada a sugerir: as categorias da lista inicial já têm fonte, ou nenhuma das fontes dela está disponível.",
       "suggested_many": "Fontes sugeridas para {{count}} categorias",
       "suggested_one": "Fonte sugerida para {{count}} categoria",
       "suggested_other": "Fontes sugeridas para {{count}} categorias",
+      "tag": "Categoria de letreiramento: {{category}} ({{reason}})",
+      "tagFor": "Categoria de letreiramento de {{name}}: {{category}} ({{reason}})",
       "title": "Categorias de letreiramento"
     },
     "menu": {
@@ -245,6 +271,7 @@
       "booharu_apply_text_style": "Aplicar estilo de texto",
       "booharu_join_balloon": "Unir textos",
       "booharu_join_page": "Unir textos divididos",
+      "booharu_set_lettering_category": "Alterar categoria de letreiramento",
       "booharu_set_review_note": "Editar nota",
       "booharu_set_translation": "Adicionar tradução",
       "booharu_split_block": "Dividir texto"

@@ -36,6 +36,7 @@
       "notePlaceholder": "次の作業に向けてメモを残す…",
       "sections": {
         "actions": "操作",
+        "lettering": "写植",
         "note": "メモ",
         "source": "原文と翻訳"
       },
@@ -58,8 +59,11 @@
     "lettering": {
       "auto": "フォントを自動で選択",
       "autoDescription": "新しい翻訳と、カテゴリが変わったボックスには、そのカテゴリのフォントが使われます。",
+      "autoOff": "フォントがカテゴリに従うのは、<a>{{setting}}</a>（{{tab}}）がオンのときだけです。",
+      "automatic": "自動",
       "bold": "太字",
       "boldFor": "{{category}}：太字",
+      "bubbleShape": "吹き出しの形：{{shape}}",
       "categories": {
         "crying": "泣き声・震え声",
         "electronic_voice": "電子音声",
@@ -81,15 +85,29 @@
         "whisper": "ささやき"
       },
       "category": "写植カテゴリ",
+      "change": "写植カテゴリを変更…",
       "defaultFont": "既定のフォント",
       "description": "台詞の見せ方や話し方に応じてフォントを選びます。各ボックスには指定されたカテゴリが使われ、指定がなければページから判断します（効果音、原文の小さな文字、吹き出しの形）。",
       "font": "フォント",
       "fontFor": "{{category}}：フォント",
       "italic": "斜体",
       "italicFor": "{{category}}：斜体",
+      "keptLocked_one": "ロック中の{{count}}個のボックスはカテゴリがそのままです。",
+      "keptLocked_other": "ロック中の{{count}}個のボックスはカテゴリがそのままです。",
+      "locked": "このテキスト、またはそれを含むレイヤーがロックされています。カテゴリを変更するには「レイヤー」でロックを解除してください。",
+      "measures": "矩形度 {{rectangularity}}% · 凸包充填率 {{solidity}}% · 深いくぼみ {{spikes}}",
+      "noBubble": "吹き出しなし",
       "noMatch": "一致するカテゴリはありません",
       "own": "専用フォントのあるカテゴリ",
       "ownNone": "まだありません。専用フォントのないカテゴリは通常の台詞と同じフォントで、通常の台詞にもなければ既定のフォントで写植します。",
+      "reasons": {
+        "floating": "吹き出しの外",
+        "model": "エージェントが選択",
+        "sfx": "効果音として検出",
+        "shape": "吹き出しの形から",
+        "small_text": "原文の文字が小さい",
+        "user": "手動で設定"
+      },
       "sameAsDefault": "既定のフォントと同じ",
       "sameAsDialogue": "通常の台詞と同じ",
       "search": "カテゴリを検索",
@@ -99,11 +117,18 @@
         "round": "丸形の吹き出しにも使用します。",
         "spiky": "トゲ形の吹き出しにも使用します。"
       },
+      "shapes": {
+        "rectangle": "長方形",
+        "round": "丸形",
+        "spiky": "ギザギザ"
+      },
       "suggest": "フォントの候補を設定",
       "suggestDescription": "開始時のフォントリストから、使用可能なフォントだけでフォント未設定のカテゴリを埋めます。設定済みの項目は変更しません。",
       "suggestedNone": "設定できる候補はありません。リストのカテゴリにはすでにフォントがあるか、リストのフォントがどれも使用できません。",
       "suggested_one": "{{count}}個のカテゴリにフォントを設定しました",
       "suggested_other": "{{count}}個のカテゴリにフォントを設定しました",
+      "tag": "写植カテゴリ：{{category}}（{{reason}}）",
+      "tagFor": "{{name}}の写植カテゴリ：{{category}}（{{reason}}）",
       "title": "写植カテゴリ"
     },
     "menu": {
@@ -233,6 +258,7 @@
       "booharu_apply_text_style": "書式を適用",
       "booharu_join_balloon": "テキストを結合",
       "booharu_join_page": "分割されたテキストを結合",
+      "booharu_set_lettering_category": "写植カテゴリを変更",
       "booharu_set_review_note": "メモを編集",
       "booharu_set_translation": "翻訳を追加",
       "booharu_split_block": "テキストを分割"

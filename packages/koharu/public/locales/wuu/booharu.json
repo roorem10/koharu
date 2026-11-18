@@ -36,6 +36,7 @@
       "notePlaceholder": "留条备注畀下一趟检查…",
       "sections": {
         "actions": "操作",
+        "lettering": "文字排版",
         "note": "备注",
         "source": "原文搭译文"
       },
@@ -58,8 +59,11 @@
     "lettering": {
       "auto": "自动选字体",
       "autoDescription": "新译文，搭类别变过个文字框，会用伊拉类别个字体。",
+      "autoOff": "只有开仔<a>{{setting}}</a>个辰光，字体再会跟牢类别变（{{tab}}）。",
+      "automatic": "自动",
       "bold": "粗体",
       "boldFor": "{{category}}：粗体",
+      "bubbleShape": "气泡形状：{{shape}}",
       "categories": {
         "crying": "哭泣／发抖",
         "electronic_voice": "电子语音",
@@ -81,15 +85,29 @@
         "whisper": "耳语"
       },
       "category": "文字排版类别",
+      "change": "更改文字排版类别…",
       "defaultFont": "默认字体",
       "description": "照一句话个呈现方式或者语气来选字体。每只文字框用替伊选好个类别，呒没选个话就看页面来定：音效、原文个小字，或者气泡个形状。",
       "font": "字体",
       "fontFor": "{{category}}：字体",
       "italic": "斜体",
       "italicFor": "{{category}}：斜体",
+      "keptLocked_one": "锁牢个 {{count}} 只文字框保留原来个类别。",
+      "keptLocked_other": "锁牢个 {{count}} 只文字框保留原来个类别。",
+      "locked": "箇段文字，或者包含伊个图层锁牢哉。到“图层”里向解锁，再好改类别。",
+      "measures": "矩形度 {{rectangularity}}% · 实心度 {{solidity}}% · 深凹陷数 {{spikes}}",
+      "noBubble": "呒没气泡",
       "noMatch": "呒没对得上个类别",
       "own": "有自家字体个类别",
       "ownNone": "还呒没：呒没自家字体个类别照普通对话排，普通对话也呒没自家字体个话就用默认字体。",
+      "reasons": {
+        "floating": "勿勒气泡里向",
+        "model": "智能体选个",
+        "sfx": "检测出来是音效",
+        "shape": "根据气泡形状",
+        "small_text": "原文字小",
+        "user": "手动设置个"
+      },
       "sameAsDefault": "搭默认字体一样",
       "sameAsDialogue": "搭普通对话一样",
       "search": "搜索类别",
@@ -99,11 +117,18 @@
         "round": "圆形气泡也用箇个。",
         "spiky": "尖刺形气泡也用箇个。"
       },
+      "shapes": {
+        "rectangle": "矩形",
+        "round": "圆形",
+        "spiky": "锯齿形"
+      },
       "suggest": "推荐字体",
       "suggestDescription": "从侬个初始字体列表里向选可用个字体，拿还呒没字体个类别填好。已有个选择保持勿变。",
       "suggestedNone": "呒没好推荐个：初始列表里向个类别已经有字体了，或者列表里向个字体侪用勿来。",
       "suggested_one": "已经替 {{count}} 只类别推荐字体",
       "suggested_other": "已经替 {{count}} 只类别推荐字体",
+      "tag": "文字排版类别：{{category}}（{{reason}}）",
+      "tagFor": "{{name}} 个文字排版类别：{{category}}（{{reason}}）",
       "title": "文字排版类别"
     },
     "menu": {
@@ -233,6 +258,7 @@
       "booharu_apply_text_style": "应用文字样式",
       "booharu_join_balloon": "合并文字",
       "booharu_join_page": "合并拆开个文字",
+      "booharu_set_lettering_category": "更改文字排版类别",
       "booharu_set_review_note": "编辑备注",
       "booharu_set_translation": "加译文",
       "booharu_split_block": "拆分文字"

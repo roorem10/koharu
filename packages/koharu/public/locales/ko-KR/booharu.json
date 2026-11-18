@@ -36,6 +36,7 @@
       "notePlaceholder": "다음 작업을 위한 메모 남기기…",
       "sections": {
         "actions": "작업",
+        "lettering": "레터링",
         "note": "메모",
         "source": "원문 및 번역"
       },
@@ -58,8 +59,11 @@
     "lettering": {
       "auto": "자동으로 글꼴 선택",
       "autoDescription": "새 번역과 범주가 바뀐 상자에는 해당 범주의 글꼴이 적용됩니다.",
+      "autoOff": "<a>{{setting}}</a> 옵션({{tab}})이 켜져 있을 때만 글꼴이 범주를 따릅니다.",
+      "automatic": "자동",
       "bold": "굵게",
       "boldFor": "{{category}}: 굵게",
+      "bubbleShape": "말풍선 모양: {{shape}}",
       "categories": {
         "crying": "울음 / 떨림",
         "electronic_voice": "전자 음성",
@@ -81,15 +85,29 @@
         "whisper": "속삭임"
       },
       "category": "레터링 범주",
+      "change": "범주 변경…",
       "defaultFont": "기본 글꼴",
       "description": "대사의 표현 방식이나 말투에 따라 글꼴을 선택합니다. 각 상자는 지정된 범주를 사용하고, 지정되지 않았다면 페이지에서 판단한 범주를 사용합니다(효과음, 작은 원문 글씨, 말풍선 모양).",
       "font": "글꼴",
       "fontFor": "{{category}}: 글꼴",
       "italic": "기울임꼴",
       "italicFor": "{{category}}: 기울임꼴",
+      "keptLocked_one": "잠긴 상자 {{count}}개는 범주가 그대로입니다.",
+      "keptLocked_other": "잠긴 상자 {{count}}개는 범주가 그대로입니다.",
+      "locked": "이 텍스트 또는 이 텍스트가 들어 있는 레이어가 잠겨 있습니다. 범주를 바꾸려면 레이어 패널에서 잠금을 해제하세요.",
+      "measures": "사각형 비율 {{rectangularity}}% · 볼록도 {{solidity}}% · 깊은 홈 {{spikes}}",
+      "noBubble": "말풍선 없음",
       "noMatch": "일치하는 범주가 없습니다",
       "own": "전용 글꼴이 있는 범주",
       "ownNone": "아직 없습니다. 전용 글꼴이 없는 범주는 일반 대사의 글꼴을, 일반 대사에도 없으면 기본 글꼴을 사용합니다.",
+      "reasons": {
+        "floating": "말풍선 밖",
+        "model": "에이전트가 선택함",
+        "sfx": "효과음으로 감지됨",
+        "shape": "말풍선 모양에 따라",
+        "small_text": "원문의 작은 글씨",
+        "user": "직접 설정됨"
+      },
       "sameAsDefault": "기본 글꼴과 같음",
       "sameAsDialogue": "일반 대사와 같음",
       "search": "범주 검색",
@@ -99,11 +117,18 @@
         "round": "둥근 말풍선에도 사용합니다.",
         "spiky": "뾰족한 말풍선에도 사용합니다."
       },
+      "shapes": {
+        "rectangle": "사각형",
+        "round": "둥근 모양",
+        "spiky": "뾰족한 모양"
+      },
       "suggest": "글꼴 추천",
       "suggestDescription": "초기 글꼴 목록에서 사용 가능한 글꼴만 골라 글꼴이 없는 범주를 채웁니다. 기존 선택은 그대로 유지됩니다.",
       "suggestedNone": "추천할 글꼴이 없습니다. 목록의 범주에 이미 글꼴이 있거나, 목록의 글꼴을 하나도 사용할 수 없습니다.",
       "suggested_one": "범주 {{count}}개에 글꼴을 추천했습니다",
       "suggested_other": "범주 {{count}}개에 글꼴을 추천했습니다",
+      "tag": "레터링 범주: {{category}} ({{reason}})",
+      "tagFor": "{{name}}의 레터링 범주: {{category}} ({{reason}})",
       "title": "레터링 범주"
     },
     "menu": {
@@ -233,6 +258,7 @@
       "booharu_apply_text_style": "글꼴 서식 적용",
       "booharu_join_balloon": "텍스트 합치기",
       "booharu_join_page": "분할된 텍스트 합치기",
+      "booharu_set_lettering_category": "레터링 범주 변경",
       "booharu_set_review_note": "메모 편집",
       "booharu_set_translation": "번역 추가",
       "booharu_split_block": "텍스트 분할"
