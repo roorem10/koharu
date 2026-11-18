@@ -48,7 +48,12 @@
   },
   "history": {
     "steps": {
-      "booharu_set_translation": "新增譯文"
+      "booharu_add_box": "新增文字框",
+      "booharu_join_balloon": "合併文字",
+      "booharu_join_page": "合併分割的文字",
+      "booharu_set_review_note": "編輯備註",
+      "booharu_set_translation": "新增譯文",
+      "booharu_split_block": "分割文字"
     }
   },
   "settings": {

@@ -48,7 +48,12 @@
   },
   "history": {
     "steps": {
-      "booharu_set_translation": "번역 추가"
+      "booharu_add_box": "텍스트 상자 추가",
+      "booharu_join_balloon": "텍스트 합치기",
+      "booharu_join_page": "분할된 텍스트 합치기",
+      "booharu_set_review_note": "메모 편집",
+      "booharu_set_translation": "번역 추가",
+      "booharu_split_block": "텍스트 분할"
     }
   },
   "settings": {

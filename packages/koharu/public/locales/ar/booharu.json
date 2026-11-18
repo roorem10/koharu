@@ -60,7 +60,12 @@
   },
   "history": {
     "steps": {
-      "booharu_set_translation": "إضافة ترجمة"
+      "booharu_add_box": "إضافة مربع نص",
+      "booharu_join_balloon": "دمج النصوص",
+      "booharu_join_page": "دمج النصوص المقسّمة",
+      "booharu_set_review_note": "تحرير الملاحظة",
+      "booharu_set_translation": "إضافة ترجمة",
+      "booharu_split_block": "تقسيم النص"
     }
   },
   "inference": {

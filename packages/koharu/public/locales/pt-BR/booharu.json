@@ -54,7 +54,12 @@
   },
   "history": {
     "steps": {
-      "booharu_set_translation": "Adicionar tradução"
+      "booharu_add_box": "Adicionar caixa de texto",
+      "booharu_join_balloon": "Unir textos",
+      "booharu_join_page": "Unir textos divididos",
+      "booharu_set_review_note": "Editar nota",
+      "booharu_set_translation": "Adicionar tradução",
+      "booharu_split_block": "Dividir texto"
     }
   },
   "inference": {

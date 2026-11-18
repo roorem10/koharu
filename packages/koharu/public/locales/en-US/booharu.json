@@ -48,7 +48,12 @@
   },
   "history": {
     "steps": {
-      "booharu_set_translation": "Add translation"
+      "booharu_add_box": "Add text box",
+      "booharu_join_balloon": "Join texts",
+      "booharu_join_page": "Join split texts",
+      "booharu_set_review_note": "Edit note",
+      "booharu_set_translation": "Add translation",
+      "booharu_split_block": "Split text"
     }
   },
   "settings": {

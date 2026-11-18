@@ -56,7 +56,12 @@
   },
   "history": {
     "steps": {
-      "booharu_set_translation": "Добавление перевода"
+      "booharu_add_box": "Добавление текстового блока",
+      "booharu_join_balloon": "Объединение текстов",
+      "booharu_join_page": "Объединение разделённых текстов",
+      "booharu_set_review_note": "Изменение примечания",
+      "booharu_set_translation": "Добавление перевода",
+      "booharu_split_block": "Разделение текста"
     }
   },
   "inference": {
