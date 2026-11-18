@@ -137,6 +137,38 @@ impl ChapterContext {
     }
 }
 
+/// The side files of a project being deleted, which go after it: made just
+/// before the project's file is removed, it removes them as it's dropped,
+/// once that file is gone, and leaves them while it's still there, as when
+/// its removal failed, so a project that stays keeps its chapter's data. A
+/// side file it can't remove then is logged, as the project is gone.
+#[must_use = "the side files go as it's dropped"]
+pub struct SideFiles(PathBuf);
+
+impl SideFiles {
+    /// The side files of the project file `project`, which go once it's
+    /// gone.
+    pub fn of(project: &Path) -> Self {
+        Self(project.to_owned())
+    }
+}
+
+impl Drop for SideFiles {
+    fn drop(&mut self) {
+        // Only once the project is surely gone: a file that can't be looked
+        // at may still be there.
+        if !matches!(self.0.try_exists(), Ok(false)) {
+            return;
+        }
+        if let Err(error) = remove_side_files(&self.0) {
+            tracing::warn!(
+                "the side files of {}, deleted, stay: {error:#}",
+                self.0.display()
+            );
+        }
+    }
+}
+
 /// Removes the side files of the project file `project`, the chapter's and
 /// the agent's, as the project goes; one it doesn't have is no error.
 pub fn remove_side_files(project: &Path) -> Result<()> {
@@ -303,6 +335,23 @@ mod tests {
         ChapterContext::update(&project, |chapter| chapter.series = None)?;
         let read = Chapter::read(&project, || anyhow::bail!("no store"))?;
         assert_eq!(read.series, None);
+        Ok(())
+    }
+
+    #[test]
+    fn the_side_files_go_only_once_the_project_is_gone() -> Result<()> {
+        let (_dir, project) = project();
+        fs_err::write(&project, "a project")?;
+        fs_err::write(side_file(&project), "{}")?;
+        fs_err::write(agent_file(&project), "{}")?;
+        // The project stays, as when its removal failed: so do they.
+        drop(SideFiles::of(&project));
+        assert!(side_file(&project).exists() && agent_file(&project).exists());
+        // Gone, they go after it.
+        let sides = SideFiles::of(&project);
+        fs_err::remove_file(&project)?;
+        drop(sides);
+        assert!(!side_file(&project).exists() && !agent_file(&project).exists());
         Ok(())
     }
 

@@ -483,6 +483,14 @@ mod tests {
         drop(library.create("Ch.2")?);
         library.delete("Ch.2")?;
         assert_eq!(library.list()?, Vec::<String>::new());
+        // A project whose file can't be removed, as one Windows holds open,
+        // stays, and keeps its chapter's data.
+        let held = dir.path().join("Ch.3.khr");
+        fs_err::create_dir(&held)?;
+        fs_err::write(side_file(&held), "{}")?;
+        fs_err::write(agent_file(&held), "{}")?;
+        assert!(library.delete("Ch.3").is_err());
+        assert!(side_file(&held).exists() && agent_file(&held).exists());
         Ok(())
     }
 }

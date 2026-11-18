@@ -31,8 +31,8 @@ use std::path::{Path, PathBuf};
 
 pub use self::{
     chapter::{
-        CHAPTER_VERSION, Chapter, ChapterBrief, ChapterCharacter, ChapterContext, agent_file,
-        remove_side_files, side_file,
+        CHAPTER_VERSION, Chapter, ChapterBrief, ChapterCharacter, ChapterContext, SideFiles,
+        agent_file, remove_side_files, side_file,
     },
     compose::{CharacterHint, Extras, MAX_TERMS, found_terms, instructions, text_known},
     instructions::{InstructionTerm, instruction_terms},
