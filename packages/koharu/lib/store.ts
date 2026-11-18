@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 
+import { foldRun, type RunRecord } from '@/lib/booharu/jobs' // Booharu: its record of runs.
 import type {
   Bounds,
   LayerId,
@@ -65,7 +66,8 @@ export const pipelineStages: readonly Stage[] = ['detect', 'recognize', 'inpaint
 /** A pipeline run as the activity center shows it, from the pipeline's events. */
 export interface Job {
   id: RunId
-  state: 'running' | 'done' | 'failed' | 'stopped'
+  /** Booharu: done with problems, for a run that went on past pages it gave up on. */
+  state: 'running' | 'done' | 'failed' | 'stopped' | 'done_with_problems'
   /** The page stages done, of `total`. */
   completed: number
   total: number
@@ -73,6 +75,9 @@ export interface Job {
   stage: Stage | null
   page: PageId | null
   error: string | null
+  /** Booharu: its stages, the project it was queued in, and its pages waiting for another try or
+   * given up on, which Booharu's fold keeps. */
+  booharu?: RunRecord
 }
 
 interface KoharuStore {
@@ -179,7 +184,12 @@ export function receivePipeline(event: PipelineEvent): void {
   }))
 }
 
+// Booharu: its record of the run, which its own fold keeps after Koharu's.
 function fold(job: Job | undefined, event: PipelineEvent): Job {
+  return foldRun(koharuFold(job, event), event)
+}
+
+function koharuFold(job: Job | undefined, event: PipelineEvent): Job {
   const current: Job = job ?? {
     id: event.run,
     state: 'running',
@@ -206,13 +216,8 @@ function fold(job: Job | undefined, event: PipelineEvent): Job {
             page: event.outcome.page,
             error: event.outcome.reason,
           }
-        : {
-            ...current,
-            // Booharu: done with problems shows as done until the Activity center lists the failed pages.
-            state: event.outcome.kind === 'done_with_problems' ? 'done' : event.outcome.kind,
-            error: null,
-          }
-    // Booharu: a page waiting for its next try, or given up on, changes no count yet.
+        : { ...current, state: event.outcome.kind, error: null }
+    // Booharu: a page waiting for its next try, or given up on, changes only Booharu's record.
     case 'retrying':
     case 'page_failed':
       return current
