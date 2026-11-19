@@ -53,3 +53,7 @@ pub const INSTRUCTIONS_CHANGED: Event<()> = Event::new("booharu_instructions_cha
 /// pages it reads, and as it ends, always ending in a state other than
 /// running.
 pub const JOB: Event<BooharuJob> = Event::new("booharu_job");
+
+/// The open project's conversation with the agent changed, as when Explain
+/// this line added its answer: whatever shows it reads it again.
+pub const AGENT_HISTORY_CHANGED: Event<()> = Event::new("booharu_agent_history_changed");

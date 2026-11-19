@@ -7,10 +7,12 @@
 //! when they write a series or the chapter's notes, or save the
 //! Instructions.
 
+pub(crate) mod agent_history;
 pub(crate) mod boxes;
 pub(crate) mod canvas;
 pub(crate) mod context;
 pub(crate) mod events;
+pub(crate) mod explain;
 pub(crate) mod fonts;
 pub(crate) mod jobs;
 pub(crate) mod lettering;

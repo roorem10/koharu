@@ -139,8 +139,11 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         crate::booharu::context::booharu_import_series,
         crate::booharu::context::booharu_get_first_start_note,
         crate::booharu::context::booharu_dismiss_first_start_note,
+        crate::booharu::context::booharu_set_chapter_brief,
         crate::booharu::read_chapter::booharu_read_chapter,
         crate::booharu::read_chapter::booharu_get_reading_model,
+        crate::booharu::explain::booharu_explain_line,
+        crate::booharu::agent_history::booharu_get_agent_history,
         crate::booharu::jobs::booharu_get_jobs,
     ];
     move |invoke: Invoke<CefRuntime>| {
@@ -245,8 +248,11 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         crate::booharu::context::booharu_import_series,
         crate::booharu::context::booharu_get_first_start_note,
         crate::booharu::context::booharu_dismiss_first_start_note,
+        crate::booharu::context::booharu_set_chapter_brief,
         crate::booharu::read_chapter::booharu_read_chapter,
         crate::booharu::read_chapter::booharu_get_reading_model,
+        crate::booharu::explain::booharu_explain_line,
+        crate::booharu::agent_history::booharu_get_agent_history,
         crate::booharu::jobs::booharu_get_jobs,
     ](types)
 }

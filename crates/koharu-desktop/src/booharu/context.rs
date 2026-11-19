@@ -1,13 +1,13 @@
 //! The series glossary and chapter notes commands: the series in the
 //! Booharu home's `series` folder, which the glossary editor lists, makes,
 //! saves, renames, deletes, exports, and imports; the open project's
-//! chapter, its link to a series and its suggested terms; where a term is
-//! used and Fix it everywhere; Import from instructions; and the note on a
-//! first start saying where Booharu 0.0.4's series are. The files and the
-//! rules are booharu-core's `context` and the `booharu` crate's, which the
-//! agent's tools share. Every write of a series file or of the open
-//! project's side file tells the interface `booharu_context_changed`, and
-//! every save of the Instructions `booharu_instructions_changed`.
+//! chapter, its link to a series, its brief and its suggested terms; where
+//! a term is used and Fix it everywhere; Import from instructions; and the
+//! note on a first start saying where Booharu 0.0.4's series are. The files
+//! and the rules are booharu-core's `context` and the `booharu` crate's,
+//! which the agent's tools share. Every write of a series file or of the
+//! open project's side file tells the interface `booharu_context_changed`,
+//! and every save of the Instructions `booharu_instructions_changed`.
 
 use std::{
     path::{Path, PathBuf},
@@ -183,6 +183,27 @@ pub async fn booharu_link_series(
             &SeriesStore::open()?,
             series.as_deref(),
         )? {
+            app.emit(CONTEXT_CHANGED, ());
+        }
+        chapter(&app)
+    })
+    .await??)
+}
+
+/// Sets the summary of the open project's chapter brief to `summary`,
+/// trimmed, as the user wrote it, so reading the chapter again keeps it:
+/// makes the brief when there is none, and keeps its characters and when
+/// and with which model it was read. A blank summary counts as no brief, so
+/// a Run press reads the chapter again. Answers the chapter then.
+#[tauri::command]
+#[specta::specta]
+pub async fn booharu_set_chapter_brief(
+    app: State<'_, Arc<App>>,
+    summary: String,
+) -> Result<ChapterState> {
+    let app = Arc::clone(&app);
+    Ok(tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        if context::set_brief(&project_file(&app)?, &summary)? {
             app.emit(CONTEXT_CHANGED, ());
         }
         chapter(&app)
