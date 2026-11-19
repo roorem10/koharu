@@ -5,24 +5,36 @@
 //! one ordinary run of them, as Koharu's Run button queues it. On a chapter
 //! with a linked series, suggested terms, or a brief, a press that would find
 //! text and translate translates last, its Translation run its last group.
+//! With Read chapter on, a press that translates on a chapter without a
+//! brief reads the chapter just before its Translation run.
 //!
 //! `booharu::runs::carry_on` plans and follows the groups, for this command
 //! and the agent's `booharu_run` tool alike, and reaches the app as its
 //! `RunHost`: a run is queued only on the project open, and each is told to
-//! the interface as `booharu_run_group`.
+//! the interface as `booharu_run_group`; the read goes through
+//! `read_chapter`, as a Read chapter job of the group's, which Stop, closing
+//! the project and opening another end, and which writes only while the
+//! project it read is the one open.
 
 use std::sync::Arc;
 
-use booharu::runs::{self, RunHost, RunPlan, RunTarget};
+use booharu::{
+    context::read::ReadOutcome,
+    jobs::{self, JobKind},
+    runs::{self, Reading, RunHost, RunPlan, RunTarget},
+};
 use booharu_core::runs::RunStage;
 use koharu_pipeline::{Pipeline, Request, RunId};
-use koharu_scene::Session;
+use koharu_scene::{PageId, Session};
 use parking_lot::Mutex;
 use tauri::State;
 
 use crate::{
     app::App,
-    booharu::events::{BooharuRunGroup, RUN_GROUP},
+    booharu::{
+        events::{BooharuRunGroup, RUN_GROUP},
+        read_chapter::{ReadRequest, read_chapter},
+    },
     commands::Result,
 };
 
@@ -36,8 +48,14 @@ use crate::{
 /// find text and translate translates last: every group without Translation
 /// first, then one Translation run, leaving out the pages a run gave up on.
 /// While a group goes on in the open project, answers that one, with its run
-/// going now, and queues nothing. `stages` are the Run menu's: Koharu's four
-/// by their names, and Read chapter, which a press leaves out for now.
+/// going now, and queues nothing; while Read chapter reads by hand, refuses.
+/// `stages` are the Run menu's: Koharu's four by their names, and `read`,
+/// Read chapter: with it, a plan that translates on a chapter without a
+/// brief reads the chapter just before its Translation run, every group
+/// without Translation first, leaving out the pages a run gave up on, unless
+/// by then the chapter has a brief or those pages no text. While it reads,
+/// the plan has no run and `reading`, and `booharu_job` tells the read as a
+/// job of the group.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_run(
@@ -80,5 +98,34 @@ impl RunHost for App {
                 count: plan.groups.len(),
             },
         );
+    }
+
+    fn read(
+        self: Arc<Self>,
+        session: Arc<Mutex<Session>>,
+        group: u64,
+        pages: Vec<PageId>,
+        stops: u64,
+    ) -> Reading {
+        Box::pin(async move {
+            // Registered first, so Stop and closing the project, which end
+            // every job once they stopped the pipeline, reach it from here.
+            let job = jobs::start(JobKind::ReadChapter)?;
+            let open = self
+                .project
+                .lock()
+                .as_ref()
+                .is_some_and(|open| Arc::ptr_eq(&open.session, &session));
+            if !open || self.pipeline.stops() != stops {
+                return Ok(ReadOutcome::Stopped);
+            }
+            let request = ReadRequest {
+                model: None,
+                pages: Some(pages),
+                group: Some(group),
+                since: Some(stops),
+            };
+            read_chapter(self, session, request, job).await
+        })
     }
 }

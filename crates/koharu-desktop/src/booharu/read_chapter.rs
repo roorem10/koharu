@@ -115,6 +115,10 @@ pub(crate) struct ReadRequest {
     /// The `booharu_run` group whose Run step this is; none for a read by
     /// hand.
     pub group: Option<u64>,
+    /// The pipeline's count of Stops a Run step's group reached the read
+    /// at, so a Stop since, even one before the read started, ends it; none
+    /// for the count as the read starts.
+    pub since: Option<u64>,
 }
 
 /// Reads the chapter of the project `session` holds as `request` asks, as
@@ -151,8 +155,12 @@ pub(crate) async fn read_chapter(
         runs::group_going().is_none_or(|going| Some(going) == request.group),
         "Read chapter can't start while a Run press is going; wait for it to end, or stop it."
     );
-    // From here on, a Stop of any kind ends the read.
-    let stops = Stops::new(job.cancel().clone(), app.pipeline.clone());
+    // From here on, a Stop of any kind ends the read, and for a Run step one
+    // since its group reached it.
+    let mut stops = Stops::new(job.cancel().clone(), app.pipeline.clone());
+    if let Some(since) = request.since {
+        stops.since = since;
+    }
     let telling = Arc::new(Telling::new(&app, &job, request.group));
     telling.tell(|_| {});
     let ending = Ending(Arc::clone(&telling), false);
@@ -185,12 +193,7 @@ async fn reading(
     };
     let chapter =
         tokio::task::spawn_blocking(move || Chapter::read(&path, SeriesStore::open)).await??;
-    let briefed = chapter
-        .context
-        .brief
-        .as_ref()
-        .is_some_and(|brief| !brief.summary.trim().is_empty());
-    if run_step && briefed {
+    if run_step && !runs::brief_missing(&chapter.context) {
         return skip("The chapter was read meanwhile.".to_owned());
     }
     let pages = request
