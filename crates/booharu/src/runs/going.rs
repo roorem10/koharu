@@ -57,6 +57,7 @@ use anyhow::{Context as _, ensure};
 use booharu_core::{
     context::{Chapter, ChapterContext, SeriesStore},
     runs::RunStage,
+    settings::LetteringSettings,
 };
 use koharu_pipeline::{Event, Outcome, Pipeline, Request, RunId, Stage, Target, pipeline_stage};
 use koharu_scene::{PageId, ProjectId, Session};
@@ -114,6 +115,14 @@ pub trait RunHost: Send + Sync + 'static {
     ) -> Reading {
         Box::pin(async { Ok(ReadOutcome::Skipped(Skip::OnlyInApp)) })
     }
+
+    /// The lettering settings as saved now, `[booharu-lettering]`, read
+    /// once for each press, as a run's snapshot reads them: the planner's
+    /// sound-effect rule follows the SFX mode. A bad stored value fails, so
+    /// nothing is planned by a mode nobody chose.
+    fn lettering(&self) -> anyhow::Result<LetteringSettings> {
+        LetteringSettings::read()
+    }
 }
 
 /// The group going on, if one is. `carry_on` holds it while it answers one
@@ -138,6 +147,9 @@ struct Going {
     /// The pages its runs gave up on so far, which its later groups leave
     /// out.
     failed: BTreeSet<PageId>,
+    /// The lettering settings the press was planned with, which its last
+    /// group's narrowing reads too.
+    lettering: LetteringSettings,
 }
 
 /// The number of the group going on, if one is, in whatever project: its
@@ -199,7 +211,8 @@ fn start(
     );
     let read = stages.contains(&RunStage::Read);
     let stages: Vec<Stage> = stages.iter().copied().filter_map(pipeline_stage).collect();
-    let groups = groups(&session.lock(), target, &stages)?;
+    let lettering = host.lettering()?;
+    let groups = groups(&session.lock(), target, &stages, &lettering)?;
     let (groups, narrows) = translating(&session, groups, &stages, read, store)?;
     let first = groups.first().map(|first| match first.read {
         true => First::Read(first.pages.clone()),
@@ -208,7 +221,9 @@ fn start(
             &first.stages,
         ))),
     });
-    go(going, host, session, groups, narrows, first, runtime)
+    go(
+        going, host, session, groups, narrows, lettering, first, runtime,
+    )
 }
 
 /// `groups`, the plan of a press on the project `session` holds with
@@ -271,13 +286,16 @@ enum Now {
 /// spawns its follower on `runtime` once the place is let go, which the
 /// follower then holds. With no first group, a plan of none, which takes no
 /// place. `narrows` tells whether its last group takes only the pages that
-/// still need translation then.
+/// still need translation then, under `lettering`, the settings the press
+/// was planned with.
+#[allow(clippy::too_many_arguments)]
 fn go(
     mut going: MutexGuard<'_, Option<Going>>,
     host: Arc<dyn RunHost>,
     session: Arc<Mutex<Session>>,
     groups: Vec<PlanGroup>,
     narrows: bool,
+    lettering: LetteringSettings,
     first: Option<First>,
     runtime: &Handle,
 ) -> anyhow::Result<(RunPlan, Option<JoinHandle<()>>)> {
@@ -322,6 +340,7 @@ fn go(
         stops,
         narrows,
         failed: BTreeSet::new(),
+        lettering,
     });
     // Let go first, as a follower that can't be spawned, on a runtime
     // shutting down, frees the place as it's dropped.
@@ -547,7 +566,7 @@ fn advance(
 fn narrowed(step: Step, going: &Going, session: &Mutex<Session>) -> anyhow::Result<Step> {
     match step {
         Step::Queue(at, next) if going.narrows && at + 1 == going.plan.groups.len() => {
-            let pages = to_translate(&session.lock(), &next.pages)?;
+            let pages = to_translate(&session.lock(), &next.pages, &going.lettering)?;
             Ok(match pages.is_empty() {
                 true => Step::End,
                 false => Step::Queue(
@@ -767,6 +786,7 @@ mod tests {
             stops: 0,
             narrows: false,
             failed: BTreeSet::new(),
+            lettering: LetteringSettings::default(),
         };
         assert_eq!(answer(Some(&going), ours), Some(plan));
         assert_eq!(answer(Some(&going), other), None);
@@ -999,6 +1019,10 @@ mod tests {
             self.announced.lock().push((plan.group, index));
         }
 
+        fn lettering(&self) -> anyhow::Result<LetteringSettings> {
+            Ok(LetteringSettings::default())
+        }
+
         fn read(
             self: Arc<Self>,
             _session: Arc<Mutex<Session>>,
@@ -1038,6 +1062,7 @@ mod tests {
             stops: 0,
             narrows: false,
             failed: BTreeSet::new(),
+            lettering: LetteringSettings::default(),
         });
         assert_eq!(group_going(), Some(number));
         free(number);
@@ -1071,6 +1096,7 @@ mod tests {
             Arc::clone(&session),
             groups,
             false,
+            LetteringSettings::default(),
             Some(First::Run(Box::new(first))),
             &runtime,
         )
@@ -1124,6 +1150,7 @@ mod tests {
                 stops,
                 narrows: false,
                 failed: BTreeSet::new(),
+                lettering: LetteringSettings::default(),
             });
             group
         };
@@ -1270,6 +1297,7 @@ mod tests {
             stops: 0,
             narrows,
             failed: BTreeSet::new(),
+            lettering: LetteringSettings::default(),
         };
         let last = |pages: &[PageId]| Step::Queue(1, translation(pages));
         assert_eq!(
@@ -1350,6 +1378,7 @@ mod tests {
             stops: host.pipeline.stops(),
             narrows: false,
             failed: BTreeSet::new(),
+            lettering: LetteringSettings::default(),
         });
         let problems = Outcome::DoneWithProblems {
             failures: vec![PageFailure {
@@ -1631,6 +1660,7 @@ mod tests {
             stops: host.pipeline.stops(),
             narrows: false,
             failed: BTreeSet::new(),
+            lettering: LetteringSettings::default(),
         });
         let problems = Outcome::DoneWithProblems {
             failures: vec![PageFailure {

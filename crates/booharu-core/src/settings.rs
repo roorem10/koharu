@@ -161,6 +161,25 @@ impl Section for LetteringSettings {
     const NAME: &'static str = "booharu-lettering";
 }
 
+impl LetteringSettings {
+    /// The section as the file holds it now, as a run's snapshot reads it:
+    /// a bad stored value fails, never replaced by its default, so nothing
+    /// follows a setting nobody chose.
+    pub fn read() -> anyhow::Result<Self> {
+        Self::checked(koharu_config::get())
+    }
+
+    /// `read`, the section as it was read, or why it couldn't be.
+    fn checked(read: koharu_config::Result<Self>) -> anyhow::Result<Self> {
+        read.with_context(|| {
+            format!(
+                "Booharu's default text style can't be read from [{}]",
+                Self::NAME
+            )
+        })
+    }
+}
+
 /// The default text look's colours and outline, as Booharu 0.0.4's
 /// Settings card set them.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -496,12 +515,7 @@ impl Snapshot {
         lettering: koharu_config::Result<LetteringSettings>,
         families: koharu_config::Result<Vec<String>>,
     ) -> anyhow::Result<Self> {
-        let lettering = lettering.with_context(|| {
-            format!(
-                "Booharu's default text style can't be read from [{}]",
-                LetteringSettings::NAME
-            )
-        })?;
+        let lettering = LetteringSettings::checked(lettering)?;
         let families = families.context("Koharu's Preferred fonts can't be read")?;
         Ok(Self {
             lettering,

@@ -16,17 +16,26 @@
 //! - a block with a source, no translation, and no translation record needs
 //!   translation, and one the Translation stage was given back unchanged (no
 //!   translation, its clean-up hidden) or with a blank source counts as
-//!   translated.
+//!   translated;
+//! - a sound effect the SFX mode keeps as art, or one with a subtitle
+//!   (`sfx::skipped` under the lettering settings, read once per plan, as a
+//!   run's snapshot reads them), needs translation only while the
+//!   Translation stage would hide its clean-up to show the art
+//!   (`sfx::kept_original` writing something: no translation, its clean-up
+//!   showing, no kept mark); any other block carrying the kept mark with no
+//!   translation needs it too, as an effect kept as art before the mode
+//!   changed, whose translation shows its clean-up again.
 //!
 //! A stage that would leave a block as it is isn't needed for it, so a page
 //! that's done reads as done however often it's run: Koharu's stages read
-//! hidden blocks as any other, and can't write a locked one, or one inside a
-//! locked layer, which fails its page's edit; detection, recognition, and
-//! inpainting read the page's scan, and do nothing on a page without one;
-//! recognition reads only a source whose frame lies on the page; inpainting
-//! redraws only under a mask, and writes the clean-up, which can't be
-//! locked. Inside a stage nothing changes: a page that needs translation is
-//! translated whole, as Koharu does.
+//! hidden blocks as any other, and leave a locked block, or one inside a
+//! locked layer, out, counting it, rather than failing the page's edit;
+//! detection, recognition, and inpainting read the page's scan, and do
+//! nothing on a page without one; recognition reads only a source whose
+//! frame lies on the page; inpainting redraws only under a mask, and writes
+//! the clean-up, which can't be locked. Inside a stage nothing changes: a
+//! page that needs translation is translated whole, as Koharu does, but for
+//! the blocks it leaves out.
 //!
 //! `carry_on`, from `going`, queues the groups one after another, for the
 //! desktop command and the agent tool alike.
@@ -54,7 +63,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Result;
 use booharu_core::{
+    attrs::Auto,
     context::{Chapter, ChapterContext},
+    settings::LetteringSettings,
+    sfx,
     status::{DETECTION, INPAINTING, OCR, blocks, untranslated},
     styles::recorded,
 };
@@ -169,12 +181,18 @@ pub fn pages(project: &Project, target: &RunTarget) -> Result<Vec<PageId>> {
 }
 
 /// What `stages` on `target` queues: with every stage, the work its pages
-/// still need, planned; with fewer, one ordinary run of those stages on
-/// every page it names, as Koharu runs them.
-pub fn groups(session: &Session, target: &RunTarget, stages: &[Stage]) -> Result<Vec<PlanGroup>> {
+/// still need under `settings`, the lettering settings, planned; with
+/// fewer, one ordinary run of those stages on every page it names, as
+/// Koharu runs them.
+pub fn groups(
+    session: &Session,
+    target: &RunTarget,
+    stages: &[Stage],
+    settings: &LetteringSettings,
+) -> Result<Vec<PlanGroup>> {
     let pages = pages(&session.project(), target)?;
     if all_stages(stages) {
-        return plan(session, &pages);
+        return plan(session, &pages, settings);
     }
     let stages: BTreeSet<Stage> = stages.iter().copied().collect();
     Ok(vec![PlanGroup {
@@ -184,15 +202,20 @@ pub fn groups(session: &Session, target: &RunTarget, stages: &[Stage]) -> Result
     }])
 }
 
-/// The work `pages` of `session`'s project still need, as groups of the
-/// pages that need the same stages, in page order, ordered by their first
-/// page; empty when nothing is left.
-pub fn plan(session: &Session, pages: &[PageId]) -> Result<Vec<PlanGroup>> {
+/// The work `pages` of `session`'s project still need under `settings`,
+/// the lettering settings, which the sound-effect rule reads, as groups of
+/// the pages that need the same stages, in page order, ordered by their
+/// first page; empty when nothing is left.
+pub fn plan(
+    session: &Session,
+    pages: &[PageId],
+    settings: &LetteringSettings,
+) -> Result<Vec<PlanGroup>> {
     let project = session.project();
     let mut groups: Vec<PlanGroup> = Vec::new();
     let mut found: BTreeMap<BTreeSet<Stage>, usize> = BTreeMap::new();
     for page in project.pages().filter(|page| pages.contains(&page.id)) {
-        let stages = needs(session, page)?;
+        let stages = needs(session, page, settings)?;
         if stages.is_empty() {
             continue;
         }
@@ -330,22 +353,27 @@ pub fn has_text(project: &Project, pages: &[PageId]) -> bool {
         .any(|(_, block, _)| !block.source.content.text().trim().is_empty())
 }
 
-/// The pages of `pages` in `session`'s project that still need translation,
-/// as the module's rules read them, in page order.
-pub fn to_translate(session: &Session, pages: &[PageId]) -> Result<Vec<PageId>> {
+/// The pages of `pages` in `session`'s project that still need translation
+/// under `settings`, the lettering settings, as the module's rules read
+/// them, in page order.
+pub fn to_translate(
+    session: &Session,
+    pages: &[PageId],
+    settings: &LetteringSettings,
+) -> Result<Vec<PageId>> {
     let project = session.project();
     let mut found = Vec::new();
     for page in project.pages().filter(|page| pages.contains(&page.id)) {
-        if needs(session, page)?.contains(&Stage::Translate) {
+        if needs(session, page, settings)?.contains(&Stage::Translate) {
             found.push(page.id);
         }
     }
     Ok(found)
 }
 
-/// The stages `page` of `session`'s project still needs, as the module's
-/// rules read them.
-fn needs(session: &Session, page: &Page) -> Result<BTreeSet<Stage>> {
+/// The stages `page` of `session`'s project still needs under `settings`,
+/// the lettering settings, as the module's rules read them.
+fn needs(session: &Session, page: &Page, settings: &LetteringSettings) -> Result<BTreeSet<Stage>> {
     let scanned = page.background.is_some();
     let blocks = blocks(page);
     if blocks.is_empty() {
@@ -364,7 +392,16 @@ fn needs(session: &Session, page: &Page) -> Result<BTreeSet<Stage>> {
             continue;
         }
         let blank = block.source.content.text().trim().is_empty();
-        if !blank && untranslated(layer, block) {
+        // A sound effect kept as art is translated only to hide its
+        // clean-up; any other block when untranslated, or kept as art once
+        // and not any more.
+        let translates = match sfx::skipped(page, layer.id, settings) {
+            true => !sfx::kept_original(layer).is_empty(),
+            false => {
+                untranslated(layer, block) || (block.translation.is_none() && Auto::of(layer).kept)
+            }
+        };
+        if !blank && translates {
             needs.insert(Stage::Translate);
         }
         // Recognition reads only a source whose frame lies on the page.
@@ -375,7 +412,7 @@ fn needs(session: &Session, page: &Page) -> Result<BTreeSet<Stage>> {
             .is_some();
         if blank && scanned && readable && !recorded(layer, OCR) {
             needs.insert(Stage::Recognize);
-            if untranslated(layer, block) {
+            if translates {
                 needs.insert(Stage::Translate);
             }
         }
@@ -407,7 +444,10 @@ fn detected(layers: &[Layer]) -> bool {
 mod tests {
     use std::io::Cursor;
 
-    use booharu_core::context::{ChapterBrief, GlossaryEntry, SeriesStore};
+    use booharu_core::{
+        context::{ChapterBrief, GlossaryEntry, SeriesStore},
+        settings::SfxMode,
+    };
     use image::{ImageFormat, Rgb, RgbImage};
     use koharu_scene::{Created, Edit, Hash, LayerId, Op, Uuid};
     use serde_json::{Value, json};
@@ -482,15 +522,21 @@ mod tests {
         }
 
         fn needs(&self, page: &str) -> Result<Vec<Stage>> {
+            self.needs_under(page, &LetteringSettings::default())
+        }
+
+        fn needs_under(&self, page: &str, settings: &LetteringSettings) -> Result<Vec<Stage>> {
             let project = self.session.project();
-            Ok(needs(&self.session, project.page(self.page(page))?)?
-                .into_iter()
-                .collect())
+            Ok(
+                needs(&self.session, project.page(self.page(page))?, settings)?
+                    .into_iter()
+                    .collect(),
+            )
         }
 
         fn plan(&self, pages: &[&str]) -> Result<Vec<(Vec<Stage>, Vec<PageId>)>> {
             let pages: Vec<PageId> = pages.iter().map(|page| self.page(page)).collect();
-            Ok(plan(&self.session, &pages)?
+            Ok(plan(&self.session, &pages, &LetteringSettings::default())?
                 .into_iter()
                 .map(|group| (group.stages, group.pages))
                 .collect())
@@ -748,6 +794,64 @@ mod tests {
     }
 
     #[test]
+    fn a_sound_effect_kept_as_art_is_translated_only_to_hide_its_clean_up() -> Result<()> {
+        // On each page a sound effect read and cleaned, with no translation:
+        // its clean-up showing, kept as art with the mark, or hidden by hand.
+        let mut ops = Vec::new();
+        for (page, name) in [("shown", "a"), ("kept", "b"), ("hidden", "c")] {
+            ops.extend(block(
+                page,
+                name,
+                0,
+                "ドン",
+                &["detection", "ocr", "inpainting"],
+                false,
+            ));
+            ops.push(patched(name, json!({"role": "sfx"})));
+        }
+        ops.push(patched("c", json!({"cleanup": {"visible": false}})));
+        let mut chapter = Chapter::new(&[("shown", true), ("kept", true), ("hidden", true)], ops)?;
+        let project = chapter.session.project();
+        let kept = sfx::kept_original(project.layer(chapter.layers["b"])?);
+        chapter.session.apply(Edit {
+            label: "test".to_owned(),
+            ops: kept,
+        })?;
+
+        // Kept as art: translated only while its clean-up shows, which the
+        // Translation stage hides; one hidden by hand stays as it is.
+        assert_eq!(chapter.needs("shown")?, [Stage::Translate]);
+        assert_eq!(chapter.needs("kept")?, NOTHING);
+        assert_eq!(chapter.needs("hidden")?, NOTHING);
+        assert_eq!(chapter.plan(&["kept", "hidden"])?, Vec::new());
+
+        // With every sound effect translated, the one kept as art before
+        // needs its translation too, which shows its clean-up again.
+        let all = LetteringSettings {
+            sfx: SfxMode::TranslateAll,
+            ..LetteringSettings::default()
+        };
+        assert_eq!(chapter.needs_under("shown", &all)?, [Stage::Translate]);
+        assert_eq!(chapter.needs_under("kept", &all)?, [Stage::Translate]);
+        assert_eq!(chapter.needs_under("hidden", &all)?, NOTHING);
+        Ok(())
+    }
+
+    #[test]
+    fn a_locked_sound_effect_is_left_out_whatever_it_needs() -> Result<()> {
+        let mut ops = block("p", "a", 0, "ドン", &["detection", "ocr"], false);
+        ops.push(patched("a", json!({"role": "sfx", "locked": true})));
+        let chapter = Chapter::new(&[("p", true)], ops)?;
+        let all = LetteringSettings {
+            sfx: SfxMode::TranslateAll,
+            ..LetteringSettings::default()
+        };
+        assert_eq!(chapter.needs("p")?, NOTHING);
+        assert_eq!(chapter.needs_under("p", &all)?, NOTHING);
+        Ok(())
+    }
+
+    #[test]
     fn pages_that_need_the_same_stages_run_together_by_their_first_page() -> Result<()> {
         let read = ["detection", "ocr", "inpainting"];
         let done = ["detection", "ocr", "inpainting", "translation"];
@@ -802,7 +906,8 @@ mod tests {
             groups(
                 session,
                 &RunTarget::Project {},
-                &[Stage::Translate, Stage::Recognize, Stage::Translate]
+                &[Stage::Translate, Stage::Recognize, Stage::Translate],
+                &LetteringSettings::default(),
             )?,
             [PlanGroup {
                 stages: vec![Stage::Recognize, Stage::Translate],
@@ -815,7 +920,7 @@ mod tests {
             pages: vec![p3, p2],
         };
         assert_eq!(
-            groups(session, &pages, &EVERY)?,
+            groups(session, &pages, &EVERY, &LetteringSettings::default())?,
             [
                 PlanGroup {
                     stages: vec![Stage::Inpaint, Stage::Translate],
@@ -871,7 +976,12 @@ mod tests {
             read: false,
         };
         let (session, project) = (&chapter.session, chapter.session.project());
-        let planned = groups(session, &RunTarget::Project {}, &EVERY)?;
+        let planned = groups(
+            session,
+            &RunTarget::Project {},
+            &EVERY,
+            &LetteringSettings::default(),
+        )?;
         let (read, inpaint) = (Stage::Recognize, Stage::Inpaint);
         assert_eq!(
             planned,
@@ -896,11 +1006,19 @@ mod tests {
         );
         // A plan that finds no text it translates runs as planned.
         let pages = [page("p1"), page("p4"), page("p6")];
-        assert_eq!(translate_last(&project, &plan(session, &pages)?), None);
+        let settings = LetteringSettings::default();
+        assert_eq!(
+            translate_last(&project, &plan(session, &pages, &settings)?),
+            None
+        );
         // The pages that still need translation, in page order.
         let pages = names.map(page);
         assert_eq!(
-            to_translate(session, &[pages[5], pages[4], pages[3], pages[2], pages[0]])?,
+            to_translate(
+                session,
+                &[pages[5], pages[4], pages[3], pages[2], pages[0]],
+                &settings,
+            )?,
             [page("p1"), page("p3"), page("p5")]
         );
         Ok(())
@@ -918,6 +1036,7 @@ mod tests {
             session,
             &RunTarget::Project {},
             &[Stage::Recognize, Stage::Translate],
+            &LetteringSettings::default(),
         )?;
         assert_eq!(
             translate_last(&project, &preset),
@@ -941,7 +1060,12 @@ mod tests {
             &EVERY[..3],
         ];
         for stages in others {
-            let preset = groups(session, &RunTarget::Project {}, stages)?;
+            let preset = groups(
+                session,
+                &RunTarget::Project {},
+                stages,
+                &LetteringSettings::default(),
+            )?;
             assert_eq!(translate_last(&project, &preset), None, "{stages:?}");
         }
         Ok(())
@@ -982,6 +1106,7 @@ mod tests {
                 pages: vec![p1, p2],
             },
             &EVERY,
+            &LetteringSettings::default(),
         )?;
         assert_eq!(
             left,
