@@ -27,6 +27,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     future::Future,
     ops::Range,
     sync::Arc,
@@ -49,6 +50,7 @@ use serde_json::{Value, json};
 use crate::{
     calls::{self, Question, Stops, Unanswered},
     lettering::{Chooser, category_ops},
+    models::CantRead,
     styles::locked,
 };
 
@@ -835,12 +837,63 @@ pub struct ReadSummary {
 pub enum ReadOutcome {
     /// It read every chunk and wrote what it found.
     Done(ReadSummary),
-    /// It had nothing to read, or nothing to read with, as `why` says, and
-    /// wrote nothing; only the app's checks before a read skip it.
-    Skipped(String),
+    /// It had nothing to read, or nothing to read with, as the [`Skip`]
+    /// says, and wrote nothing; only the app's checks before a read skip it.
+    Skipped(Skip),
     /// Stop, closing the project, or the caller going away ended it before
     /// it wrote anything.
     Stopped,
+}
+
+/// Why a read skipped, writing nothing: its job tells it, so the interface
+/// words it in the user's language. It reads in English as the job's
+/// message, and a read by hand's error.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Skip {
+    /// The chapter has a brief by now: the Context tab or the agent read it,
+    /// or wrote one, since the read was planned.
+    HasBrief,
+    /// No line of the pages has text to read.
+    NoText,
+    /// No model can read the pages: `model`, the Read chapter model when
+    /// `saved`, else the translation model, can't, as `why` says.
+    CantRead {
+        model: String,
+        why: CantRead,
+        saved: bool,
+    },
+    /// Only the app reads a chapter.
+    OnlyInApp,
+}
+
+impl fmt::Display for Skip {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::HasBrief => f.write_str("The chapter was read meanwhile."),
+            Self::NoText => f.write_str("There's no text to read; run OCR first."),
+            Self::CantRead {
+                model,
+                why,
+                saved: true,
+            } => write!(
+                f,
+                "{}. Choose another Read chapter model in Settings > Pipeline.",
+                why.why(model)
+            ),
+            Self::CantRead {
+                model,
+                why,
+                saved: false,
+            } => write!(
+                f,
+                "No model can read the chapter: {}. Choose a Read chapter model in Settings > \
+                 Pipeline.",
+                why.why(model)
+            ),
+            Self::OnlyInApp => f.write_str("Read chapter reads only in the app."),
+        }
+    }
 }
 
 /// Writes what a read found, while the project it read is open; answers

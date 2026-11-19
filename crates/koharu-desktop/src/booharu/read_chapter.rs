@@ -18,7 +18,7 @@ use std::{sync::Arc, time::Duration};
 use anyhow::{Context as _, bail, ensure};
 use booharu::{
     calls::{self, Stops},
-    context::read::{self, ReadHost, ReadOutcome, ReadSummary, Reader, Write},
+    context::read::{self, ReadHost, ReadOutcome, ReadSummary, Reader, Skip, Write},
     jobs::{self, BooharuJob, Job, JobKind, JobState},
     models::{self, ReadingModel},
     runs,
@@ -203,7 +203,7 @@ async fn reading(
     telling: &Arc<Telling>,
 ) -> anyhow::Result<ReadOutcome> {
     let run_step = request.group.is_some();
-    let skip = |why: String| match run_step {
+    let skip = |why: Skip| match run_step {
         true => Ok(ReadOutcome::Skipped(why)),
         false => Err(anyhow::anyhow!(why)),
     };
@@ -216,14 +216,14 @@ async fn reading(
     let chapter =
         tokio::task::spawn_blocking(move || Chapter::read(&path, SeriesStore::open)).await??;
     if run_step && !runs::brief_missing(&chapter.context) {
-        return skip("The chapter was read meanwhile.".to_owned());
+        return skip(Skip::HasBrief);
     }
     let pages = request
         .pages
         .unwrap_or_else(|| project.pages().map(|page| page.id).collect());
     let prepared = read::prepare(&project, &pages, chapter.series, &settings.target_language)?;
     if !prepared.has_text() {
-        return skip("There's no text to read; run OCR first.".to_owned());
+        return skip(Skip::NoText);
     }
     let Some(listed) = listed(&stops).await else {
         return Ok(ReadOutcome::Stopped);
@@ -237,7 +237,7 @@ async fn reading(
             let choice = models::reading_model(&listed, saved, &settings.translation, None);
             match choice.reader() {
                 Ok(reference) => reference.to_owned(),
-                Err(why) => return skip(format!("{why:#}")),
+                Err(why) => return skip(why),
             }
         }
     };
@@ -380,6 +380,7 @@ impl Telling {
                 kind: job.kind(),
                 state: JobState::Running,
                 message: None,
+                skip: None,
                 step: 0,
                 steps: 0,
                 group,
@@ -421,7 +422,8 @@ fn ended(job: &mut BooharuJob, outcome: &anyhow::Result<ReadOutcome>) {
         }
         Ok(ReadOutcome::Skipped(why)) => {
             job.state = JobState::Skipped;
-            job.message = Some(why.clone());
+            job.message = Some(why.to_string());
+            job.skip = Some(why.clone());
         }
         Ok(ReadOutcome::Stopped) => job.state = JobState::Stopped,
         Err(error) => {
@@ -449,6 +451,7 @@ mod tests {
             kind: JobKind::ReadChapter,
             state: JobState::Running,
             message: None,
+            skip: None,
             step: 1,
             steps: 3,
             group: Some(4),
@@ -469,13 +472,14 @@ mod tests {
             (JobState::Done, 3, Some(summary))
         );
         let mut skipped = running();
-        ended(
-            &mut skipped,
-            &Ok(ReadOutcome::Skipped("No text.".to_owned())),
-        );
+        ended(&mut skipped, &Ok(ReadOutcome::Skipped(Skip::NoText)));
         assert_eq!(
-            (skipped.state, skipped.message.as_deref()),
-            (JobState::Skipped, Some("No text."))
+            (skipped.state, skipped.skip, skipped.message.as_deref()),
+            (
+                JobState::Skipped,
+                Some(Skip::NoText),
+                Some("There's no text to read; run OCR first.")
+            )
         );
         let mut failed = running();
         let error = anyhow::anyhow!("no answer").context("Read chapter couldn't read page 1");

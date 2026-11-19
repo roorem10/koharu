@@ -68,7 +68,7 @@ use super::{
     read_before_translation, to_translate, translate_last,
 };
 use crate::{
-    context::read::ReadOutcome,
+    context::read::{ReadOutcome, Skip},
     jobs::{self, JobKind},
 };
 
@@ -112,11 +112,7 @@ pub trait RunHost: Send + Sync + 'static {
         _pages: Vec<PageId>,
         _stops: u64,
     ) -> Reading {
-        Box::pin(async {
-            Ok(ReadOutcome::Skipped(
-                "Read chapter reads only in the app.".to_owned(),
-            ))
-        })
+        Box::pin(async { Ok(ReadOutcome::Skipped(Skip::OnlyInApp)) })
     }
 }
 
@@ -1019,9 +1015,7 @@ mod tests {
                 let answer = *self.answer.lock();
                 match answer {
                     Answer::Done => Ok(ReadOutcome::Done(ReadSummary::default())),
-                    Answer::Skipped => Ok(ReadOutcome::Skipped(
-                        "No model can read the pages.".to_owned(),
-                    )),
+                    Answer::Skipped => Ok(ReadOutcome::Skipped(Skip::NoText)),
                     Answer::Failed => Err(anyhow::anyhow!("the model didn't answer")),
                     Answer::Stopped => Ok(ReadOutcome::Stopped),
                 }

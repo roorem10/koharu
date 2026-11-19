@@ -400,9 +400,11 @@
       },
       "read": {
         "failed": "Não foi possível ler o capítulo",
+        "hasBrief": "O capítulo já tem um resumo.",
         "hint": "Lê o capítulo inteiro com {{model}} antes de traduzir.",
         "label": "Leitura do capítulo",
         "needsTranslation": "Ative Tradução para ler o capítulo antes.",
+        "noText": "As páginas não têm texto para ler.",
         "pickModel": "Escolha um modelo que consiga ler as páginas.",
         "skipped": "A leitura do capítulo foi ignorada"
       },

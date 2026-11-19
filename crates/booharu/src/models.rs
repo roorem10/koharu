@@ -16,6 +16,8 @@ use anyhow::{Result, bail};
 use koharu_llm::{KOHARU, Model};
 use serde::{Deserialize, Serialize};
 
+use crate::context::read::Skip;
+
 /// Why a model can't read a chapter's pages.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
@@ -66,25 +68,22 @@ pub struct ReadingModel {
 
 impl ReadingModel {
     /// The model a read uses, or why none can, naming the model.
-    pub fn reader(&self) -> Result<&str> {
+    pub fn reader(&self) -> Result<&str, Skip> {
         if let Some(model) = &self.model {
             return Ok(model);
         }
-        match (
-            &self.saved,
-            self.saved_cant_read,
-            self.translation_cant_read,
-        ) {
-            (Some(saved), Some(why), _) => bail!(
-                "{}. Choose another Read chapter model in Settings > Pipeline.",
-                why.why(saved)
-            ),
-            (_, _, why) => bail!(
-                "No model can read the chapter: {}. Choose a Read chapter model in Settings > \
-                 Pipeline.",
-                why.unwrap_or(CantRead::NoVision).why(&self.translation)
-            ),
-        }
+        Err(match (&self.saved, self.saved_cant_read) {
+            (Some(saved), Some(why)) => Skip::CantRead {
+                model: saved.clone(),
+                why,
+                saved: true,
+            },
+            _ => Skip::CantRead {
+                model: self.translation.clone(),
+                why: self.translation_cant_read.unwrap_or(CantRead::NoVision),
+                saved: false,
+            },
+        })
     }
 }
 

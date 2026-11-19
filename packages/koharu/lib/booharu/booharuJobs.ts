@@ -4,7 +4,9 @@ import { useEffect } from 'react'
 import { create } from 'zustand'
 
 import i18n from '@/lib/i18n'
-import { commands, events, type BooharuJob } from '@koharu/ipc/protocol'
+import { useKoharuStore } from '@/lib/store'
+import { modelName } from '@/lib/translation'
+import { commands, events, type BooharuJob, type Skip } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
 /** Booharu's jobs going, by id, as the desktop last told them: the reads of a chapter, which tell
@@ -14,7 +16,8 @@ export const useBooharuJobs = create<{ jobs: Record<string, BooharuJob> }>()(() 
 
 /** `job` as the desktop told it: kept while it runs, and gone once it ends, whichever way. A read a
  * Run press started that failed or was skipped says why, as the press translates without the
- * chapter's brief; a read by hand answers through its command instead. */
+ * chapter's brief: a skip in the user's language, a failure in the desktop's words, as Koharu's
+ * errors are; a read by hand answers through its command instead. */
 export function receiveBooharuJob(job: BooharuJob): void {
   useBooharuJobs.setState((state) => {
     const jobs = { ...state.jobs }
@@ -28,8 +31,27 @@ export function receiveBooharuJob(job: BooharuJob): void {
       title: i18n.t(
         job.state === 'failed' ? 'booharu.runs.read.failed' : 'booharu.runs.read.skipped',
       ),
-      description: job.message ?? undefined,
+      description: (job.skip ? skipWords(job.skip, job.message) : job.message) ?? undefined,
     })
+  }
+}
+
+/** Why a read skipped, in the user's language, naming a model by the name Koharu's list gives it;
+ * `message`, the desktop's words, for a skip only a host outside the app makes. */
+function skipWords(skip: Skip, message: string | null): string | null {
+  switch (skip.kind) {
+    case 'has_brief':
+      return i18n.t('booharu.runs.read.hasBrief')
+    case 'no_text':
+      return i18n.t('booharu.runs.read.noText')
+    case 'cant_read': {
+      const model = modelName(useKoharuStore.getState().models, skip.model)
+      const why =
+        skip.why === 'no_vision' ? 'booharu.context.noVision' : 'booharu.context.onlyTranslates'
+      return `${i18n.t(why, { model })} ${i18n.t('booharu.runs.read.pickModel')}`
+    }
+    case 'only_in_app':
+      return message
   }
 }
 

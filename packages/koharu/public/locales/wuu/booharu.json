@@ -375,9 +375,11 @@
       },
       "read": {
         "failed": "阅读章节失败哉",
+        "hasBrief": "箇章已经有章节梗概哉。",
         "hint": "翻译之前先用 {{model}} 读完整章。",
         "label": "阅读章节",
         "needsTranslation": "要先阅读章节，先拿“翻译”打开。",
+        "noText": "页面浪呒没好读个文字。",
         "pickModel": "选一只读得懂页面个模型。",
         "skipped": "阅读章节已经跳过哉"
       },

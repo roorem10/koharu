@@ -375,9 +375,11 @@
       },
       "read": {
         "failed": "Read chapter failed",
+        "hasBrief": "The chapter already has a brief.",
         "hint": "Reads the whole chapter with {{model}} before translating.",
         "label": "Read chapter",
         "needsTranslation": "Turn on Translation to read the chapter first.",
+        "noText": "The pages have no text to read.",
         "pickModel": "Choose a model that can read the pages.",
         "skipped": "Read chapter was skipped"
       },

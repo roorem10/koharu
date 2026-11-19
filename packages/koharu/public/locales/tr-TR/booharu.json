@@ -375,9 +375,11 @@
       },
       "read": {
         "failed": "Bölüm okunamadı",
+        "hasBrief": "Bölümün zaten bir özeti var.",
         "hint": "Çeviriden önce tüm bölümü {{model}} ile okur.",
         "label": "Bölüm okuma",
         "needsTranslation": "Önce bölümü okumak için Çeviri'yi açın.",
+        "noText": "Sayfalarda okunacak metin yok.",
         "pickModel": "Sayfaları okuyabilen bir model seçin.",
         "skipped": "Bölüm okuma atlandı"
       },

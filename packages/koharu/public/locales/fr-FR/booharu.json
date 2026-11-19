@@ -400,9 +400,11 @@
       },
       "read": {
         "failed": "Échec de la lecture du chapitre",
+        "hasBrief": "Le chapitre a déjà un résumé.",
         "hint": "Lit tout le chapitre avec {{model}} avant de traduire.",
         "label": "Lecture du chapitre",
         "needsTranslation": "Activez Traduction pour lire d’abord le chapitre.",
+        "noText": "Les pages n’ont aucun texte à lire.",
         "pickModel": "Choisissez un modèle capable de lire les pages.",
         "skipped": "Lecture du chapitre ignorée"
       },

@@ -62,6 +62,7 @@ mod tests {
             kind: JobKind::ReadChapter,
             state: JobState::Running,
             message: None,
+            skip: None,
             step: 0,
             steps: 2,
             group: None,

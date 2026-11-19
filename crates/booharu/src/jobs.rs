@@ -21,7 +21,7 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 
-use crate::context::read::ReadSummary;
+use crate::context::read::{ReadSummary, Skip};
 
 /// What a job does.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -55,8 +55,10 @@ pub struct BooharuJob {
     pub id: u64,
     pub kind: JobKind,
     pub state: JobState,
-    /// Why it failed, or was skipped.
+    /// Why it failed, or was skipped, in English.
     pub message: Option<String>,
+    /// Why it was skipped, which the interface words in the user's language.
+    pub skip: Option<Skip>,
     /// How many of its steps are done: the chunks of pages read.
     pub step: u32,
     /// How many steps it has; 0 until it knows.
@@ -132,6 +134,7 @@ pub fn refused(kind: JobKind, group: Option<u64>, why: &anyhow::Error) -> Boohar
         kind,
         state: JobState::Failed,
         message: Some(format!("{why:#}")),
+        skip: None,
         step: 0,
         steps: 0,
         group,

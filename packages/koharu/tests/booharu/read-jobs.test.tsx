@@ -7,6 +7,7 @@ import { ActivityCenter } from '@/components/editor/ActivityCenter'
 import { CanvasCommandBar } from '@/components/editor/CanvasCommandBar'
 import { receiveBooharuJob, useBooharuJobEvents, useBooharuJobs } from '@/lib/booharu/booharuJobs'
 import { queryClient } from '@/lib/queries'
+import { useKoharuStore } from '@/lib/store'
 import { commands, events, type BooharuJob } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
@@ -19,6 +20,7 @@ const read = (job: Partial<BooharuJob> = {}): BooharuJob => ({
   kind: 'read_chapter',
   state: 'running',
   message: null,
+  skip: null,
   step: 0,
   steps: 0,
   group: null,
@@ -113,10 +115,43 @@ describe('Booharu’s jobs', () => {
 
   it('says why a read a Run press started failed or was skipped, and nothing else', () => {
     const shown = vi.spyOn(toast, 'add')
-    const why = "There's no text to read; run OCR first."
+    useKoharuStore.setState({
+      models: [
+        {
+          reference: 'koharu/index-translate-9b',
+          name: 'Index-Translate 9B',
+          vendor: 'koharu',
+          images: true,
+          tools: false,
+        },
+      ],
+    })
 
     tell(read({ id: 1, group: 5 }))
-    tell(read({ id: 1, group: 5, state: 'skipped', message: why }))
+    // A skip is worded here, in the user's language, naming the model as Koharu's list does.
+    tell(
+      read({
+        id: 1,
+        group: 5,
+        state: 'skipped',
+        message: 'No model can read the chapter: koharu/index-translate-9b only translates.',
+        skip: {
+          kind: 'cant_read',
+          model: 'koharu/index-translate-9b',
+          why: 'only_translates',
+          saved: false,
+        },
+      }),
+    )
+    tell(
+      read({
+        id: 6,
+        group: 5,
+        state: 'skipped',
+        message: 'The chapter was read meanwhile.',
+        skip: { kind: 'has_brief' },
+      }),
+    )
     tell(read({ id: 2, group: 5, state: 'failed', message: 'no connection' }))
     // A read by hand answers through its command, and one stopped or done needs no word.
     tell(read({ id: 3, state: 'failed', message: 'no connection' }))
@@ -126,7 +161,12 @@ describe('Booharu’s jobs', () => {
     expect(
       shown.mock.calls.map(([options]) => [options.type, options.title, options.description]),
     ).toEqual([
-      ['warning', 'Read chapter was skipped', why],
+      [
+        'warning',
+        'Read chapter was skipped',
+        "Index-Translate 9B only translates, so it can't read the chapter. Choose a model that can read the pages.",
+      ],
+      ['warning', 'Read chapter was skipped', 'The chapter already has a brief.'],
       ['warning', 'Read chapter failed', 'no connection'],
     ])
     expect(useBooharuJobs.getState().jobs).toEqual({})

@@ -295,6 +295,7 @@ describe('Read chapter in the Context tab', () => {
             kind: 'read_chapter',
             state: 'running',
             message: null,
+            skip: null,
             step: 1,
             steps: 3,
             group: 2,

@@ -253,8 +253,10 @@ export type BooharuJob = {
   id: number
   kind: JobKind
   state: JobState
-  /**  Why it failed, or was skipped. */
+  /**  Why it failed, or was skipped, in English. */
   message: string | null
+  /**  Why it was skipped, which the interface words in the user's language. */
+  skip: Skip | null
   /**  How many of its steps are done: the chunks of pages read. */
   step: number
   /**  How many steps it has; 0 until it knows. */
@@ -1733,6 +1735,27 @@ export type Size = {
   height: number
 }
 
+/**
+ *  Why a read skipped, writing nothing: its job tells it, so the interface
+ *  words it in the user's language. It reads in English as the job's
+ *  message, and a read by hand's error.
+ */
+export type Skip =
+  /**
+   *  The chapter has a brief by now: the Context tab or the agent read it,
+   *  or wrote one, since the read was planned.
+   */
+  | { kind: 'has_brief' }
+  /**  No line of the pages has text to read. */
+  | { kind: 'no_text' }
+  /**
+   *  No model can read the pages: `model`, the Read chapter model when
+   *  `saved`, else the translation model, can't, as `why` says.
+   */
+  | { kind: 'cant_read'; model: string; why: CantRead; saved: boolean }
+  /**  Only the app reads a chapter. */
+  | { kind: 'only_in_app' }
+
 /**  A string with its character marks. */
 export type Span = {
   insert: string
@@ -2215,7 +2238,7 @@ export const commands = {
   /** The models Read chapter and Explain this line use now, as the Context tab, Settings and the line card show them, with why a model can't read. */
   booharuGetReadingModel: () =>
     invoke<ReadingModel>('booharu_get_reading_model', {}, { headers: headers() }),
-  /** Explains the line `layer` of the open project, a block with source text, with the model Explain this line uses: the Read chapter model, else the translation model when it's a general model, else the agent's. Sends the page with it when the model reads images. One of Koharu's own models is loaded for it, once the pipeline unloads its own while no run goes, and dropped as it answers. Answers the explanation and two or three other translations, with the line as it was asked about and the model that answered, and adds them to the project's agent file as a note. Fails with no model to ask, an answer that doesn't read, or once Stop or closing the project stops it. */
+  /** Explains the line `layer` of the open project, a block with source text, with the model Explain this line uses: the Read chapter model, else the translation model when it's a general model, else the agent's. Sends the page with it when the model reads images. One of Koharu's own models is loaded for it, once the pipeline unloads its own while no run goes, and dropped as it answers. Answers the explanation and two or three other translations, with the line as it was asked about and the model that answered, and adds them to the project's agent file as a note, unless that file can't be read or written, which is logged and never fails the answer. Fails with no model to ask, an answer that doesn't read, or once Stop or closing the project stops it. */
   booharuExplainLine: (layer: LayerId) =>
     invoke<ExplainAnswer>('booharu_explain_line', { layer }, { headers: headers() }),
   /** Every entry of the open project's conversation with the agent, earliest first, old conversations' too; never the model's memory. A file that doesn't read fails, naming it. */
