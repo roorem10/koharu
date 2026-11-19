@@ -24,7 +24,8 @@ export function FindingRow({ finding, onShow }: { finding: Finding; onShow?: () 
     void command.catch(() => undefined).finally(() => setBusy(false))
   }
 
-  // The spaces between the parts keep them apart in the row's name.
+  // The spaces between the parts keep them apart in the row's name. The line and the agent's words
+  // keep their own direction, as English does in an Arabic interface, its full stop at its end.
   const body = (
     <>
       {flag && (
@@ -32,12 +33,14 @@ export function FindingRow({ finding, onShow }: { finding: Finding; onShow?: () 
           {t('booharu.qc.agent')}
         </Badge>
       )}{' '}
-      <span className='block text-[11px] leading-4 break-words'>{label}</span>{' '}
+      <span className='block text-[11px] leading-4 break-words'>
+        {flag ? <bdi>{label}</bdi> : label}
+      </span>{' '}
       <span
         className='block truncate text-[10px] leading-4 text-muted-foreground'
         title={finding.text || undefined}
       >
-        {finding.text || t('booharu.qc.noTranslation')}
+        {finding.text ? <bdi>{finding.text}</bdi> : t('booharu.qc.noTranslation')}
       </span>
     </>
   )

@@ -116,6 +116,10 @@ describe('Booharu QC tab', () => {
     expect(
       within(qc.getByRole('region', { name: 'Page 1' })).getByText('No translation'),
     ).toBeInTheDocument()
+    // The line and the agent's words keep their own direction in a right-to-left interface.
+    expect(qc.getByText('Check the name').closest('bdi')).not.toBeNull()
+    expect(qc.getByText('a text').closest('bdi')).not.toBeNull()
+    expect(qc.getByText('Text overflows the box').closest('bdi')).toBeNull()
 
     // A row on the page shown selects its box at once.
     await user.click(qc.getByRole('button', { name: 'Text overflows the box a text' }))
