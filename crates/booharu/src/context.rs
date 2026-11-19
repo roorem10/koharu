@@ -12,6 +12,14 @@
 //! ([`save_term`], [`delete_term`]), a suggestion accepted or dismissed by
 //! its source, the Instructions' terms offered with those the series holds
 //! already, and a series exported to or imported from a file it names.
+//!
+//! Read chapter ([`read`]) reads the whole chapter with a model that sees
+//! its pages and writes the brief, suggested terms and each line's label and
+//! note; Explain this line ([`explain`]) asks the same model about one line;
+//! [`set_brief`] keeps the summary the user wrote.
+
+pub mod explain;
+pub mod read;
 
 use std::{collections::BTreeSet, path::Path};
 
@@ -131,35 +139,71 @@ pub fn link(project: &Path, store: &SeriesStore, series: Option<&str>) -> Result
 /// links, in `store`, or its suggestions already have a term with its
 /// source. A term without a source or a target fails.
 pub fn suggest(project: &Path, store: &SeriesStore, entry: GlossaryEntry) -> Result<bool> {
-    let entry = GlossaryEntry {
-        note: entry.note.trim().to_owned(),
-        kind: entry.kind,
-        ..GlossaryEntry::new(&entry.source, &entry.target)
-    };
+    let entry = suggestion(&entry.source, &entry.target, entry.kind, &entry.note);
     ensure!(
         !entry.source.is_empty() && !entry.target.is_empty(),
         "a term needs a source and a target"
     );
-    let linked = ChapterContext::load(project)?.series;
-    let series = match linked {
-        Some(id) => store.find(&id)?,
-        None => None,
-    };
-    let held = |source: &str| {
-        series
-            .iter()
-            .flat_map(|series| &series.glossary)
-            .any(|term| same_source(&term.source, source))
-    };
-    if held(&entry.source) {
-        return Ok(false);
-    }
+    let series = linked_series(project, store)?;
     ChapterContext::update(project, |chapter| {
-        if chapter.suggestion(&entry.source).is_some() {
-            return false;
-        }
-        chapter.suggestions.push(entry);
-        true
+        add_suggestion(series.as_ref(), chapter, entry)
+    })
+}
+
+/// A term as a suggestion for a chapter holds it: unlocked, with a new id,
+/// its source, target and note trimmed.
+pub(crate) fn suggestion(source: &str, target: &str, kind: TermKind, note: &str) -> GlossaryEntry {
+    GlossaryEntry {
+        note: note.trim().to_owned(),
+        kind,
+        ..GlossaryEntry::new(source, target)
+    }
+}
+
+/// Adds `entry`, as [`suggestion`] makes it, to `chapter`'s suggestions,
+/// unless `series`, the series it links, or its suggestions already have a
+/// term with its source ([`same_source`]). Answers whether it was added: a
+/// suggestion added before counts, so of two with one source the first
+/// stays.
+pub(crate) fn add_suggestion(
+    series: Option<&Series>,
+    chapter: &mut ChapterContext,
+    entry: GlossaryEntry,
+) -> bool {
+    let held = series
+        .iter()
+        .flat_map(|series| &series.glossary)
+        .any(|term| same_source(&term.source, &entry.source));
+    if held || chapter.suggestion(&entry.source).is_some() {
+        return false;
+    }
+    chapter.suggestions.push(entry);
+    true
+}
+
+/// The series the chapter of the project file `project` links, in `store`;
+/// none when it links none, or the series' file is gone.
+pub(crate) fn linked_series(project: &Path, store: &SeriesStore) -> Result<Option<Series>> {
+    match ChapterContext::load(project)?.series {
+        Some(id) => store.find(&id),
+        None => Ok(None),
+    }
+}
+
+/// Sets the brief's summary of the chapter of the project file `project` to
+/// `summary`, trimmed, as the user wrote it, so reading the chapter again
+/// keeps it: makes the brief when there is none, and keeps its characters
+/// and when and with which model it was read, in one write of the side
+/// file. A blank summary counts as no brief for a Run press, which reads the
+/// chapter again. Answers whether it changed.
+pub fn set_brief(project: &Path, summary: &str) -> Result<bool> {
+    let summary = summary.trim();
+    ChapterContext::update(project, |chapter| {
+        let brief = chapter.brief.get_or_insert_default();
+        let changed = brief.summary != summary || !brief.edited;
+        brief.summary = summary.to_owned();
+        brief.edited = true;
+        changed
     })
 }
 
@@ -1315,6 +1359,47 @@ mod tests {
         );
         assert_eq!(store.list()?.len(), 2);
         assert!(import_series(&store, Path::new("Blue Archive.json"), false).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn the_brief_the_user_writes_keeps_what_the_read_found() -> Result<()> {
+        let chapter = Chapter::new(Vec::new())?;
+        let path = chapter.path();
+        assert!(set_brief(path, "  Hina meets Sensei.  ")?);
+        let brief = ChapterContext::load(path)?.brief.context("a brief")?;
+        assert_eq!(
+            (brief.summary.as_str(), brief.edited, brief.read_at),
+            ("Hina meets Sensei.", true, None),
+            "made when there was none"
+        );
+        let read = ChapterBrief {
+            summary: "Read".to_owned(),
+            characters: vec![booharu_core::context::ChapterCharacter {
+                name: "Hina".to_owned(),
+                original: "ヒナ".to_owned(),
+                pages: vec![1, 3],
+            }],
+            edited: false,
+            read_at: Some("2026-11-19T10:00:00Z".to_owned()),
+            read_model: Some("openai/gpt-5.4".to_owned()),
+        };
+        ChapterContext::update(path, |context| context.brief = Some(read.clone()))?;
+        assert!(set_brief(path, "Hina meets Sensei.")?);
+        let brief = ChapterContext::load(path)?.brief.context("a brief")?;
+        assert_eq!(
+            brief,
+            ChapterBrief {
+                summary: "Hina meets Sensei.".to_owned(),
+                edited: true,
+                ..read
+            },
+            "the characters and when and how it was read stay"
+        );
+        assert!(
+            !set_brief(path, "Hina meets Sensei. ")?,
+            "the same, trimmed"
+        );
         Ok(())
     }
 }

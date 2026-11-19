@@ -200,6 +200,29 @@ pub fn found_terms(
     found(project, terms).into_iter().cloned().collect()
 }
 
+/// The terms of `series`, then the chapter's suggestions in `context`,
+/// whose source occurs in `text`, one line's source, ignoring case and
+/// whitespace, as Explain this line sends them: each source once, the first
+/// locked term with it winning, else the first; locked terms first, each
+/// group in stored order; at most [`MAX_TERMS`].
+pub fn line_terms(
+    text: &str,
+    context: &ChapterContext,
+    series: Option<&Series>,
+) -> Vec<GlossaryEntry> {
+    deduplicated(
+        series
+            .into_iter()
+            .flat_map(|series| &series.glossary)
+            .chain(&context.suggestions),
+    )
+    .into_iter()
+    .filter(|term| super::occurs(text, &term.source))
+    .take(MAX_TERMS)
+    .cloned()
+    .collect()
+}
+
 /// `instructions`, the user's own, with `extras` after them, one blank line
 /// between, as a run's snapshot holds them; with no extras, `instructions`
 /// byte for byte, so the run goes as Koharu's would.
@@ -736,5 +759,38 @@ mod tests {
             assert_eq!(kept[59], "語53");
         }
         Ok(())
+    }
+
+    #[test]
+    fn a_lines_terms_are_those_its_source_uses() {
+        let series = series(vec![
+            term("ヒナ", "Hina", false),
+            term("先生", "Sensei", false),
+            term("ヒナ", "Hinata", true),
+            term("ゲヘナ", "Gehenna", false),
+        ]);
+        let chapter = ChapterContext {
+            suggestions: vec![
+                term("風紀委員", "the Prefects", false),
+                term("先 生", "Teach", false),
+            ],
+            ..ChapterContext::default()
+        };
+        let terms = line_terms("ヒナ 先生、風紀委員です", &chapter, Some(&series));
+        let found: Vec<(&str, &str)> = terms
+            .iter()
+            .map(|term| (&*term.source, &*term.target))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                ("ヒナ", "Hinata"),
+                ("先生", "Sensei"),
+                ("風紀委員", "the Prefects")
+            ],
+            "the locked term wins and goes first, a suggestion with a series term's source doesn't \
+             come, and a term the line doesn't use is left out"
+        );
+        assert!(line_terms("", &chapter, Some(&series)).is_empty());
     }
 }

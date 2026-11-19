@@ -1,0 +1,180 @@
+//! Booharu's jobs: Read chapter and Explain this line, which ask a model
+//! outside the pipeline, in a registry for the process, as a run group's
+//! place is (`runs`), so Stop and closing the project end them, and a second
+//! read is refused while one goes.
+//!
+//! A [`Job`] is registered by [`start`] and leaves the registry as it's
+//! dropped, however its work ends, cancelling its token as it goes, so work
+//! still on a blocking thread writes nothing once its caller went away.
+//! [`cancel_all`] cancels every job, which the app calls where Stop and
+//! closing the project stop the pipeline; the agent's and MCP's stop tool
+//! reach a job only through the pipeline's count of Stops, which every model
+//! call watches (`calls::Stops`).
+
+use std::{
+    collections::BTreeMap,
+    sync::atomic::{AtomicU64, Ordering},
+};
+
+use anyhow::{Result, ensure};
+use parking_lot::Mutex;
+use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
+
+use crate::context::read::ReadSummary;
+
+/// What a job does.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum JobKind {
+    ReadChapter,
+    Explain,
+}
+
+/// How a job stands, as the `booharu_job` event tells it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum JobState {
+    Running,
+    Done,
+    /// It failed, as its message says, and wrote nothing.
+    Failed,
+    /// Stop, closing the project, or its caller going away ended it before
+    /// it wrote anything.
+    Stopped,
+    /// It had nothing to do, or nothing to do it with, as its message says.
+    Skipped,
+}
+
+/// A job as the interface follows it: the `booharu_job` event's payload,
+/// told as a read starts, after each of its chunks, and as it ends, always
+/// ending with a state other than running, and what `booharu_get_jobs`
+/// answers for each read going.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+pub struct BooharuJob {
+    pub id: u64,
+    pub kind: JobKind,
+    pub state: JobState,
+    /// Why it failed, or was skipped.
+    pub message: Option<String>,
+    /// How many of its steps are done: the chunks of pages read.
+    pub step: u32,
+    /// How many steps it has; 0 until it knows.
+    pub steps: u32,
+    /// The run group whose Run step it is, for a read a Run press started.
+    pub group: Option<u64>,
+    /// What a read did, once it's done.
+    pub summary: Option<ReadSummary>,
+}
+
+/// Every job going, by id, with its kind and its cancel.
+static JOBS: Mutex<BTreeMap<u64, (JobKind, CancellationToken)>> = Mutex::new(BTreeMap::new());
+/// The id of the last job made.
+static MADE: AtomicU64 = AtomicU64::new(0);
+
+/// A job going: registered until it's dropped, which cancels it.
+#[must_use = "a job leaves the registry as it's dropped"]
+#[derive(Debug)]
+pub struct Job {
+    id: u64,
+    kind: JobKind,
+    cancel: CancellationToken,
+}
+
+impl Job {
+    /// Its id, unique in the process.
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    pub fn kind(&self) -> JobKind {
+        self.kind
+    }
+
+    /// The token [`cancel_all`] cancels, as dropping the job does.
+    pub fn cancel(&self) -> &CancellationToken {
+        &self.cancel
+    }
+
+    /// Whether it was cancelled.
+    pub fn cancelled(&self) -> bool {
+        self.cancel.is_cancelled()
+    }
+}
+
+impl Drop for Job {
+    fn drop(&mut self) {
+        self.cancel.cancel();
+        JOBS.lock().remove(&self.id);
+    }
+}
+
+/// Registers a job of `kind`. A second Read chapter while one is going is
+/// refused.
+pub fn start(kind: JobKind) -> Result<Job> {
+    let mut jobs = JOBS.lock();
+    ensure!(
+        kind != JobKind::ReadChapter || !jobs.values().any(|(going, _)| *going == kind),
+        "Read chapter is already reading; stop it or wait for it to end."
+    );
+    let id = MADE.fetch_add(1, Ordering::Relaxed) + 1;
+    let cancel = CancellationToken::new();
+    jobs.insert(id, (kind, cancel.clone()));
+    Ok(Job { id, kind, cancel })
+}
+
+/// Cancels every job going, as Stop and closing the project do.
+pub fn cancel_all() {
+    for (_, cancel) in JOBS.lock().values() {
+        cancel.cancel();
+    }
+}
+
+/// Whether a job of `kind` is going.
+pub fn busy(kind: JobKind) -> bool {
+    JOBS.lock().values().any(|(going, _)| *going == kind)
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    /// Held by every test that registers jobs, as the registry is the
+    /// process's.
+    pub(crate) static REGISTRY: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn a_second_read_is_refused_and_a_job_leaves_as_its_dropped() -> Result<()> {
+        let _held = REGISTRY.lock();
+        let read = start(JobKind::ReadChapter)?;
+        assert!(busy(JobKind::ReadChapter));
+        let error = start(JobKind::ReadChapter).expect_err("a second read");
+        assert!(error.to_string().contains("already reading"), "{error}");
+        // Explain goes beside it, as often as asked.
+        let explain = start(JobKind::Explain)?;
+        let again = start(JobKind::Explain)?;
+        assert!(busy(JobKind::Explain));
+        assert_ne!(explain.id(), again.id());
+        let cancel = read.cancel().clone();
+        drop(read);
+        assert!(cancel.is_cancelled(), "dropped, it's cancelled");
+        assert!(!busy(JobKind::ReadChapter));
+        let read = start(JobKind::ReadChapter)?;
+        drop((explain, again));
+        assert!(!busy(JobKind::Explain));
+        drop(read);
+        Ok(())
+    }
+
+    #[test]
+    fn cancel_all_cancels_every_job_going() -> Result<()> {
+        let _held = REGISTRY.lock();
+        let (read, explain) = (start(JobKind::ReadChapter)?, start(JobKind::Explain)?);
+        assert!(!read.cancelled() && !explain.cancelled());
+        cancel_all();
+        assert!(read.cancelled() && explain.cancelled());
+        // Cancelled, they stay registered until their work lets them go.
+        assert!(busy(JobKind::ReadChapter));
+        Ok(())
+    }
+}
