@@ -1205,6 +1205,34 @@ mod tests {
     }
 
     #[test]
+    fn the_preferences_commands_carry_the_sound_effect_settings_both_ways() {
+        let mut preferences = BooharuPreferences::default();
+        preferences.lettering.sfx = SfxMode::TranslateAll;
+        preferences.lettering.subtitle.size = 0.02;
+        preferences.lettering.subtitle.family = Some("Comic Neue".to_owned());
+        // As `booharu_get_preferences` answers them and
+        // `booharu_save_preferences` takes them, and as `save` checks them.
+        let sent = serde_json::to_value(&preferences).expect("JSON");
+        assert_eq!(sent["booharu-lettering"]["sfx"], json!("translate_all"));
+        assert_eq!(sent["booharu-lettering"]["subtitle"]["size"], json!(0.02));
+        let taken: BooharuPreferences = serde_json::from_value(sent).expect("taken back");
+        assert_eq!(taken, preferences);
+        taken.check().expect("a value the file takes");
+        // As the file holds each section, under its table's name.
+        let text = toml::to_string(&preferences).expect("tables");
+        assert_eq!(
+            toml::from_str::<BooharuPreferences>(&text).ok(),
+            Some(preferences)
+        );
+        // A file from before them, whose section `get` reads alone, reads
+        // their defaults.
+        let older: LetteringSettings =
+            toml::from_str("detect_colors = false\n").expect("an older section");
+        assert_eq!(older.sfx, SfxMode::Skip);
+        assert_eq!(older.subtitle, SubtitleStyle::default());
+    }
+
+    #[test]
     fn a_snapshot_fails_on_a_section_it_cant_read() {
         let lettering = LetteringSettings {
             detect_colors: false,
