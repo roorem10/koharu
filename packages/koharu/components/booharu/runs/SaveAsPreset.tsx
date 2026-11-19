@@ -5,26 +5,29 @@ import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { NameError } from '@/components/booharu/runs/NameError'
+import { useReadChapter } from '@/lib/booharu/readChapter'
 import {
   addPreset,
   MAX_PRESETS,
   presetNameError,
   saveRuns,
   useRunPresets,
+  withRead,
 } from '@/lib/booharu/runs'
 import { useKoharuStore } from '@/lib/store'
 import { Button } from '@koharu/ui/components/button'
 import { Input } from '@koharu/ui/components/input'
 
 /** Save as preset, under the Run menu's stage switches: it asks for a name in place, then saves
- * the stages switched on as a preset, after the others, refusing a blank name, or one another
- * preset has, with a message. Escape, or Cancel, puts the button back. Once there are 100 presets,
- * it says so instead. `onSaved` runs once the preset is saved; a save that fails shows its error
- * as every failed command's does, and keeps the name for another try. */
+ * the stages switched on as a preset, with Read chapter when it's on, after the others, refusing a
+ * blank name, or one another preset has, with a message. Escape, or Cancel, puts the button back.
+ * Once there are 100 presets, it says so instead. `onSaved` runs once the preset is saved; a save
+ * that fails shows its error as every failed command's does, and keeps the name for another try. */
 export function SaveAsPreset({ onSaved }: { onSaved: () => void }) {
   const { t } = useTranslation()
   const presets = useRunPresets()
   const stages = useKoharuStore((state) => state.processingStages)
+  const read = useReadChapter().on
   const [naming, setNaming] = useState(false)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -47,7 +50,7 @@ export function SaveAsPreset({ onSaved }: { onSaved: () => void }) {
       return
     }
     setSaving(true)
-    void saveRuns(addPreset(name, stages))
+    void saveRuns(addPreset(name, read ? withRead(stages) : stages))
       .then(onSaved, () => undefined)
       .finally(() => setSaving(false))
   }

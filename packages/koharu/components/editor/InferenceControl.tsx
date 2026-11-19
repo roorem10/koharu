@@ -15,6 +15,7 @@ import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PresetButtons } from '@/components/booharu/runs/PresetButtons' // Booharu: run presets.
+import { ReadChapterOption } from '@/components/booharu/runs/ReadChapterOption' // Booharu: Read chapter.
 import { RetryFailedRow } from '@/components/booharu/runs/RetryFailedRow' // Booharu: failed pages.
 import { SaveAsPreset } from '@/components/booharu/runs/SaveAsPreset' // Booharu: run presets.
 import { ModelPicker } from '@/components/controls/ModelPicker'
@@ -276,7 +277,9 @@ function RuntimeSelector({
 
         {view === 'stages' && (
           <SelectorPanel title={t('inference.pipelineStages')} onBack={() => setView('root')}>
-            {pipelineStages.map((stage) => (
+            {pipelineStages.flatMap((stage) => [
+              // Booharu: Read chapter, before Translation, as a press reads the chapter first.
+              stage === 'translate' && <ReadChapterOption key='booharu-read' />,
               <SelectorOption
                 key={stage}
                 value={stage}
@@ -284,8 +287,8 @@ function RuntimeSelector({
                 detail={t(`phaseDescription.${stage}`)}
                 selected={stages.includes(stage)}
                 onSelect={toggleStage}
-              />
-            ))}
+              />,
+            ])}
             {/* Booharu: saves the stages switched on as a run preset, named in place. */}
             <SaveAsPreset onSaved={() => setView('root')} />
           </SelectorPanel>

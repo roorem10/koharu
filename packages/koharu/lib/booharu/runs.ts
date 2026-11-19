@@ -13,6 +13,7 @@ import {
   saveBooharuSection,
   useBooharuPreferences,
 } from '@/lib/booharu/preferences'
+import { openProject, readChapterOn, setReadChapter } from '@/lib/booharu/reading'
 import i18n from '@/lib/i18n'
 import { queryClient } from '@/lib/queries'
 import { pipelineStages, useKoharuStore } from '@/lib/store'
@@ -72,15 +73,37 @@ function complete(section: RunsSettings | undefined): Runs {
   }
 }
 
+/** A Run press's stages, in the order it takes them: a page's stages, with Read chapter, which
+ * reads the whole chapter, before Translation. */
+export const runStages = [
+  'detect',
+  'recognize',
+  'inpaint',
+  'read',
+  'translate',
+] as const satisfies readonly RunStage[]
+
 /** `stages` in the order a page's stages run, each once, as a run takes them: Read chapter, which
  * no run's pages take, is left out. */
 export function inStageOrder(stages: readonly RunStage[]): Stage[] {
   return pipelineStages.filter((stage) => stages.includes(stage))
 }
 
-/** Whether `a` and `b` hold the same stages, in whatever order, Read chapter aside. */
+/** `stages` in the order a press takes them, each once, Read chapter only together with
+ * Translation, as a preset holds them. */
+export function inRunOrder(stages: readonly RunStage[]): RunStage[] {
+  const translates = stages.includes('translate')
+  return runStages.filter((stage) => stages.includes(stage) && (stage !== 'read' || translates))
+}
+
+/** `stages` with Read chapter, when they translate, in the order a press takes them. */
+export function withRead(stages: readonly RunStage[]): RunStage[] {
+  return inRunOrder([...stages, 'read'])
+}
+
+/** Whether `a` and `b` hold the same stages, Read chapter's included, in whatever order. */
 export function sameStages(a: readonly RunStage[], b: readonly RunStage[]): boolean {
-  return inStageOrder(a).join() === inStageOrder(b).join()
+  return inRunOrder(a).join() === inRunOrder(b).join()
 }
 
 /** The name `preset` shows: a built-in preset's, translated, while its name and stages are still
@@ -121,11 +144,12 @@ export function isRetries(retries: number | null): retries is number {
  * another writer has added or removed one since. */
 export type RunsEdit = (runs: Runs) => Runs
 
-/** Adds a preset named `name`, trimmed, with `stages`, after the others. */
-export function addPreset(name: string, stages: readonly Stage[]): RunsEdit {
+/** Adds a preset named `name`, trimmed, with `stages`, Read chapter's only together with
+ * Translation, after the others. */
+export function addPreset(name: string, stages: readonly RunStage[]): RunsEdit {
   return (runs) => ({
     ...runs,
-    presets: [...runs.presets, { name: name.trim(), stages: inStageOrder(stages) }],
+    presets: [...runs.presets, { name: name.trim(), stages: inRunOrder(stages) }],
   })
 }
 
@@ -139,16 +163,19 @@ export function renamePreset(from: string, to: string): RunsEdit {
   })
 }
 
-/** Switches `stage` on or off in the preset named `name`, leaving it at least one stage. */
-export function tickPresetStage(name: string, stage: Stage, on: boolean): RunsEdit {
+/** Switches `stage` on or off in the preset named `name`, leaving it at least one stage other
+ * than Read chapter, which goes only together with Translation: switching Translation off switches
+ * it off too, and it can't be switched on without. */
+export function tickPresetStage(name: string, stage: RunStage, on: boolean): RunsEdit {
   return (runs) => ({
     ...runs,
     presets: runs.presets.map((preset) => {
       if (preset.name !== name) return preset
-      const stages = on
-        ? inStageOrder([...preset.stages, stage])
-        : preset.stages.filter((candidate) => candidate !== stage)
-      return stages.length ? { ...preset, stages } : preset
+      if (on && stage === 'read' && !preset.stages.includes('translate')) return preset
+      const stages = inRunOrder(
+        on ? [...preset.stages, stage] : preset.stages.filter((candidate) => candidate !== stage),
+      )
+      return stages.some((candidate) => candidate !== 'read') ? { ...preset, stages } : preset
     }),
   })
 }
@@ -220,11 +247,14 @@ export function useRunPresets(): RunPreset[] | undefined {
   }).data
 }
 
-/** Switches the Run menu's stages to `preset`'s, in the order they run, and starts nothing. The
- * click readies the finish chime, for the run it sets up. */
+/** Switches the Run menu's stages to `preset`'s, in the order they run, and its Read chapter on
+ * when the preset reads, else off, in the open project, and starts nothing. The click readies the
+ * finish chime, for the run it sets up. */
 export function applyPreset(preset: RunPreset): void {
   prepareFinishSound()
   useKoharuStore.getState().setProcessingStages(inStageOrder(preset.stages))
+  const project = openProject()
+  if (project !== null) setReadChapter(project, inRunOrder(preset.stages).includes('read'))
 }
 
 /** Whether a run over pages chimes as it ends: the finish sound as the file holds it then, read in
@@ -258,9 +288,10 @@ function findsAndTranslates(stages: Stage[]): boolean {
  * stage on, it carries on with the work the pages still need, through `booharu_run`, or, with none
  * left, says so, offering Run all stages again, which is `run`. With fewer that find text and
  * translate it, such as a preset's, it goes through `booharu_run` too, which runs them as Koharu
- * does, or on a chapter with a glossary or notes translates last. With others, it's `run`,
- * Koharu's own run of them. The click readies the finish chime. A refusal or an error shows as
- * every failed command's does. */
+ * does, or on a chapter with a glossary or notes translates last. So does a press that translates
+ * with the Run menu's Read chapter on, whatever its other stages, which reads the whole chapter
+ * first. With others, it's `run`, Koharu's own run of them. The click readies the finish chime. A
+ * refusal or an error shows as every failed command's does. */
 export async function runOrCarryOn(
   target: Target,
   stages: Stage[],
@@ -269,13 +300,15 @@ export async function runOrCarryOn(
   prepareFinishSound()
   const carried = carryOnTarget(target)
   const every = pipelineStages.every((stage) => stages.includes(stage))
-  if (!carried || !(every || findsAndTranslates(stages))) {
+  const read = carried !== null && stages.includes('translate') && (await readChapterOn())
+  if (!carried || !(every || read || findsAndTranslates(stages))) {
     await run()
     return
   }
-  const plan = await call(commands.booharuRun, carried, stages)
-  // With fewer stages there's always a run, unless the pages are gone.
-  if (plan.run !== null || !every) return
+  const plan = await call(commands.booharuRun, carried, read ? withRead(stages) : stages)
+  // With fewer stages there's always a group, unless the pages are gone; while the press reads the
+  // chapter first, no run goes yet.
+  if (plan.groups.length > 0 || !every) return
   const shown = toast.add({
     type: 'info',
     title: i18n.t('booharu.runs.alreadyDone'),

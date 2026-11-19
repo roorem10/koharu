@@ -96,7 +96,10 @@
       "notes": "备注",
       "openGlossary": "打开完整术语表",
       "originalName": "原名",
+      "pickReader": "选一只支持图像个模型来阅读章节。箇趟个选择会保存，下趟接牢用。",
       "pickSeries": "选系列",
+      "readerDownload": "开始阅读辰光，有需要个本地模型会自动下载。",
+      "readingModel": "阅读章节用个模型",
       "readingRow": "来勒阅读章节",
       "removeImportedLines": "从翻译说明里向删脱箇眼行",
       "removedLines": "导入个行已经从翻译说明里向删脱哉。",
@@ -306,6 +309,10 @@
       },
       "read": {
         "failed": "阅读章节失败哉",
+        "hint": "翻译之前先用 {{model}} 读完整章。",
+        "label": "阅读章节",
+        "needsTranslation": "要先阅读章节，先拿“翻译”打开。",
+        "pickModel": "选一只读得懂页面个模型。",
         "skipped": "阅读章节已经跳过哉"
       },
       "retries": "每个失败阶段个重试次数",

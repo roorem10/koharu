@@ -96,7 +96,10 @@
       "notes": "Notlar",
       "openGlossary": "Sözlüğün tamamını aç",
       "originalName": "Orijinal ad",
+      "pickReader": "Bölüm okumak için görüntü destekli bir model seçin. Bu seçim bir sonraki kullanım için kaydedilir.",
       "pickSeries": "Seri seç",
+      "readerDownload": "Gerekirse okuma başladığında yerel modeller otomatik olarak indirilir.",
+      "readingModel": "Bölüm okuma modeli",
       "readingRow": "Bölüm okunuyor",
       "removeImportedLines": "Bu satırları talimatlardan kaldır",
       "removedLines": "İçe aktarılan satırlar talimatlardan kaldırıldı.",
@@ -306,6 +309,10 @@
       },
       "read": {
         "failed": "Bölüm okunamadı",
+        "hint": "Çeviriden önce tüm bölümü {{model}} ile okur.",
+        "label": "Bölüm okuma",
+        "needsTranslation": "Önce bölümü okumak için Çeviri'yi açın.",
+        "pickModel": "Sayfaları okuyabilen bir model seçin.",
         "skipped": "Bölüm okuma atlandı"
       },
       "retries": "Başarısız aşama başına yeniden deneme sayısı",

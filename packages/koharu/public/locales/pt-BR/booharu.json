@@ -106,7 +106,10 @@
       "notes": "Notas",
       "openGlossary": "Abrir glossário completo",
       "originalName": "Nome original",
+      "pickReader": "Escolha um modelo com visão para ler capítulos. Essa escolha será salva para a próxima vez.",
       "pickSeries": "Escolher série",
+      "readerDownload": "Os modelos locais são baixados automaticamente ao iniciar a leitura, se necessário.",
+      "readingModel": "Modelo de leitura do capítulo",
       "readingRow": "Lendo capítulo",
       "removeImportedLines": "Remover estas linhas das instruções",
       "removedLines": "As linhas importadas foram removidas das instruções.",
@@ -321,6 +324,10 @@
       },
       "read": {
         "failed": "Não foi possível ler o capítulo",
+        "hint": "Lê o capítulo inteiro com {{model}} antes de traduzir.",
+        "label": "Leitura do capítulo",
+        "needsTranslation": "Ative Tradução para ler o capítulo antes.",
+        "pickModel": "Escolha um modelo que consiga ler as páginas.",
         "skipped": "A leitura do capítulo foi ignorada"
       },
       "retries": "Tentativas por etapa com falha",

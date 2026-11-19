@@ -96,7 +96,10 @@
       "notes": "메모",
       "openGlossary": "전체 용어집 열기",
       "originalName": "원래 이름",
+      "pickReader": "챕터 읽기에 사용할 비전 모델을 선택하세요. 이 선택은 다음에도 유지됩니다.",
       "pickSeries": "시리즈 선택",
+      "readerDownload": "필요한 로컬 모델은 읽기를 시작할 때 자동으로 다운로드됩니다.",
+      "readingModel": "챕터 읽기 모델",
       "readingRow": "챕터 읽는 중",
       "removeImportedLines": "번역 지침에서 이 줄 제거",
       "removedLines": "가져온 줄을 번역 지침에서 제거했습니다.",
@@ -306,6 +309,10 @@
       },
       "read": {
         "failed": "챕터를 읽지 못했습니다",
+        "hint": "번역하기 전에 {{model}}(으)로 챕터 전체를 읽습니다.",
+        "label": "챕터 읽기",
+        "needsTranslation": "먼저 챕터를 읽으려면 '번역'을 켜세요.",
+        "pickModel": "페이지를 읽을 수 있는 모델을 선택하세요.",
         "skipped": "챕터 읽기를 건너뛰었습니다"
       },
       "retries": "실패한 단계별 재시도 횟수",

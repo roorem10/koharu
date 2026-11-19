@@ -96,7 +96,10 @@
       "notes": "備註",
       "openGlossary": "開啟完整術語表",
       "originalName": "原名",
+      "pickReader": "選擇用於閱讀章節的視覺模型。下次將沿用此選擇。",
       "pickSeries": "選擇系列",
+      "readerDownload": "開始閱讀時，如有需要，將自動下載本機模型。",
+      "readingModel": "章節閱讀模型",
       "readingRow": "正在閱讀章節",
       "removeImportedLines": "從翻譯說明中移除這些行",
       "removedLines": "已從翻譯說明中移除匯入的行。",
@@ -306,6 +309,10 @@
       },
       "read": {
         "failed": "閱讀章節失敗",
+        "hint": "翻譯前先用 {{model}} 閱讀整章。",
+        "label": "閱讀章節",
+        "needsTranslation": "開啟「翻譯」後才能先閱讀章節。",
+        "pickModel": "請選擇一個能閱讀頁面的模型。",
         "skipped": "已略過閱讀章節"
       },
       "retries": "每個失敗階段的重試次數",

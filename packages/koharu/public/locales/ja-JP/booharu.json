@@ -96,7 +96,10 @@
       "notes": "メモ",
       "openGlossary": "用語集全体を開く",
       "originalName": "原語名",
+      "pickReader": "章の読み込みに使用する画像対応モデルを選択してください。この選択は次回も使用されます。",
       "pickSeries": "シリーズを選択",
+      "readerDownload": "必要なローカルモデルは、読み込み開始時に自動でダウンロードされます。",
+      "readingModel": "章の読み込みモデル",
       "readingRow": "章を読み込み中",
       "removeImportedLines": "これらの行を翻訳指示から削除する",
       "removedLines": "インポートした行を翻訳指示から削除しました。",
@@ -306,6 +309,10 @@
       },
       "read": {
         "failed": "章を読み込めませんでした",
+        "hint": "翻訳の前に{{model}}で章全体を読み込みます。",
+        "label": "章の読み込み",
+        "needsTranslation": "先に章を読み込むには「翻訳」をオンにしてください。",
+        "pickModel": "ページを読み込めるモデルを選択してください。",
         "skipped": "章の読み込みをスキップしました"
       },
       "retries": "失敗した工程ごとの再試行回数",

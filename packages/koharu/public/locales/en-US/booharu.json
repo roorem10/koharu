@@ -96,7 +96,10 @@
       "notes": "Notes",
       "openGlossary": "Open full glossary",
       "originalName": "Original name",
+      "pickReader": "Choose a vision model for reading chapters. This choice is saved for next time.",
       "pickSeries": "Pick series",
+      "readerDownload": "Local models download automatically when reading starts if needed.",
+      "readingModel": "Read chapter model",
       "readingRow": "Reading chapter",
       "removeImportedLines": "Remove these lines from the instructions",
       "removedLines": "Removed the imported lines from the instructions.",
@@ -306,6 +309,10 @@
       },
       "read": {
         "failed": "Read chapter failed",
+        "hint": "Reads the whole chapter with {{model}} before translating.",
+        "label": "Read chapter",
+        "needsTranslation": "Turn on Translation to read the chapter first.",
+        "pickModel": "Choose a model that can read the pages.",
         "skipped": "Read chapter was skipped"
       },
       "retries": "Retries per failed stage",

@@ -19,6 +19,7 @@ import {
   presetLabel,
   presetNameError,
   renamePreset,
+  runStages,
   setRuns,
   tickPresetStage,
   useRunsSettings,
@@ -93,7 +94,8 @@ function Presets({ presets, change }: { presets: RunPreset[]; change: (edit: Run
   )
 }
 
-/** A preset's row, named after the name it shows: its name, its four stages, and Delete. */
+/** A preset's row, named after the name it shows: its name, its four stages with Read chapter
+ * before Translation, which it takes only together with Translation, and Delete. */
 function PresetRow({
   preset,
   presets,
@@ -115,17 +117,25 @@ function PresetRow({
       />
       <div className='flex min-w-0 items-start gap-2'>
         <div className='grid min-w-0 flex-1 grid-cols-2 gap-x-4 gap-y-2 pt-1.5'>
-          {pipelineStages.map((stage) => {
+          {runStages.map((stage) => {
             const on = preset.stages.includes(stage)
+            const others = preset.stages.filter((candidate) => candidate !== 'read')
             return (
               <label key={stage} className='flex min-w-0 items-center gap-2 text-[11px]'>
                 <Checkbox
                   checked={on}
-                  // A preset keeps at least one stage.
-                  disabled={on && preset.stages.length === 1}
+                  // A preset keeps at least one stage other than Read chapter, which goes only
+                  // together with Translation.
+                  disabled={
+                    stage === 'read'
+                      ? !preset.stages.includes('translate')
+                      : on && others.length === 1
+                  }
                   onCheckedChange={(next) => change(tickPresetStage(preset.name, stage, next))}
                 />
-                <span className='truncate'>{t(`phase.${stage}`)}</span>
+                <span className='truncate'>
+                  {stage === 'read' ? t('booharu.runs.read.label') : t(`phase.${stage}`)}
+                </span>
               </label>
             )
           })}

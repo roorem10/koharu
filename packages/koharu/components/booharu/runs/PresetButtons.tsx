@@ -2,17 +2,21 @@
 
 import { useTranslation } from 'react-i18next'
 
-import { applyPreset, presetLabel, sameStages, useRunPresets } from '@/lib/booharu/runs'
+import { useReadChapter } from '@/lib/booharu/readChapter'
+import { applyPreset, presetLabel, sameStages, useRunPresets, withRead } from '@/lib/booharu/runs'
 import { useKoharuStore } from '@/lib/store'
 import { Button } from '@koharu/ui/components/button'
 
 /** The run presets in the Run menu's root view, a button each: one switches on its stages and the
- * others off, and starts nothing, so Run starts them. The preset whose stages are the ones on shows
- * pressed. Nothing shows until the presets are read, or while there are none. */
+ * others off, Read chapter too, and starts nothing, so Run starts them. The preset whose stages are
+ * the ones on, Read chapter's included, shows pressed. Nothing shows until the presets are read, or
+ * while there are none. */
 export function PresetButtons() {
   const { t } = useTranslation()
   const presets = useRunPresets()
-  const stages = useKoharuStore((state) => state.processingStages)
+  const processing = useKoharuStore((state) => state.processingStages)
+  const read = useReadChapter().on
+  const stages = read ? withRead(processing) : processing
   if (!presets?.length) return null
   const title = t('booharu.runs.presets.short')
 
