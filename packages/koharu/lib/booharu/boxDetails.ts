@@ -33,22 +33,48 @@ export function closeBoxDetails(): void {
 }
 
 /** Closes Box details and shows its text in Story: the Story tab, as the right pane's tabs switch,
- * and the text selected, its page shown first when the canvas shows another, as focusing a Story
- * row does; its row's tag then scrolls it into view. */
+ * and the text selected as `showLayer` selects it; its row's tag then scrolls it into view. */
 export function showInStory(page: PageId, layer: LayerId): void {
   useBoxDetails.setState({
     shown: null,
     reveal: { layer, until: performance.now() + revealWait },
   })
-  const { showPanel, selectPages, selectLayers } = useKoharuStore.getState()
-  showPanel('story')
-  if (queryClient.getQueryData<ProjectView | null>(projectKey)?.page === page) {
+  useKoharuStore.getState().showPanel('story')
+  void showLayer(page, layer).catch(() => undefined)
+}
+
+/** Counts the jumps `showLayer` makes, so only the last one selects its text. */
+let jumps = 0
+
+/** The jumps' page shows, each sent once the one before has ended, so the canvas ends on the last
+ * jump's page, and how many are under way, while which the page the canvas shows is about to
+ * change. */
+let shows: Promise<unknown> = Promise.resolve()
+let showing = 0
+
+/** Selects `layer` of `page`, as focusing its Story row does, whichever tab shows: at once when the
+ * canvas shows `page` and no jump is showing another; else with `page` alone selected among the
+ * pages and no layer until the canvas shows it, then the text. A later jump, or a page or text
+ * selected meanwhile, wins over a page shown late, which then selects nothing. */
+export async function showLayer(page: PageId, layer: LayerId): Promise<void> {
+  const jump = ++jumps
+  const { selectPages, selectLayers } = useKoharuStore.getState()
+  if (!showing && queryClient.getQueryData<ProjectView | null>(projectKey)?.page === page) {
     selectLayers([layer])
     return
   }
   selectPages([page])
   selectLayers([])
-  void call(commands.show, page)
-    .then(() => useKoharuStore.getState().selectLayers([layer]))
-    .catch(() => undefined)
+  showing += 1
+  const shown = shows.then(() => call(commands.show, page))
+  shows = shown.catch(() => undefined)
+  try {
+    await shown
+  } finally {
+    showing -= 1
+  }
+  const now = useKoharuStore.getState()
+  const untouched =
+    now.selectedPages.length === 1 && now.selectedPages[0] === page && !now.selectedLayers.length
+  if (jump === jumps && untouched) now.selectLayers([layer])
 }
