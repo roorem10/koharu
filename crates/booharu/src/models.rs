@@ -88,10 +88,25 @@ impl ReadingModel {
     }
 }
 
+/// The model a read uses when `model` is named for that read alone, in
+/// place of the Read chapter model, as the agent's tool may name one:
+/// `model`, when it can read the pages; else why not, naming it, and what
+/// to do instead, as no setting is at fault.
+pub fn named_reader<'m>(models: &[Model], model: &'m str) -> Result<&'m str> {
+    match can_read(models, model) {
+        Ok(()) => Ok(model),
+        Err(why) => bail!(
+            "{}. Leave out `model` to read with the Read chapter model, or name a model that sees \
+             images and calls tools.",
+            why.why(model)
+        ),
+    }
+}
+
 /// The models a read and Explain this line use, of `models`, the list
 /// koharu-llm gives: `saved`, the Read chapter model, `[booharu-reading]
-/// model`, or the model a read overrides it with; `translation`, the
-/// translation model; and `agent`, the agent's model, `[agent] model`.
+/// model`; `translation`, the translation model; and `agent`, the agent's
+/// model, `[agent] model`.
 pub fn reading_model(
     models: &[Model],
     saved: Option<&str>,
@@ -266,6 +281,25 @@ mod tests {
             error
                 .to_string()
                 .starts_with("openai/text-only has no vision"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_model_named_for_one_read_is_refused_without_blaming_the_settings() {
+        let models = models();
+        assert_eq!(named_reader(&models, GEMMA).ok(), Some(GEMMA));
+        assert_eq!(
+            named_reader(&models, "anthropic/claude-new").ok(),
+            Some("anthropic/claude-new")
+        );
+        let error = named_reader(&models, TRANSLATE)
+            .expect_err("refused")
+            .to_string();
+        assert!(
+            error.starts_with("koharu/index-translate-9b only translates")
+                && error.contains("Leave out `model`")
+                && !error.contains("Settings"),
             "{error}"
         );
     }

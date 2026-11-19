@@ -210,11 +210,18 @@ async fn reading(
         return skip("There's no text to read; run OCR first.".to_owned());
     }
     let listed = koharu_llm::models().await;
-    let saved = request.model.or(settings.reading.model);
-    let choice = models::reading_model(&listed, saved.as_deref(), &settings.translation, None);
-    let reference = match choice.reader() {
-        Ok(reference) => reference.to_owned(),
-        Err(why) => return skip(format!("{why:#}")),
+    let reference = match request.model {
+        // Named for a read by hand alone, it's refused as itself, never as
+        // the saved setting it stands in for.
+        Some(model) => models::named_reader(&listed, &model)?.to_owned(),
+        None => {
+            let saved = settings.reading.model.as_deref();
+            let choice = models::reading_model(&listed, saved, &settings.translation, None);
+            match choice.reader() {
+                Ok(reference) => reference.to_owned(),
+                Err(why) => return skip(format!("{why:#}")),
+            }
+        }
     };
     if models::local(&reference) {
         // No run is going: the pipeline's models free their memory for it.

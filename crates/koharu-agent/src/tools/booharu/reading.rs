@@ -53,7 +53,9 @@ impl Tool for ReadChapter {
          project ended it, having written nothing. Refused while a run, a Run press or another \
          read goes; with no text on the pages, saying to run OCR first; and with no model that \
          can read them, saying why: tell the user, who can choose a Read chapter model in \
-         Settings > Pipeline. Only in the app. Needs a project open, as every tool here does."
+         Settings > Pipeline. A `model` you name that can't read is refused by name: call again \
+         without it, or with one that can. Only in the app. Needs a project open, as every tool \
+         here does."
             .to_owned()
     }
 
