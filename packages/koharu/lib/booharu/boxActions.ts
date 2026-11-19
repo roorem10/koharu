@@ -3,12 +3,14 @@
 import { call } from '@/lib/backend'
 import { openBoxDetails } from '@/lib/booharu/boxDetails'
 import { fetchLettering } from '@/lib/booharu/boxLettering'
+import { openExplanation } from '@/lib/booharu/explain'
 import {
   findLayer,
   findPart,
   isBlockLayer,
   isLockedLayer,
   isTextLayer,
+  plainText,
   type BlockLayer,
   type TextLayer,
 } from '@/lib/document'
@@ -146,6 +148,13 @@ function categorized(selection: BoxSelection): BlockLayer | null {
   return box && !box.locked && isBlockLayer(box.layer) ? box.layer : null
 }
 
+/** The selection's one block whose line Explain this line can explain, or none: it has a source to
+ * explain. A locked one can be explained, as explaining changes nothing. */
+function explainable(selection: BoxSelection): BlockLayer | null {
+  const box = only(selection)
+  return box && isBlockLayer(box.layer) && plainText(box.layer.source).trim() ? box.layer : null
+}
+
 /** After a join, as Story after a delete: a joined text that went, or its selected part, leaves the
  * selection, and the text it joined into takes its place. `joins` are each join's texts in reading
  * order, the first kept. */
@@ -217,6 +226,15 @@ export const boxActions: readonly BoxAction[] = [
       // that fails shows its error, as a command's does, and opens nothing.
       await fetchLettering(selection.page)
       openBoxDetails(selection.page, block.id, 'lettering')
+    },
+  },
+  {
+    id: 'explain',
+    label: 'booharu.context.explain',
+    enabled: (selection) => explainable(selection) !== null,
+    run: async (selection) => {
+      const block = explainable(selection)
+      if (block) await openExplanation(selection.page, block)
     },
   },
   {

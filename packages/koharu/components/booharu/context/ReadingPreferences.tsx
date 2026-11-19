@@ -14,6 +14,7 @@ import {
   completeReading,
   isPagesPerRequest,
   MAX_PAGES_PER_REQUEST,
+  readingSection,
   saveReading,
   type Reading,
 } from '@/lib/booharu/reading'
@@ -156,6 +157,8 @@ function ReadingModel({
     <div className='grid min-w-0 gap-1.5'>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
+          // The setting a link goes to, as Explain this line's with no model to ask does.
+          id={readingSection}
           type='button'
           aria-label={t('booharu.context.readingModel')}
           disabled={disabled}

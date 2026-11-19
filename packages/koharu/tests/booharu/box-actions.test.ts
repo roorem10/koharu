@@ -31,6 +31,7 @@ const none = {
   join: false,
   split: false,
   category: false,
+  explain: false,
   details: false,
 }
 const runs = { read: true, translate: true, clean: true }
@@ -56,6 +57,7 @@ describe('Booharu box actions', () => {
       join: true,
       split: true,
       category: true,
+      explain: true,
       details: true,
     })
     // Its part stands for it.
@@ -66,12 +68,20 @@ describe('Booharu box actions', () => {
     // the runs to it.
     expect(enabled(['caption'])).toEqual({ ...none, details: true })
     expect(enabled(['caption', 'free'])).toEqual({ ...none, ...runs })
-    // A locked block, or one in a locked balloon, or a locked one among others: no change at all.
-    expect(enabled(['locked'])).toEqual({ ...none, details: true })
-    expect(enabled(['held-first'])).toEqual({ ...none, details: true })
+    // A locked block, or one in a locked balloon, or a locked one among others: no change at all,
+    // though its line can be explained, which changes nothing.
+    expect(enabled(['locked'])).toEqual({ ...none, explain: true, details: true })
+    expect(enabled(['held-first'])).toEqual({ ...none, explain: true, details: true })
     expect(enabled(['free', 'locked'])).toEqual(none)
     // A balloon with one text block, or a block in none, has nothing to join with.
-    const alone = { ...runs, join: false, split: true, category: true, details: true }
+    const alone = {
+      ...runs,
+      join: false,
+      split: true,
+      category: true,
+      explain: true,
+      details: true,
+    }
     expect(enabled(['alone'])).toEqual(alone)
     expect(enabled(['free'])).toEqual(alone)
     // A sound effect isn't joined with a balloon's text, but it is split, as the desktop splits it.
@@ -121,6 +131,14 @@ describe('Booharu box actions', () => {
 
     await run('details', ['caption'])
     expect(useBoxDetails.getState().shown).toEqual({ page: 'page', layer: 'caption' })
+
+    // Explain this line opens Box details on the line's explanation.
+    await run('explain', ['second-cleanup'])
+    expect(useBoxDetails.getState().shown).toEqual({
+      page: 'page',
+      layer: 'second',
+      section: 'explain',
+    })
 
     // Change category reads the page's lettering, then opens Box details on its section.
     await run('category', ['second-mask'])

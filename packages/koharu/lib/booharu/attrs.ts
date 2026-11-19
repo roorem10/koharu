@@ -10,3 +10,9 @@ export function reviewNote(layer: Layer): string | null {
   const value = layer.attributes[namespace]?.review_note
   return typeof value === 'string' && value.trim() ? value : null
 }
+
+/** `read_note` on a block: Read chapter's note on its line, or null when it has none. */
+export function readNote(layer: Layer): string | null {
+  const value = layer.attributes[namespace]?.read_note
+  return typeof value === 'string' && value.trim() ? value : null
+}

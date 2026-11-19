@@ -4,11 +4,13 @@ import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { GlossaryTextMenu } from '@/components/booharu/context/GlossaryTextMenu'
+import { LineContextCard } from '@/components/booharu/context/LineContextCard'
 import { LetteringSection } from '@/components/booharu/lettering/LetteringSection'
 import { call } from '@/lib/backend'
 import { reviewNote } from '@/lib/booharu/attrs'
 import { boxActions, runBoxAction, type Box } from '@/lib/booharu/boxActions'
 import { showInStory } from '@/lib/booharu/boxDetails'
+import { explainSection } from '@/lib/booharu/explain'
 import { isBlockLayer, plainText } from '@/lib/document'
 import { commands, type PageId } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
@@ -32,6 +34,13 @@ export interface BoxDetailsSection {
 /** Box details' sections, in the order it shows them. A later one goes in as one more entry. */
 export const boxDetailsSections: readonly BoxDetailsSection[] = [
   { id: 'source', title: 'booharu.details.sections.source', Section: SourceSection },
+  {
+    id: explainSection,
+    title: 'booharu.details.sections.explain',
+    Section: LineContextCard,
+    // A text layer is no line of the page's to explain, nor is a block with no source.
+    shows: ({ layer }) => isBlockLayer(layer) && plainText(layer.source).trim() !== '',
+  },
   {
     id: 'lettering',
     title: 'booharu.details.sections.lettering',
@@ -151,14 +160,14 @@ function NoteSection({ box: { layer, locked } }: BoxDetailsProps) {
 }
 
 /** The text's box actions, as its menus list them, those that open Box details left out: Box
- * details itself, and Change category, whose section is here. */
+ * details itself, and Change category and Explain this line, whose sections are here. */
 function ActionsSection({ page, box }: BoxDetailsProps) {
   const { t } = useTranslation()
   const selection = { page, boxes: [box] }
   return (
     <div className='flex flex-wrap gap-1.5'>
       {boxActions
-        .filter(({ id }) => id !== 'details' && id !== 'category')
+        .filter(({ id }) => id !== 'details' && id !== 'category' && id !== 'explain')
         .map((action) => (
           <Button
             key={action.id}

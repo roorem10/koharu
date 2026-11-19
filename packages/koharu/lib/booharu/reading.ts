@@ -21,6 +21,9 @@ export type Reading = Required<ReadingSettings>
 /** The most pages one Read chapter request sends, as booharu-core checks it. */
 export const MAX_PAGES_PER_REQUEST = 40
 
+/** The id of the Read chapter model's picker in Settings > Pipeline, which a link goes to. */
+export const readingSection = 'booharu-reading-model'
+
 /** The section while the file sets nothing, as booharu-core's defaults are. */
 const builtInReading: Reading = { model: null, ask: true, pages_per_request: 20 }
 

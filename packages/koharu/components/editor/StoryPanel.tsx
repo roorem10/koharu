@@ -11,7 +11,7 @@ import { BoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the row
 import { CategoryTag } from '@/components/booharu/lettering/CategoryTag' // Booharu: the row's lettering category.
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { call, dispatch } from '@/lib/backend'
-import { setTranslation } from '@/lib/booharu/translation' // Booharu: a block's first translation.
+import { commitTranslation } from '@/lib/booharu/translation' // Booharu: a block's first translation.
 import {
   findLayer,
   isBlockLayer,
@@ -326,10 +326,11 @@ function StoryText({
                 {t('story.sfx')}
               </span>
             )}
-            {/* Booharu: right-click Add to glossary on the source and the translation. */}
+            {/* Booharu: right-click Add to glossary and Explain this line on the line's texts. */}
             <GlossaryTextMenu
               source={plainText(layer.source)}
               translation={plainText(layer.translation)}
+              line={{ page, block: layer }}
             >
               <CommitTextarea
                 aria-label={t('layers.sourceLabel', { name })}
@@ -348,9 +349,7 @@ function StoryText({
                 className={`${field} border-primary/25`}
                 value={plainText(layer.translation)}
                 // Booharu: a block's first translation goes in its frame, not the page's corner (#128).
-                onCommit={(text) =>
-                  dispatch(layer.translation ? setText : setTranslation, layer.id, text)
-                }
+                onCommit={(text) => commitTranslation(layer, text)}
               />
             </GlossaryTextMenu>
           </>

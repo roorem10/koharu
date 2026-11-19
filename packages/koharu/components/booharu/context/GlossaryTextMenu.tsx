@@ -5,6 +5,9 @@ import { useTranslation } from 'react-i18next'
 
 import { AddToGlossary } from '@/components/booharu/context/AddToGlossary'
 import { newTerm, termText, type FullEntry } from '@/lib/booharu/context'
+import { openExplanation } from '@/lib/booharu/explain'
+import type { BlockLayer } from '@/lib/document'
+import type { PageId } from '@koharu/ipc/protocol'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -31,15 +34,19 @@ function selectedIn(element: Element): string {
 /** Booharu 0.0.4's GlossaryTextMenu: a right-click on a line's source or translation, the first and
  * the second text of `children`, opens a menu with Add to glossary, which opens the term form with
  * the source selected in the source, else the line's `source`, and the translation selected in the
- * translation, else the line's `translation`; see AddToGlossary. The menu replaces the browser's
- * own there, as 0.0.4's did. */
+ * translation, else the line's `translation`; see AddToGlossary. Given the `line`, the block of the
+ * page it's on, as in Story, it also has Explain this line, which opens the line's explanation in
+ * Box details, for a line with a source to explain. The menu replaces the browser's own there, as
+ * 0.0.4's did. */
 export function GlossaryTextMenu({
   source,
   translation,
+  line,
   children,
 }: {
   source: string
   translation: string
+  line?: { page: PageId; block: BlockLayer }
   children: ReactNode
 }) {
   const { t } = useTranslation()
@@ -79,6 +86,15 @@ export function GlossaryTextMenu({
           >
             {t('booharu.context.addToGlossary')}
           </ContextMenuItem>
+          {line && (
+            <ContextMenuItem
+              className='text-[12px]'
+              disabled={!source.trim()}
+              onClick={() => void openExplanation(line.page, line.block)}
+            >
+              {t('booharu.context.explain')}
+            </ContextMenuItem>
+          )}
         </ContextMenuContent>
       </ContextMenu>
       {adding && <AddToGlossary initial={adding} onClose={() => setAdding(null)} />}
