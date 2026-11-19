@@ -20,7 +20,7 @@
 use std::collections::BTreeSet;
 
 use anyhow::{Result, bail, ensure};
-use koharu_scene::{CharStyle, Color, Content, Layer, LayerId, Op, Project, Rgba, Role};
+use koharu_scene::{CharStyle, Content, Layer, LayerId, Op, Project, Rgba, Role};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
@@ -191,16 +191,7 @@ fn outline(
         .map(|size| size / 16.0)
         .or(placed.stroke.and(placed.stroke_width));
     match width {
-        Some(width) if sfx => {
-            let light = fill
-                .is_some_and(|fill| Color::from(fill).discard_alpha().relative_luminance() > 0.5);
-            let stroke = if light {
-                [0.0, 0.0, 0.0, 1.0]
-            } else {
-                [1.0; 4]
-            };
-            (Some(Rgba(stroke)), Some(width))
-        }
+        Some(width) if sfx => (Some(crate::resolver::contrasting(fill)), Some(width)),
         _ => (None, None),
     }
 }
@@ -804,8 +795,9 @@ mod tests {
         );
     }
 
-    /// A page holding one block whose source reads `source`, with the
-    /// `c2pa` records `steps` of the Koharu stages that made it.
+    /// A page holding one block whose source reads `source`, lettered in
+    /// blue outlined 3 pixels wide in white at size 32, with the `c2pa`
+    /// records `steps` of the Koharu stages that made it.
     fn page(source: &str, steps: &[&str]) -> (tempfile::TempDir, Session, LayerId) {
         let dir = tempfile::tempdir().expect("a folder");
         let mut session = Session::create(dir.path().join("test.khr")).expect("a project");
@@ -816,6 +808,7 @@ mod tests {
         let mut block = json!({"kind": "block", "source": {
             "frame": {"box": {"bounds": {"x": 10.0, "y": 10.0, "width": 40.0, "height": 120.0}}},
             "content": source,
+            "style": {"chars": {"size": 32.0, "fill": BLUE, "stroke": WHITE, "stroke_width": 3.0}},
         }});
         if !c2pa.is_empty() {
             block["attributes"] = json!({C2PA: c2pa});
@@ -853,28 +846,37 @@ mod tests {
         session.project().layer(id).expect("the block").clone()
     }
 
-    /// Placement's op for `block`'s translation, as Koharu's places a
-    /// dialogue one: the measured colours at the page's size, where its
-    /// style sets none.
+    /// Placement's op for `block`'s translation's characters, as Koharu's
+    /// places one (`resolver::koharu_chars`): the measured colours at the
+    /// page's size, where its style sets none.
     fn placement(session: &Session, block: LayerId) -> Op {
-        let own = match &layer(session, block).content {
-            Content::Block(found) => found
-                .translation
-                .as_ref()
-                .map(|translation| translation.style.chars.clone())
-                .unwrap_or_default(),
-            _ => panic!("not a block"),
+        let project = session.project();
+        let (page, _) = project.parent(block).expect("the page");
+        let Content::Block(found) = &project.layer(block).expect("the block").content else {
+            panic!("not a block");
         };
+        let own = found
+            .translation
+            .as_ref()
+            .map(|translation| translation.style.chars.clone())
+            .unwrap_or_default();
+        let koharu = crate::resolver::koharu_chars(page, found, own.size);
         let mut chars = Map::new();
-        if own.size.is_none() {
-            chars.insert("size".to_owned(), json!(32.0));
+        if own.size.is_none()
+            && let Some(size) = koharu.size
+        {
+            chars.insert("size".to_owned(), json!(size));
         }
-        if own.fill.is_none() {
-            chars.insert("fill".to_owned(), json!(BLUE));
+        if own.fill.is_none()
+            && let Some(fill) = koharu.fill
+        {
+            chars.insert("fill".to_owned(), json!(fill));
         }
-        if own.stroke.is_none() {
-            chars.insert("stroke".to_owned(), json!(WHITE));
-            chars.insert("stroke_width".to_owned(), json!(3.0));
+        if own.stroke.is_none()
+            && let (Some(stroke), Some(width)) = (koharu.stroke, koharu.stroke_width)
+        {
+            chars.insert("stroke".to_owned(), json!(stroke));
+            chars.insert("stroke_width".to_owned(), json!(width));
         }
         Op::UpdateLayer {
             layer: block.into(),
