@@ -36,12 +36,18 @@
 //! | `booharu_import_series` | imports a series file at an absolute path, replacing the series of its id or keeping both | no |
 //! | `booharu_read_chapter` | reads the chapter whole, as Read chapter does but without its questions, with the Read chapter model or one named for that read alone, writing the brief, suggested terms, and each line's label and note, and answers what it did once the read ends; only in the app | no |
 //! | `booharu_set_chapter_brief` | sets the chapter brief's summary as the user's, which reading the chapter again keeps, keeping its characters and when and with which model it was read | no |
+//! | `booharu_get_qc_findings` | what the quality check finds on a page or every page, worked out then as the app's QC tab finds it, each finding with its page's number from 1 and id, its layer, check, problem, who found it, the line's text, and whether the user marked it OK | yes |
+//! | `booharu_check_glossary` | the glossary slips alone on a page or every page, laying no text out, each with the term's source and target and the line's translation | yes |
+//! | `booharu_mark_qc_ok` | marks a finding OK while its line stays as it is, or takes the mark back, as one undo step | no |
+//! | `booharu_flag_line` | flags lines for human review, each with a short message, as one undo step, leaving out locked lines and flags a line has, and answers which it flagged, found flagged, and left out as locked | no |
+//! | `booharu_dismiss_flag` | dismisses a line's flag with a message, or every flag on it, as one undo step, and answers how many | no |
 
 mod boxes;
 mod context;
 mod lettering;
 mod notes;
 mod project;
+mod qc;
 mod reading;
 mod runs;
 mod settings;
@@ -56,7 +62,7 @@ use booharu::context::read::ReadSummary;
 use booharu_core::{context::SeriesStore, settings::BooharuPreferences};
 use futures::future::BoxFuture;
 use koharu_pipeline::{Pipeline, PipelineConfig, Request, RunId, Stage, Target};
-use koharu_scene::{Change, Edit, LayerId, Session};
+use koharu_scene::{Change, Edit, LanguageIdentifier, LayerId, Session};
 use parking_lot::Mutex;
 use rig_agent::tool::ToolSet;
 use rig_core::tool::ToolExecutionError;
@@ -119,6 +125,13 @@ pub trait BooharuHost: Send + Sync {
         Ok(koharu_config::get::<PipelineConfig>()?
             .translator
             .instructions)
+    }
+
+    /// The language the translator translates into as saved now,
+    /// `[pipeline] translator.target`, which the quality check reads, as
+    /// the app's does, for a translation without a language of its own.
+    fn target_language(&self) -> anyhow::Result<LanguageIdentifier> {
+        Ok(koharu_config::get::<PipelineConfig>()?.translator.target)
     }
 
     /// Saves `kept` as the translator's Instructions while they're still
@@ -227,6 +240,11 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(context::ImportSeries);
     tools.add_tool(reading::ReadChapter);
     tools.add_tool(reading::SetChapterBrief);
+    tools.add_tool(qc::GetQcFindings);
+    tools.add_tool(qc::CheckGlossary);
+    tools.add_tool(qc::MarkQcOk);
+    tools.add_tool(qc::FlagLine);
+    tools.add_tool(qc::DismissFlag);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one
