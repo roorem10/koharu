@@ -770,8 +770,16 @@ pub fn lines_edit(
             let chooser = Chooser::Model {
                 confidence: Some(line.confidence),
             };
-            let (block, done) =
-                category_ops(project, layer, line.category, chooser, settings, font)?;
+            // A model's label never changes Koharu's role.
+            let (block, done) = category_ops(
+                project,
+                layer,
+                line.category,
+                chooser,
+                false,
+                settings,
+                font,
+            )?;
             if done.changed > 0 {
                 ops.extend(block);
                 counts.labelled += u32::from(line.category.is_some());
@@ -1152,12 +1160,13 @@ mod tests {
     };
 
     use anyhow::anyhow;
+    use booharu_core::attrs::Auto;
     use booharu_core::{
         context::{ChapterBrief, GlossaryEntry},
         lettering::effective,
     };
     use koharu_pipeline::{Pipeline, PipelineConfig};
-    use koharu_scene::{Created, Layer, Op};
+    use koharu_scene::{Created, Layer, Op, Role};
     use tempfile::TempDir;
     use tokio_util::sync::CancellationToken;
 
@@ -1804,6 +1813,44 @@ mod tests {
             Some(LABEL),
             "one undo step"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_models_label_never_changes_the_role_but_keeps_an_effect_as_art() -> Result<()> {
+        let chapter = Chapter::new()?;
+        let prepared = chapter.prepared()?;
+        let role = |name: &str| -> Result<(Role, bool)> {
+            match chapter.layer(name)?.content {
+                Content::Block(block) => Ok((block.role, block.cleanup.visible)),
+                _ => Err(anyhow!("{name} isn't a block")),
+            }
+        };
+        // b, a sound effect to Koharu, read as a title, and c, text, read
+        // as a sound effect.
+        chapter.edit(vec![Op::UpdateLayer {
+            layer: chapter.id("b").into(),
+            patch: json!({"role": "sfx"}),
+        }])?;
+        let steps = chapter.session.lock().history().steps.len();
+        chapter.label_lines(
+            &prepared,
+            &[
+                found(chapter.id("b"), Some(LetteringCategory::Title), 0.9),
+                found(chapter.id("c"), Some(LetteringCategory::Sfx), 0.9),
+            ],
+        )?;
+        assert_eq!(chapter.session.lock().history().steps.len(), steps + 1);
+        for name in ["b", "c"] {
+            assert_eq!(chapter.label(name)?.and_then(|label| label.role), None);
+        }
+        // Both keep their roles. The labels decide the categories: c, with
+        // no translation, is now a sound effect kept as art, so its clean-up
+        // hides with the kept mark, and b no longer is one.
+        assert_eq!(role("b")?, (Role::Sfx, true));
+        assert_eq!(role("c")?, (Role::Text, false));
+        assert!(Auto::of(&chapter.layer("c")?).kept);
+        assert!(!Auto::of(&chapter.layer("b")?).kept);
         Ok(())
     }
 

@@ -18,6 +18,16 @@
 //!   model's label.
 //! - A locked block, or one inside a locked layer, is left out and counted,
 //!   so a lock never fails the step (D7).
+//! - A category picked through [`set_category`] is also Koharu's role for
+//!   the block (D4): Sound Effect makes it a sound effect and any other
+//!   category text, so Koharu places and outlines it so at its next
+//!   translation, and the skip rule reads it. The label records the role it
+//!   had before the first such pick changed it, which Automatic gives back
+//!   as it clears the label. Read chapter's labels never change the role.
+//! - A block with no translation that the new label and role make a sound
+//!   effect kept as art (`sfx::skipped_as`) gets its clean-up hidden with
+//!   the kept mark in the same step; one kept as art that no longer is
+//!   keeps its clean-up hidden until its translation shows it.
 //!
 //! A category's font is written as the `lettering` module of booharu-core
 //! resolves it: the translation's family, weight, and italic, never other
@@ -36,10 +46,11 @@ use booharu_core::{
     edited,
     lettering::{self, CategoryFont, CategoryReason, LetteringCategory},
     settings::LetteringSettings,
+    sfx,
     shape::{self, BlockShape},
     styles,
 };
-use koharu_scene::{Content, Edit, Layer, LayerId, Op, Page, PageId, Project};
+use koharu_scene::{Content, Edit, Layer, LayerId, Op, Page, PageId, Project, Role};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -63,7 +74,8 @@ pub enum Chooser {
 /// changed by hand, which counts in `changed` and in `kept_hand_edited`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct CategoryCounts {
-    /// Blocks whose label, font, or record changed.
+    /// Blocks whose label, role, font, or record changed, or whose clean-up
+    /// was hidden to keep the original art.
     pub changed: u32,
     /// Blocks left out because they, or a layer holding them, are locked.
     pub locked: u32,
@@ -107,7 +119,8 @@ pub struct BlockLettering {
 /// The edit setting the category of each of `blocks` in `project` to
 /// `category`, or to Automatic for none, as `chooser` chooses, under
 /// `settings` and `font`, the default font, with what it did; none when
-/// every block is left out. A layer that isn't a block fails.
+/// every block is left out. The pick is also each block's role
+/// ([`category_ops`] with `role`). A layer that isn't a block fails.
 pub fn set_category(
     project: &Project,
     blocks: &[LayerId],
@@ -125,6 +138,7 @@ pub fn set_category(
             project.layer(id)?,
             category,
             chooser,
+            true,
             settings,
             font,
         )?;
@@ -145,11 +159,20 @@ pub fn set_category(
 /// chapter does for each line it labels. A locked block, or one whose label
 /// a user chose when a model chooses, gets no op. A layer that isn't a block
 /// fails.
+///
+/// With `role`, as a category picked by hand gives, the block's Koharu role
+/// follows the category: Sound Effect makes it `sfx`, any other category
+/// `text`, and Automatic gives back the role the label recorded, if any.
+/// The label records the role the block had before the first pick changed
+/// it, and keeps it through later picks. Without, as Read chapter labels,
+/// the role stays as it is. The category, the font, and whether a block
+/// with no translation is kept as art are read with the role being written.
 pub(crate) fn category_ops(
     project: &Project,
     layer: &Layer,
     category: Option<LetteringCategory>,
     chooser: Chooser,
+    role: bool,
     settings: &LetteringSettings,
     font: Option<&str>,
 ) -> Result<(Vec<Op>, CategoryCounts)> {
@@ -172,18 +195,31 @@ pub(crate) fn category_ops(
         counts.kept_user_label += 1;
         return Ok((ops, counts));
     }
+    // The role the block had before a category picked by hand changed it.
+    let recorded = held.as_ref().and_then(|label| label.role);
+    let new_role = match (role, category) {
+        (false, _) => block.role,
+        (true, Some(LetteringCategory::Sfx)) => Role::Sfx,
+        (true, Some(_)) => Role::Text,
+        (true, None) => recorded.unwrap_or(block.role),
+    };
+    let original = if new_role == block.role {
+        recorded
+    } else {
+        recorded.or(Some(block.role))
+    };
     let label = category.map(|category| match chooser {
         Chooser::User => Lettering {
             category,
             source: LetteringSource::User,
             confidence: None,
-            role: None,
+            role: original,
         },
         Chooser::Model { confidence } => Lettering {
             category,
             source: LetteringSource::Model,
             confidence,
-            role: None,
+            role: original,
         },
     });
     let mut changed = false;
@@ -198,9 +234,25 @@ pub(crate) fn category_ops(
         Some(label) => attrs::set(id, label)?,
         None => attrs::clear::<Lettering>(id),
     });
+    if new_role != block.role {
+        changed = true;
+        ops.push(Op::UpdateLayer {
+            layer: id.into(),
+            patch: json!({"role": new_role}),
+        });
+    }
+    let (page, _) = project.parent(id)?;
+    let sfx_role = new_role == Role::Sfx;
 
     let Some(translation) = &block.translation else {
         counts.untranslated += 1;
+        // An effect now kept as art keeps it in the same step; one that no
+        // longer is keeps its clean-up hidden for its translation to show.
+        if sfx::skipped_as(page, id, label.as_ref(), sfx_role, settings) {
+            let kept = sfx::kept_original(layer);
+            changed |= !kept.is_empty();
+            ops.extend(kept);
+        }
         counts.changed += u32::from(changed);
         return Ok((ops, counts));
     };
@@ -213,8 +265,7 @@ pub(crate) fn category_ops(
         counts.changed += u32::from(changed);
         return Ok((ops, counts));
     }
-    let (page, _) = project.parent(id)?;
-    let lettered = lettering::effective_with(page, id, label.as_ref(), settings)
+    let lettered = lettering::effective_as(page, id, label.as_ref(), sfx_role, settings)
         .context("a block has a category")?;
     let patch = styles::category_chars(settings, font, lettered.category);
     let current = &translation.style.chars;
@@ -350,7 +401,7 @@ pub fn fonts(settings: &LetteringSettings, font: Option<&str>) -> Vec<ResolvedFo
 mod tests {
     use std::collections::BTreeMap;
 
-    use booharu_core::shape::BubbleShape;
+    use booharu_core::{settings::SfxMode, shape::BubbleShape};
     use koharu_scene::{CharStyle, Created, LanguageIdentifier, Session, Span, Text};
     use serde_json::Value;
     use tempfile::TempDir;
@@ -471,6 +522,22 @@ mod tests {
 
         fn label(&self, name: &str) -> Result<Option<Lettering>> {
             Ok(attrs::get(&self.layer(name)?))
+        }
+
+        /// The Koharu role of the block `name`.
+        fn role(&self, name: &str) -> Result<Role> {
+            match self.layer(name)?.content {
+                Content::Block(block) => Ok(block.role),
+                _ => bail!("{name} isn't a block"),
+            }
+        }
+
+        /// Whether the clean-up of the block `name` shows.
+        fn cleaned(&self, name: &str) -> Result<bool> {
+            match self.layer(name)?.content {
+                Content::Block(block) => Ok(block.cleanup.visible),
+                _ => bail!("{name} isn't a block"),
+            }
         }
 
         fn edit(&mut self, ops: Vec<Op>) -> Result<()> {
@@ -727,6 +794,215 @@ mod tests {
             &settings,
         )?;
         assert_eq!(fixture.font("b")?, font("Badaboom BB", Some(700)));
+        Ok(())
+    }
+
+    /// A user's label of `category` recording the role `role`.
+    fn recorded(category: LetteringCategory, role: Role) -> Option<Lettering> {
+        Some(Lettering {
+            role: Some(role),
+            ..user(category)?
+        })
+    }
+
+    #[test]
+    fn a_picked_category_is_the_blocks_role_and_automatic_gives_the_first_back() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = lettered();
+        // b is text: Sound Effect makes it a sound effect in one step, and
+        // the label records the role it had.
+        let steps = fixture.session.history().steps.len();
+        let counts = fixture.set(
+            &["b"],
+            Some(LetteringCategory::Sfx),
+            Chooser::User,
+            &settings,
+        )?;
+        assert_eq!(counts.changed, 1);
+        assert_eq!(fixture.session.history().steps.len(), steps + 1);
+        assert_eq!(fixture.role("b")?, Role::Sfx);
+        assert_eq!(
+            fixture.label("b")?,
+            recorded(LetteringCategory::Sfx, Role::Text)
+        );
+        // Later picks keep the role first recorded.
+        fixture.set(
+            &["b"],
+            Some(LetteringCategory::Shout),
+            Chooser::User,
+            &settings,
+        )?;
+        assert_eq!(fixture.role("b")?, Role::Text);
+        assert_eq!(
+            fixture.label("b")?,
+            recorded(LetteringCategory::Shout, Role::Text)
+        );
+        fixture.set(
+            &["b"],
+            Some(LetteringCategory::Sfx),
+            Chooser::User,
+            &settings,
+        )?;
+        assert_eq!(
+            fixture.label("b")?,
+            recorded(LetteringCategory::Sfx, Role::Text)
+        );
+        // Automatic gives it back as it clears the label.
+        let counts = fixture.set(&["b"], None, Chooser::User, &settings)?;
+        assert_eq!(counts.changed, 1);
+        assert_eq!(
+            (fixture.role("b")?, fixture.label("b")?),
+            (Role::Text, None)
+        );
+
+        // A sound effect any other category makes text, which Automatic
+        // makes a sound effect again.
+        let a = fixture.id("a");
+        fixture.edit(vec![Op::UpdateLayer {
+            layer: a.into(),
+            patch: json!({"role": "sfx"}),
+        }])?;
+        fixture.set(
+            &["a"],
+            Some(LetteringCategory::Whisper),
+            Chooser::User,
+            &settings,
+        )?;
+        assert_eq!(fixture.role("a")?, Role::Text);
+        assert_eq!(
+            fixture.label("a")?,
+            recorded(LetteringCategory::Whisper, Role::Sfx)
+        );
+        fixture.set(&["a"], None, Chooser::User, &settings)?;
+        assert_eq!((fixture.role("a")?, fixture.label("a")?), (Role::Sfx, None));
+        // A pick that leaves the role as it was records none.
+        fixture.set(
+            &["a"],
+            Some(LetteringCategory::Sfx),
+            Chooser::User,
+            &settings,
+        )?;
+        assert_eq!(fixture.label("a")?, user(LetteringCategory::Sfx));
+
+        // One undo takes the role back with the label.
+        fixture.session.undo()?;
+        fixture.session.undo()?;
+        assert_eq!(fixture.role("a")?, Role::Text);
+        assert_eq!(
+            fixture.label("a")?,
+            recorded(LetteringCategory::Whisper, Role::Sfx)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_font_is_chosen_for_the_role_being_written() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let mut settings = lettered();
+        settings.categories.insert(
+            LetteringCategory::Sfx,
+            CategoryFont {
+                family: Some("Sound FX".to_owned()),
+                bold: false,
+                italic: false,
+            },
+        );
+        // b, a sound effect picked as a Shout, is text until Automatic makes
+        // it a sound effect again, lettered as one rather than as the
+        // floating dialogue it was while text.
+        let b = fixture.id("b");
+        fixture.edit(vec![Op::UpdateLayer {
+            layer: b.into(),
+            patch: json!({"role": "sfx"}),
+        }])?;
+        fixture.set(
+            &["b"],
+            Some(LetteringCategory::Shout),
+            Chooser::User,
+            &settings,
+        )?;
+        assert_eq!(fixture.font("b")?, font("Badaboom BB", Some(700)));
+        fixture.set(&["b"], None, Chooser::User, &settings)?;
+        assert_eq!(fixture.role("b")?, Role::Sfx);
+        assert_eq!(fixture.font("b")?, font("Sound FX", None));
+
+        // A model's doubtful Whisper through the same command makes a
+        // sound effect text, which shapes it, rather than Sound Effect's.
+        let model = Chooser::Model {
+            confidence: Some(0.25),
+        };
+        fixture.set(&["b"], Some(LetteringCategory::Whisper), model, &settings)?;
+        assert_eq!(fixture.role("b")?, Role::Text);
+        assert_eq!(fixture.font("b")?, font("Comic Neue", None));
+        Ok(())
+    }
+
+    #[test]
+    fn an_untranslated_block_picked_as_a_sound_effect_keeps_its_art() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = lettered();
+        let before = fixture.session.project();
+        let steps = fixture.session.history().steps.len();
+        let counts = fixture.set(
+            &["c"],
+            Some(LetteringCategory::Sfx),
+            Chooser::User,
+            &settings,
+        )?;
+        assert_eq!(
+            counts,
+            CategoryCounts {
+                changed: 1,
+                untranslated: 1,
+                ..CategoryCounts::default()
+            }
+        );
+        assert_eq!(fixture.session.history().steps.len(), steps + 1);
+        assert_eq!(fixture.role("c")?, Role::Sfx);
+        assert!(!fixture.cleaned("c")?);
+        assert!(Auto::of(&fixture.layer("c")?).kept);
+
+        // Picked as dialogue, it stays hidden until a translation shows it.
+        fixture.set(
+            &["c"],
+            Some(LetteringCategory::NormalDialogue),
+            Chooser::User,
+            &settings,
+        )?;
+        assert_eq!(fixture.role("c")?, Role::Text);
+        assert!(!fixture.cleaned("c")?);
+        assert!(Auto::of(&fixture.layer("c")?).kept);
+
+        // With every sound effect translated, the pick keeps nothing.
+        fixture.session.undo()?;
+        fixture.session.undo()?;
+        assert!(fixture.session.project() == before);
+        let all = LetteringSettings {
+            sfx: SfxMode::TranslateAll,
+            ..lettered()
+        };
+        fixture.set(&["c"], Some(LetteringCategory::Sfx), Chooser::User, &all)?;
+        assert_eq!(fixture.role("c")?, Role::Sfx);
+        assert!(fixture.cleaned("c")?);
+        assert!(!Auto::of(&fixture.layer("c")?).kept);
+        Ok(())
+    }
+
+    #[test]
+    fn a_locked_blocks_role_is_left_and_counted() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let counts = fixture.set(
+            &["b", "d", "e"],
+            Some(LetteringCategory::Sfx),
+            Chooser::User,
+            &lettered(),
+        )?;
+        assert_eq!((counts.changed, counts.locked), (1, 2));
+        assert_eq!(fixture.role("b")?, Role::Sfx);
+        for name in ["d", "e"] {
+            assert_eq!(fixture.role(name)?, Role::Text, "{name}");
+            assert_eq!(fixture.label(name)?, None, "{name}");
+        }
         Ok(())
     }
 
