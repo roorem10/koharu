@@ -341,6 +341,21 @@ fn a_mark_hides_its_finding_only_while_the_line_is_unchanged() -> Result<()> {
         (MISSING_TRANSLATION.to_owned(), false)
     );
     assert_eq!(attrs::get::<QcOk>(&page.layer("line")), None);
+
+    // A mark of the agent's flag, which Mark OK refuses but Koharu's own
+    // edits could write, hides nothing: a flag goes only when dismissed.
+    let printed = fingerprint(&page.layer("line"))?;
+    page.session.apply(Edit {
+        label: "test".to_owned(),
+        ops: vec![attrs::set(line, &QcOk(vec![format!("{FLAG}@{printed}")]))?],
+    })?;
+    assert_eq!(
+        page.found("line"),
+        [
+            (MISSING_TRANSLATION.to_owned(), false),
+            (FLAG.to_owned(), false)
+        ]
+    );
     Ok(())
 }
 
@@ -830,5 +845,25 @@ fn glossary_slips_are_found_as_the_page_check_finds_them_laying_no_text_out() ->
     )?);
     let hidden = check_glossary(&page.project(), page.page, &inputs)?;
     assert!(hidden.len() == 1 && hidden[0].hidden, "{hidden:?}");
+
+    // Worded again, still leaving the term out, the slip shows again...
+    let line = page.id("slips");
+    page.session.apply(edit(vec![
+        json!({"op": "set_text", "layer": line, "text": "The king, yes!"}),
+    ]))?;
+    let reworded = check_glossary(&page.project(), page.page, &inputs)?;
+    let shown: Vec<(&str, bool)> = reworded
+        .iter()
+        .map(|finding| (finding.text.as_str(), finding.hidden))
+        .collect();
+    assert_eq!(shown, [("The king, yes!", false)]);
+    // ...undoing that hides it again, and taking the mark back shows it.
+    page.session.undo()?;
+    let hidden = check_glossary(&page.project(), page.page, &inputs)?;
+    assert!(hidden.len() == 1 && hidden[0].hidden, "{hidden:?}");
+    page.apply(mark_qc_ok(&page.project(), line, "glossary:魔王", false)?);
+    assert_eq!(page.steps().last().map(String::as_str), Some(CLEAR_QC_OK));
+    let shown = check_glossary(&page.project(), page.page, &inputs)?;
+    assert!(shown.len() == 1 && !shown[0].hidden, "{shown:?}");
     Ok(())
 }
