@@ -55,26 +55,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::Result;
 use booharu_core::{
     context::{Chapter, ChapterContext},
+    status::{DETECTION, INPAINTING, OCR, blocks, untranslated},
     styles::recorded,
 };
 use koharu_pipeline::{Event, RunId, Stage, Target};
-use koharu_scene::{Block, Content, Layer, Page, PageId, Project, Rect, Session};
+use koharu_scene::{Layer, Page, PageId, Project, Rect, Session};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use strum::VariantArray as _;
 
 pub use self::going::{Reading, RunHost, carry_on, group_going};
-
-/// The `c2pa` step Koharu's Detection stage records on every panel,
-/// balloon, and block it adds.
-const DETECTION: &str = "detection";
-/// The `c2pa` step Koharu's Recognition stage records.
-const OCR: &str = "ocr";
-/// The `c2pa` step Koharu's Inpainting stage records.
-const INPAINTING: &str = "inpainting";
-/// The `c2pa` step Koharu's Translation stage records.
-const TRANSLATION: &str = "translation";
 
 /// What the Run button carries on with: every page, or the pages chosen.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
@@ -404,35 +395,12 @@ fn needs(session: &Session, page: &Page) -> Result<BTreeSet<Stage>> {
     Ok(needs)
 }
 
-/// `page`'s blocks in reading order, as Koharu's stages read them, each
-/// with whether it or a layer it's in is locked.
-fn blocks(page: &Page) -> Vec<(&Layer, &Block, bool)> {
-    fn walk<'p>(layers: &'p [Layer], locked: bool, blocks: &mut Vec<(&'p Layer, &'p Block, bool)>) {
-        for layer in layers {
-            let locked = locked || layer.locked;
-            if let Content::Block(block) = &layer.content {
-                blocks.push((layer, block, locked));
-            }
-            walk(&layer.children, locked, blocks);
-        }
-    }
-    let mut blocks = Vec::new();
-    walk(&page.layers, false, &mut blocks);
-    blocks
-}
-
 /// Whether Koharu's Detection stage left its record on any of `layers` or
 /// the layers in them.
 fn detected(layers: &[Layer]) -> bool {
     layers
         .iter()
         .any(|layer| recorded(layer, DETECTION) || detected(&layer.children))
-}
-
-/// Whether `block` has no translation, wasn't translated, and wasn't given
-/// back unchanged, which leaves no translation and hides its clean-up.
-fn untranslated(layer: &Layer, block: &Block) -> bool {
-    block.translation.is_none() && !recorded(layer, TRANSLATION) && block.cleanup.visible
 }
 
 #[cfg(test)]

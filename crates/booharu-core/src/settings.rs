@@ -234,6 +234,48 @@ impl Section for StartSettings {
     const NAME: &'static str = "booharu-start";
 }
 
+/// `[booharu-qc]`: the quality check, which looks over each page after a run
+/// and after each edit, and lists the boxes that need a look.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
+pub struct QcSettings {
+    /// The smallest drawn text that reads, as a share of the page's shorter
+    /// side, above 0 and at most 0.1: 0.01 is 12 pixels on a page 1,200
+    /// wide. Text drawn smaller is too small. A share rather than pixels, as
+    /// scans come at very different resolutions, and the shorter side, as a
+    /// long strip's height says nothing of its lettering's size.
+    #[serde(
+        deserialize_with = "min_size",
+        serialize_with = "crate::lettering::decimal"
+    )]
+    #[specta(type = f32)]
+    pub min_size: f32,
+}
+
+impl Default for QcSettings {
+    fn default() -> Self {
+        Self { min_size: 0.01 }
+    }
+}
+
+impl Section for QcSettings {
+    const NAME: &'static str = "booharu-qc";
+}
+
+/// The largest `[booharu-qc] min_size`, a tenth of the page's shorter side.
+const MAX_MIN_SIZE: f32 = 0.1;
+
+fn min_size<'de, D: Deserializer<'de>>(deserializer: D) -> Result<f32, D::Error> {
+    let share = f32::deserialize(deserializer)?;
+    if !(share > 0.0 && share <= MAX_MIN_SIZE) {
+        return Err(D::Error::custom(format!(
+            "the smallest readable text, {share} of the page's shorter side, isn't above 0 and \
+             at most {MAX_MIN_SIZE}"
+        )));
+    }
+    Ok(share)
+}
+
 /// The most pages one Read chapter request sends.
 pub const MAX_PAGES_PER_REQUEST: u32 = 40;
 
@@ -372,6 +414,8 @@ pub struct BooharuPreferences {
     pub runs: RunsSettings,
     #[serde(rename = "booharu-reading")]
     pub reading: ReadingSettings,
+    #[serde(rename = "booharu-qc")]
+    pub qc: QcSettings,
     #[serde(rename = "booharu-start")]
     pub start: StartSettings,
 }
@@ -387,6 +431,7 @@ impl BooharuPreferences {
             fonts: koharu_config::get()?,
             runs: koharu_config::get()?,
             reading: koharu_config::get()?,
+            qc: koharu_config::get()?,
             start: koharu_config::get()?,
         })
     }
@@ -405,6 +450,7 @@ impl BooharuPreferences {
             fonts,
             runs,
             reading,
+            qc,
             start,
         } = self;
         koharu_config::update(|section: &mut McpSettings| *section = mcp)?;
@@ -413,6 +459,7 @@ impl BooharuPreferences {
         koharu_config::update(|section: &mut FontSettings| *section = fonts)?;
         koharu_config::update(|section: &mut RunsSettings| *section = runs)?;
         koharu_config::update(|section: &mut ReadingSettings| *section = reading)?;
+        koharu_config::update(|section: &mut QcSettings| *section = qc)?;
         koharu_config::update(|section: &mut StartSettings| *section = start)?;
         Self::get()
     }
@@ -473,13 +520,14 @@ type Saver = fn(Map<String, Value>) -> anyhow::Result<()>;
 /// How the section named `name` is saved alone; none for a name Booharu has
 /// no section of.
 fn saver(name: &str) -> Option<Saver> {
-    let savers: [(&str, Saver); 7] = [
+    let savers: [(&str, Saver); 8] = [
         (McpSettings::NAME, saved::<McpSettings>),
         (OcrBoxSettings::NAME, saved::<OcrBoxSettings>),
         (LetteringSettings::NAME, saved::<LetteringSettings>),
         (FontSettings::NAME, saved::<FontSettings>),
         (RunsSettings::NAME, saved::<RunsSettings>),
         (ReadingSettings::NAME, saved::<ReadingSettings>),
+        (QcSettings::NAME, saved::<QcSettings>),
         (StartSettings::NAME, saved::<StartSettings>),
     ];
     savers
@@ -639,11 +687,14 @@ mod tests {
                 LetteringSettings::NAME,
                 McpSettings::NAME,
                 OcrBoxSettings::NAME,
+                QcSettings::NAME,
                 ReadingSettings::NAME,
                 RunsSettings::NAME,
                 StartSettings::NAME,
             ]
         );
+        let qc: QcSettings = toml::from_str("").expect("the defaults");
+        assert_eq!(qc.min_size, 0.01);
     }
 
     #[test]
@@ -709,6 +760,44 @@ mod tests {
             .set_section(ReadingSettings::NAME, values(json!({"model": null})))
             .expect("the translation model");
         assert_eq!(preferences.reading.model, None);
+    }
+
+    #[test]
+    fn a_bad_smallest_readable_size_fails_closed() {
+        for text in [
+            "min_size = 0",
+            "min_size = -0.01",
+            "min_size = 0.11",
+            "min_size = 1",
+            "min_size = nan",
+            "min_size = inf",
+            "min_size = \"0.01\"",
+        ] {
+            assert!(toml::from_str::<QcSettings>(text).is_err(), "took {text}");
+        }
+        for (text, share) in [("min_size = 0.1", 0.1), ("min_size = 0.0005", 0.0005)] {
+            let read: QcSettings = toml::from_str(text).expect("a share");
+            assert_eq!(read.min_size, share);
+        }
+        // Written as the decimal it was given, never the f32's long tail.
+        let written = toml::to_string(&QcSettings { min_size: 0.015 }).expect("a table");
+        assert_eq!(written.trim(), "min_size = 0.015");
+
+        // The section changes by its name, and a bad value changes nothing.
+        let mut preferences = BooharuPreferences::default();
+        preferences
+            .set_section(QcSettings::NAME, values(json!({"min_size": 0.02})))
+            .expect("a share");
+        assert_eq!(preferences.qc.min_size, 0.02);
+        assert_eq!(
+            preferences.section(QcSettings::NAME).ok(),
+            Some(json!({"min_size": 0.02}))
+        );
+        let refused = preferences.set_section(QcSettings::NAME, values(json!({"min_size": 0.5})));
+        assert!(refused.is_err());
+        assert_eq!(preferences.qc.min_size, 0.02);
+        let refused = preferences.set_section(QcSettings::NAME, values(json!({"enabled": false})));
+        assert!(refused.is_err(), "QC has no switch");
     }
 
     #[test]
