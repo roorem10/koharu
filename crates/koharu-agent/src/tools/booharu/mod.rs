@@ -21,7 +21,7 @@
 //! | `booharu_apply_text_style` | gives the translations of some blocks, pages, or the whole project the default text look again, each block's category font among it while Pick fonts automatically is on, or the font of a category or balloon shape the agent names, keeping hand-edited blocks unless told otherwise, as one undo step, and answers how many it changed, kept, and found untranslated | no |
 //! | `booharu_count_text_style_targets` | how many blocks `booharu_apply_text_style` would change, keep, and find untranslated | yes |
 //! | `booharu_run` | carries on with what the pages still need, as the Run button does with every stage on, one group of pages after another, or runs fewer stages on the pages named, and answers the plan with its first run; named with translation, Read chapter reads a chapter without a brief just before it's translated, answering no run while it reads | no |
-//! | `booharu_set_lettering_category` | sets blocks' lettering categories as the agent's labels, never over a user's, and while Pick fonts automatically is on their category fonts, never over a hand-changed font, as one undo step | no |
+//! | `booharu_set_lettering_category` | sets blocks' lettering categories as the agent's labels, never over a user's, each label also making its block a sound effect or text for Koharu's placement and the SFX mode, and while Pick fonts automatically is on their category fonts, never over a hand-changed font, as one undo step | no |
 //! | `booharu_get_text_styles` | the default text look, the default font, Pick fonts automatically, and each category's font with where it comes from; for a page or blocks, each block's category with why, its label, its balloon's shape, and whether it was changed by hand | yes |
 //! | `booharu_get_chapter_context` | the open chapter's linked series whole, its suggested terms and brief, the glossary terms found in its text, and word for word what a translation run on it adds after the Instructions | yes |
 //! | `booharu_link_series` | links the chapter to a series by its name, ignoring case, making one when asked | no |
@@ -60,7 +60,11 @@ mod sfx;
 mod styles;
 mod translation;
 
-pub(crate) use self::{context::outlined, mcp::McpCalls, runs::WAIT};
+pub(crate) use self::{
+    context::outlined,
+    mcp::McpCalls,
+    runs::{RUN, WAIT},
+};
 
 use std::{collections::BTreeSet, sync::Arc};
 

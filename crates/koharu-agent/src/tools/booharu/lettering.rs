@@ -59,29 +59,37 @@ impl Tool for SetLetteringCategory {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        "Set the lettering category of some blocks, which decides the font their translations \
-         are lettered in while Pick fonts automatically (`auto` in `booharu-lettering`) is on, \
-         as one undo step. Use it when you can tell what kind of line a block holds and its box \
-         can't, for example when view_page or the source text shows a whisper, a thought, a \
-         moan, or a title lettered as ordinary speech; booharu_get_text_styles tells each \
-         block's category and why. `category` is a category's id, or `automatic` to take back \
-         your label, so each block takes the category its own rules give. Your label counts as an \
-         automatic one: it never replaces a category the user chose (`kept_user_label`), and a \
-         block whose look was changed by hand, by the user or by booharu_apply_text_style, \
-         takes your label but keeps its font (`kept_hand_edited`). A presentation category \
-         (`title`, `phone_text`, `sfx`, `handwritten`, `sign`, `electronic_voice`) wins at any \
-         `confidence`; a delivery category (`thoughts`, `weak_shout`, `moan`, `whisper`, `shy`, \
-         `crying`, `menacing`, `shout`) wins over small text and the balloon's shape only when \
-         `confidence` is at least `model_confidence` in `booharu-lettering`, and never over a \
-         block Koharu detected as a sound effect. `normal_dialogue`, `floating`, `small_text`, \
-         and `narration_box` come from a block's balloon and text size, so a label of yours \
-         can't give them: booharu_apply_text_style with that `category`, or with a `shape`, \
-         letters a block as one of those. With `auto` off only the labels change; with it on, \
-         each translated block takes its category's font, and a block without a translation \
-         takes it once translated. Locked blocks, and blocks in locked layers, are left out. \
-         Answers how many blocks it `changed`, left out as `locked`, `kept_user_label`, \
-         `kept_hand_edited`, and found `untranslated`, which take only the label; tell the \
-         user about any it left out."
+        "Set the lettering category of some blocks, which decides the font their translations are \
+         lettered in while Pick fonts automatically (`auto` in `booharu-lettering`) is on, as one \
+         undo step. Use it when you can tell what kind of line a block holds and its box can't, \
+         for example when view_page or the source text shows a whisper, a thought, a moan, or a \
+         title lettered as ordinary speech; booharu_get_text_styles tells each block's category \
+         and why. `category` is a category's id, or `automatic` to take back your label, so each \
+         block takes the category its own rules give. Your label counts as an automatic one: it \
+         never replaces a category the user chose (`kept_user_label`), and a block whose look was \
+         changed by hand, by the user or by booharu_apply_text_style, takes your label but keeps \
+         its font (`kept_hand_edited`). A presentation category (`title`, `phone_text`, `sfx`, \
+         `handwritten`, `sign`, `electronic_voice`) wins at any `confidence`; a delivery category \
+         (`thoughts`, `weak_shout`, `moan`, `whisper`, `shy`, `crying`, `menacing`, `shout`) wins \
+         over small text and the balloon's shape only when `confidence` is at least \
+         `model_confidence` in `booharu-lettering`. `normal_dialogue`, `floating`, `small_text`, \
+         and `narration_box` come from a block's balloon and text size, so a label of yours can't \
+         give them: booharu_apply_text_style with that `category`, or with a `shape`, letters a \
+         block as one of those. Your label also marks whether the block is a sound effect, \
+         Koharu's role for it, which Koharu's placement frames and outlines its translation by and \
+         the SFX mode's skip rule (`sfx` in `booharu-lettering`) reads: `sfx` makes the block a \
+         sound effect and any other category makes it text, at any `confidence`, so give a block \
+         Koharu detected as a sound effect another category only when it isn't one, and \
+         `automatic` gives back the role it had before a label first changed it. Later runs leave \
+         alone a block that is now a sound effect the SFX mode keeps as art, a translation it has \
+         staying as it is, and one without a translation has its clean-up hidden at once so its \
+         art shows. Placement follows the new role at the block's next translation; \
+         booharu_reset_lettering gives a translated block the new role's outline at once. With \
+         `auto` off no font changes; with it on, each translated block takes its category's font, \
+         and a block without a translation takes it once translated. Locked blocks, and blocks in \
+         locked layers, are left out. Answers how many blocks it `changed`, left out as `locked`, \
+         `kept_user_label`, `kept_hand_edited`, and found `untranslated`, which take no font until \
+         translated; tell the user about any it left out."
             .to_owned()
     }
 

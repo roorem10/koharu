@@ -52,15 +52,15 @@ impl Tool for AddTextBox {
 
     fn description(&self) -> String {
         "Add a text block over a box on a page, for a line of text the automatic run missed, as \
-         the O tool adds one, as one undo step, then start the run that reads it, and as the \
-         mode says translates it and cleans the art under the whole box; the run goes on in the \
+         the O tool adds one, as one undo step, then start the run that reads it, and as the mode \
+         says translates it and cleans the art under the whole box; the run goes on in the \
          background, and wait follows it. The block goes in the smallest balloon holding most of \
-         the box, else the panel holding its centre, else on the page, read in order among what \
-         is there. This doesn't style the text: the translation is lettered as the Translation \
-         stage letters one. To read or translate an existing block again, use run with the \
-         block as the target's blocks and the stages instead. A box over blank art adds nothing \
-         and says there's nothing to read, and a locked balloon or panel refuses it. Answers the \
-         new block and the run's id."
+         the box, else the panel holding its centre, else on the page, read in order among what is \
+         there. This doesn't style the text: the translation is lettered as the Translation stage \
+         letters one. To read, translate, or clean an existing block again, use booharu_redo_boxes \
+         instead, which also takes one fixed by hand once the user agrees. A box over blank art \
+         adds nothing and says there's nothing to read, and a locked balloon or panel refuses it. \
+         Answers the new block and the run's id."
             .to_owned()
     }
 
@@ -258,7 +258,8 @@ impl Tool for SplitBlock {
          text, keeps the block's id, and a copy just after it takes the other; each keeps its \
          part of the mask and clean-up and loses its wording and translation until the run \
          writes them again. A block whose halves would be under 4 pixels across its lines, or a \
-         locked one, is refused. Answers the halves in reading order and the run's id."
+         locked one, is refused. Answers the halves in reading order and the run's id. To read \
+         or translate a block again without splitting it, use booharu_redo_boxes."
             .to_owned()
     }
 

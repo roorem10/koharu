@@ -8,7 +8,7 @@ use booharu_core::{
     Edited,
     attrs::{self, Attrs},
     edited,
-    settings::{BooharuPreferences, LetteringSettings},
+    settings::{BooharuPreferences, LetteringSettings, SfxMode, SubtitleStyle},
 };
 use koharu_config::secrets::SecretString;
 use koharu_pipeline::{PipelineConfig, TranslatorConfig};
@@ -49,7 +49,12 @@ impl Tool for GetProjectOverview {
          `detect_colors`, whether a new translation keeps the colours Koharu measured, and \
          `auto`, Pick fonts automatically, whether a new translation is lettered in its \
          block's lettering category's font instead of `font`, as booharu_get_text_styles \
-         answers each category's font and each block's category; and Booharu's settings. A \
+         answers each category's font and each block's category, `sfx`, which sound effects a \
+         run translates (`skip`, none, `inside_bubbles`, those inside a speech balloon, or \
+         `translate_all`), the others keeping the original art, and `subtitle`, the look of \
+         the line booharu_add_sfx_subtitle writes beside a sound effect: its `family`, null \
+         for `font`, its `size` as a share of the page's shorter side, and its `fill` and \
+         `stroke` colours, the outline a ninth of its size wide; and Booharu's settings. A \
          part that can't be read gives its error instead."
             .to_owned()
     }
@@ -130,6 +135,12 @@ struct NewText {
     /// its block's lettering category's font rather than `font`; the T
     /// tool's text never is.
     auto: bool,
+    /// Which sound effects a run translates; the others keep the original
+    /// art.
+    sfx: SfxMode,
+    /// How a sound effect's subtitle looks, in `font` when its family is
+    /// none.
+    subtitle: SubtitleStyle,
 }
 
 /// The look new text gets from `settings`, `[booharu-lettering]`, and
@@ -143,6 +154,8 @@ fn new_text((settings, font): (LetteringSettings, Option<String>)) -> NewText {
         stroke_width: look.stroke.map(|_| look.stroke_width),
         detect_colors: settings.detect_colors,
         auto: settings.auto,
+        sfx: settings.sfx,
+        subtitle: settings.subtitle,
     }
 }
 
@@ -448,6 +461,8 @@ mod tests {
                 stroke_width: None,
                 detect_colors: true,
                 auto: false,
+                sfx: SfxMode::Skip,
+                subtitle: SubtitleStyle::default(),
             }
         );
         settings.default.fill = Some(red);
@@ -455,6 +470,9 @@ mod tests {
         settings.default.stroke_width = 3.0;
         settings.detect_colors = false;
         settings.auto = true;
+        settings.sfx = SfxMode::InsideBubbles;
+        settings.subtitle.family = Some("Wild Words".to_owned());
+        settings.subtitle.fill = red;
         assert_eq!(
             json!(new_text((settings, None))),
             json!({
@@ -464,6 +482,13 @@ mod tests {
                 "stroke_width": 3.0,
                 "detect_colors": false,
                 "auto": true,
+                "sfx": "inside_bubbles",
+                "subtitle": {
+                    "family": "Wild Words",
+                    "size": 0.015,
+                    "fill": [1.0, 0.0, 0.0, 1.0],
+                    "stroke": [1.0, 1.0, 1.0, 1.0],
+                },
             })
         );
     }

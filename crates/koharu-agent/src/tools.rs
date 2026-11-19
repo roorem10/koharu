@@ -258,6 +258,7 @@ impl Tool for Run {
          replacing what they wrote before. Answers the run's id at once; the run goes on in the \
          background, and wait follows it."
             .to_owned()
+            + booharu::RUN // Booharu: which blocks a run leaves alone under Booharu's rules.
     }
 
     fn parameters(&self) -> Value {

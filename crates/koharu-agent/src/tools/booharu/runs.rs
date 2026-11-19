@@ -35,12 +35,28 @@ use super::{context::blocking, styles::lettering};
 use crate::tools::{failed, project, schema};
 
 /// What else Koharu's `wait` tells, as every run follows Booharu's run
-/// settings.
+/// settings and leaves blocks out by Booharu's rules.
 pub(crate) const WAIT: &str = " Under Booharu's run settings a run also tells `retrying`: a \
      page stage failed and waits to be tried again, with the try it waits for and how many it \
      has; and `page_failed`: a page failed every try, with the stage and why, and the run goes \
      on with its other pages. A run that gave up on pages ends `done_with_problems`, listing \
-     each.";
+     each. A page stage that left blocks of the page alone tells `skipped` once for the page, \
+     with its `stage` and how many it left: `sound_effects` the SFX mode kept as art, \
+     `hand_fixed` blocks fixed by hand (for `detect`, the blocks it kept as made or changed by \
+     hand), and `locked` ones, `blocks` being whether the run named blocks; tell the user what \
+     was left alone, and leave hand-fixed blocks to booharu_redo_boxes, which takes them on \
+     purpose once the user agrees.";
+
+/// What else Koharu's `run` does, as every run leaves blocks out by
+/// Booharu's rules.
+pub(crate) const RUN: &str = " Under Booharu, a run leaves alone locked blocks and the blocks \
+     fixed by hand for its stage (a source corrected by hand when reading, a translation \
+     written or fixed by hand when translating), translates a sound effect only as the SFX \
+     mode (`sfx` in `booharu-lettering`) says and never one with a subtitle, keeping the others \
+     as art, and, detecting again, keeps what was made or changed by hand, such as a block \
+     drawn, corrected, labelled, noted, or subtitled by hand, and anything locked; \
+     booharu_redo_boxes runs stages again on chosen blocks, the hand-fixed ones too on \
+     purpose.";
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -112,7 +128,10 @@ impl Tool for Run {
          text, or no model can read them, or that fails, still goes on to translation; a Stop \
          while it reads ends the group. `read` without `translate` changes nothing, and alone \
          runs nothing. booharu_read_chapter reads the chapter by hand, and while it reads, this \
-         tool is refused. Needs a project open, as every tool here does."
+         tool is refused. Its runs leave blocks alone as run's do (locked blocks, blocks fixed \
+         by hand, and sound effects the SFX mode keeps as art), as wait's `skipped` tells; \
+         booharu_redo_boxes runs stages again on chosen blocks, the hand-fixed ones too on \
+         purpose. Needs a project open, as every tool here does."
             .to_owned()
     }
 

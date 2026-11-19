@@ -566,7 +566,8 @@ impl Tool for FixTermEverywhere {
          translation was changed by hand, by the user or by you, is left alone, and so is a \
          locked line, or one in a locked layer. Answers the `run`, none when no line was left to \
          translate, which you follow with wait, and how many lines it `translated` and left \
-         alone as `kept_hand_edited` and `kept_locked`; tell the user about any it left alone."
+         alone as `kept_hand_edited` and `kept_locked`; tell the user about any it left alone. \
+         booharu_redo_boxes translates the hand-edited ones again too, once the user agrees."
             .to_owned()
     }
 

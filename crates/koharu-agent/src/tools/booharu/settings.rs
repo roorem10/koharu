@@ -46,7 +46,16 @@ impl Tool for GetSettings {
          `model_confidence`, from 0 to 1, how sure a model, you included, must be of a \
          delivery category such as `whisper` for its label to win over small text and the \
          balloon's shape (booharu_get_text_styles answers the font each category letters in \
-         and each block's category); `booharu-fonts` has \
+         and each block's category); `sfx`, which sound effects a run translates: `skip`, \
+         none, `inside_bubbles`, only those inside a speech balloon, lettered like speech, or \
+         `translate_all`, every one, as Koharu does; a sound effect a run skips, and one with a \
+         subtitle whatever the mode, keeps the original art, untranslated with its clean-up \
+         hidden; a block is a sound effect when its lettering category is `sfx`; and \
+         `subtitle`, the look of the small plain line booharu_add_sfx_subtitle writes beside a \
+         sound effect: its `family`, null for the default font, its `size`, a share of the \
+         page's shorter side above 0 and at most 0.1 (0.015 is 18 pixels on a page 1,200 \
+         wide), and its `fill` and `stroke` colours, which can't be null, the outline a ninth \
+         of its size wide; `booharu-fonts` has \
          the font picker's `favorites`, family names; `booharu-runs` has the Run menu's \
          `presets`, each a `name` and its `stages` (`detect`, `recognize`, `inpaint`, `read`, \
          `translate`; `read`, Read chapter, only with `translate`), which set the menu's stage \
@@ -131,7 +140,11 @@ impl Tool for SetSettings {
          font, and a category set to null, `{\"categories\": {\"shout\": null}}`, loses its \
          own font. A change to `booharu-lettering`, `auto` and `categories` included, applies \
          to text made from then on, never to translations already made: \
-         booharu_apply_text_style gives those the new look, their category fonts among it. A \
+         booharu_apply_text_style gives those the new look, their category fonts among it, and \
+         booharu_reset_lettering gives chosen ones their default, a subtitle its `subtitle` \
+         look. `sfx` applies to runs started from then on, so translating sound effects that \
+         were skipped needs a run of them once it allows them, and `subtitle` changes only \
+         `family`, `size`, `fill`, or `stroke` named, as `default` does. A \
          change to `booharu-runs` applies to runs started from then on, the next run of a group \
          booharu_run carries on with included; a run already going keeps the settings it \
          started with. A preset's `stages` are among `detect`, `recognize`, `inpaint`, `read` \
@@ -242,6 +255,16 @@ mod tests {
         settings.0.lock().mcp.port
     }
 
+    /// A sound effect's subtitle look as Booharu first has it.
+    fn subtitle() -> Value {
+        json!({
+            "family": null,
+            "size": 0.015,
+            "fill": [0.0, 0.0, 0.0, 1.0],
+            "stroke": [1.0, 1.0, 1.0, 1.0],
+        })
+    }
+
     #[tokio::test]
     async fn the_settings_are_read_and_saved_through_the_app() {
         let settings = Arc::new(Settings::default());
@@ -262,6 +285,8 @@ mod tests {
                     "categories": {},
                     "small_text": 0.012,
                     "model_confidence": 0.6,
+                    "sfx": "skip",
+                    "subtitle": subtitle(),
                 },
                 "booharu-fonts": {"favorites": []},
                 "booharu-runs": {
@@ -334,6 +359,8 @@ mod tests {
                     "categories": {},
                     "small_text": 0.012,
                     "model_confidence": 0.6,
+                    "sfx": "skip",
+                    "subtitle": subtitle(),
                 },
             })
         );
@@ -360,6 +387,40 @@ mod tests {
             .await
             .expect("new favourites");
         assert_eq!(json!(saved)["saved"], json!({"favorites": ["Anime Ace"]}));
+    }
+
+    #[tokio::test]
+    async fn the_sfx_mode_and_the_subtitle_look_are_saved_and_checked() {
+        let settings = Arc::new(Settings::default());
+        let (_dir, tools) = open(&settings);
+        let save = async |values: Value| {
+            let args = SetSettingsArgs {
+                section: "booharu-lettering".to_owned(),
+                values: serde_json::from_value(values).expect("keys"),
+            };
+            let saved = SetSettings.call(&mut tools.tool_context(), args).await?;
+            Ok::<_, ToolExecutionError>(json!(saved)["saved"].clone())
+        };
+        let changed =
+            json!({"sfx": "inside_bubbles", "subtitle": {"family": "Wild Words", "size": 0.02}});
+        let saved = save(changed).await.expect("a mode and a look");
+        assert_eq!(saved["sfx"], json!("inside_bubbles"));
+        // The subtitle look changes only in the keys named.
+        let mut look = subtitle();
+        look["family"] = json!("Wild Words");
+        look["size"] = json!(0.02);
+        assert_eq!(saved["subtitle"], look);
+        for refused in [
+            json!({"sfx": "some"}),
+            json!({"subtitle": {"size": 0.2}}),
+            json!({"subtitle": {"family": " "}}),
+            json!({"subtitle": {"fill": null}}),
+        ] {
+            assert!(save(refused.clone()).await.is_err(), "{refused}");
+        }
+        let held = settings.0.lock().lettering.clone();
+        assert_eq!(json!(held.sfx), json!("inside_bubbles"));
+        assert_eq!(json!(held.subtitle), look);
     }
 
     #[tokio::test]
