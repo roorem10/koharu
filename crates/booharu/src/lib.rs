@@ -1,8 +1,9 @@
 //! Booharu's features on top of Koharu: the logic its desktop commands and
 //! agent tools share, one module per feature group, such as the quality
 //! check (`qc`), Read chapter, the run planner, script export and import,
-//! Apply's default text look (`styles`), changing blocks' lettering
-//! categories (`lettering`), and the series glossary and chapter notes as
+//! Apply's default text look and Reset to lettering default (`styles`),
+//! changing blocks' lettering categories (`lettering`), sound effects'
+//! subtitles (`sfx`), and the series glossary and chapter notes as
 //! the user and the agent change them, Read chapter and Explain this line
 //! among them (`context`), with the model calls they make (`calls`), the
 //! models they choose (`models`), and the jobs they run as (`jobs`).
@@ -20,5 +21,6 @@ pub mod lettering;
 pub mod models;
 pub mod qc;
 pub mod runs;
+pub mod sfx;
 pub mod styles;
 pub mod translation;
