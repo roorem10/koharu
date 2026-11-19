@@ -334,11 +334,20 @@ async function afterWrites<T>(command: () => Promise<T>): Promise<T> {
   return command()
 }
 
-/** `text`, a line's or a selection's, as a term's source or translation: on one line, its runs of
- * whitespace one space each, trimmed. Terms are matched ignoring whitespace, so this changes no
- * match. */
+/** A Chinese or Japanese character: Han, kana, and their punctuation and full-width forms. Korean
+ * isn't one, as it writes spaces between words, so a line break there is usually one. */
+const cjk = String.raw`[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}\u3000-\u303f\uff00-\uffef]`
+
+/** A line break, with the whitespace around it, between two Chinese or Japanese characters: a
+ * vertical bubble's column break, which joins its words without a space. */
+const cjkBreak = new RegExp(String.raw`(?<=${cjk})\s*[\n\r\u2028\u2029]\s*(?=${cjk})`, 'gu')
+
+/** `text`, a line's or a selection's, as a term's source or translation: on one line, a line break
+ * between two Chinese or Japanese characters dropped, as a vertical bubble's column break joins its
+ * words, and every other run of whitespace one space, trimmed. Terms are matched ignoring
+ * whitespace, so this changes no match. */
 export function termText(text: string): string {
-  return text.replace(/\s+/gu, ' ').trim()
+  return text.replace(cjkBreak, '').replace(/\s+/gu, ' ').trim()
 }
 
 /** The key of where terms are used in the open project, under the project's, so the change, undo

@@ -9,6 +9,7 @@ import {
   matchesSearch,
   putTerm,
   sameSource,
+  termText,
   useBooharuContextChanges,
   useChapterContext,
   useSeriesList,
@@ -28,6 +29,19 @@ describe('Booharu glossary terms', () => {
     expect(sameSource(' Hina  Chan', 'hinachan')).toBe(true)
     expect(sameSource('潔　世一', '潔世一')).toBe(true)
     expect(sameSource('Hina', 'Hinata')).toBe(false)
+  })
+
+  it('takes a line’s text onto one line, joining Chinese and Japanese across a line break', () => {
+    // A vertical bubble's column break, or a selection across one, joins its words.
+    expect(termText('潔の\n武器')).toBe('潔の武器')
+    expect(termText(' 魔\r\n 王 ')).toBe('魔王')
+    expect(termText('何だ！？\nお前')).toBe('何だ！？お前')
+    expect(termText('ヒナ\u3000\nさん')).toBe('ヒナさん')
+    // Elsewhere a line break is a space, as is every other run of whitespace.
+    expect(termText('Blue\nLock')).toBe('Blue Lock')
+    expect(termText('Isagi\n潔')).toBe('Isagi 潔')
+    expect(termText('파란\n자물쇠')).toBe('파란 자물쇠')
+    expect(termText('潔  世一')).toBe('潔 世一')
   })
 
   it('finds a term by its source, translation or note, ignoring case', () => {
