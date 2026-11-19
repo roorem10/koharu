@@ -28,6 +28,9 @@ pub async fn booharu_save_preferences(
         let saved = preferences.save()?;
         // The canvas takes the ones it reads, for the text made from now on.
         super::canvas::push(&app.screen);
+        // Any section may change what the quality check finds, as
+        // `[booharu-lettering]` regroups the odd font check's blocks.
+        super::qc::touch_all();
         Ok(saved)
     })
     .await??)

@@ -6,8 +6,9 @@
 //! note on a first start saying where Booharu 0.0.4's series are. The files
 //! and the rules are booharu-core's `context` and the `booharu` crate's,
 //! which the agent's tools share. Every write of a series file or of the
-//! open project's side file tells the interface `booharu_context_changed`,
-//! and every save of the Instructions `booharu_instructions_changed`.
+//! open project's side file tells the interface `booharu_context_changed`
+//! and has the quality check check every page again ([`changed`]), and
+//! every save of the Instructions tells `booharu_instructions_changed`.
 
 use std::{
     path::{Path, PathBuf},
@@ -90,6 +91,15 @@ pub struct FirstStartNote {
     pub folder: Option<String>,
 }
 
+/// Tells the interface `booharu_context_changed` after a write of a series
+/// file or the open project's side file, and has the quality check check
+/// every page again, as the glossary it checks translations against may
+/// have changed.
+pub(crate) fn changed(app: &App) {
+    app.emit(CONTEXT_CHANGED, ());
+    super::qc::touch_all();
+}
+
 /// Every series, by name, ignoring case. A file that doesn't read is left
 /// out and logged.
 #[tauri::command]
@@ -106,7 +116,7 @@ pub async fn booharu_create_series(app: State<'_, Arc<App>>, name: String) -> Re
     let app = Arc::clone(&app);
     Ok(tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
         let series = SeriesStore::open()?.create(&name)?;
-        app.emit(CONTEXT_CHANGED, ());
+        changed(&app);
         Ok(series)
     })
     .await??)
@@ -129,7 +139,7 @@ pub async fn booharu_save_series(app: State<'_, Arc<App>>, series: Series) -> Re
     Ok(tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
         let store = SeriesStore::open()?;
         store.save(&series)?;
-        app.emit(CONTEXT_CHANGED, ());
+        changed(&app);
         store.get(&series.id)
     })
     .await??)
@@ -147,7 +157,7 @@ pub async fn booharu_rename_series(
     let app = Arc::clone(&app);
     Ok(tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
         let series = SeriesStore::open()?.rename(&id, &name)?;
-        app.emit(CONTEXT_CHANGED, ());
+        changed(&app);
         Ok(series)
     })
     .await??)
@@ -161,7 +171,7 @@ pub async fn booharu_delete_series(app: State<'_, Arc<App>>, id: String) -> Resu
     let app = Arc::clone(&app);
     Ok(tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
         SeriesStore::open()?.delete(&id)?;
-        app.emit(CONTEXT_CHANGED, ());
+        changed(&app);
         Ok(())
     })
     .await??)
@@ -183,7 +193,7 @@ pub async fn booharu_link_series(
             &SeriesStore::open()?,
             series.as_deref(),
         )? {
-            app.emit(CONTEXT_CHANGED, ());
+            changed(&app);
         }
         chapter(&app)
     })
@@ -204,7 +214,7 @@ pub async fn booharu_set_chapter_brief(
     let app = Arc::clone(&app);
     Ok(tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
         if context::set_brief(&project_file(&app)?, &summary)? {
-            app.emit(CONTEXT_CHANGED, ());
+            changed(&app);
         }
         chapter(&app)
     })
@@ -245,7 +255,7 @@ pub async fn booharu_accept_suggestion(
             entry,
             replace_locked,
         )?;
-        app.emit(CONTEXT_CHANGED, ());
+        changed(&app);
         chapter(&app)
     })
     .await??)
@@ -262,7 +272,7 @@ pub async fn booharu_dismiss_suggestion(
     let app = Arc::clone(&app);
     Ok(tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
         if context::dismiss(&project_file(&app)?, &id)? {
-            app.emit(CONTEXT_CHANGED, ());
+            changed(&app);
         }
         chapter(&app)
     })
@@ -347,7 +357,7 @@ pub async fn booharu_import_instruction_glossary(
             &lines,
             remove,
         )?;
-        app.emit(CONTEXT_CHANGED, ());
+        changed(&app);
         if let Some(kept) = &imported.instructions {
             let mut rewritten = false;
             koharu_config::update(|config: &mut PipelineConfig| {
@@ -438,7 +448,7 @@ pub async fn booharu_import_series(
     let app = Arc::clone(&app);
     Ok(tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
         let series = SeriesStore::open()?.import(series, replace)?;
-        app.emit(CONTEXT_CHANGED, ());
+        changed(&app);
         Ok(series)
     })
     .await??)

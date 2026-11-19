@@ -37,7 +37,7 @@ use koharu_scene::{PageId, Session};
 use parking_lot::Mutex;
 use tauri::State;
 
-use super::{events::CONTEXT_CHANGED, styles::look};
+use super::{context::changed, styles::look};
 use crate::{app::App, commands::Result};
 
 /// How long a load of one of Koharu's own models that didn't fit in free
@@ -173,7 +173,7 @@ pub(crate) async fn read_chapter(
     let ending = Ending(Arc::clone(&telling), false);
     let outcome = reading(&app, session, request, stops, &telling).await;
     if let Ok(ReadOutcome::Done(_)) = &outcome {
-        app.emit(CONTEXT_CHANGED, ());
+        changed(&app);
     }
     ending.end(&outcome);
     outcome

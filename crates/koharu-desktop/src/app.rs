@@ -125,6 +125,7 @@ impl App {
         self.close();
         let page = session.project().pages().next().map(|page| page.id);
         let relay = self.relay(session.subscribe());
+        crate::booharu::qc::watch(self, session.subscribe()); // Booharu: the quality check follows the project's changes.
         let session = Arc::new(Mutex::new(session));
         self.screen.set_canvas(Some(Canvas::new(
             self.gpu,
@@ -162,6 +163,7 @@ impl App {
         };
         self.pipeline.stop();
         crate::booharu::jobs::stop(); // Booharu: closing ends Read chapter and Explain this line.
+        crate::booharu::qc::stop(); // Booharu: closing stops the quality check and forgets its findings.
         self.screen.set_canvas(None);
         if let Some(project) = project {
             self.pipeline.close(project.session.lock().id());

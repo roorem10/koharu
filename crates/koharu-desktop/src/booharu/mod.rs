@@ -4,10 +4,11 @@
 //! the MCP server's start on Booharu's own port, Read chapter and Explain
 //! this line as jobs Stop and closing the project end (`jobs`), the agent's
 //! chat kept beside its project (`agent_history`), the quality check's
-//! findings and its one-page check (`qc`), and the host Booharu's
-//! agent tools reach the app through, which tells the interface when they
-//! write a series or the chapter's notes, or save the Instructions, and
-//! reads the chapter for them.
+//! findings, its watcher and its one-page check (`qc`), and the host
+//! Booharu's agent tools reach the app through, which tells the interface
+//! when they write a series or the chapter's notes, or save the
+//! Instructions, has the quality check look again after those writes and
+//! after a settings save, and reads the chapter for them.
 
 pub(crate) mod agent_history;
 pub(crate) mod boxes;
@@ -106,6 +107,9 @@ impl BooharuHost for DesktopHost {
     ) -> anyhow::Result<BooharuPreferences> {
         let saved = BooharuPreferences::save_section(name, values)?;
         canvas::push(&self.0);
+        // Any section may change what the quality check finds, as
+        // `[booharu-lettering]` regroups the odd font check's blocks.
+        qc::touch_all();
         Ok(saved)
     }
 
@@ -123,6 +127,7 @@ impl BooharuHost for DesktopHost {
         if let Some(handle) = self.0.handle() {
             events::CONTEXT_CHANGED.tell(&handle, ());
         }
+        qc::touch_all();
     }
 
     fn instructions_changed(&self) {
