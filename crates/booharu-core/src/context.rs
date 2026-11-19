@@ -16,12 +16,15 @@
 //!   the same inputs, so Koharu's conversation goes on while nothing changed.
 //! - [`instruction_terms`] reads a glossary out of the Instructions, for
 //!   Import from instructions.
+//! - [`agent`] keeps the project's conversation with the agent in a second
+//!   side file, so the chat comes back with the project.
 //!
 //! Terms are told apart by their source, trimmed, ignoring case and
 //! whitespace ([`same_source`]), and found in a text the same way
 //! ([`occurs`]). A series file may hold one source twice, as 0.0.4's could;
 //! where terms are used, the first locked one wins, else the first.
 
+pub mod agent;
 mod chapter;
 mod compose;
 mod instructions;

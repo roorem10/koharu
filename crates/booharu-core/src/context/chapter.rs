@@ -29,8 +29,9 @@ use super::{
 /// keeps it.
 pub const CHAPTER_VERSION: u32 = 1;
 
-/// Holds every read and write of a side file in this process.
-static UPDATE: Mutex<()> = Mutex::new(());
+/// Holds every read and write of a side file in this process, the agent's
+/// included.
+pub(super) static UPDATE: Mutex<()> = Mutex::new(());
 
 /// What a chapter keeps beside its project.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
