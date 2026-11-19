@@ -372,6 +372,20 @@
       "undoFor": "{{check}} için sorunsuz işaretini kaldır",
       "undoOk": "Sorunsuz işaretini kaldır"
     },
+    "redo": {
+      "keptHandFixed_one": "Elle düzeltilen {{count}} kutu olduğu gibi bırakıldı.",
+      "keptHandFixed_other": "Elle düzeltilen {{count}} kutu olduğu gibi bırakıldı.",
+      "keptLocked_one": "Kilitli {{count}} kutu olduğu gibi bırakıldı.",
+      "keptLocked_other": "Kilitli {{count}} kutu olduğu gibi bırakıldı.",
+      "nothing": "Çalıştırılacak bir şey yok",
+      "overwrite": "Üzerine yaz ve çalıştır",
+      "recognize_one": "Seçili kutulardan {{count}} tanesinin kaynak metnini elle düzelttiniz. Yeniden okunup bu metin değiştirilsin mi? Çeviriler korunur.",
+      "recognize_other": "Seçili kutulardan {{count}} tanesinin kaynak metnini elle düzelttiniz. Yeniden okunup bu metin değiştirilsin mi? Çeviriler korunur.",
+      "skip": "Bunları atla",
+      "title": "Elle düzenlenen metnin üzerine yazılsın mı?",
+      "translate_one": "Seçili kutulardan {{count}} tanesinin çevirisini elle yazdınız ya da düzelttiniz. Yeniden çevrilip bu çeviri değiştirilsin mi?",
+      "translate_other": "Seçili kutulardan {{count}} tanesinin çevirisini elle yazdınız ya da düzelttiniz. Yeniden çevrilip bu çeviri değiştirilsin mi?"
+    },
     "runs": {
       "alreadyDone": "Bu sayfalar zaten tamamlandı.",
       "behavior": {

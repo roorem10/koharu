@@ -372,6 +372,20 @@
       "undoFor": "復原{{check}}的 OK 標記",
       "undoOk": "復原 OK 標記"
     },
+    "redo": {
+      "keptHandFixed_one": "{{count}} 個手動修改過的文字框保持不變。",
+      "keptHandFixed_other": "{{count}} 個手動修改過的文字框保持不變。",
+      "keptLocked_one": "{{count}} 個已鎖定的文字框保持不變。",
+      "keptLocked_other": "{{count}} 個已鎖定的文字框保持不變。",
+      "nothing": "沒有可執行的內容",
+      "overwrite": "覆寫並執行",
+      "recognize_one": "所選文字框中有 {{count}} 個的原文是你手動更正的。要重新辨識並取代這些原文嗎？譯文將保留。",
+      "recognize_other": "所選文字框中有 {{count}} 個的原文是你手動更正的。要重新辨識並取代這些原文嗎？譯文將保留。",
+      "skip": "略過這些",
+      "title": "覆寫手動編輯的文字？",
+      "translate_one": "所選文字框中有 {{count}} 個的譯文是你手動撰寫或修改的。要重新翻譯並取代這些譯文嗎？",
+      "translate_other": "所選文字框中有 {{count}} 個的譯文是你手動撰寫或修改的。要重新翻譯並取代這些譯文嗎？"
+    },
     "runs": {
       "alreadyDone": "這些頁面已經處理完畢。",
       "behavior": {

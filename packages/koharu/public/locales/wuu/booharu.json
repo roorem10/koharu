@@ -372,6 +372,20 @@
       "undoFor": "撤销 {{check}} 个“无问题”标记",
       "undoOk": "撤销“无问题”标记"
     },
+    "redo": {
+      "keptHandFixed_one": "手动改过个 {{count}} 只文字框保持勿变。",
+      "keptHandFixed_other": "手动改过个 {{count}} 只文字框保持勿变。",
+      "keptLocked_one": "锁牢个 {{count}} 只文字框保持勿变。",
+      "keptLocked_other": "锁牢个 {{count}} 只文字框保持勿变。",
+      "nothing": "呒没啥好运行个",
+      "overwrite": "覆盖并运行",
+      "recognize_one": "拣中个文字框里向，有 {{count}} 只个原文是侬手动改过个。要重新识别、覆盖箇眼原文？译文会保留。",
+      "recognize_other": "拣中个文字框里向，有 {{count}} 只个原文是侬手动改过个。要重新识别、覆盖箇眼原文？译文会保留。",
+      "skip": "跳过箇眼",
+      "title": "要覆盖手动改过个文本？",
+      "translate_one": "拣中个文字框里向，有 {{count}} 只个译文是侬手动写个或者改过个。要重新翻译、覆盖箇眼译文？",
+      "translate_other": "拣中个文字框里向，有 {{count}} 只个译文是侬手动写个或者改过个。要重新翻译、覆盖箇眼译文？"
+    },
     "runs": {
       "alreadyDone": "箇眼页面已经处理好哉。",
       "behavior": {

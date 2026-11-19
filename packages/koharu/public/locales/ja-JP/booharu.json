@@ -372,6 +372,20 @@
       "undoFor": "{{check}}のOKを取り消す",
       "undoOk": "OKを取り消す"
     },
+    "redo": {
+      "keptHandFixed_one": "手動で修正した{{count}}個のボックスはそのままです。",
+      "keptHandFixed_other": "手動で修正した{{count}}個のボックスはそのままです。",
+      "keptLocked_one": "ロック中の{{count}}個のボックスはそのままです。",
+      "keptLocked_other": "ロック中の{{count}}個のボックスはそのままです。",
+      "nothing": "実行するものがありません",
+      "overwrite": "上書きして実行",
+      "recognize_one": "選択したボックスのうち{{count}}個は、原文を手動で修正しています。読み取り直して置き換えますか？翻訳は保持されます。",
+      "recognize_other": "選択したボックスのうち{{count}}個は、原文を手動で修正しています。読み取り直して置き換えますか？翻訳は保持されます。",
+      "skip": "それらをスキップ",
+      "title": "手動で編集したテキストを上書きしますか？",
+      "translate_one": "選択したボックスのうち{{count}}個は、翻訳を手動で書いたか修正しています。翻訳し直して置き換えますか？",
+      "translate_other": "選択したボックスのうち{{count}}個は、翻訳を手動で書いたか修正しています。翻訳し直して置き換えますか？"
+    },
     "runs": {
       "alreadyDone": "これらのページは処理済みです。",
       "behavior": {

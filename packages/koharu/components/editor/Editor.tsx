@@ -1,5 +1,6 @@
 'use client'
 
+import { RedoDialog } from '@/components/booharu/boxes/RedoDialog' // Booharu: Redo boxes' confirmation.
 import { BoxDetailsDialog } from '@/components/booharu/details/BoxDetailsDialog' // Booharu: Box details.
 import { ColorSamplingProvider } from '@/components/controls/ColorSampling'
 import { ActivityCenter } from '@/components/editor/ActivityCenter'
@@ -28,6 +29,8 @@ export function Editor() {
         <ActivityCenter />
         {/* Booharu: one text's Box details, opened from Story and the Edit menu. */}
         <BoxDetailsDialog />
+        {/* Booharu: the confirmation before a box's Read or Translate replaces text fixed by hand. */}
+        <RedoDialog />
         <ResizablePanelGroup
           id='editor'
           orientation='horizontal'

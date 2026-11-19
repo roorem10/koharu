@@ -372,6 +372,20 @@
       "undoFor": "撤销{{check}}的 OK 标记",
       "undoOk": "撤销 OK 标记"
     },
+    "redo": {
+      "keptHandFixed_one": "{{count}} 个手动修改过的文本框保持不变。",
+      "keptHandFixed_other": "{{count}} 个手动修改过的文本框保持不变。",
+      "keptLocked_one": "{{count}} 个已锁定的文本框保持不变。",
+      "keptLocked_other": "{{count}} 个已锁定的文本框保持不变。",
+      "nothing": "没有可运行的内容",
+      "overwrite": "覆盖并运行",
+      "recognize_one": "所选文本框中有 {{count}} 个的原文是你手动更正的。要重新识别并替换这些原文吗？译文将保留。",
+      "recognize_other": "所选文本框中有 {{count}} 个的原文是你手动更正的。要重新识别并替换这些原文吗？译文将保留。",
+      "skip": "跳过这些",
+      "title": "覆盖手动编辑的文本？",
+      "translate_one": "所选文本框中有 {{count}} 个的译文是你手动编写或修改的。要重新翻译并替换这些译文吗？",
+      "translate_other": "所选文本框中有 {{count}} 个的译文是你手动编写或修改的。要重新翻译并替换这些译文吗？"
+    },
     "runs": {
       "alreadyDone": "这些页面已经处理完毕。",
       "behavior": {

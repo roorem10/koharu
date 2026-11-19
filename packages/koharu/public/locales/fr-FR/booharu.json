@@ -399,6 +399,24 @@
       "undoFor": "Retirer la marque OK pour {{check}}",
       "undoOk": "Retirer la marque OK"
     },
+    "redo": {
+      "keptHandFixed_many": "{{count}} zones corrigées à la main sont restées telles quelles.",
+      "keptHandFixed_one": "{{count}} zone corrigée à la main est restée telle quelle.",
+      "keptHandFixed_other": "{{count}} zones corrigées à la main sont restées telles quelles.",
+      "keptLocked_many": "{{count}} zones verrouillées sont restées telles quelles.",
+      "keptLocked_one": "{{count}} zone verrouillée est restée telle quelle.",
+      "keptLocked_other": "{{count}} zones verrouillées sont restées telles quelles.",
+      "nothing": "Rien à lancer",
+      "overwrite": "Remplacer et lancer",
+      "recognize_many": "{{count}} des zones sélectionnées ont un texte source que vous avez corrigé à la main. Les relire et remplacer ces textes ? Les traductions sont conservées.",
+      "recognize_one": "{{count}} des zones sélectionnées a un texte source que vous avez corrigé à la main. La relire et remplacer ce texte ? Sa traduction est conservée.",
+      "recognize_other": "{{count}} des zones sélectionnées ont un texte source que vous avez corrigé à la main. Les relire et remplacer ces textes ? Les traductions sont conservées.",
+      "skip": "Ignorer celles-ci",
+      "title": "Remplacer le texte modifié à la main ?",
+      "translate_many": "{{count}} des zones sélectionnées ont une traduction que vous avez écrite ou corrigée à la main. Les retraduire et remplacer ces traductions ?",
+      "translate_one": "{{count}} des zones sélectionnées a une traduction que vous avez écrite ou corrigée à la main. La retraduire et remplacer cette traduction ?",
+      "translate_other": "{{count}} des zones sélectionnées ont une traduction que vous avez écrite ou corrigée à la main. Les retraduire et remplacer ces traductions ?"
+    },
     "runs": {
       "alreadyDone": "Ces pages sont déjà terminées.",
       "behavior": {

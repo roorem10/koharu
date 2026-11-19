@@ -399,6 +399,24 @@
       "undoFor": "Desmarcar OK en {{check}}",
       "undoOk": "Desmarcar OK"
     },
+    "redo": {
+      "keptHandFixed_many": "{{count}} cuadros corregidos a mano se quedaron como estaban.",
+      "keptHandFixed_one": "{{count}} cuadro corregido a mano se quedó como estaba.",
+      "keptHandFixed_other": "{{count}} cuadros corregidos a mano se quedaron como estaban.",
+      "keptLocked_many": "{{count}} cuadros bloqueados se quedaron como estaban.",
+      "keptLocked_one": "{{count}} cuadro bloqueado se quedó como estaba.",
+      "keptLocked_other": "{{count}} cuadros bloqueados se quedaron como estaban.",
+      "nothing": "No hay nada que ejecutar",
+      "overwrite": "Sobrescribir y ejecutar",
+      "recognize_many": "{{count}} de los cuadros seleccionados tienen un texto original que corregiste a mano. ¿Volver a leerlos y reemplazar esos textos? Se conservan las traducciones.",
+      "recognize_one": "{{count}} de los cuadros seleccionados tiene un texto original que corregiste a mano. ¿Volver a leerlo y reemplazar ese texto? Se conserva su traducción.",
+      "recognize_other": "{{count}} de los cuadros seleccionados tienen un texto original que corregiste a mano. ¿Volver a leerlos y reemplazar esos textos? Se conservan las traducciones.",
+      "skip": "Omitir esos",
+      "title": "¿Sobrescribir el texto editado a mano?",
+      "translate_many": "{{count}} de los cuadros seleccionados tienen una traducción que escribiste o corregiste a mano. ¿Volver a traducirlos y reemplazarlas?",
+      "translate_one": "{{count}} de los cuadros seleccionados tiene una traducción que escribiste o corregiste a mano. ¿Volver a traducirlo y reemplazarla?",
+      "translate_other": "{{count}} de los cuadros seleccionados tienen una traducción que escribiste o corregiste a mano. ¿Volver a traducirlos y reemplazarlas?"
+    },
     "runs": {
       "alreadyDone": "Estas páginas ya están terminadas.",
       "behavior": {

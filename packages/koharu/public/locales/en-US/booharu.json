@@ -372,6 +372,20 @@
       "undoFor": "Undo OK for {{check}}",
       "undoOk": "Undo OK"
     },
+    "redo": {
+      "keptHandFixed_one": "{{count}} box fixed by hand was left as it is.",
+      "keptHandFixed_other": "{{count}} boxes fixed by hand were left as they are.",
+      "keptLocked_one": "{{count}} locked box was left as it is.",
+      "keptLocked_other": "{{count}} locked boxes were left as they are.",
+      "nothing": "Nothing to run",
+      "overwrite": "Overwrite and run",
+      "recognize_one": "{{count}} of the selected boxes has a source you corrected by hand. Read it again and replace it? Its translation is kept.",
+      "recognize_other": "{{count}} of the selected boxes have a source you corrected by hand. Read them again and replace it? Translations are kept.",
+      "skip": "Skip those",
+      "title": "Overwrite hand-edited text?",
+      "translate_one": "{{count}} of the selected boxes has a translation you wrote or fixed by hand. Translate it again and replace it?",
+      "translate_other": "{{count}} of the selected boxes have a translation you wrote or fixed by hand. Translate them again and replace it?"
+    },
     "runs": {
       "alreadyDone": "These pages are already done.",
       "behavior": {

@@ -399,6 +399,24 @@
       "undoFor": "Desfazer OK de {{check}}",
       "undoOk": "Desfazer OK"
     },
+    "redo": {
+      "keptHandFixed_many": "{{count}} caixas corrigidas à mão ficaram como estavam.",
+      "keptHandFixed_one": "{{count}} caixa corrigida à mão ficou como estava.",
+      "keptHandFixed_other": "{{count}} caixas corrigidas à mão ficaram como estavam.",
+      "keptLocked_many": "{{count}} caixas bloqueadas ficaram como estavam.",
+      "keptLocked_one": "{{count}} caixa bloqueada ficou como estava.",
+      "keptLocked_other": "{{count}} caixas bloqueadas ficaram como estavam.",
+      "nothing": "Nada para executar",
+      "overwrite": "Substituir e executar",
+      "recognize_many": "{{count}} das caixas selecionadas têm um texto original que você corrigiu à mão. Ler de novo e substituir esses textos? As traduções são mantidas.",
+      "recognize_one": "{{count}} das caixas selecionadas tem um texto original que você corrigiu à mão. Ler de novo e substituir esse texto? A tradução é mantida.",
+      "recognize_other": "{{count}} das caixas selecionadas têm um texto original que você corrigiu à mão. Ler de novo e substituir esses textos? As traduções são mantidas.",
+      "skip": "Pular essas",
+      "title": "Substituir texto editado à mão?",
+      "translate_many": "{{count}} das caixas selecionadas têm uma tradução que você escreveu ou corrigiu à mão. Traduzir de novo e substituir essas traduções?",
+      "translate_one": "{{count}} das caixas selecionadas tem uma tradução que você escreveu ou corrigiu à mão. Traduzir de novo e substituir essa tradução?",
+      "translate_other": "{{count}} das caixas selecionadas têm uma tradução que você escreveu ou corrigiu à mão. Traduzir de novo e substituir essas traduções?"
+    },
     "runs": {
       "alreadyDone": "Estas páginas já estão prontas.",
       "behavior": {
