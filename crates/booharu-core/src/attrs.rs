@@ -13,7 +13,8 @@
 //!   owner fails closed on a value it can't read.
 //! - The content keys, [`Lettering`], [`Auto`], [`QcOk`], and [`ReadNote`],
 //!   describe a block's text, so a join or split that rewrites a block drops
-//!   them.
+//!   them; a join keeps the joined block's hand-edit record, and a split its
+//!   halves' kept mark, as they keep the clean-up as it was.
 
 use anyhow::ensure;
 use koharu_scene::{Layer, LayerId, Op, Ref, Rgba, Role};

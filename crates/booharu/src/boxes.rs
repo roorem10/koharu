@@ -311,8 +311,10 @@ const HALF_SIZE: f64 = 4.0;
 /// the source's own coordinates, so a tilted source stays tilted; each mask
 /// and clean-up keeps only its pixels on its side of the cut. Both lose their
 /// source wording and their translation, for the Recognition and
-/// Translation stages to write again; [`split_halves`] finds both in the
-/// edit's change. A block whose halves would be under 4 pixels is refused.
+/// Translation stages to write again, and keep the clean-up shown or hidden
+/// as it was, a sound effect kept as art with its kept mark; [`split_halves`]
+/// finds both in the edit's change. A block whose halves would be under 4
+/// pixels is refused.
 pub fn split_block(session: &Session, block: LayerId) -> Result<Edit> {
     let project = session.project();
     let layer = project.layer(block)?;
@@ -401,8 +403,8 @@ pub fn split_block(session: &Session, block: LayerId) -> Result<Edit> {
             !first_side(point)
         })?);
     }
-    ops.extend(dropped(layer, &block.into(), true));
-    ops.extend(dropped(layer, &copy, true));
+    ops.extend(dropped(layer, &block.into(), true)?);
+    ops.extend(dropped(layer, &copy, true)?);
     Ok(Edit {
         label: SPLIT_BLOCK.to_owned(),
         ops,
@@ -670,7 +672,7 @@ fn join(
     }
     let others: Vec<&Block> = rest.iter().map(|(_, block)| *block).collect();
     ops.extend(merged(session, first, &others)?);
-    ops.extend(dropped(project.layer(*kept)?, &(*kept).into(), false));
+    ops.extend(dropped(project.layer(*kept)?, &(*kept).into(), false)?);
     ops.extend(carried(project, group)?);
     ops.extend(rest.iter().map(|(id, _)| Op::RemoveLayer {
         layer: (*id).into(),
@@ -846,10 +848,13 @@ fn kept_side(
 /// The ops dropping from `layer`, as `target`, the Booharu keys that
 /// describe a block's text, which a join or split rewrites, and with
 /// `record` its hand-edit record. A split drops it, as its halves are read
-/// and translated again, which records them anew; a join keeps it, so the
-/// joined block's style set by hand stays a hand edit, and its joined
-/// wording, which differs from what the record holds, counts as one too.
-fn dropped(layer: &Layer, target: &Ref, record: bool) -> Vec<Op> {
+/// and translated again, which records them anew, all but the kept mark:
+/// the halves keep the clean-up as it shows, so one Booharu hid to keep a
+/// sound effect's art is still told from one hidden by hand. A join keeps
+/// it, so the joined block's style set by hand stays a hand edit, and its
+/// joined wording, which differs from what the record holds, counts as one
+/// too.
+fn dropped(layer: &Layer, target: &Ref, record: bool) -> Result<Vec<Op>> {
     fn drop<A: Attr>(layer: &Layer, target: &Ref, ops: &mut Vec<Op>) {
         if layer
             .attributes
@@ -862,11 +867,20 @@ fn dropped(layer: &Layer, target: &Ref, record: bool) -> Vec<Op> {
     let mut ops = Vec::new();
     drop::<Lettering>(layer, target, &mut ops);
     if record {
-        drop::<Auto>(layer, target, &mut ops);
+        match Auto::of(layer).kept {
+            true => {
+                let kept = Auto {
+                    kept: true,
+                    ..Auto::default()
+                };
+                ops.push(attrs::set(target.clone(), &kept)?);
+            }
+            false => drop::<Auto>(layer, target, &mut ops),
+        }
     }
     drop::<QcOk>(layer, target, &mut ops);
     drop::<ReadNote>(layer, target, &mut ops);
-    ops
+    Ok(ops)
 }
 
 /// Refuses when `layer`, or a layer holding it, is locked.
@@ -2479,6 +2493,68 @@ mod tests {
         );
         page.update(block, json!({"locked": true}))?;
         assert_eq!(locked(split_block(&page.session, block)), Some(block));
+        Ok(())
+    }
+
+    #[test]
+    fn a_split_effect_kept_as_art_keeps_its_mark() -> Result<()> {
+        use booharu_core::{
+            protect::{self, Reason},
+            runs::RunStage,
+            settings::{LetteringSettings, SfxMode},
+            sfx, styles,
+        };
+        let mut page = Fixture::new(400, 400, &[rect(0.0, 0.0, 400.0, 400.0)])?;
+        let block = page.add(
+            None,
+            json!({"kind": "block", "role": "sfx", "source": {
+                "frame": {"box": {"bounds": page_bounds(100.0, 20.0, 40.0, 100.0)}},
+                "direction": "vertical",
+                "content": "ドドド",
+            }, "attributes": {"c2pa": {
+                "detection": {"action": "c2pa.created"},
+                "ocr": {"action": "c2pa.created"},
+                "inpainting": {"action": "c2pa.created"},
+            }}}),
+        )?;
+        // Kept as art: no translation, its clean-up hidden with the mark.
+        let kept = sfx::kept_original(page.session.project().layer(block)?);
+        assert!(!kept.is_empty());
+        page.session.apply(edit(kept))?;
+        let change = page.session.apply(split_block(&page.session, block)?)?;
+        let halves = split_halves(block, &change)?;
+        // The split's own run reads each half, which keeps the mark.
+        for (&id, words) in halves.iter().zip(["ドド", "ド"]) {
+            page.update(id, json!({"source": {"content": words}}))?;
+            let read = styles::recognized(page.session.project().layer(id)?, words)?;
+            page.session.apply(edit(vec![read]))?;
+        }
+
+        let skip = LetteringSettings::default();
+        let all = LetteringSettings {
+            sfx: SfxMode::TranslateAll,
+            ..LetteringSettings::default()
+        };
+        let project = page.session.project();
+        let on = project.page(page.page)?;
+        for &id in &halves {
+            let layer = project.layer(id)?;
+            assert!(Auto::of(layer).kept);
+            assert!(!page.block(id)?.cleanup.visible);
+            // Left as art while the mode keeps it, and translated once it
+            // doesn't, never taken for a clean-up hidden by hand.
+            let translating = |settings| {
+                protect::left_out(on, layer, RunStage::Translate, settings, false, false)
+            };
+            assert_eq!(translating(&skip), Some(Reason::SoundEffect));
+            assert_eq!(translating(&all), None);
+        }
+        // The planner reads it the same way.
+        assert!(crate::runs::to_translate(&page.session, &[page.page], &skip)?.is_empty());
+        assert_eq!(
+            crate::runs::to_translate(&page.session, &[page.page], &all)?,
+            [page.page]
+        );
         Ok(())
     }
 
