@@ -20,10 +20,13 @@
 //!   so a lock never fails the step (D7).
 //! - A category picked through [`set_category`] is also Koharu's role for
 //!   the block (D4): Sound Effect makes it a sound effect and any other
-//!   category text, so Koharu places and outlines it so at its next
-//!   translation, and the skip rule reads it. The label records the role it
-//!   had before the first such pick changed it, which Automatic gives back
-//!   as it clears the label. Read chapter's labels never change the role.
+//!   category text, which the skip rule reads at once. Koharu frames and
+//!   outlines a block by its role only at its next translation, a known
+//!   limit: Reset to lettering default (`styles::reset_lettering`) brings
+//!   the outline of the new role at once. The label records the role the
+//!   block had before the first such pick changed it, which Automatic gives
+//!   back as it clears the label. Read chapter's labels never change the
+//!   role.
 //! - A block with no translation that the new label and role make a sound
 //!   effect kept as art (`sfx::skipped_as`) gets its clean-up hidden with
 //!   the kept mark in the same step; one kept as art that no longer is

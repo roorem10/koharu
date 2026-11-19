@@ -22,14 +22,23 @@
 //! keys Apply wrote take their new values and the others keep theirs, so a
 //! hand edit Apply left stays one, and the record's origin says who applied
 //! the look.
+//!
+//! Reset to lettering default ([`reset_lettering`]) gives chosen boxes and
+//! text layers their lettering default back, worked out from the scene
+//! ([`booharu_core::resolver`]): every look key, hand-set or not, and every
+//! word mark, as one undo step, leaving the words, size, frame and
+//! alignment. It is how a box whose role a picked category changed gets
+//! the outline of its new role at once, rather than at its next
+//! translation.
 
 use std::collections::BTreeSet;
 
 use anyhow::{Result, ensure};
 use booharu_core::{
-    attrs::{self, Auto, Origin},
+    attrs::{self, Auto, AutoStyle, Origin},
     edited,
     lettering::{self, LetteringCategory},
+    resolver,
     settings::LetteringSettings,
     styles,
 };
@@ -142,6 +151,118 @@ pub fn apply(
         ops,
     });
     Ok((edit, plan.counts))
+}
+
+/// Reset to lettering default's undo step label, which the History panel
+/// translates.
+pub const RESET_LABEL: &str = "booharu_reset_lettering";
+
+/// How many layers Reset to lettering default changed, left alone as
+/// locked, and found untranslated. A layer that has its default already
+/// counts in none.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
+pub struct ResetCounts {
+    /// Layers given their lettering default.
+    pub changed: u32,
+    /// Layers left as they are because they, or a layer holding them, are
+    /// locked.
+    pub locked: u32,
+    /// Blocks without a translation, which have no lettering to reset.
+    pub untranslated: u32,
+}
+
+/// The edit giving each of `layers` in `project` its lettering default
+/// ([`resolver::lettering_default`]) under `settings` and `font`, the first
+/// Preferred font, as one undo step labelled [`RESET_LABEL`], with its
+/// numbers; none when nothing changes.
+///
+/// For each unlocked layer that has a default, only the ops it needs: its
+/// text's [`resolver::LOOK`] keys and border method, every one written, null
+/// where the default sets none; its words as one unmarked span when a span
+/// has marks; and for a block its hand-edit record, automatic, with the new
+/// look as its style and its other fields as they were, so a translation
+/// typed by hand stays one. Never the words, the language, the size, the
+/// frame, the transform, the direction, the alignment, the line height, the
+/// clean-up, the source, the role, or any other attribute. A locked block
+/// or text layer, or one inside a locked layer, is counted and left, and an
+/// untranslated block counted; any other layer is left uncounted. A layer
+/// named twice counts once, and a layer not in `project` fails.
+pub fn reset_lettering(
+    project: &Project,
+    layers: &[LayerId],
+    settings: &LetteringSettings,
+    font: Option<&str>,
+) -> Result<(Option<Edit>, ResetCounts)> {
+    let mut counts = ResetCounts::default();
+    let mut ops = Vec::new();
+    let mut seen = BTreeSet::new();
+    for &id in layers {
+        if !seen.insert(id) {
+            continue;
+        }
+        let layer = project.layer(id)?;
+        let (text, block) = match &layer.content {
+            Content::Block(block) => (block.translation.as_ref(), true),
+            Content::Text(text) => (Some(&**text), false),
+            _ => continue,
+        };
+        if locked(project, layer)? {
+            counts.locked += 1;
+            continue;
+        }
+        let Some(text) = text else {
+            counts.untranslated += 1;
+            continue;
+        };
+        let Some(look) = resolver::lettering_default(project, id, settings, font)? else {
+            continue;
+        };
+        let at = ops.len();
+        let style = &text.style;
+        if AutoStyle::of(&style.chars) != AutoStyle::of(&look.chars)
+            || style.stroke_method != look.stroke_method
+        {
+            let patch = resolver::reset_patch(&look);
+            ops.push(Op::UpdateLayer {
+                layer: id.into(),
+                patch: if block {
+                    json!({"translation": {"style": patch}})
+                } else {
+                    json!({"style": patch})
+                },
+            });
+        }
+        if text
+            .content
+            .0
+            .iter()
+            .any(|span| span.attributes != CharStyle::default())
+        {
+            ops.push(Op::SetRichText {
+                layer: id.into(),
+                spans: vec![Span {
+                    insert: text.content.text(),
+                    attributes: CharStyle::default(),
+                }],
+            });
+        }
+        if block {
+            let record = Auto {
+                origin: Origin::Automatic,
+                style: Some(AutoStyle::of(&look.chars)),
+                ..Auto::of(layer)
+            };
+            if attrs::get::<Auto>(layer).as_ref() != Some(&record) {
+                ops.push(attrs::set(id, &record)?);
+            }
+        }
+        counts.changed += u32::from(ops.len() > at);
+    }
+    let edit = (!ops.is_empty()).then(|| Edit {
+        label: RESET_LABEL.to_owned(),
+        ops,
+    });
+    Ok((edit, counts))
 }
 
 /// What Apply does to a scope.
@@ -453,6 +574,20 @@ mod tests {
                 layer: block.into(),
                 patch: json!({"translation": {"style": {"chars": chars}}}),
             }])
+        }
+
+        /// Resets the lettering of `names` under `settings` with the default
+        /// font [`OLD`], the project's, and answers what it did.
+        fn reset(&mut self, names: &[&str], settings: &LetteringSettings) -> Result<ResetCounts> {
+            let layers: Vec<LayerId> = names.iter().map(|name| self.id(name)).collect();
+            let (edit, counts) =
+                reset_lettering(&self.session.project(), &layers, settings, Some(OLD))?;
+            assert_eq!(edit.is_some(), counts.changed > 0);
+            if let Some(edit) = edit {
+                assert_eq!(edit.label, RESET_LABEL);
+                self.session.apply(edit)?;
+            }
+            Ok(counts)
         }
 
         fn apply(
@@ -922,6 +1057,201 @@ mod tests {
             Origin::Agent,
         )?;
         assert_eq!(font(&fixture, "b")?, (Some(NEW.to_owned()), None, None));
+        Ok(())
+    }
+
+    #[test]
+    fn reset_gives_a_box_its_first_look_back_in_one_undo_step() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = look(true, None);
+        fixture.translate(&["a", "b"], &settings)?;
+        let first = fixture.translation("a")?;
+        let a = fixture.id("a");
+        // By hand: another font, colours, a second border, the method, a
+        // word mark and other words, then a frame, an alignment and a line
+        // height of its own.
+        fixture.restyle(
+            "a",
+            json!({
+                "family": "Comic Sans", "weight": 700, "italic": true,
+                "fill": RED, "stroke": YELLOW, "stroke_width": 5.0,
+                "outer_stroke": BLACK, "outer_stroke_width": 2.0,
+            }),
+        )?;
+        let frame = json!({"box": {"bounds": {"x": 5.0, "y": 5.0, "width": 80.0, "height": 60.0}}});
+        fixture.edit(vec![
+            Op::SetRichText {
+                layer: a.into(),
+                spans: vec![
+                    Span {
+                        insert: "Why".to_owned(),
+                        attributes: CharStyle {
+                            fill: Some(YELLOW),
+                            ..CharStyle::default()
+                        },
+                    },
+                    Span {
+                        insert: " not?".to_owned(),
+                        attributes: CharStyle::default(),
+                    },
+                ],
+            },
+            Op::UpdateLayer {
+                layer: a.into(),
+                patch: json!({"translation": {
+                    "style": {"stroke_method": "expansion", "align": "end", "line_height": 1.5},
+                    "frame": frame,
+                }}),
+            },
+        ])?;
+        let hand = fixture.translation("a")?;
+        assert_eq!(
+            edited(&fixture.layer("a")?),
+            Edited {
+                text: true,
+                style: true,
+                ..Edited::default()
+            }
+        );
+        let before = fixture.session.project();
+        let steps = fixture.session.history().steps.len();
+
+        let counts = fixture.reset(&["a", "a"], &settings)?;
+        assert_eq!(
+            counts,
+            ResetCounts {
+                changed: 1,
+                ..ResetCounts::default()
+            }
+        );
+        assert_eq!(fixture.session.history().steps.len(), steps + 1);
+        assert_eq!(
+            fixture.session.history().steps.last().map(String::as_str),
+            Some(RESET_LABEL)
+        );
+        let reset = fixture.translation("a")?;
+        // The first look, every mark gone, the border drawn Koharu's way.
+        assert_eq!(
+            AutoStyle::of(&reset.style.chars),
+            AutoStyle::of(&first.style.chars)
+        );
+        assert_eq!(reset.style.stroke_method, None);
+        assert_eq!(
+            reset.content.0,
+            vec![Span {
+                insert: "Why not?".to_owned(),
+                attributes: CharStyle::default(),
+            }]
+        );
+        // The words, size, frame, alignment and line height stay.
+        assert_eq!(reset.style.chars.size, hand.style.chars.size);
+        assert_eq!(reset.frame, hand.frame);
+        assert_eq!(reset.style.align, hand.style.align);
+        assert_eq!(reset.style.line_height, Some(1.5));
+        assert_eq!(reset.language, hand.language);
+        assert_eq!(reset.direction, hand.direction);
+        // Booharu's look again; the words typed by hand stay a hand edit.
+        assert_eq!(
+            edited(&fixture.layer("a")?),
+            Edited {
+                text: true,
+                ..Edited::default()
+            }
+        );
+
+        // A second press changes nothing and adds no undo step.
+        assert_eq!(fixture.reset(&["a"], &settings)?, ResetCounts::default());
+        assert_eq!(fixture.session.history().steps.len(), steps + 1);
+        fixture.session.undo()?;
+        assert!(fixture.session.project() == before);
+        Ok(())
+    }
+
+    #[test]
+    fn reset_keeps_a_new_size_and_outlines_at_it() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = look(true, None);
+        fixture.translate(&["b"], &settings)?;
+        fixture.restyle("b", json!({"size": 24.0, "stroke_width": 9.0}))?;
+        fixture.reset(&["b"], &settings)?;
+        let chars = fixture.translation("b")?.style.chars;
+        // The source's outline, 3 at size 32, scaled to the size kept.
+        assert_eq!(
+            (chars.size, chars.stroke, chars.stroke_width),
+            (Some(24.0), Some(WHITE), Some(2.25))
+        );
+        assert!(!edited(&fixture.layer("b")?).style);
+        Ok(())
+    }
+
+    #[test]
+    fn reset_counts_locked_and_untranslated_layers_and_letters_a_text_layer() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = look(false, Some(BLACK));
+        fixture.translate(&["a", "d"], &settings)?;
+        let p1 = fixture.page("p1");
+        let change = fixture.session.apply(Edit {
+            label: "test".to_owned(),
+            ops: [
+                json!({"op": "add_layer", "id": "$t", "page": p1, "index": 4, "layer": {
+                    "kind": "text",
+                    "content": [{"insert": "Hi", "attributes": {"italic": true}}, {"insert": "!"}],
+                    "style": {"chars": {"family": "Papyrus", "size": 20.0, "fill": RED}},
+                    "frame": {"box": {"bounds": {"x": 200.0, "y": 200.0, "width": 80.0, "height": 40.0}}},
+                }}),
+                json!({"op": "add_layer", "id": "$h", "page": p1, "index": 5, "layer": {"kind": "group"}}),
+            ]
+            .into_iter()
+            .map(serde_json::from_value)
+            .collect::<Result<_, _>>()?,
+        })?;
+        for created in change.created {
+            if let Created::Layer {
+                id,
+                label: Some(label),
+            } = created
+            {
+                fixture.layers.insert(label, id);
+            }
+        }
+        let g = fixture.id("g");
+        fixture.edit(vec![Op::UpdateLayer {
+            layer: g.into(),
+            patch: json!({"locked": true}),
+        }])?;
+        let d = fixture.layer("d")?;
+
+        // d is in the locked group g, c has no translation, and the group h
+        // has no lettering.
+        let counts = fixture.reset(&["c", "d", "h", "t"], &settings)?;
+        assert_eq!(
+            counts,
+            ResetCounts {
+                changed: 1,
+                locked: 1,
+                untranslated: 1,
+            }
+        );
+        assert!(fixture.layer("d")? == d);
+        // The text layer gets the default look at its own size, unmarked,
+        // and no record.
+        let t = fixture.layer("t")?;
+        let Content::Text(text) = &t.content else {
+            anyhow::bail!("t isn't a text layer");
+        };
+        assert_eq!(
+            AutoStyle::of(&text.style.chars),
+            AutoStyle::of(&styles::default_chars(&settings, Some(OLD)))
+        );
+        assert_eq!(text.style.chars.size, Some(20.0));
+        assert_eq!(text.content.text(), "Hi!");
+        assert!(
+            text.content
+                .0
+                .iter()
+                .all(|span| span.attributes == CharStyle::default())
+        );
+        assert_eq!(attrs::get::<Auto>(&t), None);
         Ok(())
     }
 }
