@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import { OcrBoxPreferences } from '@/components/booharu/boxes/OcrBoxPreferences' // Booharu: the O tool.
 import { GlossaryRow } from '@/components/booharu/context/GlossaryRow' // Booharu: the glossary editor.
+import { ReadingPreferences } from '@/components/booharu/context/ReadingPreferences' // Booharu: Read chapter.
 import { ColourDetectionSwitch } from '@/components/booharu/pipeline/ColourDetectionSwitch' // Booharu: colour detection.
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { detectors, inpainters, recognizers, vendorName } from '@/components/preferences/models'
@@ -154,6 +155,8 @@ export function PipelinePreferences({
         {/* Booharu: the Glossary row, which opens the series glossary every translation follows. */}
         <GlossaryRow />
       </Stage>
+      {/* Booharu: Read chapter's model, whether it asks, and its pages per request, saved at once. */}
+      <ReadingPreferences />
       {/* Booharu: the O tool's default mode, saved to its own section at once. */}
       <OcrBoxPreferences />
     </PreferencePage>
