@@ -446,6 +446,19 @@
         "translate_all": "全部翻译"
       },
       "note": "Koharu 会拿寻着个每只音效侪标出来。要照样翻译某只文字框，就帮伊拣别个排版类别，或者从伊个菜单里加字幕。",
+      "subtitle": {
+        "description": "从文字框个菜单里，帮保留原图个音效旁边加一行短短个译文。大小照页面短边个比例来设。",
+        "fillLabel": "音效字幕文本颜色",
+        "fontLabel": "音效字幕字体",
+        "larger": "拿音效字幕调大点",
+        "outlineHint": "描边个阔度是大小个九分之一。",
+        "outlineLabel": "音效字幕描边颜色",
+        "size": "大小",
+        "sizeHint": "宽 1,200 px 个页面浪，1.5% 就是 18 px。",
+        "sizeLabel": "音效字幕大小",
+        "smaller": "拿音效字幕调小点",
+        "title": "音效字幕"
+      },
       "title": "音效"
     },
     "start": {

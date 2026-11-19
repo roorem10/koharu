@@ -473,6 +473,19 @@
         "translate_all": "Traducir todo"
       },
       "note": "Koharu marca cada efecto de sonido que encuentra. Para traducir un cuadro de todos modos, elige otra categoría para él o añade un subtítulo desde su menú.",
+      "subtitle": {
+        "description": "La breve traducción que se añade junto a un efecto de sonido conservado como dibujo, desde el menú del cuadro. Su tamaño es una proporción del lado más corto de la página.",
+        "fillLabel": "Color del texto de los subtítulos de efectos de sonido",
+        "fontLabel": "Fuente de los subtítulos de efectos de sonido",
+        "larger": "Aumentar tamaño de los subtítulos de efectos de sonido",
+        "outlineHint": "Su ancho es la novena parte del tamaño.",
+        "outlineLabel": "Color del contorno de los subtítulos de efectos de sonido",
+        "size": "Tamaño",
+        "sizeHint": "En una página de 1200 px de ancho, el 1,5 % son 18 px.",
+        "sizeLabel": "Tamaño de los subtítulos de efectos de sonido",
+        "smaller": "Reducir tamaño de los subtítulos de efectos de sonido",
+        "title": "Subtítulos de efectos de sonido"
+      },
       "title": "Efectos de sonido"
     },
     "start": {

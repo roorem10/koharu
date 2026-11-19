@@ -473,6 +473,19 @@
         "translate_all": "Tout traduire"
       },
       "note": "Koharu marque chaque effet sonore qu’il trouve. Pour traduire quand même une zone de texte, choisissez-lui une autre catégorie, ou ajoutez un sous-titre depuis son menu.",
+      "subtitle": {
+        "description": "La courte traduction ajoutée à côté d’un effet sonore gardé comme dessin, depuis le menu de la zone. Sa taille est une part du petit côté de la page.",
+        "fillLabel": "Couleur du texte des sous-titres des effets sonores",
+        "fontLabel": "Police des sous-titres des effets sonores",
+        "larger": "Augmenter la taille des sous-titres des effets sonores",
+        "outlineHint": "L’épaisseur du contour vaut un neuvième de la taille.",
+        "outlineLabel": "Couleur du contour des sous-titres des effets sonores",
+        "size": "Taille",
+        "sizeHint": "Sur une page de 1 200 px de large, 1,5 % correspond à 18 px.",
+        "sizeLabel": "Taille des sous-titres des effets sonores",
+        "smaller": "Réduire la taille des sous-titres des effets sonores",
+        "title": "Sous-titres des effets sonores"
+      },
       "title": "Effets sonores"
     },
     "start": {

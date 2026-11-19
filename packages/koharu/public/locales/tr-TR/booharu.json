@@ -446,6 +446,19 @@
         "translate_all": "Tümünü çevir"
       },
       "note": "Koharu bulduğu her ses efektini işaretler. Bir kutuyu yine de çevirmek için ona başka bir kategori seçin ya da menüsünden altyazı ekleyin.",
+      "subtitle": {
+        "description": "Çizim olarak bırakılan bir ses efektinin yanına kutunun menüsünden eklenen kısa çeviri. Boyutu, sayfanın kısa kenarına oranla belirlenir.",
+        "fillLabel": "Ses efekti altyazısı metin rengi",
+        "fontLabel": "Ses efekti altyazısı yazı tipi",
+        "larger": "Ses efekti altyazısı boyutunu artır",
+        "outlineHint": "Kenarlık genişliği, boyutun dokuzda biridir.",
+        "outlineLabel": "Ses efekti altyazısı kenarlık rengi",
+        "size": "Boyut",
+        "sizeHint": "1.200 px genişliğinde bir sayfada %1,5, 18 px eder.",
+        "sizeLabel": "Ses efekti altyazısı boyutu",
+        "smaller": "Ses efekti altyazısı boyutunu azalt",
+        "title": "Ses efekti altyazıları"
+      },
       "title": "Ses efektleri"
     },
     "start": {

@@ -446,6 +446,19 @@
         "translate_all": "Translate all"
       },
       "note": "Koharu marks every sound effect it finds. Pick another category for a box to translate it anyway, or add a subtitle from its menu.",
+      "subtitle": {
+        "description": "The small translation added beside a sound effect kept as art, from the box's menu. Its size is a share of the page's shorter side.",
+        "fillLabel": "Sound effect subtitle text color",
+        "fontLabel": "Sound effect subtitle font",
+        "larger": "Increase sound effect subtitle size",
+        "outlineHint": "Its width is a ninth of the size.",
+        "outlineLabel": "Sound effect subtitle outline color",
+        "size": "Size",
+        "sizeHint": "On a page 1,200 px wide, 1.5% is 18 px.",
+        "sizeLabel": "Sound effect subtitle size",
+        "smaller": "Decrease sound effect subtitle size",
+        "title": "Sound effect subtitles"
+      },
       "title": "Sound effects"
     },
     "start": {

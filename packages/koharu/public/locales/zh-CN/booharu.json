@@ -446,6 +446,19 @@
         "translate_all": "全部翻译"
       },
       "note": "Koharu 会标记它找到的每个音效。若仍要翻译某个文本框，请为它选择其他排字类别，或从它的菜单添加字幕。",
+      "subtitle": {
+        "description": "可从文本框的菜单，在保留为原图的音效旁添加一行简短译文。字号按页面短边的比例设置。",
+        "fillLabel": "音效字幕文本颜色",
+        "fontLabel": "音效字幕字体",
+        "larger": "增大音效字幕字号",
+        "outlineHint": "描边宽度为字号的九分之一。",
+        "outlineLabel": "音效字幕描边颜色",
+        "size": "字号",
+        "sizeHint": "在宽 1,200 px 的页面上，1.5% 为 18 px。",
+        "sizeLabel": "音效字幕字号",
+        "smaller": "减小音效字幕字号",
+        "title": "音效字幕"
+      },
       "title": "音效"
     },
     "start": {

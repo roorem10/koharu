@@ -473,6 +473,19 @@
         "translate_all": "Traduzir todos"
       },
       "note": "O Koharu marca cada efeito sonoro que encontra. Para traduzir uma caixa mesmo assim, escolha outra categoria para ela ou adicione uma legenda pelo menu dela.",
+      "subtitle": {
+        "description": "A breve tradução adicionada ao lado de um efeito sonoro mantido como arte, pelo menu da caixa. O tamanho é uma fração do lado menor da página.",
+        "fillLabel": "Cor do texto das legendas de efeitos sonoros",
+        "fontLabel": "Fonte das legendas de efeitos sonoros",
+        "larger": "Aumentar tamanho das legendas de efeitos sonoros",
+        "outlineHint": "A largura do contorno é um nono do tamanho.",
+        "outlineLabel": "Cor do contorno das legendas de efeitos sonoros",
+        "size": "Tamanho",
+        "sizeHint": "Em uma página com 1.200 px de largura, 1,5% equivale a 18 px.",
+        "sizeLabel": "Tamanho das legendas de efeitos sonoros",
+        "smaller": "Diminuir tamanho das legendas de efeitos sonoros",
+        "title": "Legendas de efeitos sonoros"
+      },
       "title": "Efeitos sonoros"
     },
     "start": {
