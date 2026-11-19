@@ -151,10 +151,12 @@ pub(crate) async fn read_chapter(
         runs::group_going().is_none_or(|going| Some(going) == request.group),
         "Read chapter can't start while a Run press is going; wait for it to end, or stop it."
     );
+    // From here on, a Stop of any kind ends the read.
+    let stops = Stops::new(job.cancel().clone(), app.pipeline.clone());
     let telling = Arc::new(Telling::new(&app, &job, request.group));
     telling.tell(|_| {});
     let ending = Ending(Arc::clone(&telling), false);
-    let outcome = reading(&app, session, request, &job, &telling).await;
+    let outcome = reading(&app, session, request, stops, &telling).await;
     if let Ok(ReadOutcome::Done(_)) = &outcome {
         app.emit(CONTEXT_CHANGED, ());
     }
@@ -167,7 +169,7 @@ async fn reading(
     app: &Arc<App>,
     session: Arc<Mutex<Session>>,
     request: ReadRequest,
-    job: &Job,
+    stops: Stops,
     telling: &Arc<Telling>,
 ) -> anyhow::Result<ReadOutcome> {
     let run_step = request.group.is_some();
@@ -205,7 +207,6 @@ async fn reading(
         Ok(reference) => reference.to_owned(),
         Err(why) => return skip(format!("{why:#}")),
     };
-    let stops = Stops::new(job.cancel().clone(), app.pipeline.clone());
     if models::local(&reference) {
         // No run is going: the pipeline's models free their memory for it.
         app.pipeline.unload();

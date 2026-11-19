@@ -55,6 +55,8 @@ pub async fn booharu_explain_line(
 
 /// [`booharu_explain_line`]'s work.
 async fn explain_line(app: Arc<App>, layer: LayerId) -> anyhow::Result<ExplainAnswer> {
+    let job = jobs::start(JobKind::Explain)?;
+    let stops = Stops::new(job.cancel().clone(), app.pipeline.clone());
     let settings = settings()?;
     let agent = koharu_config::get::<AgentConfig>()?.model;
     let listed = koharu_llm::models().await;
@@ -88,8 +90,6 @@ async fn explain_line(app: Arc<App>, layer: LayerId) -> anyhow::Result<ExplainAn
         })
         .await??
     };
-    let job = jobs::start(JobKind::Explain)?;
-    let stops = Stops::new(job.cancel().clone(), app.pipeline.clone());
     if models::local(&reference) && !runs::run_going(&app.pipeline.told()) {
         // As Read chapter does: the pipeline's models free their memory.
         app.pipeline.unload();
