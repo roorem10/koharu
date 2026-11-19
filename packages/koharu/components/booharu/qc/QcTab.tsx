@@ -20,12 +20,12 @@ const filterNames = {
 } as const satisfies Record<QcFilter, string>
 
 /** The QC tab's name in the right pane, with its icon and its count of open findings on a badge in
- * Booharu's warning yellow, as Booharu 0.0.4 showed it. */
+ * Booharu's warning yellow, as Booharu 0.0.4 showed it. The name, two letters, never shrinks. */
 export function QcTabLabel({ count }: { count: number }) {
   const { t } = useTranslation()
   return (
     <>
-      <ListChecks /> <span className='truncate'>{t('booharu.qc.title')}</span>{' '}
+      <ListChecks /> <span className='shrink-0'>{t('booharu.qc.title')}</span>{' '}
       <span className='shrink-0 rounded-full bg-[var(--booharu-warning,#dba54a)] px-1.5 text-[9px] leading-4 font-semibold text-black tabular-nums'>
         {count}
       </span>

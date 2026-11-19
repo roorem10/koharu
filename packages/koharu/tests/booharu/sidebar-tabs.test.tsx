@@ -1,25 +1,30 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { iconsFit, measureTabRow, useSidebarTabsFit } from '@/lib/booharu/sidebarTabs'
+import { measureTabRow, tabsFit, type TabRow, useSidebarTabsFit } from '@/lib/booharu/sidebarTabs'
 
-/** The right pane's row of tabs as RightSidebar lays it out: 4 px of padding each side and between
- * tabs, and each tab 6 px of padding and a 1 px border each side, 4 px between its parts, and a
- * 16 px icon, the size the tabs' base class gives it, its style saying so while it's hidden too. */
-const listStyle = {
+/** How the row of tabs `element` is in, or is, fits now. */
+const fitOf = (element: Element) =>
+  (element.closest('[role="tablist"]') ?? element).getAttribute('data-booharu-tabs')
+
+/** The right pane's row of tabs as RightSidebar lays it out: 4 px of padding each side, and 4 px
+ * between tabs, 2 px while they're tight; each tab 6 px of padding, 4 px while tight, and a 1 px
+ * border each side, 4 px between its parts, and a 16 px icon, the size the tabs' base class gives
+ * it, its style saying so while it's hidden too. */
+const listStyle = (tight: boolean) => ({
   paddingLeft: '4px',
   paddingRight: '4px',
   borderLeftWidth: '0px',
   borderRightWidth: '0px',
-  columnGap: '4px',
-}
-const tabStyle = {
-  paddingLeft: '6px',
-  paddingRight: '6px',
+  columnGap: tight ? '2px' : '4px',
+})
+const tabStyle = (tight: boolean) => ({
+  paddingLeft: tight ? '4px' : '6px',
+  paddingRight: tight ? '4px' : '6px',
   borderLeftWidth: '1px',
   borderRightWidth: '1px',
   columnGap: '4px',
-}
+})
 const iconStyle = { width: '16px' }
 
 /** Gives each element's style as `style` says, the others' as jsdom does. */
@@ -36,17 +41,19 @@ const held = (element: Element) =>
 
 const box = (width: number) => ({ width }) as DOMRect
 
-/** A row `width` wide of tabs whose labels are `labels` wide whole, and cut to 10 px while the tabs
- * shrink, QC's with a badge `badge` wide. */
+/** A row `width` wide of tabs whose labels are `labels` wide whole, cut to 10 px while the tabs
+ * shrink and 1 px while they show their icons alone, QC's with a badge `badge` wide. */
 function tabRow(width: number, labels: number[], badge?: number): HTMLElement {
   const list = document.createElement('div')
+  list.setAttribute('role', 'tablist')
   list.getBoundingClientRect = () => box(width)
   labels.forEach((labelWidth, index) => {
     const tab = document.createElement('button')
     tab.setAttribute('role', 'tab')
     tab.append(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
     const label = document.createElement('span')
-    label.getBoundingClientRect = () => box(held(label) ? labelWidth : 10)
+    label.getBoundingClientRect = () =>
+      box(fitOf(label) === 'icons' ? 1 : held(label) ? labelWidth : 10)
     tab.append(label)
     if (badge !== undefined && index === labels.length - 1) {
       const count = document.createElement('span')
@@ -56,88 +63,152 @@ function tabRow(width: number, labels: number[], badge?: number): HTMLElement {
     list.append(tab)
   })
   styled((element) => {
-    if (element === list) return listStyle
-    if (element.getAttribute('role') === 'tab') return tabStyle
+    const tight = fitOf(element) === 'tight'
+    if (element === list) return listStyle(tight)
+    if (element.getAttribute('role') === 'tab') return tabStyle(tight)
     if (element instanceof SVGElement) return iconStyle
   })
   return list
 }
 
+/** A row of tabs `available` wide whose labels are `labels` wide whole, laid out as RightSidebar
+ * lays them out, the last QC's with its count at 12 on a 22.45 px badge. */
+function row(available: number, labels: number[]): TabRow {
+  return {
+    available,
+    gap: 4,
+    tightGap: 2,
+    tabs: labels.map((label, index) => {
+      const badge = index === labels.length - 1 ? 4 + 22.45 : 0
+      return { icon: 20, label, fixed: 14 + badge, tightFixed: 10 + badge }
+    }),
+  }
+}
+
 describe('Booharu right pane tabs', () => {
-  it('fits the icons while every whole label fits beside them, to a layout unit', () => {
+  it('fits the tabs whole, then without icons, then tight, then as icons alone, to a layout unit', () => {
     // Two tabs: 16 px icons, 4 px after each, labels of 30 and 40 px, 14 px of padding and borders
-    // each, and 4 px between them: 142 px.
-    const row = (available: number) => ({
+    // each, 10 px tight, and 4 px between them, 2 px tight: 142 px whole, 102 px without the icons
+    // and 92 px tight.
+    const two = (available: number): TabRow => ({
       available,
       gap: 4,
+      tightGap: 2,
       tabs: [
-        { icon: 20, label: 30, fixed: 14 },
-        { icon: 20, label: 40, fixed: 14 },
+        { icon: 20, label: 30, fixed: 14, tightFixed: 10 },
+        { icon: 20, label: 40, fixed: 14, tightFixed: 10 },
       ],
     })
-    expect(iconsFit(row(142))).toBe(true)
-    expect(iconsFit(row(142 - 1 / 64))).toBe(false)
-    expect(iconsFit({ available: 0, gap: 4, tabs: [] })).toBe(true)
+    expect(tabsFit(two(142))).toBe('whole')
+    expect(tabsFit(two(142 - 1 / 64))).toBe('labels')
+    expect(tabsFit(two(102))).toBe('labels')
+    expect(tabsFit(two(101))).toBe('tight')
+    expect(tabsFit(two(92))).toBe('tight')
+    expect(tabsFit(two(91))).toBe('icons')
+    expect(tabsFit({ available: 0, gap: 4, tightGap: 2, tabs: [] })).toBe('whole')
     // A tab without an icon takes no room for one.
     expect(
-      iconsFit({ ...row(122), tabs: [row(0).tabs[0]!, { icon: 0, label: 40, fixed: 14 }] }),
-    ).toBe(true)
-
-    // English in the pane at its default 340 px once the QC tab shows, as Chrome lays it out: the
-    // labels of 31.8, 26, 37.8, 28.2 and 14.1 px and QC's 22.45 px badge take 350.35 px with the
-    // icons, more than the 332 px the row gives; 250.35 px without them.
-    const english = {
-      available: 332,
-      gap: 4,
-      tabs: [31.8, 26, 37.8, 28.2, 14.1].map((label, index) => ({
-        icon: 20,
-        label,
-        fixed: index === 4 ? 14 + 4 + 22.45 : 14,
-      })),
-    }
-    expect(iconsFit(english)).toBe(false)
-    expect(iconsFit({ ...english, tabs: english.tabs.map((tab) => ({ ...tab, icon: 0 })) })).toBe(
-      true,
-    )
+      tabsFit({
+        ...two(122),
+        tabs: [two(0).tabs[0]!, { icon: 0, label: 40, fixed: 14, tightFixed: 10 }],
+      }),
+    ).toBe('whole')
   })
 
-  it('measures each tab’s whole label, held from shrinking, and its badge as what doesn’t shrink', () => {
+  it('keeps every whole label readable at 340 and 280 px, as Chrome lays the row out', () => {
+    // Each label's whole width as Chrome lays it out with the app's fonts, Layers, Story, Context,
+    // Agent and QC. The pane's border leaves the row 331 px at 340 px and 271 px at 280 px.
+    const labels = {
+      'zh-CN': [20, 20, 30, 30, 14.14],
+      'en-US': [31.8, 25.97, 37.75, 28.16, 14.14],
+      'ja-JP': [39.7, 50, 59.7, 59.81, 14.14],
+      'pt-BR': [44.78, 38.22, 43.77, 33.7, 14.14],
+      'ru-RU': [25.45, 50.41, 46.44, 28.27, 14.14],
+      'fr-FR': [38.67, 38, 43.3, 28.16, 14.14],
+    }
+    const fits = (available: number) =>
+      Object.fromEntries(
+        Object.entries(labels).map(([language, widths]) => [
+          language,
+          tabsFit(row(available, widths)),
+        ]),
+      )
+    // English takes 350.27 px with the icons and 250.27 px without them; Japanese 335.8 px without
+    // them and 307.8 px tight, more than 280 px leaves, where only the icons fit.
+    expect(fits(331)).toEqual({
+      'zh-CN': 'whole',
+      'en-US': 'labels',
+      'ja-JP': 'tight',
+      'pt-BR': 'labels',
+      'ru-RU': 'labels',
+      'fr-FR': 'labels',
+    })
+    expect(fits(271)).toEqual({
+      'zh-CN': 'labels',
+      'en-US': 'labels',
+      'ja-JP': 'icons',
+      'pt-BR': 'tight',
+      'ru-RU': 'tight',
+      'fr-FR': 'tight',
+    })
+  })
+
+  it('measures each tab whole and tight, held from shrinking, however the tabs fit now', () => {
     const list = tabRow(340, [37, 33, 52, 40, 18], 17)
-    const row = measureTabRow(list)
-    expect(row).toEqual({
+    // Shown as icons alone, the labels screen readers' only: they're measured whole all the same.
+    list.setAttribute('data-booharu-tabs', 'icons')
+    const measured = measureTabRow(list)
+    expect(measured).toEqual({
       available: 332,
       gap: 4,
+      tightGap: 2,
       tabs: [
-        { icon: 20, label: 37, fixed: 14 },
-        { icon: 20, label: 33, fixed: 14 },
-        { icon: 20, label: 52, fixed: 14 },
-        { icon: 20, label: 40, fixed: 14 },
-        { icon: 20, label: 18, fixed: 35 },
+        { icon: 20, label: 37, fixed: 14, tightFixed: 10 },
+        { icon: 20, label: 33, fixed: 14, tightFixed: 10 },
+        { icon: 20, label: 52, fixed: 14, tightFixed: 10 },
+        { icon: 20, label: 40, fixed: 14, tightFixed: 10 },
+        { icon: 20, label: 18, fixed: 35, tightFixed: 31 },
       ],
     })
-    // The tabs shrink again once measured.
+    // The tabs fit as they did and shrink again once measured.
+    expect(list).toHaveAttribute('data-booharu-tabs', 'icons')
     for (const tab of list.children) expect((tab as HTMLElement).style.flexShrink).toBe('')
-    // 5 icons with the gap after each (100), the labels (180), padding, borders and the badge (91)
-    // and the gaps between tabs (16): 387 px in 332.
-    expect(iconsFit(row)).toBe(false)
-    expect(iconsFit(measureTabRow(tabRow(395, [37, 33, 52, 40, 18], 17)))).toBe(true)
+    // The labels (180), padding, borders and the badge (91) and the gaps between tabs (16): 287 px
+    // in 332, with the icons (100) 387 px.
+    expect(tabsFit(measured)).toBe('labels')
+    const whole = tabRow(395, [37, 33, 52, 40, 18], 17)
+    expect(tabsFit(measureTabRow(whole))).toBe('whole')
+    expect(whole).not.toHaveAttribute('data-booharu-tabs')
   })
 
-  it('hides the icons once the labels no longer fit, and measures again as they change', async () => {
+  it('tells how the tabs fit, measuring again as they change', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
       this: HTMLElement,
     ) {
       return this.getAttribute('role') === 'tablist' ? 120 : 0
     })
-    // A label is 6 px a letter whole, and cut to 1 px while its tab shrinks.
+    // A label is 6 px a letter whole, and cut to 1 px while its tab shrinks or shows its icon alone.
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
       this: HTMLElement,
     ) {
       if (this.getAttribute('role') === 'tablist') return box(120)
-      if (this.tagName === 'SPAN') return box(held(this) ? (this.textContent?.length ?? 0) * 6 : 1)
-      return box(0)
+      if (this.tagName === 'SPAN' && fitOf(this) !== 'icons' && held(this))
+        return box((this.textContent?.length ?? 0) * 6)
+      return box(this.tagName === 'SPAN' ? 1 : 0)
     })
-    styled((element) => (element instanceof SVGElement ? { width: '12px' } : undefined))
+    // Each tab 6 px of padding each side, 4 px tight, and 4 px between its icon and its label, and
+    // the tabs 4 px apart, 2 px tight, with a 12 px icon.
+    styled((element) => {
+      const tight = fitOf(element) === 'tight'
+      if (element.getAttribute('role') === 'tablist') return { columnGap: tight ? '2px' : '4px' }
+      if (element.getAttribute('role') === 'tab')
+        return {
+          paddingLeft: tight ? '4px' : '6px',
+          paddingRight: tight ? '4px' : '6px',
+          columnGap: '4px',
+        }
+      if (element instanceof SVGElement) return { width: '12px' }
+    })
 
     function Row({ labels }: { labels: string[] }) {
       const fit = useSidebarTabsFit()
@@ -152,19 +223,23 @@ describe('Booharu right pane tabs', () => {
         </div>
       )
     }
+    const fit = () => screen.getByRole('tablist').getAttribute('data-booharu-tabs')
 
-    // With no padding or gaps here: 2 icons (24) and 2 labels of 10 letters at 6 px (120), 144 px
-    // in 120.
+    // Two labels of 10 letters (120): 138 px tight in 120, so the icons alone.
     const view = render(<Row labels={['Layersssss', 'Storyyyyyy']} />)
-    expect(screen.getByRole('tablist')).toHaveAttribute('data-booharu-icons', 'hidden')
-    // Shorter labels, as in another language: 2 icons and 2 labels of 4 letters, 72 px.
+    expect(fit()).toBe('icons')
+    // Of 8 letters (96), as in another language: 124 px without the icons, 114 px tight.
+    view.rerender(<Row labels={['Layersss', 'Storyyyy']} />)
+    await waitFor(() => expect(fit()).toBe('tight'))
+    // Of 6 letters (72): 100 px without the icons, 132 px with them.
+    view.rerender(<Row labels={['Layers', 'Storyy']} />)
+    await waitFor(() => expect(fit()).toBe('labels'))
+    // Of 4 letters (48): 108 px with the icons.
     view.rerender(<Row labels={['Laye', 'Stor']} />)
-    await waitFor(() =>
-      expect(screen.getByRole('tablist')).not.toHaveAttribute('data-booharu-icons'),
-    )
+    await waitFor(() => expect(fit()).toBeNull())
   })
 
-  it('keeps the icons while the row isn’t laid out', () => {
+  it('fits the tabs whole while the row isn’t laid out', () => {
     function Row() {
       const fit = useSidebarTabsFit()
       return (
@@ -177,6 +252,6 @@ describe('Booharu right pane tabs', () => {
       )
     }
     render(<Row />)
-    expect(screen.getByRole('tablist')).not.toHaveAttribute('data-booharu-icons')
+    expect(screen.getByRole('tablist')).not.toHaveAttribute('data-booharu-tabs')
   })
 })

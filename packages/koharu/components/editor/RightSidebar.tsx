@@ -23,11 +23,13 @@ export function RightSidebar() {
   const panel = useKoharuStore((state) => state.panel)
   const showPanel = useKoharuStore((state) => state.showPanel)
   const findings = useQcOpenCount() // Booharu: the QC tab's count of open findings.
-  const fit = useSidebarTabsFit() // Booharu: icons give way to labels when the tabs don't fit.
+  const fit = useSidebarTabsFit() // Booharu: the tabs give way as they stop fitting whole.
   // The shown tab in the accent colour, hovered or not, its underline too. Booharu: a tab shrinks,
-  // never growing, its label cut short, and loses its icon while the labels don't fit whole.
+  // never growing, its label cut short, and follows how the tabs fit: its icon goes while the whole
+  // labels don't fit beside them, its padding narrows while they fit only tight, and its label is
+  // left to screen readers and its title, the icon showing alone, once even that's too wide.
   const tab =
-    'h-7 flex-initial min-w-0 gap-1 px-1.5 text-[10px] font-semibold after:bg-primary data-active:text-primary data-active:hover:text-primary [&_svg]:size-3 group-data-[booharu-icons=hidden]/tabs-list:[&>svg]:hidden'
+    'h-7 flex-initial min-w-0 gap-1 px-1.5 text-[10px] font-semibold after:bg-primary data-active:text-primary data-active:hover:text-primary [&_svg]:size-3 group-data-[booharu-tabs=labels]/tabs-list:[&>svg]:hidden group-data-[booharu-tabs=tight]/tabs-list:[&>svg]:hidden group-data-[booharu-tabs=tight]/tabs-list:px-1 group-data-[booharu-tabs=icons]/tabs-list:[&>svg+span]:sr-only'
   return (
     <aside className='flex h-full min-h-0 flex-col bg-[var(--surface-panel)]'>
       <Tabs
@@ -38,7 +40,8 @@ export function RightSidebar() {
         <TabsList
           {...fit} // Booharu: measured to fit its tabs.
           variant='line'
-          className='h-10 w-full shrink-0 justify-start rounded-none border-b border-border/80 px-1'
+          // Booharu: the tabs closer together while they fit only tight.
+          className='h-10 w-full shrink-0 justify-start rounded-none border-b border-border/80 px-1 data-[booharu-tabs=tight]:gap-0.5'
         >
           {/* Booharu: each label in a span cut short with an ellipsis, named whole in the title. */}
           <TabsTrigger value='layers' className={tab} title={t('layers.title')}>
