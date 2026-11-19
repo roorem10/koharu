@@ -18,6 +18,7 @@ fs-err = { workspace = true }
 glifo = { workspace = true }
 harfrust = { workspace = true }
 hypher = { workspace = true }
+# Booharu: Booharu's text borders (text/contour.rs).
 i_overlay = { workspace = true }
 icu_properties = { workspace = true }
 icu_segmenter = { workspace = true }
