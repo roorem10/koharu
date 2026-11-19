@@ -352,14 +352,22 @@ pub(crate) async fn check_page(app: &Arc<App>, page: PageId) -> anyhow::Result<b
 }
 
 /// Checks `page` as [`check_page`] does, with `read`, what the watcher read
-/// for its pass, in place of what the check would read now.
+/// for its pass, in place of what the check would read now. It holds no
+/// session while it checks, only a weak handle to tell whether the session
+/// it read is still the open one, as a session held past its close keeps
+/// the project's file locked, so opening or deleting it again would fail.
 async fn check(app: &Arc<App>, page: PageId, read: Option<Arc<Inputs>>) -> anyhow::Result<bool> {
     let generation = GENERATION.load(Ordering::SeqCst);
-    let session = app.session()?;
-    let (file, project, taken) = {
-        let session = session.lock();
+    let (session, file, project, taken) = {
+        let open = app.session()?;
+        let session = open.lock();
         let taken = TAKEN.fetch_add(1, Ordering::SeqCst);
-        (session.path().to_owned(), session.project(), taken)
+        (
+            Arc::downgrade(&open),
+            session.path().to_owned(),
+            session.project(),
+            taken,
+        )
     };
     let renderer = app.renderer.clone();
     let found = tokio::task::spawn_blocking(move || -> anyhow::Result<Option<Vec<Finding>>> {
@@ -378,11 +386,13 @@ async fn check(app: &Arc<App>, page: PageId, read: Option<Arc<Inputs>>) -> anyho
     let Some(findings) = found else {
         return Ok(false);
     };
+    // The weak handle keeps the session's allocation, so no session opened
+    // since can share its address.
     let open = app
         .project
         .lock()
         .as_ref()
-        .is_some_and(|open| Arc::ptr_eq(&open.session, &session));
+        .is_some_and(|open| std::ptr::eq(Arc::as_ptr(&open.session), session.as_ptr()));
     if !open {
         return Ok(false);
     }
