@@ -123,6 +123,22 @@ pub fn start(kind: JobKind) -> Result<Job> {
     Ok(Job { id, kind, cancel })
 }
 
+/// A job of `kind` refused before it could start, as a second read is, as
+/// whoever follows jobs is told it: with an id of its own, failed with
+/// `why`, for the run group `group` whose Run step it was.
+pub fn refused(kind: JobKind, group: Option<u64>, why: &anyhow::Error) -> BooharuJob {
+    BooharuJob {
+        id: MADE.fetch_add(1, Ordering::Relaxed) + 1,
+        kind,
+        state: JobState::Failed,
+        message: Some(format!("{why:#}")),
+        step: 0,
+        steps: 0,
+        group,
+        summary: None,
+    }
+}
+
 /// Cancels every job going, as Stop and closing the project do.
 pub fn cancel_all() {
     for (_, cancel) in JOBS.lock().values() {
@@ -164,6 +180,21 @@ pub(crate) mod tests {
         drop((explain, again));
         assert!(!busy(JobKind::Explain));
         drop(read);
+        Ok(())
+    }
+
+    #[test]
+    fn a_refused_job_is_told_failed_under_an_id_of_its_own() -> Result<()> {
+        let _held = REGISTRY.blocking_lock();
+        let read = start(JobKind::ReadChapter)?;
+        let why = start(JobKind::ReadChapter).expect_err("a second read");
+        let told = refused(JobKind::ReadChapter, Some(3), &why);
+        assert_ne!(told.id, read.id(), "never the read going's");
+        assert_eq!(
+            (told.state, told.group, told.message.as_deref()),
+            (JobState::Failed, Some(3), Some(why.to_string().as_str()))
+        );
+        assert!(busy(JobKind::ReadChapter) && !read.cancelled());
         Ok(())
     }
 

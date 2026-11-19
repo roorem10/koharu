@@ -132,10 +132,12 @@ pub(crate) struct ReadRequest {
 /// `booharu::jobs::start`, which refuses a second read: the one function
 /// every read goes through.
 ///
-/// It refuses, failing before it tells anything, while a run goes, or a
-/// `booharu_run` group other than `request.group`'s. Then it tells the
-/// interface `booharu_job` as it starts, after each chunk of pages read, and
-/// as it ends, however it ends. It reads the settings: `[booharu-reading]`,
+/// It refuses while a run goes, or a `booharu_run` group other than
+/// `request.group`'s: a Run step telling only its failed end, so the press
+/// says why it translates without the read, and a read by hand nothing, as
+/// its caller answers. Then it tells the interface `booharu_job` as it
+/// starts, after each chunk of pages read, and as it ends, however it ends.
+/// It reads the settings: `[booharu-reading]`,
 /// the translation model and its target language, and the lettering
 /// settings and the default font a line's category is lettered with. A Run
 /// step (`request.group`) skips, answering why, where a read by hand fails:
@@ -153,21 +155,20 @@ pub(crate) async fn read_chapter(
     request: ReadRequest,
     job: Job,
 ) -> anyhow::Result<ReadOutcome> {
-    ensure!(
-        !runs::run_going(&app.pipeline.told()),
-        "Read chapter can't start while a run is going; wait for it to end, or stop it."
-    );
-    ensure!(
-        runs::group_going().is_none_or(|going| Some(going) == request.group),
-        "Read chapter can't start while a Run press is going; wait for it to end, or stop it."
-    );
+    let telling = Arc::new(Telling::new(&app, &job, request.group));
+    if let Err(error) = free(&app, request.group) {
+        let refused = Err(error);
+        if request.group.is_some() {
+            telling.tell(|job| ended(job, &refused));
+        }
+        return refused;
+    }
     // From here on, a Stop of any kind ends the read, and for a Run step one
     // since its group reached it.
     let mut stops = Stops::new(job.cancel().clone(), app.pipeline.clone());
     if let Some(since) = request.since {
         stops.since = since;
     }
-    let telling = Arc::new(Telling::new(&app, &job, request.group));
     telling.tell(|_| {});
     let ending = Ending(Arc::clone(&telling), false);
     let outcome = reading(&app, session, request, stops, &telling).await;
@@ -176,6 +177,21 @@ pub(crate) async fn read_chapter(
     }
     ending.end(&outcome);
     outcome
+}
+
+/// Whether a read may start, as the Run step of `group` or, with none, by
+/// hand: not while a run goes, nor a `booharu_run` group other than
+/// `group`.
+fn free(app: &App, group: Option<u64>) -> anyhow::Result<()> {
+    ensure!(
+        !runs::run_going(&app.pipeline.told()),
+        "Read chapter can't start while a run is going; wait for it to end, or stop it."
+    );
+    ensure!(
+        runs::group_going().is_none_or(|going| Some(going) == group),
+        "Read chapter can't start while a Run press is going; wait for it to end, or stop it."
+    );
+    Ok(())
 }
 
 /// [`read_chapter`]'s work once it started.

@@ -110,7 +110,16 @@ impl RunHost for App {
         Box::pin(async move {
             // Registered first, so Stop and closing the project, which end
             // every job once they stopped the pipeline, reach it from here.
-            let job = jobs::start(JobKind::ReadChapter)?;
+            // Refused, it's told, so the press says why it translates
+            // without the read.
+            let job = match jobs::start(JobKind::ReadChapter) {
+                Ok(job) => job,
+                Err(error) => {
+                    let told = jobs::refused(JobKind::ReadChapter, Some(group), &error);
+                    crate::booharu::jobs::tell(&self, told);
+                    return Err(error);
+                }
+            };
             let open = self
                 .project
                 .lock()
