@@ -84,6 +84,7 @@ describe('Booharu default text style', () => {
       'booharu-fonts': { favorites: [] },
       'booharu-runs': builtInRuns,
       'booharu-reading': builtInReading,
+      'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
     })
     expect(shown.getByText('#FF0000')).toBeInTheDocument()

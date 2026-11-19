@@ -290,7 +290,18 @@ export type BooharuPreferences = {
   'booharu-fonts': FontSettings
   'booharu-runs': RunsSettings
   'booharu-reading': ReadingSettings
+  'booharu-qc': QcSettings
   'booharu-start': StartSettings
+}
+
+/**
+ *  What the quality check found on a page: every finding on it, hidden
+ *  ones included, in reading order and then in the checks' order, which
+ *  replace the page's earlier ones.
+ */
+export type BooharuQc = {
+  page: PageId
+  findings: Finding[]
 }
 
 /**
@@ -665,6 +676,32 @@ export type ExplainAnswer = {
 export type ExportFormat = 'png' | 'psd' | 'cbz'
 
 export type FillRule = 'non_zero' | 'even_odd'
+
+/**  One thing on a page that needs a look. */
+export type Finding = {
+  page: PageId
+  /**  The block or text layer it's on. */
+  layer: LayerId
+  /**
+   *  Its check's id: `overflow`, `too_small`, `small_word`,
+   *  `missing_translation`, `empty_source`, `leftover_source`, `odd_font`
+   *  or `glossary:<term source>`, which Mark OK takes, or `flag`, the
+   *  agent's flag, which is dismissed instead.
+   */
+  check: string
+  problem: Problem
+  source: Source
+  /**
+   *  The line it's on: its translation's wording, or its source's when it
+   *  has none, or a text layer's text, trimmed.
+   */
+  text: string
+  /**
+   *  Whether a person marked it OK while the layer was as it is now. A
+   *  flag never is.
+   */
+  hidden: boolean
+}
 
 /**
  *  The note on a first start: Booharu doesn't copy Booharu 0.0.4's series,
@@ -1383,6 +1420,50 @@ export type Preferences = {
   providers: Providers
 }
 
+/**
+ *  What a finding found, with what the interface tells it with. Sizes are
+ *  page pixels, rounded to one decimal.
+ */
+export type Problem =
+  /**  The text runs past its box. */
+  | { kind: 'overflow' }
+  /**
+   *  The text is drawn at `size` at its smallest, under `limit`, the
+   *  smallest readable size on its page, as its box sets it.
+   */
+  | { kind: 'too_small'; size: number; limit: number }
+  /**
+   *  One styled word, `word`, is drawn at `size`, under `limit`, while its
+   *  box sets the rest larger.
+   */
+  | { kind: 'small_word'; word: string; size: number; limit: number }
+  /**
+   *  The line has source text but no translation, on a page Koharu's
+   *  Translation stage ran on.
+   */
+  | { kind: 'missing_translation' }
+  /**  Koharu's stages found the block and read nothing in it. */
+  | { kind: 'empty_source' }
+  /**
+   *  The line shows source text in a script its language doesn't write:
+   *  in its translation, or, `unchanged`, in the page's own lettering of
+   *  a line the model gave back unchanged.
+   */
+  | { kind: 'leftover_source'; unchanged: boolean }
+  /**
+   *  The block's font isn't `expected`, the font most of its lettering
+   *  category's blocks in the chapter are set in, but `font`; none for
+   *  the default font.
+   */
+  | { kind: 'odd_font'; expected: string | null; font: string | null }
+  /**
+   *  The translation leaves out the linked series' glossary term with the
+   *  source `source`, which it should write as `target`.
+   */
+  | { kind: 'glossary'; source: string; target: string }
+  /**  The agent flagged the line for a person to review. */
+  | { kind: 'flag'; message: string }
+
 export type ProjectAnswer = {
   id: ProjectId
   /**  The format version the file holds. */
@@ -1399,6 +1480,21 @@ export type ProjectId = string
  *  `base_url`. Keyed by rig's vendor name.
  */
 export type Providers = { [key in string]: Endpoint }
+
+/**
+ *  `[booharu-qc]`: the quality check, which looks over each page after a run
+ *  and after each edit, and lists the boxes that need a look.
+ */
+export type QcSettings = {
+  /**
+   *  The smallest drawn text that reads, as a share of the page's shorter
+   *  side, above 0 and at most 0.1: 0.01 is 12 pixels on a page 1,200
+   *  wide. Text drawn smaller is too small. A share rather than pixels, as
+   *  scans come at very different resolutions, and the shorter side, as a
+   *  long strip's height says nothing of its lettering's size.
+   */
+  min_size?: number
+}
 
 export type Query =
   /**  List the pages in order, with their sizes and backgrounds. */
@@ -1755,6 +1851,9 @@ export type Skip =
   | { kind: 'cant_read'; model: string; why: CantRead; saved: boolean }
   /**  Only the app reads a chapter. */
   | { kind: 'only_in_app' }
+
+/**  Who found a finding: Booharu's automatic checks, or the agent's review. */
+export type Source = 'auto' | 'agent'
 
 /**  A string with its character marks. */
 export type Span = {
@@ -2246,6 +2345,14 @@ export const commands = {
     invoke<AgentEntry[]>('booharu_get_agent_history', {}, { headers: headers() }),
   /** The reads going, as they were last told, which the interface starts its jobs from when it loads. */
   booharuGetJobs: () => invoke<BooharuJob[]>('booharu_get_jobs', {}, { headers: headers() }),
+  /** Every finding of the open project the quality check holds, in page order, each page's in reading order and then in the checks' order, hidden ones included: what the checks of its pages stored, each replaced as `booharu_qc` tells. Empty while no project is open. */
+  booharuGetQc: () => invoke<Finding[]>('booharu_get_qc', {}, { headers: headers() }),
+  /** Marks the finding of `check` on `layer`, a block or a text layer, OK while the layer stays as it is, when `ok`, or takes back its marks of `check`, as one undo step labelled `booharu_mark_qc_ok` or `booharu_clear_qc_ok`, then checks the layer's page again. `check` is a finding's: `overflow`, `too_small`, `small_word`, `missing_translation`, `empty_source`, `leftover_source`, `odd_font`, or `glossary:<term source>`; an agent's flag is dismissed instead. A locked layer, or one inside a locked layer, refuses it. Null when the marks stay as they are, which makes no undo step. */
+  booharuMarkQcOk: (layer: LayerId, check: string, ok: boolean) =>
+    invoke<Change | null>('booharu_mark_qc_ok', { layer, check, ok }, { headers: headers() }),
+  /** Dismisses the agent's flag on `layer`, a block or a text layer, with the message `message`, or every flag there when null, as one undo step labelled `booharu_dismiss_flag`, then checks the layer's page again. A locked layer, or one inside a locked layer, refuses it. Null when no flag matches, which makes no undo step. */
+  booharuDismissFlag: (layer: LayerId, message: string | null) =>
+    invoke<Change | null>('booharu_dismiss_flag', { layer, message }, { headers: headers() }),
 }
 
 export const events = {
@@ -2287,4 +2394,6 @@ export const events = {
     listen<BooharuJob>('booharu_job', (event) => handler(event.payload)),
   booharuAgentHistoryChanged: (handler: (payload: null) => void): Promise<UnlistenFn> =>
     listen<null>('booharu_agent_history_changed', (event) => handler(event.payload)),
+  booharuQc: (handler: (payload: BooharuQc) => void): Promise<UnlistenFn> =>
+    listen<BooharuQc>('booharu_qc', (event) => handler(event.payload)),
 }

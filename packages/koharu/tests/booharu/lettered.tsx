@@ -106,6 +106,7 @@ export function letteredDesktop(auto = false) {
     'booharu-fonts': { favorites: [] },
     'booharu-runs': builtInRuns,
     'booharu-reading': builtInReading,
+    'booharu-qc': { min_size: 0.01 },
     'booharu-start': { fresh_start_note_seen: false },
   }
   vi.spyOn(commands, 'booharuGetPreferences').mockResolvedValue(preferences)

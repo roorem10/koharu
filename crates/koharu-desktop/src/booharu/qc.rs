@@ -201,7 +201,7 @@ async fn check_again(app: &Arc<App>, layer: LayerId) {
 /// Every finding of the open project the quality check holds, in page
 /// order, each page's in reading order and then in the checks' order,
 /// hidden ones included: what the checks of its pages stored, each
-/// replaced as `booharu_qc` tells. None while no project is open.
+/// replaced as `booharu_qc` tells. Empty while no project is open.
 #[tauri::command]
 #[specta::specta]
 pub fn booharu_get_qc(app: State<'_, Arc<App>>) -> Result<Vec<Finding>> {

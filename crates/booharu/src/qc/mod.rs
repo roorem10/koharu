@@ -85,8 +85,10 @@ pub struct Finding {
     pub page: PageId,
     /// The block or text layer it's on.
     pub layer: LayerId,
-    /// Its check's id, which Mark OK takes: one of [`CHECKS`],
-    /// `glossary:<term source>`, or [`FLAG`].
+    /// Its check's id: `overflow`, `too_small`, `small_word`,
+    /// `missing_translation`, `empty_source`, `leftover_source`, `odd_font`
+    /// or `glossary:<term source>`, which Mark OK takes, or `flag`, the
+    /// agent's flag, which is dismissed instead.
     pub check: String,
     pub problem: Problem,
     pub source: Source,

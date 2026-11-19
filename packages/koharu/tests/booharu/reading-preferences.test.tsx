@@ -60,6 +60,7 @@ describe('Booharu Read chapter settings', () => {
       'booharu-fonts': { favorites: [] },
       'booharu-runs': builtInRuns,
       'booharu-reading': { ...builtInReading, model: gemma.reference },
+      'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
     })
     await waitFor(() => expect(model).toHaveTextContent('Gemma 4 12B'))

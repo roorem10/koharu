@@ -51,6 +51,7 @@ export function settingsDesktop(lettering: LetteringSettings = builtInLettering)
       'booharu-fonts': { favorites: [] },
       'booharu-runs': structuredClone(builtInRuns),
       'booharu-reading': structuredClone(builtInReading),
+      'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
     },
   }

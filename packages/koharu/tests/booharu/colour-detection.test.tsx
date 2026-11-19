@@ -59,6 +59,7 @@ describe('Booharu colour detection switch', () => {
       'booharu-fonts': { favorites: [] },
       'booharu-runs': builtInRuns,
       'booharu-reading': builtInReading,
+      'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
     })
     await waitFor(() => expect(toggle).not.toBeChecked())

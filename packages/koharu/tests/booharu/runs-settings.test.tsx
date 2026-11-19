@@ -74,6 +74,7 @@ describe('Booharu Runs settings', () => {
         on_page_failure: 'stop',
       },
       'booharu-reading': builtInReading,
+      'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
     })
     // The file's state shows once the save ends, the other writer's preset with it.

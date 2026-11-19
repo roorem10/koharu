@@ -82,6 +82,7 @@ describe('Booharu run presets in the Run menu', () => {
         ],
       },
       'booharu-reading': builtInReading,
+      'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
     })
     // The menu goes back to its root view, where the new preset shows as the stages on.
