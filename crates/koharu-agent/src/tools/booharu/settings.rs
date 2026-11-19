@@ -55,7 +55,13 @@ impl Tool for GetSettings {
          tried again, `on_page_failure`, `continue` with the other pages or `stop` the run, \
          `order`, `pages` (each page through its stages) or `stages` (one stage at a time over \
          every page, using less graphics memory), and `finish_sound`, whether a run over pages \
-         chimes as it ends; `booharu-start` has `fresh_start_note_seen`, whether the note on a \
+         chimes as it ends; `booharu-reading` has Read chapter's `model`, the model that reads a \
+         chapter's pages, which must see images and call tools, as a `vendor/model` reference, \
+         or null for the translation model when that one can, `ask`, whether the Context tab's \
+         Read chapter asks before it reads, and `pages_per_request`, from 1 to 40, the most \
+         pages one request to the model sends (booharu_read_chapter reads with that model, or \
+         one it names); Explain this line asks the same `model` when one is set; \
+         `booharu-start` has `fresh_start_note_seen`, whether the note on a \
          first start saying where Booharu 0.0.4's series are was dismissed. The default font is the first of Koharu's Preferred fonts, not a \
          Booharu setting. Needs a project open, as every tool here does."
             .to_owned()
@@ -127,7 +133,9 @@ impl Tool for SetSettings {
          booharu_run carries on with included; a run already going keeps the settings it \
          started with. A preset's `stages` are among `detect`, `recognize`, `inpaint`, `read` \
          and `translate`, with at least one other than `read`, Read chapter, which goes only \
-         with `translate`. A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
+         with `translate`. A change to `booharu-reading` applies to the next read and the next \
+         line explained; a blank `model` is refused, so set it to null for the translation \
+         model. A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
          a project open, as every tool here does."
             .to_owned()
     }
