@@ -41,6 +41,7 @@
 //! | `booharu_mark_qc_ok` | marks a finding OK while its line stays as it is, or takes the mark back, as one undo step | no |
 //! | `booharu_flag_line` | flags lines for human review, each with a short message, as one undo step, leaving out locked lines and flags a line has, and answers which it flagged, found flagged, and left out as locked | no |
 //! | `booharu_dismiss_flag` | dismisses a line's flag with a message, or every flag on it, as one undo step, and answers how many | no |
+//! | `booharu_add_sfx_subtitle` | gives a sound effect a subtitle beside it, from the words given or its translation, taking its translation away and hiding its clean-up so its art shows, as one undo step; with no words yet, starts the Translate run that writes it | no |
 
 mod boxes;
 mod context;
@@ -52,6 +53,7 @@ mod qc;
 mod reading;
 mod runs;
 mod settings;
+mod sfx;
 mod styles;
 mod translation;
 
@@ -126,6 +128,15 @@ pub trait BooharuHost: Send + Sync {
         Ok(koharu_config::get::<PipelineConfig>()?
             .translator
             .instructions)
+    }
+
+    /// The pipeline's settings as saved now, `[pipeline]`, which a run a
+    /// tool starts with a flag of Booharu's own, as Add subtitle's and Redo
+    /// boxes' runs are, runs with in place of the pipeline's own, as the
+    /// app's commands queue theirs; a subtitle given words with no
+    /// translation to take a language from is in its translator's target.
+    fn pipeline_config(&self) -> anyhow::Result<PipelineConfig> {
+        Ok(koharu_config::get()?)
     }
 
     /// What the quality check reads of the settings as saved now,
@@ -251,6 +262,7 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(qc::MarkQcOk);
     tools.add_tool(qc::FlagLine);
     tools.add_tool(qc::DismissFlag);
+    tools.add_tool(sfx::AddSfxSubtitle);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one
