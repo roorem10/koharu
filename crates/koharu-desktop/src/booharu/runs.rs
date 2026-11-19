@@ -14,7 +14,8 @@
 use std::sync::Arc;
 
 use booharu::runs::{self, RunHost, RunPlan, RunTarget};
-use koharu_pipeline::{Pipeline, Request, RunId, Stage};
+use booharu_core::runs::RunStage;
+use koharu_pipeline::{Pipeline, Request, RunId};
 use koharu_scene::Session;
 use parking_lot::Mutex;
 use tauri::State;
@@ -35,16 +36,23 @@ use crate::{
 /// find text and translate translates last: every group without Translation
 /// first, then one Translation run, leaving out the pages a run gave up on.
 /// While a group goes on in the open project, answers that one, with its run
-/// going now, and queues nothing.
+/// going now, and queues nothing. `stages` are the Run menu's: Koharu's four
+/// by their names, and Read chapter, which a press leaves out for now.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_run(
     app: State<'_, Arc<App>>,
     target: RunTarget,
-    stages: Vec<Stage>,
+    stages: Vec<RunStage>,
 ) -> Result<RunPlan> {
     let app = Arc::clone(&app);
     let session = app.session()?;
+    // Read chapter is no stage of Koharu's, and the Run step that reads is
+    // yet to come: a press with it runs the others as before.
+    let stages = stages
+        .into_iter()
+        .filter_map(koharu_pipeline::pipeline_stage)
+        .collect();
     Ok(runs::carry_on(app, session, target, stages).await?)
 }
 
