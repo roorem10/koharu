@@ -81,12 +81,19 @@ export const change = {
   history: { steps: [], current: 0 },
 } as Change
 
-/** Every command answered without the desktop, each edit answering `change`. */
+/** Every command answered without the desktop, each edit answering `change`, and Redo boxes
+ * finding no box fixed by hand or locked. */
 export function desktop() {
   const table = commands as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
   for (const name of Object.keys(table)) vi.spyOn(table, name).mockResolvedValue(null)
   return {
     run: vi.spyOn(commands, 'runPipeline').mockResolvedValue(1),
+    countRedo: vi
+      .spyOn(commands, 'booharuCountRedo')
+      .mockImplementation(async (blocks) => ({ ready: blocks.length, hand_fixed: 0, locked: 0 })),
+    redo: vi
+      .spyOn(commands, 'booharuRedoBoxes')
+      .mockResolvedValue({ run: 1, hand_fixed: 0, locked: 0 }),
     join: vi.spyOn(commands, 'booharuJoinBalloon').mockResolvedValue(change),
     joinPage: vi.spyOn(commands, 'booharuJoinPage').mockResolvedValue(change),
     split: vi.spyOn(commands, 'booharuSplitBlock').mockResolvedValue({

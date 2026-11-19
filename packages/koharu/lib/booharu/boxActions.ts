@@ -4,6 +4,7 @@ import { call } from '@/lib/backend'
 import { openBoxDetails } from '@/lib/booharu/boxDetails'
 import { fetchLettering } from '@/lib/booharu/boxLettering'
 import { openExplanation } from '@/lib/booharu/explain'
+import { redoBoxes } from '@/lib/booharu/redo'
 import {
   findLayer,
   findPart,
@@ -83,17 +84,20 @@ function blocks(selection: BoxSelection): Box[] {
   return selection.boxes.filter(({ layer }) => isBlockLayer(layer))
 }
 
-/** Whether a run may go over the selection's blocks again: it holds one, and none is locked, as a
- * run reaching a locked block stops. */
-function rerunnable(selection: BoxSelection): boolean {
-  const found = blocks(selection)
-  return found.length > 0 && found.every(({ locked }) => !locked)
+/** The ids of the selection's blocks. */
+function blockIds(selection: BoxSelection): LayerId[] {
+  return blocks(selection).map(({ layer }) => layer.id)
 }
 
-/** Runs `stage` on the selection's blocks alone, as Story's own Translate runs one block. */
+/** Whether a run may go over the selection's blocks again: one of them isn't locked, as a run
+ * leaves the locked ones alone and counts them. */
+function rerunnable(selection: BoxSelection): boolean {
+  return blocks(selection).some(({ locked }) => !locked)
+}
+
+/** Runs `stage` on the selection's blocks alone, asking nothing, as Clean again does. */
 function rerun(selection: BoxSelection, stage: Stage): Promise<unknown> {
-  const ids = blocks(selection).map(({ layer }) => layer.id)
-  return call(commands.runPipeline, { blocks: ids }, [stage])
+  return call(commands.runPipeline, { blocks: blockIds(selection) }, [stage])
 }
 
 /** The texts a join of `balloon` would make one, in reading order, the first kept; none unless it
@@ -180,13 +184,15 @@ export const boxActions: readonly BoxAction[] = [
     id: 'read',
     label: 'booharu.boxes.read',
     enabled: rerunnable,
-    run: (selection) => rerun(selection, 'recognize'),
+    // Asks first when a source was corrected by hand.
+    run: (selection) => redoBoxes(blockIds(selection), 'recognize'),
   },
   {
     id: 'translate',
     label: 'booharu.boxes.translate',
     enabled: rerunnable,
-    run: (selection) => rerun(selection, 'translate'),
+    // Asks first when a translation was written or fixed by hand.
+    run: (selection) => redoBoxes(blockIds(selection), 'translate'),
   },
   {
     id: 'clean',

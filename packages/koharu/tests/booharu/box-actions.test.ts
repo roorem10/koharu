@@ -68,11 +68,13 @@ describe('Booharu box actions', () => {
     // the runs to it.
     expect(enabled(['caption'])).toEqual({ ...none, details: true })
     expect(enabled(['caption', 'free'])).toEqual({ ...none, ...runs })
-    // A locked block, or one in a locked balloon, or a locked one among others: no change at all,
-    // though its line can be explained, which changes nothing.
+    // A locked block, or one in a locked balloon: no change at all, though its line can be
+    // explained, which changes nothing.
     expect(enabled(['locked'])).toEqual({ ...none, explain: true, details: true })
     expect(enabled(['held-first'])).toEqual({ ...none, explain: true, details: true })
-    expect(enabled(['free', 'locked'])).toEqual(none)
+    expect(enabled(['locked', 'held-first'])).toEqual(none)
+    // A locked one among others: the runs, which leave it alone and count it.
+    expect(enabled(['free', 'locked'])).toEqual({ ...none, ...runs })
     // A balloon with one text block, or a block in none, has nothing to join with.
     const alone = {
       ...runs,
@@ -109,16 +111,22 @@ describe('Booharu box actions', () => {
   })
 
   it('runs each one with its command, on the blocks alone', async () => {
-    const { run: pipeline, join, split, lettering } = desktop()
+    const { run: pipeline, countRedo, redo, join, split, lettering } = desktop()
 
+    // Read and translate go through Redo boxes, which asks nothing while no box was fixed by hand;
+    // clean runs at once.
     await run('read', ['first', 'caption', 'free-cleanup'])
     await run('translate', ['second'])
     await run('clean', ['alone'])
-    expect(pipeline.mock.calls).toEqual([
-      [{ blocks: ['first', 'free'] }, ['recognize']],
-      [{ blocks: ['second'] }, ['translate']],
-      [{ blocks: ['alone'] }, ['inpaint']],
+    expect(countRedo.mock.calls).toEqual([
+      [['first', 'free'], ['recognize']],
+      [['second'], ['translate']],
     ])
+    expect(redo.mock.calls).toEqual([
+      [['first', 'free'], ['recognize'], false],
+      [['second'], ['translate'], false],
+    ])
+    expect(pipeline.mock.calls).toEqual([[{ blocks: ['alone'] }, ['inpaint']]])
 
     await run('split', ['first-mask'])
     expect(split).toHaveBeenCalledWith('first')
@@ -148,6 +156,22 @@ describe('Booharu box actions', () => {
       layer: 'second',
       section: 'lettering',
     })
+  })
+
+  it('reruns a selection holding a locked block, which the run leaves alone and counts', async () => {
+    const { run: pipeline, countRedo, redo } = desktop()
+    countRedo.mockResolvedValue({ ready: 1, hand_fixed: 0, locked: 1 })
+    redo.mockResolvedValue({ run: 3, hand_fixed: 0, locked: 1 })
+    const shown = vi.spyOn(toast, 'add')
+
+    await run('translate', ['free', 'locked'])
+    expect(redo).toHaveBeenCalledWith(['free', 'locked'], ['translate'], false)
+    expect(shown).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'info', title: '1 locked box was left as it is.' }),
+    )
+    // Clean again asks nothing and runs on both, the stage leaving the locked one alone.
+    await run('clean', ['free', 'locked'])
+    expect(pipeline).toHaveBeenCalledWith({ blocks: ['free', 'locked'] }, ['inpaint'])
   })
 
   it('shows why Change category couldn’t read the lettering, and opens nothing', async () => {

@@ -11,6 +11,7 @@ import { BoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the row
 import { CategoryTag } from '@/components/booharu/lettering/CategoryTag' // Booharu: the row's lettering category.
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { call, dispatch } from '@/lib/backend'
+import { redoBoxes } from '@/lib/booharu/redo' // Booharu: Translate through Redo boxes.
 import { commitTranslation } from '@/lib/booharu/translation' // Booharu: a block's first translation.
 import {
   findLayer,
@@ -270,11 +271,8 @@ function StoryText({
                   aria-label={t('story.translate', { name: plainText(layer.source) })}
                   disabled={locked}
                   className='size-5 rounded-md border-primary/20 bg-primary/15 text-accent-foreground opacity-0 group-hover:opacity-100 group-data-[selected=true]:opacity-100 hover:bg-primary/25 hover:text-accent-foreground focus-visible:opacity-100 dark:border-primary/30 dark:bg-primary/25 dark:hover:bg-primary/35'
-                  onClick={() =>
-                    void call(commands.runPipeline, { blocks: [layer.id] }, ['translate']).catch(
-                      () => undefined,
-                    )
-                  }
+                  // Booharu: through Redo boxes, which asks before it replaces a hand-fixed translation.
+                  onClick={() => void redoBoxes([layer.id], 'translate').catch(() => undefined)}
                 />
               }
             >

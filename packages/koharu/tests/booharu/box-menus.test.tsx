@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { TitleBar } from '@/components/app/TitleBar'
+import { RedoDialog } from '@/components/booharu/boxes/RedoDialog'
 import { StoryPanel } from '@/components/editor/StoryPanel'
 import { useBoxDetails } from '@/lib/booharu/boxDetails'
 import { queryClient } from '@/lib/queries'
@@ -55,7 +56,7 @@ beforeEach(() => useBoxDetails.setState({ shown: null, reveal: null }))
 
 describe('Booharu box actions in the menus', () => {
   it("lists a Story row's box actions above Delete and runs them on its text", async () => {
-    const { run, join } = desktop()
+    const { redo, join } = desktop()
     openProject(boxesPage())
     const user = userEvent.setup()
     show(<StoryPanel />)
@@ -73,7 +74,7 @@ describe('Booharu box actions in the menus', () => {
       ['Delete', true],
     ])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Translate again' }))
-    await waitFor(() => expect(run).toHaveBeenCalledWith({ blocks: ['second'] }, ['translate']))
+    await waitFor(() => expect(redo).toHaveBeenCalledWith(['second'], ['translate'], false))
 
     await openRow(user, 'lo')
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Join with balloon' }))
@@ -94,8 +95,33 @@ describe('Booharu box actions in the menus', () => {
     ])
   })
 
+  it("sends a Story row's Translate through Redo boxes, which asks before it overwrites", async () => {
+    const { run, countRedo, redo } = desktop()
+    countRedo.mockResolvedValue({ ready: 0, hand_fixed: 1, locked: 0 })
+    openProject(boxesPage())
+    const user = userEvent.setup()
+    show(
+      <>
+        <StoryPanel />
+        <RedoDialog />
+      </>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Translate lo' }))
+    expect(
+      await screen.findByRole('alertdialog', { name: 'Overwrite hand-edited text?' }),
+    ).toHaveAccessibleDescription(
+      '1 of the selected boxes has a translation you wrote or fixed by hand. Translate it again and replace it?',
+    )
+    expect(countRedo).toHaveBeenCalledWith(['second'], ['translate'])
+    expect(redo).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Overwrite and run' }))
+    await waitFor(() => expect(redo).toHaveBeenCalledWith(['second'], ['translate'], true))
+    expect(run).not.toHaveBeenCalled()
+  })
+
   it('lists the box actions for the selection in the Edit menu', async () => {
-    const { run, split } = desktop()
+    const { run, redo, split } = desktop()
     openProject(boxesPage())
     // A block's clean-up stands for the block.
     useKoharuStore.getState().selectLayers(['first-cleanup'])
@@ -122,7 +148,7 @@ describe('Booharu box actions in the menus', () => {
     ).toEqual(['Read again', 'Translate again', 'Clean again', 'Join split texts on this page'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Read again' }))
     await waitFor(() =>
-      expect(run).toHaveBeenLastCalledWith({ blocks: ['free', 'alone'] }, ['recognize']),
+      expect(redo).toHaveBeenLastCalledWith(['free', 'alone'], ['recognize'], false),
     )
   })
 
