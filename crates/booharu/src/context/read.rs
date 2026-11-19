@@ -21,8 +21,9 @@
 //! at once, while the session read is still the open project and the read
 //! wasn't stopped ([`ReadHost::while_open`]): each line's category and note
 //! in one undo step labelled [`LABEL`], built against the project as it is
-//! then ([`lines_edit`]), and the brief and the terms in one write of the
-//! side file ([`merge_brief`]).
+//! then ([`lines_edit`]), and then the brief and the terms in one write of
+//! the side file ([`merge_brief`]); a brief that can't be written undoes
+//! that step, so the two land together or not at all.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -996,8 +997,9 @@ fn pages_named(first: u32, last: u32) -> String {
 
 /// Writes what a read of `prepared` in `chunks` requests found in the
 /// project `session` holds, unless `stops` stopped it: the lines' edit,
-/// then the brief, as [`read`] sets out. A side file or series that doesn't
-/// read fails it before anything is written.
+/// then the brief, as [`read`] sets out, together or not at all
+/// ([`together`]). A side file or series that doesn't read fails it before
+/// anything is written.
 fn write(
     session: &Mutex<Session>,
     prepared: &Prepared,
@@ -1019,12 +1021,11 @@ fn write(
         &reader.lettering,
         reader.font.as_deref(),
     )?;
-    if let Some(edit) = edit {
-        session.apply(edit)?;
-    }
     let at = humantime::format_rfc3339_seconds(SystemTime::now()).to_string();
-    let brief = ChapterContext::update(&path, |chapter| {
-        merge_brief(chapter, series.as_ref(), found, &reader.reference, &at)
+    let brief = together(&mut session, edit, || {
+        ChapterContext::update(&path, |chapter| {
+            merge_brief(chapter, series.as_ref(), found, &reader.reference, &at)
+        })
     })?;
     Ok(Some(ReadSummary {
         model: reader.reference.clone(),
@@ -1042,6 +1043,37 @@ fn write(
         blank_terms: brief.blank_terms,
         stopped: false,
     }))
+}
+
+/// Applies `edit`, the lines' edit, when there is one, to `session`, then
+/// runs `brief`, the brief's write, so the two land together or not at all:
+/// when the brief can't be written, as when the side file is held open or
+/// read-only, the edit's step is undone, staying only as a step to redo.
+/// The brief goes last, as the mark that the chapter was read, so a read
+/// that fails between the two is read again.
+fn together<T>(
+    session: &mut Session,
+    edit: Option<Edit>,
+    brief: impl FnOnce() -> Result<T>,
+) -> Result<T> {
+    let Some(edit) = edit else {
+        return brief();
+    };
+    let before = session.revision();
+    let change = session.apply(edit)?;
+    brief().inspect_err(|error| {
+        // An edit that changed nothing added no step, and undo would take
+        // back the one before it.
+        if change.revision == before {
+            return;
+        }
+        if let Err(undo) = session.undo() {
+            tracing::warn!(
+                "Read chapter's line labels stay though its brief wasn't written ({error:#}), as \
+                 undoing them failed: {undo:#}"
+            );
+        }
+    })
 }
 
 #[cfg(test)]
@@ -1778,6 +1810,47 @@ mod tests {
             chapter.label("c")?.map(|label| label.category),
             Some(LetteringCategory::Sfx)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_brief_that_cant_be_written_takes_the_lines_back() -> Result<()> {
+        let chapter = Chapter::new()?;
+        let prepared = chapter.prepared()?;
+        let unwritten = || -> Result<()> { Err(anyhow!("the side file can't be written")) };
+        let lines = [FoundLine {
+            note: "A pun".to_owned(),
+            ..found(chapter.id("a"), Some(LetteringCategory::Shout), 0.9)
+        }];
+        let (edit, _) = lines_edit(
+            &chapter.project(),
+            &prepared.pages,
+            &lines,
+            &LetteringSettings::default(),
+            None,
+        )?;
+        assert!(edit.is_some());
+        let history = chapter.session.lock().history();
+        let error = together(&mut chapter.session.lock(), edit, unwritten).expect_err("unwritten");
+        assert!(error.to_string().contains("can't be written"), "{error:#}");
+        assert_eq!((chapter.label("a")?, chapter.note("a")?), (None, None));
+        let after = chapter.session.lock().history();
+        assert_eq!(
+            (after.current, after.undo()),
+            (history.current, history.undo()),
+            "no step of the read's to undo"
+        );
+
+        // An edit that changes nothing adds no step, so the one before it
+        // stays.
+        let mine = || attrs::set(chapter.id("b"), &ReadNote("Mine".to_owned()));
+        chapter.edit(vec![mine()?])?;
+        let same = Edit {
+            label: LABEL.to_owned(),
+            ops: vec![mine()?],
+        };
+        together(&mut chapter.session.lock(), Some(same), unwritten).expect_err("unwritten");
+        assert_eq!(chapter.note("b")?.as_deref(), Some("Mine"));
         Ok(())
     }
 
