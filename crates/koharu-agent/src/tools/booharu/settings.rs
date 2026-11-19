@@ -48,8 +48,9 @@ impl Tool for GetSettings {
          balloon's shape (booharu_get_text_styles answers the font each category letters in \
          and each block's category); `booharu-fonts` has \
          the font picker's `favorites`, family names; `booharu-runs` has the Run menu's \
-         `presets`, each a `name` and its `stages` (`detect`, `recognize`, `inpaint`, \
-         `translate`), which set the menu's stage switches and start nothing, and how runs over \
+         `presets`, each a `name` and its `stages` (`detect`, `recognize`, `inpaint`, `read`, \
+         `translate`; `read`, Read chapter, only with `translate`), which set the menu's stage \
+         switches and start nothing, and how runs over \
          pages go, whoever starts them: `retries`, from 0 to 5, how often a failed page stage is \
          tried again, `on_page_failure`, `continue` with the other pages or `stop` the run, \
          `order`, `pages` (each page through its stages) or `stages` (one stage at a time over \
@@ -124,7 +125,9 @@ impl Tool for SetSettings {
          booharu_apply_text_style gives those the new look, their category fonts among it. A \
          change to `booharu-runs` applies to runs started from then on, the next run of a group \
          booharu_run carries on with included; a run already going keeps the settings it \
-         started with. A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
+         started with. A preset's `stages` are among `detect`, `recognize`, `inpaint`, `read` \
+         and `translate`, with at least one other than `read`, Read chapter, which goes only \
+         with `translate`. A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
          a project open, as every tool here does."
             .to_owned()
     }
