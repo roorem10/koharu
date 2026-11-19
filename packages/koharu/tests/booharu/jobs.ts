@@ -1,3 +1,4 @@
+import type { Skips } from '@/lib/booharu/jobs'
 import { pageKey, projectKey, queryClient, type ProjectView } from '@/lib/queries'
 import { receivePipeline } from '@/lib/store'
 import type { PageFailure, PipelineEvent, Stage } from '@koharu/ipc/protocol'
@@ -28,6 +29,19 @@ export function tell(...events: PipelineEvent[]): void {
 /** Run `run` queued with `stages`, over pages unless `pages` is false. */
 export function queued(run: number, stages: Stage[] = every, pages = true): PipelineEvent {
   return { kind: 'queued', run, steps: 4 * stages.length, stages, pages }
+}
+
+/** What `stage` of run `run` left alone on `page`: `counts`, the others 0, in a run naming blocks
+ * when `blocks`. */
+export function skipped(
+  run: number,
+  page: string,
+  stage: Stage,
+  counts: Partial<Skips>,
+  blocks = false,
+): PipelineEvent {
+  const none = { sound_effects: 0, hand_fixed: 0, locked: 0 }
+  return { kind: 'skipped', run, page, stage, ...none, ...counts, blocks }
 }
 
 /** A page given up on in run `run`. */

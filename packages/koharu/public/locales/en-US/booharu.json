@@ -457,6 +457,21 @@
       "retryFailedPages": "Retry failed pages",
       "retrying": "Retrying ({{attempt}}/{{attempts}})",
       "runAllAgain": "Run all stages again",
+      "skipped": {
+        "detectHandFixed_one": "Detection kept {{count}} box made or changed by hand.",
+        "detectHandFixed_other": "Detection kept {{count}} boxes made or changed by hand.",
+        "detectLocked_one": "Detection kept {{count}} locked box.",
+        "detectLocked_other": "Detection kept {{count}} locked boxes.",
+        "locked_one": "{{count}} locked box was left as it is.",
+        "locked_other": "{{count}} locked boxes were left as they are.",
+        "recognizeHandFixed_one": "{{count}} box fixed by hand wasn't read again.",
+        "recognizeHandFixed_other": "{{count}} boxes fixed by hand weren't read again.",
+        "soundEffectsHint": "To translate one anyway, pick another category for it, or change the Sound effects setting.",
+        "soundEffects_one": "{{count}} sound effect was kept as art.",
+        "soundEffects_other": "{{count}} sound effects were kept as art.",
+        "translateHandFixed_one": "{{count}} box fixed by hand wasn't translated again.",
+        "translateHandFixed_other": "{{count}} boxes fixed by hand weren't translated again."
+      },
       "title": "Runs"
     },
     "sfx": {

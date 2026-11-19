@@ -457,6 +457,21 @@
       "retryFailedPages": "Başarısız sayfaları yeniden dene",
       "retrying": "Yeniden deneniyor ({{attempt}}/{{attempts}})",
       "runAllAgain": "Tüm aşamaları yeniden çalıştır",
+      "skipped": {
+        "detectHandFixed_one": "Algılama, elle oluşturulan veya değiştirilen {{count}} kutuyu korudu.",
+        "detectHandFixed_other": "Algılama, elle oluşturulan veya değiştirilen {{count}} kutuyu korudu.",
+        "detectLocked_one": "Algılama, kilitli {{count}} kutuyu korudu.",
+        "detectLocked_other": "Algılama, kilitli {{count}} kutuyu korudu.",
+        "locked_one": "Kilitli {{count}} kutu olduğu gibi bırakıldı.",
+        "locked_other": "Kilitli {{count}} kutu olduğu gibi bırakıldı.",
+        "recognizeHandFixed_one": "Elle düzeltilen {{count}} kutu yeniden okunmadı.",
+        "recognizeHandFixed_other": "Elle düzeltilen {{count}} kutu yeniden okunmadı.",
+        "soundEffectsHint": "Yine de çevirmek için ona başka bir kategori seçin ya da “Ses efektleri” ayarını değiştirin.",
+        "soundEffects_one": "{{count}} ses efekti çizim olarak bırakıldı.",
+        "soundEffects_other": "{{count}} ses efekti çizim olarak bırakıldı.",
+        "translateHandFixed_one": "Elle düzeltilen {{count}} kutu yeniden çevrilmedi.",
+        "translateHandFixed_other": "Elle düzeltilen {{count}} kutu yeniden çevrilmedi."
+      },
       "title": "Çalıştırmalar"
     },
     "sfx": {

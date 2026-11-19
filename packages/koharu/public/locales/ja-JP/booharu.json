@@ -457,6 +457,21 @@
       "retryFailedPages": "失敗したページを再試行",
       "retrying": "再試行中（{{attempt}}/{{attempts}}）",
       "runAllAgain": "すべての工程をもう一度実行",
+      "skipped": {
+        "detectHandFixed_one": "検出では、手動で作成・変更した{{count}}個のボックスを残しました。",
+        "detectHandFixed_other": "検出では、手動で作成・変更した{{count}}個のボックスを残しました。",
+        "detectLocked_one": "検出では、ロック中の{{count}}個のボックスを残しました。",
+        "detectLocked_other": "検出では、ロック中の{{count}}個のボックスを残しました。",
+        "locked_one": "ロック中の{{count}}個のボックスはそのままです。",
+        "locked_other": "ロック中の{{count}}個のボックスはそのままです。",
+        "recognizeHandFixed_one": "手動で修正した{{count}}個のボックスはOCRを再実行しませんでした。",
+        "recognizeHandFixed_other": "手動で修正した{{count}}個のボックスはOCRを再実行しませんでした。",
+        "soundEffectsHint": "それでも翻訳するには、別の写植カテゴリを選ぶか、「効果音・擬音」の設定を変更してください。",
+        "soundEffects_one": "{{count}}個の効果音を原画のまま残しました。",
+        "soundEffects_other": "{{count}}個の効果音を原画のまま残しました。",
+        "translateHandFixed_one": "手動で修正した{{count}}個のボックスは再翻訳しませんでした。",
+        "translateHandFixed_other": "手動で修正した{{count}}個のボックスは再翻訳しませんでした。"
+      },
       "title": "実行"
     },
     "sfx": {

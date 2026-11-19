@@ -457,6 +457,21 @@
       "retryFailedPages": "重试失败的页面",
       "retrying": "正在重试（{{attempt}}/{{attempts}}）",
       "runAllAgain": "重新运行所有阶段",
+      "skipped": {
+        "detectHandFixed_one": "检测保留了 {{count}} 个手动添加或修改过的文本框。",
+        "detectHandFixed_other": "检测保留了 {{count}} 个手动添加或修改过的文本框。",
+        "detectLocked_one": "检测保留了 {{count}} 个已锁定的文本框。",
+        "detectLocked_other": "检测保留了 {{count}} 个已锁定的文本框。",
+        "locked_one": "{{count}} 个已锁定的文本框保持不变。",
+        "locked_other": "{{count}} 个已锁定的文本框保持不变。",
+        "recognizeHandFixed_one": "{{count}} 个手动修改过的文本框没有重新识别。",
+        "recognizeHandFixed_other": "{{count}} 个手动修改过的文本框没有重新识别。",
+        "soundEffectsHint": "如仍要翻译，请为它另选一个排字类别，或更改“音效”设置。",
+        "soundEffects_one": "{{count}} 个音效保留为原图。",
+        "soundEffects_other": "{{count}} 个音效保留为原图。",
+        "translateHandFixed_one": "{{count}} 个手动修改过的文本框没有重新翻译。",
+        "translateHandFixed_other": "{{count}} 个手动修改过的文本框没有重新翻译。"
+      },
       "title": "处理任务"
     },
     "sfx": {

@@ -457,6 +457,21 @@
       "retryFailedPages": "重試失敗的頁面",
       "retrying": "正在重試（{{attempt}}/{{attempts}}）",
       "runAllAgain": "重新執行所有階段",
+      "skipped": {
+        "detectHandFixed_one": "偵測保留了 {{count}} 個手動新增或修改過的文字框。",
+        "detectHandFixed_other": "偵測保留了 {{count}} 個手動新增或修改過的文字框。",
+        "detectLocked_one": "偵測保留了 {{count}} 個已鎖定的文字框。",
+        "detectLocked_other": "偵測保留了 {{count}} 個已鎖定的文字框。",
+        "locked_one": "{{count}} 個已鎖定的文字框保持不變。",
+        "locked_other": "{{count}} 個已鎖定的文字框保持不變。",
+        "recognizeHandFixed_one": "{{count}} 個手動修改過的文字框沒有重新辨識。",
+        "recognizeHandFixed_other": "{{count}} 個手動修改過的文字框沒有重新辨識。",
+        "soundEffectsHint": "如仍要翻譯，請為它另選一個排字類別，或變更「音效」設定。",
+        "soundEffects_one": "{{count}} 個音效保留為原圖。",
+        "soundEffects_other": "{{count}} 個音效保留為原圖。",
+        "translateHandFixed_one": "{{count}} 個手動修改過的文字框沒有重新翻譯。",
+        "translateHandFixed_other": "{{count}} 個手動修改過的文字框沒有重新翻譯。"
+      },
       "title": "處理作業"
     },
     "sfx": {

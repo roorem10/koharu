@@ -491,6 +491,27 @@
       "retryFailedPages": "Tentar novamente as páginas com falha",
       "retrying": "Tentando novamente ({{attempt}}/{{attempts}})",
       "runAllAgain": "Executar todas as etapas de novo",
+      "skipped": {
+        "detectHandFixed_many": "A detecção manteve {{count}} caixas criadas ou alteradas à mão.",
+        "detectHandFixed_one": "A detecção manteve {{count}} caixa criada ou alterada à mão.",
+        "detectHandFixed_other": "A detecção manteve {{count}} caixas criadas ou alteradas à mão.",
+        "detectLocked_many": "A detecção manteve {{count}} caixas bloqueadas.",
+        "detectLocked_one": "A detecção manteve {{count}} caixa bloqueada.",
+        "detectLocked_other": "A detecção manteve {{count}} caixas bloqueadas.",
+        "locked_many": "{{count}} caixas bloqueadas ficaram como estavam.",
+        "locked_one": "{{count}} caixa bloqueada ficou como estava.",
+        "locked_other": "{{count}} caixas bloqueadas ficaram como estavam.",
+        "recognizeHandFixed_many": "{{count}} caixas corrigidas à mão não passaram pelo OCR de novo.",
+        "recognizeHandFixed_one": "{{count}} caixa corrigida à mão não passou pelo OCR de novo.",
+        "recognizeHandFixed_other": "{{count}} caixas corrigidas à mão não passaram pelo OCR de novo.",
+        "soundEffectsHint": "Para traduzir um mesmo assim, escolha outra categoria para ele ou mude a configuração “Efeitos sonoros”.",
+        "soundEffects_many": "{{count}} efeitos sonoros foram mantidos como arte.",
+        "soundEffects_one": "{{count}} efeito sonoro foi mantido como arte.",
+        "soundEffects_other": "{{count}} efeitos sonoros foram mantidos como arte.",
+        "translateHandFixed_many": "{{count}} caixas corrigidas à mão não foram traduzidas de novo.",
+        "translateHandFixed_one": "{{count}} caixa corrigida à mão não foi traduzida de novo.",
+        "translateHandFixed_other": "{{count}} caixas corrigidas à mão não foram traduzidas de novo."
+      },
       "title": "Execuções"
     },
     "sfx": {

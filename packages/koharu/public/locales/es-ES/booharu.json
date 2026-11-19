@@ -491,6 +491,27 @@
       "retryFailedPages": "Reintentar páginas con errores",
       "retrying": "Reintentando ({{attempt}}/{{attempts}})",
       "runAllAgain": "Ejecutar todas las etapas de nuevo",
+      "skipped": {
+        "detectHandFixed_many": "La detección conservó {{count}} cuadros creados o cambiados a mano.",
+        "detectHandFixed_one": "La detección conservó {{count}} cuadro creado o cambiado a mano.",
+        "detectHandFixed_other": "La detección conservó {{count}} cuadros creados o cambiados a mano.",
+        "detectLocked_many": "La detección conservó {{count}} cuadros bloqueados.",
+        "detectLocked_one": "La detección conservó {{count}} cuadro bloqueado.",
+        "detectLocked_other": "La detección conservó {{count}} cuadros bloqueados.",
+        "locked_many": "{{count}} cuadros bloqueados se quedaron como estaban.",
+        "locked_one": "{{count}} cuadro bloqueado se quedó como estaba.",
+        "locked_other": "{{count}} cuadros bloqueados se quedaron como estaban.",
+        "recognizeHandFixed_many": "{{count}} cuadros corregidos a mano no se volvieron a leer.",
+        "recognizeHandFixed_one": "{{count}} cuadro corregido a mano no se volvió a leer.",
+        "recognizeHandFixed_other": "{{count}} cuadros corregidos a mano no se volvieron a leer.",
+        "soundEffectsHint": "Para traducir uno de todos modos, elige otra categoría para él o cambia el ajuste “Efectos de sonido”.",
+        "soundEffects_many": "{{count}} efectos de sonido se conservaron como dibujo.",
+        "soundEffects_one": "{{count}} efecto de sonido se conservó como dibujo.",
+        "soundEffects_other": "{{count}} efectos de sonido se conservaron como dibujo.",
+        "translateHandFixed_many": "{{count}} cuadros corregidos a mano no se volvieron a traducir.",
+        "translateHandFixed_one": "{{count}} cuadro corregido a mano no se volvió a traducir.",
+        "translateHandFixed_other": "{{count}} cuadros corregidos a mano no se volvieron a traducir."
+      },
       "title": "Ejecuciones"
     },
     "sfx": {

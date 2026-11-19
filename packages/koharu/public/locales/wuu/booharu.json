@@ -457,6 +457,21 @@
       "retryFailedPages": "重试失败个页面",
       "retrying": "来勒重试（{{attempt}}/{{attempts}}）",
       "runAllAgain": "所有阶段重新运行一趟",
+      "skipped": {
+        "detectHandFixed_one": "检测保留了手动加个或者改过个 {{count}} 只文字框。",
+        "detectHandFixed_other": "检测保留了手动加个或者改过个 {{count}} 只文字框。",
+        "detectLocked_one": "检测保留了锁牢个 {{count}} 只文字框。",
+        "detectLocked_other": "检测保留了锁牢个 {{count}} 只文字框。",
+        "locked_one": "锁牢个 {{count}} 只文字框保持勿变。",
+        "locked_other": "锁牢个 {{count}} 只文字框保持勿变。",
+        "recognizeHandFixed_one": "手动改过个 {{count}} 只文字框呒没重新识别。",
+        "recognizeHandFixed_other": "手动改过个 {{count}} 只文字框呒没重新识别。",
+        "soundEffectsHint": "要是照样要翻译，就帮伊拣别个排版类别，或者改“音效”设置。",
+        "soundEffects_one": "{{count}} 只音效保留成原图。",
+        "soundEffects_other": "{{count}} 只音效保留成原图。",
+        "translateHandFixed_one": "手动改过个 {{count}} 只文字框呒没重新翻译。",
+        "translateHandFixed_other": "手动改过个 {{count}} 只文字框呒没重新翻译。"
+      },
       "title": "运行"
     },
     "sfx": {

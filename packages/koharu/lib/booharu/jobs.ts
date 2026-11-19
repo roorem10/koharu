@@ -3,6 +3,7 @@
 import { prepareFinishSound } from '@/components/booharu/runs/sound'
 import { call } from '@/lib/backend'
 import { chime } from '@/lib/booharu/chime'
+import i18n from '@/lib/i18n'
 import { projectKey, queryClient, useProject, type ProjectView } from '@/lib/queries'
 import { pipelineStages, useKoharuStore, type Job } from '@/lib/store'
 import {
@@ -13,6 +14,7 @@ import {
   type PipelineEvent,
   type Stage,
 } from '@koharu/ipc/protocol'
+import { toast } from '@koharu/ui/components/toast'
 
 // lib/store.ts imports this module, which reaches the store again through its own imports: safe, as
 // neither module reads the other's exports while it loads, only in calls made after.
@@ -20,6 +22,10 @@ import {
 /** A page waiting for its next try: `attempt` is the try it waits for, its first counting as 1,
  * of `attempts`. */
 export type Retry = { page: PageId; stage: Stage; attempt: number; attempts: number }
+
+/** The blocks a page stage left alone on its page, as `skipped` tells them: sound effects kept as
+ * art, blocks fixed by hand (for Detection, kept as made or changed by hand) and locked ones. */
+export type Skips = { sound_effects: number; hand_fixed: number; locked: number }
 
 /** What Booharu keeps of a run beside Koharu's counts, from the pipeline's events. */
 export interface RunRecord {
@@ -39,6 +45,12 @@ export interface RunRecord {
   /** For a run over pages, the stages each page finished, so Retry failed pages runs again a stage
    * the run dropped as it gave the page up, and not one it finished. */
   finished: Partial<Record<PageId, Stage[]>>
+  /** The blocks each page stage left alone, by stage, then page, as it last told them: a page stage
+   * tried again tells them again, which replaces what it told before. */
+  skipped: Partial<Record<Stage, Partial<Record<PageId, Skips>>>>
+  /** Whether it named blocks, as its `skipped` events say: only such a run's end counts the sound
+   * effects it kept as art, which a run over pages keeps on every page, as the setting says. */
+  namedBlocks: boolean
 }
 
 /** The record of a run whose Queued the interface missed: its stages and target unknown, so it
@@ -50,19 +62,30 @@ const missed: RunRecord = {
   retrying: [],
   failures: [],
   finished: {},
+  skipped: {},
+  namedBlocks: false,
 }
 
 /** `job` with Booharu's record of the run kept through `event`, after Koharu's fold of it:
  * Queued's stages and whether it works on pages, with the project open; each page stage waiting
  * for its next try, until that stage starts or finishes, or its page is given up on; the stages
- * each page finished; and the failed pages, which a run done with problems lists as it ends, and a
- * run that failed adds its page to. */
+ * each page finished; the failed pages, which a run done with problems lists as it ends, and a
+ * run that failed adds its page to; and the blocks each page stage left alone. */
 export function foldRun(job: Job, event: PipelineEvent): Job {
   if (event.kind === 'queued') {
     const { stages, pages } = event
     return {
       ...job,
-      booharu: { stages, pages, project: openProject(), retrying: [], failures: [], finished: {} },
+      booharu: {
+        stages,
+        pages,
+        project: openProject(),
+        retrying: [],
+        failures: [],
+        finished: {},
+        skipped: {},
+        namedBlocks: false,
+      },
     }
   }
   const record = job.booharu ?? missed
@@ -101,9 +124,14 @@ export function foldRun(job: Job, event: PipelineEvent): Job {
     }
     case 'ended':
       return change({ retrying: [], failures: failuresAtEnd(record.failures, event.outcome) })
-    // Blocks a page stage left alone, which the record doesn't count yet.
-    case 'skipped':
-      return job
+    case 'skipped': {
+      const { page, stage, sound_effects, hand_fixed, locked, blocks } = event
+      const pages = { ...record.skipped[stage], [page]: { sound_effects, hand_fixed, locked } }
+      return change({
+        skipped: { ...record.skipped, [stage]: pages },
+        namedBlocks: record.namedBlocks || blocks,
+      })
+    }
   }
 }
 
@@ -125,11 +153,47 @@ function failuresAtEnd(failures: PageFailure[], outcome: Outcome): PageFailure[]
 }
 
 /** What follows `event` as it's told, after its fold, which a run told again as the editor loads
- * doesn't get: a run that ended chimes, as lib/booharu/chime.ts says. */
+ * doesn't get: a run that ended chimes, as lib/booharu/chime.ts says, and one toast says what it
+ * left alone, however it ended. */
 export function toldLive(event: PipelineEvent): void {
   if (event.kind !== 'ended') return
   const job = useKoharuStore.getState().jobs[String(event.run)]
-  if (job) chime(job, event.outcome)
+  if (!job) return
+  chime(job, event.outcome)
+  const [title, ...more] = job.booharu ? leftAlone(job.booharu) : []
+  if (title) toast.add({ type: 'info', title, description: more.join(' ') || undefined })
+}
+
+/** What the end of `record`'s run says it left alone, a sentence each, none when nothing: the
+ * blocks Detection kept as made or changed by hand; those fixed by hand that reading and
+ * translating left out; the locked ones, worded as Detection's when only it met them; and, only for
+ * a run that named blocks, the sound effects it kept as art, with how to translate one, as a box's
+ * Translate on one would otherwise seem to do nothing. */
+function leftAlone(record: RunRecord): string[] {
+  const { skipped } = record
+  const total = (stage: Stage, count: keyof Skips) =>
+    Object.values(skipped[stage] ?? {}).reduce((sum, skips) => sum + (skips?.[count] ?? 0), 0)
+  // Each stage that reaches a page leaves its locked blocks alone, Detection keeping them, and
+  // Inpainting those whose clean-up alone is locked too: the most any stage told, once a page.
+  const pages = new Set(pipelineStages.flatMap((stage) => Object.keys(skipped[stage] ?? {})))
+  const locked = [...pages].reduce(
+    (sum, page) =>
+      sum + Math.max(...pipelineStages.map((stage) => skipped[stage]?.[page]?.locked ?? 0)),
+    0,
+  )
+  const keptOnly = pipelineStages.every((stage) => stage === 'detect' || !total(stage, 'locked'))
+  const soundEffects = record.namedBlocks ? total('translate', 'sound_effects') : 0
+  const counts: Array<[string, number]> = [
+    ['booharu.runs.skipped.detectHandFixed', total('detect', 'hand_fixed')],
+    ['booharu.runs.skipped.recognizeHandFixed', total('recognize', 'hand_fixed')],
+    ['booharu.runs.skipped.translateHandFixed', total('translate', 'hand_fixed')],
+    [keptOnly ? 'booharu.runs.skipped.detectLocked' : 'booharu.runs.skipped.locked', locked],
+    ['booharu.runs.skipped.soundEffects', soundEffects],
+  ]
+  const lines = counts
+    .filter(([, count]) => count > 0)
+    .map(([key, count]) => i18n.t(key, { count }))
+  return soundEffects > 0 ? [...lines, i18n.t('booharu.runs.skipped.soundEffectsHint')] : lines
 }
 
 /** The open project's name, as the editor last read it; null while none is known. */

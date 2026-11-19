@@ -491,6 +491,27 @@
       "retryFailedPages": "Réessayer les pages en échec",
       "retrying": "Nouvelle tentative ({{attempt}}/{{attempts}})",
       "runAllAgain": "Relancer toutes les étapes",
+      "skipped": {
+        "detectHandFixed_many": "La détection a gardé {{count}} zones créées ou modifiées à la main.",
+        "detectHandFixed_one": "La détection a gardé {{count}} zone créée ou modifiée à la main.",
+        "detectHandFixed_other": "La détection a gardé {{count}} zones créées ou modifiées à la main.",
+        "detectLocked_many": "La détection a gardé {{count}} zones verrouillées.",
+        "detectLocked_one": "La détection a gardé {{count}} zone verrouillée.",
+        "detectLocked_other": "La détection a gardé {{count}} zones verrouillées.",
+        "locked_many": "{{count}} zones verrouillées sont restées telles quelles.",
+        "locked_one": "{{count}} zone verrouillée est restée telle quelle.",
+        "locked_other": "{{count}} zones verrouillées sont restées telles quelles.",
+        "recognizeHandFixed_many": "{{count}} zones corrigées à la main n’ont pas été relues.",
+        "recognizeHandFixed_one": "{{count}} zone corrigée à la main n’a pas été relue.",
+        "recognizeHandFixed_other": "{{count}} zones corrigées à la main n’ont pas été relues.",
+        "soundEffectsHint": "Pour en traduire un quand même, choisissez-lui une autre catégorie ou modifiez le réglage « Effets sonores ».",
+        "soundEffects_many": "{{count}} effets sonores ont été gardés comme dessin.",
+        "soundEffects_one": "{{count}} effet sonore a été gardé comme dessin.",
+        "soundEffects_other": "{{count}} effets sonores ont été gardés comme dessin.",
+        "translateHandFixed_many": "{{count}} zones corrigées à la main n’ont pas été retraduites.",
+        "translateHandFixed_one": "{{count}} zone corrigée à la main n’a pas été retraduite.",
+        "translateHandFixed_other": "{{count}} zones corrigées à la main n’ont pas été retraduites."
+      },
       "title": "Exécutions"
     },
     "sfx": {
