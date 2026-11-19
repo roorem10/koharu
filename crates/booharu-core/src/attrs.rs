@@ -4,9 +4,12 @@
 //! draws is a scene key instead.
 //!
 //! - A writer builds its ops with [`set`] and [`clear`] and applies them in
-//!   the one scene edit of its action, under a Booharu label. A locked layer
-//!   fails the whole edit, so a writer leaves locked layers out and says how
-//!   many it left.
+//!   the one scene edit of its action, under a Booharu label; a layer the
+//!   edit adds may carry its keys in its `AddLayer` instead, each the serde
+//!   form of its registry type under its `KEY`, as a sound effect's subtitle
+//!   is added (`sfx::subtitle_ops`), so the new layer needs no reference of
+//!   its own for a second op. A locked layer fails the whole edit, so a
+//!   writer leaves locked layers out and says how many it left.
 //! - A reader takes a value that doesn't read as its key's shape for absent,
 //!   since any agent can write these keys through the generic edit tool. That
 //!   is the deliberate exception to the scene's rule that a namespace's

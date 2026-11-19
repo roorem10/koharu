@@ -27,7 +27,9 @@ const RETYPED: &str = "set_text";
 /// new translation does: the default font, or its category's while Pick
 /// fonts automatically is on, and with colour detection off the default
 /// colours in place of the measured ones. Unlike the stage's,
-/// it gets no hand-edit record: it was typed by hand. One with a
+/// it gets no hand-edit record of its own: it was typed by hand. A sound
+/// effect kept as art has the kept mark taken from the record it holds
+/// (`styles::typed`), as its clean-up shows again. One with a
 /// translation keeps its place, lettering, and language, and the step is
 /// labelled as the Story panel labels a retyped text.
 pub fn edit(
@@ -54,7 +56,8 @@ pub fn edit(
     // The stage's ops for a translation it places (`written` in
     // koharu-pipeline's stages/translate), less its records, its c2pa one
     // naming the model that made the translation and Booharu's hand-edit
-    // one: someone typed this one.
+    // one: someone typed this one. `typed` still drops the kept mark of a
+    // sound effect kept as art, whose clean-up this shows.
     let placed = koharu_pipeline::placement(project, block, target)?;
     let looked = styles::typed(
         project,
