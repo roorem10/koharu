@@ -71,6 +71,39 @@ function tabRow(width: number, labels: number[], badge?: number): HTMLElement {
   return list
 }
 
+/** Lays out the rows of tabs the hook measures `width` wide: a label or a count 6 px a character
+ * whole, and 1 px while its tab shrinks or shows its icon alone; each tab 6 px of padding each side,
+ * 4 px tight, and 4 px between its parts; the tabs 4 px apart, 2 px tight; and 12 px icons. */
+function laidOut(width: number) {
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    return this.getAttribute('role') === 'tablist' ? width : 0
+  })
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    if (this.getAttribute('role') === 'tablist') return box(width)
+    if (this.tagName === 'SPAN' && fitOf(this) !== 'icons' && held(this))
+      return box((this.textContent?.length ?? 0) * 6)
+    return box(this.tagName === 'SPAN' ? 1 : 0)
+  })
+  styled((element) => {
+    const tight = fitOf(element) === 'tight'
+    if (element.getAttribute('role') === 'tablist') return { columnGap: tight ? '2px' : '4px' }
+    if (element.getAttribute('role') === 'tab')
+      return {
+        paddingLeft: tight ? '4px' : '6px',
+        paddingRight: tight ? '4px' : '6px',
+        columnGap: '4px',
+      }
+    if (element instanceof SVGElement) return { width: '12px' }
+  })
+}
+
+/** How the row of tabs on screen fits now. */
+const shownFit = () => screen.getByRole('tablist').getAttribute('data-booharu-tabs')
+
 /** A row of tabs `available` wide whose labels are `labels` wide whole, laid out as RightSidebar
  * lays them out, the last QC's with its count at 12 on a 22.45 px badge. */
 function row(available: number, labels: number[]): TabRow {
@@ -182,34 +215,8 @@ describe('Booharu right pane tabs', () => {
   })
 
   it('tells how the tabs fit, measuring again as they change', async () => {
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
-      this: HTMLElement,
-    ) {
-      return this.getAttribute('role') === 'tablist' ? 120 : 0
-    })
-    // A label is 6 px a letter whole, and cut to 1 px while its tab shrinks or shows its icon alone.
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-      this: HTMLElement,
-    ) {
-      if (this.getAttribute('role') === 'tablist') return box(120)
-      if (this.tagName === 'SPAN' && fitOf(this) !== 'icons' && held(this))
-        return box((this.textContent?.length ?? 0) * 6)
-      return box(this.tagName === 'SPAN' ? 1 : 0)
-    })
-    // Each tab 6 px of padding each side, 4 px tight, and 4 px between its icon and its label, and
-    // the tabs 4 px apart, 2 px tight, with a 12 px icon.
-    styled((element) => {
-      const tight = fitOf(element) === 'tight'
-      if (element.getAttribute('role') === 'tablist') return { columnGap: tight ? '2px' : '4px' }
-      if (element.getAttribute('role') === 'tab')
-        return {
-          paddingLeft: tight ? '4px' : '6px',
-          paddingRight: tight ? '4px' : '6px',
-          columnGap: '4px',
-        }
-      if (element instanceof SVGElement) return { width: '12px' }
-    })
-
+    laidOut(120)
+    // Each tab keyed by its label, so a label changed is a tab made again.
     function Row({ labels }: { labels: string[] }) {
       const fit = useSidebarTabsFit()
       return (
@@ -223,20 +230,52 @@ describe('Booharu right pane tabs', () => {
         </div>
       )
     }
-    const fit = () => screen.getByRole('tablist').getAttribute('data-booharu-tabs')
 
     // Two labels of 10 letters (120): 138 px tight in 120, so the icons alone.
     const view = render(<Row labels={['Layersssss', 'Storyyyyyy']} />)
-    expect(fit()).toBe('icons')
+    expect(shownFit()).toBe('icons')
     // Of 8 letters (96), as in another language: 124 px without the icons, 114 px tight.
     view.rerender(<Row labels={['Layersss', 'Storyyyy']} />)
-    await waitFor(() => expect(fit()).toBe('tight'))
+    await waitFor(() => expect(shownFit()).toBe('tight'))
     // Of 6 letters (72): 100 px without the icons, 132 px with them.
     view.rerender(<Row labels={['Layers', 'Storyy']} />)
-    await waitFor(() => expect(fit()).toBe('labels'))
+    await waitFor(() => expect(shownFit()).toBe('labels'))
     // Of 4 letters (48): 108 px with the icons.
     view.rerender(<Row labels={['Laye', 'Stor']} />)
-    await waitFor(() => expect(fit()).toBeNull())
+    await waitFor(() => expect(shownFit()).toBeNull())
+  })
+
+  it('measures again as a label or the count changes in place, as React changes them', async () => {
+    laidOut(120)
+    // The tabs keep their keys, as RightSidebar's do, so React changes their text in place: a
+    // language switch or a new count reaches the hook as a change of text alone.
+    function Row({ labels, count }: { labels: string[]; count: number }) {
+      const fit = useSidebarTabsFit()
+      return (
+        <div role='tablist' {...fit}>
+          {labels.map((label, index) => (
+            <button key={index} role='tab'>
+              <svg />
+              <span>{label}</span>
+              {index === labels.length - 1 && <span>{count}</span>}
+            </button>
+          ))}
+        </div>
+      )
+    }
+
+    // The labels and the count, 6 px a character, 9 of them in all: 118 px with the icons.
+    const view = render(<Row labels={['Layers', 'QC']} count={9} />)
+    expect(shownFit()).toBeNull()
+    // Layers in another language, 14 in all: 116 px without the icons.
+    view.rerender(<Row labels={['Layerssssss', 'QC']} count={9} />)
+    await waitFor(() => expect(shownFit()).toBe('labels'))
+    // The count gains a digit: 122 px without the icons, 112 px tight.
+    view.rerender(<Row labels={['Layerssssss', 'QC']} count={10} />)
+    await waitFor(() => expect(shownFit()).toBe('tight'))
+    // Layers back in the first language: 92 px without the icons.
+    view.rerender(<Row labels={['Layers', 'QC']} count={10} />)
+    await waitFor(() => expect(shownFit()).toBe('labels'))
   })
 
   it('fits the tabs whole while the row isn’t laid out', () => {
