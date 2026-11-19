@@ -207,7 +207,10 @@ fn start(
     let (groups, narrows) = translating(&session, groups, &stages, read, store)?;
     let first = groups.first().map(|first| match first.read {
         true => First::Read(first.pages.clone()),
-        false => First::Run(request(first_target(target, &stages, first), &first.stages)),
+        false => First::Run(Box::new(request(
+            first_target(target, &stages, first),
+            &first.stages,
+        ))),
     });
     go(going, host, session, groups, narrows, first, runtime)
 }
@@ -253,7 +256,7 @@ fn translating(
 /// How a group starts: with its first group's run, or with its read, on
 /// those pages.
 enum First {
-    Run(Request),
+    Run(Box<Request>),
     Read(Vec<PageId>),
 }
 
@@ -296,7 +299,7 @@ fn go(
     let (plan, now) = match first {
         First::Run(request) => {
             let run = host
-                .queue(&session, request)?
+                .queue(&session, *request)?
                 .context("the project closed")?;
             let plan = RunPlan {
                 group,
@@ -1074,7 +1077,7 @@ mod tests {
             Arc::clone(&session),
             groups,
             false,
-            Some(First::Run(first)),
+            Some(First::Run(Box::new(first))),
             &runtime,
         )
         .expect("the group");
