@@ -1,13 +1,16 @@
 //! Apply's commands: how many blocks of a scope the default text look would
-//! change, and giving it to them, each worked out by `booharu::styles`,
-//! which the agent's tool shares, under the saved `[booharu-lettering]` and
-//! the first of Koharu's Preferred fonts as they are when called.
+//! change, and giving it to them; and Reset to lettering default's, giving
+//! layers their lettering default back; each worked out by
+//! `booharu::styles`, which the agent's tools share, under the saved
+//! `[booharu-lettering]` and the first of Koharu's Preferred fonts as they
+//! are when called.
 
 use std::sync::Arc;
 
-use booharu::styles::{self, StyleCounts, StyleScope};
+use booharu::styles::{self, ResetCounts, StyleCounts, StyleScope};
 use booharu_core::{attrs::Origin, settings::LetteringSettings, styles::first_font};
 use koharu_renderer::RendererConfig;
+use koharu_scene::LayerId;
 use tauri::State;
 
 use crate::{app::App, commands::Result};
@@ -68,6 +71,37 @@ pub async fn booharu_apply_text_styles(
             font.as_deref(),
             Origin::Automatic,
         )?;
+        if let Some(edit) = edit {
+            tracing::info!(label = %edit.label, ops = edit.ops.len(), "edit");
+            session.apply(edit)?;
+        }
+        Ok(counts)
+    })
+    .await??)
+}
+
+/// Gives the layers `layers` their lettering default back, as one undo step
+/// labelled `booharu_reset_lettering`: a translated box the look its first
+/// translation got, at its current size, with its role and, while Pick fonts
+/// automatically is on, its category's font; a sound effect's subtitle its
+/// subtitle look; and any other text layer the default look. Only the look
+/// changes: the text, size, frame, and the rest stay. Locked layers and
+/// untranslated boxes are left alone and counted. Answers how many layers it
+/// changed, and how many it left alone as locked or untranslated; with
+/// nothing to change, it makes no undo step.
+#[tauri::command]
+#[specta::specta]
+pub async fn booharu_reset_lettering(
+    app: State<'_, Arc<App>>,
+    layers: Vec<LayerId>,
+) -> Result<ResetCounts> {
+    let app = Arc::clone(&app);
+    Ok(tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let (settings, font) = look()?;
+        let session = app.session()?;
+        let mut session = session.lock();
+        let (edit, counts) =
+            styles::reset_lettering(&session.project(), &layers, &settings, font.as_deref())?;
         if let Some(edit) = edit {
             tracing::info!(label = %edit.label, ops = edit.ops.len(), "edit");
             session.apply(edit)?;
