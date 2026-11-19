@@ -138,7 +138,8 @@ impl Tool for SetSettings {
          and `translate`, with at least one other than `read`, Read chapter, which goes only \
          with `translate`. A change to `booharu-reading` applies to the next read and the next \
          line explained; a blank `model` is refused, so set it to null for the translation \
-         model. A change to `booharu-qc` applies as the quality check next checks each page. \
+         model. A change to `booharu-qc` applies to booharu_get_qc_findings at once, and to \
+         the QC tab as the app checks every page again after any section's save. \
          A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
          a project open, as every tool here does."
             .to_owned()
