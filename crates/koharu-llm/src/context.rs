@@ -172,6 +172,27 @@ impl Context {
     pub fn policy(&self, spec: &ModelSpec) -> CompactionPolicy {
         policy(&self.prompts, spec)
     }
+
+    /// Booharu: the conversation as rig keeps it, its compaction's summary
+    /// and what it tracks among it, which Booharu saves beside the project
+    /// so the agent's chat comes back with it.
+    #[must_use]
+    pub fn conversation(&self) -> &Conversation {
+        &self.conversation
+    }
+
+    /// Booharu: this context, with its prompts, going on with
+    /// `conversation`, one Booharu saved, in place of its own. A provider's
+    /// count of its tokens isn't saved, so they're estimated until a reply
+    /// counts them again.
+    #[must_use]
+    pub fn continuing(self, conversation: Conversation) -> Self {
+        Self {
+            conversation,
+            count: None,
+            ..self
+        }
+    }
 }
 
 /// What every model here carries.
@@ -312,6 +333,38 @@ mod tests {
             .await
             .unwrap();
         assert!(context.messages().len() < 8);
+    }
+
+    /// Booharu: a conversation saved as rig writes it goes on in a new
+    /// context as it was, its compaction's summary still the summary rather
+    /// than an ordinary message, so the next compaction carries it on.
+    #[tokio::test]
+    async fn a_saved_conversation_goes_on_with_its_summary() {
+        let script = scripted(Some(&FUNCTION_TAGS), 4000, vec![Ok("The story so far.")]);
+        let mut context = Context::new(SummaryPrompts::DEFAULT);
+        let messages = (0..40)
+            .flat_map(|_| [Message::user(long(1000)), Message::assistant(long(1000))])
+            .collect();
+        context.record([(messages, Usage::default())]);
+        context.fit(&script.model).await.unwrap();
+        let summarized = summarized_prefix(context.conversation());
+        assert!(summarized > 0, "a summary");
+        context.record([(vec![Message::user("Next.")], usage(500))]);
+
+        let saved = serde_json::to_string(context.conversation()).unwrap();
+        let read: Conversation = serde_json::from_str(&saved).unwrap();
+        let restored = Context::new(SummaryPrompts::DEFAULT).continuing(read);
+        assert_eq!(restored.messages(), context.messages());
+        assert_eq!(restored.conversation(), context.conversation());
+        assert_eq!(summarized_prefix(restored.conversation()), summarized);
+        assert_eq!(
+            summary_state(restored.conversation()),
+            summary_state(context.conversation())
+        );
+        // The count was the provider's; the saved conversation is estimated.
+        assert!(context.count.is_some());
+        assert_eq!(restored.count, None);
+        assert_eq!(restored.tokens(), estimate_tokens(context.messages()));
     }
 
     #[test]
