@@ -13,7 +13,8 @@
 //!   the subtitled ones (`sfx::skipped`), which no redo lifts; a subtitle
 //!   run translates the effects it names.
 //! - Detect again keeps what was made or changed by hand, a split's halves
-//!   and a clean-up hidden by hand among it, and what is locked ([`keeps`]).
+//!   and a clean-up hidden by hand, or shown again by hand on an effect kept
+//!   as art, among it, and what is locked ([`keeps`]).
 //!
 //! koharu-pipeline's Booharu glue calls [`left_out`] from each stage's hook
 //! and [`keeps`] from Detect's, and the redo counts read [`left_out`] too.
@@ -129,14 +130,14 @@ pub fn cleanable(page: &Page, layer: &Layer) -> bool {
 /// with what it detects: a locked layer; a block changed by hand (its
 /// source, translation, or style, or drawn by hand, as
 /// [`edited`](crate::edited) reports it, a split's halves among them),
-/// whose clean-up was hidden by hand ([`sfx::hand_kept`]), labelled by a
+/// whose clean-up was hidden by hand ([`sfx::hand_kept`]) or shown again by
+/// hand after Booharu kept it as art ([`sfx::hand_shown`]), labelled by a
 /// user, given a reviewer's note, or subtitled; a panel or balloon Koharu's
-/// Detection stage didn't make; and
-/// any text layer, the T tool's and subtitles. Anything else, a block,
-/// panel, or balloon detection made and nobody changed among them, is
-/// detected again, a block whose clean-up Booharu hid to keep it as art
-/// (the kept mark) or the Translation stage hid giving it back among them,
-/// as no hand hid those.
+/// Detection stage didn't make; and any text layer, the T tool's and
+/// subtitles. Anything else, a block, panel, or balloon detection made and
+/// nobody changed among them, is detected again, a block whose clean-up
+/// Booharu hid to keep it as art (the kept mark) or the Translation stage
+/// hid giving it back among them, as no hand hid those.
 pub fn keeps(page: &Page, layer: &Layer) -> bool {
     if layer.locked {
         return true;
@@ -145,6 +146,7 @@ pub fn keeps(page: &Page, layer: &Layer) -> bool {
         Content::Block(block) => {
             edited(layer).hand_edited()
                 || sfx::hand_kept(layer, block)
+                || sfx::hand_shown(layer, block)
                 || attrs::get::<Lettering>(layer)
                     .is_some_and(|label| label.source == LetteringSource::User)
                 || attrs::get::<ReviewNote>(layer).is_some()
@@ -675,5 +677,28 @@ mod tests {
         let layer = fixture.layer("held");
         assert_eq!(Auto::of(&layer).text, Some(text_hash("")));
         assert!(!keeps(&fixture.page(), &layer));
+    }
+
+    #[test]
+    fn detect_again_keeps_a_clean_up_shown_by_hand_on_an_effect_kept_as_art() {
+        let mut fixture = Fixture::new();
+        // Kept as art by Booharu, its clean-up hidden with the kept mark:
+        // replaced, as no hand chose that.
+        let ops = sfx::kept_original(&fixture.layer("effect"));
+        assert!(!ops.is_empty());
+        fixture.apply(ops);
+        assert!(!keeps(&fixture.page(), &fixture.layer("effect")));
+        // Its clean-up shown again by hand, the mark left: kept, though
+        // nothing else about it changed, as keeping the art leaves that
+        // choice alone.
+        let effect = fixture.id("effect");
+        fixture.apply(vec![Op::UpdateLayer {
+            layer: effect.into(),
+            patch: json!({"cleanup": {"visible": true}}),
+        }]);
+        let layer = fixture.layer("effect");
+        assert!(!edited(&layer).hand_edited());
+        assert!(sfx::kept_original(&layer).is_empty());
+        assert!(keeps(&fixture.page(), &layer));
     }
 }

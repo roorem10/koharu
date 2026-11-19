@@ -12,7 +12,8 @@
 //! An effect a run skips keeps the page's own lettering: no translation, its
 //! clean-up hidden, with the kept mark in its hand-edit record
 //! ([`kept_original`]), so a clean-up hidden by hand can be told from
-//! Booharu's own ([`hand_kept`]). The mark is never Koharu's given-back
+//! Booharu's own ([`hand_kept`]), and one shown again by hand from one
+//! Booharu never kept ([`hand_shown`]). The mark is never Koharu's given-back
 //! record, which would have the quality check report every effect as given
 //! back untranslated. A first translation typed into such an effect on the
 //! canvas shows its clean-up again and takes the mark off ([`shown_again`]),
@@ -121,7 +122,8 @@ fn mode_skips(page: &Page, block: LayerId, mode: SfxMode) -> bool {
 /// for a block with no translation whose clean-up shows and that carries no
 /// mark. Anything else gets none: a translated block keeps its translation,
 /// and one whose clean-up shows while it carries the mark had it shown by
-/// hand. It never writes the given-back record or a `c2pa` one.
+/// hand ([`hand_shown`]). It never writes the given-back record or a `c2pa`
+/// one.
 pub fn kept_original(layer: &Layer) -> Vec<Op> {
     let Content::Block(block) = &layer.content else {
         return Vec::new();
@@ -201,6 +203,14 @@ pub(crate) fn unmarked(layer: &Layer) -> Result<Option<Op>> {
 /// Translation stage gave it back nor Booharu kept it as art.
 pub fn hand_kept(layer: &Layer, block: &Block) -> bool {
     status::kept(block) && !status::given_back(layer, block) && !Auto::of(layer).kept
+}
+
+/// Whether `block`, which `layer` holds, had its clean-up shown again by
+/// hand after Booharu kept it as art: it has no translation, and its
+/// clean-up shows though it carries the kept mark, which [`kept_original`]
+/// leaves alone as the user's choice.
+pub fn hand_shown(layer: &Layer, block: &Block) -> bool {
+    block.translation.is_none() && block.cleanup.visible && Auto::of(layer).kept
 }
 
 /// Whether `source`, a sound effect's source lying at `rect` on the page,
@@ -808,6 +818,34 @@ mod tests {
             hide(id),
         ]);
         assert!(!hand_kept(&fixture.layer(id), &fixture.block(id)));
+    }
+
+    #[test]
+    fn a_clean_up_shown_again_by_hand_on_an_effect_kept_as_art_is_told() {
+        let mut fixture = Fixture::new("sfx");
+        let id = fixture.outside;
+        let shown = |fixture: &Fixture| hand_shown(&fixture.layer(id), &fixture.block(id));
+        // Untouched, its clean-up shows with no mark.
+        assert!(!shown(&fixture));
+        // Kept as art: hidden, with the mark.
+        let ops = kept_original(&fixture.layer(id));
+        fixture.apply(ops);
+        assert!(!shown(&fixture));
+        // Shown again by hand, the mark left: the user's choice, which
+        // keeping the art leaves alone.
+        fixture.apply(vec![Op::UpdateLayer {
+            layer: id.into(),
+            patch: json!({"cleanup": {"visible": true}}),
+        }]);
+        assert!(shown(&fixture));
+        assert!(kept_original(&fixture.layer(id)).is_empty());
+        assert!(!hand_kept(&fixture.layer(id), &fixture.block(id)));
+        // Translated, it's no effect kept as art any more.
+        fixture.apply(vec![Op::SetText {
+            layer: id.into(),
+            text: "BOOM".to_owned(),
+        }]);
+        assert!(!shown(&fixture));
     }
 
     #[test]

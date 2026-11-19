@@ -15,8 +15,9 @@
 //!   with the kept art of the effects a translation skips (I1, I2); and
 //!   Detect again's additions (D2).
 //! - [`stays`], in Detect again's removals (D1), keeps what the user made (a
-//!   split's halves among it), fixed (a clean-up hidden by hand among it),
-//!   labelled, noted, subtitled, or locked, and whatever holds it.
+//!   split's halves among it), fixed (a clean-up hidden by hand, or shown
+//!   again by hand on an effect kept as art, among it), labelled, noted,
+//!   subtitled, or locked, and whatever holds it.
 //! - [`Left::told`] tells each page's counts once its edit is in, when any is
 //!   above 0.
 
@@ -1820,6 +1821,58 @@ mod tests {
         // It keeps its clean-up hidden, so cleaning again never shows it.
         let kept = fixture.block("by_hand")?;
         assert!(!kept.cleanup.visible && kept.translation.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn detect_again_keeps_a_clean_up_shown_by_hand_on_an_effect_kept_as_art() -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("shown", None, 0, block("sfx", (10.0, 10.0))),
+                add("as_art", None, 1, block("sfx", (60.0, 10.0))),
+            ],
+        )?;
+        // Both kept as art by Booharu, with the mark, then one's clean-up
+        // shown again by hand, which keeping the art leaves alone.
+        for label in ["shown", "as_art"] {
+            fixture.edit(sfx::kept_original(&fixture.layer(label)?))?;
+        }
+        fixture.edit(vec![serde_json::from_value(
+            json!({"op": "update_layer", "layer": fixture.id("shown"),
+                "patch": {"cleanup": {"visible": true}}}),
+        )?])?;
+        let at = fixture.page;
+        // What detection finds again: the same two blocks.
+        let additions = vec![
+            found(at, "d0", None, 0, lettering((10.0, 10.0)))?,
+            found_mask("d0", (10, 10))?,
+            found(at, "d1", None, 1, lettering((60.0, 10.0)))?,
+            found_mask("d1", (60, 10))?,
+        ];
+        let events = Events::new();
+        let left = Left::of(Stage::Detect, Snapshot::default(), events.clone());
+        let page = fixture.page()?;
+        let mut ops = Vec::new();
+        removals(&page, &page.layers, &mut ops);
+        let added = left.writing(&fixture.member(None)).added(&page, additions);
+        // No new block over the one shown by hand; the other is replaced.
+        let own = |label: &str| label.to_owned();
+        assert_eq!(
+            shape(&added),
+            (vec![(own("d1"), None, 0)], vec![own("d1.mask")])
+        );
+        ops.extend(added);
+        fixture.edit(ops)?;
+        left.told();
+        assert_eq!(skipped(&events.told()), [(Stage::Detect, 0, 1, 0, false)]);
+        let layers = fixture.layers()?;
+        assert!(layers.contains("shown"), "{layers:?}");
+        assert!(!layers.contains("as_art"));
+        assert_eq!(layers.len(), 2, "{layers:?}");
+        // Its clean-up still shows, and keeping the art leaves it so.
+        assert!(fixture.block("shown")?.cleanup.visible);
+        assert!(sfx::kept_original(&fixture.layer("shown")?).is_empty());
         Ok(())
     }
 
