@@ -200,8 +200,12 @@
     "details": {
       "close": "Close",
       "description": "Inspect and edit information for this text box.",
+      "detailsIssues_one": "Box details for {{name}}: {{count}} QC issue",
+      "detailsIssues_other": "Box details for {{name}}: {{count}} QC issues",
       "empty": "Empty",
       "hidden": "Hidden (marked OK)",
+      "issues_one": "Box details: {{count}} QC issue",
+      "issues_other": "Box details: {{count}} QC issues",
       "noBoxIssues": "No issues on this box.",
       "noteLabel": "Box note",
       "noteLocked": "This text, or a layer it's in, is locked. Unlock it in Layers to change its note.",

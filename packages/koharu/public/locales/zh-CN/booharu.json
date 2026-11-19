@@ -200,8 +200,12 @@
     "details": {
       "close": "关闭",
       "description": "查看并编辑此文本框的信息。",
+      "detailsIssues_one": "{{name}} 的文本框详情：{{count}} 个 QC 问题",
+      "detailsIssues_other": "{{name}} 的文本框详情：{{count}} 个 QC 问题",
       "empty": "暂无",
       "hidden": "已隐藏（标记为 OK）",
+      "issues_one": "文本框详情：{{count}} 个 QC 问题",
+      "issues_other": "文本框详情：{{count}} 个 QC 问题",
       "noBoxIssues": "此文本框未发现问题。",
       "noteLabel": "文本框备注",
       "noteLocked": "此文本或包含它的图层已锁定。请在“图层”中解锁后再修改备注。",

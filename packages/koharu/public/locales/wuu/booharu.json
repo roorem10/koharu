@@ -200,8 +200,12 @@
     "details": {
       "close": "关闭",
       "description": "查看搭编辑箇只文字框个信息。",
+      "detailsIssues_one": "{{name}} 个文字框详情：{{count}} 个质检问题",
+      "detailsIssues_other": "{{name}} 个文字框详情：{{count}} 个质检问题",
       "empty": "还呒没",
       "hidden": "囥脱个（标成“无问题”）",
+      "issues_one": "文字框详情：{{count}} 个质检问题",
+      "issues_other": "文字框详情：{{count}} 个质检问题",
       "noBoxIssues": "箇只文字框呒没问题。",
       "noteLabel": "文字框备注",
       "noteLocked": "箇段文字，或者包含伊个图层锁牢哉。到“图层”里向解锁，再好改备注。",

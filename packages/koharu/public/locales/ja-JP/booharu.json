@@ -200,8 +200,12 @@
     "details": {
       "close": "閉じる",
       "description": "このテキストボックスの情報を確認・編集します。",
+      "detailsIssues_one": "{{name}}のボックス詳細：QCの指摘{{count}}件",
+      "detailsIssues_other": "{{name}}のボックス詳細：QCの指摘{{count}}件",
       "empty": "なし",
       "hidden": "非表示（OKに設定済み）",
+      "issues_one": "ボックス詳細：QCの指摘{{count}}件",
+      "issues_other": "ボックス詳細：QCの指摘{{count}}件",
       "noBoxIssues": "このボックスに問題はありません。",
       "noteLabel": "ボックスのメモ",
       "noteLocked": "このテキスト、またはそれを含むレイヤーがロックされています。メモを変更するには「レイヤー」でロックを解除してください。",

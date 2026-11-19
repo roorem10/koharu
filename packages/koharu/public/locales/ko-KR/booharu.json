@@ -200,8 +200,12 @@
     "details": {
       "close": "닫기",
       "description": "이 텍스트 상자의 정보를 확인하고 편집합니다.",
+      "detailsIssues_one": "{{name}}의 상자 세부 정보: QC 문제 {{count}}개",
+      "detailsIssues_other": "{{name}}의 상자 세부 정보: QC 문제 {{count}}개",
       "empty": "없음",
       "hidden": "숨김 (OK로 표시됨)",
+      "issues_one": "상자 세부 정보: QC 문제 {{count}}개",
+      "issues_other": "상자 세부 정보: QC 문제 {{count}}개",
       "noBoxIssues": "이 상자에는 문제가 없습니다.",
       "noteLabel": "상자 메모",
       "noteLocked": "이 텍스트 또는 이 텍스트가 들어 있는 레이어가 잠겨 있습니다. 메모를 바꾸려면 레이어 패널에서 잠금을 해제하세요.",
