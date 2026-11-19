@@ -308,9 +308,16 @@ impl Prepared {
     /// The chunks a read sends the pages in, as ranges of [`Self::pages`]:
     /// at most `per_request` pages each, from 1 to 40, and fewer when a model
     /// whose context holds `window` tokens couldn't take them, each page
-    /// costing about [`IMAGE_TOKENS`] with its text and room for its answer;
-    /// a page that alone is too much goes alone.
-    pub fn chunks(&self, per_request: u32, window: Option<u32>) -> Vec<Range<usize>> {
+    /// costing about [`IMAGE_TOKENS`] with its text and room for its answer,
+    /// or when one that answers with at most `output` tokens couldn't answer
+    /// for them all ([`Self::answer_tokens`]); a page that alone is too much
+    /// goes alone.
+    pub fn chunks(
+        &self,
+        per_request: u32,
+        window: Option<u32>,
+        output: Option<u32>,
+    ) -> Vec<Range<usize>> {
         let per_request = per_request.clamp(1, MAX_PAGES_PER_REQUEST) as usize;
         let fixed = self.fixed_tokens();
         let mut chunks = Vec::new();
@@ -320,7 +327,9 @@ impl Prepared {
             let mut tokens = fixed.saturating_add(self.page_tokens(start));
             while end < self.pages.len() && end - start < per_request {
                 let more = tokens.saturating_add(self.page_tokens(end));
-                if window.is_some_and(|window| more > window) {
+                if window.is_some_and(|window| more > window)
+                    || output.is_some_and(|output| self.answer_tokens(start..end + 1) > output)
+                {
                     break;
                 }
                 tokens = more;
@@ -336,7 +345,7 @@ impl Prepared {
     /// `per_request` pages: what the largest chunk needs, at most
     /// [`MAX_CONTEXT`].
     pub fn context(&self, per_request: u32) -> u32 {
-        self.chunks(per_request, Some(MAX_CONTEXT))
+        self.chunks(per_request, Some(MAX_CONTEXT), None)
             .into_iter()
             .map(|chunk| self.tokens(chunk))
             .max()
@@ -345,7 +354,7 @@ impl Prepared {
     }
 
     /// About how many tokens the answer for the pages `chunk` takes, which
-    /// a local model is held to.
+    /// a local model is held to, and a model's answer limit must hold.
     pub fn answer_tokens(&self, chunk: Range<usize>) -> u32 {
         let lines: usize = self.pages[chunk].iter().map(|page| page.lines.len()).sum();
         ANSWER_TOKENS.saturating_add(LINE_TOKENS.saturating_mul(count(lines)))
@@ -889,6 +898,7 @@ pub async fn read(
     let spec = model.spec();
     let fit = Fit {
         window: spec.and_then(ModelSpec::input_limit),
+        output: spec.and_then(|spec| spec.max_output_tokens),
         local: spec.is_some_and(|spec| spec.provider.vendor() == koharu_llm::KOHARU),
     };
     let asking = &stops;
@@ -897,10 +907,12 @@ pub async fn read(
 }
 
 /// How the model a read asks takes a request: the most tokens it reads,
-/// and whether it's Koharu's own, which needs an answer length.
+/// the most it answers with, and whether it's Koharu's own, which needs an
+/// answer length.
 #[derive(Clone, Copy, Debug, Default)]
 struct Fit {
     window: Option<u32>,
+    output: Option<u32>,
     local: bool,
 }
 
@@ -919,7 +931,7 @@ where
     Fut: Future<Output = Result<Option<String>>>,
 {
     ensure!(!prepared.pages.is_empty(), "there are no pages to read");
-    let chunks = prepared.chunks(reader.pages_per_request, fit.window);
+    let chunks = prepared.chunks(reader.pages_per_request, fit.window, fit.output);
     let steps = count(chunks.len());
     host.progress(0, steps);
     let mut found = Found::default();
@@ -1475,14 +1487,18 @@ mod tests {
             series: None,
             target_language: "en".to_owned(),
         };
-        assert_eq!(prepared.chunks(2, None), [0..2, 2..4, 4..5]);
-        assert_eq!(prepared.chunks(0, None).len(), 5, "at least one page each");
-        let all = prepared.chunks(99, None);
+        assert_eq!(prepared.chunks(2, None, None), [0..2, 2..4, 4..5]);
+        assert_eq!(
+            prepared.chunks(0, None, None).len(),
+            5,
+            "at least one page each"
+        );
+        let all = prepared.chunks(99, None, None);
         assert_eq!((all.len(), &all[0]), (1, &(0..5)), "up to 40 pages");
         let two = prepared.fixed_tokens() + prepared.page_tokens(0) + prepared.page_tokens(1);
-        assert_eq!(prepared.chunks(20, Some(two)), [0..2, 2..4, 4..5]);
+        assert_eq!(prepared.chunks(20, Some(two), None), [0..2, 2..4, 4..5]);
         assert_eq!(
-            prepared.chunks(20, Some(1)).len(),
+            prepared.chunks(20, Some(1), None).len(),
             5,
             "a page too much alone goes alone"
         );
@@ -1492,6 +1508,14 @@ mod tests {
             prepared.answer_tokens(0..2),
             ANSWER_TOKENS + 6 * LINE_TOKENS
         );
+        // A model that answers with few tokens takes fewer pages, however
+        // large its window.
+        let answers = prepared.answer_tokens(0..2);
+        assert_eq!(
+            prepared.chunks(20, Some(u32::MAX), Some(answers)),
+            [0..2, 2..4, 4..5]
+        );
+        assert_eq!(prepared.chunks(20, None, Some(1)).len(), 5);
         Ok(())
     }
 
@@ -2049,8 +2073,8 @@ mod tests {
         let script = Script::new(vec![Ok(Some(answer("S", json!([]), json!([]), json!([]))))]);
         let prepared = chapter.prepared()?;
         let fit = Fit {
-            window: None,
             local: true,
+            ..Fit::default()
         };
         read_with(
             Arc::new(Host::default()),
