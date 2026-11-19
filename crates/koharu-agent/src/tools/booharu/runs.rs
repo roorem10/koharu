@@ -54,8 +54,8 @@ pub(crate) const RUN: &str = " Under Booharu, a run leaves alone locked blocks a
      written or fixed by hand when translating), translates a sound effect only as the SFX \
      mode (`sfx` in `booharu-lettering`) says and never one with a subtitle, keeping the others \
      as art, and, detecting again, keeps what was made or changed by hand, such as a block \
-     drawn, corrected, labelled, noted, or subtitled by hand, or one whose clean-up was hidden \
-     by hand, and anything locked; \
+     drawn, split, corrected, labelled, noted, or subtitled by hand, or one whose clean-up was \
+     hidden by hand, and anything locked; \
      booharu_redo_boxes runs stages again on chosen blocks, the hand-fixed ones too on \
      purpose.";
 

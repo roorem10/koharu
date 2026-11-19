@@ -312,7 +312,8 @@ const HALF_SIZE: f64 = 4.0;
 /// and clean-up keeps only its pixels on its side of the cut. Both lose their
 /// source wording and their translation, for the Recognition and
 /// Translation stages to write again, and keep the clean-up shown or hidden
-/// as it was, a sound effect kept as art with its kept mark; [`split_halves`]
+/// as it was, a sound effect kept as art with its kept mark. Both count as
+/// drawn by hand from then on, so Detect again keeps them; [`split_halves`]
 /// finds both in the edit's change. A block whose halves would be under 4
 /// pixels is refused.
 pub fn split_block(session: &Session, block: LayerId) -> Result<Edit> {
@@ -847,13 +848,11 @@ fn kept_side(
 
 /// The ops dropping from `layer`, as `target`, the Booharu keys that
 /// describe a block's text, which a join or split rewrites, and with
-/// `record` its hand-edit record. A split drops it, as its halves are read
-/// and translated again, which records them anew, all but the kept mark:
-/// the halves keep the clean-up as it shows, so one Booharu hid to keep a
-/// sound effect's art is still told from one hidden by hand. A join keeps
-/// it, so the joined block's style set by hand stays a hand edit, and its
-/// joined wording, which differs from what the record holds, counts as one
-/// too.
+/// `record` its hand-edit record. A split puts a half's own record in its
+/// place ([`half_record`]), as its halves are read and translated again,
+/// which records them anew. A join keeps it, so the joined block's style
+/// set by hand stays a hand edit, and its joined wording, which differs from
+/// what the record holds, counts as one too.
 fn dropped(layer: &Layer, target: &Ref, record: bool) -> Result<Vec<Op>> {
     fn drop<A: Attr>(layer: &Layer, target: &Ref, ops: &mut Vec<Op>) {
         if layer
@@ -867,20 +866,26 @@ fn dropped(layer: &Layer, target: &Ref, record: bool) -> Result<Vec<Op>> {
     let mut ops = Vec::new();
     drop::<Lettering>(layer, target, &mut ops);
     if record {
-        match Auto::of(layer).kept {
-            true => {
-                let kept = Auto {
-                    kept: true,
-                    ..Auto::default()
-                };
-                ops.push(attrs::set(target.clone(), &kept)?);
-            }
-            false => drop::<Auto>(layer, target, &mut ops),
-        }
+        ops.push(attrs::set(target.clone(), &half_record(layer))?);
     }
     drop::<QcOk>(layer, target, &mut ops);
     drop::<ReadNote>(layer, target, &mut ops);
     Ok(ops)
+}
+
+/// The hand-edit record a split gives each half of the block `layer` holds,
+/// read before the edit: drawn, as the split cut the half's box by hand
+/// though it keeps the detection record it was copied with, so Detect again
+/// keeps it (D1), as it keeps a box drawn with the O tool; and the kept mark
+/// of an effect Booharu kept as art, as the half keeps the clean-up as it
+/// shows, so it's still told from one hidden by hand. Nothing else: the
+/// split's run reads and translates the half again, which records it anew.
+fn half_record(layer: &Layer) -> Auto {
+    Auto {
+        drawn: true,
+        kept: Auto::of(layer).kept,
+        ..Auto::default()
+    }
 }
 
 /// Refuses when `layer`, or a layer holding it, is locked.
@@ -2555,6 +2560,51 @@ mod tests {
             crate::runs::to_translate(&page.session, &[page.page], &all)?,
             [page.page]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_splits_halves_are_drawn_by_hand_so_detect_again_keeps_them() -> Result<()> {
+        use booharu_core::{protect, runs::RunStage, settings::LetteringSettings};
+        let mut page = Fixture::new(400, 400, &[rect(0.0, 0.0, 400.0, 400.0)])?;
+        let bounds = page_bounds(100.0, 20.0, 40.0, 100.0);
+        let block = page.add(None, text_block(bounds, Direction::Vertical, "あいう"))?;
+        // Detected, read, and translated by the stages.
+        run_on(&mut page, block, "Who?")?;
+        let keeps = |page: &Fixture, id: LayerId| -> Result<bool> {
+            let project = page.session.project();
+            Ok(protect::keeps(project.page(page.page)?, project.layer(id)?))
+        };
+        assert!(!keeps(&page, block)?);
+
+        let change = page.session.apply(split_block(&page.session, block)?)?;
+        let halves = split_halves(block, &change)?;
+        let settings = LetteringSettings::default();
+        for (&id, (words, text)) in halves.iter().zip([("あい", "Wh"), ("う", "o?")]) {
+            // The split's own run reads and translates each half, which no
+            // hand edit keeps it from.
+            let project = page.session.project();
+            let (on, layer) = (project.page(page.page)?, project.layer(id)?);
+            for stage in [RunStage::Recognize, RunStage::Translate] {
+                assert_eq!(
+                    protect::left_out(on, layer, stage, &settings, false, false),
+                    None
+                );
+            }
+            page.update(id, json!({"source": {"content": words}}))?;
+            run_on(&mut page, id, text)?;
+            // Each half keeps the detection record it was copied with, yet
+            // counts as drawn by hand, and nothing else about it does.
+            let layer = page.session.project().layer(id)?.clone();
+            assert!(booharu_core::styles::recorded(&layer, "detection"));
+            assert!(Auto::of(&layer).drawn);
+            let edited = booharu_core::edited(&layer);
+            assert_eq!(
+                (edited.source, edited.text, edited.style, edited.drawn),
+                (false, false, false, true)
+            );
+            assert!(keeps(&page, id)?);
+        }
         Ok(())
     }
 

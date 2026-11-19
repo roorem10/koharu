@@ -14,9 +14,9 @@
 //!   Recognition stage's readings (R2); the Inpainting stage's clean-ups,
 //!   with the kept art of the effects a translation skips (I1, I2); and
 //!   Detect again's additions (D2).
-//! - [`stays`], in Detect again's removals (D1), keeps what the user made,
-//!   fixed (a clean-up hidden by hand among it), labelled, noted, subtitled,
-//!   or locked, and whatever holds it.
+//! - [`stays`], in Detect again's removals (D1), keeps what the user made (a
+//!   split's halves among it), fixed (a clean-up hidden by hand among it),
+//!   labelled, noted, subtitled, or locked, and whatever holds it.
 //! - [`Left::told`] tells each page's counts once its edit is in, when any is
 //!   above 0.
 
@@ -1820,6 +1820,57 @@ mod tests {
         // It keeps its clean-up hidden, so cleaning again never shows it.
         let kept = fixture.block("by_hand")?;
         assert!(!kept.cleanup.visible && kept.translation.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn detect_again_keeps_a_splits_halves_and_adds_no_block_over_them() -> Result<()> {
+        // A block detection found, split in two by hand: each half keeps the
+        // detection record it was copied with, its own record saying a hand
+        // cut its box, and is read again.
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("first", None, 0, block("text", (30.0, 10.0))),
+                add("second", None, 1, block("text", (10.0, 10.0))),
+            ],
+        )?;
+        for label in ["first", "second"] {
+            let cut = Auto {
+                drawn: true,
+                ..Auto::of(&fixture.layer(label)?)
+            };
+            fixture.edit(vec![attrs::set(fixture.id(label), &cut)?])?;
+        }
+        // What detection finds again: the block as it was before the split.
+        let at = fixture.page;
+        let merged = || -> Result<Vec<Op>> {
+            let block = json!({"kind": "block", "source": {"frame": {"box": {"bounds":
+                {"x": 10.0, "y": 10.0, "width": 40.0, "height": 40.0}}}},
+                "attributes": {"c2pa": {"detection": {"action": "c2pa.created"}}}});
+            Ok(vec![
+                found(at, "d0", None, 0, block)?,
+                serde_json::from_value(json!({"op": "write_pixels", "layer": "$d0.mask",
+                    "rect": {"x": 10, "y": 10, "width": 40, "height": 40},
+                    "pixels": vec![255u8; 40 * 40]}))?,
+            ])
+        };
+        // Untouched since, then with one half's translation fixed by hand,
+        // which once left the other's line with no block at all.
+        for fixed in [false, true] {
+            if fixed {
+                fixture.type_in("second", "Who?")?;
+            }
+            let events = Events::new();
+            let left = Left::of(Stage::Detect, Snapshot::default(), events.clone());
+            let page = fixture.page()?;
+            let mut ops = Vec::new();
+            removals(&page, &page.layers, &mut ops);
+            ops.extend(left.writing(&fixture.member(None)).added(&page, merged()?));
+            assert!(ops.is_empty(), "{ops:?}");
+            left.told();
+            assert_eq!(skipped(&events.told()), [(Stage::Detect, 0, 2, 0, false)]);
+        }
         Ok(())
     }
 }

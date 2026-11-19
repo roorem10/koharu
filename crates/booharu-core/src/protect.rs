@@ -12,8 +12,8 @@
 //! - Translating leaves out the sound effects the SFX mode keeps as art and
 //!   the subtitled ones (`sfx::skipped`), which no redo lifts; a subtitle
 //!   run translates the effects it names.
-//! - Detect again keeps what was made or changed by hand, a clean-up hidden
-//!   by hand among it, and what is locked ([`keeps`]).
+//! - Detect again keeps what was made or changed by hand, a split's halves
+//!   and a clean-up hidden by hand among it, and what is locked ([`keeps`]).
 //!
 //! koharu-pipeline's Booharu glue calls [`left_out`] from each stage's hook
 //! and [`keeps`] from Detect's, and the redo counts read [`left_out`] too.
@@ -128,9 +128,10 @@ pub fn cleanable(page: &Page, layer: &Layer) -> bool {
 /// Whether Detect again keeps `layer`, on `page`, rather than replace it
 /// with what it detects: a locked layer; a block changed by hand (its
 /// source, translation, or style, or drawn by hand, as
-/// [`edited`](crate::edited) reports it), whose clean-up was hidden by hand
-/// ([`sfx::hand_kept`]), labelled by a user, given a reviewer's note, or
-/// subtitled; a panel or balloon Koharu's Detection stage didn't make; and
+/// [`edited`](crate::edited) reports it, a split's halves among them),
+/// whose clean-up was hidden by hand ([`sfx::hand_kept`]), labelled by a
+/// user, given a reviewer's note, or subtitled; a panel or balloon Koharu's
+/// Detection stage didn't make; and
 /// any text layer, the T tool's and subtitles. Anything else, a block,
 /// panel, or balloon detection made and nobody changed among them, is
 /// detected again, a block whose clean-up Booharu hid to keep it as art
@@ -614,6 +615,34 @@ mod tests {
             }
         }
         assert_eq!(checked, 2);
+    }
+
+    #[test]
+    fn detect_again_keeps_a_split_half_though_detection_made_it() {
+        let mut fixture = Fixture::new();
+        let settings = translate_all();
+        // A split's half keeps the detection record it was copied with, and
+        // its record says a hand cut its box.
+        let held = fixture.id("held");
+        let cut = Auto {
+            drawn: true,
+            ..Auto::of(&fixture.layer("held"))
+        };
+        fixture.apply(vec![attrs::set(held, &cut).expect("the record")]);
+        let layer = fixture.layer("held");
+        assert!(recorded(&layer, DETECTION));
+        assert!(keeps(&fixture.page(), &layer));
+        // Every stage still reads, cleans, and translates it, as the split's
+        // own run does.
+        for stage in STAGES {
+            assert_eq!(
+                fixture.left_out("held", stage, &settings, false, false),
+                None
+            );
+        }
+        // Translated as the Translation stage records one, it stays kept.
+        fixture.translate("held", "Why?");
+        assert!(keeps(&fixture.page(), &fixture.layer("held")));
     }
 
     #[test]

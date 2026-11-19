@@ -463,7 +463,9 @@ pub struct Edited {
     /// it is marked with one, or the agent chose its style on purpose; with
     /// nothing recorded, no stage wrote the translation.
     pub style: bool,
-    /// It was drawn by hand: no detection made it, as the O tool's boxes.
+    /// It was drawn by hand: no detection made it, as the O tool's boxes,
+    /// or its record says a hand cut its box ([`Auto::drawn`]), as a split's
+    /// halves, which keep the detection record they were copied with.
     pub drawn: bool,
 }
 
@@ -518,7 +520,7 @@ pub fn edited(layer: &Layer) -> Edited {
         source,
         text,
         style,
-        drawn: !recorded("detection"),
+        drawn: record.drawn || !recorded("detection"),
     }
 }
 
@@ -1038,6 +1040,30 @@ mod tests {
         let (_dir, session, block) = page("", &[]);
         let empty = edited(&layer(&session, block));
         assert_eq!((empty.source, empty.drawn), (false, true));
+    }
+
+    #[test]
+    fn a_box_cut_by_hand_is_drawn_though_detection_made_it() {
+        // A split's half keeps the detection record it was copied with, and
+        // its record says a hand cut its box.
+        let (_dir, mut session, block) = page("", &["detection", "ocr"]);
+        assert!(!edited(&layer(&session, block)).drawn);
+        let cut = Auto {
+            drawn: true,
+            ..Auto::default()
+        };
+        apply(
+            &mut session,
+            vec![attrs::set(block, &cut).expect("the record")],
+        );
+        let half = edited(&layer(&session, block));
+        assert_eq!((half.source, half.text, half.style), (false, false, false));
+        assert!(half.drawn && half.hand_edited());
+
+        // Read and translated by the stages afterwards, it stays drawn.
+        let read = recognized(&layer(&session, block), "").expect("the record");
+        apply(&mut session, vec![read]);
+        assert!(edited(&layer(&session, block)).drawn);
     }
 
     #[test]

@@ -16,8 +16,9 @@
 //!   owner fails closed on a value it can't read.
 //! - The content keys, [`Lettering`], [`Auto`], [`QcOk`], and [`ReadNote`],
 //!   describe a block's text, so a join or split that rewrites a block drops
-//!   them; a join keeps the joined block's hand-edit record, and a split its
-//!   halves' kept mark, as they keep the clean-up as it was.
+//!   them; a join keeps the joined block's hand-edit record, and a split
+//!   gives its halves one of their own, drawn by hand, with the kept mark,
+//!   as they keep the clean-up as it was.
 
 use anyhow::ensure;
 use koharu_scene::{Layer, LayerId, Op, Ref, Rgba, Role};
@@ -80,13 +81,14 @@ pub enum LetteringSource {
 
 /// `auto`: `{"origin"?: "agent", "source"?: hash, "text"?: hash, "style"?:
 /// {family, weight, italic, fill, stroke, stroke_width, outer_stroke,
-/// outer_stroke_width}, "kept"?: true}`, on a block: the hand-edit record,
-/// what Booharu's automatic steps last wrote there, so `styles::edited`
-/// tells a hand edit, a part that now differs, from their own, and whether
-/// Booharu hid its clean-up to keep the original art. Hand edits win. Each
-/// part is left out until a step writes it; later stages add their own, such
-/// as the marks and the category they applied, which is why it takes keys it
-/// doesn't know.
+/// outer_stroke_width}, "kept"?: true, "drawn"?: true}`, on a block: the
+/// hand-edit record, what Booharu's automatic steps last wrote there, so
+/// `styles::edited` tells a hand edit, a part that now differs, from their
+/// own, whether Booharu hid its clean-up to keep the original art, and
+/// whether a hand cut its box where Koharu's records say detection made it.
+/// Hand edits win. Each part is left out until a step writes it; later
+/// stages add their own, such as the marks and the category they applied,
+/// which is why it takes keys it doesn't know.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct Auto {
     /// Who chose the style: Booharu's automatic steps, or the agent on
@@ -110,6 +112,12 @@ pub struct Auto {
     /// drops it; a clean-up hidden with no mark was hidden by hand.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub kept: bool,
+    /// Whether its box was drawn by hand though it carries the detection
+    /// record it was copied with: a split's halves, whose boxes the split
+    /// cut. `styles::edited` then reports it drawn, as a box drawn with the O
+    /// tool is, so Detect again keeps it. Automatic steps keep it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub drawn: bool,
 }
 
 impl Attr for Auto {
@@ -401,6 +409,7 @@ mod tests {
                 ..AutoStyle::default()
             }),
             kept: true,
+            drawn: true,
         };
         let qc_ok = QcOk(vec!["overflow".to_owned(), "glossary:Shale".to_owned()]);
         let flags = Flags(vec![Flag {
@@ -550,6 +559,24 @@ mod tests {
         assert_eq!(
             get::<Auto>(&layer(&session, id)).map(|auto| auto.kept),
             Some(false)
+        );
+    }
+
+    #[test]
+    fn a_box_drawn_by_hand_is_written_only_when_set() {
+        let drawn = Auto {
+            drawn: true,
+            ..Auto::default()
+        };
+        assert_eq!(json!(drawn), json!({"drawn": true}));
+        assert_eq!(
+            serde_json::from_value::<Auto>(json!({"drawn": true})).expect("a record"),
+            drawn
+        );
+        assert!(
+            !serde_json::from_value::<Auto>(json!({"kept": true}))
+                .expect("a record")
+                .drawn
         );
     }
 
