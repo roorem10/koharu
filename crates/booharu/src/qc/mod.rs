@@ -8,6 +8,11 @@
 //! word, a missing translation, an empty source, leftover source text, an
 //! odd font, glossary slips, and the agent's flags. A text layer gets only
 //! the size checks and flags. Every page is checked: none waits for a run.
+//! A sound effect the SFX mode keeps as art, or one with a subtitle
+//! (`sfx::skipped`, under the inputs' lettering settings), keeps the page's
+//! own lettering on purpose, so it's never missing a translation, showing
+//! source left over, or an empty source: the run planner reads the same
+//! rule.
 //!
 //! - Sizes and overflow are measured as the caller's renderer draws the
 //!   text ([`measure`]); the rules are pure ([`rules`]). [`check_glossary`]
@@ -34,6 +39,7 @@ use booharu_core::{
     lettering::{self, LetteringCategory},
     qc::{self as marks, GLOSSARY},
     settings::{LetteringSettings, QcSettings},
+    sfx,
     status::{self, DETECTION, OCR, TRANSLATION},
     styles::recorded,
 };
@@ -398,10 +404,12 @@ fn facts(page: &Page, layer: &Layer, translated: bool, inputs: &Inputs) -> Optio
                 block: true,
                 language: translation.map(|translation| translation.language.clone()),
                 cleanup_visible: block.cleanup.visible,
+                kept: Auto::of(layer).kept,
                 detected: recorded(layer, DETECTION),
                 read: recorded(layer, OCR),
                 given_back: status::given_back(layer, block),
                 translated_page: translated,
+                skipped: sfx::skipped(page, layer.id, &inputs.lettering),
                 category: lettering::effective(page, layer.id, &inputs.lettering)
                     .map(|effective| effective.category),
                 font: translation.and_then(|translation| translation.style.chars.family.clone()),

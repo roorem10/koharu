@@ -11,8 +11,10 @@ use booharu_core::{
     attrs::{self, Flag, Flags, QcOk},
     context::GlossaryEntry,
     qc::fingerprint,
+    settings::SfxMode,
     styles,
 };
+use koharu_pipeline::Stage;
 use koharu_renderer::{Renderer, RendererConfig};
 use koharu_scene::{Change, Created, Edit, Op, Session, Transform};
 use serde_json::{Value, json};
@@ -865,5 +867,61 @@ fn glossary_slips_are_found_as_the_page_check_finds_them_laying_no_text_out() ->
     assert_eq!(page.steps().last().map(String::as_str), Some(CLEAR_QC_OK));
     let shown = check_glossary(&page.project(), page.page, &inputs)?;
     assert!(shown.len() == 1 && !shown[0].hidden, "{shown:?}");
+    Ok(())
+}
+
+#[test]
+fn the_run_planner_and_the_check_read_one_sound_effect_rule() -> Result<()> {
+    // A page Koharu's Translation stage ran on, with the sound effect `e`
+    // read and left untranslated, its clean-up showing.
+    let mut page = Fixture::new(
+        400,
+        400,
+        vec![
+            translated("a", 0, "Hello there"),
+            block("e", 1, "ドドド", Value::Null, c2pa(&["detection", "ocr"])),
+        ],
+    );
+    page.update("e", json!({"role": "sfx"}));
+    let skip = LetteringSettings::default();
+    let all = LetteringSettings {
+        sfx: SfxMode::TranslateAll,
+        ..LetteringSettings::default()
+    };
+    let planned = |page: &Fixture, settings: &LetteringSettings| -> Result<bool> {
+        let groups = crate::runs::plan(&page.session, &[page.page], settings)?;
+        Ok(groups
+            .iter()
+            .any(|group| group.stages.contains(&Stage::Translate)))
+    };
+    let missing = |page: &Fixture, settings: &LetteringSettings| -> Result<bool> {
+        let project = page.project();
+        let inputs = Inputs::new(
+            &project,
+            &QcSettings { min_size: 0.01 },
+            "en".parse()?,
+            settings.clone(),
+            None,
+        );
+        let found = check_page(&renderer(), &project, page.page, &inputs)?;
+        Ok(found
+            .iter()
+            .any(|finding| finding.layer == page.id("e") && finding.check == MISSING_TRANSLATION))
+    };
+    // Kept as art: translated only to hide its clean-up, and missing nothing.
+    assert!(planned(&page, &skip)?);
+    assert!(!missing(&page, &skip)?);
+    // Once hidden, with the kept mark: nothing planned, nothing found.
+    let kept = sfx::kept_original(&page.layer("e"));
+    assert!(!kept.is_empty());
+    page.apply(Some(Edit {
+        label: "test".to_owned(),
+        ops: kept,
+    }));
+    assert!(!planned(&page, &skip)?);
+    assert!(!missing(&page, &skip)?);
+    // With every sound effect translated, both see its translation missing.
+    assert!(planned(&page, &all)?);
+    assert!(missing(&page, &all)?);
     Ok(())
 }

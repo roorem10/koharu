@@ -24,6 +24,9 @@ pub(crate) struct Facts {
     /// Whether its clean-up shows: a line keeping the page's own lettering
     /// hides it.
     pub cleanup_visible: bool,
+    /// Whether it carries Booharu's kept mark: its clean-up was hidden to
+    /// keep a sound effect as art, which its translation shows again.
+    pub kept: bool,
     /// Whether Koharu's Detection stage made it.
     pub detected: bool,
     /// Whether Koharu's Recognition stage read it.
@@ -32,6 +35,11 @@ pub(crate) struct Facts {
     pub given_back: bool,
     /// Whether Koharu's Translation stage ran on its page.
     pub translated_page: bool,
+    /// Whether it's a sound effect the SFX mode keeps as art, or one with a
+    /// subtitle (`sfx::skipped`), which keeps the page's own lettering: no
+    /// translation is missing, its source isn't left over, and an empty one
+    /// is no finding.
+    pub skipped: bool,
     /// Its lettering category.
     pub category: Option<LetteringCategory>,
     /// Its translation's font family; none for the default font.
@@ -131,19 +139,22 @@ fn rounded(size: f32) -> f32 {
 }
 
 /// Whether the block has a source but no translation, on a page Koharu's
-/// Translation stage ran on, and shows its clean-up: a line keeping the
-/// page's lettering, given back unchanged or with its clean-up hidden by
-/// hand, isn't missing one.
+/// Translation stage ran on, and shows its clean-up, or hides it only as a
+/// sound effect once kept as art: a line keeping the page's lettering,
+/// given back unchanged, with its clean-up hidden by hand, or a sound effect
+/// kept as art now, isn't missing one, as the run planner reads it too.
 fn missing_translation(facts: &Facts) -> bool {
-    !facts.source.trim().is_empty()
+    !facts.skipped
+        && !facts.source.trim().is_empty()
         && written(facts).is_none()
-        && facts.cleanup_visible
+        && (facts.cleanup_visible || facts.kept)
         && facts.translated_page
 }
 
-/// Whether Koharu's stages found the block and read it, and read nothing.
+/// Whether Koharu's stages found the block and read it, and read nothing,
+/// unless it's a sound effect kept as art, which needs no wording.
 fn empty_source(facts: &Facts) -> bool {
-    facts.detected && facts.read && facts.source.trim().is_empty()
+    !facts.skipped && facts.detected && facts.read && facts.source.trim().is_empty()
 }
 
 /// Whether the block shows source text a translation into its language
@@ -151,8 +162,12 @@ fn empty_source(facts: &Facts) -> bool {
 /// is its source, trimmed (`false`), or, on a line given back unchanged,
 /// some in its source, which the page still shows (`true`). Its language is
 /// its translation's tag, or `target`'s with no translation or an
-/// undetermined tag.
+/// undetermined tag. A sound effect kept as art shows its source on
+/// purpose.
 fn leftover(facts: &Facts, target: &LanguageIdentifier) -> Option<bool> {
+    if facts.skipped {
+        return None;
+    }
     let target = facts
         .language
         .as_ref()
@@ -502,6 +517,57 @@ mod tests {
         ] {
             assert_eq!(problems(&skipped, &judge(&en, &none)), [], "{skipped:?}");
         }
+    }
+
+    #[test]
+    fn a_sound_effect_kept_as_art_is_missing_nothing_and_leaves_nothing_over() {
+        let en = english();
+        let none = Majorities::new();
+        let skipped = |facts: Facts| Facts {
+            skipped: true,
+            ..facts
+        };
+        // Each would fire on a block that isn't skipped.
+        let untranslated = Facts {
+            translation: None,
+            ..block("ドドド", "", None)
+        };
+        let given_back = Facts {
+            cleanup_visible: false,
+            given_back: true,
+            ..untranslated.clone()
+        };
+        let empty = Facts {
+            translation: None,
+            ..block("  ", "", None)
+        };
+        let leftover = block("ドドド", "ドドド!!", None);
+        // Kept as art before: its clean-up hidden, with the mark.
+        let kept = Facts {
+            cleanup_visible: false,
+            kept: true,
+            ..untranslated.clone()
+        };
+        assert_eq!(
+            problems(&kept, &judge(&en, &none)),
+            [Problem::MissingTranslation]
+        );
+        for facts in [untranslated, given_back, empty, leftover, kept] {
+            assert_ne!(problems(&facts, &judge(&en, &none)), [], "{facts:?}");
+            let facts = skipped(facts);
+            assert_eq!(problems(&facts, &judge(&en, &none)), [], "{facts:?}");
+        }
+        // The agent's flags still show.
+        let flagged = skipped(Facts {
+            flags: vec!["Check the tone".to_owned()],
+            ..block("ドドド", "", None)
+        });
+        assert_eq!(
+            problems(&flagged, &judge(&en, &none)),
+            [Problem::Flag {
+                message: "Check the tone".to_owned()
+            }]
+        );
     }
 
     #[test]
