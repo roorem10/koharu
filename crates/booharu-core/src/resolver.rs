@@ -579,12 +579,15 @@ mod tests {
             stroke_method: None,
         };
         let patch = reset_patch(&look);
-        let keys: Vec<&str> = patch["chars"]
+        // In key order whether or not serde_json keeps insertion order, as a
+        // build of the desktop has it do.
+        let mut keys: Vec<&str> = patch["chars"]
             .as_object()
             .expect("chars")
             .keys()
             .map(String::as_str)
             .collect();
+        keys.sort_unstable();
         let mut expected = LOOK.to_vec();
         expected.sort_unstable();
         assert_eq!(keys, expected, "never the size");
