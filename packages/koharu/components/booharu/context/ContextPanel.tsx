@@ -4,6 +4,7 @@ import { BookOpen, Lock } from 'lucide-react'
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ChapterReading } from '@/components/booharu/context/ChapterReading'
 import { GlossaryDialog } from '@/components/booharu/context/GlossaryDialog'
 import { SeriesPicker } from '@/components/booharu/context/SeriesPicker'
 import { TermForm } from '@/components/booharu/context/TermForm'
@@ -40,12 +41,12 @@ interface Listed {
   suggested: boolean
 }
 
-/** The Context tab, Booharu 0.0.4's layout before Read chapter: the series the open chapter
- * follows, picked or made here; a line asking for one while it links none, or saying the one it
- * links is gone, or can't be read, with the error naming its file and Unlink series, so a broken
- * series file never leaves the chapter stuck on it; and the glossary its translations follow,
- * searchable, the series' terms then the terms suggested for the chapter, each suggestion to
- * accept into the series, to edit and accept, or to dismiss, a term accepted showing where it's
+/** The Context tab, Booharu 0.0.4's layout: the series the open chapter follows, picked or made
+ * here; a line asking for one while it links none, or saying the one it links is gone, or can't be
+ * read, with the error naming its file and Unlink series, so a broken series file never leaves the
+ * chapter stuck on it; Read chapter and the chapter's brief; and the glossary its translations
+ * follow, searchable, the series' terms then the terms suggested for the chapter, each suggestion
+ * to accept into the series, to edit and accept, or to dismiss, a term accepted showing where it's
  * used, with Re-translate those lines; then Open full glossary, the glossary editor. Accepting a
  * suggestion whose source the series has opens the term form, which says what saving replaces,
  * rather than replacing that term at a click. A side file that doesn't read shows its error, which
@@ -117,6 +118,8 @@ export function ContextPanel() {
             )
           )}
         </section>
+        {/* Booharu: Read chapter and the chapter's brief, between the series and the glossary. */}
+        <ChapterReading chapter={data} />
         <section className='grid min-w-0 gap-2' aria-labelledby={heading}>
           <h3 id={heading} className='font-semibold'>
             {t('booharu.context.glossary')}

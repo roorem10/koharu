@@ -16,6 +16,7 @@ import {
   type GlossaryEntry,
   type InstructionImport,
   type InstructionPreview,
+  type ReadSummary,
   type Series,
   type SeriesImport,
   type TermKind,
@@ -327,12 +328,32 @@ export function dismissSuggestion(id: string): Promise<ChapterState> {
   return queueWrite(() => call(commands.booharuDismissSuggestion, id))
 }
 
+/** Sets the summary of the open chapter's brief to `summary`, as the user wrote it, which reading
+ * the chapter again keeps: the desktop trims it, makes the brief when there is none, and keeps its
+ * characters and when and with which model it was read. A blank summary counts as no brief, so a
+ * Run press reads the chapter again. */
+export function setChapterBrief(summary: string): Promise<ChapterState> {
+  return queueWrite(() => call(commands.booharuSetChapterBrief, summary))
+}
+
 /** Runs `command` once the writes queued before it end, so it reads the series and the chapter as
  * they left them, without holding back the writes queued after it. A failure shows its error, as
  * every failed command's does, and rejects. */
 async function afterWrites<T>(command: () => Promise<T>): Promise<T> {
   await writing.catch(() => undefined)
   return command()
+}
+
+/** Reads the open project's whole chapter with the Read chapter model, as the Context tab's button
+ * does, once the writes queued before it end, without holding back the writes queued after it, as
+ * a read takes minutes; then reads the series and the chapter again, whether it worked or not.
+ * Answers what it did, `stopped` when Stop or closing the project ended it before it wrote
+ * anything. A refusal, such as with no text to read, shows its error, as every failed command's
+ * does, and rejects. */
+export function readChapter(): Promise<ReadSummary> {
+  return afterWrites(() => call(commands.booharuReadChapter, null)).finally(() =>
+    refreshContext().catch(() => undefined),
+  )
 }
 
 /** A Chinese or Japanese character: Han, kana, and their punctuation and full-width forms. Korean

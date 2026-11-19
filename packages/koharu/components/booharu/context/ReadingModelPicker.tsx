@@ -27,13 +27,16 @@ export function readingChoices(models: readonly Model[], saved: string | null): 
  * pages, listed again as it opens, with the saved Read chapter model checked. A pick saves it as
  * `[booharu-reading] model` at once, then `onPicked` runs with it; a save that fails shows its
  * error as every failed command's does, and picks nothing. `onCancel` gives it a heading with
- * Cancel, which picks nothing, for a menu it opens inside of; a dialog has its own. */
+ * Cancel, which picks nothing, for a menu it opens inside of; a dialog has its own. Under the menu,
+ * what to pick and that the pick is saved, unless `hint` is off, for a dialog that says it above. */
 export function ReadingModelPicker({
   onPicked,
   onCancel,
+  hint = true,
 }: {
   onPicked: (reference: string) => void
   onCancel?: () => void
+  hint?: boolean
 }) {
   const { t } = useTranslation()
   const models = useKoharuStore((state) => state.models)
@@ -93,9 +96,11 @@ export function ReadingModelPicker({
         busyModel={saving}
         onSelect={pick}
       />
-      <p className='px-2 pt-0.5 pb-1 text-[10px] leading-snug text-muted-foreground'>
-        {t('booharu.context.pickReader')} {t('booharu.context.readerDownload')}
-      </p>
+      {hint && (
+        <p className='px-2 pt-0.5 pb-1 text-[10px] leading-snug text-muted-foreground'>
+          {t('booharu.context.pickReader')} {t('booharu.context.readerDownload')}
+        </p>
+      )}
     </div>
   )
 }
