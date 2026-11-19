@@ -19,14 +19,17 @@
 //! change changes or adds, and every page as it starts, as it falls behind
 //! the changes, and as [`touch_all`] asks, when the glossary, Booharu's
 //! settings or Koharu's fonts change. Once the project has gone [`QUIET`],
-//! and at most [`CAP`] after the first page queued, it checks them one at a
-//! time in page order, with what it read for the pass, and every page when
-//! the chapter's majority fonts changed since the pass before. A run isn't
-//! waited for: a page is checked as it is, and the run's next write queues
-//! it again.
+//! and at most [`CAP`] after the first page queued, it starts a pass: it
+//! forgets the findings of any page the project no longer has, as after
+//! changes it missed, reads what the checks read once, and checks the pages
+//! one at a time in page order, every page when the chapter's majority
+//! fonts changed since the pass before. It follows the changes while it
+//! checks, and pages they queue start a new pass once due, which takes the
+//! pages the pass going hasn't checked yet too. A run isn't waited for: a
+//! page is checked as it is, and the run's next write queues it again.
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     path::Path,
     sync::{
         Arc,
@@ -41,6 +44,7 @@ use booharu_core::{
     context::SeriesStore,
     settings::{LetteringSettings, QcSettings},
 };
+use futures::future::BoxFuture;
 use koharu_pipeline::PipelineConfig;
 use koharu_scene::{Change, LayerId, PageId, Project};
 use parking_lot::Mutex;
@@ -122,7 +126,9 @@ pub(crate) fn touch_all() {
 
 /// The watcher's work: follows `changes`, the open project's, and
 /// `touched`, [`touch_all`]'s asks, and checks the pages they queue as
-/// they're due, until the session closes its changes as it goes.
+/// they're due, one at a time, until the session closes its changes as it
+/// goes. It follows them while it checks too: a change never waits for a
+/// pass to end, nor stops the page being checked.
 async fn watching(
     app: Arc<App>,
     mut changes: Receiver<Change>,
@@ -131,7 +137,27 @@ async fn watching(
     let mut queue = Queue::default();
     // The project is opening: its tags come back as its pages are checked.
     queue.add_all(Instant::now());
+    // What the pass going read for its pages; none while none goes.
+    let mut read: Option<Arc<Inputs>> = None;
+    // The page being checked.
+    let mut checking: Option<BoxFuture<'static, ()>> = None;
     loop {
+        if checking.is_none() {
+            // Pages that came due start a new pass, which takes those the
+            // pass going has left too.
+            if queue.due().is_some_and(|due| due <= Instant::now()) {
+                read = start(&app, &mut queue).await;
+            }
+            if let Some(inputs) = &read {
+                match queue.next() {
+                    Some(page) => {
+                        let check = checked(Arc::clone(&app), page, Arc::clone(inputs));
+                        checking = Some(Box::pin(check));
+                    }
+                    None => read = None,
+                }
+            }
+        }
         tokio::select! {
             change = changes.recv() => match change {
                 Ok(change) => {
@@ -142,12 +168,14 @@ async fn watching(
                         forget(&app, page);
                     }
                 }
-                // It missed changes, which may have changed any page.
+                // It missed changes, which may have changed any page, or
+                // removed one, which the next pass forgets.
                 Err(RecvError::Lagged(_)) => queue.add_all(Instant::now()),
                 Err(RecvError::Closed) => return,
             },
             Some(()) = touched.recv() => queue.add_all(Instant::now()),
-            () = until(queue.due()) => pass(&app, &mut queue).await,
+            () = finished(&mut checking) => checking = None,
+            () = until(queue.due()), if checking.is_none() => {}
         }
     }
 }
@@ -160,22 +188,37 @@ async fn until(due: Option<Instant>) {
     }
 }
 
-/// Checks the pages `queue` holds, now they're due: reads the settings, the
-/// glossary and the chapter's majority fonts once for the pass, then checks
-/// each page in page order. Before the project has opened the pass is put
-/// off, and while the settings can't be read the pages wait for the next
-/// change, keeping the findings they have.
-async fn pass(app: &Arc<App>, queue: &mut Queue) {
+/// Waits until the page `checking` checks is checked, which a wait given up
+/// leaves going; for ever while no page is.
+async fn finished(checking: &mut Option<BoxFuture<'static, ()>>) {
+    match checking {
+        Some(check) => check.await,
+        None => std::future::pending().await,
+    }
+}
+
+/// Starts a pass over the pages `queue` holds, now they're due, and those
+/// the pass going has left: forgets the findings of any page the project no
+/// longer has, as after changes the watcher missed, reads the settings, the
+/// glossary and the chapter's majority fonts once for the pass, and takes
+/// its pages in page order. Answers what it read; none before the project
+/// has opened, which puts the pass off, or while the settings can't be
+/// read, when the pages wait for the next change, keeping the findings they
+/// have.
+async fn start(app: &Arc<App>, queue: &mut Queue) -> Option<Arc<Inputs>> {
     // The project opens right after its watcher starts.
     let Ok(session) = app.session() else {
         queue.postpone(Instant::now());
-        return;
+        return None;
     };
-    let (file, project) = {
+    let generation = GENERATION.load(Ordering::SeqCst);
+    let (file, project, taken) = {
         let session = session.lock();
-        (session.path().to_owned(), session.project())
+        let taken = TAKEN.fetch_add(1, Ordering::SeqCst);
+        (session.path().to_owned(), session.project(), taken)
     };
     drop(session);
+    forget_gone(app, &project, generation, taken);
     let read = tokio::task::spawn_blocking(move || {
         let inputs = inputs(&file, &project)?;
         anyhow::Ok((project, inputs))
@@ -188,25 +231,28 @@ async fn pass(app: &Arc<App>, queue: &mut Queue) {
         Err(error) => {
             tracing::warn!("the quality check can't check the pages: {error:#}");
             queue.hold();
-            return;
+            return None;
         }
     };
-    let pages = queue.take(project.pages().map(|page| page.id), &inputs.majorities);
-    let inputs = Arc::new(inputs);
-    for page in pages {
-        if let Err(error) = check(app, page, Some(Arc::clone(&inputs))).await {
-            tracing::warn!("the quality check couldn't check page {page}: {error:#}");
-        }
+    queue.take(project.pages().map(|page| page.id), &inputs.majorities);
+    Some(Arc::new(inputs))
+}
+
+/// Checks `page` of the open project with `inputs`, what the watcher's pass
+/// read, logging what fails.
+async fn checked(app: Arc<App>, page: PageId, inputs: Arc<Inputs>) {
+    if let Err(error) = check(&app, page, Some(inputs)).await {
+        tracing::warn!("the quality check couldn't check page {page}: {error:#}");
     }
 }
 
 /// The pages the watcher checks next, and when: [`QUIET`] after the latest
 /// change that queued any, but at most [`CAP`] after the first queued since
-/// they were last taken. Pure, and driven by the instants it's given, so a
-/// test drives its clock.
+/// they were last taken, and meanwhile those the pass going has left. Pure,
+/// and driven by the instants it's given, so a test drives its clock.
 #[derive(Debug, Default)]
 struct Queue {
-    /// The pages changes queued.
+    /// The pages changes queued since the pass going took its pages.
     pages: BTreeSet<PageId>,
     /// Whether every page is queued, whichever the project has when they're
     /// taken.
@@ -218,6 +264,8 @@ struct Queue {
     cap: Option<Instant>,
     /// The chapter's majority fonts as the pages were last taken.
     majorities: Option<Majorities>,
+    /// The pages the pass going has left to check, in page order.
+    left: VecDeque<PageId>,
 }
 
 impl Queue {
@@ -237,11 +285,13 @@ impl Queue {
         self.wait(now);
     }
 
-    /// Drops `pages`, which a change removed.
+    /// Drops `pages`, which a change removed, from the queue and from the
+    /// pass going.
     fn remove(&mut self, pages: &[PageId]) {
         for page in pages {
             self.pages.remove(page);
         }
+        self.left.retain(|page| !pages.contains(page));
         if self.pages.is_empty() && !self.all {
             self.hold();
         }
@@ -266,27 +316,33 @@ impl Queue {
         self.due
     }
 
-    /// Takes the pages to check now, in `order`, the project's page order:
-    /// every page when every page was queued or `majorities`, the chapter's
-    /// majority fonts now, aren't those the pages were last taken with, as
-    /// they change what the odd font check finds on any page; else the
-    /// queued pages `order` still has.
-    fn take(
-        &mut self,
-        order: impl IntoIterator<Item = PageId>,
-        majorities: &Majorities,
-    ) -> Vec<PageId> {
+    /// Starts a pass over the pages to check now, in place of the pass
+    /// going, in `order`, the project's page order: every page when every
+    /// page was queued or `majorities`, the chapter's majority fonts now,
+    /// aren't those the pages were last taken with, as they change what the
+    /// odd font check finds on any page; else the queued pages and those
+    /// the pass going has left that `order` still has, so a page changed
+    /// since the pass going checked it is checked again ahead of the pages
+    /// after it.
+    fn take(&mut self, order: impl IntoIterator<Item = PageId>, majorities: &Majorities) {
         let mut all = std::mem::take(&mut self.all);
         if self.majorities.as_ref() != Some(majorities) {
             self.majorities = Some(majorities.clone());
             all = true;
         }
-        let queued = std::mem::take(&mut self.pages);
+        let mut queued = std::mem::take(&mut self.pages);
+        queued.extend(self.left.drain(..));
         self.hold();
-        order
+        self.left = order
             .into_iter()
             .filter(|page| all || queued.contains(page))
-            .collect()
+            .collect();
+    }
+
+    /// The next page the pass going checks; none once it has checked them
+    /// all.
+    fn next(&mut self) -> Option<PageId> {
+        self.left.pop_front()
     }
 
     /// Makes the pages due [`QUIET`] after `now`, but no later than [`CAP`]
@@ -319,6 +375,42 @@ pub(crate) fn forget(app: &App, page: PageId) {
     keep(page, generation, checked, |findings| {
         app.emit(events::QC, events::BooharuQc { page, findings });
     });
+}
+
+/// Forgets, as [`forget`] does, the findings of each page `project`, a
+/// snapshot taken as `taken` in the store's generation `generation`, no
+/// longer has: a page removed by a change the watcher missed. Its empty
+/// entry is that snapshot's, so what a check of a newer one stores stands,
+/// as for a page an undo brought back meanwhile.
+fn forget_gone(app: &App, project: &Project, generation: u64, taken: u64) {
+    let pages = gone(&FINDINGS.lock(), |page| project.page(page).is_ok(), taken);
+    for page in pages {
+        let checked = Checked {
+            taken,
+            findings: Vec::new(),
+        };
+        keep(page, generation, checked, |findings| {
+            app.emit(events::QC, events::BooharuQc { page, findings });
+        });
+    }
+}
+
+/// The pages `stored` holds findings for from a snapshot older than one
+/// taken as `taken`, which doesn't have them, as `has` tells: removed since
+/// those findings were found. A page checked since, as one an undo brought
+/// back, or forgotten already, holding none, isn't.
+fn gone(
+    stored: &BTreeMap<PageId, Checked>,
+    has: impl Fn(PageId) -> bool,
+    taken: u64,
+) -> Vec<PageId> {
+    stored
+        .iter()
+        .filter(|(page, checked)| {
+            checked.taken < taken && !checked.findings.is_empty() && !has(**page)
+        })
+        .map(|(page, _)| *page)
+        .collect()
 }
 
 /// What a check of `project`, which the project file `file` holds, reads
@@ -521,12 +613,39 @@ mod tests {
         Majorities::from([(LetteringCategory::NormalDialogue, Some(family.to_owned()))])
     }
 
-    /// A queue whose pages were taken once, with `majorities("A")`.
+    /// A pass over the pages `queue` takes in `order` with `majorities`, to
+    /// its end: the pages it checks, in turn.
+    fn pass(
+        queue: &mut Queue,
+        order: impl IntoIterator<Item = PageId>,
+        majorities: &Majorities,
+    ) -> Vec<PageId> {
+        queue.take(order, majorities);
+        std::iter::from_fn(|| queue.next()).collect()
+    }
+
+    /// A queue whose pages were checked once, with `majorities("A")`.
     fn checked_once(order: &[PageId], now: Instant) -> Queue {
         let mut queue = Queue::default();
         queue.add_all(now);
-        assert_eq!(queue.take(order.iter().copied(), &majorities("A")), order);
+        assert_eq!(
+            pass(&mut queue, order.iter().copied(), &majorities("A")),
+            order
+        );
         queue
+    }
+
+    /// A finding of the overflow check on `page`, reading `text`.
+    fn finding(page: PageId, text: &str) -> Finding {
+        Finding {
+            page,
+            layer: LayerId(Uuid::now_v7()),
+            check: "overflow".to_owned(),
+            problem: Problem::Overflow,
+            source: Source::Auto,
+            text: text.to_owned(),
+            hidden: false,
+        }
     }
 
     #[test]
@@ -549,7 +668,7 @@ mod tests {
         }
         // ...but never later than five seconds after the first.
         assert_eq!(queue.due(), Some(start + CAP));
-        assert_eq!(queue.take([a, b, c], &majorities("A")), [a, b]);
+        assert_eq!(pass(&mut queue, [a, b, c], &majorities("A")), [a, b]);
         assert_eq!(queue.due(), None, "taken");
 
         // The cap starts again from the next change.
@@ -565,13 +684,13 @@ mod tests {
         queue.add([d, a, c], start);
         queue.remove(&[c]);
         assert_eq!(
-            queue.take([d, c, b, a], &majorities("A")),
+            pass(&mut queue, [d, c, b, a], &majorities("A")),
             [d, a],
             "in the order the project has them now"
         );
         queue.add([b], start);
         assert_eq!(
-            queue.take([a, c], &majorities("A")),
+            pass(&mut queue, [a, c], &majorities("A")),
             [],
             "a page the project no longer has"
         );
@@ -588,22 +707,22 @@ mod tests {
         let mut queue = Queue::default();
         queue.add_all(start);
         assert_eq!(queue.due(), Some(start + QUIET), "every page as it starts");
-        assert_eq!(queue.take([a, b, c], &majorities("A")), [a, b, c]);
+        assert_eq!(pass(&mut queue, [a, b, c], &majorities("A")), [a, b, c]);
 
         // Missed changes, or a touch, queue every page.
         queue.add_all(start);
         queue.add([b], start);
-        assert_eq!(queue.take([a, b, c], &majorities("A")), [a, b, c]);
+        assert_eq!(pass(&mut queue, [a, b, c], &majorities("A")), [a, b, c]);
 
         // A change of one page checks that page alone while the majority
         // fonts stay as they were...
         queue.add([b], start);
-        assert_eq!(queue.take([a, b, c], &majorities("A")), [b]);
+        assert_eq!(pass(&mut queue, [a, b, c], &majorities("A")), [b]);
         // ...and every page once they change.
         queue.add([b], start);
-        assert_eq!(queue.take([a, b, c], &majorities("B")), [a, b, c]);
+        assert_eq!(pass(&mut queue, [a, b, c], &majorities("B")), [a, b, c]);
         queue.add([c], start);
-        assert_eq!(queue.take([a, b, c], &majorities("B")), [c]);
+        assert_eq!(pass(&mut queue, [a, b, c], &majorities("B")), [c]);
     }
 
     #[test]
@@ -624,7 +743,69 @@ mod tests {
         assert_eq!(queue.due(), None);
         queue.add([b], later);
         assert_eq!(queue.due(), Some(later + QUIET));
-        assert_eq!(queue.take([a, b], &majorities("A")), [a, b]);
+        assert_eq!(pass(&mut queue, [a, b], &majorities("A")), [a, b]);
+    }
+
+    #[test]
+    fn a_change_during_a_pass_joins_the_pages_it_has_left_in_page_order() {
+        let start = Instant::now();
+        let [a, b, c, d, e] = pages();
+        let mut queue = Queue::default();
+        queue.add_all(start);
+        queue.take([a, b, c, d, e], &majorities("A"));
+        assert_eq!([queue.next(), queue.next()], [Some(a), Some(b)]);
+
+        // While b is checked, a changes again and e goes: the pass goes on
+        // without e, and the change comes due as ever.
+        queue.add([a], start);
+        queue.remove(&[e]);
+        assert_eq!(queue.due(), Some(start + QUIET));
+        assert_eq!(queue.next(), Some(c));
+
+        // Once it's due, a new pass takes the changed page and those the
+        // pass going has left, in page order, and none twice.
+        assert_eq!(pass(&mut queue, [a, b, c, d], &majorities("A")), [a, d]);
+        assert_eq!(queue.due(), None, "taken");
+
+        // Every page queued meanwhile, as on a touch, takes every page.
+        queue.add_all(start);
+        queue.take([a, b, c, d], &majorities("A"));
+        assert_eq!(queue.next(), Some(a));
+        queue.add_all(start);
+        assert_eq!(
+            pass(&mut queue, [a, b, c, d], &majorities("A")),
+            [a, b, c, d]
+        );
+
+        // A page removed meanwhile leaves the pass going.
+        queue.add_all(start);
+        queue.take([a, b, c, d], &majorities("A"));
+        queue.remove(&[b]);
+        let left: Vec<_> = std::iter::from_fn(|| queue.next()).collect();
+        assert_eq!(left, [a, c, d]);
+    }
+
+    #[test]
+    fn a_page_a_newer_snapshot_lacks_is_forgotten_once() {
+        let [kept, removed, back, forgotten] = pages();
+        let checked = |page, taken, findings| {
+            let findings = if findings {
+                vec![finding(page, "text")]
+            } else {
+                Vec::new()
+            };
+            (page, Checked { taken, findings })
+        };
+        let stored = BTreeMap::from([
+            checked(kept, 1, true),
+            checked(removed, 2, true),
+            // Checked since the snapshot was taken, as when an undo brought
+            // it back.
+            checked(back, 9, true),
+            // Forgotten already.
+            checked(forgotten, 3, false),
+        ]);
+        assert_eq!(gone(&stored, |page| page == kept, 5), [removed]);
     }
 
     #[test]
@@ -632,15 +813,7 @@ mod tests {
         let page = PageId(Uuid::now_v7());
         let checked = |taken, text: &str| Checked {
             taken,
-            findings: vec![Finding {
-                page,
-                layer: LayerId(Uuid::now_v7()),
-                check: "overflow".to_owned(),
-                problem: Problem::Overflow,
-                source: Source::Auto,
-                text: text.to_owned(),
-                hidden: false,
-            }],
+            findings: vec![finding(page, text)],
         };
         let held = || {
             FINDINGS
