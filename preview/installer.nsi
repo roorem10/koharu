@@ -86,6 +86,16 @@ Section "Application"
   ; Booharu 0.0.3 and earlier installed the program as koharu.exe. VerifyDestination has
   ; already refused any folder holding an official Koharu, so this one is our own old copy.
   Delete "$INSTDIR\koharu.exe"
+  ; Every earlier Booharu, up to the 0.0.5 builds on Koharu 0.85.2, installed CEF 154's dxil.dll,
+  ; which CEF 156 no longer ships, and File /r replaces only the files this build ships. Delete an
+  ; older Booharu's copy so it doesn't sit beside CEF 156's dxcompiler.dll, but never another
+  ; program's: only beside Booharu.exe or in the folder the last install recorded, which is where
+  ; VerifyDestination lets koharu.exe through.
+  ReadRegStr $0 HKCU "Software\Booharu" "InstallDir"
+  ${If} ${FileExists} "$INSTDIR\Booharu.exe"
+  ${OrIf} $0 == "$INSTDIR"
+    Delete "$INSTDIR\dxil.dll"
+  ${EndIf}
   ; The build script already rejects dot-files in staging. With /x ".*" and a "/*" pattern, makensis on Windows found no files.
   File /r "${RUNTIME_DIR}\*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -108,6 +118,8 @@ Section "Uninstall"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Booharu"
   DeleteRegKey HKCU "Software\Booharu"
   !include "${UNINSTALL_INCLUDE}"
+  ; Booharu's builds on CEF 154 installed dxil.dll too, which this build's list lacks.
+  Delete "$INSTDIR\dxil.dll"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
 SectionEnd
