@@ -76,6 +76,17 @@ pub struct CategoryCounts {
     pub untranslated: u32,
 }
 
+impl CategoryCounts {
+    /// Counts `other`'s blocks too.
+    fn add(&mut self, other: Self) {
+        self.changed += other.changed;
+        self.locked += other.locked;
+        self.kept_user_label += other.kept_user_label;
+        self.kept_hand_edited += other.kept_hand_edited;
+        self.untranslated += other.untranslated;
+    }
+}
+
 /// A block's lettering category as the interface shows it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct BlockLettering {
@@ -109,94 +120,124 @@ pub fn set_category(
     let mut ops = Vec::new();
     let mut seen = BTreeSet::new();
     for &id in blocks.iter().filter(|id| seen.insert(**id)) {
-        let layer = project.layer(id)?;
-        let Content::Block(block) = &layer.content else {
-            bail!("layer {id} isn't a block");
-        };
-        if locked(project, layer)? {
-            counts.locked += 1;
-            continue;
-        }
-        let held = attrs::get::<Lettering>(layer);
-        let users = held
-            .as_ref()
-            .is_some_and(|label| label.source == LetteringSource::User);
-        let model = matches!(chooser, Chooser::Model { .. });
-        if model && users {
-            counts.kept_user_label += 1;
-            continue;
-        }
-        let label = category.map(|category| match chooser {
-            Chooser::User => Lettering {
-                category,
-                source: LetteringSource::User,
-                confidence: None,
-            },
-            Chooser::Model { confidence } => Lettering {
-                category,
-                source: LetteringSource::Model,
-                confidence,
-            },
-        });
-        let mut changed = false;
-        let raw = |label: Option<&Lettering>| label.map(serde_json::to_value).transpose();
-        let before = layer
-            .attributes
-            .get(attrs::NAMESPACE)
-            .and_then(|keys| keys.get(<Lettering as attrs::Attr>::KEY))
-            .cloned();
-        changed |= before != raw(label.as_ref())?;
-        ops.push(match &label {
-            Some(label) => attrs::set(id, label)?,
-            None => attrs::clear::<Lettering>(id),
-        });
-
-        let Some(translation) = &block.translation else {
-            counts.untranslated += 1;
-            counts.changed += u32::from(changed);
-            continue;
-        };
-        if !settings.auto {
-            counts.changed += u32::from(changed);
-            continue;
-        }
-        if model && edited(layer).style {
-            counts.kept_hand_edited += 1;
-            counts.changed += u32::from(changed);
-            continue;
-        }
-        let (page, _) = project.parent(id)?;
-        let lettered = lettering::effective_with(page, id, label.as_ref(), settings)
-            .context("a block has a category")?;
-        let patch = styles::category_chars(settings, font, lettered.category);
-        let current = &translation.style.chars;
-        let after = styles::patched(current, &patch)?;
-        if after != *current {
-            changed = true;
-            ops.push(Op::UpdateLayer {
-                layer: id.into(),
-                patch: json!({"translation": {"style": {"chars": patch}}}),
-            });
-        }
-        // The values written are Booharu's from now on. A translation no
-        // stage wrote keeps its other values hand edits.
-        let mut record = Auto::of(layer);
-        if record.style.is_none() && !styles::recorded(layer, "translation") {
-            record.style = Some(AutoStyle::default());
-        }
-        let written = patch.keys().cloned().collect();
-        let record = record.restyled(&after, &written);
-        if attrs::get::<Auto>(layer) != Some(record.clone()) {
-            changed = true;
-            ops.push(attrs::set(id, &record)?);
-        }
-        counts.changed += u32::from(changed);
+        let (block, counted) = category_ops(
+            project,
+            project.layer(id)?,
+            category,
+            chooser,
+            settings,
+            font,
+        )?;
+        ops.extend(block);
+        counts.add(counted);
     }
     let edit = (!ops.is_empty()).then(|| Edit {
         label: LABEL.to_owned(),
         ops,
     });
     Ok((edit, counts))
+}
+
+/// The ops setting the category of `layer`, a block of `project`, to
+/// `category`, or to Automatic for none, as `chooser` chooses, under
+/// `settings` and `font`, the default font, with what they do to it, as
+/// [`set_category`] counts a block: its work for one block, which Read
+/// chapter does for each line it labels. A locked block, or one whose label
+/// a user chose when a model chooses, gets no op. A layer that isn't a block
+/// fails.
+pub(crate) fn category_ops(
+    project: &Project,
+    layer: &Layer,
+    category: Option<LetteringCategory>,
+    chooser: Chooser,
+    settings: &LetteringSettings,
+    font: Option<&str>,
+) -> Result<(Vec<Op>, CategoryCounts)> {
+    let id = layer.id;
+    let mut counts = CategoryCounts::default();
+    let mut ops = Vec::new();
+    let Content::Block(block) = &layer.content else {
+        bail!("layer {id} isn't a block");
+    };
+    if locked(project, layer)? {
+        counts.locked += 1;
+        return Ok((ops, counts));
+    }
+    let held = attrs::get::<Lettering>(layer);
+    let users = held
+        .as_ref()
+        .is_some_and(|label| label.source == LetteringSource::User);
+    let model = matches!(chooser, Chooser::Model { .. });
+    if model && users {
+        counts.kept_user_label += 1;
+        return Ok((ops, counts));
+    }
+    let label = category.map(|category| match chooser {
+        Chooser::User => Lettering {
+            category,
+            source: LetteringSource::User,
+            confidence: None,
+        },
+        Chooser::Model { confidence } => Lettering {
+            category,
+            source: LetteringSource::Model,
+            confidence,
+        },
+    });
+    let mut changed = false;
+    let raw = |label: Option<&Lettering>| label.map(serde_json::to_value).transpose();
+    let before = layer
+        .attributes
+        .get(attrs::NAMESPACE)
+        .and_then(|keys| keys.get(<Lettering as attrs::Attr>::KEY))
+        .cloned();
+    changed |= before != raw(label.as_ref())?;
+    ops.push(match &label {
+        Some(label) => attrs::set(id, label)?,
+        None => attrs::clear::<Lettering>(id),
+    });
+
+    let Some(translation) = &block.translation else {
+        counts.untranslated += 1;
+        counts.changed += u32::from(changed);
+        return Ok((ops, counts));
+    };
+    if !settings.auto {
+        counts.changed += u32::from(changed);
+        return Ok((ops, counts));
+    }
+    if model && edited(layer).style {
+        counts.kept_hand_edited += 1;
+        counts.changed += u32::from(changed);
+        return Ok((ops, counts));
+    }
+    let (page, _) = project.parent(id)?;
+    let lettered = lettering::effective_with(page, id, label.as_ref(), settings)
+        .context("a block has a category")?;
+    let patch = styles::category_chars(settings, font, lettered.category);
+    let current = &translation.style.chars;
+    let after = styles::patched(current, &patch)?;
+    if after != *current {
+        changed = true;
+        ops.push(Op::UpdateLayer {
+            layer: id.into(),
+            patch: json!({"translation": {"style": {"chars": patch}}}),
+        });
+    }
+    // The values written are Booharu's from now on. A translation no
+    // stage wrote keeps its other values hand edits.
+    let mut record = Auto::of(layer);
+    if record.style.is_none() && !styles::recorded(layer, "translation") {
+        record.style = Some(AutoStyle::default());
+    }
+    let written = patch.keys().cloned().collect();
+    let record = record.restyled(&after, &written);
+    if attrs::get::<Auto>(layer) != Some(record.clone()) {
+        changed = true;
+        ops.push(attrs::set(id, &record)?);
+    }
+    counts.changed += u32::from(changed);
+    Ok((ops, counts))
 }
 
 /// The lettering of every block on `page` in `project`, in reading order,
