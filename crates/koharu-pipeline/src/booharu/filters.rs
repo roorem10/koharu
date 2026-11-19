@@ -15,7 +15,8 @@
 //!   with the kept art of the effects a translation skips (I1, I2); and
 //!   Detect again's additions (D2).
 //! - [`stays`], in Detect again's removals (D1), keeps what the user made,
-//!   fixed, labelled, noted, subtitled, or locked, and whatever holds it.
+//!   fixed (a clean-up hidden by hand among it), labelled, noted, subtitled,
+//!   or locked, and whatever holds it.
 //! - [`Left::told`] tells each page's counts once its edit is in, when any is
 //!   above 0.
 
@@ -530,7 +531,7 @@ mod tests {
     use booharu_core::{
         attrs::{self, Auto, ReviewNote, SfxSubtitle},
         settings::{LetteringSettings, SfxMode},
-        styles::{recognized, recorded},
+        styles::{given_back, recognized, recorded},
     };
     use icu_locale_core::langid;
     use image::{ImageFormat, Rgb, RgbImage};
@@ -1696,6 +1697,68 @@ mod tests {
         assert!(ops.is_empty(), "{ops:?}");
         left.told();
         assert_eq!(skipped(&events.told()), [(Stage::Detect, 0, 2, 1, false)]);
+        Ok(())
+    }
+
+    #[test]
+    fn detect_again_keeps_a_clean_up_hidden_by_hand_but_not_one_booharu_or_the_translator_hid()
+    -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("by_hand", None, 0, block("sfx", (10.0, 10.0))),
+                add("as_art", None, 1, block("sfx", (60.0, 10.0))),
+                add("given", None, 2, block("text", (110.0, 10.0))),
+            ],
+        )?;
+        let hide = |label: &str| -> Result<Op> {
+            Ok(serde_json::from_value(
+                json!({"op": "update_layer", "layer": fixture.id(label),
+                    "patch": {"cleanup": {"visible": false}}}),
+            )?)
+        };
+        // Each block's clean-up hidden, with no translation: by hand, by
+        // Booharu keeping the art with its mark, and by the Translation stage
+        // given the source back.
+        fixture.edit(vec![hide("by_hand")?])?;
+        fixture.edit(sfx::kept_original(&fixture.layer("as_art")?))?;
+        fixture.edit(vec![hide("given")?, given_back(&fixture.layer("given")?)?])?;
+        let at = fixture.page;
+        // What detection finds again: the same three blocks.
+        let additions = vec![
+            found(at, "d0", None, 0, lettering((10.0, 10.0)))?,
+            found_mask("d0", (10, 10))?,
+            found(at, "d1", None, 1, lettering((60.0, 10.0)))?,
+            found_mask("d1", (60, 10))?,
+            found(at, "d2", None, 2, lettering((110.0, 10.0)))?,
+            found_mask("d2", (110, 10))?,
+        ];
+        let events = Events::new();
+        let left = Left::of(Stage::Detect, Snapshot::default(), events.clone());
+        let page = fixture.page()?;
+        let mut ops = Vec::new();
+        removals(&page, &page.layers, &mut ops);
+        let added = left.writing(&fixture.member(None)).added(&page, additions);
+        // No new block over the one hidden by hand; the others are replaced.
+        let own = |label: &str| label.to_owned();
+        assert_eq!(
+            shape(&added),
+            (
+                vec![(own("d1"), None, 0), (own("d2"), None, 1)],
+                vec![own("d1.mask"), own("d2.mask")],
+            )
+        );
+        ops.extend(added);
+        fixture.edit(ops)?;
+        left.told();
+        assert_eq!(skipped(&events.told()), [(Stage::Detect, 0, 1, 0, false)]);
+        let layers = fixture.layers()?;
+        assert!(layers.contains("by_hand"), "{layers:?}");
+        assert!(!layers.contains("as_art") && !layers.contains("given"));
+        assert_eq!(layers.len(), 3, "{layers:?}");
+        // It keeps its clean-up hidden, so cleaning again never shows it.
+        let kept = fixture.block("by_hand")?;
+        assert!(!kept.cleanup.visible && kept.translation.is_none());
         Ok(())
     }
 }

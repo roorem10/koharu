@@ -12,6 +12,8 @@
 //! - Translating leaves out the sound effects the SFX mode keeps as art and
 //!   the subtitled ones (`sfx::skipped`), which no redo lifts; a subtitle
 //!   run translates the effects it names.
+//! - Detect again keeps what was made or changed by hand, a clean-up hidden
+//!   by hand among it, and what is locked ([`keeps`]).
 //!
 //! koharu-pipeline's Booharu glue calls [`left_out`] from each stage's hook
 //! and [`keeps`] from Detect's, and the redo counts read [`left_out`] too.
@@ -126,18 +128,22 @@ pub fn cleanable(page: &Page, layer: &Layer) -> bool {
 /// Whether Detect again keeps `layer`, on `page`, rather than replace it
 /// with what it detects: a locked layer; a block changed by hand (its
 /// source, translation, or style, or drawn by hand, as
-/// [`edited`](crate::edited) reports it), labelled by a user, given a
-/// reviewer's note, or subtitled; a panel or balloon Koharu's Detection
-/// stage didn't make; and any text layer, the T tool's and subtitles.
-/// Anything else, a block, panel, or balloon detection made and nobody
-/// changed among them, is detected again.
+/// [`edited`](crate::edited) reports it), whose clean-up was hidden by hand
+/// ([`sfx::hand_kept`]), labelled by a user, given a reviewer's note, or
+/// subtitled; a panel or balloon Koharu's Detection stage didn't make; and
+/// any text layer, the T tool's and subtitles. Anything else, a block,
+/// panel, or balloon detection made and nobody changed among them, is
+/// detected again, a block whose clean-up Booharu hid to keep it as art
+/// (the kept mark) or the Translation stage hid giving it back among them,
+/// as no hand hid those.
 pub fn keeps(page: &Page, layer: &Layer) -> bool {
     if layer.locked {
         return true;
     }
     match &layer.content {
-        Content::Block(_) => {
+        Content::Block(block) => {
             edited(layer).hand_edited()
+                || sfx::hand_kept(layer, block)
                 || attrs::get::<Lettering>(layer)
                     .is_some_and(|label| label.source == LetteringSource::User)
                 || attrs::get::<ReviewNote>(layer).is_some()
@@ -158,7 +164,7 @@ mod tests {
     use crate::{
         attrs::{Auto, SfxSubtitle},
         settings::SfxMode,
-        styles::{recognized, text_hash},
+        styles::{given_back, recognized, text_hash},
     };
 
     /// A page holding a detected balloon around the detected block `held`,
@@ -608,5 +614,37 @@ mod tests {
             }
         }
         assert_eq!(checked, 2);
+    }
+
+    #[test]
+    fn detect_again_keeps_a_clean_up_hidden_by_hand_but_not_booharus_or_the_translators() {
+        let mut fixture = Fixture::new();
+        let hide = |id: LayerId| Op::UpdateLayer {
+            layer: id.into(),
+            patch: json!({"cleanup": {"visible": false}}),
+        };
+        // Hidden by hand on a block with no translation: kept, though nothing
+        // else about it changed.
+        let effect = fixture.id("effect");
+        fixture.apply(vec![hide(effect)]);
+        let layer = fixture.layer("effect");
+        assert!(!edited(&layer).hand_edited());
+        assert!(keeps(&fixture.page(), &layer));
+
+        // Hidden by Booharu, with the kept mark, to keep the art: replaced.
+        let ops = sfx::kept_original(&fixture.layer("text"));
+        assert!(!ops.is_empty());
+        fixture.apply(ops);
+        let layer = fixture.layer("text");
+        assert!(Auto::of(&layer).kept);
+        assert!(!keeps(&fixture.page(), &layer));
+
+        // Hidden by the Translation stage, given the source back: replaced.
+        let held = fixture.id("held");
+        let given = given_back(&fixture.layer("held")).expect("the record");
+        fixture.apply(vec![hide(held), given]);
+        let layer = fixture.layer("held");
+        assert_eq!(Auto::of(&layer).text, Some(text_hash("")));
+        assert!(!keeps(&fixture.page(), &layer));
     }
 }
