@@ -60,6 +60,14 @@ jobs:
             choco install nsis -y --no-progress
           }
 
+      # bindgen parses MSVC's standard library, which rejects a Clang older than
+      # its own Visual Studio's (STL1000), and the runner's LLVM can lag behind
+      # it, as it did when windows-latest moved to Visual Studio 18. Koharu's own
+      # workflows install the same version (its commit cf9b1600).
+      - name: Install LLVM
+        shell: pwsh
+        run: choco upgrade llvm --version 22.1.8 --allow-downgrade --no-progress -y
+
       - uses: Swatinem/rust-cache@v2
         with:
           # Booharu 0.0.5 is built on Koharu 0.85, which shares almost no
@@ -81,6 +89,8 @@ jobs:
           bun --version
           cmake --version | Select-Object -First 1
           ninja --version
+          $clang = Join-Path $env:ProgramFiles 'LLVM\bin\clang.exe'
+          if (Test-Path $clang) { & $clang --version | Select-Object -First 1 } else { 'clang: none in Program Files\LLVM' }
 
       # rust-cache prunes target\ before saving it, and a CEF copy it had pruned (archive.json
       # gone) stopped the CEF build script. CEF now lives outside target\, in CEF_PATH.
