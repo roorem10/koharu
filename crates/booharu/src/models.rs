@@ -55,7 +55,7 @@ pub struct ReadingModel {
     /// Why the saved model can't read pages, which makes a read refuse
     /// rather than fall back; none when it can.
     pub saved_cant_read: Option<CantRead>,
-    /// The translation model, `[pipeline] translator model`.
+    /// The translation model, `[pipeline.translator] model`.
     pub translation: String,
     /// Why the translation model can't read pages; none when it can.
     pub translation_cant_read: Option<CantRead>,
