@@ -201,6 +201,8 @@
       "close": "Close",
       "description": "Inspect and edit information for this text box.",
       "empty": "Empty",
+      "hidden": "Hidden (marked OK)",
+      "noBoxIssues": "No issues on this box.",
       "noteLabel": "Box note",
       "noteLocked": "This text, or a layer it's in, is locked. Unlock it in Layers to change its note.",
       "notePlaceholder": "Leave a note for the next pass…",
@@ -209,6 +211,7 @@
         "explain": "Explanation",
         "lettering": "Lettering",
         "note": "Note",
+        "qc": "QC",
         "source": "Source & translation"
       },
       "showInStory": "Show in Story",

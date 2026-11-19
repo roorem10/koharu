@@ -224,6 +224,8 @@
       "close": "Fechar",
       "description": "Inspecione e edite as informações desta caixa de texto.",
       "empty": "Vazio",
+      "hidden": "Ocultos (marcados como OK)",
+      "noBoxIssues": "Nenhum problema nesta caixa.",
       "noteLabel": "Nota da caixa",
       "noteLocked": "Este texto, ou uma camada que o contém, está bloqueado. Desbloqueie em Camadas para alterar a nota.",
       "notePlaceholder": "Deixe uma nota para a próxima revisão…",
@@ -232,6 +234,7 @@
         "explain": "Explicação",
         "lettering": "Letreiramento",
         "note": "Nota",
+        "qc": "QC",
         "source": "Texto original e tradução"
       },
       "showInStory": "Mostrar em História",

@@ -6,11 +6,13 @@ import { useTranslation } from 'react-i18next'
 import { GlossaryTextMenu } from '@/components/booharu/context/GlossaryTextMenu'
 import { LineContextCard } from '@/components/booharu/context/LineContextCard'
 import { LetteringSection } from '@/components/booharu/lettering/LetteringSection'
+import { QcSection } from '@/components/booharu/qc/QcSection'
 import { call } from '@/lib/backend'
 import { reviewNote } from '@/lib/booharu/attrs'
 import { boxActions, runBoxAction, type Box } from '@/lib/booharu/boxActions'
 import { showInStory } from '@/lib/booharu/boxDetails'
 import { explainSection } from '@/lib/booharu/explain'
+import { qcSection } from '@/lib/booharu/qc'
 import { isBlockLayer, plainText } from '@/lib/document'
 import { commands, type PageId } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
@@ -34,6 +36,8 @@ export interface BoxDetailsSection {
 /** Box details' sections, in the order it shows them. A later one goes in as one more entry. */
 export const boxDetailsSections: readonly BoxDetailsSection[] = [
   { id: 'source', title: 'booharu.details.sections.source', Section: SourceSection },
+  // What the quality check found, which the ? tag opens on while something is open.
+  { id: qcSection, title: 'booharu.details.sections.qc', Section: QcSection },
   {
     id: explainSection,
     title: 'booharu.details.sections.explain',

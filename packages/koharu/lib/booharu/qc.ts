@@ -30,6 +30,9 @@ interface QcState {
 
 export const useBooharuQc = create<QcState>()(() => ({ project: null, pages: {}, previous: null }))
 
+/** Box details' section that lists what the quality check found on a text. */
+export const qcSection = 'qc'
+
 /** The pages told since the last read of every finding was asked, whose findings are newer than its
  * answer. */
 const told = new Set<PageId>()

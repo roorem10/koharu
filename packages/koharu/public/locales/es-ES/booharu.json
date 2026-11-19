@@ -224,6 +224,8 @@
       "close": "Cerrar",
       "description": "Inspecciona y edita la información de este cuadro de texto.",
       "empty": "Vacío",
+      "hidden": "Ocultos (marcados como OK)",
+      "noBoxIssues": "No hay problemas en este cuadro.",
       "noteLabel": "Nota del cuadro",
       "noteLocked": "Este texto, o una capa que lo contiene, está bloqueado. Quita el bloqueo en Capas para cambiar su nota.",
       "notePlaceholder": "Deja una nota para la próxima revisión…",
@@ -232,6 +234,7 @@
         "explain": "Explicación",
         "lettering": "Rotulación",
         "note": "Nota",
+        "qc": "QC",
         "source": "Texto original y traducción"
       },
       "showInStory": "Mostrar en Guion",

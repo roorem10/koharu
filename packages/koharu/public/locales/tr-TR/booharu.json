@@ -201,6 +201,8 @@
       "close": "Kapat",
       "description": "Bu metin kutusunun bilgilerini inceleyin ve düzenleyin.",
       "empty": "Boş",
+      "hidden": "Gizli (sorunsuz işaretlendi)",
+      "noBoxIssues": "Bu kutuda sorun yok.",
       "noteLabel": "Kutu notu",
       "noteLocked": "Bu metin ya da onu içeren bir katman kilitli. Notunu değiştirmek için Katmanlar panelinde kilidi açın.",
       "notePlaceholder": "Sonraki kontrol için not bırakın…",
@@ -209,6 +211,7 @@
         "explain": "Açıklama",
         "lettering": "Dizgi",
         "note": "Not",
+        "qc": "QC",
         "source": "Kaynak metin ve çeviri"
       },
       "showInStory": "Hikâye’de göster",

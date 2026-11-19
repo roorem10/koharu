@@ -201,6 +201,8 @@
       "close": "关闭",
       "description": "查看搭编辑箇只文字框个信息。",
       "empty": "还呒没",
+      "hidden": "囥脱个（标成“无问题”）",
+      "noBoxIssues": "箇只文字框呒没问题。",
       "noteLabel": "文字框备注",
       "noteLocked": "箇段文字，或者包含伊个图层锁牢哉。到“图层”里向解锁，再好改备注。",
       "notePlaceholder": "留条备注畀下一趟检查…",
@@ -209,6 +211,7 @@
         "explain": "解释",
         "lettering": "文字排版",
         "note": "备注",
+        "qc": "QC",
         "source": "原文搭译文"
       },
       "showInStory": "勒故事里向显示",

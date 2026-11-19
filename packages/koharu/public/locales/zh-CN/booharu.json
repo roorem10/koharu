@@ -201,6 +201,8 @@
       "close": "关闭",
       "description": "查看并编辑此文本框的信息。",
       "empty": "暂无",
+      "hidden": "已隐藏（标记为 OK）",
+      "noBoxIssues": "此文本框未发现问题。",
       "noteLabel": "文本框备注",
       "noteLocked": "此文本或包含它的图层已锁定。请在“图层”中解锁后再修改备注。",
       "notePlaceholder": "为下一轮检查留下备注…",
@@ -209,6 +211,7 @@
         "explain": "解释",
         "lettering": "排字",
         "note": "备注",
+        "qc": "QC",
         "source": "原文与译文"
       },
       "showInStory": "在故事中显示",
