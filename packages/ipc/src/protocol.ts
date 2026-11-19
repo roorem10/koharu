@@ -32,6 +32,63 @@ export type AgentConfig = {
   corrections?: number
 }
 
+/**  Why a new conversation started. */
+export type AgentDividerReason =
+  /**  The user pressed New chat. */
+  | 'new_chat'
+  /**
+   *  The saved memory couldn't be read back, as after an update whose rig
+   *  reads it no more, so the model starts afresh.
+   */
+  | 'memory_lost'
+
+/**
+ *  One entry of the transcript, as the chat panel shows it. Every entry has
+ *  an id, unique in its file, and the time it happened, in milliseconds
+ *  since the epoch, by which the transcript is ordered.
+ */
+export type AgentEntry =
+  /**  What the user sent. */
+  | { role: 'user'; id: string; at: number; text: string }
+  /**  The agent's answer, as the chat panel showed it once it ended. */
+  | {
+      role: 'assistant'
+      id: string
+      at: number
+      /**  The model that answered, as Koharu's settings name it. */
+      model: string
+      state: AgentTurnState
+      /**  Why it failed, when it did. */
+      error: string | null
+      parts: AgentPart[]
+    }
+  /**
+   *  Where a new conversation starts: the model doesn't remember what is
+   *  above it.
+   */
+  | { role: 'divider'; id: string; at: number; reason: AgentDividerReason }
+  /**
+   *  An answer from outside the conversation, such as Explain this
+   *  line's, which the model doesn't remember either.
+   */
+  | {
+      role: 'note'
+      id: string
+      at: number
+      kind: AgentNoteKind
+      /**  The text block the note is about. */
+      layer: LayerId
+      /**  Its source text when it was asked. */
+      source: string
+      /**  Its translation when it was asked. */
+      translation: string
+      explanation: string
+      /**  Two or three other ways to translate the line. */
+      alternatives: string[]
+      /**  The model that answered, by the reference that answered. */
+      model: string
+    }
+
 /**
  *  What an agent run tells the panel: the agent's events as they come, then
  *  how it ended. A cancelled run tells nothing more.
@@ -40,6 +97,45 @@ export type AgentEvent =
   | { type: 'event'; event: Event }
   | { type: 'completed'; answer: string }
   | { type: 'failed'; error: string }
+
+/**  What a note holds. */
+export type AgentNoteKind =
+  /**  Explain this line's answer. */
+  'explain'
+
+/**  A part of an agent's answer, as the chat panel shows it. */
+export type AgentPart =
+  | { type: 'text'; text: string }
+  /**
+   *  The model's reasoning, with when it started and ended, in
+   *  milliseconds since the epoch.
+   */
+  | { type: 'thinking'; text: string; started: number; ended: number | null }
+  /**  A tool the agent called, with its arguments as the model gave them. */
+  | {
+      type: 'tool'
+      tool: string
+      arguments: Value
+      state: AgentToolState
+      /**  Why it failed, when it did. */
+      error: string | null
+    }
+
+/**
+ *  How a tool call ended; one still running when its answer ended counts as
+ *  failed.
+ */
+export type AgentToolState = 'done' | 'failed'
+
+/**  How an agent's answer ended. */
+export type AgentTurnState =
+  | 'done'
+  | 'failed'
+  /**
+   *  Stopped, replaced by another run, or cut off by New chat or by the
+   *  project closing.
+   */
+  | 'cancelled'
 
 export type Align = 'start' | 'center' | 'end' | 'justify'
 
@@ -148,6 +244,28 @@ export type BlockShape = {
 }
 
 /**
+ *  A job as the interface follows it: the `booharu_job` event's payload,
+ *  told as a read starts, after each of its chunks, and as it ends, always
+ *  ending with a state other than running, and what `booharu_get_jobs`
+ *  answers for each read going.
+ */
+export type BooharuJob = {
+  id: number
+  kind: JobKind
+  state: JobState
+  /**  Why it failed, or was skipped. */
+  message: string | null
+  /**  How many of its steps are done: the chunks of pages read. */
+  step: number
+  /**  How many steps it has; 0 until it knows. */
+  steps: number
+  /**  The run group whose Run step it is, for a read a Run press started. */
+  group: number | null
+  /**  What a read did, once it's done. */
+  summary: ReadSummary | null
+}
+
+/**
  *  Why a box drawn with the O tool added nothing, or what failed reading it,
  *  for the interface to say in the user's language.
  */
@@ -169,6 +287,7 @@ export type BooharuPreferences = {
   'booharu-lettering': LetteringSettings
   'booharu-fonts': FontSettings
   'booharu-runs': RunsSettings
+  'booharu-reading': ReadingSettings
   'booharu-start': StartSettings
 }
 
@@ -217,6 +336,16 @@ export type Camera = {
   x: number
   y: number
 }
+
+/**  Why a model can't read a chapter's pages. */
+export type CantRead =
+  /**  It sees no images. */
+  | 'no_vision'
+  /**
+   *  It sees images but only translates, calling no tools, as Koharu's
+   *  Index-Translate does.
+   */
+  | 'only_translates'
 
 /**
  *  What a change of category did to its blocks. A block can count in more
@@ -298,6 +427,8 @@ export type ChapterBrief = {
   edited?: boolean
   /**  When the chapter was read, as an RFC 3339 time. */
   read_at?: string | null
+  /**  The model that read it, by the reference that answered. */
+  read_model?: string | null
 }
 
 /**  A character in the chapter, and the pages they're on, counted from 1. */
@@ -511,6 +642,23 @@ export type Event =
   | { type: 'reasoning'; delta: string }
   | { type: 'tool_started'; tool: string; arguments: Value }
   | { type: 'tool_finished'; tool: string; error: string | null }
+
+/**  What Explain this line answers. */
+export type ExplainAnswer = {
+  layer: LayerId
+  /**
+   *  The line's source as it was asked about; an answer is dropped when the
+   *  line's source or translation changed since.
+   */
+  source: string
+  /**  Its translation as it was asked about; empty when it had none. */
+  translation: string
+  explanation: string
+  /**  Two or three other ways to translate the line, none blank. */
+  alternatives: string[]
+  /**  The model that answered, by its reference. */
+  model: string
+}
 
 export type ExportFormat = 'png' | 'psd' | 'cbz'
 
@@ -745,6 +893,23 @@ export type InstructionTerm = {
   source: string
   target: string
 }
+
+/**  What a job does. */
+export type JobKind = 'read_chapter' | 'explain'
+
+/**  How a job stands, as the `booharu_job` event tells it. */
+export type JobState =
+  | 'running'
+  | 'done'
+  /**  It failed, as its message says, and wrote nothing. */
+  | 'failed'
+  /**
+   *  Stop, closing the project, or its caller going away ended it before
+   *  it wrote anything.
+   */
+  | 'stopped'
+  /**  It had nothing to do, or nothing to do it with, as its message says. */
+  | 'skipped'
 
 /**
  *  The names of the layers a PSD needs where the scene has none, in the app's
@@ -1192,12 +1357,21 @@ export type PipelineEvent =
    */
   | { kind: 'page_failed'; run: RunId; page: PageId; stage: Stage; reason: string }
 
-/**  Pages that need the same stages, which one run works on. */
+/**
+ *  Pages that need the same stages, which one run works on; or a press's
+ *  Read chapter step, which no run works on.
+ */
 export type PlanGroup = {
-  /**  In stage order. */
+  /**  In stage order; none for the read. */
   stages: Stage[]
   /**  In page order. */
   pages: PageId[]
+  /**
+   *  Whether it's the press's Read chapter step, which reads the whole
+   *  chapter before its Translation run: it has no stages, and every page
+   *  of the project.
+   */
+  read?: boolean
 }
 
 export type Preferences = {
@@ -1250,6 +1424,103 @@ export type RangeInclusive<T> = {
 /**  Editable RGBA pixels. */
 export type Raster = {
   offset?: Offset
+}
+
+/**
+ *  What a read did, as the Context tab's toast, the agent, and the
+ *  `booharu_job` event tell it.
+ */
+export type ReadSummary = {
+  /**  The model that read, by the reference that answered. */
+  model: string
+  /**  How many pages it read. */
+  pages: number
+  /**  How many requests they went in. */
+  chunks: number
+  /**  Whether the brief's summary was kept, as the user wrote it. */
+  summary_kept: boolean
+  /**  How many characters the brief has. */
+  characters: number
+  suggestions_added: number
+  /**  Lines whose category, or its font, changed. */
+  lines_labelled: number
+  notes_written: number
+  /**  Lines whose category the user chose, which the read kept. */
+  kept_user_labels: number
+  /**  Lines skipped because they, or a layer holding them, are locked. */
+  skipped_locked: number
+  /**
+   *  Lines skipped because they're gone or their source changed while the
+   *  chapter was read.
+   */
+  skipped_changed: number
+  /**  Line ids the model gave that aren't lines of the pages read, dropped. */
+  unknown_ids: number
+  /**  Terms skipped because their source or target was blank. */
+  blank_terms: number
+  /**
+   *  Whether Stop, closing the project, or the caller going away ended it
+   *  before it wrote anything; every count is then 0.
+   */
+  stopped: boolean
+}
+
+/**
+ *  The models Read chapter and Explain this line would use, as the Context
+ *  tab, Settings and the line card show them.
+ */
+export type ReadingModel = {
+  /**
+   *  The model a read would use: the saved Read chapter model, else the
+   *  translation model when it can read; none when neither can.
+   */
+  model: string | null
+  /**
+   *  Whether `model` is one of Koharu's own, which reads on this computer
+   *  rather than through a provider's API.
+   */
+  local: boolean
+  /**
+   *  The saved Read chapter model, `[booharu-reading] model`; none for the
+   *  translation model.
+   */
+  saved: string | null
+  /**
+   *  Why the saved model can't read pages, which makes a read refuse
+   *  rather than fall back; none when it can.
+   */
+  saved_cant_read: CantRead | null
+  /**  The translation model, `[pipeline.translator] model`. */
+  translation: string
+  /**  Why the translation model can't read pages; none when it can. */
+  translation_cant_read: CantRead | null
+  /**
+   *  The model Explain this line would use; none when none is set, which
+   *  disables it.
+   */
+  explain: string | null
+}
+
+/**
+ *  `[booharu-reading]`: Read chapter, which reads the whole chapter with a
+ *  model that sees its pages before it is translated, and Explain this line,
+ *  which asks the same model first.
+ */
+export type ReadingSettings = {
+  /**
+   *  The model that reads, as Koharu's settings name a model (a reference
+   *  such as `openai/gpt-5.4`), never blank; none for the translation model
+   *  when it can read.
+   */
+  model?: string | null
+  /**  Whether the Context tab asks before reading a chapter. */
+  ask?: boolean
+  /**
+   *  How many pages one request sends at most, from 1 to 40,
+   *  `MAX_PAGES_PER_REQUEST`; fewer go when the model's context window
+   *  can't hold them.
+   */
+  pages_per_request?: number
 }
 
 /**  The recognizers, by id in the section and by name. */
@@ -1329,7 +1600,10 @@ export type RunOrder =
 export type RunPlan = {
   group: number
   groups: PlanGroup[]
+  /**  The run going now; none while the group's read goes. */
   run: RunId | null
+  /**  Whether the group's Read chapter step is going, which no run is. */
+  reading: boolean
 }
 
 /**
@@ -1340,16 +1614,29 @@ export type RunPlan = {
 export type RunPreset = {
   /**  Its name, unique among the presets once trimmed, and never blank. */
   name: string
-  /**  Its stages, at least one, in stage order. */
+  /**
+   *  Its stages, in stage order: at least one other than Read, and Read
+   *  only together with Translate.
+   */
   stages: RunStage[]
 }
 
 /**
  *  A stage of a run, in the order a page's stages run: koharu-pipeline's
  *  `Stage`, which this crate can't name, with the same names in the same
- *  order, so a preset holds what the Run menu's switches send.
+ *  order, so a preset holds what the Run menu's switches send, and Read,
+ *  Booharu's own, which Koharu's stages don't have.
  */
-export type RunStage = 'detect' | 'recognize' | 'inpaint' | 'translate'
+export type RunStage =
+  | 'detect'
+  | 'recognize'
+  | 'inpaint'
+  /**
+   *  Read chapter: the whole chapter read before it is translated, which
+   *  a press takes only when it also translates.
+   */
+  | 'read'
+  | 'translate'
 
 /**  What the Run button carries on with: every page, or the pages chosen. */
 export type RunTarget = { kind: 'project' } | { kind: 'pages'; pages: PageId[] }
@@ -1358,7 +1645,8 @@ export type RunTarget = { kind: 'project' } | { kind: 'pages'; pages: PageId[] }
 export type RunsSettings = {
   /**
    *  At most 100, `MAX_PRESETS`, each with a name, unique once trimmed
-   *  and never blank, and at least one stage.
+   *  and never blank, and at least one stage other than Read, which it
+   *  holds only together with Translate.
    */
   presets?: RunPreset[]
   /**
@@ -1836,8 +2124,8 @@ export const commands = {
       {},
       { headers: headers() },
     ),
-  /** Carries on with what the pages `target` names still need when `stages` holds every stage: queues one ordinary run for each group of the pages that need the same stages, one after another, each announced as `booharu_run_group`, and answers the plan with its first run; with nothing left to do, no run and no groups. With fewer stages, one ordinary run of them on every page `target` names, as Koharu's Run button queues it, as a plan of one group. On a chapter with notes, a plan that would find text and translate translates last: every group without Translation first, then one Translation run, leaving out the pages a run gave up on. While a group goes on in the open project, answers that one, with its run going now, and queues nothing. */
-  booharuRun: (target: RunTarget, stages: Stage[]) =>
+  /** Carries on with what the pages `target` names still need when `stages` holds every stage: queues one ordinary run for each group of the pages that need the same stages, one after another, each announced as `booharu_run_group`, and answers the plan with its first run; with nothing left to do, no run and no groups. With fewer stages, one ordinary run of them on every page `target` names, as Koharu's Run button queues it, as a plan of one group. On a chapter with notes, a plan that would find text and translate translates last: every group without Translation first, then one Translation run, leaving out the pages a run gave up on. While a group goes on in the open project, answers that one, with its run going now, and queues nothing. `stages` are the Run menu's: Koharu's four by their names, and Read chapter, which a press leaves out for now. */
+  booharuRun: (target: RunTarget, stages: RunStage[]) =>
     invoke<RunPlan>('booharu_run', { target, stages }, { headers: headers() }),
   /** Sets the lettering category of `blocks` as the user picks it, or Automatic for none, which clears their labels, as one undo step labelled `booharu_set_lettering_category`: each block's label, and while Pick fonts automatically is on, its translation's category font, even one changed by hand. Locked blocks, and blocks in locked layers, are left out. Answers how many blocks it changed, left out as locked, and found untranslated, which take only their label; with nothing to change, it makes no undo step. */
   booharuSetLetteringCategory: (blocks: LayerId[], category: LetteringCategory | null) =>
@@ -1918,6 +2206,23 @@ export const commands = {
   /** Dismisses the note on a first start for good, saving `[booharu-start]` `fresh_start_note_seen` alone. */
   booharuDismissFirstStartNote: () =>
     invoke<null>('booharu_dismiss_first_start_note', {}, { headers: headers() }),
+  /** Sets the summary of the open project's chapter brief to `summary`, trimmed, as the user wrote it, so reading the chapter again keeps it: makes the brief when there is none, and keeps its characters and when and with which model it was read. A blank summary counts as no brief, so a Run press reads the chapter again. Answers the chapter then. */
+  booharuSetChapterBrief: (summary: string) =>
+    invoke<ChapterState>('booharu_set_chapter_brief', { summary }, { headers: headers() }),
+  /** Reads the open project's whole chapter with the Read chapter model, or `model` in its place, as the Context tab's button and the agent's tool do: its brief, the terms it suggests, and each line's lettering category and note, written once every page is read. Refuses while another read, a run, or a Run press goes; with no text, saying to run OCR first; and with no model that can read the pages, naming why. Answers what it did; a read stopped answers `stopped`, having written nothing. */
+  booharuReadChapter: (model: string | null) =>
+    invoke<ReadSummary>('booharu_read_chapter', { model }, { headers: headers() }),
+  /** The models Read chapter and Explain this line use now, as the Context tab, Settings and the line card show them, with why a model can't read. */
+  booharuGetReadingModel: () =>
+    invoke<ReadingModel>('booharu_get_reading_model', {}, { headers: headers() }),
+  /** Explains the line `layer` of the open project, a block with source text, with the model Explain this line uses: the Read chapter model, else the translation model when it's a general model, else the agent's. Sends the page with it when the model reads images. One of Koharu's own models is loaded for it, once the pipeline unloads its own while no run goes, and dropped as it answers. Answers the explanation and two or three other translations, with the line as it was asked about and the model that answered, and adds them to the project's agent file as a note. Fails with no model to ask, an answer that doesn't read, or once Stop or closing the project stops it. */
+  booharuExplainLine: (layer: LayerId) =>
+    invoke<ExplainAnswer>('booharu_explain_line', { layer }, { headers: headers() }),
+  /** Every entry of the open project's conversation with the agent, earliest first, old conversations' too; never the model's memory. A file that doesn't read fails, naming it. */
+  booharuGetAgentHistory: () =>
+    invoke<AgentEntry[]>('booharu_get_agent_history', {}, { headers: headers() }),
+  /** The reads going, as they were last told, which the interface starts its jobs from when it loads. */
+  booharuGetJobs: () => invoke<BooharuJob[]>('booharu_get_jobs', {}, { headers: headers() }),
 }
 
 export const events = {
@@ -1955,4 +2260,8 @@ export const events = {
     listen<null>('booharu_context_changed', (event) => handler(event.payload)),
   booharuInstructionsChanged: (handler: (payload: null) => void): Promise<UnlistenFn> =>
     listen<null>('booharu_instructions_changed', (event) => handler(event.payload)),
+  booharuJob: (handler: (payload: BooharuJob) => void): Promise<UnlistenFn> =>
+    listen<BooharuJob>('booharu_job', (event) => handler(event.payload)),
+  booharuAgentHistoryChanged: (handler: (payload: null) => void): Promise<UnlistenFn> =>
+    listen<null>('booharu_agent_history_changed', (event) => handler(event.payload)),
 }

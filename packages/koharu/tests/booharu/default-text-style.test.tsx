@@ -8,7 +8,7 @@ import { queryClient } from '@/lib/queries'
 import type { LetteringSettings } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
-import { builtInLettering, builtInRuns, settingsDesktop, settle } from './settings'
+import { builtInLettering, builtInReading, builtInRuns, settingsDesktop, settle } from './settings'
 
 const RED = [1, 0, 0, 1] as const
 const WHITE = [1, 1, 1, 1] as const
@@ -83,6 +83,7 @@ describe('Booharu default text style', () => {
       },
       'booharu-fonts': { favorites: [] },
       'booharu-runs': builtInRuns,
+      'booharu-reading': builtInReading,
       'booharu-start': { fresh_start_note_seen: false },
     })
     expect(shown.getByText('#FF0000')).toBeInTheDocument()

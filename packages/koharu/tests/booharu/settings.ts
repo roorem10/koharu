@@ -4,6 +4,7 @@ import {
   commands,
   type BooharuPreferences,
   type LetteringSettings,
+  type ReadingSettings,
   type RunsSettings,
 } from '@koharu/ipc/protocol'
 
@@ -29,6 +30,13 @@ export const builtInRuns = {
   finish_sound: true,
 } satisfies RunsSettings
 
+/** `[booharu-reading]` as the desktop answers it while the file sets nothing. */
+export const builtInReading = {
+  model: null,
+  ask: true,
+  pages_per_request: 20,
+} satisfies ReadingSettings
+
 /** The desktop with every command answering null, and the Booharu settings its file holds, which
  * another writer, such as the agent's settings tool, may change while a page shows them; `saves`
  * lists what each save sent. */
@@ -42,6 +50,7 @@ export function settingsDesktop(lettering: LetteringSettings = builtInLettering)
       'booharu-lettering': structuredClone(lettering),
       'booharu-fonts': { favorites: [] },
       'booharu-runs': structuredClone(builtInRuns),
+      'booharu-reading': structuredClone(builtInReading),
       'booharu-start': { fresh_start_note_seen: false },
     },
   }

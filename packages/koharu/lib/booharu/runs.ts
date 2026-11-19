@@ -21,6 +21,7 @@ import {
   type BooharuPreferences,
   type RunPreset,
   type RunsSettings,
+  type RunStage,
   type RunTarget,
   type Stage,
   type Target,
@@ -71,13 +72,14 @@ function complete(section: RunsSettings | undefined): Runs {
   }
 }
 
-/** `stages` in the order a page's stages run, each once, as a run takes them. */
-export function inStageOrder(stages: readonly Stage[]): Stage[] {
+/** `stages` in the order a page's stages run, each once, as a run takes them: Read chapter, which
+ * no run's pages take, is left out. */
+export function inStageOrder(stages: readonly RunStage[]): Stage[] {
   return pipelineStages.filter((stage) => stages.includes(stage))
 }
 
-/** Whether `a` and `b` hold the same stages, in whatever order. */
-export function sameStages(a: readonly Stage[], b: readonly Stage[]): boolean {
+/** Whether `a` and `b` hold the same stages, in whatever order, Read chapter aside. */
+export function sameStages(a: readonly RunStage[], b: readonly RunStage[]): boolean {
   return inStageOrder(a).join() === inStageOrder(b).join()
 }
 

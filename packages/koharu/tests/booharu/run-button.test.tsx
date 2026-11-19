@@ -13,7 +13,7 @@ import { every, openChapter } from './jobs'
 import { settingsDesktop } from './settings'
 
 /** The desktop, with booharu_run answering `plan`, and the editor's command bar on Chapter 1. */
-function renderCommandBar(plan: RunPlan = { group: 1, groups: [], run: 3 }) {
+function renderCommandBar(plan: RunPlan = { group: 1, groups: [], run: 3, reading: false }) {
   settingsDesktop()
   const carryOn = vi.spyOn(commands, 'booharuRun').mockResolvedValue(plan)
   const run = vi.spyOn(commands, 'runPipeline').mockResolvedValue(4)
@@ -56,7 +56,12 @@ describe('Booharu’s Run button', () => {
   })
 
   it('goes through booharu_run with fewer stages that read and translate, to translate last', async () => {
-    const { carryOn, run, user } = renderCommandBar({ group: 3, groups: [], run: null })
+    const { carryOn, run, user } = renderCommandBar({
+      group: 3,
+      groups: [],
+      run: null,
+      reading: false,
+    })
     act(() => useKoharuStore.setState({ processingStages: ['translate', 'recognize'] }))
 
     await user.click(runButton())
@@ -76,7 +81,12 @@ describe('Booharu’s Run button', () => {
   })
 
   it('says when the pages are already done, offering to run every stage again', async () => {
-    const { carryOn, run, user } = renderCommandBar({ group: 2, groups: [], run: null })
+    const { carryOn, run, user } = renderCommandBar({
+      group: 2,
+      groups: [],
+      run: null,
+      reading: false,
+    })
 
     await user.click(runButton())
     expect(await screen.findByText('These pages are already done.')).toBeInTheDocument()

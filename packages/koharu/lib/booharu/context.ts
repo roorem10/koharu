@@ -95,6 +95,7 @@ function fillChapter(chapter: ChapterState): FullChapter {
         })),
         edited: brief.edited ?? false,
         read_at: brief.read_at ?? null,
+        read_model: brief.read_model ?? null,
       },
       suggestions: (context.suggestions ?? []).map(fillEntry),
     },

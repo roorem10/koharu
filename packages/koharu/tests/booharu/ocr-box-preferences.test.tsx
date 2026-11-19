@@ -8,7 +8,7 @@ import { queryClient } from '@/lib/queries'
 import { commands, type BooharuPreferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
-import { builtInRuns } from './settings'
+import { builtInReading, builtInRuns } from './settings'
 
 /** The sections these tests leave alone, as the desktop answers them. */
 const OTHERS = {
@@ -22,6 +22,7 @@ const OTHERS = {
   },
   'booharu-fonts': { favorites: [] },
   'booharu-runs': builtInRuns,
+  'booharu-reading': builtInReading,
   'booharu-start': { fresh_start_note_seen: false },
 } satisfies Partial<BooharuPreferences>
 

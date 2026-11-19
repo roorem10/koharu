@@ -9,7 +9,7 @@ import { useKoharuStore } from '@/lib/store'
 import { commands, type Preferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
-import { builtInLettering, builtInRuns, settingsDesktop } from './settings'
+import { builtInLettering, builtInReading, builtInRuns, settingsDesktop } from './settings'
 
 const preferences: Preferences = {
   pipeline: {},
@@ -73,6 +73,7 @@ describe('Booharu Runs settings', () => {
         presets: [...builtInRuns.presets, { name: 'Clean only', stages: ['inpaint'] }],
         on_page_failure: 'stop',
       },
+      'booharu-reading': builtInReading,
       'booharu-start': { fresh_start_note_seen: false },
     })
     // The file's state shows once the save ends, the other writer's preset with it.
