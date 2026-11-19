@@ -19,6 +19,7 @@ humantime = { workspace = true }
 image = { workspace = true }
 koharu-llm = { workspace = true }
 koharu-pipeline = { workspace = true }
+koharu-renderer = { workspace = true }
 koharu-scene = { workspace = true }
 kurbo = { workspace = true }
 parking_lot = { workspace = true }

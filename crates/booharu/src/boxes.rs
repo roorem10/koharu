@@ -870,7 +870,7 @@ fn dropped(layer: &Layer, target: &Ref, record: bool) -> Vec<Op> {
 }
 
 /// Refuses when `layer`, or a layer holding it, is locked.
-fn unlocked(project: &Project, layer: LayerId) -> Result<()> {
+pub(crate) fn unlocked(project: &Project, layer: LayerId) -> Result<()> {
     let mut at = Some(project.layer(layer)?);
     while let Some(layer) = at {
         if layer.locked {
