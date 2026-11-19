@@ -353,6 +353,43 @@
       "detectColorsDescription": "Copia los colores de relleno y contorno de la rotulación original al texto recién traducido. Las traducciones existentes conservan sus colores.",
       "detectColorsNote": "Si está desactivado, el texto recién traducido usa los <a>colores de texto predeterminados</a> ({{tab}})."
     },
+    "qc": {
+      "agent": "Agente",
+      "all": "Todos",
+      "autoChecks": "Comprobaciones automáticas",
+      "automatic": "Se comprueba automáticamente tras el procesamiento y los cambios",
+      "checks": {
+        "empty_source": "Resultado de OCR vacío",
+        "glossary": "Glosario: {{source}} se traduce como {{target}}",
+        "leftover_source": "Queda texto original en la traducción",
+        "missing_translation": "Falta la traducción",
+        "odd_font": "Fuente inusual. Se esperaba {{expected}}",
+        "overflow": "El texto desborda el cuadro",
+        "small_word": "Una palabra mide {{size, number}} px: {{word}}",
+        "too_small": "Texto pequeño: {{size, number}} px",
+        "unchanged": "La línea volvió sin traducir"
+      },
+      "defaultFont": "la fuente predeterminada",
+      "dismiss": "Descartar",
+      "dismissFor": "Descartar aviso de revisión: {{check}}",
+      "noFindings": "No hay resultados visibles. Activa Mostrar ocultos para ver los cuadros marcados como OK.",
+      "noTranslation": "Sin traducción",
+      "ok": "OK",
+      "okFor": "Marcar {{check}} como OK",
+      "page": "Página {{page}}",
+      "settings": {
+        "description": "Cada página se comprueba tras el procesamiento y los cambios, y los cuadros que conviene revisar aparecen en la pestaña QC. El tamaño mínimo de texto legible se indica como porcentaje del lado más corto de la página.",
+        "larger": "Aumentar tamaño mínimo de texto legible",
+        "minSize": "Tamaño mínimo de texto legible",
+        "minSizeHint": "En una página de 1200 px de ancho, el 1 % son 12 px.",
+        "smaller": "Reducir tamaño mínimo de texto legible",
+        "title": "Control de calidad"
+      },
+      "showHidden": "Mostrar ocultos",
+      "title": "QC",
+      "undoFor": "Desmarcar OK en {{check}}",
+      "undoOk": "Desmarcar OK"
+    },
     "runs": {
       "alreadyDone": "Estas páginas ya están terminadas.",
       "behavior": {
@@ -478,8 +515,12 @@
     "steps": {
       "booharu_add_box": "Añadir cuadro de texto",
       "booharu_apply_text_style": "Aplicar estilo de texto",
+      "booharu_clear_qc_ok": "Desmarcar OK",
+      "booharu_dismiss_flag": "Descartar aviso de revisión",
+      "booharu_flag_line": "Añadir aviso de revisión",
       "booharu_join_balloon": "Unir textos",
       "booharu_join_page": "Unir textos divididos",
+      "booharu_mark_qc_ok": "Marcar resultado como OK",
       "booharu_read_chapter": "Leer capítulo",
       "booharu_set_lettering_category": "Cambiar categoría de rotulación",
       "booharu_set_review_note": "Editar nota",

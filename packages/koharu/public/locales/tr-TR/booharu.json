@@ -328,6 +328,43 @@
       "detectColorsDescription": "Özgün yazının dolgu ve kenarlık renklerini yeni çevrilen metne kopyalar. Mevcut çeviriler renklerini korur.",
       "detectColorsNote": "Kapalıyken yeni çevrilen metin <a>varsayılan metin renklerini</a> ({{tab}}) kullanır."
     },
+    "qc": {
+      "agent": "Ajan",
+      "all": "Tümü",
+      "autoChecks": "Otomatik denetimler",
+      "automatic": "İşlem ve düzenlemelerden sonra otomatik denetlenir",
+      "checks": {
+        "empty_source": "Boş OCR sonucu",
+        "glossary": "Sözlük: {{source}} için {{target}} kullanılmalı",
+        "leftover_source": "Çeviride kaynak metin kalmış",
+        "missing_translation": "Eksik çeviri",
+        "odd_font": "Alışılmadık yazı tipi. Beklenen: {{expected}}",
+        "overflow": "Metin kutudan taşıyor",
+        "small_word": "Bir sözcüğün boyutu {{size, number}} px: {{word}}",
+        "too_small": "Küçük metin: {{size, number}} px",
+        "unchanged": "Satır çevrilmeden geri döndü"
+      },
+      "defaultFont": "varsayılan yazı tipi",
+      "dismiss": "Reddet",
+      "dismissFor": "İnceleme uyarısını reddet: {{check}}",
+      "noFindings": "Görünür bulgu yok. Sorunsuz olarak işaretlenen kutular için Gizlenenleri göster seçeneğini açın.",
+      "noTranslation": "Çeviri yok",
+      "ok": "OK",
+      "okFor": "{{check}} denetimini sorunsuz işaretle",
+      "page": "Sayfa {{page}}",
+      "settings": {
+        "description": "Her sayfa işlem ve düzenlemelerden sonra denetlenir; göz atılması gereken kutular QC sekmesinde listelenir. En küçük okunabilir metin boyutu, sayfanın kısa kenarının yüzdesi olarak ayarlanır.",
+        "larger": "En küçük okunabilir metin boyutunu artır",
+        "minSize": "En küçük okunabilir metin boyutu",
+        "minSizeHint": "1.200 px genişliğinde bir sayfada %1, 12 px eder.",
+        "smaller": "En küçük okunabilir metin boyutunu azalt",
+        "title": "Kalite denetimi"
+      },
+      "showHidden": "Gizlenenleri göster",
+      "title": "QC",
+      "undoFor": "{{check}} için sorunsuz işaretini kaldır",
+      "undoOk": "Sorunsuz işaretini kaldır"
+    },
     "runs": {
       "alreadyDone": "Bu sayfalar zaten tamamlandı.",
       "behavior": {
@@ -445,8 +482,12 @@
     "steps": {
       "booharu_add_box": "Metin kutusu ekle",
       "booharu_apply_text_style": "Metin stilini uygula",
+      "booharu_clear_qc_ok": "Sorunsuz işaretini kaldır",
+      "booharu_dismiss_flag": "İnceleme uyarısını reddet",
+      "booharu_flag_line": "İnceleme uyarısı ekle",
       "booharu_join_balloon": "Metinleri birleştir",
       "booharu_join_page": "Bölünmüş metinleri birleştir",
+      "booharu_mark_qc_ok": "Bulguyu sorunsuz işaretle",
       "booharu_read_chapter": "Bölümü oku",
       "booharu_set_lettering_category": "Dizgi kategorisini değiştir",
       "booharu_set_review_note": "Notu düzenle",

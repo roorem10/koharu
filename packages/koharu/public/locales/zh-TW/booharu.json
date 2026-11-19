@@ -328,6 +328,43 @@
       "detectColorsDescription": "將原文字的填色與描邊色彩複製到新翻譯的文字上。現有譯文的色彩保持不變。",
       "detectColorsNote": "關閉時，新翻譯的文字使用<a>預設文字色彩</a>（{{tab}}）。"
     },
+    "qc": {
+      "agent": "代理",
+      "all": "全部",
+      "autoChecks": "自動檢查",
+      "automatic": "處理和編輯後自動檢查",
+      "checks": {
+        "empty_source": "OCR 結果為空",
+        "glossary": "術語表：{{source}} 應譯為 {{target}}",
+        "leftover_source": "譯文中仍有原文",
+        "missing_translation": "缺少譯文",
+        "odd_font": "字型異常，應為 {{expected}}",
+        "overflow": "文字超出文字框",
+        "small_word": "有一個詞的字級為 {{size, number}} px：{{word}}",
+        "too_small": "字級過小：{{size, number}} px",
+        "unchanged": "該行未經翻譯，原樣傳回"
+      },
+      "defaultFont": "預設字型",
+      "dismiss": "忽略",
+      "dismissFor": "忽略待複查標記：{{check}}",
+      "noFindings": "沒有可見的檢查結果。啟用「顯示隱藏項目」可查看標記為 OK 的文字框。",
+      "noTranslation": "無譯文",
+      "ok": "OK",
+      "okFor": "將{{check}}標記為 OK",
+      "page": "第 {{page}} 頁",
+      "settings": {
+        "description": "每次處理和編輯後都會檢查各頁，需要查看的文字框會列在「QC」分頁中。最小可讀字級以頁面短邊的百分比設定。",
+        "larger": "增加最小可讀字級",
+        "minSize": "最小可讀字級",
+        "minSizeHint": "在寬 1,200 px 的頁面上，1% 為 12 px。",
+        "smaller": "減少最小可讀字級",
+        "title": "品質檢查"
+      },
+      "showHidden": "顯示隱藏項目",
+      "title": "QC",
+      "undoFor": "復原{{check}}的 OK 標記",
+      "undoOk": "復原 OK 標記"
+    },
     "runs": {
       "alreadyDone": "這些頁面已經處理完畢。",
       "behavior": {
@@ -445,8 +482,12 @@
     "steps": {
       "booharu_add_box": "新增文字框",
       "booharu_apply_text_style": "套用文字樣式",
+      "booharu_clear_qc_ok": "移除 OK 標記",
+      "booharu_dismiss_flag": "忽略待複查標記",
+      "booharu_flag_line": "標記為待複查",
       "booharu_join_balloon": "合併文字",
       "booharu_join_page": "合併分割的文字",
+      "booharu_mark_qc_ok": "將檢查結果標記為 OK",
       "booharu_read_chapter": "閱讀章節",
       "booharu_set_lettering_category": "變更排字類別",
       "booharu_set_review_note": "編輯備註",

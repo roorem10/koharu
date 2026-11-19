@@ -328,6 +328,43 @@
       "detectColorsDescription": "Copies the fill and outline colors of the original lettering onto newly translated text. Existing translations keep their colors.",
       "detectColorsNote": "When it's off, newly translated text uses the <a>default text colors</a> ({{tab}})."
     },
+    "qc": {
+      "agent": "Agent",
+      "all": "All",
+      "autoChecks": "Auto checks",
+      "automatic": "Checked automatically after processing and edits",
+      "checks": {
+        "empty_source": "Empty OCR result",
+        "glossary": "Glossary: translate {{source}} as {{target}}",
+        "leftover_source": "Source text remains in the translation",
+        "missing_translation": "Missing translation",
+        "odd_font": "Unusual font. Expected {{expected}}",
+        "overflow": "Text overflows the box",
+        "small_word": "One word is {{size, number}} px: {{word}}",
+        "too_small": "Small text: {{size, number}} px",
+        "unchanged": "The line came back untranslated"
+      },
+      "defaultFont": "the default font",
+      "dismiss": "Dismiss",
+      "dismissFor": "Dismiss review flag: {{check}}",
+      "noFindings": "No visible findings. Check Show hidden for boxes marked OK.",
+      "noTranslation": "No translation",
+      "ok": "OK",
+      "okFor": "Mark {{check}} OK",
+      "page": "Page {{page}}",
+      "settings": {
+        "description": "Each page is checked after runs and edits, and the boxes that need a look are listed in the QC tab. The smallest readable text is set as a share of the page's shorter side.",
+        "larger": "Increase smallest readable text",
+        "minSize": "Smallest readable text",
+        "minSizeHint": "On a page 1,200 px wide, 1% is 12 px.",
+        "smaller": "Decrease smallest readable text",
+        "title": "Quality check"
+      },
+      "showHidden": "Show hidden",
+      "title": "QC",
+      "undoFor": "Undo OK for {{check}}",
+      "undoOk": "Undo OK"
+    },
     "runs": {
       "alreadyDone": "These pages are already done.",
       "behavior": {
@@ -445,8 +482,12 @@
     "steps": {
       "booharu_add_box": "Add text box",
       "booharu_apply_text_style": "Apply text style",
+      "booharu_clear_qc_ok": "Remove OK mark",
+      "booharu_dismiss_flag": "Dismiss review flag",
+      "booharu_flag_line": "Flag line for review",
       "booharu_join_balloon": "Join texts",
       "booharu_join_page": "Join split texts",
+      "booharu_mark_qc_ok": "Mark finding OK",
       "booharu_read_chapter": "Read chapter",
       "booharu_set_lettering_category": "Change lettering category",
       "booharu_set_review_note": "Edit note",

@@ -422,6 +422,43 @@
       "detectColorsDescription": "ينسخ ألوان التعبئة والحدود من الكتابة الأصلية إلى النص المترجم حديثًا. تحتفظ الترجمات الحالية بألوانها.",
       "detectColorsNote": "عند إيقاف هذا الخيار، يستخدم النص المترجم حديثًا <a>ألوان النص الافتراضية</a> ({{tab}})."
     },
+    "qc": {
+      "agent": "الوكيل",
+      "all": "الكل",
+      "autoChecks": "فحوصات تلقائية",
+      "automatic": "يُفحص تلقائيًا بعد المعالجة والتعديلات",
+      "checks": {
+        "empty_source": "نتيجة OCR فارغة",
+        "glossary": "المسرد: يُترجم {{source}} إلى {{target}}",
+        "leftover_source": "ما زال هناك نص أصلي في الترجمة",
+        "missing_translation": "ترجمة مفقودة",
+        "odd_font": "خط غير معتاد. المتوقع {{expected}}",
+        "overflow": "النص يتجاوز حدود المربع",
+        "small_word": "إحدى الكلمات بحجم {{size, number}} بكسل: {{word}}",
+        "too_small": "نص صغير: {{size, number}} بكسل",
+        "unchanged": "أُعيد السطر دون ترجمة"
+      },
+      "defaultFont": "الخط الافتراضي",
+      "dismiss": "تجاهل",
+      "dismissFor": "تجاهل تنبيه المراجعة: {{check}}",
+      "noFindings": "لا توجد نتائج ظاهرة. فعّل «إظهار المخفي» لعرض المربعات المعلّمة بأنها سليمة.",
+      "noTranslation": "لا توجد ترجمة",
+      "ok": "OK",
+      "okFor": "وضع علامة OK على {{check}}",
+      "page": "الصفحة {{page}}",
+      "settings": {
+        "description": "تُفحص كل صفحة بعد المعالجة والتعديلات، وتُدرج المربعات التي تحتاج إلى مراجعة في تبويب QC. يُضبط أصغر حجم مقروء للنص كنسبة مئوية من الضلع الأقصر للصفحة.",
+        "larger": "زيادة أصغر حجم مقروء للنص",
+        "minSize": "أصغر حجم مقروء للنص",
+        "minSizeHint": "في صفحة بعرض 1200 بكسل، 1% يساوي 12 بكسل.",
+        "smaller": "تقليل أصغر حجم مقروء للنص",
+        "title": "فحص الجودة"
+      },
+      "showHidden": "إظهار المخفي",
+      "title": "QC",
+      "undoFor": "إلغاء علامة OK لـ {{check}}",
+      "undoOk": "إلغاء علامة OK"
+    },
     "runs": {
       "alreadyDone": "هذه الصفحات منجزة بالفعل.",
       "behavior": {
@@ -565,8 +602,12 @@
     "steps": {
       "booharu_add_box": "إضافة مربع نص",
       "booharu_apply_text_style": "تطبيق نمط النص",
+      "booharu_clear_qc_ok": "إلغاء علامة OK",
+      "booharu_dismiss_flag": "تجاهل تنبيه المراجعة",
+      "booharu_flag_line": "إضافة تنبيه للمراجعة",
       "booharu_join_balloon": "دمج النصوص",
       "booharu_join_page": "دمج النصوص المقسّمة",
+      "booharu_mark_qc_ok": "وضع علامة OK على النتيجة",
       "booharu_read_chapter": "قراءة الفصل",
       "booharu_set_lettering_category": "تغيير فئة التنضيد",
       "booharu_set_review_note": "تحرير الملاحظة",

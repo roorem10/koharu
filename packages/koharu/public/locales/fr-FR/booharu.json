@@ -353,6 +353,43 @@
       "detectColorsDescription": "Copie les couleurs de remplissage et de contour du lettrage d’origine sur le texte nouvellement traduit. Les traductions existantes conservent leurs couleurs.",
       "detectColorsNote": "Lorsque l’option est désactivée, le texte nouvellement traduit utilise les <a>couleurs de texte par défaut</a> ({{tab}})."
     },
+    "qc": {
+      "agent": "Agent",
+      "all": "Tous",
+      "autoChecks": "Vérifications automatiques",
+      "automatic": "Vérification automatique après le traitement et les modifications",
+      "checks": {
+        "empty_source": "Résultat OCR vide",
+        "glossary": "Glossaire : traduire {{source}} par {{target}}",
+        "leftover_source": "Du texte source reste dans la traduction",
+        "missing_translation": "Traduction manquante",
+        "odd_font": "Police inhabituelle. Police attendue : {{expected}}",
+        "overflow": "Le texte déborde de la zone",
+        "small_word": "Un mot fait {{size, number}} px : {{word}}",
+        "too_small": "Texte trop petit : {{size, number}} px",
+        "unchanged": "La ligne est revenue sans traduction"
+      },
+      "defaultFont": "la police par défaut",
+      "dismiss": "Ignorer",
+      "dismissFor": "Ignorer le signalement : {{check}}",
+      "noFindings": "Aucun résultat visible. Activez Afficher les résultats masqués pour voir les zones marquées OK.",
+      "noTranslation": "Aucune traduction",
+      "ok": "OK",
+      "okFor": "Marquer {{check}} comme OK",
+      "page": "Page {{page}}",
+      "settings": {
+        "description": "Chaque page est vérifiée après le traitement et les modifications, et les zones à revoir sont listées dans l’onglet QC. La taille minimale de texte lisible s’exprime en pourcentage du petit côté de la page.",
+        "larger": "Augmenter la taille minimale de texte lisible",
+        "minSize": "Taille minimale de texte lisible",
+        "minSizeHint": "Sur une page de 1 200 px de large, 1 % correspond à 12 px.",
+        "smaller": "Réduire la taille minimale de texte lisible",
+        "title": "Contrôle qualité"
+      },
+      "showHidden": "Afficher les résultats masqués",
+      "title": "QC",
+      "undoFor": "Retirer la marque OK pour {{check}}",
+      "undoOk": "Retirer la marque OK"
+    },
     "runs": {
       "alreadyDone": "Ces pages sont déjà terminées.",
       "behavior": {
@@ -478,8 +515,12 @@
     "steps": {
       "booharu_add_box": "Ajouter une zone de texte",
       "booharu_apply_text_style": "Appliquer le style de texte",
+      "booharu_clear_qc_ok": "Retirer la marque OK",
+      "booharu_dismiss_flag": "Ignorer le signalement",
+      "booharu_flag_line": "Signaler la ligne à vérifier",
       "booharu_join_balloon": "Fusionner des textes",
       "booharu_join_page": "Fusionner les textes divisés",
+      "booharu_mark_qc_ok": "Marquer le résultat comme OK",
       "booharu_read_chapter": "Lire le chapitre",
       "booharu_set_lettering_category": "Modifier la catégorie de lettrage",
       "booharu_set_review_note": "Modifier la note",

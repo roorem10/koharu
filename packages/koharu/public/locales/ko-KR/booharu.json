@@ -328,6 +328,43 @@
       "detectColorsDescription": "원본 글자의 채우기 및 테두리 색상을 새로 번역된 텍스트에 복사합니다. 기존 번역의 색상은 유지됩니다.",
       "detectColorsNote": "이 옵션이 꺼져 있으면 새로 번역된 텍스트는 <a>기본 텍스트 색상</a>({{tab}})을 사용합니다."
     },
+    "qc": {
+      "agent": "에이전트",
+      "all": "전체",
+      "autoChecks": "자동 검사",
+      "automatic": "처리 및 편집 후 자동 검사",
+      "checks": {
+        "empty_source": "OCR 결과가 비어 있습니다",
+        "glossary": "용어집: {{source}}의 번역어는 {{target}}입니다",
+        "leftover_source": "번역에 원문이 남아 있습니다",
+        "missing_translation": "번역 누락",
+        "odd_font": "일반적이지 않은 글꼴입니다. 예상 글꼴: {{expected}}",
+        "overflow": "텍스트가 상자를 벗어납니다",
+        "small_word": "한 단어의 글자 크기가 {{size, number}} px입니다: {{word}}",
+        "too_small": "작은 글씨: {{size, number}} px",
+        "unchanged": "번역되지 않고 원문 그대로 반환되었습니다"
+      },
+      "defaultFont": "기본 글꼴",
+      "dismiss": "무시",
+      "dismissFor": "검토 플래그 무시: {{check}}",
+      "noFindings": "표시할 검사 결과가 없습니다. OK로 표시한 상자는 숨긴 결과 표시에서 확인하세요.",
+      "noTranslation": "번역 없음",
+      "ok": "OK",
+      "okFor": "{{check}}을(를) OK로 표시",
+      "page": "{{page}}페이지",
+      "settings": {
+        "description": "처리나 편집이 끝날 때마다 각 페이지를 검사하고, 확인이 필요한 상자를 QC 탭에 표시합니다. 읽을 수 있는 최소 글자 크기는 페이지 짧은 변에 대한 비율로 설정합니다.",
+        "larger": "읽을 수 있는 최소 글자 크기 늘리기",
+        "minSize": "읽을 수 있는 최소 글자 크기",
+        "minSizeHint": "너비가 1,200 px인 페이지에서 1%는 12 px입니다.",
+        "smaller": "읽을 수 있는 최소 글자 크기 줄이기",
+        "title": "품질 검사"
+      },
+      "showHidden": "숨긴 결과 표시",
+      "title": "QC",
+      "undoFor": "{{check}}의 OK 취소",
+      "undoOk": "OK 취소"
+    },
     "runs": {
       "alreadyDone": "이 페이지들은 이미 처리되었습니다.",
       "behavior": {
@@ -445,8 +482,12 @@
     "steps": {
       "booharu_add_box": "텍스트 상자 추가",
       "booharu_apply_text_style": "글꼴 서식 적용",
+      "booharu_clear_qc_ok": "OK 표시 취소",
+      "booharu_dismiss_flag": "검토 플래그 무시",
+      "booharu_flag_line": "검토 플래그 지정",
       "booharu_join_balloon": "텍스트 합치기",
       "booharu_join_page": "분할된 텍스트 합치기",
+      "booharu_mark_qc_ok": "검사 결과를 OK로 표시",
       "booharu_read_chapter": "챕터 읽기",
       "booharu_set_lettering_category": "레터링 범주 변경",
       "booharu_set_review_note": "메모 편집",

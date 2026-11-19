@@ -328,6 +328,43 @@
       "detectColorsDescription": "元の文字の塗り色と縁取り色を、新しく翻訳した文字にコピーします。既存の翻訳の色は変更しません。",
       "detectColorsNote": "オフのときは、新しく翻訳した文字に<a>既定の文字色</a>（{{tab}}）を使います。"
     },
+    "qc": {
+      "agent": "エージェント",
+      "all": "すべて",
+      "autoChecks": "自動チェック",
+      "automatic": "処理や編集後に自動でチェックします",
+      "checks": {
+        "empty_source": "OCRの結果が空です",
+        "glossary": "用語集：「{{source}}」は「{{target}}」と訳します",
+        "leftover_source": "翻訳に原文が残っています",
+        "missing_translation": "翻訳がありません",
+        "odd_font": "通常と異なるフォントです。想定：{{expected}}",
+        "overflow": "テキストがボックスからはみ出しています",
+        "small_word": "1語の文字サイズが{{size, number}} pxです：{{word}}",
+        "too_small": "文字が小さい：{{size, number}} px",
+        "unchanged": "翻訳されずに原文のまま返されました"
+      },
+      "defaultFont": "既定のフォント",
+      "dismiss": "解除",
+      "dismissFor": "要確認フラグを解除：{{check}}",
+      "noFindings": "表示できる指摘はありません。「非表示の結果を表示」でOKにしたボックスを確認できます。",
+      "noTranslation": "翻訳なし",
+      "ok": "OK",
+      "okFor": "{{check}}をOKにする",
+      "page": "{{page}}ページ目",
+      "settings": {
+        "description": "各ページは処理や編集のたびにチェックされ、確認が必要なボックスが「QC」タブに表示されます。読める最小の文字サイズは、ページの短辺に対する割合で指定します。",
+        "larger": "読める最小の文字サイズを拡大",
+        "minSize": "読める最小の文字サイズ",
+        "minSizeHint": "幅1,200 pxのページでは、1%は12 pxです。",
+        "smaller": "読める最小の文字サイズを縮小",
+        "title": "品質チェック"
+      },
+      "showHidden": "非表示の結果を表示",
+      "title": "QC",
+      "undoFor": "{{check}}のOKを取り消す",
+      "undoOk": "OKを取り消す"
+    },
     "runs": {
       "alreadyDone": "これらのページは処理済みです。",
       "behavior": {
@@ -445,8 +482,12 @@
     "steps": {
       "booharu_add_box": "テキストボックスを追加",
       "booharu_apply_text_style": "書式を適用",
+      "booharu_clear_qc_ok": "OKを取り消す",
+      "booharu_dismiss_flag": "要確認フラグを解除",
+      "booharu_flag_line": "要確認フラグを付ける",
       "booharu_join_balloon": "テキストを結合",
       "booharu_join_page": "分割されたテキストを結合",
+      "booharu_mark_qc_ok": "指摘をOKにする",
       "booharu_read_chapter": "章を読み込む",
       "booharu_set_lettering_category": "写植カテゴリを変更",
       "booharu_set_review_note": "メモを編集",

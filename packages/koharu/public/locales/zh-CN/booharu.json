@@ -328,6 +328,43 @@
       "detectColorsDescription": "将原文字的填充和描边颜色复制到新翻译的文字上。现有译文的颜色保持不变。",
       "detectColorsNote": "关闭时，新翻译的文字使用<a>默认文字颜色</a>（{{tab}}）。"
     },
+    "qc": {
+      "agent": "智能体",
+      "all": "全部",
+      "autoChecks": "自动检查",
+      "automatic": "处理和编辑后自动检查",
+      "checks": {
+        "empty_source": "OCR 结果为空",
+        "glossary": "术语表：{{source}} 应译为 {{target}}",
+        "leftover_source": "译文中仍有原文",
+        "missing_translation": "缺少译文",
+        "odd_font": "字体异常，应为 {{expected}}",
+        "overflow": "文本超出文本框",
+        "small_word": "有一个词的字号为 {{size, number}} px：{{word}}",
+        "too_small": "字号过小：{{size, number}} px",
+        "unchanged": "该行未经翻译，原样返回"
+      },
+      "defaultFont": "默认字体",
+      "dismiss": "忽略",
+      "dismissFor": "忽略待复核标记：{{check}}",
+      "noFindings": "没有可见的检查结果。启用“显示隐藏项”可查看标记为 OK 的文本框。",
+      "noTranslation": "无译文",
+      "ok": "OK",
+      "okFor": "将{{check}}标记为 OK",
+      "page": "第 {{page}} 页",
+      "settings": {
+        "description": "每次处理和编辑后都会检查各页，需要查看的文本框会列在“QC”标签页中。最小可读字号按页面短边的百分比设置。",
+        "larger": "增大最小可读字号",
+        "minSize": "最小可读字号",
+        "minSizeHint": "在宽 1,200 px 的页面上，1% 为 12 px。",
+        "smaller": "减小最小可读字号",
+        "title": "质量检查"
+      },
+      "showHidden": "显示隐藏项",
+      "title": "QC",
+      "undoFor": "撤销{{check}}的 OK 标记",
+      "undoOk": "撤销 OK 标记"
+    },
     "runs": {
       "alreadyDone": "这些页面已经处理完毕。",
       "behavior": {
@@ -445,8 +482,12 @@
     "steps": {
       "booharu_add_box": "添加文本框",
       "booharu_apply_text_style": "应用文字样式",
+      "booharu_clear_qc_ok": "撤销 OK 标记",
+      "booharu_dismiss_flag": "忽略待复核标记",
+      "booharu_flag_line": "标记为待复核",
       "booharu_join_balloon": "合并文本",
       "booharu_join_page": "合并拆分的文本",
+      "booharu_mark_qc_ok": "将检查结果标记为 OK",
       "booharu_read_chapter": "阅读章节",
       "booharu_set_lettering_category": "更改排字类别",
       "booharu_set_review_note": "编辑备注",

@@ -353,6 +353,43 @@
       "detectColorsDescription": "Copia as cores de preenchimento e de contorno do letreiramento original para o texto recém-traduzido. As traduções existentes mantêm suas cores.",
       "detectColorsNote": "Quando desativada, o texto recém-traduzido usa as <a>cores de texto padrão</a> ({{tab}})."
     },
+    "qc": {
+      "agent": "Agente",
+      "all": "Todos",
+      "autoChecks": "Verificações automáticas",
+      "automatic": "Verificado automaticamente após processamento e edições",
+      "checks": {
+        "empty_source": "Resultado de OCR vazio",
+        "glossary": "Glossário: {{source}} deve ser traduzido como {{target}}",
+        "leftover_source": "Há texto original restante na tradução",
+        "missing_translation": "Tradução ausente",
+        "odd_font": "Fonte incomum. Esperada: {{expected}}",
+        "overflow": "O texto ultrapassa a caixa",
+        "small_word": "Uma palavra está com {{size, number}} px: {{word}}",
+        "too_small": "Texto pequeno: {{size, number}} px",
+        "unchanged": "A linha voltou sem tradução"
+      },
+      "defaultFont": "a fonte padrão",
+      "dismiss": "Dispensar",
+      "dismissFor": "Dispensar alerta de revisão: {{check}}",
+      "noFindings": "Nenhum apontamento visível. Ative Mostrar ocultos para ver as caixas marcadas como OK.",
+      "noTranslation": "Sem tradução",
+      "ok": "OK",
+      "okFor": "Marcar {{check}} como OK",
+      "page": "Página {{page}}",
+      "settings": {
+        "description": "Cada página é verificada após o processamento e as edições, e as caixas que precisam de atenção aparecem na aba QC. O tamanho mínimo de texto legível é definido como uma porcentagem do lado menor da página.",
+        "larger": "Aumentar tamanho mínimo de texto legível",
+        "minSize": "Tamanho mínimo de texto legível",
+        "minSizeHint": "Em uma página com 1.200 px de largura, 1% equivale a 12 px.",
+        "smaller": "Diminuir tamanho mínimo de texto legível",
+        "title": "Controle de qualidade"
+      },
+      "showHidden": "Mostrar ocultos",
+      "title": "QC",
+      "undoFor": "Desfazer OK de {{check}}",
+      "undoOk": "Desfazer OK"
+    },
     "runs": {
       "alreadyDone": "Estas páginas já estão prontas.",
       "behavior": {
@@ -478,8 +515,12 @@
     "steps": {
       "booharu_add_box": "Adicionar caixa de texto",
       "booharu_apply_text_style": "Aplicar estilo de texto",
+      "booharu_clear_qc_ok": "Desfazer OK",
+      "booharu_dismiss_flag": "Dispensar alerta de revisão",
+      "booharu_flag_line": "Adicionar alerta de revisão",
       "booharu_join_balloon": "Unir textos",
       "booharu_join_page": "Unir textos divididos",
+      "booharu_mark_qc_ok": "Marcar apontamento como OK",
       "booharu_read_chapter": "Ler capítulo",
       "booharu_set_lettering_category": "Alterar categoria de letreiramento",
       "booharu_set_review_note": "Editar nota",

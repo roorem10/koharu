@@ -328,6 +328,43 @@
       "detectColorsDescription": "拿原来文字个填充搭描边颜色复制到新翻译个文字浪。已有个译文颜色保持勿变。",
       "detectColorsNote": "关脱个辰光，新翻译个文字用<a>默认文字颜色</a>（{{tab}}）。"
     },
+    "qc": {
+      "agent": "智能体",
+      "all": "全部",
+      "autoChecks": "自动检查",
+      "automatic": "处理搭编辑以后自动检查",
+      "checks": {
+        "empty_source": "OCR 结果是空个",
+        "glossary": "术语表：{{source}} 应该译成 {{target}}",
+        "leftover_source": "译文里向还有原文",
+        "missing_translation": "缺少译文",
+        "odd_font": "字体勿寻常。应当是 {{expected}}",
+        "overflow": "文字超出文字框哉",
+        "small_word": "有一只词个大小是 {{size, number}} px：{{word}}",
+        "too_small": "字太小：{{size, number}} px",
+        "unchanged": "迭行呒没翻译，原样还转来哉"
+      },
+      "defaultFont": "默认字体",
+      "dismiss": "忽略",
+      "dismissFor": "忽略待复查标记：{{check}}",
+      "noFindings": "呒没显示出来个问题。要看标成“无问题”个文字框，请打开“显示囥脱个结果”。",
+      "noTranslation": "呒没译文",
+      "ok": "OK",
+      "okFor": "拿 {{check}} 标成“无问题”",
+      "page": "第 {{page}} 页",
+      "settings": {
+        "description": "每趟处理搭编辑以后侪会检查各页，要看一看个文字框会列辣“QC”标签页里向。最小可读字号用页面短边个百分比来设。",
+        "larger": "拿最小可读字号调大点",
+        "minSize": "最小可读字号",
+        "minSizeHint": "宽 1,200 px 个页面浪，1% 就是 12 px。",
+        "smaller": "拿最小可读字号调小点",
+        "title": "质量检查"
+      },
+      "showHidden": "显示囥脱个结果",
+      "title": "QC",
+      "undoFor": "撤销 {{check}} 个“无问题”标记",
+      "undoOk": "撤销“无问题”标记"
+    },
     "runs": {
       "alreadyDone": "箇眼页面已经处理好哉。",
       "behavior": {
@@ -445,8 +482,12 @@
     "steps": {
       "booharu_add_box": "加文字框",
       "booharu_apply_text_style": "应用文字样式",
+      "booharu_clear_qc_ok": "撤销“无问题”标记",
+      "booharu_dismiss_flag": "忽略待复查标记",
+      "booharu_flag_line": "标成待复查",
       "booharu_join_balloon": "合并文字",
       "booharu_join_page": "合并拆开个文字",
+      "booharu_mark_qc_ok": "拿问题标成“无问题”",
       "booharu_read_chapter": "阅读章节",
       "booharu_set_lettering_category": "更改文字排版类别",
       "booharu_set_review_note": "编辑备注",
