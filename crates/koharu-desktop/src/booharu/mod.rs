@@ -2,10 +2,11 @@
 //! `commands` lists, its events, which `events::bindings` lists, what the
 //! canvas's Booharu effect does, the Booharu settings pushed to the canvas,
 //! the MCP server's start on Booharu's own port, Read chapter and Explain
-//! this line as jobs Stop and closing the project end (`jobs`), and the host
-//! Booharu's agent tools reach the app through, which tells the interface
-//! when they write a series or the chapter's notes, or save the
-//! Instructions.
+//! this line as jobs Stop and closing the project end (`jobs`), the agent's
+//! chat kept beside its project (`agent_history`), and the host Booharu's
+//! agent tools reach the app through, which tells the interface when they
+//! write a series or the chapter's notes, or save the Instructions, and
+//! reads the chapter for them.
 
 pub(crate) mod agent_history;
 pub(crate) mod boxes;
@@ -27,9 +28,13 @@ pub(crate) mod translation;
 
 use std::sync::Arc;
 
+use anyhow::Context as _;
+use booharu::context::read::ReadSummary;
 use booharu_core::settings::BooharuPreferences;
+use futures::future::BoxFuture;
 use koharu_agent::BooharuHost;
 use koharu_scene::{Change, Edit, Session};
+use parking_lot::Mutex;
 use tauri::Manager as _;
 
 use crate::{app::App, commands::Result, screen::Screen};
@@ -61,7 +66,8 @@ fn applied(
 /// The app as Booharu's agent tools reach it, the in-app agent's and the MCP
 /// server's alike, through what the commands run: the window, for the
 /// canvas's settings after a save, and through its handle the app, for the
-/// run groups `booharu_run` carries on with.
+/// run groups `booharu_run` carries on with and the chapter
+/// `booharu_read_chapter` reads.
 pub(crate) struct DesktopHost(pub(crate) Screen);
 
 impl BooharuHost for DesktopHost {
@@ -99,5 +105,29 @@ impl BooharuHost for DesktopHost {
         if let Some(handle) = self.0.handle() {
             events::INSTRUCTIONS_CHANGED.tell(&handle, ());
         }
+    }
+
+    /// A read by hand, as the Context tab's (`read_chapter`), of the tools'
+    /// project while it's the one open: a Read chapter job, which a drop of
+    /// the tool's call stops, as Stop does.
+    fn read_chapter(
+        &self,
+        session: Arc<Mutex<Session>>,
+        model: Option<String>,
+    ) -> BoxFuture<'static, anyhow::Result<ReadSummary>> {
+        let app = self
+            .0
+            .handle()
+            .and_then(|handle| Some(Arc::clone(handle.try_state::<Arc<App>>()?.inner())));
+        Box::pin(async move {
+            let app = app.context("Read chapter can't start before the app is up")?;
+            let open = app
+                .project
+                .lock()
+                .as_ref()
+                .is_some_and(|open| Arc::ptr_eq(&open.session, &session));
+            anyhow::ensure!(open, "the project this call was made on is no longer open");
+            read_chapter::read_by_hand(app, session, model).await
+        })
     }
 }

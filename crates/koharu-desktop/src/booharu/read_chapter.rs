@@ -57,7 +57,8 @@ pub async fn booharu_read_chapter(
     app: State<'_, Arc<App>>,
     model: Option<String>,
 ) -> Result<ReadSummary> {
-    Ok(read_by_hand(Arc::clone(&app), model).await?)
+    let session = app.session()?;
+    Ok(read_by_hand(Arc::clone(&app), session, model).await?)
 }
 
 /// The models Read chapter and Explain this line use now, as the Context
@@ -76,22 +77,27 @@ pub async fn booharu_get_reading_model() -> Result<ReadingModel> {
     ))
 }
 
-/// Reads the open project's whole chapter by hand, as the Context tab's
-/// command and the agent's tool do: registers the job, refused while
-/// another read goes, and calls [`read_chapter`] on every page, with
-/// `model` in place of the Read chapter model when given. A read stopped
-/// answers a summary that says so.
+/// Reads the whole chapter of the project `session` holds by hand, as the
+/// Context tab's command and the agent's tool do: registers the job,
+/// refused while another read goes, and calls [`read_chapter`] on every
+/// page, with `model` in place of the Read chapter model when given. A read
+/// stopped answers a summary that says so. The read goes on a task of its
+/// own, which a drop of this future stops as Stop does, as the agent's tool
+/// call is dropped with its run, so the read ends as a stopped read ends,
+/// telling the interface.
 pub(crate) async fn read_by_hand(
     app: Arc<App>,
+    session: Arc<Mutex<Session>>,
     model: Option<String>,
 ) -> anyhow::Result<ReadSummary> {
     let job = jobs::start(JobKind::ReadChapter)?;
-    let session = app.session()?;
+    let _stop = job.cancel().clone().drop_guard();
     let request = ReadRequest {
         model,
         ..ReadRequest::default()
     };
-    Ok(match read_chapter(app, session, request, job).await? {
+    let reading = tokio::spawn(read_chapter(app, session, request, job));
+    Ok(match reading.await?? {
         ReadOutcome::Done(summary) => summary,
         // A read by hand refuses where a Run step skips.
         ReadOutcome::Skipped(why) => bail!(why),

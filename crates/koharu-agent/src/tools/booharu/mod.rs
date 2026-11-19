@@ -34,12 +34,15 @@
 //! | `booharu_fix_term_everywhere` | translates again, in one Translation run, every line using a term but hand-edited and locked ones, as Fix it everywhere does | no |
 //! | `booharu_export_series` | writes a series to a file at an absolute path, in 0.0.4's shape, replacing a file there only when told to | no |
 //! | `booharu_import_series` | imports a series file at an absolute path, replacing the series of its id or keeping both | no |
+//! | `booharu_read_chapter` | reads the chapter whole, as Read chapter does but without its questions, with the Read chapter model or one named for that read alone, writing the brief, suggested terms, and each line's label and note, and answers what it did once the read ends; only in the app | no |
+//! | `booharu_set_chapter_brief` | sets the chapter brief's summary as the user's, which reading the chapter again keeps, keeping its characters and when and with which model it was read | no |
 
 mod boxes;
 mod context;
 mod lettering;
 mod notes;
 mod project;
+mod reading;
 mod runs;
 mod settings;
 mod styles;
@@ -49,7 +52,9 @@ pub(crate) use self::{context::outlined, runs::WAIT};
 
 use std::{collections::BTreeSet, sync::Arc};
 
+use booharu::context::read::ReadSummary;
 use booharu_core::{context::SeriesStore, settings::BooharuPreferences};
+use futures::future::BoxFuture;
 use koharu_pipeline::{Pipeline, PipelineConfig, Request, RunId, Stage, Target};
 use koharu_scene::{Change, Edit, LayerId, Session};
 use parking_lot::Mutex;
@@ -156,6 +161,26 @@ pub trait BooharuHost: Send + Sync {
             None => Ok(Some(pipeline.run(Arc::clone(session), request)?)),
         }
     }
+
+    /// Reads the whole chapter of the project `session` holds, as Read
+    /// chapter in the Context tab does once the user said yes, with `model`
+    /// in place of the Read chapter model when given, for that read alone,
+    /// and answers what it did once the read ends. A drop of the future
+    /// stops the read, as Stop does. Read chapter runs in the app, which
+    /// reads with its models: elsewhere, an error saying so.
+    fn read_chapter(
+        &self,
+        session: Arc<Mutex<Session>>,
+        model: Option<String>,
+    ) -> BoxFuture<'static, anyhow::Result<ReadSummary>> {
+        let _ = (session, model);
+        Box::pin(async {
+            anyhow::bail!(
+                "Read chapter runs in the app, which reads with its models, and can't read the \
+                 chapter here"
+            )
+        })
+    }
 }
 
 impl Tools {
@@ -200,6 +225,8 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(context::FixTermEverywhere);
     tools.add_tool(context::ExportSeries);
     tools.add_tool(context::ImportSeries);
+    tools.add_tool(reading::ReadChapter);
+    tools.add_tool(reading::SetChapterBrief);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one

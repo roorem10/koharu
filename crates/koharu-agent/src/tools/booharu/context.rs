@@ -721,7 +721,7 @@ impl Tool for ImportSeries {
 /// Runs `work` with the tools on the open project and the app's host, on a
 /// blocking thread, as the files and the host block; an error reaches the
 /// model word for word.
-async fn blocking<T: Send + 'static>(
+pub(super) async fn blocking<T: Send + 'static>(
     context: &ToolContext,
     work: impl FnOnce(&Tools, &dyn BooharuHost) -> anyhow::Result<T> + Send + 'static,
 ) -> Result<T, ToolExecutionError> {
@@ -733,14 +733,14 @@ async fn blocking<T: Send + 'static>(
 }
 
 /// The open project's file, which its side file sits beside.
-fn file(tools: &Tools) -> PathBuf {
+pub(super) fn file(tools: &Tools) -> PathBuf {
     tools.session.lock().path().to_owned()
 }
 
 /// The app's host, else, outside the app, Booharu's defaults: the series in
-/// the Booharu home, the Instructions in the settings file, and runs on the
-/// tools' own pipeline.
-fn host(tools: &Tools) -> Arc<dyn BooharuHost> {
+/// the Booharu home, the Instructions in the settings file, runs on the
+/// tools' own pipeline, and no Read chapter.
+pub(super) fn host(tools: &Tools) -> Arc<dyn BooharuHost> {
     tools.booharu.clone().unwrap_or_else(|| Arc::new(Unhosted))
 }
 
@@ -777,8 +777,8 @@ mod tests {
     use super::*;
     use crate::McpServer;
 
-    /// Every glossary tool, and whether it only reads.
-    const TOOLS: [(&str, bool); 11] = [
+    /// Every glossary and chapter tool, and whether it only reads.
+    const TOOLS: [(&str, bool); 13] = [
         ("booharu_get_chapter_context", true),
         ("booharu_link_series", false),
         ("booharu_save_glossary_entry", false),
@@ -790,6 +790,8 @@ mod tests {
         ("booharu_fix_term_everywhere", false),
         ("booharu_export_series", false),
         ("booharu_import_series", false),
+        ("booharu_read_chapter", false),
+        ("booharu_set_chapter_brief", false),
     ];
 
     /// The app as the glossary tools reach it: its series in a folder of
@@ -946,7 +948,7 @@ mod tests {
     }
 
     #[test]
-    fn every_glossary_tool_is_offered_inlined_and_marked_as_it_reads() {
+    fn every_glossary_and_chapter_tool_is_offered_inlined_and_marked_as_it_reads() {
         let definitions = Tools::toolset().tool_definitions();
         for (name, reads) in TOOLS {
             let tool = definitions
