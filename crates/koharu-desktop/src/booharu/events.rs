@@ -1,8 +1,9 @@
 //! What Booharu tells the interface on its own, as Koharu's events do;
 //! `events::bindings` lists them for the bindings.
 
-use booharu::jobs::BooharuJob;
+use booharu::{jobs::BooharuJob, qc::Finding};
 use koharu_pipeline::RunId;
+use koharu_scene::PageId;
 use serde::Serialize;
 use specta::Type;
 
@@ -57,3 +58,16 @@ pub const JOB: Event<BooharuJob> = Event::new("booharu_job");
 /// The open project's conversation with the agent changed, as when Explain
 /// this line added its answer: whatever shows it reads it again.
 pub const AGENT_HISTORY_CHANGED: Event<()> = Event::new("booharu_agent_history_changed");
+
+/// What the quality check found on a page: every finding on it, hidden
+/// ones included, in reading order and then in the checks' order, which
+/// replace the page's earlier ones.
+#[derive(Clone, Debug, PartialEq, Serialize, Type)]
+pub struct BooharuQc {
+    pub page: PageId,
+    pub findings: Vec<Finding>,
+}
+
+/// A page's findings, each time a check of it stores them: as the page
+/// changes, and at once after Mark OK or Dismiss on it.
+pub const QC: Event<BooharuQc> = Event::new("booharu_qc");

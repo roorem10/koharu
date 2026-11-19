@@ -3,7 +3,8 @@
 //! canvas's Booharu effect does, the Booharu settings pushed to the canvas,
 //! the MCP server's start on Booharu's own port, Read chapter and Explain
 //! this line as jobs Stop and closing the project end (`jobs`), the agent's
-//! chat kept beside its project (`agent_history`), and the host Booharu's
+//! chat kept beside its project (`agent_history`), the quality check's
+//! findings and its one-page check (`qc`), and the host Booharu's
 //! agent tools reach the app through, which tells the interface when they
 //! write a series or the chapter's notes, or save the Instructions, and
 //! reads the chapter for them.
@@ -20,6 +21,7 @@ pub(crate) mod lettering;
 pub(crate) mod mcp;
 pub(crate) mod notes;
 pub(crate) mod ocr_box;
+pub(crate) mod qc;
 pub(crate) mod read_chapter;
 pub(crate) mod runs;
 pub(crate) mod settings;
@@ -61,6 +63,28 @@ fn applied(
     let edit = build(&session)?;
     tracing::info!(label = %edit.label, ops = edit.ops.len(), "edit");
     Ok(session.apply(edit)?)
+}
+
+/// Builds an edit with `build` from the open project and applies it, as
+/// [`apply`] does, when there is one: none when the action changes nothing,
+/// which makes no undo step.
+async fn apply_if(
+    app: &Arc<App>,
+    build: impl FnOnce(&Session) -> anyhow::Result<Option<Edit>> + Send + 'static,
+) -> Result<Option<Change>> {
+    let app = Arc::clone(app);
+    Ok(
+        tokio::task::spawn_blocking(move || -> anyhow::Result<Option<Change>> {
+            let session = app.session()?;
+            let mut session = session.lock();
+            let Some(edit) = build(&session)? else {
+                return Ok(None);
+            };
+            tracing::info!(label = %edit.label, ops = edit.ops.len(), "edit");
+            Ok(Some(session.apply(edit)?))
+        })
+        .await??,
+    )
 }
 
 /// The app as Booharu's agent tools reach it, the in-app agent's and the MCP

@@ -145,6 +145,9 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         crate::booharu::explain::booharu_explain_line,
         crate::booharu::agent_history::booharu_get_agent_history,
         crate::booharu::jobs::booharu_get_jobs,
+        crate::booharu::qc::booharu_get_qc,
+        crate::booharu::qc::booharu_mark_qc_ok,
+        crate::booharu::qc::booharu_dismiss_flag,
     ];
     move |invoke: Invoke<CefRuntime>| {
         let message = &invoke.message;
@@ -254,5 +257,8 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         crate::booharu::explain::booharu_explain_line,
         crate::booharu::agent_history::booharu_get_agent_history,
         crate::booharu::jobs::booharu_get_jobs,
+        crate::booharu::qc::booharu_get_qc,
+        crate::booharu::qc::booharu_mark_qc_ok,
+        crate::booharu::qc::booharu_dismiss_flag,
     ](types)
 }
