@@ -258,6 +258,7 @@ mod tests {
                     "order": "pages",
                     "finish_sound": true,
                 },
+                "booharu-reading": {"model": null, "ask": true, "pages_per_request": 20},
                 "booharu-start": {"fresh_start_note_seen": false},
             })
         );
