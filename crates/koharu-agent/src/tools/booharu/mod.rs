@@ -62,7 +62,7 @@ use booharu::context::read::ReadSummary;
 use booharu_core::{context::SeriesStore, settings::BooharuPreferences};
 use futures::future::BoxFuture;
 use koharu_pipeline::{Pipeline, PipelineConfig, Request, RunId, Stage, Target};
-use koharu_scene::{Change, Edit, LanguageIdentifier, LayerId, Session};
+use koharu_scene::{Change, Edit, LayerId, Session};
 use parking_lot::Mutex;
 use rig_agent::tool::ToolSet;
 use rig_core::tool::ToolExecutionError;
@@ -127,11 +127,16 @@ pub trait BooharuHost: Send + Sync {
             .instructions)
     }
 
-    /// The language the translator translates into as saved now,
-    /// `[pipeline] translator.target`, which the quality check reads, as
-    /// the app's does, for a translation without a language of its own.
-    fn target_language(&self) -> anyhow::Result<LanguageIdentifier> {
-        Ok(koharu_config::get::<PipelineConfig>()?.translator.target)
+    /// What the quality check reads of the settings as saved now,
+    /// `[booharu-qc]`, `[pipeline] translator.target` and
+    /// `[booharu-lettering]`, each as the app's quality check reads it, so a
+    /// bad stored value in another section fails neither.
+    fn qc_settings(&self) -> anyhow::Result<booharu::qc::Settings> {
+        Ok(booharu::qc::Settings {
+            qc: koharu_config::get()?,
+            target: koharu_config::get::<PipelineConfig>()?.translator.target,
+            lettering: koharu_config::get()?,
+        })
     }
 
     /// Saves `kept` as the translator's Instructions while they're still

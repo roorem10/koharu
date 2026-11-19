@@ -36,7 +36,7 @@ use std::{
 };
 
 use anyhow::Context as _;
-use booharu::qc::{Finding, Inputs, Majorities};
+use booharu::qc::{Finding, Inputs, Majorities, Settings};
 use booharu_core::{
     context::SeriesStore,
     settings::{LetteringSettings, QcSettings},
@@ -324,19 +324,20 @@ pub(crate) fn forget(app: &App, page: PageId) {
 /// What a check of `project`, which the project file `file` holds, reads
 /// now: `[booharu-qc]`, `[pipeline]`'s target language, and
 /// `[booharu-lettering]` as the settings file holds them, a bad stored
-/// value failing, and the series the chapter links in the Booharu home's
-/// series folder.
+/// value in one of them failing, as the agent's tools read them through
+/// `BooharuHost::qc_settings`, and the series the chapter links in the
+/// Booharu home's series folder.
 pub(crate) fn inputs(file: &Path, project: &Project) -> anyhow::Result<Inputs> {
-    let qc = koharu_config::get::<QcSettings>()?;
-    let target = koharu_config::get::<PipelineConfig>()?.translator.target;
-    let lettering = koharu_config::get::<LetteringSettings>()?;
+    let settings = Settings {
+        qc: koharu_config::get::<QcSettings>()?,
+        target: koharu_config::get::<PipelineConfig>()?.translator.target,
+        lettering: koharu_config::get::<LetteringSettings>()?,
+    };
     Ok(booharu::qc::inputs(
         project,
         file,
         SeriesStore::open,
-        &qc,
-        target,
-        lettering,
+        settings,
     ))
 }
 

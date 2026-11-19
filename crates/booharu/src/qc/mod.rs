@@ -12,8 +12,9 @@
 //! - Sizes and overflow are measured as the caller's renderer draws the
 //!   text ([`measure`]); the rules are pure ([`rules`]). [`check_glossary`]
 //!   finds a page's glossary slips alone, laying no text out.
-//! - What a check reads beside the page, the settings and the chapter's
-//!   glossary and majority fonts, is gathered once into [`Inputs`].
+//! - What a check reads beside the page, its three settings sections
+//!   ([`Settings`]) and the chapter's glossary and majority fonts, is
+//!   gathered once into [`Inputs`].
 //! - Findings are never stored here. Mark OK is the layer's `qc_ok`
 //!   attribute, whose entries name a check and the layer's fingerprint
 //!   (`booharu_core::qc`), so a mark hides its finding only until the layer
@@ -217,19 +218,29 @@ impl Inputs {
     }
 }
 
+/// What a check reads of the settings: these three sections and no other,
+/// so a bad stored value elsewhere, which fails the section holding it,
+/// fails no check. The app's quality check and the agent's tools read them
+/// alike, each section as the settings file holds it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Settings {
+    /// `[booharu-qc]`.
+    pub qc: QcSettings,
+    /// `[pipeline] translator.target`.
+    pub target: LanguageIdentifier,
+    /// `[booharu-lettering]`.
+    pub lettering: LetteringSettings,
+}
+
 /// What a check of `project`, which the project file `file` holds, reads:
-/// the smallest readable size of `qc`, `[booharu-qc]`; `target`,
-/// `[pipeline] translator.target`; `lettering`, `[booharu-lettering]`; and
-/// the series the chapter links, from the store `store` opens. A chapter
-/// or series that can't be read is logged and skips the glossary check
-/// alone.
+/// `settings`, and the series the chapter links, from the store `store`
+/// opens. A chapter or series that can't be read is logged and skips the
+/// glossary check alone.
 pub fn inputs(
     project: &Project,
     file: &Path,
     store: impl FnOnce() -> Result<SeriesStore>,
-    qc: &QcSettings,
-    target: LanguageIdentifier,
-    lettering: LetteringSettings,
+    settings: Settings,
 ) -> Inputs {
     let series = match Chapter::read(file, store) {
         Ok(chapter) => chapter.series,
@@ -238,7 +249,12 @@ pub fn inputs(
             None
         }
     };
-    Inputs::new(project, qc, target, lettering, series)
+    let Settings {
+        qc,
+        target,
+        lettering,
+    } = settings;
+    Inputs::new(project, &qc, target, lettering, series)
 }
 
 /// Each lettering category's majority font across `project`, as `lettering`

@@ -369,21 +369,18 @@ fn opened(tools: &Tools) -> (PathBuf, Project) {
 }
 
 /// What a check of `project`, which the project file `file` holds, reads,
-/// as the app's quality check reads it: `[booharu-qc]` and
-/// `[booharu-lettering]` as the app holds them, the translator's target
-/// language, and the series the chapter links, from the app's series
-/// folder. A section that can't be read is an error, which reaches the
-/// model; a chapter or series that can't be read skips the glossary check
-/// alone.
+/// as the app's quality check reads it: the three settings sections it
+/// reads, as the app holds them, and the series the chapter links, from
+/// the app's series folder. One of those sections that can't be read is an
+/// error, which reaches the model, and a bad value in any other section
+/// changes nothing; a chapter or series that can't be read skips the
+/// glossary check alone.
 fn inputs(host: &dyn BooharuHost, file: &Path, project: &Project) -> anyhow::Result<Inputs> {
-    let preferences = host.preferences()?;
     Ok(qc::inputs(
         project,
         file,
         || host.series(),
-        &preferences.qc,
-        host.target_language()?,
-        preferences.lettering,
+        host.qc_settings()?,
     ))
 }
 
@@ -429,11 +426,11 @@ mod tests {
 
     use booharu_core::{
         context::{GlossaryEntry, SeriesStore},
-        settings::BooharuPreferences,
+        settings::{BooharuPreferences, LetteringSettings, QcSettings},
     };
     use koharu_pipeline::{Pipeline, PipelineConfig};
     use koharu_renderer::{Renderer, RendererConfig};
-    use koharu_scene::{Created, LanguageIdentifier, Session};
+    use koharu_scene::{Created, Session};
     use parking_lot::Mutex;
     use serde_json::{Map, json};
 
@@ -448,8 +445,9 @@ mod tests {
         ("booharu_dismiss_flag", false),
     ];
 
-    /// The app as the quality check tools reach it: Booharu's default
-    /// settings, English the target, and its series in a folder of the
+    /// The app as the quality check tools reach it: the quality check's and
+    /// the lettering's default settings, English the target, a bad value in
+    /// a section the check doesn't read, and its series in a folder of the
     /// test's.
     struct Checked {
         series: SeriesStore,
@@ -457,7 +455,7 @@ mod tests {
 
     impl BooharuHost for Checked {
         fn preferences(&self) -> anyhow::Result<BooharuPreferences> {
-            Ok(BooharuPreferences::default())
+            anyhow::bail!("[booharu-reading] pages_per_request = 99 is over 40")
         }
 
         fn save_section(
@@ -476,8 +474,12 @@ mod tests {
             Ok(self.series.clone())
         }
 
-        fn target_language(&self) -> anyhow::Result<LanguageIdentifier> {
-            Ok("en".parse()?)
+        fn qc_settings(&self) -> anyhow::Result<qc::Settings> {
+            Ok(qc::Settings {
+                qc: QcSettings::default(),
+                target: "en".parse()?,
+                lettering: LetteringSettings::default(),
+            })
         }
     }
 
