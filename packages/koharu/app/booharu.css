@@ -1,21 +1,60 @@
 /* Booharu's own styles. app/layout.tsx imports this file once, right after globals.css, so Koharu's
  * stylesheet stays as upstream ships it. */
 
+/* Booharu's warning yellow, with black text on it, in both themes: the QC tab's count and the ?
+ * tag of a box the quality check has something open on, as Booharu 0.0.4 showed them. */
+:root {
+  --booharu-warning: #dba54a;
+}
+
 /* The still interface: globals.css stops every animation with a '*' rule in layer base, and with
  * reduced motion (Windows' animation effects off) it also stops its startup spinner. The rules here
- * are the exceptions Booharu allows, one class each. They sit in the same native layer, base, where
- * a class outranks '*'; an !important declaration in a layer also beats the unlayered !important
- * reduced-motion rule and every declaration that isn't !important, such as Tailwind's
- * motion-reduce:animate-none in layer utilities. */
+ * are the only exceptions Booharu allows, one class each: loading spinners and the QC ? tag. They
+ * sit in the same native layer, base, where a class outranks '*'; an !important declaration in a
+ * layer also beats the unlayered !important reduced-motion rule and every declaration that isn't
+ * !important, such as Tailwind's motion-reduce:animate-none in layer utilities. */
 @layer base {
   /* A loading spinner is the only sign that an import, an export, a download or a run is still
    * going, so it keeps turning, with reduced motion too. */
   .animate-spin {
     animation: var(--animate-spin) !important;
   }
+
+  /* The ? tag of a box the quality check has something open on blinks, the one sign of it on the
+   * box's rows, so with reduced motion it blinks more slowly rather than stopping. */
+  .booharu-qc-blink {
+    animation: booharu-qc-blink 1.6s ease-in-out infinite !important;
+  }
+
+  /* The slower blink stays in this layer, after the rule above: an unlayered one would lose to that
+   * rule's !important. */
+  @media (prefers-reduced-motion: reduce) {
+    .booharu-qc-blink {
+      animation-duration: 2.4s !important;
+    }
+  }
+}
+
+@keyframes booharu-qc-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
 }
 
 @layer components {
+  /* The QC ? tag's yellow, over the outline button's own colours, whose hover and dark-theme
+   * classes sit in layer utilities, after this one, hence !important. */
+  .booharu-qc-tag {
+    border-color: var(--booharu-warning) !important;
+    background-color: var(--booharu-warning) !important;
+    color: #000 !important;
+  }
+
   /* A Booharu tool's hint, such as the O tool's Alt and Shift modes, sits on a line of its own
    * under the tool's name and key: Koharu's tooltip lays its content out in one row. */
   [data-slot='tooltip-content']:has(> .booharu-tool-hint) {
