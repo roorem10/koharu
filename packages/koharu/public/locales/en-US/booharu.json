@@ -120,6 +120,8 @@
       "termSaved": "Term saved",
       "terms": "Terms",
       "title": "Context",
+      "unlinkSeries": "Unlink series",
+      "unreadableSeries": "The series this chapter follows can't be read. Fix its file or pick another series.",
       "usage": "Where {{source}} is used",
       "usageFailed": "Could not find where this term is used.",
       "usedOnLines_one": "Used on {{count}} line in this project",

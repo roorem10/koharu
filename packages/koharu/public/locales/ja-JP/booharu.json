@@ -120,6 +120,8 @@
       "termSaved": "用語を保存しました",
       "terms": "用語",
       "title": "コンテキスト",
+      "unlinkSeries": "シリーズとのリンクを解除",
+      "unreadableSeries": "この章が使っているシリーズを読み込めません。ファイルを修正するか、別のシリーズを選んでください。",
       "usage": "{{source}}の使用箇所",
       "usageFailed": "この用語の使用箇所を調べられませんでした。",
       "usedOnLines_one": "このプロジェクトの{{count}}行で使用",

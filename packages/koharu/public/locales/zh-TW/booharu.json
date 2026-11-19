@@ -120,6 +120,8 @@
       "termSaved": "術語已儲存",
       "terms": "術語",
       "title": "上下文",
+      "unlinkSeries": "取消連結系列",
+      "unreadableSeries": "無法讀取此章節連結的系列。請修復其檔案，或選擇其他系列。",
       "usage": "{{source}} 的使用位置",
       "usageFailed": "無法找出此術語的使用位置。",
       "usedOnLines_one": "在此專案的 {{count}} 行文字中使用",

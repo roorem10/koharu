@@ -24,8 +24,8 @@ import {
 /** Add to glossary, from a line's text: the term form filled from `initial`, with Lock, saving the
  * term into the series the open chapter follows in place of a term with its source, then showing
  * where it's used, with Re-translate those lines, until Done. While the chapter follows no series,
- * or one that's gone, it asks for one first, as Booharu 0.0.4 did, and links the chapter to the
- * series picked or made; `onClose` closes it. */
+ * or one that's gone or can't be read, the error then shown, it asks for one first, as Booharu
+ * 0.0.4 did, and links the chapter to the series picked or made; `onClose` closes it. */
 export function AddToGlossary({ initial, onClose }: { initial: FullEntry; onClose: () => void }) {
   const { t } = useTranslation()
   const chapter = useChapterContext()
@@ -54,9 +54,11 @@ export function AddToGlossary({ initial, onClose }: { initial: FullEntry; onClos
           {t('booharu.context.addToGlossary')}
         </DialogTitle>
         <DialogDescription className='text-[11px]'>
-          {chapter.data?.missing
-            ? t('booharu.context.missingSeries')
-            : t('booharu.context.chooseSeriesHint')}
+          {chapter.data?.unreadable
+            ? t('booharu.context.unreadableSeries')
+            : chapter.data?.missing
+              ? t('booharu.context.missingSeries')
+              : t('booharu.context.chooseSeriesHint')}
         </DialogDescription>
         {chapter.error ? (
           <div role='alert' className='grid gap-1 text-[11px] leading-4'>
@@ -64,7 +66,14 @@ export function AddToGlossary({ initial, onClose }: { initial: FullEntry; onClos
             <p className='break-words text-muted-foreground'>{failure(chapter.error)}</p>
           </div>
         ) : chapter.data ? (
-          <SeriesPicker value={null} onChange={(id) => linkSeries(id)} />
+          <>
+            {chapter.data.unreadable && (
+              <p role='alert' className='text-[11px] break-words text-muted-foreground'>
+                {chapter.data.unreadable}
+              </p>
+            )}
+            <SeriesPicker value={null} onChange={(id) => linkSeries(id)} />
+          </>
         ) : (
           <p className='text-[11px] text-muted-foreground'>{t('booharu.context.loading')}</p>
         )}

@@ -120,6 +120,8 @@
       "termSaved": "术语保存好哉",
       "terms": "术语",
       "title": "上下文",
+      "unlinkSeries": "取消关联系列",
+      "unreadableSeries": "箇章关联个系列读勿出来。修好伊个文件，或者换只系列。",
       "usage": "{{source}} 用辣啥地方",
       "usageFailed": "寻勿着箇个术语用辣啥地方。",
       "usedOnLines_one": "箇个项目里向有 {{count}} 行用着",

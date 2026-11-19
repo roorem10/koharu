@@ -343,9 +343,16 @@ export type ChapterState = {
   /**  Whether the chapter links a series whose file is gone. */
   missing: boolean
   /**
+   *  Why the series the chapter links can't be read, naming its file, when
+   *  that file is there but doesn't read: `series` is none then, and a run
+   *  translating the chapter is refused until the file reads again or the
+   *  chapter links another series, or none, which the Context tab offers.
+   */
+  unreadable: string | null
+  /**
    *  The terms a run translating the chapter now sends, locked first: the
    *  series' terms and the suggestions its text uses, each source once, at
-   *  most 60.
+   *  most 60; none while the series can't be read.
    */
   glossary: GlossaryEntry[]
   /**
@@ -1862,7 +1869,7 @@ export const commands = {
   /** Links the open project's chapter to the series `series`, or to none, and answers the chapter then. A series that isn't saved, or doesn't read, fails, linking nothing. */
   booharuLinkSeries: (series: string | null) =>
     invoke<ChapterState>('booharu_link_series', { series }, { headers: headers() }),
-  /** The open project's chapter: its side file, the series it links, and the glossary a translation run on it would send. A side file or a linked series' file that doesn't read fails, naming it. */
+  /** The open project's chapter: its side file, the series it links, and the glossary a translation run on it would send. A side file that doesn't read fails, naming it; a linked series' file that doesn't read is answered as `unreadable`, so another series, or none, can be linked. */
   booharuGetChapterContext: () =>
     invoke<ChapterState>('booharu_get_chapter_context', {}, { headers: headers() }),
   /** Accepts the open chapter's suggestion `entry` names by its id into the series the chapter links, as `entry` holds it, the user's changes included, in place of the series' term with its source, a locked one only with `replace_locked`, the user's choice in the term form, which says what saving replaces; the suggestion leaves the chapter. Answers the chapter then. Fails, changing nothing, when the suggestion is gone, the chapter links no series, the series' term with its source is locked and `replace_locked` is off, or the term lacks a source or a target. */

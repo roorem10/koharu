@@ -120,6 +120,8 @@
       "termSaved": "Terim kaydedildi",
       "terms": "Terimler",
       "title": "Bağlam",
+      "unlinkSeries": "Seri bağlantısını kaldır",
+      "unreadableSeries": "Bu bölümün bağlı olduğu seri okunamıyor. Dosyasını düzeltin veya başka bir seri seçin.",
       "usage": "{{source}} teriminin kullanıldığı yerler",
       "usageFailed": "Bu terimin nerede kullanıldığı bulunamadı.",
       "usedOnLines_one": "Bu projede {{count}} satırda kullanılıyor",

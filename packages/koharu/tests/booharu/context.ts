@@ -29,7 +29,9 @@ export function haikyu(): Required<Series> {
 
 /** The desktop's series folder and the open project's side file, which the context commands read
  * and write as booharu-core does, every other command answering null; another writer, such as the
- * agent, may change either between commands. `saves` lists each series saved whole. */
+ * agent, may change either between commands. A series whose id is in `files.unreadable` has a file
+ * that doesn't read: the list leaves it out, and a chapter linking it reads with its error. `saves`
+ * lists each series saved whole. */
 export function contextDesktop({
   series = [blueLock(), haikyu()],
   linked = blueLock().id as string | null,
@@ -40,6 +42,7 @@ export function contextDesktop({
   const files = {
     series: new Map(series.map((item) => [item.id!, structuredClone(item)])),
     chapter: { series: linked, suggestions: structuredClone(suggestions) },
+    unreadable: new Set<string>(),
   }
   const saves: Series[] = []
   const get = (id: string) => {
@@ -48,29 +51,33 @@ export function contextDesktop({
     return structuredClone(found)
   }
   const state = (): ChapterState => {
-    const series = files.chapter.series ? (files.series.get(files.chapter.series) ?? null) : null
+    const id = files.chapter.series
+    const unreadable = id !== null && files.unreadable.has(id)
+    const series = id !== null && !unreadable ? (files.series.get(id) ?? null) : null
     return {
       context: {
         version: 1,
-        series: files.chapter.series,
+        series: id,
         brief: null,
         suggestions: structuredClone(files.chapter.suggestions),
       },
       series: series && structuredClone(series),
-      missing: files.chapter.series !== null && series === null,
+      missing: id !== null && !unreadable && series === null,
+      unreadable: unreadable
+        ? `Booharu's chapter file Ch.1.booharu.json links the series "${id}", which can't be read: the series file ${id}.json can't be read`
+        : null,
       glossary: [],
       fresh: false,
       left_out: 0,
     }
   }
   const spies = {
-    list: vi
-      .spyOn(commands, 'booharuListSeries')
-      .mockImplementation(async () =>
-        [...files.series.values()]
-          .map((item) => structuredClone(item))
-          .sort((a, b) => a.name!.localeCompare(b.name!)),
-      ),
+    list: vi.spyOn(commands, 'booharuListSeries').mockImplementation(async () =>
+      [...files.series.values()]
+        .filter((item) => !files.unreadable.has(item.id!))
+        .map((item) => structuredClone(item))
+        .sort((a, b) => a.name!.localeCompare(b.name!)),
+    ),
     get: vi.spyOn(commands, 'booharuGetSeries').mockImplementation(async (id) => get(id)),
     save: vi.spyOn(commands, 'booharuSaveSeries').mockImplementation(async (saved) => {
       saves.push(structuredClone(saved))

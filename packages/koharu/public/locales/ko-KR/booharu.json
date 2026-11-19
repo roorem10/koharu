@@ -120,6 +120,8 @@
       "termSaved": "용어 저장됨",
       "terms": "용어",
       "title": "문맥",
+      "unlinkSeries": "시리즈 연결 해제",
+      "unreadableSeries": "이 챕터가 따르는 시리즈를 읽을 수 없습니다. 파일을 고치거나 다른 시리즈를 선택하세요.",
       "usage": "{{source}} 사용 위치",
       "usageFailed": "이 용어가 사용된 위치를 찾지 못했습니다.",
       "usedOnLines_one": "이 프로젝트의 {{count}}개 줄에서 사용됨",

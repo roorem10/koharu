@@ -171,6 +171,31 @@ describe('Booharu Add to glossary', () => {
     ])
   })
 
+  it('asks for another series when the linked one’s file doesn’t read', async () => {
+    const { files, spies } = setUp()
+    files.unreadable.add(blueLock().id)
+    const user = userEvent.setup()
+    mount(<StoryPanel />)
+
+    await addToGlossary(
+      user,
+      await screen.findByRole('textbox', { name: "Isagi's weapon source text" }),
+    )
+    const ask = within(await screen.findByRole('dialog', { name: 'Add to glossary' }))
+    expect(
+      ask.getByText(
+        "The series this chapter follows can't be read. Fix its file or pick another series.",
+      ),
+    ).toBeInTheDocument()
+    expect(ask.getByRole('alert')).toHaveTextContent('blue-lock-0123456789ab.json')
+    await user.click(await ask.findByRole('combobox', { name: 'Series' }))
+    await user.click(await screen.findByRole('option', { name: 'Haikyu' }))
+
+    await waitFor(() => expect(spies.link).toHaveBeenCalledWith(haikyu().id))
+    const form = await termForm()
+    expect(form.getByRole('textbox', { name: 'Source' })).toHaveValue('潔の武器')
+  })
+
   it('opens from the texts Box details shows too, with the text selected there', async () => {
     const { saves } = setUp()
     const user = userEvent.setup()

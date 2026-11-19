@@ -132,6 +132,8 @@
       "termSaved": "Terme enregistré",
       "terms": "Termes",
       "title": "Contexte",
+      "unlinkSeries": "Dissocier la série",
+      "unreadableSeries": "Impossible de lire la série que suit ce chapitre. Corrigez son fichier ou choisissez une autre série.",
       "usage": "Où {{source}} est utilisé",
       "usageFailed": "Impossible de trouver où ce terme est utilisé.",
       "usedOnLines_many": "Utilisé dans {{count}} lignes de ce projet",

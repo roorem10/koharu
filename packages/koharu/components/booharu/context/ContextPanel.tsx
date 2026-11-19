@@ -42,13 +42,14 @@ interface Listed {
 
 /** The Context tab, Booharu 0.0.4's layout before Read chapter: the series the open chapter
  * follows, picked or made here; a line asking for one while it links none, or saying the one it
- * links is gone; and the glossary its translations follow, searchable, the series' terms then the
- * terms suggested for the chapter, each suggestion to accept into the series, to edit and accept,
- * or to dismiss, a term accepted showing where it's used, with Re-translate those lines; then Open
- * full glossary, the glossary editor. Accepting a suggestion whose source the series has opens the
- * term form, which says what saving replaces, rather than replacing that term at a click. A side
- * file that doesn't read shows its error, which names it. Everything is read again after every
- * change to the chapter, its series or its pages. */
+ * links is gone, or can't be read, with the error naming its file and Unlink series, so a broken
+ * series file never leaves the chapter stuck on it; and the glossary its translations follow,
+ * searchable, the series' terms then the terms suggested for the chapter, each suggestion to
+ * accept into the series, to edit and accept, or to dismiss, a term accepted showing where it's
+ * used, with Re-translate those lines; then Open full glossary, the glossary editor. Accepting a
+ * suggestion whose source the series has opens the term form, which says what saving replaces,
+ * rather than replacing that term at a click. A side file that doesn't read shows its error, which
+ * names it. Everything is read again after every change to the chapter, its series or its pages. */
 export function ContextPanel() {
   const { t } = useTranslation()
   const heading = useId()
@@ -94,7 +95,21 @@ export function ContextPanel() {
       <div className='grid min-w-0 gap-4 p-3 text-[11px]'>
         <section className='grid min-w-0 gap-1.5'>
           <SeriesPicker value={linked?.id ?? null} onChange={(id) => linkSeries(id)} />
-          {data.missing ? (
+          {data.unreadable ? (
+            <div role='alert' className='grid min-w-0 gap-1 leading-4'>
+              <p className='font-medium'>{t('booharu.context.unreadableSeries')}</p>
+              <p className='break-words text-muted-foreground'>{data.unreadable}</p>
+              <Button
+                type='button'
+                size='xs'
+                variant='outline'
+                className='justify-self-start'
+                onClick={() => void linkSeries(null).catch(() => undefined)}
+              >
+                {t('booharu.context.unlinkSeries')}
+              </Button>
+            </div>
+          ) : data.missing ? (
             <p className='text-muted-foreground'>{t('booharu.context.missingSeries')}</p>
           ) : (
             !linked && (

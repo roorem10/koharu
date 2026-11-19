@@ -9,7 +9,7 @@ import { resources, supportedLanguages } from '@/lib/i18n'
 import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 
-import { contextDesktop, haikyu, openChapter, term } from './context'
+import { blueLock, contextDesktop, haikyu, openChapter, term } from './context'
 
 /** The right pane, its Context tab shown. */
 async function contextTab(user: ReturnType<typeof userEvent.setup>) {
@@ -221,6 +221,40 @@ describe('Booharu Context tab', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Could not load chapter context.')
     expect(alert).toHaveTextContent('Ch.1.booharu.json is not a chapter file: expected value')
+  })
+
+  it('offers another series, or none, when the linked one’s file doesn’t read', async () => {
+    const { files, spies } = contextDesktop()
+    files.unreadable.add(blueLock().id)
+    const user = userEvent.setup()
+    await contextTab(user)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(
+      "The series this chapter follows can't be read. Fix its file or pick another series.",
+    )
+    expect(alert).toHaveTextContent("the series file blue-lock-0123456789ab.json can't be read")
+    // The picker stays, and the chapter's suggestions, which wait for a series to accept them.
+    expect(screen.getByRole('combobox', { name: 'Series' })).toHaveTextContent('Pick series')
+    expect((await row('ヒナ')).getByRole('button', { name: 'Accept' })).toBeDisabled()
+
+    await user.click(within(alert).getByRole('button', { name: 'Unlink series' }))
+    await waitFor(() => expect(spies.link).toHaveBeenCalledWith(null))
+    expect(files.chapter.series).toBeNull()
+    expect(
+      await screen.findByText('Pick or create a series to keep the glossary across chapters.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    // Linked again, it can be swapped for another series through the picker.
+    files.chapter.series = blueLock().id
+    await act(() => refreshContext())
+    await screen.findByRole('alert')
+    await user.click(screen.getByRole('combobox', { name: 'Series' }))
+    await user.click(await screen.findByRole('option', { name: 'Haikyu' }))
+    await waitFor(() => expect(spies.link).toHaveBeenLastCalledWith(haikyu().id))
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect(screen.getByRole('combobox', { name: 'Series' })).toHaveTextContent('Haikyu')
   })
 
   it('has its strings in every language', () => {

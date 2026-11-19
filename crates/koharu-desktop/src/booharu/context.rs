@@ -9,7 +9,10 @@
 //! project's side file tells the interface `booharu_context_changed`, and
 //! every save of the Instructions `booharu_instructions_changed`.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::ensure;
 use booharu::context::{self, FixedTerm, GlossaryUsage, InstructionImport};
@@ -21,6 +24,7 @@ use booharu_core::{
     settings::StartSettings,
 };
 use koharu_pipeline::PipelineConfig;
+use koharu_scene::Project;
 use serde::Serialize;
 use specta::Type;
 use tauri::{State, Window};
@@ -41,9 +45,14 @@ pub struct ChapterState {
     pub series: Option<Series>,
     /// Whether the chapter links a series whose file is gone.
     pub missing: bool,
+    /// Why the series the chapter links can't be read, naming its file, when
+    /// that file is there but doesn't read: `series` is none then, and a run
+    /// translating the chapter is refused until the file reads again or the
+    /// chapter links another series, or none, which the Context tab offers.
+    pub unreadable: Option<String>,
     /// The terms a run translating the chapter now sends, locked first: the
     /// series' terms and the suggestions its text uses, each source once, at
-    /// most 60.
+    /// most 60; none while the series can't be read.
     pub glossary: Vec<GlossaryEntry>,
     /// Whether the chapter's text isn't known yet, as a page was never
     /// through detection or a block waits to be read, so a run sends every
@@ -182,8 +191,9 @@ pub async fn booharu_link_series(
 }
 
 /// The open project's chapter: its side file, the series it links, and the
-/// glossary a translation run on it would send. A side file or a linked
-/// series' file that doesn't read fails, naming it.
+/// glossary a translation run on it would send. A side file that doesn't
+/// read fails, naming it; a linked series' file that doesn't read is
+/// answered as `unreadable`, so another series, or none, can be linked.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_get_chapter_context(app: State<'_, Arc<App>>) -> Result<ChapterState> {
@@ -446,16 +456,45 @@ fn chapter(app: &App) -> anyhow::Result<ChapterState> {
         let session = session.lock();
         (session.path().to_owned(), session.project())
     };
+    chapter_state(&path, &project, SeriesStore::open)
+}
+
+/// The chapter of the project file `path`, whose project is `project`, with
+/// the series it links from the store `store` opens. A side file that
+/// doesn't read fails, naming it; a linked series' file that doesn't read is
+/// answered as `unreadable`, with no glossary, as a translating run is
+/// refused, so the Context tab can still link another series, or none.
+fn chapter_state(
+    path: &Path,
+    project: &Project,
+    store: impl FnOnce() -> anyhow::Result<SeriesStore>,
+) -> anyhow::Result<ChapterState> {
     let Chapter {
         context,
         series,
         missing,
-    } = Chapter::read(&path, SeriesStore::open)?;
-    let extras = Extras::of(&project, &context, series.as_ref(), false);
+    } = match Chapter::read(path, store) {
+        Ok(chapter) => chapter,
+        Err(error) => {
+            // The side file reads, so the series it links doesn't.
+            let context = ChapterContext::load(path)?;
+            return Ok(ChapterState {
+                context,
+                series: None,
+                missing: false,
+                unreadable: Some(format!("{error:#}")),
+                glossary: Vec::new(),
+                fresh: false,
+                left_out: 0,
+            });
+        }
+    };
+    let extras = Extras::of(project, &context, series.as_ref(), false);
     Ok(ChapterState {
         context,
         series,
         missing,
+        unreadable: None,
         glossary: extras.glossary,
         fresh: extras.fresh,
         left_out: extras.left_out,
@@ -464,9 +503,48 @@ fn chapter(app: &App) -> anyhow::Result<ChapterState> {
 
 #[cfg(test)]
 mod tests {
-    use booharu_core::context::{agent_file, side_file};
+    use booharu_core::context::{ChapterContext, SeriesStore, agent_file, side_file};
+    use koharu_scene::Session;
 
+    use super::chapter_state;
     use crate::library::Library;
+
+    #[test]
+    fn a_linked_series_that_doesnt_read_leaves_the_chapter_to_link_another() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let session = Session::create(dir.path().join("Ch.1.khr"))?;
+        let (path, project) = (session.path().to_owned(), session.project());
+        let store = SeriesStore::new(dir.path().join("series"));
+        let series = store.create("Blue Lock")?;
+        let id = series.id.clone();
+        ChapterContext::update(&path, |chapter| chapter.series = Some(id.clone()))?;
+        let read = chapter_state(&path, &project, || Ok(store.clone()))?;
+        assert_eq!((read.series, read.unreadable), (Some(series), None));
+
+        // Its file is broken by hand: the chapter still reads, linking it,
+        // with the error, which names the file.
+        fs_err::write(dir.path().join("series").join(format!("{id}.json")), "[")?;
+        let read = chapter_state(&path, &project, || Ok(store.clone()))?;
+        assert_eq!(read.context.series.as_deref(), Some(&*id));
+        assert_eq!((read.series, read.missing), (None, false));
+        assert!(read.glossary.is_empty());
+        let error = read.unreadable.expect("the series' error");
+        assert!(error.contains(&format!("{id}.json")), "{error}");
+        // So another series, or none, can be linked in its place.
+        booharu::context::link(&path, &store, None)?;
+        let read = chapter_state(&path, &project, || Ok(store.clone()))?;
+        assert_eq!((read.context.series, read.unreadable), (None, None));
+
+        // A side file that doesn't read still fails, naming it.
+        fs_err::write(side_file(&path), "{ not json")?;
+        let failed =
+            chapter_state(&path, &project, || Ok(store.clone())).expect_err("a broken side file");
+        assert!(
+            format!("{failed:#}").contains("Ch.1.booharu.json"),
+            "{failed:#}"
+        );
+        Ok(())
+    }
 
     #[test]
     fn deleting_a_project_deletes_its_side_files() -> anyhow::Result<()> {

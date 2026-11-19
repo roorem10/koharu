@@ -132,6 +132,8 @@
       "termSaved": "Término guardado",
       "terms": "Términos",
       "title": "Contexto",
+      "unlinkSeries": "Desvincular serie",
+      "unreadableSeries": "No se puede leer la serie que sigue este capítulo. Corrige su archivo o elige otra serie.",
       "usage": "Dónde se usa {{source}}",
       "usageFailed": "No se ha podido averiguar dónde se usa este término.",
       "usedOnLines_many": "Se usa en {{count}} líneas de este proyecto",
