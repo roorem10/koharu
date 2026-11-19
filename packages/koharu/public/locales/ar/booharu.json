@@ -131,6 +131,7 @@
       "openGlossary": "فتح المسرد الكامل",
       "originalName": "الاسم الأصلي",
       "pickSeries": "اختيار سلسلة",
+      "readingRow": "جارٍ قراءة الفصل",
       "removeImportedLines": "إزالة هذه الأسطر من التعليمات",
       "removedLines": "أُزيلت الأسطر المستوردة من التعليمات.",
       "replace": "استبدال",
@@ -357,6 +358,10 @@
         "short": "الإعدادات المسبقة",
         "title": "إعدادات المعالجة المسبقة"
       },
+      "read": {
+        "failed": "تعذّرت قراءة الفصل",
+        "skipped": "تم تخطي قراءة الفصل"
+      },
       "retries": "عدد المحاولات الإضافية لكل مرحلة فاشلة",
       "retriesDescription": "انتظر 2 ثم 5 ثم 10 ثوانٍ بين المحاولات (0–5 محاولات إضافية).",
       "retryFailedPages": "إعادة محاولة الصفحات التي فشلت",
@@ -447,6 +452,7 @@
       "booharu_apply_text_style": "تطبيق نمط النص",
       "booharu_join_balloon": "دمج النصوص",
       "booharu_join_page": "دمج النصوص المقسّمة",
+      "booharu_read_chapter": "قراءة الفصل",
       "booharu_set_lettering_category": "تغيير فئة التنضيد",
       "booharu_set_review_note": "تحرير الملاحظة",
       "booharu_set_translation": "إضافة ترجمة",

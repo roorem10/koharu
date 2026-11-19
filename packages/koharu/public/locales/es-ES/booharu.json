@@ -107,6 +107,7 @@
       "openGlossary": "Abrir glosario completo",
       "originalName": "Nombre original",
       "pickSeries": "Elegir serie",
+      "readingRow": "Leyendo capítulo",
       "removeImportedLines": "Quitar estas líneas de las instrucciones",
       "removedLines": "Se han quitado de las instrucciones las líneas importadas.",
       "replace": "Reemplazar",
@@ -318,6 +319,10 @@
         "short": "Preajustes",
         "title": "Preajustes de ejecución"
       },
+      "read": {
+        "failed": "No se pudo leer el capítulo",
+        "skipped": "Se ha omitido la lectura del capítulo"
+      },
       "retries": "Reintentos por etapa fallida",
       "retriesDescription": "Espera 2, 5 y luego 10 segundos entre reintentos (0–5 reintentos).",
       "retryFailedPages": "Reintentar páginas con errores",
@@ -390,6 +395,7 @@
       "booharu_apply_text_style": "Aplicar estilo de texto",
       "booharu_join_balloon": "Unir textos",
       "booharu_join_page": "Unir textos divididos",
+      "booharu_read_chapter": "Leer capítulo",
       "booharu_set_lettering_category": "Cambiar categoría de rotulación",
       "booharu_set_review_note": "Editar nota",
       "booharu_set_translation": "Añadir traducción",

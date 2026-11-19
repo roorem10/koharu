@@ -97,6 +97,7 @@
       "openGlossary": "用語集全体を開く",
       "originalName": "原語名",
       "pickSeries": "シリーズを選択",
+      "readingRow": "章を読み込み中",
       "removeImportedLines": "これらの行を翻訳指示から削除する",
       "removedLines": "インポートした行を翻訳指示から削除しました。",
       "replace": "置き換える",
@@ -303,6 +304,10 @@
         "short": "プリセット",
         "title": "実行プリセット"
       },
+      "read": {
+        "failed": "章を読み込めませんでした",
+        "skipped": "章の読み込みをスキップしました"
+      },
       "retries": "失敗した工程ごとの再試行回数",
       "retriesDescription": "再試行の間に2秒、5秒、10秒の順で待機します（再試行回数：0–5回）。",
       "retryFailedPages": "失敗したページを再試行",
@@ -367,6 +372,7 @@
       "booharu_apply_text_style": "書式を適用",
       "booharu_join_balloon": "テキストを結合",
       "booharu_join_page": "分割されたテキストを結合",
+      "booharu_read_chapter": "章を読み込む",
       "booharu_set_lettering_category": "写植カテゴリを変更",
       "booharu_set_review_note": "メモを編集",
       "booharu_set_translation": "翻訳を追加",

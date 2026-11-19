@@ -2,6 +2,7 @@
 
 import { InferenceControl } from '@/components/editor/InferenceControl'
 import { call } from '@/lib/backend'
+import { useReadingChapter } from '@/lib/booharu/booharuJobs' // Booharu: a read going.
 import { runOrCarryOn } from '@/lib/booharu/runs' // Booharu: Run carries on with what's left.
 import { usePage } from '@/lib/queries'
 import { pipelineStages, useKoharuStore, type PipelineScope } from '@/lib/store'
@@ -11,7 +12,9 @@ export function CanvasCommandBar() {
   const page = usePage().data
   const selectedPages = useKoharuStore((state) => state.selectedPages)
   const jobs = useKoharuStore((state) => state.jobs)
-  const running = Object.values(jobs).find((job) => job.state === 'running')
+  // Booharu: a Read chapter going counts as running, so no run starts beside it.
+  const reading = useReadingChapter()
+  const running = Object.values(jobs).find((job) => job.state === 'running') ?? reading
 
   const run = (selection: PipelineScope, stages: Stage[]) => {
     const target: Target = selection === 'project' ? 'project' : { pages: selectedPages }

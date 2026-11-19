@@ -7,6 +7,7 @@ import { I18nextProvider } from 'react-i18next'
 import { StartupView } from '@/components/app/StartupView'
 import ClientOnly from '@/components/ClientOnly'
 import { refreshModels, refreshPreferences } from '@/lib/backend'
+import { useBooharuJobEvents } from '@/lib/booharu/booharuJobs' // Booharu: its reads going.
 import { useBooharuRunGroups } from '@/lib/booharu/chime' // Booharu: carrying-on groups' runs.
 import { useBooharuContextChanges } from '@/lib/booharu/context' // Booharu: glossary changes.
 import { useBooharuNotices } from '@/lib/booharu/notices' // Booharu: its notices, as toasts.
@@ -110,6 +111,7 @@ export function Providers({ children }: { children: ReactNode }) {
   useBooharuNotices() // Booharu: its own notices, such as why a drawn box added nothing.
   useBooharuRunGroups() // Booharu: which runs carry on a chapter together, so a group chimes once.
   useBooharuContextChanges() // Booharu: reads the series and the chapter again as they change.
+  useBooharuJobEvents() // Booharu: follows each Read chapter going, which no run works on.
 
   return (
     <QueryClientProvider client={queryClient}>

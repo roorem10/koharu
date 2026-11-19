@@ -97,6 +97,7 @@
       "openGlossary": "開啟完整術語表",
       "originalName": "原名",
       "pickSeries": "選擇系列",
+      "readingRow": "正在閱讀章節",
       "removeImportedLines": "從翻譯說明中移除這些行",
       "removedLines": "已從翻譯說明中移除匯入的行。",
       "replace": "取代",
@@ -303,6 +304,10 @@
         "short": "預設",
         "title": "作業預設"
       },
+      "read": {
+        "failed": "閱讀章節失敗",
+        "skipped": "已略過閱讀章節"
+      },
       "retries": "每個失敗階段的重試次數",
       "retriesDescription": "重試間隔依序為 2、5、10 秒（可重試 0–5 次）。",
       "retryFailedPages": "重試失敗的頁面",
@@ -367,6 +372,7 @@
       "booharu_apply_text_style": "套用文字樣式",
       "booharu_join_balloon": "合併文字",
       "booharu_join_page": "合併分割的文字",
+      "booharu_read_chapter": "閱讀章節",
       "booharu_set_lettering_category": "變更排字類別",
       "booharu_set_review_note": "編輯備註",
       "booharu_set_translation": "新增譯文",

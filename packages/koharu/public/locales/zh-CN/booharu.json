@@ -97,6 +97,7 @@
       "openGlossary": "打开完整术语表",
       "originalName": "原名",
       "pickSeries": "选择系列",
+      "readingRow": "正在阅读章节",
       "removeImportedLines": "从翻译说明中移除这些行",
       "removedLines": "已从翻译说明中移除导入的行。",
       "replace": "替换",
@@ -303,6 +304,10 @@
         "short": "预设",
         "title": "任务预设"
       },
+      "read": {
+        "failed": "阅读章节失败",
+        "skipped": "已跳过阅读章节"
+      },
       "retries": "每个失败阶段的重试次数",
       "retriesDescription": "重试间隔依次为 2、5、10 秒（可重试 0–5 次）。",
       "retryFailedPages": "重试失败的页面",
@@ -367,6 +372,7 @@
       "booharu_apply_text_style": "应用文字样式",
       "booharu_join_balloon": "合并文本",
       "booharu_join_page": "合并拆分的文本",
+      "booharu_read_chapter": "阅读章节",
       "booharu_set_lettering_category": "更改排字类别",
       "booharu_set_review_note": "编辑备注",
       "booharu_set_translation": "添加译文",

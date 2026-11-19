@@ -3,19 +3,22 @@
 import { RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { useReadingChapter } from '@/lib/booharu/booharuJobs'
 import { retryFailedPages, useRetryable } from '@/lib/booharu/jobs'
 import { useKoharuStore } from '@/lib/store'
 import { Button } from '@koharu/ui/components/button'
 
 /** Retry failed pages in the Run menu's root view, while the last run in the open project has
- * failed pages to queue again, as its list in the Activity center does; it waits while a run goes.
- * `onRetry` closes the menu as the click queues them. */
+ * failed pages to queue again, as its list in the Activity center does; it waits while a run or a
+ * read of the chapter goes. `onRetry` closes the menu as the click queues them. */
 export function RetryFailedRow({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation()
   const job = useRetryable()
-  const running = useKoharuStore((state) =>
-    Object.values(state.jobs).some((other) => other.state === 'running'),
-  )
+  const reading = useReadingChapter()
+  const running =
+    useKoharuStore((state) =>
+      Object.values(state.jobs).some((other) => other.state === 'running'),
+    ) || reading
   if (!job) return null
 
   return (

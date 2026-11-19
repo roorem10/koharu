@@ -4,6 +4,7 @@ import { CircleAlert, X } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useReadingChapter } from '@/lib/booharu/booharuJobs'
 import { retryFailedPages, retryRuns, showFailedPage } from '@/lib/booharu/jobs'
 import { usePages } from '@/lib/queries'
 import { useKoharuStore, type Job } from '@/lib/store'
@@ -13,13 +14,16 @@ import { Button } from '@koharu/ui/components/button'
  * or a run over pages that failed. Each row has the page's number, which shows the page, the stage
  * that failed and why, cut to two lines; a page the project no longer has is left out, and with
  * none left, a failed run says why it failed. Retry failed pages queues them again, from the stage
- * each failed at, for a run over pages, while no run goes; Dismiss takes the list away. */
+ * each failed at, for a run over pages, while no run or read of the chapter goes; Dismiss takes the
+ * list away. */
 export function FailedPages({ job }: { job: Job }) {
   const { t } = useTranslation()
   const dismiss = useKoharuStore((state) => state.dismissJob)
-  const running = useKoharuStore((state) =>
-    Object.values(state.jobs).some((other) => other.state === 'running'),
-  )
+  const reading = useReadingChapter()
+  const running =
+    useKoharuStore((state) =>
+      Object.values(state.jobs).some((other) => other.state === 'running'),
+    ) || reading
   const order = usePages().data?.map((page) => page.id) ?? []
   const [queuing, setQueuing] = useState(false)
   const rows = (job.booharu?.failures ?? []).flatMap((failure) => {

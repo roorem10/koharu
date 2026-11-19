@@ -20,6 +20,7 @@ import { SaveAsPreset } from '@/components/booharu/runs/SaveAsPreset' // Booharu
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { OutputPicker } from '@/components/controls/OutputPicker'
 import { call, refreshModels, savePreferences } from '@/lib/backend'
+import { useReadingChapter } from '@/lib/booharu/booharuJobs' // Booharu: a read going.
 import { pipelineStages, useKoharuStore, type PipelineScope } from '@/lib/store'
 import { modelName, vendorOf } from '@/lib/translation'
 import { commands, type Model, type Stage, type TranslatorConfig } from '@koharu/ipc/protocol'
@@ -43,7 +44,9 @@ export function InferenceControl({
   const setStages = useKoharuStore((state) => state.setProcessingStages)
   const jobs = useKoharuStore((state) => state.jobs)
   const selectedPages = useKoharuStore((state) => state.selectedPages)
-  const running = Object.values(jobs).find((job) => job.state === 'running') ?? null
+  // Booharu: a Read chapter going counts as running, so the button shows Stop, which stops it.
+  const reading = useReadingChapter()
+  const running = Object.values(jobs).find((job) => job.state === 'running') ?? reading
   const unavailable = scope === 'selected-pages' && selectedPages.length === 0
 
   const stop = () => void call(commands.stopPipeline).catch(() => undefined)

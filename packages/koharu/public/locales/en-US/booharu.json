@@ -97,6 +97,7 @@
       "openGlossary": "Open full glossary",
       "originalName": "Original name",
       "pickSeries": "Pick series",
+      "readingRow": "Reading chapter",
       "removeImportedLines": "Remove these lines from the instructions",
       "removedLines": "Removed the imported lines from the instructions.",
       "replace": "Replace",
@@ -303,6 +304,10 @@
         "short": "Presets",
         "title": "Run presets"
       },
+      "read": {
+        "failed": "Read chapter failed",
+        "skipped": "Read chapter was skipped"
+      },
       "retries": "Retries per failed stage",
       "retriesDescription": "Wait 2, 5, then 10 seconds between retries (0–5 retries).",
       "retryFailedPages": "Retry failed pages",
@@ -367,6 +372,7 @@
       "booharu_apply_text_style": "Apply text style",
       "booharu_join_balloon": "Join texts",
       "booharu_join_page": "Join split texts",
+      "booharu_read_chapter": "Read chapter",
       "booharu_set_lettering_category": "Change lettering category",
       "booharu_set_review_note": "Edit note",
       "booharu_set_translation": "Add translation",

@@ -4,8 +4,10 @@ import { useMutationState } from '@tanstack/react-query'
 import { CircleAlert, Download, LoaderCircle, Square, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { BooharuJobRows } from '@/components/booharu/jobs/BooharuJobRows' // Booharu: a read going.
 import { FailedPages, RetryingNote } from '@/components/booharu/runs/FailedPages' // Booharu: failed pages.
 import { call } from '@/lib/backend'
+import { useBooharuJobCount } from '@/lib/booharu/booharuJobs' // Booharu: a read going.
 import { listsFailedPages, useVisibleJobs } from '@/lib/booharu/jobs' // Booharu: runs it lists.
 import { usePages } from '@/lib/queries'
 import { useKoharuStore, type Job } from '@/lib/store'
@@ -32,7 +34,13 @@ export function ActivityCenter() {
   )
   const failedDownloads = Object.values(downloads).filter((download) => failure(download) !== null)
   const visibleDownloads = [...runningDownloads, ...failedDownloads]
-  if (activities.length === 0 && visibleJobs.length === 0 && visibleDownloads.length === 0)
+  const booharuJobs = useBooharuJobCount() // Booharu: a Read chapter going shows too.
+  if (
+    activities.length === 0 &&
+    visibleJobs.length === 0 &&
+    visibleDownloads.length === 0 &&
+    booharuJobs === 0 // Booharu: and keeps the Activity center open.
+  )
     return null
 
   return (
@@ -67,6 +75,8 @@ export function ActivityCenter() {
       {failedDownloads.map((download) => (
         <DownloadItem key={download.id} download={download} />
       ))}
+      {/* Booharu: a Read chapter going, with its progress and Stop. */}
+      <BooharuJobRows />
       {visibleJobs.map((job) => (
         <JobItem key={job.id} job={job} />
       ))}
