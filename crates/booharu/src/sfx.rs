@@ -13,7 +13,9 @@
 
 use anyhow::{Result, bail, ensure};
 use booharu_core::{settings::LetteringSettings, sfx};
+use koharu_pipeline::RunId;
 use koharu_scene::{Change, Content, Created, Edit, LanguageIdentifier, LayerId, Project};
+use serde::{Deserialize, Serialize};
 
 use crate::boxes::unlocked;
 
@@ -35,6 +37,15 @@ pub enum Subtitle {
     /// No words were given and the effect has no translation to subtitle it
     /// with: a Translate run in subtitle mode on the effect makes one.
     NeedsTranslation,
+}
+
+/// What the desktop's Add subtitle answers: the subtitle, the one the
+/// effect had or the one just added, or else the Translate run in subtitle
+/// mode that makes it.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
+pub struct SfxSubtitleAnswer {
+    pub layer: Option<LayerId>,
+    pub run: Option<RunId>,
 }
 
 /// What adding a subtitle to the sound effect `block` of `project` comes
