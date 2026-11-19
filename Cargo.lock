@@ -1174,8 +1174,11 @@ name = "booharu"
 version = "0.85.2"
 dependencies = [
  "anyhow",
+ "base64 0.23.1",
  "booharu-core",
+ "humantime",
  "image",
+ "koharu-llm",
  "koharu-pipeline",
  "koharu-scene",
  "kurbo",
@@ -1188,6 +1191,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 

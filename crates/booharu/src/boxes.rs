@@ -100,11 +100,12 @@ pub fn split_stages() -> BTreeSet<Stage> {
     BTreeSet::from([Stage::Recognize, Stage::Translate])
 }
 
-/// A page's scan, decoded, which [`add_box`] reads a box against.
+/// A page's scan, decoded, which [`add_box`] reads a box against, and
+/// Read chapter and Explain this line show a model.
 pub struct Scan {
     /// The file it was decoded from, which the page may have changed since.
     file: Hash,
-    image: DynamicImage,
+    pub(crate) image: DynamicImage,
 }
 
 /// `page`'s scan, decoded, which [`add_box`] reads a box against; `None`
