@@ -12,7 +12,11 @@
 //!   whitespace, at most [`MAX_TERMS`]. While the chapter's text isn't known
 //!   yet, as when the run detects or reads text first, a page with a scan was
 //!   never through detection, or a block still waits to be read, the
-//!   glossary is every term instead, locked first, as many.
+//!   glossary is every term instead, locked first, as many, with those the
+//!   text known so far uses first in each group, so the cap leaves out a term
+//!   the chapter is known to use only after every one it isn't: a scanned
+//!   page detection found nothing on leaves no record of it, and keeps the
+//!   text unknown.
 //! - The background, which the model reads and never translates: the series'
 //!   notes, then the brief's summary.
 //! - The chapter's characters from its brief, each with their pages and the
@@ -37,7 +41,8 @@ pub const MAX_TERMS: usize = 60;
 /// What a translation run sends with its chapter.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct Extras {
-    /// The terms, locked first, each group in stored order.
+    /// The terms, locked first, each group in stored order; while the
+    /// text isn't known, those the text known so far uses first in each.
     pub glossary: Vec<GlossaryEntry>,
     /// Whether the glossary is every term, as the chapter's text isn't known
     /// yet, rather than the terms found in it.
@@ -82,7 +87,7 @@ impl Extras {
                 .chain(&context.suggestions),
         );
         let found: Vec<&GlossaryEntry> = match fresh {
-            true => terms,
+            true => used_first(project, terms),
             false => found(project, terms),
         };
         let left_out = found.len().saturating_sub(MAX_TERMS);
@@ -247,11 +252,25 @@ fn found<'t>(project: &Project, terms: Vec<&'t GlossaryEntry>) -> Vec<&'t Glossa
     let texts = sources(project);
     terms
         .into_iter()
-        .filter(|term| {
-            let source = key(&term.source);
-            texts.iter().any(|text| text.contains(&source))
-        })
+        .filter(|term| used(term, &texts))
         .collect()
+}
+
+/// `terms`, locked first, as [`deduplicated`] leaves them, with those whose
+/// source occurs in the source of a block on some page of `project` before
+/// the others in each group, each part in their order.
+fn used_first<'t>(project: &Project, mut terms: Vec<&'t GlossaryEntry>) -> Vec<&'t GlossaryEntry> {
+    let texts = sources(project);
+    // A stable sort, so each part keeps its order.
+    terms.sort_by_cached_key(|term| (!term.locked, !used(term, &texts)));
+    terms
+}
+
+/// Whether the source of `term` occurs in one of `texts`, block sources as
+/// terms are compared.
+fn used(term: &GlossaryEntry, texts: &[String]) -> bool {
+    let source = key(&term.source);
+    texts.iter().any(|text| text.contains(&source))
 }
 
 /// The source of every block on every page, as terms are compared.
@@ -332,6 +351,7 @@ fn line(text: &str) -> String {
 mod tests {
     use std::io::Cursor;
 
+    use anyhow::Context as _;
     use image::{ImageFormat, Rgb, RgbImage};
     use koharu_scene::{Created, Edit, Hash, LayerId, Op, Session};
     use serde_json::{Value, json};
@@ -632,10 +652,11 @@ mod tests {
         let found = Extras::of(&page.project(), &context, Some(&series), false);
         assert_eq!(sources(&found), ["ヒナ"]);
 
-        // A run that detects or reads first doesn't know the text yet.
+        // A run that detects or reads first doesn't know the text yet: every
+        // term, locked first, and the one the text known uses first after.
         let fresh = Extras::of(&page.project(), &context, Some(&series), true);
         assert!(fresh.fresh);
-        assert_eq!(sources(&fresh), ["リムル", "先生", "ヒナ"]);
+        assert_eq!(sources(&fresh), ["リムル", "ヒナ", "先生"]);
 
         // Nor does one where a block waits to be read...
         let mut waiting = Page::new(vec![
@@ -662,6 +683,58 @@ mod tests {
         assert!(!text_known(&undetected.project()));
         let extras = Extras::of(&undetected.project(), &context, Some(&series), false);
         assert_eq!(sources(&extras), ["リムル", "先生", "ヒナ"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_fresh_chapter_sends_at_most_60_terms_those_its_text_uses_first() -> anyhow::Result<()> {
+        // 70 terms, the last five locked, of which the text uses 語62 and 語68.
+        let terms = (0..70)
+            .map(|index| {
+                term(
+                    &format!("語{index:02}"),
+                    &format!("word {index}"),
+                    index >= 65,
+                )
+            })
+            .collect();
+        let series = series(terms);
+        let mut chapter = Page::read(&["語62 と 語68"])?;
+        // A second scanned page, which detection found nothing on, or never
+        // went through: no record tells which, so the text isn't known.
+        let scan = chapter
+            .project()
+            .pages()
+            .find_map(|page| page.background)
+            .context("a scan")?
+            .file;
+        let blank = json!({"op": "add_page", "id": "$blank", "index": 1, "background": scan});
+        chapter.session.apply(Edit {
+            label: "test".to_owned(),
+            ops: vec![serde_json::from_value(blank)?],
+        })?;
+        assert!(!text_known(&chapter.project()));
+        for finds_text in [false, true] {
+            let extras = Extras::of(
+                &chapter.project(),
+                &ChapterContext::default(),
+                Some(&series),
+                finds_text,
+            );
+            assert!(extras.fresh);
+            assert_eq!(extras.glossary.len(), MAX_TERMS);
+            assert_eq!(extras.left_out, 10);
+            let kept = sources(&extras);
+            assert_eq!(
+                kept[..6],
+                ["語68", "語65", "語66", "語67", "語69", "語62"],
+                "locked first, and in each group those the text uses first"
+            );
+            // Then the others in stored order, those past the cap left out,
+            // never 語62, past it in stored order.
+            assert_eq!(kept[6], "語00");
+            assert_eq!(kept[59], "語53");
+        }
         Ok(())
     }
 }
