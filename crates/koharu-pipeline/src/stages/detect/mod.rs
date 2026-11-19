@@ -48,6 +48,7 @@ fn threshold<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<f32>, 
 
 pub(crate) async fn detect(task: &Task, config: &PipelineConfig) -> anyhow::Result<()> {
     let member = &task.members[0];
+    let left = crate::booharu::Left::new(task, config); // Booharu: what Detect again keeps.
     let read = member.clone();
     let scan = tokio::task::spawn_blocking(move || {
         let _span =
@@ -90,30 +91,38 @@ pub(crate) async fn detect(task: &Task, config: &PipelineConfig) -> anyhow::Resu
         layers::additions(&layout, &typography, page, &name)
     })
     .await??;
+    let detecting = left.writing(member); // Booharu: what Detect again keeps, for the write.
     member
         .apply(Stage::Detect, move |project| {
             let Ok(page) = project.page(page) else {
                 return Ok(Vec::new());
             };
             let mut ops = Vec::new();
-            removals(&page.layers, &mut ops);
-            ops.extend(additions);
+            removals(page, &page.layers, &mut ops); // Booharu: on the page, for what stays (D1).
+            ops.extend(detecting.added(page, additions)); // Booharu: none over what stays (D2).
             Ok(ops)
         })
-        .await
+        .await?;
+    left.told(); // Booharu: what Detect again kept, once the edit is in.
+    Ok(())
 }
 
 /// Removes the page's panels, balloons, and blocks, each with what's inside
 /// it, but a locked one, which the user keeps.
-fn removals(layers: &[Layer], ops: &mut Vec<Op>) {
+// Booharu: crate-wide, for the tests of Booharu's hooks, and given `page`,
+// for what Detect again keeps there.
+pub(crate) fn removals(page: &koharu_scene::Page, layers: &[Layer], ops: &mut Vec<Op>) {
     for layer in layers.iter().filter(|layer| !layer.locked) {
         match layer.content {
+            // Booharu: one Detect again keeps, or one holding a layer kept or
+            // locked, stays, and what's inside it is gone through (D1).
+            _ if crate::booharu::stays(page, layer) => removals(page, &layer.children, ops),
             Content::Panel(_) | Content::Balloon(_) | Content::Block(_) => {
                 ops.push(Op::RemoveLayer {
                     layer: layer.id.into(),
                 })
             }
-            _ => removals(&layer.children, ops),
+            _ => removals(page, &layer.children, ops), // Booharu: on the page.
         }
     }
 }
