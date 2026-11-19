@@ -1,6 +1,9 @@
 //! The agent panel: the in-app agent's run on the open project, one at a
 //! time, in the project's conversation, both of which close with it. Its
 //! settings are the preferences' `[agent]`.
+//!
+//! Booharu: the conversation is also kept beside the project, and comes
+//! back with it (`booharu::agent_history`).
 
 use std::sync::{
     Arc,
@@ -52,23 +55,30 @@ pub async fn run_agent(
     let id = RUNS.fetch_add(1, Ordering::Relaxed) + 1;
     let mut project = app.project.lock();
     let project = project.as_mut().context("no project is open")?;
+    // Booharu: the turn, kept beside the project as it ends (D18).
+    let mut chat = crate::booharu::agent_history::Recorder::start(&app, project, &prompt, &model);
     let running = Arc::clone(&app);
     let task = tokio::spawn(
         async move {
             let events = on_event.clone();
+            let fold = chat.fold(); // Booharu: the turn, folded as the panel folds it.
             let result = async {
                 let conversation = conversation(&running, &model).await?;
                 let mut agent = conversation.lock().await;
                 agent.set_config(config);
-                anyhow::Ok(
-                    agent
-                        .run(&prompt, move |event| {
-                            let _ = events.send(AgentEvent::Event { event });
-                        })
-                        .await?,
-                )
+                // Booharu: the answer waits while what the model remembers
+                // now is kept with the turn, the run answered or not.
+                let answer = agent
+                    .run(&prompt, move |event| {
+                        fold(&event); // Booharu: before the panel hears it.
+                        let _ = events.send(AgentEvent::Event { event });
+                    })
+                    .await;
+                chat.remember(agent.context()); // Booharu: see above.
+                anyhow::Ok(answer?)
             }
             .await;
+            chat.finish(&result).await; // Booharu: kept before the panel hears the end.
             let _ = on_event.send(match result {
                 Ok(answer) => AgentEvent::Completed { answer },
                 Err(error) => AgentEvent::Failed {
@@ -105,6 +115,8 @@ pub fn stop_agent(app: State<'_, Arc<App>>, run: u64) {
 #[specta::specta]
 pub fn reset_agent(app: State<'_, Arc<App>>) {
     if let Some(project) = app.project.lock().as_mut() {
+        // Booharu: the chat stays above a divider, and the model forgets it (D18).
+        crate::booharu::agent_history::new_chat(&app, project);
         project.run = None;
         project.conversation = None;
     }
@@ -127,7 +139,13 @@ async fn conversation(app: &App, model: &str) -> anyhow::Result<Arc<tokio::sync:
     let conversation = Arc::new(tokio::sync::Mutex::new(Agent::new(
         tools,
         connected,
-        Context::new(SummaryPrompts::DEFAULT),
+        // Booharu: the conversation kept beside the project goes on (D18).
+        crate::booharu::agent_history::restore(
+            app,
+            &session,
+            Context::new(SummaryPrompts::DEFAULT),
+        )
+        .await,
     )));
     // Kept only while its project is still the open one: one made during a
     // close goes with the run that made it.
