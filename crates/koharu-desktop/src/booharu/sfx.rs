@@ -20,9 +20,10 @@ use crate::{app::App, commands::Result};
 /// layer. An effect with a subtitle answers that one and changes nothing.
 /// An effect with no words to subtitle it with is translated first: one
 /// Translate run on it, with the saved pipeline settings, in subtitle mode,
-/// which adds the subtitle as it writes, answered as the run. Refuses a
-/// layer that isn't a sound effect, and one that is, or is in, a locked
-/// layer.
+/// which adds the subtitle as it writes, answered as the run; one with no
+/// words read either is refused, as the run would have nothing to send, so
+/// it's read again first or given the words. Refuses a layer that isn't a
+/// sound effect, and one that is, or is in, a locked layer.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_add_sfx_subtitle(

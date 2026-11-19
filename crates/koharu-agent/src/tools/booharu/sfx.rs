@@ -23,8 +23,8 @@ pub(super) struct AddSfxSubtitleArgs {
     /// The sound effect's block.
     block: LayerId,
     /// The subtitle's words, 1 to 500 characters once trimmed; left out,
-    /// the effect's own translation, or one made for it first when it has
-    /// none.
+    /// the effect's own translation, or one made for it first from its
+    /// words read when it has none.
     #[serde(default)]
     text: Option<String>,
 }
@@ -50,11 +50,13 @@ impl Tool for AddSfxSubtitle {
          characters once trimmed, else the effect's own translation; with neither, it starts a \
          Translate run on the effect that writes the translation it gets as the subtitle \
          instead of as the effect's translation, or nothing when that only gives the source \
-         back: follow it with wait. Answers `layer`, the subtitle's text layer, or `run`, that \
-         Translate run, the other null. An effect with a subtitle keeps it, and the call \
-         answers that one and changes nothing: to change its words, set its text with edit. \
-         Later translation runs, booharu_redo_boxes included, leave a subtitled effect \
-         untranslated whatever the SFX mode."
+         back: follow it with wait. An effect with no words read yet, a blank source, has \
+         nothing to translate and is refused without `text`: give `text`, or read it again \
+         first with booharu_redo_boxes (`recognize`). Answers `layer`, the subtitle's text \
+         layer, or `run`, that Translate run, the other null. An effect with a subtitle keeps \
+         it, and the call answers that one and changes nothing: to change its words, set its \
+         text with edit. Later translation runs, booharu_redo_boxes included, leave a \
+         subtitled effect untranslated whatever the SFX mode."
             .to_owned()
     }
 
@@ -121,7 +123,7 @@ mod tests {
     };
     use koharu_pipeline::{Pipeline, PipelineConfig, Request, RunId, Stage, Target};
     use koharu_renderer::{Renderer, RendererConfig};
-    use koharu_scene::{Content, Created, Edit, Layer, Session, Text};
+    use koharu_scene::{Content, Created, Edit, Layer, Op, Session, Text};
     use parking_lot::Mutex;
     use serde_json::{Map, json};
 
@@ -361,6 +363,24 @@ mod tests {
             .expect_err("blank words refused");
         assert!(blank.to_string().contains("1 to 500"), "{blank}");
         assert_eq!(steps(&tools), before);
+        assert!(app.started.lock().is_empty());
+        // An effect with no words read has nothing a run could translate.
+        let bang = id("bang");
+        tools
+            .session
+            .lock()
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops: vec![Op::UpdateLayer {
+                    layer: bang.into(),
+                    patch: json!({"source": {"content": ""}}),
+                }],
+            })
+            .expect("a blank source");
+        let unread = add(&tools, json!({"block": bang}))
+            .await
+            .expect_err("an effect with no words read refused");
+        assert!(unread.to_string().contains("no words read yet"), "{unread}");
         assert!(app.started.lock().is_empty());
         // What the schema refuses before the call.
         let schema = AddSfxSubtitle.parameters();

@@ -274,7 +274,8 @@ export const boxActions: readonly BoxAction[] = [
     run: async (selection) => {
       const block = soundEffect(selection)
       if (!block) return
-      // From the effect's translation; with none, a Translate run makes the subtitle as it writes.
+      // From the effect's translation; with none, a Translate run makes the subtitle as it writes,
+      // and an effect with no words read is refused, its error shown as a command's is.
       const { layer, run } = await call(commands.booharuAddSfxSubtitle, block.id, null)
       if (layer !== null) await showLayer(selection.page, layer)
       else if (run !== null) {

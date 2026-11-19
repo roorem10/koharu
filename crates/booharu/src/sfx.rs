@@ -38,7 +38,8 @@ pub enum Subtitle {
     /// apply; [`created`] finds the subtitle in its change.
     Edit(Edit),
     /// No words were given and the effect has no translation to subtitle it
-    /// with: a Translate run in subtitle mode on the effect makes one.
+    /// with, but it has words read: a Translate run in subtitle mode on the
+    /// effect makes one.
     NeedsTranslation,
 }
 
@@ -62,7 +63,8 @@ pub struct SfxSubtitleAnswer {
 /// 1 to [`MAX_TEXT`] characters, or else the effect's own translation when
 /// it isn't blank, give [`Subtitle::Edit`], in the translation's language
 /// unless that is undetermined, else in `target`; with neither, the answer
-/// is [`Subtitle::NeedsTranslation`].
+/// is [`Subtitle::NeedsTranslation`], and a refusal when the effect has no
+/// words read either, as a Translate run would have nothing to send.
 pub fn add_sfx_subtitle(
     project: &Project,
     block: LayerId,
@@ -102,6 +104,13 @@ pub fn add_sfx_subtitle(
         .map(|translation| translation.content.text().trim().to_owned())
         .filter(|words| !words.is_empty());
     let Some(words) = given.or(translated) else {
+        // A translation of no words would end with no subtitle and nothing
+        // said, as the Translation stage sends no blank source.
+        ensure!(
+            !found.source.content.text().trim().is_empty(),
+            "the sound effect has no words read yet, so there's nothing to translate for its \
+             subtitle: read it again first, or give the subtitle's words (layer {block})"
+        );
         return Ok(Subtitle::NeedsTranslation);
     };
     let language = found
@@ -412,6 +421,35 @@ mod tests {
         assert!(matches!(
             fixture.add("bang", None, &all)?,
             Subtitle::NeedsTranslation
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn an_effect_with_no_words_read_takes_only_words_given_or_its_translation() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = LetteringSettings::default();
+        let bang = fixture.id("bang");
+        fixture.edit(vec![Op::UpdateLayer {
+            layer: bang.into(),
+            patch: json!({"source": {"content": "  "}}),
+        }])?;
+        // A Translate run would have nothing to send: refused, saying how
+        // to go on.
+        let refused = fixture.add("bang", None, &settings).unwrap_err();
+        assert!(
+            refused.to_string().contains("has no words read yet"),
+            "{refused}"
+        );
+        // Words given, or a translation, still make one.
+        assert!(matches!(
+            fixture.add("bang", Some("Bang"), &settings)?,
+            Subtitle::Edit(_)
+        ));
+        fixture.translate("bang", "BANG", "en")?;
+        assert!(matches!(
+            fixture.add("bang", None, &settings)?,
+            Subtitle::Edit(_)
         ));
         Ok(())
     }
