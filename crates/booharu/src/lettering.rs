@@ -177,11 +177,13 @@ pub(crate) fn category_ops(
             category,
             source: LetteringSource::User,
             confidence: None,
+            role: None,
         },
         Chooser::Model { confidence } => Lettering {
             category,
             source: LetteringSource::Model,
             confidence,
+            role: None,
         },
     });
     let mut changed = false;
@@ -542,6 +544,7 @@ mod tests {
             category,
             source: LetteringSource::User,
             confidence: None,
+            role: None,
         })
     }
 
@@ -705,6 +708,7 @@ mod tests {
                 category: LetteringCategory::Shout,
                 source: LetteringSource::Model,
                 confidence: Some(0.9),
+                role: None,
             })
         );
         assert_eq!(fixture.font("b")?.0.as_deref(), Some("Comic Sans"));

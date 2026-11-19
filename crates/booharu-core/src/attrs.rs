@@ -16,7 +16,7 @@
 //!   them.
 
 use anyhow::ensure;
-use koharu_scene::{Layer, LayerId, Op, Ref, Rgba};
+use koharu_scene::{Layer, LayerId, Op, Ref, Rgba, Role};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::lettering::LetteringCategory;
@@ -37,10 +37,12 @@ pub trait Attr: Serialize + DeserializeOwned {
 }
 
 /// `lettering`: `{"category": category id, "source": "user" | "model",
-/// "confidence"?: number}`, on a block: its lettering category, such as
-/// `"shout"`, who chose it, and how sure a model was of its choice, from 0
-/// to 1. A user's choice is never replaced by a model's. An id Booharu
-/// doesn't know reads as no label, as a bad value does.
+/// "confidence"?: number, "role"?: "text" | "sfx"}`, on a block: its
+/// lettering category, such as `"shout"`, who chose it, how sure a model was
+/// of its choice, from 0 to 1, and the block's Koharu role before a category
+/// chosen by hand changed it, so choosing Automatic restores it. A user's
+/// choice is never replaced by a model's. An id Booharu doesn't know reads as
+/// no label, as a bad value does.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(deny_unknown_fields)]
 pub struct Lettering {
@@ -48,6 +50,11 @@ pub struct Lettering {
     pub source: LetteringSource,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidence: Option<f32>,
+    /// The block's role before a category chosen by hand changed it, which
+    /// the first such choice records and later ones keep; none when no
+    /// choice changed it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<Role>,
 }
 
 impl Attr for Lettering {
@@ -69,11 +76,12 @@ pub enum LetteringSource {
 
 /// `auto`: `{"origin"?: "agent", "source"?: hash, "text"?: hash, "style"?:
 /// {family, weight, italic, fill, stroke, stroke_width, outer_stroke,
-/// outer_stroke_width}}`, on a block: the hand-edit record, what Booharu's
-/// automatic steps last wrote there, so `styles::edited` tells a hand edit,
-/// a part that now differs, from their own. Hand edits win. Each part is
-/// left out until a step writes it; later stages add their own, such as the
-/// marks and the category they applied, which is why it takes keys it
+/// outer_stroke_width}, "kept"?: true}`, on a block: the hand-edit record,
+/// what Booharu's automatic steps last wrote there, so `styles::edited`
+/// tells a hand edit, a part that now differs, from their own, and whether
+/// Booharu hid its clean-up to keep the original art. Hand edits win. Each
+/// part is left out until a step writes it; later stages add their own, such
+/// as the marks and the category they applied, which is why it takes keys it
 /// doesn't know.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct Auto {
@@ -92,6 +100,12 @@ pub struct Auto {
     /// The style values an automatic step left on the translation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub style: Option<AutoStyle>,
+    /// Whether Booharu hid the block's clean-up to keep the original art:
+    /// a sound effect a run skips, or one given a subtitle (`sfx`). A
+    /// translation, typed or written by a stage, or a line given back,
+    /// drops it; a clean-up hidden with no mark was hidden by hand.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub kept: bool,
 }
 
 impl Attr for Auto {
@@ -371,6 +385,7 @@ mod tests {
             category: LetteringCategory::Shout,
             source: LetteringSource::Model,
             confidence: Some(0.75),
+            role: Some(Role::Text),
         };
         let auto = Auto {
             origin: Origin::Agent,
@@ -381,6 +396,7 @@ mod tests {
                 stroke_width: Some(1.5),
                 ..AutoStyle::default()
             }),
+            kept: true,
         };
         let qc_ok = QcOk(vec!["overflow".to_owned(), "glossary:Shale".to_owned()]);
         let flags = Flags(vec![Flag {
@@ -493,6 +509,7 @@ mod tests {
             category: LetteringCategory::Shout,
             source: LetteringSource::Model,
             confidence: Some(1.5),
+            role: None,
         };
         assert!(set(id, &unsure).is_err());
         assert!(set(id, &OriginalScan(false)).is_err());
@@ -506,5 +523,73 @@ mod tests {
             y: 0.0,
         };
         assert!(set(id, &skew).is_err());
+    }
+
+    #[test]
+    fn the_kept_mark_is_written_only_when_set() {
+        let (_dir, mut session, id) = project();
+        let kept = Auto {
+            kept: true,
+            ..Auto::default()
+        };
+        assert_eq!(json!(kept), json!({"kept": true}));
+        assert_eq!(json!(Auto::default()), json!({}));
+        session
+            .apply(edit(vec![set(id, &kept).expect("the mark")]))
+            .expect("the record");
+        let written = layer(&session, id);
+        assert_eq!(get::<Auto>(&written), Some(kept));
+        assert_eq!(written.attributes[NAMESPACE]["auto"], json!({"kept": true}));
+        // A record with no mark reads as unmarked.
+        let ops = vec![set(id, &Auto::default()).expect("no mark")];
+        session.apply(edit(ops)).expect("the record");
+        assert_eq!(
+            get::<Auto>(&layer(&session, id)).map(|auto| auto.kept),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn a_labels_role_reads_back_and_is_absent_by_default() {
+        let (_dir, mut session, id) = project();
+        let label = Lettering {
+            category: LetteringCategory::Sfx,
+            source: LetteringSource::User,
+            confidence: None,
+            role: Some(Role::Text),
+        };
+        assert_eq!(
+            json!(label),
+            json!({"category": "sfx", "source": "user", "role": "text"})
+        );
+        session
+            .apply(edit(vec![set(id, &label).expect("a label")]))
+            .expect("the label");
+        assert_eq!(get::<Lettering>(&layer(&session, id)), Some(label));
+
+        // A label no hand-picked category changed the role of holds none,
+        // and leaves it out.
+        let raw = Op::SetAttribute {
+            layer: id.into(),
+            namespace: NAMESPACE.to_owned(),
+            key: Lettering::KEY.to_owned(),
+            value: Some(json!({"category": "shout", "source": "model", "confidence": 0.75})),
+        };
+        session.apply(edit(vec![raw])).expect("a model's label");
+        let read = get::<Lettering>(&layer(&session, id)).expect("a label");
+        assert_eq!(read.role, None);
+        assert_eq!(
+            json!(read),
+            json!({"category": "shout", "source": "model", "confidence": 0.75})
+        );
+        // A role Koharu doesn't have reads as no label.
+        let raw = Op::SetAttribute {
+            layer: id.into(),
+            namespace: NAMESPACE.to_owned(),
+            key: Lettering::KEY.to_owned(),
+            value: Some(json!({"category": "shout", "source": "user", "role": "speech"})),
+        };
+        session.apply(edit(vec![raw])).expect("a bad label");
+        assert_eq!(get::<Lettering>(&layer(&session, id)), None);
     }
 }

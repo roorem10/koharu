@@ -2326,6 +2326,7 @@ mod tests {
             category: booharu_core::lettering::LetteringCategory::Shout,
             source: attrs::LetteringSource::User,
             confidence: None,
+            role: None,
         };
         page.session.apply(edit(vec![
             attrs::set(block, &lettering)?,

@@ -439,6 +439,7 @@ mod tests {
             category,
             source: LetteringSource::Model,
             confidence,
+            role: None,
         })
     }
 

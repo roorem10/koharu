@@ -551,6 +551,7 @@ mod tests {
             category,
             source,
             confidence,
+            role: None,
         }
     }
 

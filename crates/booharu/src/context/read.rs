@@ -1753,6 +1753,7 @@ mod tests {
             category: LetteringCategory::Whisper,
             source: LetteringSource::User,
             confidence: None,
+            role: None,
         };
         chapter.edit(vec![attrs::set(chapter.id("a"), &users)?])?;
         let counts = chapter.label_lines(
@@ -1778,6 +1779,7 @@ mod tests {
                 category: LetteringCategory::Shout,
                 source: LetteringSource::Model,
                 confidence: Some(0.3),
+                role: None,
             }),
             "stored"
         );
@@ -1854,6 +1856,7 @@ mod tests {
             category: LetteringCategory::Whisper,
             source: LetteringSource::User,
             confidence: None,
+            role: None,
         };
         chapter.edit(vec![attrs::set(chapter.id("a"), &users)?])?;
         let first = [

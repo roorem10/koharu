@@ -230,7 +230,7 @@ pub fn patched(chars: &CharStyle, patch: &Map<String, Value>) -> Result<CharStyl
 /// counts as typed by hand, while the style values one typed by hand had,
 /// and the run left, stay hand edits. The values the look writes, a
 /// category's family, weight, and italic among them, are recorded as
-/// automatic.
+/// automatic. The record drops the kept mark.
 pub fn translated(
     project: &Project,
     block: LayerId,
@@ -253,26 +253,43 @@ pub fn translated(
         record.style = Some(AutoStyle::default());
     }
     record.text = Some(text_hash(text));
+    // A translation drops the kept mark: its clean-up shows under it.
+    record.kept = false;
     let record = record.restyled(&looked.after, &looked.written);
     let mut ops = Vec::from_iter(looked.op);
     ops.push(attrs::set(layer.id, &record)?);
     Ok(ops)
 }
 
-/// The op giving a translation typed by hand into `block` in `project`, a
+/// The ops giving a translation typed by hand into `block` in `project`, a
 /// block with none, in the Story panel or through the agent, the default
 /// look, its category's font among it while Pick fonts automatically is on,
 /// as [`new_translation`] gives one, after `placed`, placement's op for it,
-/// both read before the edit; none when it writes nothing. It gets no
-/// record: it's hand-made.
+/// both read before the edit; none when they write nothing. It gets no
+/// record of its own: it's hand-made. A block carrying the kept mark has the
+/// record written without it, as the translation shows its clean-up.
 pub fn typed(
     project: &Project,
     block: LayerId,
     placed: &Op,
     settings: &LetteringSettings,
     font: Option<&str>,
-) -> Result<Option<Op>> {
-    Ok(looked(project, block, placed, settings, font)?.op)
+) -> Result<Vec<Op>> {
+    let layer = project.layer(block)?;
+    let mut ops = Vec::from_iter(looked(project, block, placed, settings, font)?.op);
+    let record = Auto::of(layer);
+    if record.kept {
+        let record = Auto {
+            kept: false,
+            ..record
+        };
+        ops.push(if record == Auto::default() {
+            attrs::clear::<Auto>(block)
+        } else {
+            attrs::set(block, &record)?
+        });
+    }
+    Ok(ops)
 }
 
 /// The op recording on `layer`, a block read before the edit, that the
@@ -280,12 +297,14 @@ pub fn typed(
 /// translation, in the stage's edit: the record's translation is no text,
 /// so one typed there later counts as typed by hand, even as the wording
 /// the stage was given, and the record keeps no style or origin, which went
-/// with any translation the block had. Its source part is kept.
+/// with any translation the block had, nor the kept mark, as the stage's
+/// own keeping replaces Booharu's. Its source part is kept.
 pub fn given_back(layer: &Layer) -> Result<Op> {
     let record = Auto {
         origin: Origin::Automatic,
         text: Some(text_hash("")),
         style: None,
+        kept: false,
         ..Auto::of(layer)
     };
     attrs::set(layer.id, &record)
@@ -1211,19 +1230,106 @@ mod tests {
         );
     }
 
+    /// Hides `block`'s clean-up and marks it kept, as Booharu keeps a sound
+    /// effect's art.
+    fn keep(session: &mut Session, block: LayerId) {
+        let record = Auto {
+            kept: true,
+            ..Auto::of(&layer(session, block))
+        };
+        apply(
+            session,
+            vec![
+                Op::UpdateLayer {
+                    layer: block.into(),
+                    patch: json!({"cleanup": {"visible": false}}),
+                },
+                attrs::set(block, &record).expect("the mark"),
+            ],
+        );
+        assert!(Auto::of(&layer(session, block)).kept);
+    }
+
+    #[test]
+    fn a_translation_or_a_line_given_back_drops_the_kept_mark() {
+        let look = settings(true, None, None);
+        // Translated by a stage.
+        let (_dir, mut session, block) = page("ドン", &["detection", "ocr"]);
+        keep(&mut session, block);
+        translate(&mut session, block, "BOOM", &look, None);
+        assert!(!Auto::of(&layer(&session, block)).kept);
+
+        // Typed by hand: no record of its own, so a record holding nothing
+        // but the mark goes, and one holding more keeps the rest.
+        let (_dir, mut session, block) = page("ドン", &["detection", "ocr"]);
+        keep(&mut session, block);
+        let ops = typed(
+            &session.project(),
+            block,
+            &placement(&session, block),
+            &look,
+            None,
+        )
+        .expect("the ops");
+        assert_eq!(
+            json!(ops),
+            json!([attrs::clear::<Auto>(block)]),
+            "the look writes nothing here, so the mark's removal alone"
+        );
+        let read = recognized(&layer(&session, block), "ドン").expect("the record");
+        apply(&mut session, vec![read]);
+        assert!(Auto::of(&layer(&session, block)).kept, "reading keeps it");
+        let ops = typed(
+            &session.project(),
+            block,
+            &placement(&session, block),
+            &look,
+            None,
+        )
+        .expect("the ops");
+        apply(&mut session, ops);
+        assert_eq!(
+            attrs::get::<Auto>(&layer(&session, block)),
+            Some(Auto {
+                source: Some(text_hash("ドン")),
+                ..Auto::default()
+            })
+        );
+        // With no mark, a typed translation writes no record at all.
+        let ops = typed(
+            &session.project(),
+            block,
+            &placement(&session, block),
+            &look,
+            None,
+        )
+        .expect("the ops");
+        assert!(ops.is_empty(), "{ops:?}");
+
+        // Given back.
+        let (_dir, mut session, block) = page("ドン", &["detection", "ocr"]);
+        keep(&mut session, block);
+        let given = given_back(&layer(&session, block)).expect("the record");
+        apply(&mut session, vec![given]);
+        let found = layer(&session, block);
+        assert!(!Auto::of(&found).kept);
+        assert_eq!(Auto::of(&found).text, Some(text_hash("")));
+    }
+
     #[test]
     fn a_typed_translation_gets_the_look_and_no_record() {
         let (_dir, session, block) = page("どうして", &["detection", "ocr"]);
         let look = settings(false, Some(RED), None);
-        let op = typed(
+        let mut ops = typed(
             &session.project(),
             block,
             &placement(&session, block),
             &look,
             Some("CCWildWords"),
         )
-        .expect("the look")
-        .expect("an op");
+        .expect("the look");
+        assert_eq!(ops.len(), 1, "the look alone, and no record: {ops:?}");
+        let op = ops.remove(0);
         let Op::UpdateLayer { patch, .. } = op else {
             panic!("{op:?}");
         };
@@ -1243,7 +1349,7 @@ mod tests {
                 None
             )
             .expect("the look")
-            .is_none()
+            .is_empty()
         );
         // Placement's op for another layer is refused.
         let other = Op::UpdateLayer {
@@ -1282,6 +1388,7 @@ mod tests {
             category,
             source: attrs::LetteringSource::User,
             confidence: None,
+            role: None,
         };
         apply(session, vec![attrs::set(block, &label).expect("a label")]);
     }
@@ -1399,7 +1506,7 @@ mod tests {
         )
         .expect("the look");
         assert_eq!(
-            op.map(|op| json!(op)["patch"].clone()),
+            op.first().map(|op| json!(op)["patch"].clone()),
             Some(json!({"translation": {"style": {"chars": {"family": "CCWildWords"}}}}))
         );
         // A typed translation gets the category's font with it on.
@@ -1413,7 +1520,7 @@ mod tests {
         )
         .expect("the look");
         assert_eq!(
-            op.map(|op| json!(op)["patch"].clone()),
+            op.first().map(|op| json!(op)["patch"].clone()),
             Some(json!({"translation": {"style": {"chars": {
                 "family": "Badaboom BB", "weight": 700, "italic": true,
             }}}}))
