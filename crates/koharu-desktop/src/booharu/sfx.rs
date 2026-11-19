@@ -23,7 +23,8 @@ use crate::{app::App, commands::Result};
 /// which adds the subtitle as it writes, answered as the run; one with no
 /// words read either is refused, as the run would have nothing to send, so
 /// it's read again first or given the words. Refuses a layer that isn't a
-/// sound effect, and one that is, or is in, a locked layer.
+/// sound effect, one that is, or is in, a locked layer, and one whose source
+/// has no box to put the subtitle beside.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_add_sfx_subtitle(

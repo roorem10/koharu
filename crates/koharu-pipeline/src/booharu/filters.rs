@@ -283,8 +283,9 @@ impl Writing {
 
     /// The ops giving the sound effect `layer` on `page` its answer `text`,
     /// in `language`, as its subtitle: none when it's locked now, counted;
-    /// when it got a subtitle since the read; or when the answer is its
-    /// source, both trimmed, which leaves it as it is.
+    /// when it got a subtitle since the read; when the answer is its source,
+    /// both trimmed; or when its source has no box to put one beside, as
+    /// Add subtitle refuses one; each leaves it as it is.
     fn subtitle(
         &self,
         page: &Page,
@@ -299,7 +300,10 @@ impl Writing {
             self.left.count(&self.member, Reason::Locked);
             return Ok(None);
         }
-        if sfx::subtitled(page, layer.id) || text.trim() == block.source.content.text().trim() {
+        if sfx::subtitled(page, layer.id)
+            || text.trim() == block.source.content.text().trim()
+            || block.source.bounds().is_none()
+        {
             return Ok(None);
         }
         let booharu = &self.left.0.booharu;
@@ -1284,6 +1288,44 @@ mod tests {
             skipped(&events.told()),
             [(Stage::Translate, 2, 0, 1, false)]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_subtitle_run_leaves_an_effect_whose_source_lost_its_box_as_it_is() -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("effect", None, 0, block("sfx", (20.0, 20.0))),
+                add("talk", None, 1, block("text", (80.0, 20.0))),
+            ],
+        )?;
+        let events = Events::new();
+        let left = Left::of(
+            Stage::Translate,
+            snapshot(SfxMode::Skip, false, true),
+            events.clone(),
+        );
+        let member = fixture.member(Some(&["effect", "talk"]));
+        assert_eq!(left.sent(&member).blocks, member.blocks);
+        // While the model ran, the effect's source became point text, with
+        // no box to put a subtitle beside.
+        fixture.op(json!({"op": "update_layer", "layer": fixture.id("effect"),
+            "patch": {"source": {"frame": "point"}}}))?;
+        let said = answers(&fixture, &[("effect", "BAM"), ("talk", "Why?")]);
+        // No error to fail the page's edit, which the run would retry.
+        let ops = left.writing(&member).written(
+            &fixture.project(),
+            said,
+            &TranslatorConfig::default(),
+        )?;
+        fixture.edit(ops)?;
+        let page = fixture.page()?;
+        assert_eq!(sfx::subtitle_of(&page, fixture.id("effect")), None);
+        assert_eq!(fixture.translation("effect")?, None);
+        assert!(fixture.block("effect")?.cleanup.visible, "as it was");
+        // The page's other answers are written.
+        assert_eq!(fixture.translation("talk")?.as_deref(), Some("Why?"));
         Ok(())
     }
 

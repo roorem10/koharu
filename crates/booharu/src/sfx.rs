@@ -59,7 +59,8 @@ pub struct SfxSubtitleAnswer {
 /// It refuses a layer that isn't a block, a block that isn't a sound effect
 /// (`sfx::sound_effect`), and a block that is locked or inside a locked
 /// layer ([`crate::boxes::Refusal::Locked`]). An effect with a subtitle
-/// answers [`Subtitle::Existing`]. Otherwise the words `text`, trimmed and
+/// answers [`Subtitle::Existing`]; else one whose source has no box to put a
+/// subtitle beside is refused. Otherwise the words `text`, trimmed and
 /// 1 to [`MAX_TEXT`] characters, or else the effect's own translation when
 /// it isn't blank, give [`Subtitle::Edit`], in the translation's language
 /// unless that is undetermined, else in `target`; with neither, the answer
@@ -86,6 +87,12 @@ pub fn add_sfx_subtitle(
     if let Some(existing) = sfx::subtitle_of(page, block) {
         return Ok(Subtitle::Existing(existing));
     }
+    // Refused before a run is queued, whose subtitle would find no place
+    // either.
+    ensure!(
+        found.source.bounds().is_some(),
+        "the sound effect's source has no box to put a subtitle beside (layer {block})"
+    );
     let given = match &text {
         Some(text) => {
             let text = text.trim();
@@ -451,6 +458,26 @@ mod tests {
             fixture.add("bang", None, &settings)?,
             Subtitle::Edit(_)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn an_effect_whose_source_has_no_box_is_refused_before_any_run() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = LetteringSettings::default();
+        let bang = fixture.id("bang");
+        fixture.edit(vec![Op::UpdateLayer {
+            layer: bang.into(),
+            patch: json!({"source": {"frame": "point"}}),
+        }])?;
+        // With words given, and with none, which would queue a run.
+        for text in [Some("Bang"), None] {
+            let refused = fixture.add("bang", text, &settings).unwrap_err();
+            assert!(
+                refused.to_string().contains("no box"),
+                "{text:?}: {refused}"
+            );
+        }
         Ok(())
     }
 

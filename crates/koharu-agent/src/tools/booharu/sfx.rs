@@ -46,17 +46,18 @@ impl Tool for AddSfxSubtitle {
          art shows. Use it for a sound effect worth explaining that should stay drawn, as the \
          SFX mode (`sfx` in `booharu-lettering`) keeps sound effects by default. `block` is the \
          effect: a block whose lettering category is `sfx`, as booharu_get_text_styles tells \
-         it, neither locked nor in a locked layer. The words are `text` when given, 1 to 500 \
-         characters once trimmed, else the effect's own translation; with neither, it starts a \
-         Translate run on the effect that writes the translation it gets as the subtitle \
-         instead of as the effect's translation, or nothing when that only gives the source \
-         back: follow it with wait. An effect with no words read yet, a blank source, has \
-         nothing to translate and is refused without `text`: give `text`, or read it again \
-         first with booharu_redo_boxes (`recognize`). Answers `layer`, the subtitle's text \
-         layer, or `run`, that Translate run, the other null. An effect with a subtitle keeps \
-         it, and the call answers that one and changes nothing: to change its words, set its \
-         text with edit. Later translation runs, booharu_redo_boxes included, leave a \
-         subtitled effect untranslated whatever the SFX mode."
+         it, neither locked nor in a locked layer, whose source has a box to put the subtitle \
+         beside. The words are `text` when given, 1 to 500 characters once trimmed, else the \
+         effect's own translation; with neither, it starts a Translate run on the effect that \
+         writes the translation it gets as the subtitle instead of as the effect's \
+         translation, or nothing when that only gives the source back: follow it with wait. \
+         An effect with no words read yet, a blank source, has nothing to translate and is \
+         refused without `text`: give `text`, or read it again first with booharu_redo_boxes \
+         (`recognize`). Answers `layer`, the subtitle's text layer, or `run`, that Translate \
+         run, the other null. An effect with a subtitle keeps it, and the call answers that \
+         one and changes nothing: to change its words, set its text with edit. Later \
+         translation runs, booharu_redo_boxes included, leave a subtitled effect untranslated \
+         whatever the SFX mode."
             .to_owned()
     }
 
