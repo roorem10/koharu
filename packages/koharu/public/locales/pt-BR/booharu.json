@@ -32,7 +32,21 @@
       "join": "Unir ao balão",
       "joinPage": "Unir textos divididos nesta página",
       "read": "Refazer OCR",
+      "reset": "Redefinir para o padrão de letreiramento",
+      "resetAlready": "O padrão de letreiramento já está aplicado",
+      "resetDone_many": "{{count}} caixas redefinidas para o padrão de letreiramento",
+      "resetDone_one": "{{count}} caixa redefinida para o padrão de letreiramento",
+      "resetDone_other": "{{count}} caixas redefinidas para o padrão de letreiramento",
+      "resetLocked_many": "{{count}} caixas bloqueadas ficaram como estavam.",
+      "resetLocked_one": "{{count}} caixa bloqueada ficou como estava.",
+      "resetLocked_other": "{{count}} caixas bloqueadas ficaram como estavam.",
+      "resetNone": "Nada foi redefinido",
+      "resetUntranslated_many": "{{count}} caixas não têm tradução para redefinir.",
+      "resetUntranslated_one": "{{count}} caixa não tem tradução para redefinir.",
+      "resetUntranslated_other": "{{count}} caixas não têm tradução para redefinir.",
       "split": "Dividir",
+      "subtitle": "Adicionar legenda",
+      "subtitleTranslating": "Traduzindo o efeito sonoro para a legenda…",
       "translate": "Traduzir novamente"
     },
     "context": {
@@ -568,6 +582,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Adicionar caixa de texto",
+      "booharu_add_sfx_subtitle": "Adicionar legenda de efeito sonoro",
       "booharu_apply_text_style": "Aplicar estilo de texto",
       "booharu_clear_qc_ok": "Desfazer OK",
       "booharu_dismiss_flag": "Dispensar alerta de revisão",
@@ -576,6 +591,7 @@
       "booharu_join_page": "Unir textos divididos",
       "booharu_mark_qc_ok": "Marcar apontamento como OK",
       "booharu_read_chapter": "Ler capítulo",
+      "booharu_reset_lettering": "Redefinir para o padrão de letreiramento",
       "booharu_set_lettering_category": "Alterar categoria de letreiramento",
       "booharu_set_review_note": "Editar nota",
       "booharu_set_translation": "Adicionar tradução",

@@ -67,6 +67,8 @@ describe('Booharu Box details', () => {
       'Clean again',
       'Join with balloon',
       'Split',
+      'Add subtitle',
+      'Reset to lettering default',
     ])
     await user.click(actions.getByRole('button', { name: 'Split' }))
     await waitFor(() => expect(split).toHaveBeenCalledWith('second'))

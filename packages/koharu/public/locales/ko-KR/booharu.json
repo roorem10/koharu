@@ -29,7 +29,18 @@
       "join": "말풍선과 합치기",
       "joinPage": "이 페이지의 분할된 텍스트 합치기",
       "read": "OCR 다시 수행",
+      "reset": "레터링 기본값으로 초기화",
+      "resetAlready": "이미 레터링 기본값입니다",
+      "resetDone_one": "상자 {{count}}개를 레터링 기본값으로 초기화했습니다",
+      "resetDone_other": "상자 {{count}}개를 레터링 기본값으로 초기화했습니다",
+      "resetLocked_one": "잠긴 상자 {{count}}개는 그대로 두었습니다.",
+      "resetLocked_other": "잠긴 상자 {{count}}개는 그대로 두었습니다.",
+      "resetNone": "초기화한 상자가 없습니다",
+      "resetUntranslated_one": "상자 {{count}}개는 아직 번역이 없어 초기화할 것이 없습니다.",
+      "resetUntranslated_other": "상자 {{count}}개는 아직 번역이 없어 초기화할 것이 없습니다.",
       "split": "분할",
+      "subtitle": "자막 추가",
+      "subtitleTranslating": "자막을 달기 위해 효과음을 번역하는 중…",
       "translate": "다시 번역"
     },
     "context": {
@@ -529,6 +540,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "텍스트 상자 추가",
+      "booharu_add_sfx_subtitle": "효과음 자막 추가",
       "booharu_apply_text_style": "글꼴 서식 적용",
       "booharu_clear_qc_ok": "OK 표시 취소",
       "booharu_dismiss_flag": "검토 플래그 무시",
@@ -537,6 +549,7 @@
       "booharu_join_page": "분할된 텍스트 합치기",
       "booharu_mark_qc_ok": "검사 결과를 OK로 표시",
       "booharu_read_chapter": "챕터 읽기",
+      "booharu_reset_lettering": "레터링 기본값으로 초기화",
       "booharu_set_lettering_category": "레터링 범주 변경",
       "booharu_set_review_note": "메모 편집",
       "booharu_set_translation": "번역 추가",

@@ -11,6 +11,7 @@ import { call } from '@/lib/backend'
 import { reviewNote } from '@/lib/booharu/attrs'
 import { boxActions, runBoxAction, type Box } from '@/lib/booharu/boxActions'
 import { showInStory } from '@/lib/booharu/boxDetails'
+import { useLettering } from '@/lib/booharu/boxLettering'
 import { explainSection } from '@/lib/booharu/explain'
 import { qcSection } from '@/lib/booharu/qc'
 import { isBlockLayer, plainText } from '@/lib/document'
@@ -164,10 +165,12 @@ function NoteSection({ box: { layer, locked } }: BoxDetailsProps) {
 }
 
 /** The text's box actions, as its menus list them, those that open Box details left out: Box
- * details itself, and Change category and Explain this line, whose sections are here. */
+ * details itself, and Change category and Explain this line, whose sections are here. They follow
+ * the page's lettering, as the menus do. */
 function ActionsSection({ page, box }: BoxDetailsProps) {
   const { t } = useTranslation()
-  const selection = { page, boxes: [box] }
+  const lettering = useLettering(page).data
+  const selection = { page, boxes: [box], lettering }
   return (
     <div className='flex flex-wrap gap-1.5'>
       {boxActions

@@ -32,7 +32,21 @@
       "join": "Fusionner avec la bulle",
       "joinPage": "Fusionner les textes divisés de cette page",
       "read": "Relire",
+      "reset": "Rétablir le style de lettrage par défaut",
+      "resetAlready": "Le style de lettrage par défaut est déjà appliqué",
+      "resetDone_many": "{{count}} zones rétablies au style de lettrage par défaut",
+      "resetDone_one": "{{count}} zone rétablie au style de lettrage par défaut",
+      "resetDone_other": "{{count}} zones rétablies au style de lettrage par défaut",
+      "resetLocked_many": "{{count}} zones verrouillées sont restées telles quelles.",
+      "resetLocked_one": "{{count}} zone verrouillée est restée telle quelle.",
+      "resetLocked_other": "{{count}} zones verrouillées sont restées telles quelles.",
+      "resetNone": "Rien n’a été rétabli",
+      "resetUntranslated_many": "{{count}} zones n’ont pas de traduction à rétablir.",
+      "resetUntranslated_one": "{{count}} zone n’a pas de traduction à rétablir.",
+      "resetUntranslated_other": "{{count}} zones n’ont pas de traduction à rétablir.",
       "split": "Diviser",
+      "subtitle": "Ajouter un sous-titre",
+      "subtitleTranslating": "Traduction de l’effet sonore pour son sous-titre…",
       "translate": "Retraduire"
     },
     "context": {
@@ -568,6 +582,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Ajouter une zone de texte",
+      "booharu_add_sfx_subtitle": "Ajouter un sous-titre d’effet sonore",
       "booharu_apply_text_style": "Appliquer le style de texte",
       "booharu_clear_qc_ok": "Retirer la marque OK",
       "booharu_dismiss_flag": "Ignorer le signalement",
@@ -576,6 +591,7 @@
       "booharu_join_page": "Fusionner les textes divisés",
       "booharu_mark_qc_ok": "Marquer le résultat comme OK",
       "booharu_read_chapter": "Lire le chapitre",
+      "booharu_reset_lettering": "Rétablir le style de lettrage par défaut",
       "booharu_set_lettering_category": "Modifier la catégorie de lettrage",
       "booharu_set_review_note": "Modifier la note",
       "booharu_set_translation": "Ajouter une traduction",

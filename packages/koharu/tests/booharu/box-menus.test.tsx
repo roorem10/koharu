@@ -46,7 +46,9 @@ const boxItems = [
   'Clean again',
   'Join with balloon',
   'Split',
+  'Add subtitle',
   'Change category…',
+  'Reset to lettering default',
   'Explain this line',
   'Box details',
   'Join split texts on this page',
@@ -68,7 +70,9 @@ describe('Booharu box actions in the menus', () => {
       ['Clean again', true],
       ['Join with balloon', true],
       ['Split', true],
+      ['Add subtitle', false],
       ['Change category…', true],
+      ['Reset to lettering default', false],
       ['Explain this line', true],
       ['Box details', true],
       ['Delete', true],
@@ -80,10 +84,12 @@ describe('Booharu box actions in the menus', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Join with balloon' }))
     await waitFor(() => expect(join).toHaveBeenCalledWith('second'))
 
-    // A text layer has nothing to read, translate, clean, join, split or explain, and no category;
-    // a locked block takes no change, though its line can be explained.
+    // A text layer has nothing to read, translate, clean, join, split or explain, and no category,
+    // though its look can be reset; a locked block takes no change, though its line can be
+    // explained.
     await openRow(user, 'Caption')
     expect((await items()).filter(([, on]) => on).map(([name]) => name)).toEqual([
+      'Reset to lettering default',
       'Box details',
       'Delete',
     ])
@@ -93,6 +99,39 @@ describe('Booharu box actions in the menus', () => {
       'Explain this line',
       'Box details',
     ])
+  })
+
+  it("offers Add subtitle on a sound effect once the page's lettering is read", async () => {
+    const { lettering, subtitle } = desktop()
+    lettering.mockResolvedValue([
+      {
+        block: 'bang',
+        category: 'sfx',
+        reason: 'sfx',
+        label: null,
+        shape: null,
+        hand_edited: false,
+      },
+    ])
+    openProject(boxesPage())
+    const user = userEvent.setup()
+    show(<StoryPanel />)
+
+    await openRow(user, 'Bang')
+    const item = await screen.findByRole('menuitem', { name: 'Add subtitle' })
+    await waitFor(() => expect(item).not.toHaveAttribute('aria-disabled', 'true'))
+    expect(lettering).toHaveBeenCalledWith('page')
+    fireEvent.click(item)
+    await waitFor(() => expect(subtitle).toHaveBeenCalledWith('bang', null))
+    // The subtitle is selected, as the canvas shows its page.
+    await waitFor(() => expect(useKoharuStore.getState().selectedLayers).toEqual(['bang-subtitle']))
+
+    // A text the lettering doesn't call a sound effect takes none.
+    await openRow(user, 'lo')
+    expect(await screen.findByRole('menuitem', { name: 'Add subtitle' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
   })
 
   it("sends a Story row's Translate through Redo boxes, which asks before it overwrites", async () => {
@@ -140,12 +179,18 @@ describe('Booharu box actions in the menus', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Split' }))
     await waitFor(() => expect(split).toHaveBeenCalledWith('first'))
 
-    // Two texts: the runs only, over both blocks.
+    // Three texts: the runs, over the blocks, and Reset, which the text layer takes.
     useKoharuStore.getState().selectLayers(['free', 'caption', 'alone'])
     await openEdit(user)
     expect(
       (await items()).filter(([name, on]) => on && boxItems.includes(name)).map(([name]) => name),
-    ).toEqual(['Read again', 'Translate again', 'Clean again', 'Join split texts on this page'])
+    ).toEqual([
+      'Read again',
+      'Translate again',
+      'Clean again',
+      'Reset to lettering default',
+      'Join split texts on this page',
+    ])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Read again' }))
     await waitFor(() =>
       expect(redo).toHaveBeenLastCalledWith(['free', 'alone'], ['recognize'], false),

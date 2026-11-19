@@ -29,7 +29,18 @@
       "join": "合併至對白框",
       "joinPage": "合併此頁上分割的文字",
       "read": "重新辨識",
+      "reset": "重設為排字類別預設樣式",
+      "resetAlready": "已是排字類別預設樣式",
+      "resetDone_one": "已將 {{count}} 個文字框重設為排字類別預設樣式",
+      "resetDone_other": "已將 {{count}} 個文字框重設為排字類別預設樣式",
+      "resetLocked_one": "{{count}} 個已鎖定的文字框保持不變。",
+      "resetLocked_other": "{{count}} 個已鎖定的文字框保持不變。",
+      "resetNone": "沒有重設任何文字框",
+      "resetUntranslated_one": "{{count}} 個文字框還沒有譯文，無需重設。",
+      "resetUntranslated_other": "{{count}} 個文字框還沒有譯文，無需重設。",
       "split": "分割",
+      "subtitle": "新增字幕",
+      "subtitleTranslating": "正在翻譯音效，以便新增字幕…",
       "translate": "重新翻譯"
     },
     "context": {
@@ -529,6 +540,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "新增文字框",
+      "booharu_add_sfx_subtitle": "新增音效字幕",
       "booharu_apply_text_style": "套用文字樣式",
       "booharu_clear_qc_ok": "移除 OK 標記",
       "booharu_dismiss_flag": "忽略待複查標記",
@@ -537,6 +549,7 @@
       "booharu_join_page": "合併分割的文字",
       "booharu_mark_qc_ok": "將檢查結果標記為 OK",
       "booharu_read_chapter": "閱讀章節",
+      "booharu_reset_lettering": "重設為排字類別預設樣式",
       "booharu_set_lettering_category": "變更排字類別",
       "booharu_set_review_note": "編輯備註",
       "booharu_set_translation": "新增譯文",

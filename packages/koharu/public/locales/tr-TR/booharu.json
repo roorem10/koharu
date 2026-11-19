@@ -29,7 +29,18 @@
       "join": "Balonla birleştir",
       "joinPage": "Bu sayfadaki bölünmüş metinleri birleştir",
       "read": "Yeniden oku",
+      "reset": "Dizgi kategorisinin varsayılan stiline sıfırla",
+      "resetAlready": "Dizgi kategorisinin varsayılan stili zaten uygulanmış",
+      "resetDone_one": "{{count}} kutu dizgi kategorisinin varsayılan stiline sıfırlandı",
+      "resetDone_other": "{{count}} kutu dizgi kategorisinin varsayılan stiline sıfırlandı",
+      "resetLocked_one": "Kilitli {{count}} kutu olduğu gibi bırakıldı.",
+      "resetLocked_other": "Kilitli {{count}} kutu olduğu gibi bırakıldı.",
+      "resetNone": "Hiçbir şey sıfırlanmadı",
+      "resetUntranslated_one": "{{count}} kutunun sıfırlanacak çevirisi yok.",
+      "resetUntranslated_other": "{{count}} kutunun sıfırlanacak çevirisi yok.",
       "split": "Böl",
+      "subtitle": "Altyazı ekle",
+      "subtitleTranslating": "Altyazısı için ses efekti çevriliyor…",
       "translate": "Yeniden çevir"
     },
     "context": {
@@ -529,6 +540,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Metin kutusu ekle",
+      "booharu_add_sfx_subtitle": "Ses efekti altyazısı ekle",
       "booharu_apply_text_style": "Metin stilini uygula",
       "booharu_clear_qc_ok": "Sorunsuz işaretini kaldır",
       "booharu_dismiss_flag": "İnceleme uyarısını reddet",
@@ -537,6 +549,7 @@
       "booharu_join_page": "Bölünmüş metinleri birleştir",
       "booharu_mark_qc_ok": "Bulguyu sorunsuz işaretle",
       "booharu_read_chapter": "Bölümü oku",
+      "booharu_reset_lettering": "Dizgi kategorisinin varsayılan stiline sıfırla",
       "booharu_set_lettering_category": "Dizgi kategorisini değiştir",
       "booharu_set_review_note": "Notu düzenle",
       "booharu_set_translation": "Çeviri ekle",

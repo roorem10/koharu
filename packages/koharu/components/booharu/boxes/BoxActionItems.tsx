@@ -13,6 +13,7 @@ import {
   selectedBoxes,
   type BoxSelection,
 } from '@/lib/booharu/boxActions'
+import { useLettering } from '@/lib/booharu/boxLettering'
 import { pageKey, usePageStory } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type LayerId, type Page, type PageId } from '@koharu/ipc/protocol'
@@ -22,7 +23,8 @@ import { cn } from '@koharu/ui/lib/utils'
 type ItemProps = ComponentProps<typeof DropdownMenuItem>
 
 /** The box actions for `selection`, each an `Item` of the menu it sits in, disabled where it can't
- * act, or while the selection is still unknown. */
+ * act, or while the selection is still unknown. The page's lettering is read while the menu shows,
+ * so an action that needs a block's category, Add subtitle, follows it. */
 function ActionItems({
   selection,
   Item,
@@ -31,14 +33,16 @@ function ActionItems({
   Item: ComponentType<ItemProps>
 }) {
   const { t } = useTranslation()
+  const lettering = useLettering(selection?.page).data
+  const lettered = useMemo(() => selection && { ...selection, lettering }, [selection, lettering])
   return (
     <>
       {boxActions.map((action) => (
         <Item
           key={action.id}
-          disabled={!selection || !action.enabled(selection)}
+          disabled={!lettered || !action.enabled(lettered)}
           onClick={() => {
-            if (selection) runBoxAction(action, selection)
+            if (lettered) runBoxAction(action, lettered)
           }}
         >
           {t(action.label)}

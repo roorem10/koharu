@@ -29,7 +29,18 @@
       "join": "フキダシと結合",
       "joinPage": "このページの分割されたテキストを結合",
       "read": "OCRを再実行",
+      "reset": "写植カテゴリの既定値に戻す",
+      "resetAlready": "すでに写植カテゴリの既定値です",
+      "resetDone_one": "{{count}}個のボックスを写植カテゴリの既定値に戻しました",
+      "resetDone_other": "{{count}}個のボックスを写植カテゴリの既定値に戻しました",
+      "resetLocked_one": "ロック中の{{count}}個のボックスはそのままです。",
+      "resetLocked_other": "ロック中の{{count}}個のボックスはそのままです。",
+      "resetNone": "何も戻しませんでした",
+      "resetUntranslated_one": "{{count}}個のボックスにはまだ翻訳がないため、戻すものはありません。",
+      "resetUntranslated_other": "{{count}}個のボックスにはまだ翻訳がないため、戻すものはありません。",
       "split": "分割",
+      "subtitle": "字幕を追加",
+      "subtitleTranslating": "字幕を付けるため、効果音を翻訳しています…",
       "translate": "再翻訳"
     },
     "context": {
@@ -529,6 +540,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "テキストボックスを追加",
+      "booharu_add_sfx_subtitle": "効果音の字幕を追加",
       "booharu_apply_text_style": "書式を適用",
       "booharu_clear_qc_ok": "OKを取り消す",
       "booharu_dismiss_flag": "要確認フラグを解除",
@@ -537,6 +549,7 @@
       "booharu_join_page": "分割されたテキストを結合",
       "booharu_mark_qc_ok": "指摘をOKにする",
       "booharu_read_chapter": "章を読み込む",
+      "booharu_reset_lettering": "写植カテゴリの既定値に戻す",
       "booharu_set_lettering_category": "写植カテゴリを変更",
       "booharu_set_review_note": "メモを編集",
       "booharu_set_translation": "翻訳を追加",

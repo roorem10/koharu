@@ -32,7 +32,21 @@
       "join": "Unir con el globo",
       "joinPage": "Unir los textos divididos de esta página",
       "read": "Volver a leer",
+      "reset": "Restablecer al estilo predeterminado de rotulación",
+      "resetAlready": "El estilo predeterminado de rotulación ya está aplicado",
+      "resetDone_many": "{{count}} cuadros restablecidos al estilo predeterminado de rotulación",
+      "resetDone_one": "{{count}} cuadro restablecido al estilo predeterminado de rotulación",
+      "resetDone_other": "{{count}} cuadros restablecidos al estilo predeterminado de rotulación",
+      "resetLocked_many": "{{count}} cuadros bloqueados se quedaron como estaban.",
+      "resetLocked_one": "{{count}} cuadro bloqueado se quedó como estaba.",
+      "resetLocked_other": "{{count}} cuadros bloqueados se quedaron como estaban.",
+      "resetNone": "No se restableció nada",
+      "resetUntranslated_many": "{{count}} cuadros no tienen traducción que restablecer.",
+      "resetUntranslated_one": "{{count}} cuadro no tiene traducción que restablecer.",
+      "resetUntranslated_other": "{{count}} cuadros no tienen traducción que restablecer.",
       "split": "Dividir",
+      "subtitle": "Añadir subtítulo",
+      "subtitleTranslating": "Traduciendo el efecto de sonido para su subtítulo…",
       "translate": "Volver a traducir"
     },
     "context": {
@@ -568,6 +582,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Añadir cuadro de texto",
+      "booharu_add_sfx_subtitle": "Añadir subtítulo de efecto de sonido",
       "booharu_apply_text_style": "Aplicar estilo de texto",
       "booharu_clear_qc_ok": "Desmarcar OK",
       "booharu_dismiss_flag": "Descartar aviso de revisión",
@@ -576,6 +591,7 @@
       "booharu_join_page": "Unir textos divididos",
       "booharu_mark_qc_ok": "Marcar resultado como OK",
       "booharu_read_chapter": "Leer capítulo",
+      "booharu_reset_lettering": "Restablecer al estilo predeterminado de rotulación",
       "booharu_set_lettering_category": "Cambiar categoría de rotulación",
       "booharu_set_review_note": "Editar nota",
       "booharu_set_translation": "Añadir traducción",

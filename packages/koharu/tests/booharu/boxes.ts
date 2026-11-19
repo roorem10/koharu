@@ -81,8 +81,9 @@ export const change = {
   history: { steps: [], current: 0 },
 } as Change
 
-/** Every command answered without the desktop, each edit answering `change`, and Redo boxes
- * finding no box fixed by hand or locked. */
+/** Every command answered without the desktop, each edit answering `change`, Redo boxes finding no
+ * box fixed by hand or locked, Add subtitle answering the subtitle "bang-subtitle", and Reset to
+ * lettering default resetting one text. */
 export function desktop() {
   const table = commands as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
   for (const name of Object.keys(table)) vi.spyOn(table, name).mockResolvedValue(null)
@@ -102,6 +103,12 @@ export function desktop() {
       run: 2,
     }),
     note: vi.spyOn(commands, 'booharuSetReviewNote').mockResolvedValue(change),
+    subtitle: vi
+      .spyOn(commands, 'booharuAddSfxSubtitle')
+      .mockResolvedValue({ layer: 'bang-subtitle', run: null }),
+    reset: vi
+      .spyOn(commands, 'booharuResetLettering')
+      .mockResolvedValue({ changed: 1, locked: 0, untranslated: 0 }),
     lettering: vi.spyOn(commands, 'booharuGetLettering').mockResolvedValue([]),
     findSplit: vi
       .spyOn(commands, 'booharuFindSplitBalloons')

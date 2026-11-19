@@ -1,7 +1,7 @@
 'use client'
 
 import { call } from '@/lib/backend'
-import { openBoxDetails } from '@/lib/booharu/boxDetails'
+import { openBoxDetails, showLayer } from '@/lib/booharu/boxDetails'
 import { fetchLettering } from '@/lib/booharu/boxLettering'
 import { openExplanation } from '@/lib/booharu/explain'
 import { redoBoxes } from '@/lib/booharu/redo'
@@ -15,15 +15,19 @@ import {
   type BlockLayer,
   type TextLayer,
 } from '@/lib/document'
+import i18n from '@/lib/i18n'
 import { useKoharuStore } from '@/lib/store'
 import {
   commands,
+  type BlockLettering,
   type Layer,
   type LayerId,
   type PageId,
+  type ResetCounts,
   type SplitBalloon,
   type Stage,
 } from '@koharu/ipc/protocol'
+import { toast } from '@koharu/ui/components/toast'
 
 /** A text a box action acts on: a block, or a text layer; the layer holding it, null at the page's
  * top level; and whether it, or a layer holding it, is locked, which refuses every edit and run
@@ -34,10 +38,13 @@ export interface Box {
   locked: boolean
 }
 
-/** What a box action acts on: texts of one page. */
+/** What a box action acts on: texts of one page, with the page's lettering, by block, as the views
+ * last read it through `useLettering`; undefined while it isn't known, which leaves an action that
+ * needs a block's category, Add subtitle, off. */
 export interface BoxSelection {
   page: PageId
   boxes: Box[]
+  lettering?: ReadonlyMap<LayerId, BlockLettering>
 }
 
 /** The texts `selected` names among `layers`, a page's, in its order and each once: blocks and
@@ -152,6 +159,45 @@ function categorized(selection: BoxSelection): BlockLayer | null {
   return box && !box.locked && isBlockLayer(box.layer) ? box.layer : null
 }
 
+/** The selection's one sound effect a subtitle can go beside, or none: a block whose category, as
+ * its page's lettering says, is `sfx`, which the desktop's rule for a sound effect follows, and
+ * that isn't locked, as the subtitle's edit also hides the effect's translation and clean-up. One
+ * with a subtitle already counts: Add subtitle then selects that one. */
+function soundEffect(selection: BoxSelection): BlockLayer | null {
+  const box = only(selection)
+  if (!box || box.locked || !isBlockLayer(box.layer)) return null
+  return selection.lettering?.get(box.layer.id)?.category === 'sfx' ? box.layer : null
+}
+
+/** Whether Reset to lettering default gives `box` a look back: a translated block or a text layer,
+ * neither locked; an untranslated block has no lettering. */
+function resettable({ layer, locked }: Box): boolean {
+  return !locked && (isTextLayer(layer) || (isBlockLayer(layer) && layer.translation != null))
+}
+
+/** The toast after Reset to lettering default, `counts` its answer: how many texts it reset, or
+ * that it reset none, with how many it left alone as locked or untranslated; with none reset and
+ * none left alone, every text had its default already. */
+function resetNotice(counts: ResetCounts): void {
+  const notes = [
+    counts.locked > 0 ? i18n.t('booharu.boxes.resetLocked', { count: counts.locked }) : null,
+    counts.untranslated > 0
+      ? i18n.t('booharu.boxes.resetUntranslated', { count: counts.untranslated })
+      : null,
+  ].filter((note): note is string => note !== null)
+  const description = notes.join(' ') || undefined
+  if (counts.changed > 0) {
+    toast.add({
+      type: 'success',
+      title: i18n.t('booharu.boxes.resetDone', { count: counts.changed }),
+      description,
+    })
+  } else {
+    const title = i18n.t(description ? 'booharu.boxes.resetNone' : 'booharu.boxes.resetAlready')
+    toast.add({ type: 'info', title, description })
+  }
+}
+
 /** The selection's one block whose line Explain this line can explain, or none: it has a source to
  * explain. A locked one can be explained, as explaining changes nothing. */
 function explainable(selection: BoxSelection): BlockLayer | null {
@@ -222,6 +268,21 @@ export const boxActions: readonly BoxAction[] = [
     },
   },
   {
+    id: 'subtitle',
+    label: 'booharu.boxes.subtitle',
+    enabled: (selection) => soundEffect(selection) !== null,
+    run: async (selection) => {
+      const block = soundEffect(selection)
+      if (!block) return
+      // From the effect's translation; with none, a Translate run makes the subtitle as it writes.
+      const { layer, run } = await call(commands.booharuAddSfxSubtitle, block.id, null)
+      if (layer !== null) await showLayer(selection.page, layer)
+      else if (run !== null) {
+        toast.add({ type: 'info', title: i18n.t('booharu.boxes.subtitleTranslating') })
+      }
+    },
+  },
+  {
     id: 'category',
     label: 'booharu.lettering.change',
     enabled: (selection) => categorized(selection) !== null,
@@ -232,6 +293,17 @@ export const boxActions: readonly BoxAction[] = [
       // that fails shows its error, as a command's does, and opens nothing.
       await fetchLettering(selection.page)
       openBoxDetails(selection.page, block.id, 'lettering')
+    },
+  },
+  {
+    id: 'reset',
+    label: 'booharu.boxes.reset',
+    enabled: (selection) => selection.boxes.some(resettable),
+    // Every selected text goes, so the toast counts the locked and untranslated ones it leaves.
+    run: async (selection) => {
+      if (!selection.boxes.some(resettable)) return
+      const layers = selection.boxes.map(({ layer }) => layer.id)
+      resetNotice(await call(commands.booharuResetLettering, layers))
     },
   },
   {

@@ -29,7 +29,18 @@
       "join": "Join with balloon",
       "joinPage": "Join split texts on this page",
       "read": "Read again",
+      "reset": "Reset to lettering default",
+      "resetAlready": "Already at the lettering default",
+      "resetDone_one": "Reset {{count}} box to its lettering default",
+      "resetDone_other": "Reset {{count}} boxes to their lettering default",
+      "resetLocked_one": "{{count}} locked box was left as it is.",
+      "resetLocked_other": "{{count}} locked boxes were left as they are.",
+      "resetNone": "Nothing was reset",
+      "resetUntranslated_one": "{{count}} box has no translation to reset.",
+      "resetUntranslated_other": "{{count}} boxes have no translation to reset.",
       "split": "Split",
+      "subtitle": "Add subtitle",
+      "subtitleTranslating": "Translating the sound effect for its subtitle…",
       "translate": "Translate again"
     },
     "context": {
@@ -529,6 +540,7 @@
   "history": {
     "steps": {
       "booharu_add_box": "Add text box",
+      "booharu_add_sfx_subtitle": "Add sound effect subtitle",
       "booharu_apply_text_style": "Apply text style",
       "booharu_clear_qc_ok": "Remove OK mark",
       "booharu_dismiss_flag": "Dismiss review flag",
@@ -537,6 +549,7 @@
       "booharu_join_page": "Join split texts",
       "booharu_mark_qc_ok": "Mark finding OK",
       "booharu_read_chapter": "Read chapter",
+      "booharu_reset_lettering": "Reset to lettering default",
       "booharu_set_lettering_category": "Change lettering category",
       "booharu_set_review_note": "Edit note",
       "booharu_set_translation": "Add translation",
