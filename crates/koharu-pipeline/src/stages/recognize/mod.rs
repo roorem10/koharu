@@ -24,12 +24,15 @@ pub struct RecognizerConfig {
 
 pub(crate) async fn recognize(task: &Task, config: &PipelineConfig) -> anyhow::Result<()> {
     let members = task.members.clone();
+    let left = crate::booharu::Left::new(task, config); // Booharu: the run's filters.
+    let reading = left.clone(); // Booharu: the run's filters, for the read.
     let read = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
         let mut read = Vec::new();
         for member in members {
             let _span =
                 tracing::info_span!("read", stage = %Stage::Recognize, page = member.index + 1)
                     .entered();
+            let member = reading.sent(&member); // Booharu: the blocks the filters leave (R1).
             if let Some(crops) = crops(&member)? {
                 read.push((member, crops));
             }
@@ -38,6 +41,7 @@ pub(crate) async fn recognize(task: &Task, config: &PipelineConfig) -> anyhow::R
     })
     .await??;
     if read.is_empty() {
+        left.told(); // Booharu: what the filters left out of every page.
         return Ok(());
     }
     let (members, crops): (Vec<Member>, Vec<Vec<(LayerId, DynamicImage)>>) =
@@ -69,6 +73,7 @@ pub(crate) async fn recognize(task: &Task, config: &PipelineConfig) -> anyhow::R
     let name = model.to_string();
     for (member, texts) in members.iter().zip(texts) {
         let name = name.clone();
+        let writing = left.writing(member); // Booharu: the run's filters, for the write.
         member
             .apply(Stage::Recognize, move |project| {
                 let mut ops = Vec::new();
@@ -77,6 +82,11 @@ pub(crate) async fn recognize(task: &Task, config: &PipelineConfig) -> anyhow::R
                         project.layer(block).map(|layer| &layer.content),
                         Ok(Content::Block(_))
                     ) {
+                        continue;
+                    }
+                    // Booharu: one locked or corrected by hand since the read
+                    // stays as it is (R2).
+                    if writing.leaves(project, block) {
                         continue;
                     }
                     ops.push(koharu_scene::Op::UpdateLayer {
@@ -96,6 +106,7 @@ pub(crate) async fn recognize(task: &Task, config: &PipelineConfig) -> anyhow::R
             })
             .await?;
     }
+    left.told(); // Booharu: what the filters left out, once the edits are in.
     Ok(())
 }
 

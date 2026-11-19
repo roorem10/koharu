@@ -1,0 +1,1197 @@
+//! The run filters of Stage 9: what each page stage of a run leaves out of
+//! a page, as booharu-core's `protect` rules say, and the counts of it that
+//! the page's `Event::Skipped` tells.
+//!
+//! - [`Left::sent`], in the Translation and Recognition stages' reads (T1,
+//!   R1), narrows a page to the blocks the stage may change, counting the
+//!   rest. A translation left with no line to send still hides the clean-up
+//!   of each sound effect it skips ([`Left::unsent`], T2).
+//! - [`Writing`], in each stage's write, checks again against the project as
+//!   the write finds it, so a block locked or fixed by hand while the model
+//!   ran stays as it is, counted, rather than failing the page's edit or
+//!   being written over: the Translation stage's answers (T3, T4), with a
+//!   subtitle run's subtitles and the kept art of the effects it skips; the
+//!   Recognition stage's readings (R2); and the Inpainting stage's
+//!   clean-ups, with the kept art of the effects a translation skips (I1,
+//!   I2).
+//! - [`Left::told`] tells each page's counts once its edit is in, when any is
+//!   above 0.
+
+use std::sync::Arc;
+
+use booharu_core::{
+    protect::{self, Reason},
+    runs::RunStage,
+    settings::Snapshot,
+    sfx,
+};
+use icu_locale_core::LanguageIdentifier;
+use koharu_scene::{Content, Layer, LayerId, Op, Page, PageId, Project, Ref};
+use parking_lot::Mutex;
+use tokio_util::sync::CancellationToken;
+
+use crate::{
+    Event, PipelineConfig, RunId, Stage, TranslatorConfig,
+    event::Events,
+    stages::{Member, Task, translate::written},
+};
+
+/// The filters of the run that queued a page stage's task, by its snapshot,
+/// and what they left out of each of the task's pages so far.
+#[derive(Clone)]
+pub(crate) struct Left(Arc<Filters>);
+
+struct Filters {
+    stage: Stage,
+    booharu: Snapshot,
+    events: Events,
+    /// Each page's counts, in the order the task met its pages.
+    pages: Mutex<Vec<Tally>>,
+}
+
+/// What a stage left out of one page of a run, by reason.
+struct Tally {
+    run: RunId,
+    page: PageId,
+    /// Whether the run named blocks, as the page was handed to the task.
+    named: bool,
+    cancel: CancellationToken,
+    sound_effects: u32,
+    hand_fixed: u32,
+    locked: u32,
+}
+
+impl Tally {
+    fn new(member: &Member) -> Self {
+        Self {
+            run: member.run,
+            page: member.page,
+            named: member.blocks.is_some(),
+            cancel: member.cancel.clone(),
+            sound_effects: 0,
+            hand_fixed: 0,
+            locked: 0,
+        }
+    }
+}
+
+impl Left {
+    /// The filters of `task`, whose run's settings are `config`'s: its first
+    /// page's, which a recognition task shares with the other pages it
+    /// reads, as the scheduler batches only runs whose filters match.
+    pub(crate) fn new(task: &Task, config: &PipelineConfig) -> Self {
+        Self::of(task.stage, config.booharu.clone(), task.events.clone())
+    }
+
+    fn of(stage: Stage, booharu: Snapshot, events: Events) -> Self {
+        Self(Arc::new(Filters {
+            stage,
+            booharu,
+            events,
+            pages: Mutex::new(Vec::new()),
+        }))
+    }
+
+    /// `member` with only the blocks the stage may change on its page, as
+    /// the project is now, counting the others; as it is when the stage
+    /// leaves out none (T1, R1). A translation sends only blocks with words,
+    /// so it counts no other.
+    pub(crate) fn sent(&self, member: &Member) -> Member {
+        let named = self.tally(member, |tally| tally.named);
+        let project = member.session.lock().project();
+        let Ok(page) = project.page(member.page) else {
+            return member.clone();
+        };
+        let translating = self.0.stage == Stage::Translate;
+        let blocks = member.blocks(&project);
+        let all = blocks.len();
+        let mut kept = Vec::with_capacity(all);
+        for (id, block) in blocks {
+            let reason = project
+                .layer(id)
+                .ok()
+                .and_then(|layer| self.why(page, layer, named));
+            match reason {
+                Some(reason) => {
+                    if !translating || !block.source.content.text().trim().is_empty() {
+                        self.count(member, reason);
+                    }
+                }
+                None => kept.push(id),
+            }
+        }
+        if kept.len() == all {
+            return member.clone();
+        }
+        Member {
+            blocks: Some(kept.into()),
+            ..member.clone()
+        }
+    }
+
+    /// Why the stage leaves out the block `layer` holds on `page`, for a run
+    /// that named blocks when `named`.
+    fn why(&self, page: &Page, layer: &Layer, named: bool) -> Option<Reason> {
+        let booharu = &self.0.booharu;
+        protect::left_out(
+            page,
+            layer,
+            RunStage::from(self.0.stage),
+            &booharu.lettering,
+            booharu.redo,
+            named && booharu.subtitle_run,
+        )
+    }
+
+    /// `f` of the counts of `member`'s page, new ones the first time.
+    fn tally<R>(&self, member: &Member, f: impl FnOnce(&mut Tally) -> R) -> R {
+        let mut pages = self.0.pages.lock();
+        let at = match pages
+            .iter()
+            .position(|tally| (tally.run, tally.page) == (member.run, member.page))
+        {
+            Some(at) => at,
+            None => {
+                pages.push(Tally::new(member));
+                pages.len() - 1
+            }
+        };
+        f(&mut pages[at])
+    }
+
+    fn count(&self, member: &Member, reason: Reason) {
+        self.tally(member, |tally| match reason {
+            Reason::SoundEffect => tally.sound_effects += 1,
+            Reason::HandFixed => tally.hand_fixed += 1,
+            Reason::Locked => tally.locked += 1,
+        });
+    }
+
+    /// Tells each page's counts as one `Event::Skipped`, when any is above 0
+    /// and its run didn't stop, which wrote nothing; then forgets them.
+    pub(crate) fn told(&self) {
+        let pages = std::mem::take(&mut *self.0.pages.lock());
+        for tally in pages {
+            let counted = tally.sound_effects + tally.hand_fixed + tally.locked;
+            if counted == 0 || tally.cancel.is_cancelled() {
+                continue;
+            }
+            self.0.events.send(Event::Skipped {
+                run: tally.run,
+                page: tally.page,
+                stage: self.0.stage,
+                sound_effects: tally.sound_effects,
+                hand_fixed: tally.hand_fixed,
+                locked: tally.locked,
+                blocks: tally.named,
+            });
+        }
+    }
+
+    /// The end of a translation with no line to send (T2): the clean-up of
+    /// each sound effect it skips hidden, so the effect keeps its art, as the
+    /// stage's own edit, then the counts told.
+    pub(crate) async fn unsent(&self, member: &Member) -> anyhow::Result<()> {
+        let writing = self.writing(member);
+        member
+            .apply(self.0.stage, move |project| Ok(writing.kept(project)))
+            .await?;
+        self.told();
+        Ok(())
+    }
+
+    /// The filters as `member`'s write checks them.
+    pub(crate) fn writing(&self, member: &Member) -> Writing {
+        Writing {
+            left: self.clone(),
+            member: member.clone(),
+        }
+    }
+}
+
+/// The filters as a stage's write checks them for one page, against the
+/// project as the write finds it.
+pub(crate) struct Writing {
+    left: Left,
+    member: Member,
+}
+
+impl Writing {
+    fn named(&self) -> bool {
+        self.left.tally(&self.member, |tally| tally.named)
+    }
+
+    /// Whether the stage leaves out `block` now, counting it if so: one
+    /// locked or fixed by hand since the read stays as it is (R2, I2).
+    pub(crate) fn leaves(&self, project: &Project, block: LayerId) -> bool {
+        let named = self.named();
+        let (Ok(page), Ok(layer)) = (project.page(self.member.page), project.layer(block)) else {
+            return false;
+        };
+        let Some(reason) = self.left.why(page, layer, named) else {
+            return false;
+        };
+        self.left.count(&self.member, reason);
+        true
+    }
+
+    /// The Translation stage's edit of `translated`, the answers for the
+    /// blocks it sent, in reading order, by `translator`, into `project` as
+    /// it is now (T3, T4): an answer for a block the stage leaves out now is
+    /// dropped, counted; in a subtitle run, each named sound effect's answer
+    /// becomes its subtitle (`subtitle`); the rest go through `written`,
+    /// followed by the kept art of the sound effects the stage skips.
+    pub(crate) fn written(
+        &self,
+        project: &Project,
+        translated: Vec<(LayerId, LanguageIdentifier, String)>,
+        translator: &TranslatorConfig,
+    ) -> anyhow::Result<Vec<Op>> {
+        let booharu = &self.left.0.booharu;
+        let Ok(page) = project.page(self.member.page) else {
+            return written(project, translated, translator, booharu);
+        };
+        let named = self.named();
+        let subtitling = named && booharu.subtitle_run;
+        let mut answers = Vec::with_capacity(translated.len());
+        let mut subtitles = Vec::new();
+        for (block, source, text) in translated {
+            let Ok(layer) = project.layer(block) else {
+                // `written` passes over a block that's gone.
+                answers.push((block, source, text));
+                continue;
+            };
+            if subtitling && sfx::sound_effect(page, block, &booharu.lettering) {
+                subtitles.extend(self.subtitle(page, layer, &text, &translator.target)?);
+                continue;
+            }
+            match self.left.why(page, layer, named) {
+                Some(reason) => self.left.count(&self.member, reason),
+                None => answers.push((block, source, text)),
+            }
+        }
+        let mut ops = written(project, answers, translator, booharu)?;
+        ops.extend(self.kept(project));
+        ops.extend(numbered(subtitles)?);
+        Ok(ops)
+    }
+
+    /// The ops giving the sound effect `layer` on `page` its answer `text`,
+    /// in `language`, as its subtitle: none when it's locked now, counted;
+    /// when it got a subtitle since the read; or when the answer is its
+    /// source, both trimmed, which leaves it as it is.
+    fn subtitle(
+        &self,
+        page: &Page,
+        layer: &Layer,
+        text: &str,
+        language: &LanguageIdentifier,
+    ) -> anyhow::Result<Option<Vec<Op>>> {
+        let Content::Block(block) = &layer.content else {
+            return Ok(None);
+        };
+        if protect::locked(page, layer.id) {
+            self.left.count(&self.member, Reason::Locked);
+            return Ok(None);
+        }
+        if sfx::subtitled(page, layer.id) || text.trim() == block.source.content.text().trim() {
+            return Ok(None);
+        }
+        let booharu = &self.left.0.booharu;
+        sfx::subtitle_ops(
+            page,
+            layer.id,
+            text,
+            language,
+            &booharu.lettering.subtitle,
+            booharu.font.as_deref(),
+        )
+        .map(Some)
+    }
+
+    /// The kept art of each sound effect a translation skips among the
+    /// blocks of the page the stage works on: its clean-up hidden with the
+    /// kept mark, as `sfx::kept_original` keeps one with no translation, so
+    /// it stays hidden whichever of cleaning and translating comes first
+    /// (T2, T3, I2). A translation keeps only effects with words, as it
+    /// sends no other.
+    pub(crate) fn kept(&self, project: &Project) -> Vec<Op> {
+        let Ok(page) = project.page(self.member.page) else {
+            return Vec::new();
+        };
+        let named = self.named();
+        let booharu = &self.left.0.booharu;
+        let translating = self.left.0.stage == Stage::Translate;
+        self.member
+            .blocks(project)
+            .into_iter()
+            .filter(|(_, block)| !translating || !block.source.content.text().trim().is_empty())
+            .filter_map(|(id, _)| project.layer(id).ok())
+            .filter(|layer| {
+                let skipped = protect::left_out(
+                    page,
+                    layer,
+                    RunStage::Translate,
+                    &booharu.lettering,
+                    booharu.redo,
+                    named && booharu.subtitle_run,
+                );
+                skipped == Some(Reason::SoundEffect)
+            })
+            .flat_map(sfx::kept_original)
+            .collect()
+    }
+}
+
+/// `subtitles`, each one's ops, as one edit's: the first keeps
+/// `sfx::SUBTITLE_REF`, and each other gets one of its own; they go in from
+/// the last place among a parent's layers, so adding one never moves the
+/// place another goes, right after its effect.
+fn numbered(mut subtitles: Vec<Vec<Op>>) -> anyhow::Result<Vec<Op>> {
+    let place = |ops: &Vec<Op>| match ops.first() {
+        Some(Op::AddLayer { index, .. }) => *index,
+        _ => 0,
+    };
+    subtitles.sort_by_key(|ops| std::cmp::Reverse(place(ops)));
+    let mut all = Vec::new();
+    for (at, mut ops) in subtitles.into_iter().enumerate() {
+        if at > 0
+            && let Some(Op::AddLayer { id, .. }) = ops.first_mut()
+        {
+            let label = format!("${}-{at}", sfx::SUBTITLE_REF);
+            *id = Some(Ref::try_from(label).map_err(anyhow::Error::msg)?);
+        }
+        all.extend(ops);
+    }
+    Ok(all)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        io::Cursor,
+        time::Duration,
+    };
+
+    use anyhow::{Context as _, Result};
+    use booharu_core::{
+        attrs::Auto,
+        settings::{LetteringSettings, SfxMode},
+        status,
+        styles::{recognized, recorded},
+    };
+    use icu_locale_core::langid;
+    use image::{ImageFormat, Rgb, RgbImage};
+    use koharu_scene::{Block, Created, Edit, Hash, Session};
+    use parking_lot::RwLock;
+    use petgraph::stable_graph::NodeIndex;
+    use serde_json::{Value, json};
+
+    use super::*;
+    use crate::{
+        Outcome, Target,
+        scheduler::{Command, Plan, Run, Scheduler},
+    };
+
+    /// The source wording of every block.
+    const SOURCE: &str = "どうして";
+    /// A page's side, in pixels.
+    const SIDE: u32 = 200;
+
+    /// A block of Koharu's `role`, its source's box 20 by 40 at `x`, `y`,
+    /// reading [`SOURCE`], as Koharu's stages detect and read one.
+    fn block(role: &str, (x, y): (f64, f64)) -> Value {
+        json!({"kind": "block", "role": role, "source": {
+            "frame": {"box": {"bounds": {"x": x, "y": y, "width": 20.0, "height": 40.0}}},
+            "content": SOURCE,
+        }, "attributes": {"c2pa": {
+            "detection": {"action": "c2pa.created"},
+            "ocr": {"action": "c2pa.created"},
+        }}})
+    }
+
+    /// The op adding `layer` as `$label` at `index` among `parent`'s layers,
+    /// or the page `$p`'s.
+    fn add(label: &str, parent: Option<&str>, index: usize, layer: Value) -> Value {
+        json!({"op": "add_layer", "id": format!("${label}"), "page": "$p",
+            "parent": parent.map(|parent| format!("${parent}")), "index": index, "layer": layer})
+    }
+
+    /// The op giving the block `$label` a mask over the 20 by 40 box at `x`,
+    /// `y`.
+    fn mask(label: &str, (x, y): (i32, i32)) -> Value {
+        json!({"op": "write_pixels", "layer": format!("${label}.mask"),
+            "rect": {"x": x, "y": y, "width": 20, "height": 40}, "pixels": vec![255u8; 20 * 40]})
+    }
+
+    /// A run's snapshot with sound effects under `sfx`, Redo boxes' flag
+    /// `redo`, and a subtitle run's `subtitle_run`.
+    fn snapshot(sfx: SfxMode, redo: bool, subtitle_run: bool) -> Snapshot {
+        Snapshot {
+            lettering: LetteringSettings {
+                sfx,
+                ..LetteringSettings::default()
+            },
+            redo,
+            subtitle_run,
+            ..Snapshot::default()
+        }
+    }
+
+    fn skip() -> Snapshot {
+        snapshot(SfxMode::Skip, false, false)
+    }
+
+    /// Each `Event::Skipped` `told` holds: its stage, its counts of sound
+    /// effects, hand fixes, and locks, and whether the run named blocks.
+    fn skipped(told: &[Event]) -> Vec<(Stage, u32, u32, u32, bool)> {
+        told.iter()
+            .filter_map(|event| match *event {
+                Event::Skipped {
+                    stage,
+                    sound_effects,
+                    hand_fixed,
+                    locked,
+                    blocks,
+                    ..
+                } => Some((stage, sound_effects, hand_fixed, locked, blocks)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// `(label, text)`, each as the Translation stage's model answers for
+    /// the block `label`.
+    fn answers(
+        fixture: &Fixture,
+        said: &[(&str, &str)],
+    ) -> Vec<(LayerId, LanguageIdentifier, String)> {
+        said.iter()
+            .map(|(label, text)| (fixture.id(label), langid!("ja"), (*text).to_owned()))
+            .collect()
+    }
+
+    /// A project of one page, 200 pixels square, with a white scan when
+    /// asked, holding what the ops given add on `$p`, each block's wording
+    /// recorded as the Recognition stage records it, so a corrected one reads
+    /// as fixed by hand.
+    struct Fixture {
+        _dir: tempfile::TempDir,
+        session: Arc<Mutex<Session>>,
+        page: PageId,
+        ids: BTreeMap<String, LayerId>,
+    }
+
+    impl Fixture {
+        fn new(scanned: bool, ops: Vec<Value>) -> Result<Self> {
+            let dir = tempfile::tempdir()?;
+            let mut session = Session::create(dir.path().join("test.khr"))?;
+            let mut page = json!({"op": "add_page", "id": "$p", "index": 0,
+                "size": {"width": SIDE, "height": SIDE}});
+            let mut edit = Vec::new();
+            if scanned {
+                let mut scan = Vec::new();
+                RgbImage::from_pixel(SIDE, SIDE, Rgb([255; 3]))
+                    .write_to(&mut Cursor::new(&mut scan), ImageFormat::Png)?;
+                // A page with a scan takes its size.
+                page["size"] = Value::Null;
+                page["background"] = json!(Hash::of(&scan));
+                edit.push(Op::AddFile { bytes: scan });
+            }
+            edit.push(serde_json::from_value(page)?);
+            for op in ops {
+                edit.push(serde_json::from_value(op)?);
+            }
+            let change = session.apply(Edit {
+                label: "test".to_owned(),
+                ops: edit,
+            })?;
+            let ids = change
+                .created
+                .into_iter()
+                .filter_map(|created| match created {
+                    Created::Layer {
+                        id,
+                        label: Some(label),
+                    } => Some((label, id)),
+                    _ => None,
+                })
+                .collect();
+            let page = change.pages.added[0];
+            let project = session.project();
+            let records = project
+                .blocks(page)?
+                .into_iter()
+                .map(|(id, block)| recognized(project.layer(id)?, &block.source.content.text()))
+                .collect::<Result<Vec<_>>>()?;
+            session.apply(Edit {
+                label: "test".to_owned(),
+                ops: records,
+            })?;
+            Ok(Self {
+                _dir: dir,
+                session: Arc::new(Mutex::new(session)),
+                page,
+                ids,
+            })
+        }
+
+        fn id(&self, label: &str) -> LayerId {
+            self.ids[label]
+        }
+
+        fn label(&self, id: LayerId) -> String {
+            self.ids
+                .iter()
+                .find_map(|(label, at)| (*at == id).then(|| label.clone()))
+                .unwrap_or_else(|| id.to_string())
+        }
+
+        fn project(&self) -> Project {
+            self.session.lock().project()
+        }
+
+        fn page(&self) -> Result<Page> {
+            Ok(self.project().page(self.page)?.clone())
+        }
+
+        fn layer(&self, label: &str) -> Result<Layer> {
+            Ok(self.project().layer(self.id(label))?.clone())
+        }
+
+        fn block(&self, label: &str) -> Result<Block> {
+            match self.layer(label)?.content {
+                Content::Block(block) => Ok(*block),
+                _ => anyhow::bail!("{label} isn't a block"),
+            }
+        }
+
+        fn translation(&self, label: &str) -> Result<Option<String>> {
+            Ok(self
+                .block(label)?
+                .translation
+                .map(|translation| translation.content.text()))
+        }
+
+        fn edit(&self, ops: Vec<Op>) -> Result<()> {
+            self.session.lock().apply(Edit {
+                label: "test".to_owned(),
+                ops,
+            })?;
+            Ok(())
+        }
+
+        fn op(&self, op: Value) -> Result<()> {
+            self.edit(vec![serde_json::from_value(op)?])
+        }
+
+        fn lock(&self, label: &str) -> Result<()> {
+            self.op(json!({"op": "update_layer", "layer": self.id(label),
+                "patch": {"locked": true}}))
+        }
+
+        /// Types `text` as the translation of the block `label`, by hand.
+        fn type_in(&self, label: &str, text: &str) -> Result<()> {
+            self.edit(vec![Op::SetText {
+                layer: self.id(label).into(),
+                text: text.to_owned(),
+            }])
+        }
+
+        /// Corrects the source of the block `label` by hand.
+        fn correct(&self, label: &str) -> Result<()> {
+            self.op(json!({"op": "update_layer", "layer": self.id(label),
+                "patch": {"source": {"content": "なぜ"}}}))
+        }
+
+        /// The page as run 1 hands it to a task, limited to the blocks
+        /// `named` when it names some.
+        fn member(&self, named: Option<&[&str]>) -> Member {
+            Member {
+                run: RunId(1),
+                job: NodeIndex::new(0),
+                page: self.page,
+                index: 0,
+                blocks: named.map(|named| named.iter().map(|label| self.id(label)).collect()),
+                session: Arc::clone(&self.session),
+                cancel: CancellationToken::new(),
+            }
+        }
+
+        /// The blocks `member` has a task work on.
+        fn sent(&self, member: &Member) -> BTreeSet<String> {
+            member
+                .blocks(&self.project())
+                .into_iter()
+                .map(|(id, _)| self.label(id))
+                .collect()
+        }
+
+        /// What run 1, of `stages` on `target` with the snapshot `booharu`,
+        /// told once it ended done, on a scheduler of its own, queued as
+        /// `Pipeline::run` queues a run but with no setting read.
+        async fn run(
+            &self,
+            target: Target,
+            stages: &[Stage],
+            booharu: Snapshot,
+        ) -> Result<Vec<Event>> {
+            let events = Events::new();
+            let config = PipelineConfig {
+                booharu,
+                ..PipelineConfig::default()
+            };
+            let commands = Scheduler::spawn(Arc::new(RwLock::new(config.clone())), events.clone());
+            let stages: BTreeSet<Stage> = stages.iter().copied().collect();
+            let project = self.project();
+            let plan = Plan::new(&project, &target, &stages)?;
+            let run = RunId(1);
+            events.send(Event::Queued {
+                run,
+                steps: plan.pages() * stages.len(),
+                stages: stages.iter().copied().collect(),
+                pages: true,
+            });
+            let queued = Run::new(
+                run,
+                Arc::clone(&self.session),
+                project.id(),
+                config,
+                plan,
+                &stages,
+            );
+            commands
+                .send(Command::Run(queued))
+                .map_err(|_| anyhow::anyhow!("the scheduler ended"))?;
+            let told = events
+                .history(run, Duration::from_secs(60))
+                .await
+                .context("a history")?;
+            let done = Event::Ended {
+                run,
+                outcome: Outcome::Done,
+            };
+            anyhow::ensure!(told.last() == Some(&done), "{told:#?}");
+            Ok(told)
+        }
+    }
+
+    // S9-e: the run filters of the Translation and Recognition stages.
+
+    #[tokio::test]
+    async fn a_translation_with_no_line_to_send_still_hides_its_effects_clean_up_and_tells_why()
+    -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("effect", None, 0, block("sfx", (10.0, 10.0))),
+                add("typed", None, 1, block("text", (40.0, 10.0))),
+                add("locked", None, 2, block("text", (70.0, 10.0))),
+                // An effect with no words, which a translation never sends.
+                add(
+                    "blank",
+                    None,
+                    3,
+                    json!({"kind": "block", "role": "sfx", "source": {}}),
+                ),
+            ],
+        )?;
+        fixture.type_in("typed", "Hm")?;
+        fixture.lock("locked")?;
+        // No model loads: every line is left out before the request.
+        let told = fixture
+            .run(Target::Project, &[Stage::Translate], skip())
+            .await?;
+        assert_eq!(skipped(&told), [(Stage::Translate, 1, 1, 1, false)]);
+        assert!(told.iter().any(|event| matches!(event,
+            Event::Skipped { run: RunId(1), page, .. } if *page == fixture.page)));
+        // The effect keeps its art, in the stage's own edit.
+        assert!(!fixture.block("effect")?.cleanup.visible);
+        assert!(Auto::of(&fixture.layer("effect")?).kept);
+        assert_eq!(fixture.translation("effect")?, None);
+        assert!(fixture.block("blank")?.cleanup.visible);
+        // What was fixed by hand or locked stays as it was.
+        assert_eq!(fixture.translation("typed")?.as_deref(), Some("Hm"));
+        assert_eq!(fixture.translation("locked")?, None);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn reading_leaves_out_blocks_corrected_by_hand_or_locked_and_tells_why() -> Result<()> {
+        let fixture = Fixture::new(
+            true,
+            vec![
+                add("corrected", None, 0, block("text", (10.0, 10.0))),
+                add("locked", None, 1, block("text", (60.0, 10.0))),
+            ],
+        )?;
+        fixture.correct("corrected")?;
+        fixture.lock("locked")?;
+        // No model loads: the page has nothing left to read.
+        let told = fixture
+            .run(Target::Project, &[Stage::Recognize], skip())
+            .await?;
+        assert_eq!(skipped(&told), [(Stage::Recognize, 0, 1, 1, false)]);
+        assert_eq!(fixture.block("corrected")?.source.content.text(), "なぜ");
+        Ok(())
+    }
+
+    #[test]
+    fn redo_boxes_lifts_a_hand_fix_but_never_a_lock_or_a_sound_effects_skip() -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("plain", None, 0, block("text", (10.0, 10.0))),
+                add("corrected", None, 1, block("text", (40.0, 10.0))),
+                add("typed", None, 2, block("text", (70.0, 10.0))),
+                add("effect", None, 3, block("sfx", (100.0, 10.0))),
+                add("locked", None, 4, block("text", (130.0, 10.0))),
+            ],
+        )?;
+        fixture.correct("corrected")?;
+        fixture.type_in("typed", "Hm")?;
+        fixture.lock("locked")?;
+        let sent = |stage: Stage, redo: bool| {
+            let events = Events::new();
+            let left = Left::of(stage, snapshot(SfxMode::Skip, redo, false), events.clone());
+            let sent = fixture.sent(&left.sent(&fixture.member(None)));
+            left.told();
+            (sent, skipped(&events.told()))
+        };
+        let set = |labels: &[&str]| labels.iter().map(|label| (*label).to_owned()).collect();
+        assert_eq!(
+            sent(Stage::Recognize, false),
+            (
+                set(&["plain", "typed", "effect"]),
+                vec![(Stage::Recognize, 0, 1, 1, false)]
+            )
+        );
+        assert_eq!(
+            sent(Stage::Recognize, true),
+            (
+                set(&["plain", "corrected", "typed", "effect"]),
+                vec![(Stage::Recognize, 0, 0, 1, false)]
+            )
+        );
+        assert_eq!(
+            sent(Stage::Translate, false),
+            (
+                set(&["plain", "corrected"]),
+                vec![(Stage::Translate, 1, 1, 1, false)]
+            )
+        );
+        assert_eq!(
+            sent(Stage::Translate, true),
+            (
+                set(&["plain", "corrected", "typed"]),
+                vec![(Stage::Translate, 1, 0, 1, false)]
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_lock_or_a_hand_fix_made_while_the_model_ran_leaves_its_block_as_it_is() -> Result<()> {
+        let layers = || {
+            vec![
+                add("a", None, 0, block("text", (10.0, 10.0))),
+                add("b", None, 1, block("text", (40.0, 10.0))),
+                add("c", None, 2, block("text", (70.0, 10.0))),
+            ]
+        };
+        // A translation reads every block; while its model runs, b is locked
+        // and c's translation typed by hand.
+        let fixture = Fixture::new(false, layers())?;
+        let events = Events::new();
+        let left = Left::of(Stage::Translate, skip(), events.clone());
+        let member = fixture.member(None);
+        assert_eq!(left.sent(&member).blocks, None, "it leaves out none");
+        fixture.lock("b")?;
+        fixture.type_in("c", "By hand")?;
+        let said = answers(&fixture, &[("a", "A!"), ("b", "B!"), ("c", "C!")]);
+        let ops = left.writing(&member).written(
+            &fixture.project(),
+            said,
+            &TranslatorConfig::default(),
+        )?;
+        // The page's edit goes in, neither failing on b nor writing over c.
+        fixture.edit(ops)?;
+        left.told();
+        assert_eq!(fixture.translation("a")?.as_deref(), Some("A!"));
+        assert_eq!(fixture.translation("b")?, None);
+        assert_eq!(fixture.translation("c")?.as_deref(), Some("By hand"));
+        assert_eq!(
+            skipped(&events.told()),
+            [(Stage::Translate, 0, 1, 1, false)]
+        );
+
+        // A reading the same way: a locked, b corrected by hand meanwhile.
+        let fixture = Fixture::new(false, layers())?;
+        let events = Events::new();
+        let left = Left::of(Stage::Recognize, skip(), events.clone());
+        let member = left.sent(&fixture.member(None));
+        assert_eq!(member.blocks, None, "it leaves out none");
+        fixture.lock("a")?;
+        fixture.correct("b")?;
+        let writing = left.writing(&member);
+        let project = fixture.project();
+        let left_out: Vec<bool> = ["a", "b", "c"]
+            .iter()
+            .map(|label| writing.leaves(&project, fixture.id(label)))
+            .collect();
+        assert_eq!(left_out, [true, true, false]);
+        left.told();
+        assert_eq!(
+            skipped(&events.told()),
+            [(Stage::Recognize, 0, 1, 1, false)]
+        );
+        Ok(())
+    }
+
+    // S9-e: a sound effect kept as art, by translating and by cleaning.
+
+    #[tokio::test]
+    async fn a_skipped_effects_clean_up_stays_hidden_whichever_of_cleaning_and_translating_is_first()
+    -> Result<()> {
+        for first in [Stage::Translate, Stage::Inpaint] {
+            let fixture = Fixture::new(
+                true,
+                vec![
+                    add("effect", None, 0, block("sfx", (40.0, 40.0))),
+                    mask("effect", (40, 40)),
+                ],
+            )?;
+            let then = match first {
+                Stage::Translate => Stage::Inpaint,
+                _ => Stage::Translate,
+            };
+            // Neither loads a model: the clean-up is plain paper, and the
+            // translation has no line to send.
+            for stage in [first, then] {
+                let told = fixture.run(Target::Project, &[stage], skip()).await?;
+                let tells = match stage {
+                    Stage::Translate => vec![(Stage::Translate, 1, 0, 0, false)],
+                    _ => Vec::new(),
+                };
+                assert_eq!(skipped(&told), tells, "{stage:?}, {first:?} first");
+                assert!(
+                    !fixture.block("effect")?.cleanup.visible,
+                    "after {stage:?}, {first:?} first"
+                );
+                assert!(Auto::of(&fixture.layer("effect")?).kept);
+            }
+            let cleaned = fixture.layer("effect")?;
+            assert!(recorded(&cleaned, status::INPAINTING), "{first:?} first");
+
+            // Set to Translate all, a run translates it, and its clean-up
+            // shows under its translation.
+            let left = Left::of(
+                Stage::Translate,
+                snapshot(SfxMode::TranslateAll, false, false),
+                Events::new(),
+            );
+            let member = fixture.member(None);
+            assert_eq!(left.sent(&member).blocks, None, "it's sent");
+            let said = answers(&fixture, &[("effect", "BAM")]);
+            let ops = left.writing(&member).written(
+                &fixture.project(),
+                said,
+                &TranslatorConfig::default(),
+            )?;
+            fixture.edit(ops)?;
+            assert_eq!(fixture.translation("effect")?.as_deref(), Some("BAM"));
+            assert!(fixture.block("effect")?.cleanup.visible);
+            assert!(!Auto::of(&fixture.layer("effect")?).kept);
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn cleaning_leaves_a_locked_clean_up_or_block_as_it_is_and_tells_why() -> Result<()> {
+        let fixture = Fixture::new(
+            true,
+            vec![
+                add("free", None, 0, block("text", (10.0, 10.0))),
+                mask("free", (10, 10)),
+                add("part", None, 1, block("text", (70.0, 10.0))),
+                mask("part", (70, 10)),
+                add("whole", None, 2, block("text", (130.0, 10.0))),
+                mask("whole", (130, 10)),
+            ],
+        )?;
+        fixture.op(json!({"op": "update_layer", "layer": fixture.id("part"),
+            "patch": {"cleanup": {"locked": true}}}))?;
+        fixture.lock("whole")?;
+        // The page's edit goes in: no model loads, as the clean-ups are
+        // plain paper, and no locked layer is written.
+        let told = fixture
+            .run(Target::Project, &[Stage::Inpaint], skip())
+            .await?;
+        assert_eq!(skipped(&told), [(Stage::Inpaint, 0, 0, 2, false)]);
+        let cleaned = |label| {
+            fixture
+                .layer(label)
+                .map(|layer| recorded(&layer, status::INPAINTING))
+        };
+        assert!(cleaned("free")?);
+        assert!(!cleaned("part")?);
+        assert!(!cleaned("whole")?);
+        Ok(())
+    }
+
+    #[test]
+    fn a_page_tells_nothing_left_out_once_and_a_stopped_run_tells_nothing() -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("plain", None, 0, block("text", (10.0, 10.0))),
+                add("locked", None, 1, block("text", (40.0, 10.0))),
+            ],
+        )?;
+        let events = Events::new();
+        let left = Left::of(Stage::Recognize, skip(), events.clone());
+        // Nothing left out tells nothing.
+        left.sent(&fixture.member(None));
+        left.told();
+        assert!(events.told().is_empty());
+        fixture.lock("locked")?;
+        // Each run's page tells its own, once; a stopped run's, nothing.
+        let other = Member {
+            run: RunId(2),
+            ..fixture.member(Some(&["locked"]))
+        };
+        let stopped = Member {
+            run: RunId(3),
+            ..fixture.member(None)
+        };
+        stopped.cancel.cancel();
+        for member in [fixture.member(None), other, stopped] {
+            left.sent(&member);
+        }
+        left.told();
+        left.told();
+        let told: Vec<(RunId, bool)> = events
+            .told()
+            .into_iter()
+            .filter_map(|event| match event {
+                Event::Skipped {
+                    run,
+                    locked: 1,
+                    blocks,
+                    ..
+                } => Some((run, blocks)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(told, [(RunId(1), false), (RunId(2), true)]);
+        Ok(())
+    }
+
+    // S9-g: a subtitle run.
+
+    #[test]
+    fn a_subtitle_run_writes_each_named_effects_answer_as_its_subtitle() -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("effect", None, 0, block("sfx", (20.0, 20.0))),
+                add("hidden", None, 1, block("sfx", (80.0, 20.0))),
+                add("talk", None, 2, block("text", (140.0, 20.0))),
+            ],
+        )?;
+        // One effect's clean-up was hidden by hand.
+        fixture.op(json!({"op": "update_layer", "layer": fixture.id("hidden"),
+            "patch": {"cleanup": {"visible": false}}}))?;
+        let events = Events::new();
+        let left = Left::of(
+            Stage::Translate,
+            snapshot(SfxMode::Skip, false, true),
+            events.clone(),
+        );
+        let member = fixture.member(Some(&["effect", "hidden", "talk"]));
+        // Each named effect is sent, skipped or kept by hand as it is.
+        assert_eq!(left.sent(&member).blocks, member.blocks);
+        let said = answers(
+            &fixture,
+            &[("effect", "BAM"), ("hidden", "THUD"), ("talk", "Why?")],
+        );
+        let ops = left.writing(&member).written(
+            &fixture.project(),
+            said,
+            &TranslatorConfig::default(),
+        )?;
+        // Two subtitles in one edit, each after its own effect.
+        fixture.edit(ops)?;
+        left.told();
+        assert!(events.told().is_empty(), "nothing left out");
+        let page = fixture.page()?;
+        let project = fixture.project();
+        for (label, text) in [("effect", "BAM"), ("hidden", "THUD")] {
+            let subtitle = sfx::subtitle_of(&page, fixture.id(label)).context("a subtitle")?;
+            let layer = project.layer(subtitle)?;
+            assert_eq!(layer.name, sfx::SUBTITLE_NAME);
+            let Content::Text(written) = &layer.content else {
+                anyhow::bail!("{label}'s subtitle isn't text");
+            };
+            assert_eq!(written.content.text(), text);
+            // The effect stays the original art.
+            assert_eq!(fixture.translation(label)?, None);
+            assert!(!fixture.block(label)?.cleanup.visible);
+            assert!(Auto::of(&fixture.layer(label)?).kept);
+            let after = page
+                .layers
+                .iter()
+                .position(|layer| layer.id == fixture.id(label))
+                .context("the effect")?;
+            assert_eq!(page.layers[after + 1].id, subtitle, "{label}");
+        }
+        // A named block that isn't an effect is translated as any other.
+        assert_eq!(fixture.translation("talk")?.as_deref(), Some("Why?"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_subtitle_run_writes_none_for_an_answer_that_gives_the_source_back_or_a_changed_effect()
+    -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("same", None, 0, block("sfx", (20.0, 20.0))),
+                add("locks", None, 1, block("sfx", (80.0, 20.0))),
+                add("gets", None, 2, block("sfx", (140.0, 20.0))),
+            ],
+        )?;
+        let events = Events::new();
+        let left = Left::of(
+            Stage::Translate,
+            snapshot(SfxMode::Skip, false, true),
+            events.clone(),
+        );
+        let member = fixture.member(Some(&["same", "locks", "gets"]));
+        assert_eq!(left.sent(&member).blocks, member.blocks);
+        // While the model ran, one effect was locked and another subtitled.
+        fixture.lock("locks")?;
+        let style = LetteringSettings::default().subtitle;
+        let page = fixture.page()?;
+        let ops = sfx::subtitle_ops(
+            &page,
+            fixture.id("gets"),
+            "POW",
+            &langid!("en"),
+            &style,
+            None,
+        )?;
+        fixture.edit(ops)?;
+        let before = fixture.page()?;
+        let said = answers(
+            &fixture,
+            &[
+                ("same", &format!(" {SOURCE} ")),
+                ("locks", "BAM"),
+                ("gets", "THUD"),
+            ],
+        );
+        let ops = left.writing(&member).written(
+            &fixture.project(),
+            said,
+            &TranslatorConfig::default(),
+        )?;
+        assert!(ops.is_empty(), "{ops:?}");
+        left.told();
+        assert_eq!(skipped(&events.told()), [(Stage::Translate, 0, 0, 1, true)]);
+        assert_eq!(fixture.page()?, before);
+        assert!(fixture.block("same")?.cleanup.visible, "as it was");
+
+        // A run naming no blocks ignores the flag.
+        let events = Events::new();
+        let left = Left::of(
+            Stage::Translate,
+            snapshot(SfxMode::Skip, false, true),
+            events.clone(),
+        );
+        assert!(fixture.sent(&left.sent(&fixture.member(None))).is_empty());
+        left.told();
+        assert_eq!(
+            skipped(&events.told()),
+            [(Stage::Translate, 2, 0, 1, false)]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_subtitled_effect_is_left_out_of_every_later_translation() -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("effect", None, 0, block("sfx", (20.0, 20.0))),
+                add("talk", None, 1, block("text", (80.0, 20.0))),
+            ],
+        )?;
+        let left = Left::of(
+            Stage::Translate,
+            snapshot(SfxMode::Skip, false, true),
+            Events::new(),
+        );
+        let member = fixture.member(Some(&["effect"]));
+        let said = answers(&fixture, &[("effect", "BAM")]);
+        let ops = left.writing(&member).written(
+            &fixture.project(),
+            said,
+            &TranslatorConfig::default(),
+        )?;
+        fixture.edit(ops)?;
+        assert!(sfx::subtitled(&fixture.page()?, fixture.id("effect")));
+        for mode in [SfxMode::Skip, SfxMode::InsideBubbles, SfxMode::TranslateAll] {
+            for redo in [false, true] {
+                let events = Events::new();
+                let left = Left::of(
+                    Stage::Translate,
+                    snapshot(mode, redo, false),
+                    events.clone(),
+                );
+                let sent = fixture.sent(&left.sent(&fixture.member(None)));
+                assert_eq!(sent, BTreeSet::from(["talk".to_owned()]), "{mode:?}");
+                left.told();
+                assert_eq!(
+                    skipped(&events.told()),
+                    [(Stage::Translate, 1, 0, 0, false)]
+                );
+            }
+        }
+
+        // Subtitled while the model ran, its answer is dropped too.
+        let fixture = Fixture::new(
+            false,
+            vec![add("effect", None, 0, block("sfx", (20.0, 20.0)))],
+        )?;
+        let events = Events::new();
+        let all = snapshot(SfxMode::TranslateAll, false, false);
+        let left = Left::of(Stage::Translate, all, events.clone());
+        let member = fixture.member(None);
+        assert_eq!(left.sent(&member).blocks, None, "Translate all sends it");
+        let style = LetteringSettings::default().subtitle;
+        let ops = sfx::subtitle_ops(
+            &fixture.page()?,
+            fixture.id("effect"),
+            "POW",
+            &langid!("en"),
+            &style,
+            None,
+        )?;
+        fixture.edit(ops)?;
+        let said = answers(&fixture, &[("effect", "BAM")]);
+        let ops = left.writing(&member).written(
+            &fixture.project(),
+            said,
+            &TranslatorConfig::default(),
+        )?;
+        assert!(ops.is_empty(), "{ops:?}");
+        left.told();
+        assert_eq!(
+            skipped(&events.told()),
+            [(Stage::Translate, 1, 0, 0, false)]
+        );
+        Ok(())
+    }
+}

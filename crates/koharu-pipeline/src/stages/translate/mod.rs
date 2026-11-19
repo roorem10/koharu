@@ -120,15 +120,18 @@ pub(crate) async fn translate(
 ) -> Result<()> {
     let member = &task.members[0];
     let translator = config.translator.clone();
-    let booharu = config.booharu.clone(); // Booharu: the run's settings, for `written`.
+    let left = crate::booharu::Left::new(task, config); // Booharu: the run's filters.
     let (read, vision) = (member.clone(), translator.vision);
+    let reading = left.clone(); // Booharu: the run's filters, for the read.
     let page = tokio::task::spawn_blocking(move || {
         let _span = info_span!("read", stage = %Stage::Translate, page = read.index + 1).entered();
-        page(&read, vision)
+        page(&reading.sent(&read), vision) // Booharu: the blocks the filters leave (T1).
     })
     .await??;
     let Some(page) = page else {
-        return Ok(());
+        // Booharu: the skipped sound effects' clean-up hidden, and what the
+        // filters left out told (T2).
+        return left.unsent(member).await;
     };
     let conversation = &mut *conversation;
     conversation.keep(&translator);
@@ -171,11 +174,16 @@ pub(crate) async fn translate(
         .zip(translations)
         .map(|((block, source), text)| (block, source, text))
         .collect();
+    let writing = left.writing(member); // Booharu: the run's filters, for the write.
     member
         .apply(Stage::Translate, move |project| {
-            written(project, translated, &translator, &booharu) // Booharu: and the run's settings.
+            // Booharu: through the filters again, as `written` with the run's
+            // settings, a subtitle run's subtitles, and the kept art (T3, T4).
+            writing.written(project, translated, &translator)
         })
-        .await
+        .await?;
+    left.told(); // Booharu: what the filters left out, once the edit is in.
+    Ok(())
 }
 
 /// The page's texts the task works on, and the page itself when the model

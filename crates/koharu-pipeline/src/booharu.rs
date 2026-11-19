@@ -29,6 +29,11 @@
 //!   ended.
 //! - `answered`, in a translation's turn, gives a hosted model's request ten
 //!   minutes to answer.
+//! - `Left` and `Writing`, in `filters`, are the run filters each page stage
+//!   goes through: what it leaves out of a page, what it checks again as it
+//!   writes, and the page's `Event::Skipped`.
+
+mod filters;
 
 use std::{collections::BTreeSet, future::Future, path::Path, time::Duration};
 
@@ -52,6 +57,7 @@ use parking_lot::Mutex;
 use rig_agent::run::PromptError;
 use serde::Serialize;
 
+pub(crate) use self::filters::Left;
 use crate::{
     PipelineConfig, Stage, TranslatorConfig,
     stages::translate::{Conversation, turn},

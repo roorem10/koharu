@@ -157,6 +157,8 @@ pub(crate) async fn inpaint(
         .await?;
     let page = member.page;
     let model = model.to_string();
+    let left = crate::booharu::Left::new(task, config); // Booharu: the run's filters.
+    let cleaning = left.writing(member); // Booharu: the run's filters, for the write (I1).
     member
         .apply(Stage::Inpaint, move |project| match work.target {
             Target::Blocks(cleanups) => Ok(cleanups
@@ -164,9 +166,11 @@ pub(crate) async fn inpaint(
                 .filter(|cleanup| {
                     project.layer(cleanup.block).is_ok_and(|layer| {
                         matches!(&layer.content, Content::Block(block) if block.cleanup.id == cleanup.cleanup)
+                            && !cleaning.leaves(project, layer.id) // Booharu: nor locked now (I2).
                     })
                 })
                 .flat_map(|cleanup| cleaned(cleanup, &work.image, &model, &prompt))
+                .chain(cleaning.kept(project)) // Booharu: the skipped effects keep their art (I2).
                 .collect()),
             Target::Area { rect, mask } => {
                 let Ok(at) = project.page(page) else {
@@ -205,7 +209,9 @@ pub(crate) async fn inpaint(
                 ])
             }
         })
-        .await
+        .await?;
+    left.told(); // Booharu: what the filters left out, once the edit is in.
+    Ok(())
 }
 
 /// The ops replacing a block's clean-up with the fill under its grown mask.
