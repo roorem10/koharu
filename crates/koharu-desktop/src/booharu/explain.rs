@@ -23,7 +23,7 @@ use tauri::State;
 
 use super::{
     events::AGENT_HISTORY_CHANGED,
-    read_chapter::{connect, settings},
+    read_chapter::{connect, listed, settings},
 };
 use crate::{app::App, commands::Result};
 
@@ -60,7 +60,7 @@ async fn explain_line(app: Arc<App>, layer: LayerId) -> anyhow::Result<ExplainAn
     let stops = Stops::new(job.cancel().clone(), app.pipeline.clone());
     let settings = settings()?;
     let agent = koharu_config::get::<AgentConfig>()?.model;
-    let listed = koharu_llm::models().await;
+    let listed = listed(&stops).await.context(STOPPED)?;
     let reference = models::explain_model(
         &listed,
         settings.reading.model.as_deref(),

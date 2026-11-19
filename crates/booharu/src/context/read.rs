@@ -925,14 +925,17 @@ where
     let mut found = Found::default();
     let mut previous = String::new();
     for (step, chunk) in (1..).zip(&chunks) {
-        if stops.stopped() {
-            return Ok(ReadOutcome::Stopped);
-        }
         let pages = &prepared.pages[chunk.clone()];
         let (first, last) = (pages[0].number, pages[pages.len() - 1].number);
         let mut images = Vec::new();
         let mut places = Vec::new();
         for page in pages {
+            // Before each scan, as reading and encoding a chunk's takes a
+            // while: a Stop between chunks, or among a chunk's scans, ends
+            // the read there.
+            if stops.stopped() {
+                return Ok(ReadOutcome::Stopped);
+            }
             let sight = calls::page_sight(Arc::clone(&session), page.id, SIGHT)
                 .await
                 .with_context(|| {
@@ -1993,6 +1996,22 @@ mod tests {
         assert_eq!(script.asked().len(), 1);
         assert_eq!(ChapterContext::load(&chapter.path())?.brief, None);
         assert_eq!((chapter.label("a")?, chapter.note("a")?), (None, None));
+
+        // Stopped before its first scan is read, it asks nothing.
+        let stopped = self::stops();
+        stopped.cancel.cancel();
+        let outcome = read_with(
+            Arc::new(Host::default()),
+            Arc::clone(&chapter.session),
+            chapter.prepared()?,
+            chapter.reader(1),
+            Fit::default(),
+            stopped,
+            |question| script.ask(question),
+        )
+        .await?;
+        assert_eq!(outcome, ReadOutcome::Stopped);
+        assert_eq!(script.asked().len(), 1, "nothing more asked");
         Ok(())
     }
 

@@ -29,7 +29,7 @@ use booharu_core::{
 };
 use koharu_agent::AgentConfig;
 use koharu_llm::{
-    Size,
+    Model, Size,
     rig::{driver::DynModel, operation::Completion},
 };
 use koharu_pipeline::PipelineConfig;
@@ -225,7 +225,9 @@ async fn reading(
     if !prepared.has_text() {
         return skip("There's no text to read; run OCR first.".to_owned());
     }
-    let listed = koharu_llm::models().await;
+    let Some(listed) = listed(&stops).await else {
+        return Ok(ReadOutcome::Stopped);
+    };
     let reference = match request.model {
         // Named for a read by hand alone, it's refused as itself, never as
         // the saved setting it stands in for.
@@ -289,6 +291,17 @@ pub(super) fn settings() -> anyhow::Result<Settings> {
         translation: pipeline.translator.model,
         target_language: pipeline.translator.target.to_string(),
     })
+}
+
+/// The models the user can pick, as koharu-llm lists them, or none once
+/// `stops` stops the wait, as the list asks every vendor's server, and one
+/// that doesn't answer holds it up.
+pub(super) async fn listed(stops: &Stops) -> Option<Vec<Model>> {
+    tokio::select! {
+        biased;
+        () = stops.wait() => None,
+        listed = koharu_llm::models() => Some(listed),
+    }
 }
 
 /// The model `reference` names, connected with `size`, or none once
