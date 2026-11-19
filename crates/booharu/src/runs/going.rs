@@ -94,6 +94,13 @@ struct Going {
     failed: BTreeSet<PageId>,
 }
 
+/// The number of the group going on, if one is, in whatever project: its
+/// own Run step reads while it goes, and nothing else may.
+#[must_use]
+pub fn group_going() -> Option<u64> {
+    GOING.lock().as_ref().map(|going| going.plan.group)
+}
+
 /// Carries on with what the pages `target` names still need in the project
 /// `session` holds when `stages` holds every stage: queues one ordinary run
 /// for each group of the pages that need the same stages, one after
@@ -189,6 +196,7 @@ fn go(
             group,
             groups,
             run: None,
+            reading: false,
         };
         return Ok((plan, None));
     };
@@ -198,6 +206,7 @@ fn go(
         group,
         groups,
         run: Some(run),
+        reading: false,
     };
     host.announce(&plan, 0, run);
     *going = Some(Going {
@@ -366,6 +375,7 @@ fn narrowed(step: Step, going: &Going, session: &Mutex<Session>) -> anyhow::Resu
                     PlanGroup {
                         stages: next.stages,
                         pages,
+                        read: false,
                     },
                 ),
             })
@@ -423,6 +433,7 @@ fn next_step(
                     PlanGroup {
                         stages: group.stages.clone(),
                         pages,
+                        read: false,
                     },
                 )
             })
@@ -450,6 +461,7 @@ mod tests {
         PlanGroup {
             stages: stages.to_vec(),
             pages: pages.iter().map(|&number| page(number)).collect(),
+            read: false,
         }
     }
 
@@ -523,6 +535,7 @@ mod tests {
             group: 7,
             groups: vec![group(&EVERY, &[1])],
             run: Some(RunId(3)),
+            reading: false,
         };
         let going = Going {
             plan: plan.clone(),
@@ -591,6 +604,7 @@ mod tests {
         PlanGroup {
             stages: vec![Stage::Detect],
             pages: pages.to_vec(),
+            read: false,
         }
     }
 
@@ -599,6 +613,7 @@ mod tests {
         PlanGroup {
             stages: vec![stage],
             pages: pages.to_vec(),
+            read: false,
         }
     }
 
@@ -703,6 +718,27 @@ mod tests {
         }
     }
 
+    #[test]
+    fn the_group_going_is_the_one_in_the_place() {
+        let _placing = PLACING.blocking_lock();
+        let number = MADE.fetch_add(1, Ordering::Relaxed) + 1;
+        *GOING.lock() = Some(Going {
+            plan: RunPlan {
+                group: number,
+                groups: vec![group(&EVERY, &[1])],
+                run: None,
+                reading: true,
+            },
+            project: ProjectId(Uuid::from_u128(1)),
+            stops: 0,
+            narrows: false,
+            failed: BTreeSet::new(),
+        });
+        assert_eq!(group_going(), Some(number));
+        free(number);
+        assert_eq!(group_going(), None);
+    }
+
     /// Waits until no group holds the place, as once its follower went.
     async fn freed() {
         let waited = tokio::time::Instant::now();
@@ -777,6 +813,7 @@ mod tests {
                     group,
                     groups: vec![detection(&pages[..1]), detection(&pages[1..])],
                     run: Some(RunId(0)),
+                    reading: false,
                 },
                 project,
                 stops,
@@ -871,11 +908,13 @@ mod tests {
         let carrying_on = vec![PlanGroup {
             stages: EVERY.to_vec(),
             pages: pages.clone(),
+            read: false,
         }];
         let reading = [Stage::Recognize, Stage::Translate];
         let preset = vec![PlanGroup {
             stages: reading.to_vec(),
             pages: pages.clone(),
+            read: false,
         }];
         let plans = |stages: &[Stage], groups: &[PlanGroup]| {
             translating(&session, groups.to_vec(), stages, unlinked).expect("the plan")
@@ -888,6 +927,7 @@ mod tests {
         let read = PlanGroup {
             stages: EVERY[..3].to_vec(),
             pages: pages.clone(),
+            read: false,
         };
         assert_eq!(
             plans(&EVERY, &carrying_on),
@@ -929,6 +969,7 @@ mod tests {
                 group: 0,
                 groups: vec![detection(&pages), translation(&pages)],
                 run: None,
+                reading: false,
             },
             project: session.lock().id(),
             stops: 0,
@@ -1007,6 +1048,7 @@ mod tests {
                 group,
                 groups: vec![detection(&pages), translation(&pages)],
                 run: Some(RunId(0)),
+                reading: false,
             },
             project: session.lock().id(),
             stops: host.pipeline.stops(),

@@ -51,14 +51,14 @@ use booharu_core::{
     context::{Chapter, SeriesStore},
     styles::recorded,
 };
-use koharu_pipeline::{RunId, Stage, Target};
+use koharu_pipeline::{Event, RunId, Stage, Target};
 use koharu_scene::{Block, Content, Layer, Page, PageId, Project, Rect, Session};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use strum::VariantArray as _;
 
-pub use self::going::{RunHost, carry_on};
+pub use self::going::{RunHost, carry_on, group_going};
 
 /// The `c2pa` step Koharu's Detection stage records on every panel,
 /// balloon, and block it adds.
@@ -91,13 +91,19 @@ impl RunTarget {
     }
 }
 
-/// Pages that need the same stages, which one run works on.
+/// Pages that need the same stages, which one run works on; or a press's
+/// Read chapter step, which no run works on.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
 pub struct PlanGroup {
-    /// In stage order.
+    /// In stage order; none for the read.
     pub stages: Vec<Stage>,
     /// In page order.
     pub pages: Vec<PageId>,
+    /// Whether it's the press's Read chapter step, which reads the whole
+    /// chapter before its Translation run: it has no stages, and every page
+    /// of the project.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub read: bool,
 }
 
 /// What carrying on queues: the runs of `groups`, one after another, which
@@ -107,7 +113,30 @@ pub struct PlanGroup {
 pub struct RunPlan {
     pub group: u64,
     pub groups: Vec<PlanGroup>,
+    /// The run going now; none while the group's read goes.
     pub run: Option<RunId>,
+    /// Whether the group's Read chapter step is going, which no run is.
+    pub reading: bool,
+}
+
+/// Whether a run is going on the pipeline whose events so far are `told`,
+/// as `Pipeline::told` gives them: one was queued and hasn't ended. A run
+/// stopped is going until the pipeline tells it ended.
+#[must_use]
+pub fn run_going(told: &[Event]) -> bool {
+    let mut going = BTreeSet::new();
+    for event in told {
+        match event {
+            Event::Queued { run, .. } => {
+                going.insert(*run);
+            }
+            Event::Ended { run, .. } => {
+                going.remove(run);
+            }
+            _ => {}
+        }
+    }
+    !going.is_empty()
 }
 
 /// Whether `stages` holds every stage, which makes the Run button carry on
@@ -154,6 +183,7 @@ pub fn groups(session: &Session, target: &RunTarget, stages: &[Stage]) -> Result
     Ok(vec![PlanGroup {
         stages: stages.into_iter().collect(),
         pages,
+        read: false,
     }])
 }
 
@@ -173,6 +203,7 @@ pub fn plan(session: &Session, pages: &[PageId]) -> Result<Vec<PlanGroup>> {
             groups.push(PlanGroup {
                 stages: stages.into_iter().collect(),
                 pages: Vec::new(),
+                read: false,
             });
             groups.len() - 1
         });
@@ -228,10 +259,12 @@ pub fn translate_last(project: &Project, groups: &[PlanGroup]) -> Option<Vec<Pla
     let last = PlanGroup {
         stages: vec![Stage::Translate],
         pages: in_order(translated),
+        read: false,
     };
     let before = before.into_iter().map(|(stages, pages)| PlanGroup {
         stages,
         pages: in_order(pages),
+        read: false,
     });
     Some(before.chain([last]).collect())
 }
@@ -749,6 +782,7 @@ mod tests {
             [PlanGroup {
                 stages: vec![Stage::Recognize, Stage::Translate],
                 pages: vec![p1, p2, p3],
+                read: false,
             }]
         );
         // Every stage carries on with what the pages named still need.
@@ -761,10 +795,12 @@ mod tests {
                 PlanGroup {
                     stages: vec![Stage::Inpaint, Stage::Translate],
                     pages: vec![p2],
+                    read: false,
                 },
                 PlanGroup {
                     stages: EVERY.to_vec(),
                     pages: vec![p3],
+                    read: false,
                 },
             ]
         );
@@ -807,6 +843,7 @@ mod tests {
         let group = |stages: &[Stage], pages: &[&str]| PlanGroup {
             stages: stages.to_vec(),
             pages: pages.iter().map(|name| page(name)).collect(),
+            read: false,
         };
         let (session, project) = (&chapter.session, chapter.session.project());
         let planned = groups(session, &RunTarget::Project {}, &EVERY)?;
@@ -863,10 +900,12 @@ mod tests {
                 PlanGroup {
                     stages: vec![Stage::Recognize],
                     pages: vec![p1, p2],
+                    read: false,
                 },
                 PlanGroup {
                     stages: vec![Stage::Translate],
                     pages: vec![p1, p2],
+                    read: false,
                 },
             ])
         );
@@ -958,5 +997,23 @@ mod tests {
             assert!(read(wrong.clone()).is_err(), "{wrong}");
         }
         Ok(())
+    }
+
+    #[test]
+    fn a_run_is_going_from_queued_until_it_ends() {
+        let queued = |run| Event::Queued {
+            run: RunId(run),
+            steps: 1,
+            stages: vec![Stage::Detect],
+            pages: true,
+        };
+        let ended = |run| Event::Ended {
+            run: RunId(run),
+            outcome: koharu_pipeline::Outcome::Stopped,
+        };
+        assert!(!run_going(&[]));
+        assert!(run_going(&[queued(1)]));
+        assert!(run_going(&[queued(1), queued(2), ended(1)]));
+        assert!(!run_going(&[queued(1), queued(2), ended(2), ended(1)]));
     }
 }

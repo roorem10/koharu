@@ -168,6 +168,7 @@ mod tests {
             [PlanGroup {
                 stages: vec![Stage::Detect],
                 pages: vec![page],
+                read: false,
             }]
         );
         let run = plan.run.expect("the group's run");
