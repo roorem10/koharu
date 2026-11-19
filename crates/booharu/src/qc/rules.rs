@@ -202,14 +202,22 @@ fn script(character: char) -> Option<Script> {
     }
 }
 
+/// The Chinese languages, each written in Han: the macrolanguage `zh` and
+/// the languages ISO 639-3 counts in it, Cantonese, `yue`, which Koharu
+/// offers as a target, among them.
+const CHINESE: [&str; 17] = [
+    "zh", "cdo", "cjy", "cmn", "cnp", "cpx", "csp", "czh", "czo", "gan", "hak", "hsn", "lzh",
+    "mnp", "nan", "wuu", "yue",
+];
+
 /// Whether a translation into `target` writes `character` only as leftover
-/// source text: Japanese writes kana and Han, Chinese Han, and Korean
-/// Hangul; any other language none of them.
+/// source text: Japanese writes kana and Han, the Chinese languages Han,
+/// and Korean Hangul; any other language none of them.
 fn leftover_character(target: &LanguageIdentifier, character: char) -> bool {
     let written: &[Script] = match target.language.as_str() {
         "ja" => &[Script::Kana, Script::Han],
-        "zh" => &[Script::Han],
         "ko" => &[Script::Hangul],
+        language if CHINESE.contains(&language) => &[Script::Han],
         _ => &[],
     };
     script(character).is_some_and(|script| !written.contains(&script))
@@ -391,6 +399,11 @@ mod tests {
         assert!(!leftover("漢字", Some("zh")));
         assert!(leftover("Hello 漢", Some("ko")));
         assert!(!leftover("안녕", Some("ko")));
+        // Cantonese, and Chinese's other languages, write Han too.
+        assert!(!leftover("你係邊個？", Some("yue")));
+        assert!(leftover("你好あ", Some("yue")));
+        assert!(!leftover("侬好", Some("wuu")));
+        assert!(leftover("你好あ", Some("cmn")));
     }
 
     #[test]
@@ -439,6 +452,12 @@ mod tests {
         // shows nothing left over.
         let ja: LanguageIdentifier = "ja".parse().expect("a language");
         assert_eq!(problems(&given_back, &judge(&ja, &none)), []);
+        let yue: LanguageIdentifier = "yue".parse().expect("a language");
+        let chinese = Facts {
+            source: "你好".to_owned(),
+            ..given_back.clone()
+        };
+        assert_eq!(problems(&chinese, &judge(&yue, &none)), []);
         let kept = Facts {
             given_back: false,
             ..given_back
