@@ -21,6 +21,7 @@ use rig_core::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio_util::sync::CancellationToken;
 
 use super::{BooharuHost, context::blocking};
 use crate::tools::{Tools, failed, project, schema};
@@ -89,12 +90,27 @@ impl Tool for GetQcFindings {
         context: &mut ToolContext,
         args: PagesArgs,
     ) -> Result<Vec<PageFinding>, Self::Error> {
-        blocking(context, move |tools, host| {
+        // What the check reads is taken with the tools, which are let go
+        // before any page is laid out: they hold the session, which keeps
+        // its project's file locked while it's held, so a project closed
+        // meanwhile would open again only once every page was laid out.
+        let (renderer, project, inputs) = blocking(context, |tools, host| {
             let (file, project) = opened(tools);
             let inputs = inputs(host, &file, &project)?;
+            Ok((tools.renderer.clone(), project, inputs))
+        })
+        .await?;
+        // A call dropped, as when the agent is stopped, lays out no more
+        // pages.
+        let dropped = CancellationToken::new();
+        let _stops = dropped.clone().drop_guard();
+        tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<PageFinding>> {
             let mut found = Vec::new();
             for (page_number, page) in numbered(&project, args.page)? {
-                let findings = qc::check_page(&tools.renderer, &project, page, &inputs)?;
+                if dropped.is_cancelled() {
+                    break;
+                }
+                let findings = qc::check_page(&renderer, &project, page, &inputs)?;
                 found.extend(findings.into_iter().map(|finding| PageFinding {
                     page_number,
                     finding,
@@ -103,6 +119,8 @@ impl Tool for GetQcFindings {
             Ok(found)
         })
         .await
+        .map_err(failed)?
+        .map_err(|error| failed(format!("{error:#}")))
     }
 }
 
