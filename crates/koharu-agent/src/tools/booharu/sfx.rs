@@ -51,6 +51,9 @@ impl Tool for AddSfxSubtitle {
          effect's own translation; with neither, it starts a Translate run on the effect that \
          writes the translation it gets as the subtitle instead of as the effect's \
          translation, or nothing when that only gives the source back: follow it with wait. \
+         An effect given a translation while that run went, typed or by another run, keeps it \
+         and gets no subtitle, the run telling `skipped` with it as `hand_fixed`: call again \
+         to make the subtitle from that translation. \
          An effect with no words read yet, a blank source, has nothing to translate and is \
          refused without `text`: give `text`, or read it again first with booharu_redo_boxes \
          (`recognize`). Answers `layer`, the subtitle's text layer, or `run`, that Translate \

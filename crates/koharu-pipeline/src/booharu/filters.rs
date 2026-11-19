@@ -284,9 +284,10 @@ impl Writing {
 
     /// The ops giving the sound effect `layer` on `page` its answer `text`,
     /// in `language`, as its subtitle: none when it's locked now, counted;
-    /// when it got a subtitle since the read; when the answer is its source,
-    /// both trimmed; or when its source has no box to put one beside, as
-    /// Add subtitle refuses one; each leaves it as it is.
+    /// when it has a translation of some words now, counted as fixed by
+    /// hand; when it got a subtitle since the read; when the answer is its
+    /// source, both trimmed; or when its source has no box to put one
+    /// beside, as Add subtitle refuses one; each leaves it as it is.
     fn subtitle(
         &self,
         page: &Page,
@@ -299,6 +300,18 @@ impl Writing {
         };
         if protect::locked(page, layer.id) {
             self.left.count(&self.member, Reason::Locked);
+            return Ok(None);
+        }
+        // Add subtitle runs one only for an effect with no words of its own
+        // to subtitle it with, so a translation now was typed, or written by
+        // another run, while the model ran. The subtitle would take it away:
+        // it stays, and Add subtitle makes the subtitle from it (D1).
+        let translated = block
+            .translation
+            .as_ref()
+            .is_some_and(|translation| !translation.content.text().trim().is_empty());
+        if translated {
+            self.left.count(&self.member, Reason::HandFixed);
             return Ok(None);
         }
         if sfx::subtitled(page, layer.id)
@@ -1327,6 +1340,54 @@ mod tests {
         assert!(fixture.block("effect")?.cleanup.visible, "as it was");
         // The page's other answers are written.
         assert_eq!(fixture.translation("talk")?.as_deref(), Some("Why?"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_subtitle_run_keeps_a_translation_typed_while_it_ran_and_counts_it_fixed_by_hand()
+    -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("typed", None, 0, block("sfx", (20.0, 20.0))),
+                add("still", None, 1, block("sfx", (80.0, 20.0))),
+            ],
+        )?;
+        let events = Events::new();
+        let left = Left::of(
+            Stage::Translate,
+            snapshot(SfxMode::Skip, false, true),
+            events.clone(),
+        );
+        let member = fixture.member(Some(&["typed", "still"]));
+        assert_eq!(left.sent(&member).blocks, member.blocks);
+        // While the model ran, one effect's translation was typed by hand.
+        fixture.type_in("typed", "Thump")?;
+        let said = answers(&fixture, &[("typed", "BAM"), ("still", "THUD")]);
+        let ops = left.writing(&member).written(
+            &fixture.project(),
+            said,
+            &TranslatorConfig::default(),
+        )?;
+        fixture.edit(ops)?;
+        left.told();
+        assert_eq!(skipped(&events.told()), [(Stage::Translate, 0, 1, 0, true)]);
+        let page = fixture.page()?;
+        // The typed words stay, with no subtitle, and the clean-up as it was.
+        assert_eq!(sfx::subtitle_of(&page, fixture.id("typed")), None);
+        assert_eq!(fixture.translation("typed")?.as_deref(), Some("Thump"));
+        assert!(fixture.block("typed")?.cleanup.visible);
+        assert!(!Auto::of(&fixture.layer("typed")?).kept);
+        // The effect still without one gets its subtitle as before.
+        let subtitle = sfx::subtitle_of(&page, fixture.id("still")).context("a subtitle")?;
+        let project = fixture.project();
+        let Content::Text(written) = &project.layer(subtitle)?.content else {
+            anyhow::bail!("the subtitle isn't text");
+        };
+        assert_eq!(written.content.text(), "THUD");
+        assert_eq!(fixture.translation("still")?, None);
+        assert!(!fixture.block("still")?.cleanup.visible);
+        assert!(Auto::of(&fixture.layer("still")?).kept);
         Ok(())
     }
 

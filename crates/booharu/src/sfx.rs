@@ -149,7 +149,9 @@ pub fn created(change: &Change) -> Option<LayerId> {
 /// subtitle it with ([`Subtitle::NeedsTranslation`]): Translate alone on
 /// the effect, with `config`, the saved pipeline settings, in subtitle mode
 /// (`booharu.subtitle_run`), so the stage writes the translation it gets as
-/// the effect's subtitle rather than as its translation.
+/// the effect's subtitle rather than as its translation. An effect given a
+/// translation while the run went keeps it, counted as fixed by hand, and
+/// [`add_sfx_subtitle`] then makes the subtitle from it.
 #[must_use]
 pub fn subtitle_run(block: LayerId, mut config: PipelineConfig) -> Request {
     config.booharu.subtitle_run = true;
