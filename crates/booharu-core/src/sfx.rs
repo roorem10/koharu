@@ -14,7 +14,9 @@
 //! ([`kept_original`]), so a clean-up hidden by hand can be told from
 //! Booharu's own ([`hand_kept`]). The mark is never Koharu's given-back
 //! record, which would have the quality check report every effect as given
-//! back untranslated.
+//! back untranslated. A first translation typed into such an effect on the
+//! canvas shows its clean-up again and takes the mark off ([`shown_again`]),
+//! as one typed in the Story panel does.
 //!
 //! The run filters, the planner, the quality check, and the commands all
 //! call these functions, never a copy of their own.
@@ -144,6 +146,54 @@ pub fn kept_original(layer: &Layer) -> Vec<Op> {
         },
         mark,
     ]
+}
+
+/// The inverse of [`kept_original`], for a first translation typed into an
+/// effect kept as art, read before the edit: for a block with no translation
+/// that carries the kept mark, its clean-up shown when hidden and its
+/// hand-edit record without the mark, or none at all when nothing else is
+/// left in it, as [`styles::typed`](crate::styles::typed) writes it. Any
+/// other layer gets none: a block with no mark has its clean-up as the user
+/// left it, hidden by hand or shown, and a translated block had its mark
+/// dealt with as the translation came.
+pub fn shown_again(layer: &Layer) -> Result<Vec<Op>> {
+    let Content::Block(block) = &layer.content else {
+        return Ok(Vec::new());
+    };
+    if block.translation.is_some() {
+        return Ok(Vec::new());
+    }
+    let Some(unmark) = unmarked(layer)? else {
+        return Ok(Vec::new());
+    };
+    let mut ops = Vec::with_capacity(2);
+    if !block.cleanup.visible {
+        ops.push(Op::UpdateLayer {
+            layer: layer.id.into(),
+            patch: json!({"cleanup": {"visible": true}}),
+        });
+    }
+    ops.push(unmark);
+    Ok(ops)
+}
+
+/// The op taking the kept mark off `layer`'s hand-edit record: the record
+/// without it, or no record at all when nothing else is left in it; none for
+/// a layer whose record carries no mark.
+pub(crate) fn unmarked(layer: &Layer) -> Result<Option<Op>> {
+    let record = Auto::of(layer);
+    if !record.kept {
+        return Ok(None);
+    }
+    let record = Auto {
+        kept: false,
+        ..record
+    };
+    Ok(Some(if record == Auto::default() {
+        attrs::clear::<Auto>(layer.id)
+    } else {
+        attrs::set(layer.id, &record)?
+    }))
 }
 
 /// Whether `block`, which `layer` holds, had its clean-up hidden by hand: it
@@ -653,6 +703,75 @@ mod tests {
         assert!(kept_original(&fixture.layer(other)).is_empty());
         // And a layer that isn't a block has nothing to keep.
         assert!(kept_original(&fixture.layer(fixture.balloon)).is_empty());
+    }
+
+    #[test]
+    fn showing_a_kept_effect_again_undoes_keeping_it_and_nothing_else() {
+        let mut fixture = Fixture::new("sfx");
+        let shown = |layer: &Layer| shown_again(layer).expect("the ops");
+        let json = |ops: &[Op]| serde_json::to_value(ops).expect("JSON");
+        let show = |id: LayerId| Op::UpdateLayer {
+            layer: id.into(),
+            patch: json!({"cleanup": {"visible": true}}),
+        };
+
+        // Kept as art with nothing else recorded: its clean-up shows, and the
+        // record, left empty, goes.
+        let id = fixture.outside;
+        let ops = kept_original(&fixture.layer(id));
+        fixture.apply(ops);
+        let ops = shown(&fixture.layer(id));
+        assert_eq!(json(&ops), json(&[show(id), attrs::clear::<Auto>(id)]));
+        fixture.apply(ops);
+        let layer = fixture.layer(id);
+        assert!(fixture.block(id).cleanup.visible);
+        assert_eq!(attrs::get::<Auto>(&layer), None);
+        assert!(shown(&layer).is_empty());
+
+        // A record holding more keeps it, as it was before the mark.
+        let id = fixture.under;
+        let source = styles::recognized(&fixture.layer(id), "ドン").expect("the record");
+        fixture.apply(vec![source]);
+        let before = Auto::of(&fixture.layer(id));
+        let ops = kept_original(&fixture.layer(id));
+        fixture.apply(ops);
+        let ops = shown(&fixture.layer(id));
+        assert_eq!(ops.len(), 2, "{ops:?}");
+        fixture.apply(ops);
+        assert!(fixture.block(id).cleanup.visible);
+        assert_eq!(attrs::get::<Auto>(&fixture.layer(id)), Some(before));
+
+        // Marked, but its clean-up shown by hand: only the mark goes.
+        let id = fixture.held;
+        let ops = kept_original(&fixture.layer(id));
+        fixture.apply(ops);
+        fixture.apply(vec![show(id)]);
+        let ops = shown(&fixture.layer(id));
+        assert_eq!(json(&ops), json(&[attrs::clear::<Auto>(id)]));
+
+        // A clean-up hidden by hand, with no mark, stays hidden.
+        let mut fixture = Fixture::new("sfx");
+        let id = fixture.outside;
+        fixture.apply(vec![Op::UpdateLayer {
+            layer: id.into(),
+            patch: json!({"cleanup": {"visible": false}}),
+        }]);
+        assert!(hand_kept(&fixture.layer(id), &fixture.block(id)));
+        assert!(shown(&fixture.layer(id)).is_empty());
+
+        // A translated block is left as it is, even one still marked.
+        let id = fixture.under;
+        let ops = kept_original(&fixture.layer(id));
+        fixture.apply(ops);
+        fixture.apply(vec![Op::SetText {
+            layer: id.into(),
+            text: "BOOM".to_owned(),
+        }]);
+        assert!(Auto::of(&fixture.layer(id)).kept);
+        assert!(shown(&fixture.layer(id)).is_empty());
+
+        // And a layer that isn't a block has no clean-up to show.
+        assert!(shown(&fixture.layer(fixture.balloon)).is_empty());
     }
 
     #[test]

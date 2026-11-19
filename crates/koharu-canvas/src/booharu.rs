@@ -1,12 +1,14 @@
 //! Booharu's part of the canvas: the O tool, whose box dragged out over the
 //! page the canvas answers as `Effect::Booharu`, for the host to make a text
 //! block of, and the default look of new text, which the T tool's text and a
-//! translation typed into a block with none get. The Booharu settings the
-//! canvas needs are one `BooharuSettings`, which the host pushes at startup
-//! and whenever the settings they come from are saved.
+//! translation typed into a block with none get. Such a translation typed
+//! into a sound effect kept as art also shows its clean-up again, without
+//! the kept mark, in the same step. The Booharu settings the canvas needs
+//! are one `BooharuSettings`, which the host pushes at startup and whenever
+//! the settings they come from are saved.
 
-use booharu_core::{lettering, settings::LetteringSettings, styles};
-use koharu_scene::{CharStyle, Content, Fit, Frame, Layer, LayerId, Page, PageId, Role, Text};
+use booharu_core::{lettering, settings::LetteringSettings, sfx, styles};
+use koharu_scene::{CharStyle, Content, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text};
 use kurbo::{Point, Rect, Size};
 use ui_events::keyboard::Modifiers;
 
@@ -92,13 +94,34 @@ pub(crate) fn untranslated(
     }
 }
 
+/// The ops a first translation typed into `layer`, a block on `page` with
+/// none, adds to its step: for a sound effect Booharu kept as art, its
+/// clean-up shown again and the kept mark taken off, as the Story panel's
+/// typing does ([`sfx::shown_again`]); none for any other block, so a
+/// clean-up hidden by hand stays hidden, as Koharu leaves it.
+pub(crate) fn shown_again(page: &Page, layer: LayerId) -> Vec<Op> {
+    // A record read as valid stays valid without the mark, so this never
+    // fails; were it to, the clean-up would stay hidden and marked, as
+    // Koharu's typing alone leaves it.
+    find(&page.layers, layer)
+        .and_then(|found| sfx::shown_again(found).ok())
+        .unwrap_or_default()
+}
+
+/// The layer `id` among `layers` and their children.
+fn find(layers: &[Layer], id: LayerId) -> Option<&Layer> {
+    layers.iter().find_map(|layer| match layer.id == id {
+        true => Some(layer),
+        false => find(&layer.children, id),
+    })
+}
+
 /// The role of the block `id` among `layers` and their children.
 fn role(layers: &[Layer], id: LayerId) -> Option<Role> {
-    layers.iter().find_map(|layer| match &layer.content {
-        _ if layer.id != id => role(&layer.children, id),
+    match &find(layers, id)?.content {
         Content::Block(block) => Some(block.role),
         _ => None,
-    })
+    }
 }
 
 /// What one of Booharu's gestures did, for the host to act on.
@@ -345,12 +368,6 @@ mod tests {
     /// The source of `layer` on `page`, standing in for a translation typed
     /// into it, with the look `untranslated` gives it under `settings`.
     fn typed(page: &Page, layer: LayerId, settings: &BooharuSettings) -> CharStyle {
-        fn find(layers: &[Layer], id: LayerId) -> Option<&Layer> {
-            layers.iter().find_map(|layer| match layer.id == id {
-                true => Some(layer),
-                false => find(&layer.children, id),
-            })
-        }
         let Some(Content::Block(block)) = find(&page.layers, layer).map(|found| &found.content)
         else {
             panic!("no block {layer}");

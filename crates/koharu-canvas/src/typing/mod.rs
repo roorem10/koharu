@@ -492,7 +492,11 @@ impl Typing {
                     layer: layer.into(),
                     patch: json!({ "translation": placed }),
                 };
-                vec![edit("set_text", vec![place, spans(layer, self.content)])]
+                // Booharu: in the same step, a sound effect kept as art shows
+                // its clean-up again and loses the kept mark.
+                let mut ops = vec![place, spans(layer, self.content)];
+                ops.extend(crate::booharu::shown_again(page, layer));
+                vec![edit("set_text", ops)]
             }
             Target::New if !self.content.0.is_empty() => {
                 let text = Text {

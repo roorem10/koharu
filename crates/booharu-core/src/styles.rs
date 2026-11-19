@@ -258,7 +258,8 @@ pub fn translated(
 /// as [`new_translation`] gives one, after `placed`, placement's op for it,
 /// both read before the edit; none when they write nothing. It gets no
 /// record of its own: it's hand-made. A block carrying the kept mark has the
-/// record written without it, as the translation shows its clean-up.
+/// record written without it, as the translation shows its clean-up: the
+/// record's part of [`crate::sfx::shown_again`].
 pub fn typed(
     project: &Project,
     block: LayerId,
@@ -268,18 +269,7 @@ pub fn typed(
 ) -> Result<Vec<Op>> {
     let layer = project.layer(block)?;
     let mut ops = Vec::from_iter(looked(project, block, placed, settings, font)?.op);
-    let record = Auto::of(layer);
-    if record.kept {
-        let record = Auto {
-            kept: false,
-            ..record
-        };
-        ops.push(if record == Auto::default() {
-            attrs::clear::<Auto>(block)
-        } else {
-            attrs::set(block, &record)?
-        });
-    }
+    ops.extend(crate::sfx::unmarked(layer)?);
     Ok(ops)
 }
 

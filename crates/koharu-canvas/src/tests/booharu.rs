@@ -1,12 +1,15 @@
-//! The O tool's box, as the canvas answers it, and the default look of the
-//! text the T tool adds and of a translation typed into a block with none,
-//! on the canvas's harness.
+//! The O tool's box, as the canvas answers it, the default look of the text
+//! the T tool adds and of a translation typed into a block with none, and
+//! the clean-up such a translation shows again on a sound effect kept as
+//! art, on the canvas's harness.
 
 use std::collections::BTreeMap;
 
 use booharu_core::{
+    attrs::{self, Auto},
     lettering::{CategoryFont, LetteringCategory},
     settings::{DefaultTextStyle, LetteringSettings},
+    sfx,
 };
 use koharu_scene::{CharStyle, Fit};
 
@@ -350,13 +353,19 @@ fn untranslated() -> Option<(Fixture, LayerId, LayerId)> {
 }
 
 /// Types "Hi" with the T tool into the block pressed at `at`, and commits
-/// it: the translation's character values.
-fn type_translation(fixture: &mut Fixture, block: LayerId, at: (f64, f64)) -> CharStyle {
+/// it: what the commit answered, not yet applied.
+fn commit_translation(fixture: &mut Fixture, block: LayerId, at: (f64, f64)) -> Vec<Effect> {
     fixture.canvas.set_tool(Tool::Text);
     let effects = gesture(&mut fixture.canvas, at, at);
     assert_eq!(selections(&effects), [vec![block]]);
     type_text(&mut fixture.canvas, "Hi");
-    let effects = press_key(&mut fixture.canvas, NamedKey::Enter, Code::Enter, CONTROL);
+    press_key(&mut fixture.canvas, NamedKey::Enter, Code::Enter, CONTROL)
+}
+
+/// Types "Hi" with the T tool into the block pressed at `at`, and commits
+/// it: the translation's character values.
+fn type_translation(fixture: &mut Fixture, block: LayerId, at: (f64, f64)) -> CharStyle {
+    let effects = commit_translation(fixture, block, at);
     assert_eq!(apply(fixture, effects), ["set_text"]);
     chars(&layer(fixture, block)["translation"])
 }
@@ -446,6 +455,129 @@ fn a_translation_typed_into_a_block_takes_its_categorys_font_while_the_switch_is
     // The T tool's own text has no category (T17), only the default look.
     let text = type_new(&mut fixture, (10.0, 210.0), (110.0, 260.0));
     assert_eq!(font(chars(&text)), (Some(FONT.to_owned()), None, None));
+}
+
+/// Keeps the block `block` as art, as a run skipping a sound effect does:
+/// its clean-up hidden, with the kept mark.
+fn keep_as_art(fixture: &mut Fixture, block: LayerId) {
+    let kept = {
+        let project = fixture.session.lock().project();
+        sfx::kept_original(project.layer(block).expect("the block"))
+    };
+    assert_eq!(kept.len(), 2, "{kept:?}");
+    let ops = kept
+        .iter()
+        .map(|op| serde_json::to_value(op).expect("an op"))
+        .collect();
+    other_writer(fixture, ops);
+}
+
+/// The ops of the one edit among `effects`, which is labelled `set_text`.
+fn set_text(effects: &[Effect]) -> Vec<Op> {
+    let edits: Vec<&Edit> = effects
+        .iter()
+        .filter_map(|effect| match effect {
+            Effect::Edit(edit) => Some(edit),
+            _ => None,
+        })
+        .collect();
+    match edits[..] {
+        [edit] if edit.label == "set_text" => edit.ops.clone(),
+        ref other => panic!("{other:?} isn't one set_text edit"),
+    }
+}
+
+fn json_of(ops: &[Op]) -> Value {
+    serde_json::to_value(ops).expect("JSON")
+}
+
+/// The ops Koharu's typing gives `block`, read from `fixture` before the
+/// commit, with nothing pushed: the translation in its source's place and
+/// style, and its words, "Hi", as `ops`, the commit's, hold them second.
+fn koharus(fixture: &Fixture, block: LayerId, ops: &[Op]) -> Value {
+    let mut placed = layer(fixture, block)["source"].clone();
+    placed.as_object_mut().expect("a text").remove("content");
+    let Some(Op::SetRichText { spans, .. }) = ops.get(1) else {
+        panic!("{ops:?} hold no words second");
+    };
+    let words: String = spans.iter().map(|span| span.insert.as_str()).collect();
+    assert_eq!(words, "Hi");
+    json_of(&[
+        Op::UpdateLayer {
+            layer: block.into(),
+            patch: json!({ "translation": placed }),
+        },
+        Op::SetRichText {
+            layer: block.into(),
+            spans: spans.clone(),
+        },
+    ])
+}
+
+#[test]
+fn a_translation_typed_into_an_effect_kept_as_art_shows_its_clean_up_in_the_same_step() {
+    let Some((mut fixture, _, boom)) = untranslated() else {
+        return;
+    };
+    keep_as_art(&mut fixture, boom);
+    let effects = commit_translation(&mut fixture, boom, (300.0, 100.0));
+    let ops = set_text(&effects);
+    // Koharu's two ops, then the clean-up shown and the record cleared, as
+    // it held only the mark.
+    assert_eq!(ops.len(), 4, "{ops:?}");
+    assert_eq!(json_of(&ops[..2]), koharus(&fixture, boom, &ops));
+    let shown = [
+        Op::UpdateLayer {
+            layer: boom.into(),
+            patch: json!({"cleanup": {"visible": true}}),
+        },
+        attrs::clear::<Auto>(boom),
+    ];
+    assert_eq!(json_of(&ops[2..]), json_of(&shown));
+
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    let typed = layer(&fixture, boom);
+    assert!(typed["translation"].is_object(), "{typed}");
+    assert_eq!(typed["cleanup"]["visible"], json!(true));
+    assert!(typed["attributes"]["booharu"]["auto"].is_null(), "{typed}");
+    // One step: undone, the effect is kept as art again.
+    fixture
+        .session
+        .lock()
+        .undo()
+        .expect("the undo")
+        .expect("a step");
+    fixture.render();
+    let undone = layer(&fixture, boom);
+    assert!(undone["translation"].is_null(), "{undone}");
+    assert_eq!(undone["cleanup"]["visible"], json!(false));
+    assert_eq!(undone["attributes"]["booharu"]["auto"]["kept"], json!(true));
+}
+
+#[test]
+fn a_translation_typed_into_a_block_without_the_mark_is_koharus_alone() {
+    let Some((mut fixture, talk, boom)) = untranslated() else {
+        return;
+    };
+    // A sound effect whose clean-up was hidden by hand keeps it hidden.
+    other_writer(
+        &mut fixture,
+        vec![json!({"op": "update_layer", "layer": boom,
+            "patch": {"cleanup": {"visible": false}}})],
+    );
+    let effects = commit_translation(&mut fixture, boom, (300.0, 100.0));
+    let ops = set_text(&effects);
+    assert_eq!(json_of(&ops), koharus(&fixture, boom, &ops));
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    let typed = layer(&fixture, boom);
+    assert!(typed["translation"].is_object(), "{typed}");
+    assert_eq!(typed["cleanup"]["visible"], json!(false));
+    assert!(typed["attributes"]["booharu"].is_null(), "{typed}");
+
+    // Dialogue, its clean-up showing, alike.
+    let effects = commit_translation(&mut fixture, talk, (100.0, 100.0));
+    let ops = set_text(&effects);
+    assert_eq!(json_of(&ops), koharus(&fixture, talk, &ops));
 }
 
 #[test]
