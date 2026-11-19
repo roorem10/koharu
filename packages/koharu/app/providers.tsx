@@ -12,6 +12,7 @@ import { useBooharuJobEvents } from '@/lib/booharu/booharuJobs' // Booharu: its 
 import { useBooharuRunGroups } from '@/lib/booharu/chime' // Booharu: carrying-on groups' runs.
 import { useBooharuContextChanges } from '@/lib/booharu/context' // Booharu: glossary changes.
 import { useBooharuNotices } from '@/lib/booharu/notices' // Booharu: its notices, as toasts.
+import { useBooharuQcEvents } from '@/lib/booharu/qc' // Booharu: the quality check's findings.
 import { usePageMenuGuard } from '@/lib/booharu/usePageMenuGuard' // Booharu: the menu guard.
 import i18n from '@/lib/i18n'
 import {
@@ -114,6 +115,7 @@ export function Providers({ children }: { children: ReactNode }) {
   useBooharuContextChanges() // Booharu: reads the series and the chapter again as they change.
   useBooharuJobEvents() // Booharu: follows each Read chapter going, which no run works on.
   useBooharuAgentChatEvents() // Booharu: keeps the agent's chat with the project, as it changes.
+  useBooharuQcEvents() // Booharu: keeps the quality check's findings with the project, page by page.
 
   return (
     <QueryClientProvider client={queryClient}>
