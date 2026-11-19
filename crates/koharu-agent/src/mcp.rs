@@ -37,6 +37,8 @@ pub struct McpServer {
     address: SocketAddr,
     project: Arc<RwLock<Option<Tools>>>,
     cancel: CancellationToken,
+    /// Booharu: the calls in flight, which `open` drops.
+    calls: crate::tools::booharu::McpCalls,
 }
 
 impl McpServer {
@@ -47,6 +49,7 @@ impl McpServer {
         let address = listener.local_addr()?;
         let handler = Handler::new();
         let project = Arc::clone(&handler.project);
+        let calls = handler.calls.clone(); // Booharu: the calls each session's handler runs.
         let cancel = CancellationToken::new();
         // A browser sends an `Origin` and an MCP client doesn't, so refusing
         // every one keeps web pages out, as the MCP spec asks of a local
@@ -73,6 +76,7 @@ impl McpServer {
             address,
             project,
             cancel,
+            calls, // Booharu: the calls in flight.
         })
     }
 
@@ -83,6 +87,8 @@ impl McpServer {
     /// The project calls go to from now on, or none.
     pub fn open(&self, tools: Option<Tools>) {
         *self.project.write() = tools;
+        // Booharu: drops the calls in flight, which would keep the project they went to open.
+        self.calls.close();
     }
 }
 
@@ -98,6 +104,8 @@ impl Drop for McpServer {
 struct Handler {
     project: Arc<RwLock<Option<Tools>>>,
     tools: ToolSet,
+    /// Booharu: the calls in flight, which the server's `open` drops.
+    calls: crate::tools::booharu::McpCalls,
 }
 
 impl Handler {
@@ -105,6 +113,7 @@ impl Handler {
         Self {
             project: Arc::default(),
             tools: Tools::toolset(),
+            calls: Default::default(), // Booharu: none in flight yet.
         }
     }
 
@@ -158,7 +167,11 @@ impl ServerHandler for Handler {
         _: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
         let arguments = Value::Object(request.arguments.unwrap_or_default());
-        Ok(self.answer(&request.name, arguments).await.into())
+        // Booharu: dropped once its project closes, so it holds that project no longer.
+        let answer = self
+            .calls
+            .until_closed(self.answer(&request.name, arguments));
+        Ok(answer.await.into())
     }
 }
 

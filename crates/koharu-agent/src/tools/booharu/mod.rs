@@ -45,6 +45,7 @@
 mod boxes;
 mod context;
 mod lettering;
+mod mcp;
 mod notes;
 mod project;
 mod qc;
@@ -54,7 +55,7 @@ mod settings;
 mod styles;
 mod translation;
 
-pub(crate) use self::{context::outlined, runs::WAIT};
+pub(crate) use self::{context::outlined, mcp::McpCalls, runs::WAIT};
 
 use std::{collections::BTreeSet, sync::Arc};
 
