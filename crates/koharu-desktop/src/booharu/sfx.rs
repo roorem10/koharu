@@ -3,11 +3,11 @@
 //! `[booharu-lettering]`, the first of Koharu's Preferred fonts, and the
 //! saved pipeline settings as they are when called.
 
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Context as _;
 use booharu::sfx::{self, SfxSubtitleAnswer, Subtitle};
-use koharu_pipeline::{PipelineConfig, Stage, Target};
+use koharu_pipeline::PipelineConfig;
 use koharu_scene::LayerId;
 use tauri::State;
 
@@ -59,41 +59,10 @@ pub async fn booharu_add_sfx_subtitle(
             run: None,
         });
     }
-    let (target, stages, config) = subtitle_run(block, config);
-    let run = app.process(target, stages, Some(config))?;
+    let request = sfx::subtitle_run(block, config);
+    let run = app.process(request.target, request.stages, request.config)?;
     Ok(SfxSubtitleAnswer {
         layer: None,
         run: Some(run),
     })
-}
-
-/// The Translate run in subtitle mode on the sound effect `block`, with
-/// `config`, the saved pipeline settings.
-fn subtitle_run(
-    block: LayerId,
-    mut config: PipelineConfig,
-) -> (Target, BTreeSet<Stage>, PipelineConfig) {
-    config.booharu.subtitle_run = true;
-    (
-        Target::Blocks(vec![block]),
-        BTreeSet::from([Stage::Translate]),
-        config,
-    )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn an_effect_without_words_is_translated_alone_in_subtitle_mode() {
-        let block: LayerId = "00000000-0000-0000-0000-000000000001"
-            .parse()
-            .expect("an id");
-        let (target, stages, config) = subtitle_run(block, PipelineConfig::default());
-        assert_eq!(target, Target::Blocks(vec![block]));
-        assert_eq!(stages, BTreeSet::from([Stage::Translate]));
-        assert!(config.booharu.subtitle_run);
-        assert!(!config.booharu.redo);
-    }
 }

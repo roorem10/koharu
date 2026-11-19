@@ -4,11 +4,11 @@
 //! worked out by `booharu::redo`, which the agent's tool shares, under the
 //! saved `[booharu-lettering]` as it is when called.
 
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 
 use booharu::redo::{self, RedoAnswer, RedoCounts};
 use booharu_core::{runs::RunStage, settings::LetteringSettings};
-use koharu_pipeline::{PipelineConfig, Stage, Target, pipeline_stage};
+use koharu_pipeline::PipelineConfig;
 use koharu_scene::LayerId;
 use tauri::State;
 
@@ -59,55 +59,9 @@ pub async fn booharu_redo_boxes(
         redo::redo_targets(&project, &blocks, &asked, &settings, include_hand_fixed)
     })
     .await??;
-    let queued = match run(redo.blocks.clone(), &stages, include_hand_fixed, config) {
-        Some((target, stages, config)) => Some(app.process(target, stages, Some(config))?),
+    let queued = match redo.request(&stages, include_hand_fixed, config) {
+        Some(request) => Some(app.process(request.target, request.stages, request.config)?),
         None => None,
     };
     Ok(redo.answer(queued, include_hand_fixed))
-}
-
-/// The run Redo boxes queues on `blocks`, the boxes it takes, for `stages`:
-/// Koharu's stages by the same names on those boxes, with `config`, the
-/// saved pipeline settings, its `booharu.redo` set when the redo takes the
-/// hand-fixed boxes too; none when it takes no box.
-fn run(
-    blocks: Vec<LayerId>,
-    stages: &[RunStage],
-    include_hand_fixed: bool,
-    mut config: PipelineConfig,
-) -> Option<(Target, BTreeSet<Stage>, PipelineConfig)> {
-    if blocks.is_empty() {
-        return None;
-    }
-    config.booharu.redo = include_hand_fixed;
-    let stages = stages.iter().filter_map(|&stage| pipeline_stage(stage));
-    Some((Target::Blocks(blocks), stages.collect(), config))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_redo_runs_once_on_the_boxes_it_takes_lifting_the_hand_fixed_rule_when_asked() {
-        let blocks: Vec<LayerId> = ["00000000-0000-0000-0000-000000000001"]
-            .iter()
-            .map(|id| id.parse().expect("an id"))
-            .collect();
-        let stages = [RunStage::Translate, RunStage::Recognize];
-        assert!(run(Vec::new(), &stages, true, PipelineConfig::default()).is_none());
-        for include_hand_fixed in [true, false] {
-            let (target, queued, config) = run(
-                blocks.clone(),
-                &stages,
-                include_hand_fixed,
-                PipelineConfig::default(),
-            )
-            .expect("a run");
-            assert_eq!(target, Target::Blocks(blocks.clone()));
-            assert_eq!(queued, BTreeSet::from([Stage::Recognize, Stage::Translate]));
-            assert_eq!(config.booharu.redo, include_hand_fixed);
-            assert!(!config.booharu.subtitle_run);
-        }
-    }
 }

@@ -5,10 +5,11 @@
 //! source corrected by hand when reading, and a translation written or
 //! fixed by hand, or a clean-up hidden by hand on a box with none, when
 //! translating. Redo boxes counts the boxes named first ([`count_redo`]),
-//! so the interface can ask before taking the hand-fixed ones too, then
-//! runs the stages again on the boxes it may change ([`redo_targets`]): one
-//! ordinary run whose `booharu.redo` flag lifts the hand-fixed rule alone,
-//! answered with the boxes it left alone ([`Redo::answer`]).
+//! so the interface and the agent can ask before taking the hand-fixed ones
+//! too, then runs the stages again on the boxes it may change
+//! ([`redo_targets`]): one ordinary run ([`Redo::request`]) whose
+//! `booharu.redo` flag lifts the hand-fixed rule alone, answered with the
+//! boxes it left alone ([`Redo::answer`]).
 //! A lock is never lifted, and neither is the SFX mode keeping a sound
 //! effect as art.
 
@@ -20,7 +21,7 @@ use booharu_core::{
     runs::RunStage,
     settings::LetteringSettings,
 };
-use koharu_pipeline::RunId;
+use koharu_pipeline::{PipelineConfig, Request, RunId, Target, pipeline_stage};
 use koharu_scene::{Content, LayerId, Project};
 use serde::{Deserialize, Serialize};
 
@@ -58,6 +59,32 @@ pub struct Redo {
 }
 
 impl Redo {
+    /// The run Redo boxes queues on these boxes for `stages`, with
+    /// `config`, the saved pipeline settings: Koharu's stages by the same
+    /// names, its `booharu.redo` set when the redo takes the hand-fixed
+    /// boxes too (`include_hand_fixed`), so it reads and translates those
+    /// again; none when it takes no box.
+    #[must_use]
+    pub fn request(
+        &self,
+        stages: &[RunStage],
+        include_hand_fixed: bool,
+        mut config: PipelineConfig,
+    ) -> Option<Request> {
+        if self.blocks.is_empty() {
+            return None;
+        }
+        config.booharu.redo = include_hand_fixed;
+        Some(Request {
+            target: Target::Blocks(self.blocks.clone()),
+            stages: stages
+                .iter()
+                .filter_map(|&stage| pipeline_stage(stage))
+                .collect(),
+            config: Some(config),
+        })
+    }
+
     /// What Redo boxes answers once it queued `run` on these boxes, none
     /// when there were none: the boxes it left alone, the locked ones, and
     /// the hand-fixed ones unless it took them (`include_hand_fixed`).
@@ -145,6 +172,7 @@ pub fn redo_targets(
 mod tests {
     use std::collections::BTreeMap;
 
+    use koharu_pipeline::Stage;
     use koharu_scene::{Created, Edit, Op, Session};
     use serde_json::json;
     use tempfile::TempDir;
@@ -352,6 +380,35 @@ mod tests {
         }
         assert_eq!(reason("effect", true)?, Some(Reason::SoundEffect));
         assert_eq!(reason("locked", true)?, Some(Reason::Locked));
+        Ok(())
+    }
+
+    #[test]
+    fn a_redo_is_one_run_lifting_the_hand_fixed_rule_only_when_asked() -> Result<()> {
+        let block: LayerId = "00000000-0000-0000-0000-000000000001".parse()?;
+        let stages = [RunStage::Translate, RunStage::Recognize];
+        let none = Redo::default();
+        assert!(
+            none.request(&stages, true, PipelineConfig::default())
+                .is_none()
+        );
+        let redo = Redo {
+            blocks: vec![block],
+            counts: RedoCounts::default(),
+        };
+        for include_hand_fixed in [true, false] {
+            let request = redo
+                .request(&stages, include_hand_fixed, PipelineConfig::default())
+                .expect("a run");
+            assert_eq!(request.target, Target::Blocks(vec![block]));
+            assert_eq!(
+                request.stages,
+                BTreeSet::from([Stage::Recognize, Stage::Translate])
+            );
+            let config = request.config.expect("the run's own settings");
+            assert_eq!(config.booharu.redo, include_hand_fixed);
+            assert!(!config.booharu.subtitle_run);
+        }
         Ok(())
     }
 }

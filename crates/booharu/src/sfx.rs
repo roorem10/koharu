@@ -5,15 +5,18 @@
 //! [`add_sfx_subtitle`] answers what adding one comes to: the subtitle the
 //! effect has already, the edit adding one from the words given or from
 //! the effect's own translation, or that a translation is needed first,
-//! which the caller gets from a Translate run in subtitle mode. The edit
-//! comes from `booharu_core::sfx::subtitle_ops`: the text layer right after
-//! the effect in reading order, in the subtitle look of `[booharu-lettering]
+//! which the caller gets from a Translate run in subtitle mode
+//! ([`subtitle_run`]). The edit comes from
+//! `booharu_core::sfx::subtitle_ops`: the text layer right after the effect
+//! in reading order, in the subtitle look of `[booharu-lettering]
 //! subtitle`, and the effect's translation taken away with its clean-up
 //! hidden and the kept mark, all as one undo step.
 
+use std::collections::BTreeSet;
+
 use anyhow::{Result, bail, ensure};
 use booharu_core::{settings::LetteringSettings, sfx};
-use koharu_pipeline::RunId;
+use koharu_pipeline::{PipelineConfig, Request, RunId, Stage, Target};
 use koharu_scene::{Change, Content, Created, Edit, LanguageIdentifier, LayerId, Project};
 use serde::{Deserialize, Serialize};
 
@@ -124,6 +127,21 @@ pub fn created(change: &Change) -> Option<LayerId> {
         } if label == sfx::SUBTITLE_REF => Some(*id),
         _ => None,
     })
+}
+
+/// The run that subtitles the sound effect `block` when it has no words to
+/// subtitle it with ([`Subtitle::NeedsTranslation`]): Translate alone on
+/// the effect, with `config`, the saved pipeline settings, in subtitle mode
+/// (`booharu.subtitle_run`), so the stage writes the translation it gets as
+/// the effect's subtitle rather than as its translation.
+#[must_use]
+pub fn subtitle_run(block: LayerId, mut config: PipelineConfig) -> Request {
+    config.booharu.subtitle_run = true;
+    Request {
+        target: Target::Blocks(vec![block]),
+        stages: BTreeSet::from([Stage::Translate]),
+        config: Some(config),
+    }
 }
 
 #[cfg(test)]
@@ -395,6 +413,18 @@ mod tests {
             fixture.add("bang", None, &all)?,
             Subtitle::NeedsTranslation
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn an_effect_without_words_is_translated_alone_in_subtitle_mode() -> Result<()> {
+        let block: LayerId = "00000000-0000-0000-0000-000000000001".parse()?;
+        let request = subtitle_run(block, PipelineConfig::default());
+        assert_eq!(request.target, Target::Blocks(vec![block]));
+        assert_eq!(request.stages, BTreeSet::from([Stage::Translate]));
+        let config = request.config.expect("the run's own settings");
+        assert!(config.booharu.subtitle_run);
+        assert!(!config.booharu.redo);
         Ok(())
     }
 }
