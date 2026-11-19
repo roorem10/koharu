@@ -342,14 +342,14 @@
       "automatic": "Checked automatically after processing and edits",
       "checks": {
         "empty_source": "Empty OCR result",
-        "glossary": "Glossary: translate {{source}} as {{target}}",
-        "leftover_source": "Source text remains in the translation",
+        "glossary": "Glossary: {{source}} should be {{target}}",
+        "leftover_source": "Untranslated source text remains",
         "missing_translation": "Missing translation",
         "odd_font": "Unusual font. Expected {{expected}}",
         "overflow": "Text overflows the box",
         "small_word": "One word is {{size, number}} px: {{word}}",
         "too_small": "Small text: {{size, number}} px",
-        "unchanged": "The line came back untranslated"
+        "unchanged": "Given back untranslated"
       },
       "defaultFont": "the default font",
       "dismiss": "Dismiss",
