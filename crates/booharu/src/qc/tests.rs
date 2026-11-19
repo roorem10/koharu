@@ -1,13 +1,15 @@
 //! The quality check on pages a session holds: what [`check_page`] finds,
 //! measured with a renderer that sets Latin text in installed fonts, so no
-//! test needs a CJK or named font or downloads one, and the edits that mark
-//! findings OK and flag lines.
+//! test needs a CJK or named font or downloads one, the glossary slips
+//! [`check_glossary`] finds without one, and the edits that mark findings
+//! OK and flag lines.
 
 use std::collections::BTreeMap;
 
 use anyhow::Result;
 use booharu_core::{
     attrs::{self, Flag, Flags, QcOk},
+    context::GlossaryEntry,
     qc::fingerprint,
     styles,
 };
@@ -753,5 +755,80 @@ fn dismissing_takes_one_flag_or_all_and_refuses_locked_lines() -> Result<()> {
         .err()
         .and_then(|error| error.downcast_ref::<Refusal>().cloned());
     assert!(matches!(locked, Some(Refusal::Locked { layer, .. }) if layer == a));
+    Ok(())
+}
+
+#[test]
+fn glossary_slips_are_found_as_the_page_check_finds_them_laying_no_text_out() -> Result<()> {
+    let frame = || boxed(10.0, 10.0, 300.0, 150.0, "best");
+    let automatic = || c2pa(&["detection", "ocr", "translation"]);
+    let mut page = Fixture::new(
+        400,
+        400,
+        vec![
+            block(
+                "slips",
+                0,
+                "魔王だ",
+                translation(" The king! ", frame(), None),
+                automatic(),
+            ),
+            block(
+                "follows",
+                1,
+                "魔王だ",
+                translation("The Demon King!", frame(), None),
+                automatic(),
+            ),
+            block(
+                "locked",
+                2,
+                "魔王だ",
+                translation("The king!", frame(), None),
+                automatic(),
+            ),
+        ],
+    );
+    page.update("locked", json!({"locked": true}));
+    let series = Series {
+        glossary: vec![GlossaryEntry::new("魔王", "Demon King")],
+        ..Series::default()
+    };
+    let project = page.project();
+    let inputs = Inputs::new(
+        &project,
+        &QcSettings { min_size: 0.01 },
+        "en".parse().expect("a language"),
+        LetteringSettings::default(),
+        Some(series),
+    );
+    let slips = check_glossary(&project, page.page, &inputs)?;
+    assert_eq!(
+        slips,
+        [Finding {
+            page: page.page,
+            layer: page.id("slips"),
+            check: "glossary:魔王".to_owned(),
+            problem: Problem::Glossary {
+                source: "魔王".to_owned(),
+                target: "Demon King".to_owned(),
+            },
+            source: Source::Auto,
+            text: "The king!".to_owned(),
+            hidden: false,
+        }]
+    );
+    let mut checked = check_page(&renderer(), &project, page.page, &inputs)?;
+    checked.retain(|finding| matches!(finding.problem, Problem::Glossary { .. }));
+    assert_eq!(checked, slips);
+
+    page.apply(mark_qc_ok(
+        &project,
+        page.id("slips"),
+        "glossary:魔王",
+        true,
+    )?);
+    let hidden = check_glossary(&page.project(), page.page, &inputs)?;
+    assert!(hidden.len() == 1 && hidden[0].hidden, "{hidden:?}");
     Ok(())
 }

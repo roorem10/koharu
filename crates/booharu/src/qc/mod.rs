@@ -10,7 +10,8 @@
 //! the size checks and flags. Every page is checked: none waits for a run.
 //!
 //! - Sizes and overflow are measured as the caller's renderer draws the
-//!   text ([`measure`]); the rules are pure ([`rules`]).
+//!   text ([`measure`]); the rules are pure ([`rules`]). [`check_glossary`]
+//!   finds a page's glossary slips alone, laying no text out.
 //! - What a check reads beside the page, the settings and the chapter's
 //!   glossary and majority fonts, is gathered once into [`Inputs`].
 //! - Findings are never stored here. Mark OK is the layer's `qc_ok`
@@ -283,6 +284,28 @@ pub fn check_page(
     page: PageId,
     inputs: &Inputs,
 ) -> Result<Vec<Finding>> {
+    findings(project, page, inputs, |layer| measured(renderer, layer))
+}
+
+/// The glossary slips on `page` of `project`, as [`check_page`] finds them
+/// with `inputs`, but laying no text out, so it never blocks on a font:
+/// each block of its story but the locked ones whose translation leaves out
+/// a term of the linked series, in story order.
+pub fn check_glossary(project: &Project, page: PageId, inputs: &Inputs) -> Result<Vec<Finding>> {
+    let mut found = findings(project, page, inputs, |_| None)?;
+    found.retain(|finding| matches!(finding.problem, Problem::Glossary { .. }));
+    Ok(found)
+}
+
+/// What on `page` of `project` needs a look, with `inputs`, each layer's
+/// text measured by `measure`, which gives none for a text it doesn't
+/// measure: [`check_page`]'s walk.
+fn findings(
+    project: &Project,
+    page: PageId,
+    inputs: &Inputs,
+    measure: impl Fn(&Layer) -> Option<Measured>,
+) -> Result<Vec<Finding>> {
     let view = project.page(page)?;
     let shorter = view.size.width.min(view.size.height);
     let limit = inputs.min_size * shorter as f32;
@@ -301,7 +324,7 @@ pub fn check_page(
         let Some(mut facts) = facts(view, layer, translated, inputs) else {
             continue;
         };
-        facts.measured = measured(renderer, layer);
+        facts.measured = measure(layer);
         let fingerprint = marks::fingerprint(layer)?;
         let ok = attrs::get::<QcOk>(layer);
         let text = shown(layer);
