@@ -26,6 +26,7 @@ pub(crate) mod qc;
 pub(crate) mod read_chapter;
 pub(crate) mod runs;
 pub(crate) mod settings;
+pub(crate) mod sfx;
 pub(crate) mod styles;
 pub(crate) mod translation;
 
