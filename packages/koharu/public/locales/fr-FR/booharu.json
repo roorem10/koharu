@@ -461,6 +461,20 @@
       "runAllAgain": "Relancer toutes les étapes",
       "title": "Exécutions"
     },
+    "sfx": {
+      "hints": {
+        "inside_bubbles": "Traduit les effets sonores dans les bulles ; laisse les autres dans le dessin.",
+        "skip": "Laisse les effets sonores tels quels dans le dessin original : ni traduits ni effacés.",
+        "translate_all": "Traduit et lettre tous les effets sonores."
+      },
+      "modes": {
+        "inside_bubbles": "Uniquement dans les bulles",
+        "skip": "Garder comme dessin",
+        "translate_all": "Tout traduire"
+      },
+      "note": "Koharu marque chaque effet sonore qu’il trouve. Pour traduire quand même une zone de texte, choisissez-lui une autre catégorie, ou ajoutez un sous-titre depuis son menu.",
+      "title": "Effets sonores"
+    },
     "start": {
       "body": "Les paramètres de Booharu 0.0.4 ne sont pas repris. Pour retrouver ses glossaires, utilisez « Importer une série » dans le glossaire complet.",
       "dismiss": "Ignorer",

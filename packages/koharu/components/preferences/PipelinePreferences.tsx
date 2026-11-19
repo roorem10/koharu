@@ -8,6 +8,7 @@ import { OcrBoxPreferences } from '@/components/booharu/boxes/OcrBoxPreferences'
 import { GlossaryRow } from '@/components/booharu/context/GlossaryRow' // Booharu: the glossary editor.
 import { ReadingPreferences } from '@/components/booharu/context/ReadingPreferences' // Booharu: Read chapter.
 import { ColourDetectionSwitch } from '@/components/booharu/pipeline/ColourDetectionSwitch' // Booharu: colour detection.
+import { SfxSection } from '@/components/booharu/pipeline/SfxSection' // Booharu: sound effects.
 import { QcPreferences } from '@/components/booharu/qc/QcPreferences' // Booharu: the quality check.
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { detectors, inpainters, recognizers, vendorName } from '@/components/preferences/models'
@@ -153,6 +154,8 @@ export function PipelinePreferences({
         />
         {/* Booharu: whether new translations keep the original lettering's colours, saved at once. */}
         <ColourDetectionSwitch />
+        {/* Booharu: which sound effects a run translates, saved at once. */}
+        <SfxSection />
         {/* Booharu: the Glossary row, which opens the series glossary every translation follows. */}
         <GlossaryRow />
       </Stage>

@@ -461,6 +461,20 @@
       "runAllAgain": "Executar todas as etapas de novo",
       "title": "Execuções"
     },
+    "sfx": {
+      "hints": {
+        "inside_bubbles": "Traduz os efeitos sonoros dentro dos balões de fala; mantém o resto como arte.",
+        "skip": "Mantém os efeitos sonoros como parte da arte original: sem traduzir e sem apagar.",
+        "translate_all": "Traduz e letreira todos os efeitos sonoros."
+      },
+      "modes": {
+        "inside_bubbles": "Somente dentro dos balões",
+        "skip": "Manter como arte",
+        "translate_all": "Traduzir todos"
+      },
+      "note": "O Koharu marca cada efeito sonoro que encontra. Para traduzir uma caixa mesmo assim, escolha outra categoria para ela ou adicione uma legenda pelo menu dela.",
+      "title": "Efeitos sonoros"
+    },
     "start": {
       "body": "As configurações do Booharu 0.0.4 não são trazidas. Para recuperar os glossários dele, use “Importar série” no glossário completo.",
       "dismiss": "Dispensar",

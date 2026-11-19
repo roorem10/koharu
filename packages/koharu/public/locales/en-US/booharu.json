@@ -434,6 +434,20 @@
       "runAllAgain": "Run all stages again",
       "title": "Runs"
     },
+    "sfx": {
+      "hints": {
+        "inside_bubbles": "Translate sound effects inside speech bubbles; keep the rest as art.",
+        "skip": "Leave sound effects as the original art: not translated, not erased.",
+        "translate_all": "Translate and letter every sound effect."
+      },
+      "modes": {
+        "inside_bubbles": "Inside bubbles only",
+        "skip": "Keep as art",
+        "translate_all": "Translate all"
+      },
+      "note": "Koharu marks every sound effect it finds. Pick another category for a box to translate it anyway, or add a subtitle from its menu.",
+      "title": "Sound effects"
+    },
     "start": {
       "body": "Settings from Booharu 0.0.4 aren't carried over. To bring back its glossaries, use “Import series” in the full glossary.",
       "dismiss": "Dismiss",

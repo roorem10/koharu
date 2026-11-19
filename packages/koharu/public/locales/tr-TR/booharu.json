@@ -434,6 +434,20 @@
       "runAllAgain": "Tüm aşamaları yeniden çalıştır",
       "title": "Çalıştırmalar"
     },
+    "sfx": {
+      "hints": {
+        "inside_bubbles": "Konuşma balonlarının içindeki ses efektlerini çevirir; diğerlerini çizim olarak bırakır.",
+        "skip": "Ses efektlerini orijinal çizimin parçası olarak bırakır: çevrilmez, silinmez.",
+        "translate_all": "Tüm ses efektlerini çevirir ve dizer."
+      },
+      "modes": {
+        "inside_bubbles": "Yalnızca balon içindekiler",
+        "skip": "Çizim olarak bırak",
+        "translate_all": "Tümünü çevir"
+      },
+      "note": "Koharu bulduğu her ses efektini işaretler. Bir kutuyu yine de çevirmek için ona başka bir kategori seçin ya da menüsünden altyazı ekleyin.",
+      "title": "Ses efektleri"
+    },
     "start": {
       "body": "Booharu 0.0.4’ün ayarları aktarılmaz. Sözlüklerini geri getirmek için sözlüğün tamamında “Seriyi içe aktar” seçeneğini kullanın.",
       "dismiss": "Kapat",

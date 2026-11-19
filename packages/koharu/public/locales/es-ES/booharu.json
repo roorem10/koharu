@@ -461,6 +461,20 @@
       "runAllAgain": "Ejecutar todas las etapas de nuevo",
       "title": "Ejecuciones"
     },
+    "sfx": {
+      "hints": {
+        "inside_bubbles": "Traduce los efectos de sonido dentro de los bocadillos; deja el resto como parte del dibujo.",
+        "skip": "Deja los efectos de sonido como parte del dibujo original: sin traducir ni borrar.",
+        "translate_all": "Traduce y rotula todos los efectos de sonido."
+      },
+      "modes": {
+        "inside_bubbles": "Solo dentro de los bocadillos",
+        "skip": "Conservar como dibujo",
+        "translate_all": "Traducir todo"
+      },
+      "note": "Koharu marca cada efecto de sonido que encuentra. Para traducir un cuadro de todos modos, elige otra categoría para él o añade un subtítulo desde su menú.",
+      "title": "Efectos de sonido"
+    },
     "start": {
       "body": "Los ajustes de Booharu 0.0.4 no se conservan. Para recuperar sus glosarios, usa “Importar serie” en el glosario completo.",
       "dismiss": "Descartar",

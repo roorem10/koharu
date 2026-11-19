@@ -434,6 +434,20 @@
       "runAllAgain": "重新執行所有階段",
       "title": "處理作業"
     },
+    "sfx": {
+      "hints": {
+        "inside_bubbles": "翻譯對話框內的音效，其餘保留為原圖。",
+        "skip": "將音效保留為原圖：不翻譯，也不擦除。",
+        "translate_all": "翻譯所有音效並排字。"
+      },
+      "modes": {
+        "inside_bubbles": "僅對話框內",
+        "skip": "保留原圖",
+        "translate_all": "全部翻譯"
+      },
+      "note": "Koharu 會標記它找到的每個音效。若仍要翻譯某個文字框，請為它選擇其他排字類別，或從它的選單新增字幕。",
+      "title": "音效"
+    },
     "start": {
       "body": "Booharu 0.0.4 的設定不會沿用。若要找回其術語表，請在完整術語表中使用「匯入系列」。",
       "dismiss": "關閉",
