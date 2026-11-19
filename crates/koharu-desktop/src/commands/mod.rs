@@ -150,6 +150,8 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         crate::booharu::qc::booharu_dismiss_flag,
         crate::booharu::sfx::booharu_add_sfx_subtitle,
         crate::booharu::styles::booharu_reset_lettering,
+        crate::booharu::redo::booharu_count_redo,
+        crate::booharu::redo::booharu_redo_boxes,
     ];
     move |invoke: Invoke<CefRuntime>| {
         let message = &invoke.message;
@@ -264,5 +266,7 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         crate::booharu::qc::booharu_dismiss_flag,
         crate::booharu::sfx::booharu_add_sfx_subtitle,
         crate::booharu::styles::booharu_reset_lettering,
+        crate::booharu::redo::booharu_count_redo,
+        crate::booharu::redo::booharu_redo_boxes,
     ](types)
 }

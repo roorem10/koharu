@@ -24,6 +24,7 @@ pub(crate) mod notes;
 pub(crate) mod ocr_box;
 pub(crate) mod qc;
 pub(crate) mod read_chapter;
+pub(crate) mod redo;
 pub(crate) mod runs;
 pub(crate) mod settings;
 pub(crate) mod sfx;

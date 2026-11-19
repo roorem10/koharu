@@ -7,7 +7,8 @@
 //! translating. Redo boxes counts the boxes named first ([`count_redo`]),
 //! so the interface can ask before taking the hand-fixed ones too, then
 //! runs the stages again on the boxes it may change ([`redo_targets`]): one
-//! ordinary run whose `booharu.redo` flag lifts the hand-fixed rule alone.
+//! ordinary run whose `booharu.redo` flag lifts the hand-fixed rule alone,
+//! answered with the boxes it left alone ([`Redo::answer`]).
 //! A lock is never lifted, and neither is the SFX mode keeping a sound
 //! effect as art.
 
@@ -54,6 +55,24 @@ pub struct RedoAnswer {
 pub struct Redo {
     pub blocks: Vec<LayerId>,
     pub counts: RedoCounts,
+}
+
+impl Redo {
+    /// What Redo boxes answers once it queued `run` on these boxes, none
+    /// when there were none: the boxes it left alone, the locked ones, and
+    /// the hand-fixed ones unless it took them (`include_hand_fixed`).
+    #[must_use]
+    pub fn answer(&self, run: Option<RunId>, include_hand_fixed: bool) -> RedoAnswer {
+        RedoAnswer {
+            run,
+            hand_fixed: if include_hand_fixed {
+                0
+            } else {
+                self.counts.hand_fixed
+            },
+            locked: self.counts.locked,
+        }
+    }
 }
 
 /// How the boxes `blocks` of `project` stand for running `stages` again,
@@ -302,6 +321,16 @@ mod tests {
             fixture.ids(&["ready", "typed", "hidden", "effect"])
         );
         assert_eq!(with.counts, without.counts);
+        // The answer tells the boxes left alone: the hand-fixed ones only
+        // when the redo didn't take them.
+        let run = Some(RunId(9));
+        let answer = |hand_fixed| RedoAnswer {
+            run,
+            hand_fixed,
+            locked: 2,
+        };
+        assert_eq!(without.answer(run, false), answer(2));
+        assert_eq!(with.answer(run, true), answer(0));
 
         // The run's redo flag lifts the hand-fixed rule alone: the sound
         // effect stays art, and a locked box stays out.
