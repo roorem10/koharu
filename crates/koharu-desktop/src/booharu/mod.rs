@@ -1,19 +1,23 @@
 //! Booharu's part of the app: its commands, which the Booharu block of
 //! `commands` lists, its events, which `events::bindings` lists, what the
 //! canvas's Booharu effect does, the Booharu settings pushed to the canvas,
-//! the MCP server's start on Booharu's own port, and the host Booharu's
-//! agent tools reach the app through, which tells the interface when they
-//! write a series or the chapter's notes, or save the Instructions.
+//! the MCP server's start on Booharu's own port, Read chapter and Explain
+//! this line as jobs Stop and closing the project end (`jobs`), and the host
+//! Booharu's agent tools reach the app through, which tells the interface
+//! when they write a series or the chapter's notes, or save the
+//! Instructions.
 
 pub(crate) mod boxes;
 pub(crate) mod canvas;
 pub(crate) mod context;
 pub(crate) mod events;
 pub(crate) mod fonts;
+pub(crate) mod jobs;
 pub(crate) mod lettering;
 pub(crate) mod mcp;
 pub(crate) mod notes;
 pub(crate) mod ocr_box;
+pub(crate) mod read_chapter;
 pub(crate) mod runs;
 pub(crate) mod settings;
 pub(crate) mod styles;

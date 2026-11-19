@@ -1,6 +1,7 @@
 //! What Booharu tells the interface on its own, as Koharu's events do;
 //! `events::bindings` lists them for the bindings.
 
+use booharu::jobs::BooharuJob;
 use koharu_pipeline::RunId;
 use serde::Serialize;
 use specta::Type;
@@ -47,3 +48,8 @@ pub const CONTEXT_CHANGED: Event<()> = Event::new("booharu_context_changed");
 /// reads Koharu's settings again, so its next save of them keeps the
 /// Instructions as they are now.
 pub const INSTRUCTIONS_CHANGED: Event<()> = Event::new("booharu_instructions_changed");
+
+/// How a Read chapter job goes: told as it starts, after each chunk of
+/// pages it reads, and as it ends, always ending in a state other than
+/// running.
+pub const JOB: Event<BooharuJob> = Event::new("booharu_job");

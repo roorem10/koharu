@@ -49,6 +49,7 @@ pub async fn fill(
 #[specta::specta]
 pub fn stop_pipeline(app: State<'_, Arc<App>>) {
     app.pipeline.stop();
+    crate::booharu::jobs::stop(); // Booharu: Stop ends Read chapter and Explain this line.
 }
 
 /// Unloads every model the pipeline loaded once the GPU's current call ends,

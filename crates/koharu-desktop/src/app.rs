@@ -161,6 +161,7 @@ impl App {
             project.take()
         };
         self.pipeline.stop();
+        crate::booharu::jobs::stop(); // Booharu: closing ends Read chapter and Explain this line.
         self.screen.set_canvas(None);
         if let Some(project) = project {
             self.pipeline.close(project.session.lock().id());
