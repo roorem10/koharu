@@ -50,8 +50,8 @@ describe('Booharu sound effects setting', () => {
     file.preferences['booharu-lettering'].auto = true
 
     await user.click(select)
-    // Each mode in the list says what it does.
-    expect(screen.getByRole('option', { name: /^Inside bubbles only/ })).toHaveTextContent(
+    // Each mode in the list says what it does, once the list has opened.
+    expect(await screen.findByRole('option', { name: /^Inside bubbles only/ })).toHaveTextContent(
       'Translate sound effects inside speech bubbles; keep the rest as art.',
     )
     await user.click(screen.getByRole('option', { name: /^Translate all/ }))
