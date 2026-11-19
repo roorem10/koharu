@@ -18,6 +18,9 @@
 //! - A run over pages may go one stage at a time: every page's detection,
 //!   then every page's recognition, and so on, starting with no model loaded
 //!   and unloading each stage's model before the next stage's loads.
+//! - A recognition task reads pages of runs whose filters leave out the same
+//!   blocks only ([`alike`]), as it reads them all with its first page's
+//!   settings, whatever policy each run has.
 
 use std::collections::{BTreeSet, HashSet};
 
@@ -70,6 +73,14 @@ pub(super) fn stage(run: &Run) -> Option<Stage> {
 /// `now`, or, in a run on `stage`, for its own stage.
 pub(super) fn held(job: &Job, stage: Option<Stage>, now: Instant) -> bool {
     job.tries.at.is_some_and(|at| at > now) || stage.is_some_and(|stage| job.stage != stage)
+}
+
+/// Whether a recognition task may read a page of `other` beside one of
+/// `first`, whose settings the task reads every page with: their runs leave
+/// out the same blocks, as Redo boxes reads blocks corrected by hand again
+/// and another run leaves them as they are.
+pub(super) fn alike(first: &Run, other: &Run) -> bool {
+    first.config.booharu.redo == other.config.booharu.redo
 }
 
 /// When the first job waiting to be tried again is due, after `now`.
@@ -364,6 +375,16 @@ mod tests {
         /// Queues `stages` on every page as run `id`, following `policy`,
         /// as `Pipeline::run` queues a run.
         fn run(&self, id: u64, stages: &[Stage], policy: Option<RunPolicy>) -> RunId {
+            let booharu = Snapshot {
+                runs: policy,
+                ..Snapshot::default()
+            };
+            self.run_with(id, stages, booharu)
+        }
+
+        /// Queues `stages` on every page as run `id`, with the snapshot
+        /// `booharu`.
+        fn run_with(&self, id: u64, stages: &[Stage], booharu: Snapshot) -> RunId {
             let run = RunId(id);
             let stages: BTreeSet<Stage> = stages.iter().copied().collect();
             let project = self.session.lock().project();
@@ -375,10 +396,7 @@ mod tests {
                 pages: true,
             });
             let config = PipelineConfig {
-                booharu: Snapshot {
-                    runs: policy,
-                    ..Snapshot::default()
-                },
+                booharu,
                 ..PipelineConfig::default()
             };
             let queued = Run::new(
@@ -862,5 +880,35 @@ mod tests {
             .map(|(_, pages, _)| pages)
             .collect();
         assert_eq!(batches, [vec![0, 1, 2], vec![0], vec![1], vec![2]]);
+    }
+
+    #[tokio::test]
+    async fn a_recognition_task_reads_no_page_of_a_run_whose_filters_differ() {
+        let chapter = Chapter::new(3);
+        // Cleaning holds every page in flight a while, so both readings'
+        // pages are ready to be read together once it's done.
+        for index in 0..3 {
+            let slow = Try::Slow(Duration::from_millis(300));
+            chapter.script.tries(index, Stage::Inpaint, vec![slow]);
+        }
+        let cleaning = chapter.run(0, &[Stage::Inpaint], None);
+        let redo = |redo| Snapshot {
+            redo,
+            ..Snapshot::default()
+        };
+        let reading = chapter.run_with(1, &[Stage::Recognize], redo(false));
+        // Redo boxes reads blocks corrected by hand, which the other leaves.
+        let again = chapter.run_with(2, &[Stage::Recognize], redo(true));
+        for run in [cleaning, reading, again] {
+            let told = chapter.told(run).await;
+            assert_eq!(ended(&told), Some(&Outcome::Done), "{told:#?}");
+        }
+        let batches: Vec<Vec<usize>> = chapter
+            .ran()
+            .into_iter()
+            .filter(|(stage, ..)| *stage == Stage::Recognize)
+            .map(|(_, pages, _)| pages)
+            .collect();
+        assert_eq!(batches, [vec![0, 1, 2], vec![0, 1, 2]]);
     }
 }

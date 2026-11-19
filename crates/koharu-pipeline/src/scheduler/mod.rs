@@ -345,6 +345,8 @@ impl Scheduler {
                             && other.priority != first.priority
                             && stages::key(other.stage, &self.runs[other.run].config) == model
                             && !self.alone(**other) // Booharu: nor with one tried again.
+                            // Booharu: nor with a run whose filters differ.
+                            && booharu::alike(&self.runs[first.run], &self.runs[other.run])
                     })
                     .copied()
                     .collect();
