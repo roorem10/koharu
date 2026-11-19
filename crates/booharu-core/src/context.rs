@@ -38,7 +38,7 @@ pub use self::{
         agent_file, remove_side_files, side_file,
     },
     compose::{
-        CharacterHint, Extras, MAX_TERMS, found_terms, instructions, line_terms, text_known,
+        CharacterHint, Extras, MAX_TERMS, found_terms, instructions, line_terms, slips, text_known,
     },
     instructions::{InstructionTerm, instruction_terms},
     series::{Character, GlossaryEntry, Series, SeriesStore, TermKind, valid_id},

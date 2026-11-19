@@ -27,7 +27,10 @@
 //! spelling, and its background was reference only, never translated or
 //! returned.
 
-use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
+use std::{
+    collections::{BTreeMap, BTreeSet, btree_map::Entry},
+    ops::Range,
+};
 
 use koharu_scene::{Content, Layer, Project};
 use serde::Serialize;
@@ -221,6 +224,63 @@ pub fn line_terms(
     .take(MAX_TERMS)
     .cloned()
     .collect()
+}
+
+/// The glossary terms `translation`, one line's, leaves out of `source`, the
+/// line's source: of the terms of `series`, then the chapter's suggestions
+/// in `context`, whose source occurs in `source` ([`line_terms`]), each one
+/// whose target doesn't occur in the translation, ignoring case and
+/// whitespace ([`occurs`](super::occurs)), in the order they first occur in
+/// the source. A term found only inside a longer one's occurrences, such as
+/// 王 inside 王子, is the longer one's. A blank translation, or one that is
+/// its source, as a line given back unchanged is, leaves out nothing: there
+/// is no translation to check.
+pub fn slips(
+    source: &str,
+    translation: &str,
+    context: &ChapterContext,
+    series: Option<&Series>,
+) -> Vec<GlossaryEntry> {
+    if translation.trim().is_empty() || super::same_source(translation, source) {
+        return Vec::new();
+    }
+    let text = key(source);
+    let terms = line_terms(source, context, series);
+    let found: Vec<Vec<Range<usize>>> = terms
+        .iter()
+        .map(|term| occurrences(&text, &key(&term.source)))
+        .collect();
+    let inside_longer = |index: usize, at: &Range<usize>| {
+        found.iter().enumerate().any(|(other, theirs)| {
+            other != index
+                && theirs.iter().any(|over| {
+                    over.len() > at.len() && over.start <= at.start && at.end <= over.end
+                })
+        })
+    };
+    let mut slips: Vec<(usize, GlossaryEntry)> = terms
+        .iter()
+        .zip(&found)
+        .enumerate()
+        .filter(|(index, (_, mine))| !mine.iter().all(|at| inside_longer(*index, at)))
+        .filter(|(_, (term, _))| !super::occurs(translation, &term.target))
+        .map(|(_, (term, mine))| (mine.first().map_or(usize::MAX, |at| at.start), term.clone()))
+        .collect();
+    slips.sort_by_key(|(first, _)| *first);
+    slips.into_iter().map(|(_, term)| term).collect()
+}
+
+/// Where `needle` occurs in `text`, overlapping occurrences too, as byte
+/// ranges in order.
+fn occurrences(text: &str, needle: &str) -> Vec<Range<usize>> {
+    if needle.is_empty() {
+        return Vec::new();
+    }
+    text.char_indices()
+        .map(|(start, _)| start)
+        .filter(|start| text[*start..].starts_with(needle))
+        .map(|start| start..start + needle.len())
+        .collect()
 }
 
 /// `instructions`, the user's own, with `extras` after them, one blank line
@@ -472,6 +532,76 @@ mod tests {
 
     fn sources(extras: &Extras) -> Vec<&str> {
         extras.glossary.iter().map(|term| &*term.source).collect()
+    }
+
+    fn slipped(source: &str, translation: &str, series: &Series) -> Vec<String> {
+        slips(
+            source,
+            translation,
+            &ChapterContext::default(),
+            Some(series),
+        )
+        .into_iter()
+        .map(|term| term.source)
+        .collect()
+    }
+
+    #[test]
+    fn a_line_slips_the_terms_its_translation_leaves_out() {
+        let demon = series(vec![term("魔王", "Demon King", true)]);
+        assert_eq!(slipped("魔王です", "The king", &demon), ["魔王"]);
+        assert!(slipped("魔王です", "The Demon King", &demon).is_empty());
+        // Case and the lettering's line breaks don't count.
+        assert!(slipped("魔\n王です", "THE DEMON\nKING!", &demon).is_empty());
+
+        let rimuru = series(vec![term("リムル", "Rimuru", false)]);
+        assert_eq!(slipped("リムル様！", "Lord Rimiru!", &rimuru), ["リムル"]);
+        assert!(slipped("リムル様！", "LORD RIMURU!", &rimuru).is_empty());
+
+        // A target in the source's script.
+        let back = series(vec![term("Demon King", "魔王", false)]);
+        assert!(slipped("The Demon King!", "魔王だ", &back).is_empty());
+        assert_eq!(slipped("The Demon King!", "魔玉だ", &back), ["Demon King"]);
+
+        // A chapter's suggestion slips as a series term does.
+        let suggested = ChapterContext {
+            suggestions: vec![term("勇者", "Hero", false)],
+            ..ChapterContext::default()
+        };
+        let found = slips("勇者と魔王", "The king and him", &suggested, Some(&demon));
+        let found: Vec<&str> = found.iter().map(|term| &*term.source).collect();
+        assert_eq!(found, ["勇者", "魔王"], "in the order they occur");
+    }
+
+    #[test]
+    fn the_longest_term_found_wins() {
+        let both = series(vec![
+            term("王子", "Prince", false),
+            term("王", "King", false),
+        ]);
+        assert!(slipped("王子様", "Prince!", &both).is_empty());
+        // 王 found on its own as well slips there.
+        assert_eq!(slipped("王子と王", "The prince and him", &both), ["王"]);
+        assert_eq!(slipped("王と王子", "Them", &both), ["王", "王子"]);
+    }
+
+    #[test]
+    fn a_blank_or_unchanged_translation_slips_nothing() {
+        let demon = series(vec![term("魔王", "Demon King", true)]);
+        assert!(slipped("魔王です", "", &demon).is_empty());
+        assert!(slipped("魔王です", " \n ", &demon).is_empty());
+        assert!(
+            slipped("魔王です", " 魔王 です", &demon).is_empty(),
+            "given back"
+        );
+        assert!(slipped("こんにちは", "Hello", &demon).is_empty(), "no term");
+        let blank = series(vec![term("魔王", " ", false)]);
+        assert!(
+            slipped("魔王です", "The king", &blank).is_empty(),
+            "no target"
+        );
+        let none = ChapterContext::default();
+        assert!(slips("魔王です", "The king", &none, None).is_empty());
     }
 
     #[test]

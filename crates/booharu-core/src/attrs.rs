@@ -143,8 +143,14 @@ pub struct AutoStyle {
     pub outer_stroke_width: Option<f64>,
 }
 
-/// `qc_ok`: `[string]`, on a block: the QC checks the user marked as fine, by
-/// check id, and `"glossary:<term>"` for each glossary term they dismissed.
+/// `qc_ok`: `[string]`, on a block or a text layer: the quality check's
+/// findings a person marked OK, each `"<check>@<fingerprint>"` (see
+/// [`crate::qc`]): the check's id, such as `"overflow"`, or
+/// `"glossary:<term source>"` for a glossary slip, and the layer's
+/// fingerprint when it was marked, so a mark hides its finding only until
+/// what the checks read on the layer changes. An entry that doesn't read
+/// so, or whose fingerprint is stale, hides nothing, and the key's next write
+/// drops it.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(transparent)]
 pub struct QcOk(pub Vec<String>);
@@ -153,8 +159,10 @@ impl Attr for QcOk {
     const KEY: &'static str = "qc_ok";
 }
 
-/// `flags`: `[{"kind": string, "message": string}]`, on a block: what an
-/// agent's review asks a person to look at.
+/// `flags`: `[{"kind": "review", "message": string}]`, on a block or a text
+/// layer: what an agent's review asks a person to look at, which the quality
+/// check shows as a finding of its own, never hidden, until a person
+/// dismisses it.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(transparent)]
 pub struct Flags(pub Vec<Flag>);
@@ -163,13 +171,26 @@ impl Attr for Flags {
     const KEY: &'static str = "flags";
 }
 
-/// One of a block's [`Flags`]: its kind, such as `"glossary"` or `"review"`,
-/// and what to look at.
+/// One of a layer's [`Flags`]: its kind, always [`Flag::REVIEW`] as Booharu
+/// writes it, and what to look at.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(deny_unknown_fields)]
 pub struct Flag {
     pub kind: String,
     pub message: String,
+}
+
+impl Flag {
+    /// The kind of every flag Booharu writes: an agent's review.
+    pub const REVIEW: &'static str = "review";
+
+    /// An agent's review flag asking a person to look at `message`.
+    pub fn review(message: impl Into<String>) -> Self {
+        Self {
+            kind: Self::REVIEW.to_owned(),
+            message: message.into(),
+        }
+    }
 }
 
 /// `read_note`: string, on a block: Read chapter's note on its line.

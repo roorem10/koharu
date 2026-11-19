@@ -20,7 +20,7 @@
 use std::collections::BTreeSet;
 
 use anyhow::{Result, bail, ensure};
-use koharu_scene::{CharStyle, Color, Content, Hash, Layer, LayerId, Op, Project, Rgba, Role};
+use koharu_scene::{CharStyle, Color, Content, Layer, LayerId, Op, Project, Rgba, Role};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
@@ -47,10 +47,7 @@ pub fn first_font(families: &[String]) -> Option<&str> {
 /// The record's hash of `text`, trimmed: the first 8 bytes of its BLAKE3
 /// hash as 16 hex digits, the same in every build and on every machine.
 pub fn text_hash(text: &str) -> String {
-    Hash::of(text.trim().as_bytes()).as_bytes()[..8]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    crate::qc::short_hash(text.trim().as_bytes())
 }
 
 /// The default look as character values, for text with nothing measured to

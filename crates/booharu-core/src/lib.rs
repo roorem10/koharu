@@ -5,7 +5,8 @@
 //! in (`lettering`), the shapes of balloons (`shape`), the run policy and
 //! the Run menu's presets (`runs`), what Koharu's stages did to a page's
 //! blocks (`status`), the series glossaries and the chapter notes every
-//! translation follows (`context`), and its version.
+//! translation follows (`context`), the quality check's Mark OK record
+//! (`qc`), and its version.
 //!
 //! The crate sits just above the scene and the config, never above
 //! koharu-pipeline, koharu-agent, or koharu-desktop, so koharu-pipeline's
@@ -15,6 +16,7 @@
 pub mod attrs;
 pub mod context;
 pub mod lettering;
+pub mod qc;
 pub mod runs;
 pub mod settings;
 pub mod shape;
