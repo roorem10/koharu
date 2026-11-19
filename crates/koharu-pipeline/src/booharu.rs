@@ -569,6 +569,7 @@ mod tests {
         context::{ChapterContext, GlossaryEntry},
         edited,
         lettering::{CategoryFont, LetteringCategory},
+        resolver::koharu_chars,
         runs::RunsSettings,
         settings::{DefaultTextStyle, LetteringSettings},
         styles::text_hash,
@@ -1495,6 +1496,104 @@ mod tests {
                 "{label}"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn the_lettering_default_gives_the_chars_koharus_placement_writes() -> Result<()> {
+        let block = |role: &str, x: f64, chars: Value| {
+            json!({"kind": "block", "role": role, "source": {
+                "frame": {"box": {"bounds": {"x": x, "y": 20.0, "width": 40.0, "height": 120.0}}},
+                "content": SOURCE,
+                "style": {"chars": chars},
+            }})
+        };
+        let add = |label: &str, parent: Option<&str>, index: usize, layer: Value| {
+            let mut op = json!({"op": "add_layer", "id": format!("${label}"), "page": "$p",
+                "index": index, "layer": layer});
+            if let Some(parent) = parent {
+                op["parent"] = json!(format!("${parent}"));
+            }
+            op
+        };
+        let panel = json!({"kind": "panel", "outline": "M0 200 H400 V400 H0 Z"});
+        // Untranslated: a text block outlined in white at size 32 and one
+        // filled black at 40; light and dark sound effects without outlines
+        // at 100, and one without a colour; and two plain text blocks at 20
+        // in panels two deep, which put the page's lettering size at 20,
+        // counting the text blocks inside other layers and no sound effect.
+        let page = Page::of(vec![
+            add(
+                "stroked",
+                None,
+                0,
+                block(
+                    "text",
+                    10.0,
+                    json!({"size": 32.0, "fill": BLUE, "stroke": WHITE, "stroke_width": 3.0}),
+                ),
+            ),
+            add(
+                "big",
+                None,
+                1,
+                block("text", 60.0, json!({"size": 40.0, "fill": BLACK})),
+            ),
+            add(
+                "light",
+                None,
+                2,
+                block("sfx", 110.0, json!({"size": 100.0, "fill": YELLOW})),
+            ),
+            add(
+                "dark",
+                None,
+                3,
+                block("sfx", 160.0, json!({"size": 100.0, "fill": RED})),
+            ),
+            add("bare", None, 4, block("sfx", 210.0, json!({}))),
+            add("outer", None, 5, panel.clone()),
+            add("inner", Some("outer"), 0, panel),
+            add(
+                "deep",
+                Some("inner"),
+                0,
+                block("text", 260.0, json!({"size": 20.0})),
+            ),
+            add(
+                "deeper",
+                Some("inner"),
+                1,
+                block("text", 310.0, json!({"size": 20.0})),
+            ),
+        ])?;
+        let project = page.session.project();
+        let mut placed = BTreeMap::new();
+        for label in ["stroked", "big", "light", "dark", "bare", "deep", "deeper"] {
+            let id = page.id(label);
+            let Op::UpdateLayer { patch, .. } = crate::placement(&project, id, &langid!("en"))?
+            else {
+                anyhow::bail!("placement updates {label}");
+            };
+            let chars: CharStyle =
+                serde_json::from_value(patch["translation"]["style"]["chars"].clone())?;
+            let (on, _) = project.parent(id)?;
+            let Content::Block(block) = &project.layer(id)?.content else {
+                anyhow::bail!("{label} isn't a block");
+            };
+            assert_eq!(koharu_chars(on, block, None), chars, "{label}");
+            placed.insert(label, chars);
+        }
+        // The fixtures reach each rule: the size, the outline scaled to it,
+        // and a sound effect's outline, black around a light fill and white
+        // around any other.
+        let outline = |label: &str| (placed[label].stroke, placed[label].stroke_width);
+        assert!(placed.values().all(|chars| chars.size == Some(20.0)));
+        assert_eq!(outline("stroked"), (Some(WHITE), Some(3.0 * 20.0 / 32.0)));
+        assert_eq!(outline("big"), (None, None));
+        assert_eq!(outline("light"), (Some(BLACK), Some(20.0 / 16.0)));
+        assert_eq!(outline("dark"), (Some(WHITE), Some(20.0 / 16.0)));
+        assert_eq!(outline("bare"), (Some(WHITE), Some(20.0 / 16.0)));
         Ok(())
     }
 
