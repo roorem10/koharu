@@ -3,7 +3,7 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { create } from 'zustand'
 
-import { openBoxDetails } from '@/lib/booharu/boxDetails'
+import { openBoxDetails, useBoxDetails } from '@/lib/booharu/boxDetails'
 import { failure } from '@/lib/booharu/context'
 import { openProject } from '@/lib/booharu/reading'
 import { plainText, type BlockLayer } from '@/lib/document'
@@ -91,15 +91,18 @@ export function useExplainModel(): { model: string | null | undefined; known: bo
 }
 
 /** Explain this line, from Story's right-click menu and the box actions: Box details opens on the
- * line `block` of `page` at its explanation, which is asked for when a model explains lines and the
- * line has none going or shown as it is now; with no model, the card says which settings choose
- * one. Settles once Box details opens, the answer still on its way. */
+ * line `block` of `page` at its explanation at once, as the desktop may take a while to say which
+ * model explains lines, listing every vendor's models. Once it has, the explanation is asked for
+ * when a model explains lines, Box details still shows the line, and the line has none going or
+ * shown as it is now; with no model, the card says which settings choose one. Settles once it's
+ * asked for, or won't be, the answer still on its way. */
 export async function openExplanation(page: PageId, block: BlockLayer): Promise<void> {
+  openBoxDetails(page, block.id, explainSection)
   const reader = await queryClient
     .fetchQuery({ ...readingModelQuery, staleTime: 0 })
     .catch(() => null)
-  openBoxDetails(page, block.id, explainSection)
-  if (!reader?.explain) return
+  const shown = useBoxDetails.getState().shown
+  if (!reader?.explain || shown?.page !== page || shown.layer !== block.id) return
   const { project, lines } = useExplanations.getState()
   const held = project === openProject() ? lines[block.id] : undefined
   if (held?.state === 'explaining' || answerFor(held, block)) return

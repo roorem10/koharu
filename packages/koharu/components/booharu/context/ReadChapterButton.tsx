@@ -197,9 +197,11 @@ export function ReadChapterButton({ linked }: { linked: boolean }) {
         size='sm'
         className='w-full text-[11px]'
         disabled={project === null || running || reads || busy}
+        aria-busy={reads || busy}
         onClick={press}
       >
-        {reads ? <LoaderCircle className='animate-spin' /> : <BookOpenText />}
+        {/* The desktop may take a while to say which model reads, listing every vendor's models. */}
+        {reads || busy ? <LoaderCircle className='animate-spin' /> : <BookOpenText />}
         {reads ? t('booharu.context.reading') : t('booharu.context.readChapter')}
       </Button>
       <Dialog

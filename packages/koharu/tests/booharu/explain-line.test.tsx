@@ -9,7 +9,7 @@ import { RightSidebar } from '@/components/editor/RightSidebar'
 import { StoryPanel } from '@/components/editor/StoryPanel'
 import { useAgentChat } from '@/lib/booharu/agentChat'
 import { boxActions, runBoxAction, selectedBoxes } from '@/lib/booharu/boxActions'
-import { openBoxDetails, useBoxDetails } from '@/lib/booharu/boxDetails'
+import { closeBoxDetails, openBoxDetails, useBoxDetails } from '@/lib/booharu/boxDetails'
 import { useExplanations } from '@/lib/booharu/explain'
 import { resources, supportedLanguages } from '@/lib/i18n'
 import { queryClient } from '@/lib/queries'
@@ -67,12 +67,27 @@ function readingModel(explain: string | null): ReadingModel {
 function setUp(explain: string | null = gpt.reference) {
   const spies = desktop()
   useKoharuStore.setState({ models })
-  vi.spyOn(commands, 'booharuGetReadingModel').mockResolvedValue(readingModel(explain))
+  const reading = vi
+    .spyOn(commands, 'booharuGetReadingModel')
+    .mockResolvedValue(readingModel(explain))
   const ask = vi.spyOn(commands, 'booharuExplainLine').mockResolvedValue(answer)
   const edit = vi.spyOn(commands, 'edit').mockResolvedValue(change)
   const typed = vi.spyOn(commands, 'booharuSetTranslation').mockResolvedValue(change)
   openProject(explainPage())
-  return { ...spies, ask, edit, typed }
+  return { ...spies, reading, ask, edit, typed }
+}
+
+/** Holds back the desktop's answers to which models read and explain until `answer` is called,
+ * which gives each one asked `explain` as Explain this line's model. */
+function holdReadingModel(reading: ReturnType<typeof setUp>['reading']) {
+  const held: ((model: ReadingModel) => void)[] = []
+  reading.mockImplementation(() => new Promise((resolve) => held.push(resolve)))
+  return {
+    answer: (explain: string | null = gpt.reference) =>
+      act(async () => {
+        for (const tell of held.splice(0)) tell(readingModel(explain))
+      }),
+  }
 }
 
 /** Box details' Explain this line section, once it shows. */
@@ -126,7 +141,7 @@ describe('Booharu Explain this line', () => {
       section: 'explain',
     })
     expect(card.getByText('Isagi names the skill he wins with.')).toBeInTheDocument()
-    expect(card.getByRole('button', { name: 'Explaining…' })).toBeDisabled()
+    expect(await card.findByRole('button', { name: 'Explaining…' })).toBeDisabled()
     expect(ask.mock.calls).toEqual([['free']])
 
     act(() => answerLine(answer))
@@ -141,6 +156,48 @@ describe('Booharu Explain this line', () => {
     expect(card.getByText('Answered by GPT-5.4')).toBeInTheDocument()
     expect(card.queryByRole('button', { name: 'Explain this line' })).toBeNull()
     expect(shown).not.toHaveBeenCalled()
+  })
+
+  it('opens Box details at once, and asks once the desktop says which model explains lines', async () => {
+    const { reading, ask } = setUp()
+    const models = holdReadingModel(reading)
+    const user = userEvent.setup()
+    mount(
+      <>
+        <StoryPanel />
+        <BoxDetailsDialog />
+      </>,
+    )
+
+    await explainFromStory(user)
+
+    // Box details shows the line while the model is still unknown, Explain this line off.
+    const card = await explanation()
+    expect(card.getByRole('button', { name: 'Explain this line' })).toBeDisabled()
+    expect(ask).not.toHaveBeenCalled()
+
+    await models.answer()
+
+    expect(await card.findByText(answer.explanation)).toBeInTheDocument()
+    expect(ask.mock.calls).toEqual([['free']])
+  })
+
+  it('asks nothing for a line Box details no longer shows once the model is known', async () => {
+    const { reading, ask } = setUp()
+    const models = holdReadingModel(reading)
+    mount(<BoxDetailsDialog />)
+
+    const explain = boxActions.find(({ id }) => id === 'explain')!
+    const boxes = selectedBoxes(explainPage().layers, ['free-mask'])
+    act(() => runBoxAction(explain, { page: 'page', boxes }))
+    await explanation()
+    act(() => closeBoxDetails())
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    await models.answer()
+
+    expect(ask).not.toHaveBeenCalled()
+    expect(useExplanations.getState().lines).toEqual({})
   })
 
   it('makes another translation the line’s as one edit, and offers none for a locked line', async () => {

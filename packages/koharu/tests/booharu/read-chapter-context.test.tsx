@@ -277,6 +277,28 @@ describe('Read chapter in the Context tab', () => {
     expect(saves).toEqual([])
   })
 
+  it('says it’s busy while the desktop tells which model would read', async () => {
+    readDesktop({ reading: { model: gpt.reference } })
+    const user = userEvent.setup()
+    await renderPanel()
+    const reading = vi.mocked(commands.booharuGetReadingModel)
+    const known = reading.getMockImplementation()!
+    let tell!: () => void
+    reading.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          tell = () => resolve(known())
+        }),
+    )
+
+    await user.click(readButton())
+    expect(readButton()).toBeDisabled()
+    expect(readButton()).toHaveAttribute('aria-busy', 'true')
+
+    await act(async () => tell())
+    await asking('GPT-5.4 will read the whole chapter. This will use API credits. Are you sure?')
+  })
+
   it('shows a refusal’s error, and says Reading chapter… while a Run press reads', async () => {
     const { read } = readDesktop({ reading: { ask: false } })
     read.mockRejectedValueOnce("There's no text to read; run OCR first.")
