@@ -14,15 +14,30 @@ use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 
 /// A stage of a run, in the order a page's stages run: koharu-pipeline's
 /// `Stage`, which this crate can't name, with the same names in the same
-/// order, so a preset holds what the Run menu's switches send.
+/// order, so a preset holds what the Run menu's switches send, and Read,
+/// Booharu's own, which Koharu's stages don't have.
 #[derive(
-    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize, specta::Type,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    specta::Type,
+    schemars::JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum RunStage {
     Detect,
     Recognize,
     Inpaint,
+    /// Read chapter: the whole chapter read before it is translated, which
+    /// a press takes only when it also translates.
+    Read,
     Translate,
 }
 
@@ -34,7 +49,8 @@ pub enum RunStage {
 pub struct RunPreset {
     /// Its name, unique among the presets once trimmed, and never blank.
     pub name: String,
-    /// Its stages, at least one, in stage order.
+    /// Its stages, in stage order: at least one other than Read, and Read
+    /// only together with Translate.
     pub stages: BTreeSet<RunStage>,
 }
 
@@ -74,7 +90,8 @@ pub const MAX_RETRIES: u8 = 5;
 #[serde(default)]
 pub struct RunsSettings {
     /// At most 100, `MAX_PRESETS`, each with a name, unique once trimmed
-    /// and never blank, and at least one stage.
+    /// and never blank, and at least one stage other than Read, which it
+    /// holds only together with Translate.
     #[serde(deserialize_with = "presets")]
     #[specta(type = Vec<RunPreset>)]
     pub presets: Vec<RunPreset>,
@@ -148,9 +165,15 @@ fn presets<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<RunPreset>,
                 "two run presets are named \"{name}\""
             )));
         }
-        if preset.stages.is_empty() {
+        if preset.stages.iter().all(|&stage| stage == RunStage::Read) {
             return Err(D::Error::custom(format!(
-                "the run preset \"{name}\" has no stage"
+                "the run preset \"{name}\" has no stage other than Read chapter"
+            )));
+        }
+        if preset.stages.contains(&RunStage::Read) && !preset.stages.contains(&RunStage::Translate)
+        {
+            return Err(D::Error::custom(format!(
+                "the run preset \"{name}\" reads the chapter without translating it"
             )));
         }
     }
@@ -277,6 +300,7 @@ mod tests {
             preset("  ", "\"detect\""),
             preset("Read", ""),
             preset("Read", "\"read\""),
+            preset("Read", "\"detect\", \"read\""),
             preset("Read", "\"detect\"") + &preset(" Read ", "\"translate\""),
             "[[presets]]\nstages = [\"detect\"]\n".to_owned(),
             preset("Read", "\"recognize\"") + "stage = \"recognize\"\n",
@@ -300,6 +324,13 @@ mod tests {
                 .collect::<String>();
         let read: RunsSettings = toml::from_str(&most).expect("the most presets and retries");
         assert_eq!((read.presets.len(), read.retries), (MAX_PRESETS, 5));
+        // Read chapter goes with Translation.
+        let read: RunsSettings = toml::from_str(&preset("Read", "\"translate\", \"read\""))
+            .expect("Read with Translate");
+        assert_eq!(
+            read.presets[0].stages.iter().copied().collect::<Vec<_>>(),
+            [RunStage::Read, RunStage::Translate]
+        );
         let none: RunsSettings = toml::from_str("presets = []\nretries = 0").expect("none");
         assert!(none.presets.is_empty());
         assert_eq!(none.policy().retries, 0);

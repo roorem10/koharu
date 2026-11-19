@@ -76,6 +76,8 @@ pub struct ChapterBrief {
     pub edited: bool,
     /// When the chapter was read, as an RFC 3339 time.
     pub read_at: Option<String>,
+    /// The model that read it, by the reference that answered.
+    pub read_model: Option<String>,
 }
 
 /// A character in the chapter, and the pages they're on, counted from 1.

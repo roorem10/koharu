@@ -152,15 +152,15 @@ pub struct PageFailure {
     pub reason: String,
 }
 
-// A preset's stage is a stage of Koharu's, by the same name.
-impl From<RunStage> for Stage {
-    fn from(stage: RunStage) -> Self {
-        match stage {
-            RunStage::Detect => Self::Detect,
-            RunStage::Recognize => Self::Recognize,
-            RunStage::Inpaint => Self::Inpaint,
-            RunStage::Translate => Self::Translate,
-        }
+/// The stage of Koharu's that a Run menu stage is, by the same name, or none
+/// for Read chapter, which is Booharu's own and no stage of a run's pages.
+pub fn pipeline_stage(stage: RunStage) -> Option<Stage> {
+    match stage {
+        RunStage::Detect => Some(Stage::Detect),
+        RunStage::Recognize => Some(Stage::Recognize),
+        RunStage::Inpaint => Some(Stage::Inpaint),
+        RunStage::Read => None,
+        RunStage::Translate => Some(Stage::Translate),
     }
 }
 
@@ -1137,7 +1137,7 @@ mod tests {
         use strum::VariantArray as _;
         for &stage in Stage::VARIANTS {
             let preset = RunStage::from(stage);
-            assert_eq!(Stage::from(preset), stage);
+            assert_eq!(pipeline_stage(preset), Some(stage));
             assert_eq!(
                 serde_json::to_value(preset).ok(),
                 serde_json::to_value(stage).ok()
@@ -1145,6 +1145,10 @@ mod tests {
         }
         let presets: Vec<RunStage> = Stage::VARIANTS.iter().map(|&stage| stage.into()).collect();
         assert!(presets.is_sorted());
+        // Read chapter is no stage of Koharu's, and comes just before
+        // Translation.
+        assert_eq!(pipeline_stage(RunStage::Read), None);
+        assert!(RunStage::Inpaint < RunStage::Read && RunStage::Read < RunStage::Translate);
     }
 
     fn colours(chars: &CharStyle) -> (Option<Rgba>, Option<Rgba>, Option<f64>) {

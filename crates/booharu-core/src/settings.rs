@@ -234,6 +234,69 @@ impl Section for StartSettings {
     const NAME: &'static str = "booharu-start";
 }
 
+/// The most pages one Read chapter request sends.
+pub const MAX_PAGES_PER_REQUEST: u32 = 40;
+
+/// `[booharu-reading]`: Read chapter, which reads the whole chapter with a
+/// model that sees its pages before it is translated, and Explain this line,
+/// which asks the same model first.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
+pub struct ReadingSettings {
+    /// The model that reads, as Koharu's settings name a model (a reference
+    /// such as `openai/gpt-5.4`), never blank; none for the translation model
+    /// when it can read.
+    #[serde(deserialize_with = "reading_model")]
+    #[specta(type = Option<String>)]
+    pub model: Option<String>,
+    /// Whether the Context tab asks before reading a chapter.
+    pub ask: bool,
+    /// How many pages one request sends at most, from 1 to 40,
+    /// `MAX_PAGES_PER_REQUEST`; fewer go when the model's context window
+    /// can't hold them.
+    #[serde(deserialize_with = "pages_per_request")]
+    #[specta(type = u32)]
+    pub pages_per_request: u32,
+}
+
+impl Default for ReadingSettings {
+    fn default() -> Self {
+        Self {
+            model: None,
+            ask: true,
+            pages_per_request: 20,
+        }
+    }
+}
+
+impl Section for ReadingSettings {
+    const NAME: &'static str = "booharu-reading";
+}
+
+/// A model reference, or none; a blank one names no model.
+fn reading_model<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<String>, D::Error> {
+    let model = Option::<String>::deserialize(deserializer)?;
+    if model
+        .as_deref()
+        .is_some_and(|model| model.trim().is_empty())
+    {
+        return Err(D::Error::custom(
+            "the Read chapter model can't be blank; leave it out for the translation model",
+        ));
+    }
+    Ok(model)
+}
+
+fn pages_per_request<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
+    let pages = u32::deserialize(deserializer)?;
+    if !(1..=MAX_PAGES_PER_REQUEST).contains(&pages) {
+        return Err(D::Error::custom(format!(
+            "{pages} pages per Read chapter request aren't between 1 and {MAX_PAGES_PER_REQUEST}"
+        )));
+    }
+    Ok(pages)
+}
+
 /// Family names, none of them blank.
 fn families<'de, D: Deserializer<'de>>(deserializer: D) -> Result<BTreeSet<String>, D::Error> {
     let families = BTreeSet::<String>::deserialize(deserializer)?;
@@ -307,6 +370,8 @@ pub struct BooharuPreferences {
     pub fonts: FontSettings,
     #[serde(rename = "booharu-runs")]
     pub runs: RunsSettings,
+    #[serde(rename = "booharu-reading")]
+    pub reading: ReadingSettings,
     #[serde(rename = "booharu-start")]
     pub start: StartSettings,
 }
@@ -321,6 +386,7 @@ impl BooharuPreferences {
             lettering: koharu_config::get()?,
             fonts: koharu_config::get()?,
             runs: koharu_config::get()?,
+            reading: koharu_config::get()?,
             start: koharu_config::get()?,
         })
     }
@@ -338,6 +404,7 @@ impl BooharuPreferences {
             lettering,
             fonts,
             runs,
+            reading,
             start,
         } = self;
         koharu_config::update(|section: &mut McpSettings| *section = mcp)?;
@@ -345,6 +412,7 @@ impl BooharuPreferences {
         koharu_config::update(|section: &mut LetteringSettings| *section = lettering)?;
         koharu_config::update(|section: &mut FontSettings| *section = fonts)?;
         koharu_config::update(|section: &mut RunsSettings| *section = runs)?;
+        koharu_config::update(|section: &mut ReadingSettings| *section = reading)?;
         koharu_config::update(|section: &mut StartSettings| *section = start)?;
         Self::get()
     }
@@ -405,12 +473,13 @@ type Saver = fn(Map<String, Value>) -> anyhow::Result<()>;
 /// How the section named `name` is saved alone; none for a name Booharu has
 /// no section of.
 fn saver(name: &str) -> Option<Saver> {
-    let savers: [(&str, Saver); 6] = [
+    let savers: [(&str, Saver); 7] = [
         (McpSettings::NAME, saved::<McpSettings>),
         (OcrBoxSettings::NAME, saved::<OcrBoxSettings>),
         (LetteringSettings::NAME, saved::<LetteringSettings>),
         (FontSettings::NAME, saved::<FontSettings>),
         (RunsSettings::NAME, saved::<RunsSettings>),
+        (ReadingSettings::NAME, saved::<ReadingSettings>),
         (StartSettings::NAME, saved::<StartSettings>),
     ];
     savers
@@ -551,6 +620,15 @@ mod tests {
         assert!(fonts.favorites.is_empty());
         let start: StartSettings = toml::from_str("").expect("the defaults");
         assert!(!start.fresh_start_note_seen);
+        let reading: ReadingSettings = toml::from_str("").expect("the defaults");
+        assert_eq!(
+            reading,
+            ReadingSettings {
+                model: None,
+                ask: true,
+                pages_per_request: 20,
+            }
+        );
         // In whichever order serde_json keeps a map's keys.
         let mut names = BooharuPreferences::names();
         names.sort();
@@ -561,10 +639,76 @@ mod tests {
                 LetteringSettings::NAME,
                 McpSettings::NAME,
                 OcrBoxSettings::NAME,
+                ReadingSettings::NAME,
                 RunsSettings::NAME,
                 StartSettings::NAME,
             ]
         );
+    }
+
+    #[test]
+    fn a_bad_reading_model_or_page_count_fails_closed() {
+        let refused = [
+            r#"model = """#,
+            r#"model = "  ""#,
+            "model = 1",
+            "ask = \"yes\"",
+            "pages_per_request = 0",
+            "pages_per_request = 41",
+            "pages_per_request = -1",
+            "pages_per_request = 2.5",
+        ];
+        for text in refused {
+            assert!(
+                toml::from_str::<ReadingSettings>(text).is_err(),
+                "took {text}"
+            );
+        }
+        let read: ReadingSettings =
+            toml::from_str("model = \"openai/gpt-5.4\"\nask = false\npages_per_request = 40\n")
+                .expect("a model, no asking and the most pages");
+        assert_eq!(
+            read,
+            ReadingSettings {
+                model: Some("openai/gpt-5.4".to_owned()),
+                ask: false,
+                pages_per_request: MAX_PAGES_PER_REQUEST,
+            }
+        );
+        let text = toml::to_string(&read).expect("a table");
+        assert_eq!(toml::from_str::<ReadingSettings>(&text).ok(), Some(read));
+        let fewest: ReadingSettings = toml::from_str("pages_per_request = 1").expect("one page");
+        assert_eq!(fewest.pages_per_request, 1);
+
+        // The section changes by its name, a null model going back to the
+        // translation model's, and a bad value changing nothing.
+        let mut preferences = BooharuPreferences::default();
+        preferences
+            .set_section(
+                ReadingSettings::NAME,
+                values(json!({"model": "anthropic/claude", "pages_per_request": 8})),
+            )
+            .expect("a model and a page count");
+        assert_eq!(
+            preferences.reading.model.as_deref(),
+            Some("anthropic/claude")
+        );
+        assert_eq!(preferences.reading.pages_per_request, 8);
+        assert!(preferences.reading.ask, "a key left out keeps its value");
+        let refused = preferences.set_section(
+            ReadingSettings::NAME,
+            values(json!({"pages_per_request": 0})),
+        );
+        assert!(refused.is_err());
+        assert_eq!(preferences.reading.pages_per_request, 8);
+        // 0.0.4's automatic reading is the Run menu's Read chapter now.
+        let refused =
+            preferences.set_section(ReadingSettings::NAME, values(json!({"automatic": true})));
+        assert!(refused.is_err());
+        preferences
+            .set_section(ReadingSettings::NAME, values(json!({"model": null})))
+            .expect("the translation model");
+        assert_eq!(preferences.reading.model, None);
     }
 
     #[test]

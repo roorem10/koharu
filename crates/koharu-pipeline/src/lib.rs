@@ -13,8 +13,9 @@ mod request;
 mod scheduler;
 mod stages;
 
-// Booharu: a page a run gave up on, as its ending lists it.
-pub use booharu::PageFailure;
+// Booharu: a page a run gave up on, as its ending lists it, and the stage of
+// Koharu's a Run menu stage is.
+pub use booharu::{PageFailure, pipeline_stage};
 pub use config::PipelineConfig;
 pub use error::{Error, Result};
 pub use event::{Event, Outcome, RunId};
