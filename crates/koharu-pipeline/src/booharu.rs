@@ -727,7 +727,7 @@ mod tests {
                 ..LetteringSettings::default()
             },
             font: font.map(str::to_owned),
-            runs: None,
+            ..Snapshot::default()
         }
     }
 

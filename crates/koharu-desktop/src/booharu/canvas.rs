@@ -70,7 +70,7 @@ mod tests {
         let snapshot = Snapshot {
             lettering: lettering.clone(),
             font: Some("Anime Ace".to_owned()),
-            runs: None,
+            ..Snapshot::default()
         };
         assert_eq!(
             of(snapshot).text,

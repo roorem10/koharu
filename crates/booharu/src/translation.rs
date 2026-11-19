@@ -230,7 +230,7 @@ mod tests {
                 ..LetteringSettings::default()
             },
             font: Some("CCWildWords".to_owned()),
-            runs: None,
+            ..Snapshot::default()
         };
 
         // Detection on: the default font, and the measured colours stay.

@@ -133,6 +133,13 @@ pub struct LetteringSettings {
     )]
     #[specta(type = f32)]
     pub model_confidence: f32,
+    /// Which sound effects a run translates and cleans: one it skips keeps
+    /// the original art, its clean-up hidden. A block is a sound effect when
+    /// its lettering category, as Booharu reads it, is Sound Effect.
+    pub sfx: SfxMode,
+    /// How a sound effect's subtitle looks: the small plain translation
+    /// written beside an effect kept as art.
+    pub subtitle: SubtitleStyle,
 }
 
 impl Default for LetteringSettings {
@@ -144,6 +151,8 @@ impl Default for LetteringSettings {
             categories: BTreeMap::new(),
             small_text: 0.012,
             model_confidence: 0.6,
+            sfx: SfxMode::default(),
+            subtitle: SubtitleStyle::default(),
         }
     }
 }
@@ -194,6 +203,11 @@ fn colour<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Rgba>, D:
     Ok(colour)
 }
 
+/// A colour that must be set, of four channels each from 0 to 1.
+fn solid<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Rgba, D::Error> {
+    colour(deserializer)?.ok_or_else(|| D::Error::custom("a colour can't be left unset here"))
+}
+
 /// The widest outline the default look takes, in pixels.
 const STROKE_WIDTH: f64 = 50.0;
 
@@ -205,6 +219,94 @@ fn stroke_width<'de, D: Deserializer<'de>>(deserializer: D) -> Result<f64, D::Er
         )));
     }
     Ok(width)
+}
+
+/// Which sound effects a run translates, `[booharu-lettering] sfx`. A
+/// sound effect a run skips keeps the original art: no translation, its
+/// clean-up hidden. One with a subtitle is skipped whatever the mode.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    specta::Type,
+    schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum SfxMode {
+    /// None: every sound effect stays as art.
+    #[default]
+    Skip,
+    /// Only those inside a speech balloon, which are lettered like speech.
+    InsideBubbles,
+    /// Every one, as Koharu translates them.
+    TranslateAll,
+}
+
+/// How a sound effect's subtitle looks, `[booharu-lettering] subtitle`: a
+/// small plain line beside the effect, outlined `size / 9` wide.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
+pub struct SubtitleStyle {
+    /// Its font; none for the default font. Never blank.
+    #[serde(deserialize_with = "subtitle_family")]
+    #[specta(type = Option<String>)]
+    pub family: Option<String>,
+    /// Its drawn size, as a share of the page's shorter side, above 0 and at
+    /// most 0.1: 0.015 is 18 pixels on a page 1,200 wide.
+    #[serde(deserialize_with = "subtitle_size")]
+    #[specta(type = f64)]
+    pub size: f64,
+    /// The text's colour.
+    #[serde(deserialize_with = "solid")]
+    #[specta(type = Rgba)]
+    pub fill: Rgba,
+    /// The outline's colour.
+    #[serde(deserialize_with = "solid")]
+    #[specta(type = Rgba)]
+    pub stroke: Rgba,
+}
+
+impl Default for SubtitleStyle {
+    fn default() -> Self {
+        Self {
+            family: None,
+            size: 0.015,
+            fill: Rgba([0.0, 0.0, 0.0, 1.0]),
+            stroke: Rgba([1.0; 4]),
+        }
+    }
+}
+
+/// The largest subtitle, a tenth of the page's shorter side.
+const MAX_SUBTITLE_SIZE: f64 = 0.1;
+
+fn subtitle_family<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<String>, D::Error> {
+    let family = Option::<String>::deserialize(deserializer)?;
+    if family
+        .as_deref()
+        .is_some_and(|family| family.trim().is_empty())
+    {
+        return Err(D::Error::custom(
+            "a subtitle's font can't be blank; leave it out for the default font",
+        ));
+    }
+    Ok(family)
+}
+
+fn subtitle_size<'de, D: Deserializer<'de>>(deserializer: D) -> Result<f64, D::Error> {
+    let size = f64::deserialize(deserializer)?;
+    if !(size > 0.0 && size <= MAX_SUBTITLE_SIZE) {
+        return Err(D::Error::custom(format!(
+            "a subtitle {size} of the page's shorter side isn't above 0 and at most \
+             {MAX_SUBTITLE_SIZE}"
+        )));
+    }
+    Ok(size)
 }
 
 /// `[booharu-fonts]`: the font picker's favourites.
@@ -365,6 +467,17 @@ pub struct Snapshot {
     /// snapshot of each run it queues, and nothing else reads; none, as
     /// [`read`](Self::read) leaves it, runs as Koharu does.
     pub runs: Option<RunPolicy>,
+    /// Whether this run is Redo boxes taking hand-fixed boxes too: a box
+    /// read or translated by hand is read and translated again. A lock or a
+    /// sound effect's skip still leaves a box out. False as
+    /// [`read`](Self::read) leaves it; only Booharu's own Rust callers set
+    /// it, on the config of the run they queue, which `Pipeline::run` keeps.
+    pub redo: bool,
+    /// Whether this run translates sound effects for their subtitles: the
+    /// blocks its target names are translated though skipped or fixed by
+    /// hand. False as [`read`](Self::read) leaves it; only Booharu's own
+    /// Rust callers set it, as `redo`.
+    pub subtitle_run: bool,
 }
 
 impl Snapshot {
@@ -394,6 +507,8 @@ impl Snapshot {
             lettering,
             font: crate::styles::first_font(&families).map(str::to_owned),
             runs: None,
+            redo: false,
+            subtitle_run: false,
         })
     }
 }
@@ -813,7 +928,8 @@ mod tests {
         };
         // TOML has no null: an unset colour is left out.
         let text = toml::to_string(&lettering).expect("a table");
-        assert!(!text.contains("stroke ="), "{text}");
+        let table: toml::Table = toml::from_str(&text).expect("a table");
+        assert!(table["default"].get("stroke").is_none(), "{text}");
         assert_eq!(
             toml::from_str::<LetteringSettings>(&text).ok(),
             Some(lettering)
@@ -947,6 +1063,134 @@ mod tests {
     }
 
     #[test]
+    fn sound_effects_are_skipped_and_subtitled_plainly_by_default() {
+        let lettering: LetteringSettings = toml::from_str("").expect("the defaults");
+        assert_eq!(lettering.sfx, SfxMode::Skip);
+        assert_eq!(
+            lettering.subtitle,
+            SubtitleStyle {
+                family: None,
+                size: 0.015,
+                fill: Rgba([0.0, 0.0, 0.0, 1.0]),
+                stroke: Rgba([1.0; 4]),
+            }
+        );
+        let json = serde_json::to_value(&lettering).expect("JSON");
+        assert_eq!(json["sfx"], json!("skip"));
+        assert_eq!(
+            json["subtitle"],
+            json!({"family": null, "size": 0.015, "fill": [0.0, 0.0, 0.0, 1.0],
+                "stroke": [1.0, 1.0, 1.0, 1.0]})
+        );
+    }
+
+    #[test]
+    fn the_sound_effect_settings_read_back_as_they_were_written() {
+        let lettering = LetteringSettings {
+            sfx: SfxMode::InsideBubbles,
+            subtitle: SubtitleStyle {
+                family: Some("Comic Neue".to_owned()),
+                size: 0.02,
+                fill: Rgba([1.0, 0.0, 0.0, 1.0]),
+                stroke: Rgba([0.0, 0.0, 0.0, 1.0]),
+            },
+            ..LetteringSettings::default()
+        };
+        let text = toml::to_string(&lettering).expect("a table");
+        assert!(text.contains("sfx = \"inside_bubbles\""), "{text}");
+        assert_eq!(
+            toml::from_str::<LetteringSettings>(&text).ok(),
+            Some(lettering.clone())
+        );
+        let json = serde_json::to_value(&lettering).expect("JSON");
+        assert_eq!(
+            serde_json::from_value::<LetteringSettings>(json).ok(),
+            Some(lettering)
+        );
+        for (text, mode) in [
+            (r#"sfx = "skip""#, SfxMode::Skip),
+            (r#"sfx = "inside_bubbles""#, SfxMode::InsideBubbles),
+            (r#"sfx = "translate_all""#, SfxMode::TranslateAll),
+        ] {
+            let read: LetteringSettings = toml::from_str(text).expect("a mode");
+            assert_eq!(read.sfx, mode);
+        }
+        let largest: LetteringSettings =
+            toml::from_str("[subtitle]\nsize = 0.1").expect("the largest subtitle");
+        assert_eq!(largest.subtitle.size, 0.1);
+    }
+
+    #[test]
+    fn a_bad_sound_effect_setting_fails_closed() {
+        let refused = [
+            r#"sfx = "kept""#,
+            r#"sfx = "translateAll""#,
+            "sfx = 1",
+            "[subtitle]\nfamily = \"\"",
+            "[subtitle]\nfamily = \"   \"",
+            "[subtitle]\nsize = 0",
+            "[subtitle]\nsize = -0.01",
+            "[subtitle]\nsize = 0.11",
+            "[subtitle]\nsize = nan",
+            "[subtitle]\nsize = inf",
+            "[subtitle]\nfill = [1.5, 0, 0, 1]",
+            "[subtitle]\nfill = [0, 0, 1]",
+            "[subtitle]\nstroke = [0, 0, -1, 1]",
+        ];
+        for text in refused {
+            assert!(
+                toml::from_str::<LetteringSettings>(text).is_err(),
+                "took {text}"
+            );
+        }
+        // Through its section too, where a null colour is no colour at all,
+        // and a bad value or an unknown key changes nothing.
+        let mut preferences = BooharuPreferences::default();
+        preferences
+            .set_section(
+                LetteringSettings::NAME,
+                values(json!({"sfx": "translate_all", "subtitle": {"size": 0.03}})),
+            )
+            .expect("a mode and a size");
+        assert_eq!(preferences.lettering.sfx, SfxMode::TranslateAll);
+        assert_eq!(preferences.lettering.subtitle.size, 0.03);
+        assert_eq!(
+            preferences.lettering.subtitle.fill,
+            SubtitleStyle::default().fill,
+            "a key left out keeps its value"
+        );
+        for change in [
+            json!({"subtitle": {"fill": null}}),
+            json!({"subtitle": {"family": " "}}),
+            json!({"subtitle": {"size": 0.2}}),
+            json!({"sfx": "everything"}),
+            json!({"subtitle": {"outline_width": 2}}),
+        ] {
+            let changed = preferences.set_section(LetteringSettings::NAME, values(change.clone()));
+            assert!(changed.is_err(), "took {change}");
+            assert_eq!(preferences.lettering.sfx, SfxMode::TranslateAll);
+            assert_eq!(preferences.lettering.subtitle.size, 0.03);
+        }
+        preferences
+            .set_section(
+                LetteringSettings::NAME,
+                values(json!({"subtitle": {"family": "Comic Neue"}})),
+            )
+            .expect("a family");
+        assert_eq!(
+            preferences.lettering.subtitle.family.as_deref(),
+            Some("Comic Neue")
+        );
+        preferences
+            .set_section(
+                LetteringSettings::NAME,
+                values(json!({"subtitle": {"family": null}})),
+            )
+            .expect("the default font again");
+        assert_eq!(preferences.lettering.subtitle.family, None);
+    }
+
+    #[test]
     fn a_snapshot_fails_on_a_section_it_cant_read() {
         let lettering = LetteringSettings {
             detect_colors: false,
@@ -959,6 +1203,8 @@ mod tests {
                 lettering: lettering.clone(),
                 font: Some("CCWildWords".to_owned()),
                 runs: None,
+                redo: false,
+                subtitle_run: false,
             })
         );
         // A bad stored value is an error, never Koharu's look or no font.
@@ -980,10 +1226,12 @@ mod tests {
             "{error:#}"
         );
         // Koharu's own, for what read nothing: no font, the colours Koharu
-        // gives kept, and no run policy.
+        // gives kept, and no run policy. Nor a redo or a subtitle run, which
+        // no read sets.
         let default = Snapshot::default();
         assert!(default.lettering.detect_colors && default.font.is_none());
         assert_eq!(default.runs, None);
+        assert!(!default.redo && !default.subtitle_run);
     }
 
     #[test]
