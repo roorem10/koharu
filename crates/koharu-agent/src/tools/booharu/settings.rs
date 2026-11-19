@@ -61,6 +61,9 @@ impl Tool for GetSettings {
          Read chapter asks before it reads, and `pages_per_request`, from 1 to 40, the most \
          pages one request to the model sends (booharu_read_chapter reads with that model, or \
          one it names); Explain this line asks the same `model` when one is set; \
+         `booharu-qc` has the quality check's `min_size`, the smallest drawn text that reads, \
+         as a share of the page's shorter side, above 0 and at most 0.1 (0.01 is 12 pixels on \
+         a page 1,200 wide), under which a box's text is too small; \
          `booharu-start` has `fresh_start_note_seen`, whether the note on a \
          first start saying where Booharu 0.0.4's series are was dismissed. The default font is the first of Koharu's Preferred fonts, not a \
          Booharu setting. Needs a project open, as every tool here does."
@@ -135,7 +138,8 @@ impl Tool for SetSettings {
          and `translate`, with at least one other than `read`, Read chapter, which goes only \
          with `translate`. A change to `booharu-reading` applies to the next read and the next \
          line explained; a blank `model` is refused, so set it to null for the translation \
-         model. A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
+         model. A change to `booharu-qc` applies as the quality check next checks each page. \
+         A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
          a project open, as every tool here does."
             .to_owned()
     }
@@ -270,6 +274,7 @@ mod tests {
                     "finish_sound": true,
                 },
                 "booharu-reading": {"model": null, "ask": true, "pages_per_request": 20},
+                "booharu-qc": {"min_size": 0.01},
                 "booharu-start": {"fresh_start_note_seen": false},
             })
         );
