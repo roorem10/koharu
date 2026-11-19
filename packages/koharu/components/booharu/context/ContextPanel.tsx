@@ -25,12 +25,13 @@ import { Button } from '@koharu/ui/components/button'
 import { Input } from '@koharu/ui/components/input'
 import { ScrollArea } from '@koharu/ui/components/scroll-area'
 
-/** The Context tab's name in the right pane, with its icon, as Booharu 0.0.4 showed it. */
+/** The Context tab's name in the right pane, with its icon, as Booharu 0.0.4 showed it, cut short
+ * with an ellipsis when the pane is too narrow for it. */
 export function ContextTabLabel() {
   const { t } = useTranslation()
   return (
     <>
-      <BookOpen /> {t('booharu.context.title')}
+      <BookOpen /> <span className='truncate'>{t('booharu.context.title')}</span>
     </>
   )
 }

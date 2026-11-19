@@ -7,6 +7,7 @@ import { ContextPanel, ContextTabLabel } from '@/components/booharu/context/Cont
 import { AgentPanel } from '@/components/editor/AgentPanel'
 import { LayersPanel } from '@/components/editor/LayersPanel'
 import { StoryPanel } from '@/components/editor/StoryPanel'
+import { useSidebarTabsFit } from '@/lib/booharu/sidebarTabs' // Booharu: five tabs in a narrow pane.
 import { useProject } from '@/lib/queries'
 import { useKoharuStore, type Panel } from '@/lib/store'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@koharu/ui/components/tabs'
@@ -19,9 +20,11 @@ export function RightSidebar() {
   const project = useProject().data?.name ?? null
   const panel = useKoharuStore((state) => state.panel)
   const showPanel = useKoharuStore((state) => state.showPanel)
-  // The shown tab in the accent colour, hovered or not, its underline too.
+  const fit = useSidebarTabsFit() // Booharu: icons give way to labels when the tabs don't fit.
+  // The shown tab in the accent colour, hovered or not, its underline too. Booharu: a tab shrinks,
+  // never growing, its label cut short, and loses its icon while the labels don't fit whole.
   const tab =
-    'h-7 flex-none gap-1 px-1.5 text-[10px] font-semibold after:bg-primary data-active:text-primary data-active:hover:text-primary [&_svg]:size-3'
+    'h-7 flex-initial min-w-0 gap-1 px-1.5 text-[10px] font-semibold after:bg-primary data-active:text-primary data-active:hover:text-primary [&_svg]:size-3 group-data-[booharu-icons=hidden]/tabs-list:[&>svg]:hidden'
   return (
     <aside className='flex h-full min-h-0 flex-col bg-[var(--surface-panel)]'>
       <Tabs
@@ -30,21 +33,23 @@ export function RightSidebar() {
         className='min-h-0 flex-1 gap-0'
       >
         <TabsList
+          {...fit} // Booharu: measured to fit its tabs.
           variant='line'
           className='h-10 w-full shrink-0 justify-start rounded-none border-b border-border/80 px-1'
         >
-          <TabsTrigger value='layers' className={tab}>
-            <Layers3 /> {t('layers.title')}
+          {/* Booharu: each label in a span cut short with an ellipsis, named whole in the title. */}
+          <TabsTrigger value='layers' className={tab} title={t('layers.title')}>
+            <Layers3 /> <span className='truncate'>{t('layers.title')}</span>
           </TabsTrigger>
-          <TabsTrigger value='story' className={tab}>
-            <BookOpenText /> {t('story.title')}
+          <TabsTrigger value='story' className={tab} title={t('story.title')}>
+            <BookOpenText /> <span className='truncate'>{t('story.title')}</span>
           </TabsTrigger>
           {/* Booharu: the Context tab, the chapter's series and glossary, between Story and Agent. */}
-          <TabsTrigger value='context' className={tab}>
+          <TabsTrigger value='context' className={tab} title={t('booharu.context.title')}>
             <ContextTabLabel />
           </TabsTrigger>
-          <TabsTrigger value='agent' className={tab}>
-            <Bot /> {t('agent.title')}
+          <TabsTrigger value='agent' className={tab} title={t('agent.title')}>
+            <Bot /> <span className='truncate'>{t('agent.title')}</span>
           </TabsTrigger>
         </TabsList>
         <TabsContent value='layers' className='flex min-h-0 flex-col'>
