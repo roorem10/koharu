@@ -4,9 +4,11 @@ import { BookOpenText, Bot, Layers3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { ContextPanel, ContextTabLabel } from '@/components/booharu/context/ContextPanel' // Booharu: the Context tab.
+import { QcTab, QcTabLabel } from '@/components/booharu/qc/QcTab' // Booharu: the QC tab.
 import { AgentPanel } from '@/components/editor/AgentPanel'
 import { LayersPanel } from '@/components/editor/LayersPanel'
 import { StoryPanel } from '@/components/editor/StoryPanel'
+import { useQcOpenCount } from '@/lib/booharu/qc' // Booharu: the QC tab shows while it lists a finding.
 import { useSidebarTabsFit } from '@/lib/booharu/sidebarTabs' // Booharu: five tabs in a narrow pane.
 import { useProject } from '@/lib/queries'
 import { useKoharuStore, type Panel } from '@/lib/store'
@@ -20,6 +22,7 @@ export function RightSidebar() {
   const project = useProject().data?.name ?? null
   const panel = useKoharuStore((state) => state.panel)
   const showPanel = useKoharuStore((state) => state.showPanel)
+  const findings = useQcOpenCount() // Booharu: the QC tab's count of open findings.
   const fit = useSidebarTabsFit() // Booharu: icons give way to labels when the tabs don't fit.
   // The shown tab in the accent colour, hovered or not, its underline too. Booharu: a tab shrinks,
   // never growing, its label cut short, and loses its icon while the labels don't fit whole.
@@ -51,6 +54,12 @@ export function RightSidebar() {
           <TabsTrigger value='agent' className={tab} title={t('agent.title')}>
             <Bot /> <span className='truncate'>{t('agent.title')}</span>
           </TabsTrigger>
+          {/* Booharu: the QC tab, last, while it lists a finding, with their count. */}
+          {findings > 0 && (
+            <TabsTrigger value='qc' className={tab} title={t('booharu.qc.title')}>
+              <QcTabLabel count={findings} />
+            </TabsTrigger>
+          )}
         </TabsList>
         <TabsContent value='layers' className='flex min-h-0 flex-col'>
           <LayersPanel />
@@ -64,6 +73,10 @@ export function RightSidebar() {
         </TabsContent>
         <TabsContent value='agent' keepMounted className='flex min-h-0 flex-col'>
           <AgentPanel key={project} />
+        </TabsContent>
+        {/* Booharu: the QC tab's list of the boxes that need a look. */}
+        <TabsContent value='qc' className='flex min-h-0 flex-col'>
+          <QcTab />
         </TabsContent>
       </Tabs>
     </aside>
