@@ -50,7 +50,8 @@ jobs:
       - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
         with:
-          # Booharu 0.0.5 is built on Koharu 0.85, apart from 0.0.4's dependencies.
+          # Booharu 0.0.5 is built on Koharu 0.85 and later, apart from 0.0.4's
+          # dependencies. The key keeps its 0.85 name so the warm cache still serves.
           shared-key: booharu-check-koharu-085
           # Keep compiled dependencies even when a test fails.
           cache-on-failure: true

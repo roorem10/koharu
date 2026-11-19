@@ -3,7 +3,7 @@
 The Windows installer does not require these developer tools. This page is for rebuilding the modified source.
 
 1. Extract the entire source ZIP into a normal folder, for example `C:\Booharu-Source`. Do not build from inside the ZIP.
-2. Install Rust 1.99.1 or newer (MSVC toolchain), Bun 1.3.14 or newer, LLVM (its libclang generates the native bindings), CMake, Ninja, and NSIS.
+2. Install Rust 1.99.1 or newer (MSVC toolchain), Bun 1.3.14 or newer, LLVM 22.1.8 or newer (its libclang generates the native bindings, and Visual Studio 18's standard library refuses an older Clang), CMake, Ninja, and NSIS.
 3. Install Visual Studio Build Tools with **Desktop development with C++** and the Windows SDK. Restart your terminal after installing tools. CMake, Ninja, Rust and Bun must be on PATH; set `LIBCLANG_PATH` to LLVM's `bin` folder if bindgen cannot find libclang.
 4. Open PowerShell in the extracted source folder and run:
 

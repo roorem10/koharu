@@ -1,6 +1,6 @@
 # Install Booharu
 
-Booharu is a personal Windows fork of [Koharu](https://github.com/koharu-rs/koharu). Since 0.0.5 it is built on Koharu 0.85. It keeps its settings, projects and window apart from official Koharu, so both can stay installed and run at the same time.
+Booharu is a personal Windows fork of [Koharu](https://github.com/koharu-rs/koharu). Booharu 0.0.5 is built on Koharu 0.86. It keeps its settings, projects and window apart from official Koharu, so both can stay installed and run at the same time.
 
 ## Portable ZIP
 
@@ -43,6 +43,6 @@ If the port is taken or outside that range, Booharu starts without the MCP serve
 
 ## Projects from Booharu 0.0.4 and earlier
 
-Booharu 0.0.5 uses Koharu 0.85's project format (`.khr`). It cannot open `.khrproj` projects made by Booharu 0.0.4 or earlier, or by Koharu 0.83 and earlier. Booharu 0.0.4 and earlier kept everything in a **PreviewData** folder beside the program; installing 0.0.5 leaves that folder alone.
+Booharu 0.0.5 uses Koharu's project format (`.khr`), the same in Koharu 0.85 and 0.86. It cannot open `.khrproj` projects made by Booharu 0.0.4 or earlier, or by Koharu 0.83 and earlier. Booharu 0.0.4 and earlier kept everything in a **PreviewData** folder beside the program; installing 0.0.5 leaves that folder alone.
 
 To finish an old chapter, keep the old version: install 0.0.5 into a different folder, or use the portable ZIP. The installer warns before it replaces an older Booharu.
