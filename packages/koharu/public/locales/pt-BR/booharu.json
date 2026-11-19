@@ -504,7 +504,7 @@
         "recognizeHandFixed_many": "{{count}} caixas corrigidas à mão não passaram pelo OCR de novo.",
         "recognizeHandFixed_one": "{{count}} caixa corrigida à mão não passou pelo OCR de novo.",
         "recognizeHandFixed_other": "{{count}} caixas corrigidas à mão não passaram pelo OCR de novo.",
-        "soundEffectsHint": "Para traduzir um mesmo assim, escolha outra categoria para ele ou mude a configuração “Efeitos sonoros”.",
+        "soundEffectsHint": "Para traduzir um mesmo assim, escolha outra categoria para ele ou mude a configuração “Efeitos sonoros”; se ele tiver legenda, apague-a também.",
         "soundEffects_many": "{{count}} efeitos sonoros foram mantidos como arte.",
         "soundEffects_one": "{{count}} efeito sonoro foi mantido como arte.",
         "soundEffects_other": "{{count}} efeitos sonoros foram mantidos como arte.",

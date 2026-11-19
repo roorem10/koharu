@@ -8,7 +8,8 @@ import { done, openChapter, queued, skipped, tell } from './jobs'
 const job = (run: number) => useKoharuStore.getState().jobs[String(run)]
 
 const hint =
-  'To translate one anyway, pick another category for it, or change the Sound effects setting.'
+  'To translate one anyway, pick another category for it, or change the Sound effects setting; ' +
+  'one with a subtitle also needs its subtitle deleted.'
 
 describe('What a run left alone', () => {
   it('keeps what each page stage left alone, a stage told again replacing what it told', () => {

@@ -466,7 +466,7 @@
         "locked_other": "Kilitli {{count}} kutu olduğu gibi bırakıldı.",
         "recognizeHandFixed_one": "Elle düzeltilen {{count}} kutu yeniden okunmadı.",
         "recognizeHandFixed_other": "Elle düzeltilen {{count}} kutu yeniden okunmadı.",
-        "soundEffectsHint": "Yine de çevirmek için ona başka bir kategori seçin ya da “Ses efektleri” ayarını değiştirin.",
+        "soundEffectsHint": "Yine de çevirmek için ona başka bir kategori seçin ya da “Ses efektleri” ayarını değiştirin; altyazısı varsa onu da silin.",
         "soundEffects_one": "{{count}} ses efekti çizim olarak bırakıldı.",
         "soundEffects_other": "{{count}} ses efekti çizim olarak bırakıldı.",
         "translateHandFixed_one": "Elle düzeltilen {{count}} kutu yeniden çevrilmedi.",

@@ -466,7 +466,7 @@
         "locked_other": "锁牢个 {{count}} 只文字框保持勿变。",
         "recognizeHandFixed_one": "手动改过个 {{count}} 只文字框呒没重新识别。",
         "recognizeHandFixed_other": "手动改过个 {{count}} 只文字框呒没重新识别。",
-        "soundEffectsHint": "要是照样要翻译，就帮伊拣别个排版类别，或者改“音效”设置。",
+        "soundEffectsHint": "要是照样要翻译，就帮伊拣别个排版类别，或者改“音效”设置；有字幕个，还要拿字幕删脱。",
         "soundEffects_one": "{{count}} 只音效保留成原图。",
         "soundEffects_other": "{{count}} 只音效保留成原图。",
         "translateHandFixed_one": "手动改过个 {{count}} 只文字框呒没重新翻译。",

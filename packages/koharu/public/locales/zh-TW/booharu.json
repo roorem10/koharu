@@ -466,7 +466,7 @@
         "locked_other": "{{count}} 個已鎖定的文字框保持不變。",
         "recognizeHandFixed_one": "{{count}} 個手動修改過的文字框沒有重新辨識。",
         "recognizeHandFixed_other": "{{count}} 個手動修改過的文字框沒有重新辨識。",
-        "soundEffectsHint": "如仍要翻譯，請為它另選一個排字類別，或變更「音效」設定。",
+        "soundEffectsHint": "如仍要翻譯，請為它另選一個排字類別，或變更「音效」設定；如果它有字幕，還需刪除該字幕。",
         "soundEffects_one": "{{count}} 個音效保留為原圖。",
         "soundEffects_other": "{{count}} 個音效保留為原圖。",
         "translateHandFixed_one": "{{count}} 個手動修改過的文字框沒有重新翻譯。",

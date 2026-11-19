@@ -504,7 +504,7 @@
         "recognizeHandFixed_many": "{{count}} zones corrigées à la main n’ont pas été relues.",
         "recognizeHandFixed_one": "{{count}} zone corrigée à la main n’a pas été relue.",
         "recognizeHandFixed_other": "{{count}} zones corrigées à la main n’ont pas été relues.",
-        "soundEffectsHint": "Pour en traduire un quand même, choisissez-lui une autre catégorie ou modifiez le réglage « Effets sonores ».",
+        "soundEffectsHint": "Pour en traduire un quand même, choisissez-lui une autre catégorie ou modifiez le réglage « Effets sonores » ; s’il a un sous-titre, supprimez-le aussi.",
         "soundEffects_many": "{{count}} effets sonores ont été gardés comme dessin.",
         "soundEffects_one": "{{count}} effet sonore a été gardé comme dessin.",
         "soundEffects_other": "{{count}} effets sonores ont été gardés comme dessin.",

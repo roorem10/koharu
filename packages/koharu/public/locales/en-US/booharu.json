@@ -466,7 +466,7 @@
         "locked_other": "{{count}} locked boxes were left as they are.",
         "recognizeHandFixed_one": "{{count}} box fixed by hand wasn't read again.",
         "recognizeHandFixed_other": "{{count}} boxes fixed by hand weren't read again.",
-        "soundEffectsHint": "To translate one anyway, pick another category for it, or change the Sound effects setting.",
+        "soundEffectsHint": "To translate one anyway, pick another category for it, or change the Sound effects setting; one with a subtitle also needs its subtitle deleted.",
         "soundEffects_one": "{{count}} sound effect was kept as art.",
         "soundEffects_other": "{{count}} sound effects were kept as art.",
         "translateHandFixed_one": "{{count}} box fixed by hand wasn't translated again.",

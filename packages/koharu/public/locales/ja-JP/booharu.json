@@ -466,7 +466,7 @@
         "locked_other": "ロック中の{{count}}個のボックスはそのままです。",
         "recognizeHandFixed_one": "手動で修正した{{count}}個のボックスはOCRを再実行しませんでした。",
         "recognizeHandFixed_other": "手動で修正した{{count}}個のボックスはOCRを再実行しませんでした。",
-        "soundEffectsHint": "それでも翻訳するには、別の写植カテゴリを選ぶか、「効果音・擬音」の設定を変更してください。",
+        "soundEffectsHint": "それでも翻訳するには、別の写植カテゴリを選ぶか、「効果音・擬音」の設定を変更してください。字幕がある場合は、その字幕も削除してください。",
         "soundEffects_one": "{{count}}個の効果音を原画のまま残しました。",
         "soundEffects_other": "{{count}}個の効果音を原画のまま残しました。",
         "translateHandFixed_one": "手動で修正した{{count}}個のボックスは再翻訳しませんでした。",

@@ -504,7 +504,7 @@
         "recognizeHandFixed_many": "{{count}} cuadros corregidos a mano no se volvieron a leer.",
         "recognizeHandFixed_one": "{{count}} cuadro corregido a mano no se volvió a leer.",
         "recognizeHandFixed_other": "{{count}} cuadros corregidos a mano no se volvieron a leer.",
-        "soundEffectsHint": "Para traducir uno de todos modos, elige otra categoría para él o cambia el ajuste “Efectos de sonido”.",
+        "soundEffectsHint": "Para traducir uno de todos modos, elige otra categoría para él o cambia el ajuste “Efectos de sonido”; si tiene subtítulo, bórralo también.",
         "soundEffects_many": "{{count}} efectos de sonido se conservaron como dibujo.",
         "soundEffects_one": "{{count}} efecto de sonido se conservó como dibujo.",
         "soundEffects_other": "{{count}} efectos de sonido se conservaron como dibujo.",
