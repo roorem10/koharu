@@ -153,6 +153,19 @@ async fn main() -> Result<()> {
             Event::Queued { .. } | Event::Ended { .. } => {}
             // Booharu: told again in how the run ended.
             Event::Retrying { .. } | Event::PageFailed { .. } => {}
+            // Booharu: blocks a page stage left alone.
+            Event::Skipped {
+                page,
+                stage,
+                sound_effects,
+                hand_fixed,
+                locked,
+                ..
+            } => println!(
+                "{elapsed:7.1}s page {} {stage} left alone {sound_effects} sound effects, \
+                 {hand_fixed} fixed by hand, {locked} locked",
+                number(page)
+            ),
         }
     }
 

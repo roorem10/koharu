@@ -80,6 +80,21 @@ pub enum Event {
         stage: Stage,
         reason: String,
     },
+    /// Booharu: a page stage left blocks of the page alone, sent once for
+    /// the page when any count is above 0: `sound_effects` kept as art by the
+    /// SFX mode, `hand_fixed` fixed by hand (for Detect, the blocks it kept
+    /// because they were made, fixed, labelled, noted, or subtitled by hand),
+    /// and `locked` locked or in a locked layer. `blocks` is whether the run
+    /// named blocks.
+    Skipped {
+        run: RunId,
+        page: PageId,
+        stage: Stage,
+        sound_effects: u32,
+        hand_fixed: u32,
+        locked: u32,
+        blocks: bool,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, specta::Type)]
@@ -137,7 +152,9 @@ impl Events {
         | Event::Ended { run, .. }
         // Booharu: a page stage tried again, and a page given up on.
         | Event::Retrying { run, .. }
-        | Event::PageFailed { run, .. }) = &event;
+        | Event::PageFailed { run, .. }
+        // Booharu: blocks a page stage left alone.
+        | Event::Skipped { run, .. }) = &event;
         {
             let mut runs = self.runs.lock();
             let record = runs.entry(*run).or_insert_with(Record::new);
@@ -173,6 +190,8 @@ impl Events {
                 Event::Retrying { page, stage, .. } | Event::PageFailed { page, stage, .. } => {
                     record.stages.remove(&(*page, *stage));
                 }
+                // Booharu: blocks left alone change no span; the stage goes on.
+                Event::Skipped { .. } => {}
                 Event::Ended { outcome, .. } => {
                     record.ended.send_replace(true);
                     // A failed or stopped run leaves stages it never finished.

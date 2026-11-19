@@ -830,6 +830,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn blocks_a_stage_left_alone_are_told_in_the_runs_history_as_skipped() -> Result<()> {
+        let events = crate::event::Events::new();
+        let mut listener = events.subscribe();
+        let page: PageId = "00000000-0000-0000-0000-000000000001".parse()?;
+        let skipped = Event::Skipped {
+            run: crate::RunId(3),
+            page,
+            stage: Stage::Translate,
+            sound_effects: 2,
+            hand_fixed: 1,
+            locked: 0,
+            blocks: true,
+        };
+        events.send(skipped.clone());
+        assert_eq!(events.told(), std::slice::from_ref(&skipped));
+        assert_eq!(listener.recv().await?, skipped);
+        assert_eq!(
+            serde_json::to_value(&skipped)?,
+            json!({"kind": "skipped", "run": 3, "page": page, "stage": "translate",
+                "sound_effects": 2, "hand_fixed": 1, "locked": 0, "blocks": true})
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn a_run_tells_its_stages_and_whether_it_works_on_pages() -> Result<()> {
         // A page with no scan, so no stage here loads a model.
         let Page {
