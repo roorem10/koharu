@@ -58,6 +58,8 @@
       "deleteCharacter": "Karakteri sil",
       "deleteSeries": "Seriyi sil",
       "deleteSeriesConfirm": "Bu seri ve sözlüğü silinsin mi? Bölüm projeleri korunacak.",
+      "discuss": "Tartış",
+      "discussPrompt": "{{layer}} metin katmanını tartış. Kaynak metin: {{source}}. Çeviri: {{translation}}. Açıklama: {{explanation}}. Sayfa görüntüsü için view_page kullan.",
       "dismiss": "Reddet",
       "done": "Tamam",
       "dontAsk": "Bir daha sorma",

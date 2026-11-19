@@ -63,6 +63,8 @@
       "deleteCharacter": "Eliminar personaje",
       "deleteSeries": "Eliminar serie",
       "deleteSeriesConfirm": "¿Eliminar esta serie y su glosario? Sus proyectos de capítulos se conservarán.",
+      "discuss": "Comentar",
+      "discussPrompt": "Comenta la capa de texto {{layer}}. Texto original: {{source}}. Traducción: {{translation}}. Explicación: {{explanation}}. Usa view_page para ver la imagen de la página.",
       "dismiss": "Descartar",
       "done": "Hecho",
       "dontAsk": "No volver a preguntar",

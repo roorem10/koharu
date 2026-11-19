@@ -58,6 +58,8 @@
       "deleteCharacter": "删除角色",
       "deleteSeries": "删除系列",
       "deleteSeriesConfirm": "删除此系列及其术语表？该系列的章节项目将保留。",
+      "discuss": "讨论",
+      "discussPrompt": "讨论文本图层 {{layer}}。原文：{{source}}。译文：{{translation}}。解释：{{explanation}}。使用 view_page 查看页面图像。",
       "dismiss": "忽略",
       "done": "完成",
       "dontAsk": "不再询问",

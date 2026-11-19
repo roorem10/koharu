@@ -63,6 +63,8 @@
       "deleteCharacter": "Supprimer le personnage",
       "deleteSeries": "Supprimer la série",
       "deleteSeriesConfirm": "Supprimer cette série et son glossaire ? Les projets de ses chapitres seront conservés.",
+      "discuss": "Discuter",
+      "discussPrompt": "Discutez du calque de texte {{layer}}. Texte source : {{source}}. Traduction : {{translation}}. Explication : {{explanation}}. Utilisez view_page pour voir l’image de la page.",
       "dismiss": "Ignorer",
       "done": "Terminé",
       "dontAsk": "Ne plus demander",

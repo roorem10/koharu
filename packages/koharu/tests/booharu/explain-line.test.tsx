@@ -5,7 +5,9 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { BoxDetailsDialog } from '@/components/booharu/details/BoxDetailsDialog'
+import { RightSidebar } from '@/components/editor/RightSidebar'
 import { StoryPanel } from '@/components/editor/StoryPanel'
+import { useAgentChat } from '@/lib/booharu/agentChat'
 import { boxActions, runBoxAction, selectedBoxes } from '@/lib/booharu/boxActions'
 import { openBoxDetails, useBoxDetails } from '@/lib/booharu/boxDetails'
 import { useExplanations } from '@/lib/booharu/explain'
@@ -16,7 +18,7 @@ import { commands, type ExplainAnswer, type Page, type ReadingModel } from '@koh
 import { toast } from '@koharu/ui/components/toast'
 
 import { block, boxesPage, change, desktop, openProject } from './boxes'
-import { gpt, models } from './reading'
+import { gpt, koharuPreferences, models } from './reading'
 
 function mount(ui: ReactNode) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
@@ -98,6 +100,7 @@ async function explainFromStory(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   useBoxDetails.setState({ shown: null, reveal: null })
   useExplanations.setState({ project: null, lines: {} })
+  useAgentChat.setState({ project: null, turns: [], running: null, stale: false })
 })
 
 describe('Booharu Explain this line', () => {
@@ -259,12 +262,45 @@ describe('Booharu Explain this line', () => {
     expect(ask.mock.calls).toEqual([['free'], ['free']])
   })
 
+  it("takes the line to the agent's composer once, and shows the Agent tab", async () => {
+    setUp()
+    explained(answer)
+    useKoharuStore.setState({ preferences: koharuPreferences(gpt.reference), panel: 'story' })
+    const user = userEvent.setup()
+    const view = mount(
+      <>
+        <RightSidebar />
+        <BoxDetailsDialog />
+      </>,
+    )
+
+    act(() => openBoxDetails('page', 'free', 'explain'))
+    const card = await explanation()
+    await user.click(card.getByRole('button', { name: 'Discuss' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(useKoharuStore.getState().panel).toBe('agent')
+    expect(screen.getByRole('tab', { name: 'Agent' })).toHaveAttribute('aria-selected', 'true')
+    const composer = screen.getByRole('textbox', { name: 'Message Booharu Agent' })
+    expect(composer).toHaveValue(
+      `Discuss text layer free. Source: 潔の武器. Translation: Isagi's weapon. Explanation: ${answer.explanation}. Use view_page for the page image.`,
+    )
+
+    // Nothing is sent, and the line goes in once: the chat's panel, mounted again, starts empty.
+    expect(commands.runAgent).not.toHaveBeenCalled()
+    view.unmount()
+    mount(<RightSidebar />)
+    expect(screen.getByRole('textbox', { name: 'Message Booharu Agent' })).toHaveValue('')
+  })
+
   it('has its strings in all 12 languages, each filling in and linking what English does', () => {
     const keys = [
       'booharu.context.explain',
       'booharu.context.explaining',
       'booharu.context.useThis',
       'booharu.context.useThisLocked',
+      'booharu.context.discuss',
+      'booharu.context.discussPrompt',
       'booharu.context.answeredBy',
       'booharu.context.readNote',
       'booharu.context.alternatives',

@@ -63,6 +63,8 @@
       "deleteCharacter": "Excluir personagem",
       "deleteSeries": "Excluir série",
       "deleteSeriesConfirm": "Excluir esta série e seu glossário? Os projetos dos capítulos serão mantidos.",
+      "discuss": "Discutir",
+      "discussPrompt": "Discutir a camada de texto {{layer}}. Texto original: {{source}}. Tradução: {{translation}}. Explicação: {{explanation}}. Use view_page para ver a imagem da página.",
       "dismiss": "Dispensar",
       "done": "Concluído",
       "dontAsk": "Não perguntar novamente",

@@ -58,6 +58,8 @@
       "deleteCharacter": "등장인물 삭제",
       "deleteSeries": "시리즈 삭제",
       "deleteSeriesConfirm": "이 시리즈와 용어집을 삭제할까요? 각 챕터의 프로젝트는 유지됩니다.",
+      "discuss": "논의",
+      "discussPrompt": "텍스트 레이어 {{layer}}에 관해 논의합니다. 원문: {{source}}. 번역: {{translation}}. 설명: {{explanation}}. 페이지 이미지는 view_page로 확인하세요.",
       "dismiss": "무시",
       "done": "완료",
       "dontAsk": "다시 묻지 않기",

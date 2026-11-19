@@ -58,6 +58,8 @@
       "deleteCharacter": "Delete character",
       "deleteSeries": "Delete series",
       "deleteSeriesConfirm": "Delete this series and its glossary? Its chapter projects will remain.",
+      "discuss": "Discuss",
+      "discussPrompt": "Discuss text layer {{layer}}. Source: {{source}}. Translation: {{translation}}. Explanation: {{explanation}}. Use view_page for the page image.",
       "dismiss": "Dismiss",
       "done": "Done",
       "dontAsk": "Don't ask again",

@@ -5,6 +5,7 @@ import { create } from 'zustand'
 
 import { call } from '@/lib/backend'
 import { useProject } from '@/lib/queries'
+import { useKoharuStore } from '@/lib/store'
 import {
   commands,
   events,
@@ -218,4 +219,25 @@ export function withDivider<T extends ChatTurn>(turns: (T | BooharuTurn)[]): (T 
     ...turns,
     { id: crypto.randomUUID(), role: 'divider', at: Date.now(), reason: 'new_chat' },
   ]
+}
+
+/** A line Discuss handed to the agent, which the chat's composer takes once. */
+const useAgentDrafts = create<{ draft: { text: string } | null }>()(() => ({ draft: null }))
+
+/** Discuss: puts `prompt` in the agent's composer, in place of what it holds, and shows the Agent
+ * tab. Nothing is sent until the user sends it. */
+export function discussInAgent(prompt: string): void {
+  useAgentDrafts.setState({ draft: { text: prompt } })
+  useKoharuStore.getState().showPanel('agent')
+}
+
+/** Copies each line Discuss hands over into the chat's composer once, through `fill`, the
+ * composer's setter. */
+export function useAgentDraft(fill: (text: string) => void): void {
+  const draft = useAgentDrafts((state) => state.draft)
+  useEffect(() => {
+    if (!draft) return
+    fill(draft.text)
+    useAgentDrafts.setState((state) => (state.draft === draft ? { draft: null } : state))
+  }, [draft, fill])
 }

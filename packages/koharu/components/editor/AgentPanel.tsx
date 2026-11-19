@@ -12,11 +12,12 @@ import { call, savePreferences } from '@/lib/backend'
 import {
   chattedSinceDivider,
   isBooharuTurn,
+  useAgentDraft,
   useBooharuAgentChat,
   useBooharuAgentRun,
   withDivider,
   type BooharuTurn,
-} from '@/lib/booharu/agentChat' // Booharu: the chat kept with the project.
+} from '@/lib/booharu/agentChat' // Booharu: the chat kept with the project, and Discuss.
 import { useKoharuStore } from '@/lib/store'
 import { modelName, REASONING } from '@/lib/translation'
 import { commands, type AgentConfig, type AgentEvent, type Event } from '@koharu/ipc/protocol'
@@ -84,6 +85,7 @@ export function AgentPanel() {
     const viewport = list.current
     if (viewport && following.current) viewport.scrollTop = viewport.scrollHeight
   }, [turns])
+  useAgentDraft(setPrompt) // Booharu: Discuss puts a line in the composer.
 
   if (!preferences) {
     return (

@@ -5,7 +5,9 @@ import { useId } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 
 import type { BoxDetailsProps } from '@/components/booharu/details/sections'
+import { discussInAgent } from '@/lib/booharu/agentChat'
 import { readNote } from '@/lib/booharu/attrs'
+import { closeBoxDetails } from '@/lib/booharu/boxDetails'
 import { answerFor, explainLine, useExplainModel, useExplanation } from '@/lib/booharu/explain'
 import { readingSection } from '@/lib/booharu/reading'
 import { openSettingsSection } from '@/lib/booharu/settingsLink'
@@ -20,9 +22,10 @@ import { Button } from '@koharu/ui/components/button'
  * chapter's note on the line, then Explain this line, which asks the model Explain this line uses
  * about the line, as it is, in its page and chapter. Its answer explains the line and gives two or
  * three other ways to translate it, each with Use this, which makes it the line's translation as
- * typing it in Story does, unless the line is locked, and says which model answered. An answer
- * goes once the line changes since it was asked, as by Use this. A failure says why, with Try
- * again. With no model to ask, Explain this line is off, and the card says where to choose one. */
+ * typing it in Story does, unless the line is locked; it says which model answered, and Discuss
+ * takes the line to the agent's chat. An answer goes once the line changes since it was asked, as
+ * by Use this. A failure says why, with Try again. With no model to ask, Explain this line is off,
+ * and the card says where to choose one. */
 export function LineContextCard({ box: { layer, locked } }: BoxDetailsProps) {
   const { t, i18n } = useTranslation()
   const alternatives = useId()
@@ -134,6 +137,25 @@ export function LineContextCard({ box: { layer, locked } }: BoxDetailsProps) {
             >
               {t('booharu.context.answeredBy', { model: modelName(models, answer.model) })}
             </p>
+            <Button
+              type='button'
+              variant='ghost'
+              size='xs'
+              className='shrink-0 text-[11px]'
+              onClick={() => {
+                closeBoxDetails()
+                discussInAgent(
+                  t('booharu.context.discussPrompt', {
+                    layer: layer.id,
+                    source: answer.source,
+                    translation: answer.translation,
+                    explanation: answer.explanation,
+                  }),
+                )
+              }}
+            >
+              {t('booharu.context.discuss')}
+            </Button>
           </div>
         </div>
       )}

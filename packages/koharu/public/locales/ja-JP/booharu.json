@@ -58,6 +58,8 @@
       "deleteCharacter": "キャラクターを削除",
       "deleteSeries": "シリーズを削除",
       "deleteSeriesConfirm": "このシリーズと用語集を削除しますか？各章のプロジェクトは保持されます。",
+      "discuss": "相談",
+      "discussPrompt": "テキストレイヤー{{layer}}について相談します。原文：{{source}}。翻訳：{{translation}}。解説：{{explanation}}。ページ画像はview_pageで確認してください。",
       "dismiss": "却下",
       "done": "完了",
       "dontAsk": "今後確認しない",

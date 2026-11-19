@@ -72,6 +72,8 @@
       "deleteCharacter": "حذف الشخصية",
       "deleteSeries": "حذف السلسلة",
       "deleteSeriesConfirm": "هل تريد حذف هذه السلسلة ومسردها؟ ستبقى مشاريع فصولها.",
+      "discuss": "مناقشة",
+      "discussPrompt": "ناقش طبقة النص {{layer}}. النص المصدر: {{source}}. الترجمة: {{translation}}. الشرح: {{explanation}}. استخدم view_page لعرض صورة الصفحة.",
       "dismiss": "تجاهل",
       "done": "تم",
       "dontAsk": "عدم السؤال مجددًا",
