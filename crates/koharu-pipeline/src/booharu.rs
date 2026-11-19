@@ -5,8 +5,10 @@
 //! uses the same values, whether the Run button, the agent, or MCP queued it.
 //!
 //! - `queued`, in `Pipeline::run`, takes the snapshot, the run policy of
-//!   `[booharu-runs]` included, or refuses the run when a section it reads
-//!   can't be read. For a run that translates it also appends the chapter's
+//!   `[booharu-runs]` included, with the flags the run's caller set on its
+//!   config's snapshot (Redo boxes' `redo`, a subtitle run's
+//!   `subtitle_run`), or refuses the run when a section it reads can't be
+//!   read. For a run that translates it also appends the chapter's
 //!   glossary and notes, from its side file and the series it links, to the
 //!   Instructions in the run's config, never in the saved setting, or
 //!   refuses the run when either file can't be read.
@@ -59,16 +61,18 @@ use crate::{
 /// queued with, with Booharu's settings as they're saved now:
 /// `[booharu-lettering]`, the first of Koharu's Preferred fonts, and
 /// `[booharu-runs]`'s run policy, which the run then follows whoever queued
-/// it; and, when it translates, the chapter's glossary and notes after its
-/// Instructions ([`chapter`]). A section that can't be read refuses the run,
-/// as a bad stored value is an error, never replaced by its default.
+/// it; the flags only its caller knows, kept from `config`'s own snapshot
+/// ([`snapshot`]); and, when it translates, the chapter's glossary and notes
+/// after its Instructions ([`chapter`]). A section that can't be read
+/// refuses the run, as a bad stored value is an error, never replaced by its
+/// default.
 pub(crate) fn queued(
     config: PipelineConfig,
     session: &Mutex<Session>,
     stages: &BTreeSet<Stage>,
 ) -> crate::Result<PipelineConfig> {
     let families = koharu_config::get::<RendererConfig>().map(|renderer| renderer.font_families);
-    let booharu = snapshot(Snapshot::read(families), RunPolicy::read())?;
+    let booharu = snapshot(Snapshot::read(families), RunPolicy::read(), &config.booharu)?;
     let (path, project) = {
         let session = session.lock();
         (session.path().to_owned(), session.project())
@@ -128,16 +132,23 @@ fn chapter(
     })
 }
 
-/// A run's snapshot: `read`, with `policy` in it, or the error of the first
-/// that couldn't be read, which refuses the run as an invalid request.
+/// A run's snapshot: `read`, with `policy` in it and the run's own flags
+/// from `asked`, the snapshot of the config it was queued with: Redo boxes'
+/// `redo` and a subtitle run's `subtitle_run`, which only the caller that
+/// queued the run sets, and which no saved setting holds. Or the error of
+/// the first that couldn't be read, which refuses the run as an invalid
+/// request.
 fn snapshot(
     read: anyhow::Result<Snapshot>,
     policy: anyhow::Result<RunPolicy>,
+    asked: &Snapshot,
 ) -> crate::Result<Snapshot> {
     let invalid = |error: anyhow::Error| crate::Error::invalid(format!("{error:#}"));
     let read = read.map_err(invalid)?;
     Ok(Snapshot {
         runs: Some(policy.map_err(invalid)?),
+        redo: asked.redo,
+        subtitle_run: asked.subtitle_run,
         ..read
     })
 }
@@ -739,7 +750,7 @@ mod tests {
         }
         .policy();
         let read = snapshot(true, None, None, Some("CCWildWords"));
-        let queued = super::snapshot(Ok(read.clone()), Ok(policy))?;
+        let queued = super::snapshot(Ok(read.clone()), Ok(policy), &Snapshot::default())?;
         assert_eq!(
             queued,
             Snapshot {
@@ -750,7 +761,8 @@ mod tests {
         // A bad [booharu-runs] refuses the run, naming the section.
         let bad = anyhow::anyhow!("9 retries aren't between 0 and 5")
             .context("Booharu's run settings can't be read from [booharu-runs]");
-        let refused = super::snapshot(Ok(read), Err(bad)).expect_err("a bad policy");
+        let refused =
+            super::snapshot(Ok(read), Err(bad), &Snapshot::default()).expect_err("a bad policy");
         assert!(
             matches!(&refused, crate::Error::Invalid(message)
                 if message.contains("[booharu-runs]") && message.contains("9 retries")),
@@ -759,6 +771,61 @@ mod tests {
         // A config a caller made, as upstream's tests and examples make one,
         // runs Koharu's way.
         assert_eq!(PipelineConfig::default().booharu.runs, None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_queued_run_keeps_its_callers_flags_and_reads_every_setting_again() -> Result<()> {
+        let read = snapshot(true, None, None, Some("CCWildWords"));
+        let policy = RunsSettings::default().policy();
+        // Redo boxes taking hand-fixed boxes, and a subtitle run, as their
+        // callers ask on the config they queue; a setting the caller's
+        // config holds is read again, as it's saved now.
+        let asked = Snapshot {
+            redo: true,
+            subtitle_run: true,
+            font: Some("Comic Neue".to_owned()),
+            ..Snapshot::default()
+        };
+        assert_eq!(
+            super::snapshot(Ok(read.clone()), Ok(policy), &asked)?,
+            Snapshot {
+                runs: Some(policy),
+                redo: true,
+                subtitle_run: true,
+                ..read
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_redo_and_subtitle_flags_go_through_queued() -> Result<()> {
+        let Page {
+            _dir: _held,
+            session,
+            blocks: _,
+        } = Page::new(&[("a", "text")])?;
+        let session = Mutex::new(session);
+        for (redo, subtitle_run) in [(true, false), (false, true), (false, false)] {
+            let config = PipelineConfig {
+                booharu: Snapshot {
+                    redo,
+                    subtitle_run,
+                    ..Snapshot::default()
+                },
+                ..PipelineConfig::default()
+            };
+            for stages in [&[Stage::Recognize][..], &[Stage::Translate, Stage::Inpaint]] {
+                let run = queued(config.clone(), &session, &stages.iter().copied().collect())?;
+                assert_eq!(
+                    (run.booharu.redo, run.booharu.subtitle_run),
+                    (redo, subtitle_run),
+                    "{stages:?}"
+                );
+                assert!(run.booharu.runs.is_some(), "the run policy is read");
+            }
+        }
         Ok(())
     }
 
