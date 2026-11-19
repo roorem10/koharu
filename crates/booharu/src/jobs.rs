@@ -139,13 +139,14 @@ pub fn busy(kind: JobKind) -> bool {
 pub(crate) mod tests {
     use super::*;
 
-    /// Held by every test that registers jobs, as the registry is the
+    /// Held by every test that registers jobs, or starts a run group, which
+    /// is refused while Read chapter reads, as the registry is the
     /// process's.
-    pub(crate) static REGISTRY: Mutex<()> = Mutex::new(());
+    pub(crate) static REGISTRY: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     #[test]
     fn a_second_read_is_refused_and_a_job_leaves_as_its_dropped() -> Result<()> {
-        let _held = REGISTRY.lock();
+        let _held = REGISTRY.blocking_lock();
         let read = start(JobKind::ReadChapter)?;
         assert!(busy(JobKind::ReadChapter));
         let error = start(JobKind::ReadChapter).expect_err("a second read");
@@ -168,7 +169,7 @@ pub(crate) mod tests {
 
     #[test]
     fn cancel_all_cancels_every_job_going() -> Result<()> {
-        let _held = REGISTRY.lock();
+        let _held = REGISTRY.blocking_lock();
         let (read, explain) = (start(JobKind::ReadChapter)?, start(JobKind::Explain)?);
         assert!(!read.cancelled() && !explain.cancelled());
         cancel_all();

@@ -47,12 +47,6 @@ pub async fn booharu_run(
 ) -> Result<RunPlan> {
     let app = Arc::clone(&app);
     let session = app.session()?;
-    // Read chapter is no stage of Koharu's, and the Run step that reads is
-    // yet to come: a press with it runs the others as before.
-    let stages = stages
-        .into_iter()
-        .filter_map(koharu_pipeline::pipeline_stage)
-        .collect();
     Ok(runs::carry_on(app, session, target, stages).await?)
 }
 

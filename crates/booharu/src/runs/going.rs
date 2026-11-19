@@ -27,9 +27,25 @@
 //! the Translation run's included, and with no page left, the press ends.
 //! Each run is announced with its place among the plan's groups, the
 //! Translation run's last, so the interface chimes once for the press.
+//!
+//! A press with Read chapter on reads the chapter before its Translation
+//! run, as the module above sets out: the read is a group no run works on,
+//! which the follower reads through the host ([`RunHost::read`]) while the
+//! group holds its place, its plan `reading` with no `run`, first when it's
+//! the plan's first group. Just before it reads, it checks again that the
+//! brief is still missing, as the Context tab or the agent may have read the
+//! chapter meanwhile, and that its pages have text, skipping the read
+//! otherwise. A read done, skipped or failed goes on to the Translation run,
+//! as a read never holds translation back, and the app tells why; a read
+//! stopped, or a Stop since the group reached it, ends the group, as a run
+//! that stopped does. The pages a run of the press gave up on are left out
+//! of the read too, and the read is never announced, so the Translation
+//! run's announcement stays the last.
 
 use std::{
     collections::BTreeSet,
+    future::Future,
+    pin::Pin,
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
@@ -37,21 +53,33 @@ use std::{
     time::Duration,
 };
 
-use anyhow::Context as _;
-use booharu_core::context::SeriesStore;
-use koharu_pipeline::{Event, Outcome, Pipeline, Request, RunId, Stage, Target};
+use anyhow::{Context as _, ensure};
+use booharu_core::{
+    context::{Chapter, ChapterContext, SeriesStore},
+    runs::RunStage,
+};
+use koharu_pipeline::{Event, Outcome, Pipeline, Request, RunId, Stage, Target, pipeline_stage};
 use koharu_scene::{PageId, ProjectId, Session};
 use parking_lot::{Mutex, MutexGuard};
 use tokio::{runtime::Handle, task::JoinHandle};
 
 use super::{
-    PlanGroup, RunPlan, RunTarget, all_stages, groups, has_notes, to_translate, translate_last,
+    PlanGroup, RunPlan, RunTarget, all_stages, brief_missing, groups, has_notes, has_text,
+    read_before_translation, to_translate, translate_last,
 };
+use crate::{
+    context::read::ReadOutcome,
+    jobs::{self, JobKind},
+};
+
+/// A Run step's read as a host reads it: how it ended.
+pub type Reading = Pin<Box<dyn Future<Output = anyhow::Result<ReadOutcome>> + Send>>;
 
 /// The app as a group's runs reach it. The desktop app queues a run only on
 /// the project open and tells the interface each run; a host outside it,
 /// such as the agent's own, queues on its pipeline and tells no one. A host
-/// blocks, so it's called on a blocking thread.
+/// blocks, so it's called on a blocking thread; its read, which waits on a
+/// model, is awaited.
 pub trait RunHost: Send + Sync + 'static {
     /// The pipeline the runs go on, whose history tells how each ended.
     fn pipeline(&self) -> &Pipeline;
@@ -68,6 +96,28 @@ pub trait RunHost: Send + Sync + 'static {
     /// Tells whoever follows runs that `run` is the run of the `index`th of
     /// `plan`'s groups.
     fn announce(&self, plan: &RunPlan, index: usize, run: RunId);
+
+    /// Reads the chapter of the project `session` holds as the Run step of
+    /// `group`, on `pages`, those of the project its runs didn't give up on,
+    /// while that project is the one open: a Stop since the pipeline's count
+    /// of Stops was `stops`, as the group reached the read, closing the
+    /// project, or another opening, stops it, writing nothing. Answers how
+    /// it ended; skipped or failed, the group goes on to translate, and the
+    /// host tells why. A host outside the app skips it, as only the app
+    /// reads.
+    fn read(
+        self: Arc<Self>,
+        _session: Arc<Mutex<Session>>,
+        _group: u64,
+        _pages: Vec<PageId>,
+        _stops: u64,
+    ) -> Reading {
+        Box::pin(async {
+            Ok(ReadOutcome::Skipped(
+                "Read chapter reads only in the app.".to_owned(),
+            ))
+        })
+    }
 }
 
 /// The group going on, if one is. `carry_on` holds it while it answers one
@@ -102,20 +152,24 @@ pub fn group_going() -> Option<u64> {
 }
 
 /// Carries on with what the pages `target` names still need in the project
-/// `session` holds when `stages` holds every stage: queues one ordinary run
-/// for each group of the pages that need the same stages, one after
+/// `session` holds when `stages` holds Koharu's four: queues one ordinary
+/// run for each group of the pages that need the same stages, one after
 /// another, each announced through `host`, and answers the plan with its
 /// first run; with nothing left to do, no run and no groups. With fewer
 /// stages, one ordinary run of them on every page `target` names, as
 /// Koharu's Run button queues it, as a plan of one group. On a chapter with
 /// notes, a plan that would find text and translate translates last, its
-/// Translation run its last group. While a group goes on in the project,
-/// answers that one, with its run going now, and queues nothing.
+/// Translation run its last group. With Read chapter among `stages`, a plan
+/// that translates on a chapter without a brief reads the chapter just
+/// before its Translation run, whatever it finds, answering no run and
+/// `reading` when it reads first. While a group goes on in the project,
+/// answers that one, with its run going now, and queues nothing; while Read
+/// chapter reads by hand, refuses.
 pub async fn carry_on(
     host: Arc<dyn RunHost>,
     session: Arc<Mutex<Session>>,
     target: RunTarget,
-    stages: Vec<Stage>,
+    stages: Vec<RunStage>,
 ) -> anyhow::Result<RunPlan> {
     let runtime = Handle::current();
     let (plan, _following) = tokio::task::spawn_blocking(move || {
@@ -126,13 +180,13 @@ pub async fn carry_on(
 }
 
 /// `carry_on`'s work, on a thread no caller can cancel: the plan, and the
-/// follower of the first run it queued, already spawned on `runtime`.
-/// `store` opens the series folder, when the chapter links a series.
+/// follower of the group it started, already spawned on `runtime`. `store`
+/// opens the series folder, when the chapter links a series.
 fn start(
     host: Arc<dyn RunHost>,
     session: Arc<Mutex<Session>>,
     target: &RunTarget,
-    stages: &[Stage],
+    stages: &[RunStage],
     store: impl FnOnce() -> anyhow::Result<SeriesStore>,
     runtime: &Handle,
 ) -> anyhow::Result<(RunPlan, Option<JoinHandle<()>>)> {
@@ -141,53 +195,91 @@ fn start(
     if let Some(plan) = answer(going.as_ref(), project) {
         return Ok((plan, None));
     }
-    let groups = groups(&session.lock(), target, stages)?;
-    let (groups, narrows) = translating(&session, groups, stages, store)?;
-    let first = groups
-        .first()
-        .map(|first| request(first_target(target, stages, first), &first.stages));
+    // While Read chapter reads by hand, this press's own read would be
+    // refused, and its runs would go on beside the read: one at a time.
+    ensure!(
+        !jobs::busy(JobKind::ReadChapter),
+        "Read chapter is reading the chapter; wait for it to end, or stop it."
+    );
+    let read = stages.contains(&RunStage::Read);
+    let stages: Vec<Stage> = stages.iter().copied().filter_map(pipeline_stage).collect();
+    let groups = groups(&session.lock(), target, &stages)?;
+    let (groups, narrows) = translating(&session, groups, &stages, read, store)?;
+    let first = groups.first().map(|first| match first.read {
+        true => First::Read(first.pages.clone()),
+        false => First::Run(request(first_target(target, &stages, first), &first.stages)),
+    });
     go(going, host, session, groups, narrows, first, runtime)
 }
 
 /// `groups`, the plan of a press on the project `session` holds with
-/// `stages`, as it goes: translating last, when one would find text and
-/// translate on a chapter with notes, as planned otherwise; with whether its
-/// Translation run, carrying on, takes only the pages that still need it
-/// then. With fewer stages it translates every page of its group, as
-/// Koharu translates each page a run names. `store` opens the series
-/// folder, when the chapter links a series.
+/// `stages`, as it goes: with `read`, Read chapter on, when a group
+/// translates on a chapter whose brief is missing, every group without
+/// Translation, then the read, then the Translation run; else translating
+/// last, when one would find text and translate on a chapter with notes;
+/// as planned otherwise. With whether its Translation run, carrying on,
+/// takes only the pages that still need it then: with fewer stages it
+/// translates every page of its group, as Koharu translates each page a run
+/// names. The chapter is read once, and only for a plan that would split.
+/// `store` opens the series folder, when the chapter links a series.
 fn translating(
     session: &Mutex<Session>,
     groups: Vec<PlanGroup>,
     stages: &[Stage],
+    read: bool,
     store: impl FnOnce() -> anyhow::Result<SeriesStore>,
 ) -> anyhow::Result<(Vec<PlanGroup>, bool)> {
     let (path, project) = {
         let session = session.lock();
         (session.path().to_owned(), session.project())
     };
-    let Some(split) = translate_last(&project, &groups) else {
-        return Ok((groups, false));
+    let reads = match read {
+        true => read_before_translation(&project, &groups),
+        false => None,
     };
-    Ok(match has_notes(&path, store)? {
-        true => (split, all_stages(stages)),
-        false => (groups, false),
+    let split = translate_last(&project, &groups);
+    if reads.is_none() && split.is_none() {
+        return Ok((groups, false));
+    }
+    let chapter = Chapter::read(&path, store)?;
+    let narrows = all_stages(stages);
+    Ok(match (reads, split) {
+        (Some(reads), _) if brief_missing(&chapter.context) => (reads, narrows),
+        (_, Some(split)) if has_notes(&chapter) => (split, narrows),
+        _ => (groups, false),
     })
 }
 
-/// Starts a group of `groups` in the project `session` holds from `first`,
-/// its first group's run, in the place `going` holds: queues the run,
-/// announces it, and spawns its follower on `runtime` once the place is let
-/// go, which the follower then holds. With no run, a plan of none, which
-/// takes no place. `narrows` tells whether its last group takes only the
-/// pages that still need translation then.
+/// How a group starts: with its first group's run, or with its read, on
+/// those pages.
+enum First {
+    Run(Request),
+    Read(Vec<PageId>),
+}
+
+/// What a group's follower waits on: the run of its `at`th group, or the
+/// read of its `at`th group, on those pages, with the pipeline's count of
+/// Stops as the group reached it, so a Stop since stops it.
+#[derive(Debug, PartialEq, Eq)]
+enum Now {
+    Run(usize, RunId),
+    Read(usize, Vec<PageId>, u64),
+}
+
+/// Starts a group of `groups` in the project `session` holds from `first`
+/// in the place `going` holds: queues its first group's run and announces
+/// it, or, when its first group is the read, takes the place reading; and
+/// spawns its follower on `runtime` once the place is let go, which the
+/// follower then holds. With no first group, a plan of none, which takes no
+/// place. `narrows` tells whether its last group takes only the pages that
+/// still need translation then.
 fn go(
     mut going: MutexGuard<'_, Option<Going>>,
     host: Arc<dyn RunHost>,
     session: Arc<Mutex<Session>>,
     groups: Vec<PlanGroup>,
     narrows: bool,
-    first: Option<Request>,
+    first: Option<First>,
     runtime: &Handle,
 ) -> anyhow::Result<(RunPlan, Option<JoinHandle<()>>)> {
     let group = MADE.fetch_add(1, Ordering::Relaxed) + 1;
@@ -201,14 +293,30 @@ fn go(
         return Ok((plan, None));
     };
     let (project, stops) = (session.lock().id(), host.pipeline().stops());
-    let run = host.queue(&session, first)?.context("the project closed")?;
-    let plan = RunPlan {
-        group,
-        groups,
-        run: Some(run),
-        reading: false,
+    let (plan, now) = match first {
+        First::Run(request) => {
+            let run = host
+                .queue(&session, request)?
+                .context("the project closed")?;
+            let plan = RunPlan {
+                group,
+                groups,
+                run: Some(run),
+                reading: false,
+            };
+            host.announce(&plan, 0, run);
+            (plan, Now::Run(0, run))
+        }
+        First::Read(pages) => {
+            let plan = RunPlan {
+                group,
+                groups,
+                run: None,
+                reading: true,
+            };
+            (plan, Now::Read(0, pages, stops))
+        }
     };
-    host.announce(&plan, 0, run);
     *going = Some(Going {
         plan: plan.clone(),
         project,
@@ -219,7 +327,7 @@ fn go(
     // Let go first, as a follower that can't be spawned, on a runtime
     // shutting down, frees the place as it's dropped.
     drop(going);
-    let following = runtime.spawn(follow(host, session, Place(group), run));
+    let following = runtime.spawn(follow(host, session, Place(group), now));
     Ok((plan, Some(following)))
 }
 
@@ -259,22 +367,22 @@ impl Drop for Place {
     }
 }
 
-/// Follows the group whose place it holds from `run`, its first: once each
-/// run ends, queues the group's next run, or ends the group.
-async fn follow(
-    host: Arc<dyn RunHost>,
-    session: Arc<Mutex<Session>>,
-    place: Place,
-    mut run: RunId,
-) {
+/// Follows the group whose place it holds from `now`, its first run or its
+/// read: once each run or the read ends, goes on to the group's next run or
+/// read, or ends the group.
+async fn follow(host: Arc<dyn RunHost>, session: Arc<Mutex<Session>>, place: Place, mut now: Now) {
     let group = place.0;
-    let mut index = 0;
     loop {
-        let outcome = match ended(host.pipeline(), run).await {
-            Ok(outcome) => outcome,
-            Err(error) => {
-                tracing::warn!("couldn't follow run group {group}: {error:#}");
-                return;
+        let (index, outcome) = match now {
+            Now::Run(index, run) => match ended(host.pipeline(), run).await {
+                Ok(outcome) => (index, outcome),
+                Err(error) => {
+                    tracing::warn!("couldn't follow run group {group}: {error:#}");
+                    return;
+                }
+            },
+            Now::Read(index, pages, stops) => {
+                (index, read_step(&host, &session, group, pages, stops).await)
             }
         };
         let (working, held) = (Arc::clone(&host), Arc::clone(&session));
@@ -282,7 +390,7 @@ async fn follow(
             tokio::task::spawn_blocking(move || advance(&*working, &held, group, index, &outcome))
                 .await;
         match next {
-            Ok(Ok(Some(queued))) => (index, run) = queued,
+            Ok(Ok(Some(next))) => now = next,
             Ok(Ok(None)) => return,
             Ok(Err(error)) => {
                 // Told only here: the interface isn't, and the group ends
@@ -312,20 +420,86 @@ async fn ended(pipeline: &Pipeline, run: RunId) -> anyhow::Result<Outcome> {
     }
 }
 
-/// What follows `group`'s run of its `index`th group ending with `outcome`,
-/// in `session`'s project: its next run, queued and announced, with its
-/// group's index, on the pages of it the project still has and no run of
-/// the group gave up on; `None` once the group is over, which frees its
-/// place, or went to another project's group. A Stop since the run was
-/// queued ends it as a run that stopped does, and a run that can't be queued
-/// ends it too.
+/// How `group`'s read on `pages` of the project `session` holds, which the
+/// group reached as the pipeline's count of Stops was `stops`, ends for the
+/// group: done, skipped or failed, as Done, so the Translation run follows
+/// it, as a read never holds translation back; stopped, or a Stop since, as
+/// Stopped, which ends the group. Just before it reads, it checks again
+/// that the read is wanted ([`wanted`]), and skips it, telling no one,
+/// otherwise.
+async fn read_step(
+    host: &Arc<dyn RunHost>,
+    session: &Arc<Mutex<Session>>,
+    group: u64,
+    pages: Vec<PageId>,
+    stops: u64,
+) -> Outcome {
+    if host.pipeline().stops() != stops {
+        return Outcome::Stopped;
+    }
+    let (held, named) = (Arc::clone(session), pages.clone());
+    match tokio::task::spawn_blocking(move || wanted(&held, &named)).await {
+        Ok(Ok(true)) => {}
+        Ok(Ok(false)) => return Outcome::Done,
+        Ok(Err(error)) => {
+            // The Translation run that follows reads the same files, and
+            // fails as it tells why.
+            tracing::warn!("run group {group} goes on without Read chapter: {error:#}");
+            return Outcome::Done;
+        }
+        Err(error) => {
+            tracing::warn!("run group {group} goes on without Read chapter: {error}");
+            return Outcome::Done;
+        }
+    }
+    match Arc::clone(host)
+        .read(Arc::clone(session), group, pages, stops)
+        .await
+    {
+        Ok(ReadOutcome::Done(_)) => Outcome::Done,
+        Ok(ReadOutcome::Skipped(why)) => {
+            tracing::info!("run group {group} skipped Read chapter: {why}");
+            Outcome::Done
+        }
+        Ok(ReadOutcome::Stopped) => Outcome::Stopped,
+        Err(error) => {
+            tracing::warn!("run group {group} goes on without Read chapter: {error:#}");
+            Outcome::Done
+        }
+    }
+}
+
+/// Whether a press's read on `pages` of the project `session` holds still
+/// has something to do: the chapter's brief is still missing, as the
+/// Context tab or the agent may have read the chapter, or written a brief,
+/// since the press planned, and a block on those pages has text to read. A
+/// side file that doesn't read fails.
+fn wanted(session: &Mutex<Session>, pages: &[PageId]) -> anyhow::Result<bool> {
+    let (path, text) = {
+        let session = session.lock();
+        (
+            session.path().to_owned(),
+            has_text(&session.project(), pages),
+        )
+    };
+    Ok(text && brief_missing(&ChapterContext::load(&path)?))
+}
+
+/// What follows `group`'s run or read of its `index`th group ending with
+/// `outcome`, in `session`'s project: its next run, queued and announced, or
+/// its read, with its group's index, on the pages of it the project still
+/// has and no run of the group gave up on; `None` once the group is over,
+/// which frees its place, or went to another project's group. A Stop since
+/// the run was queued, or the read reached, ends it as a run that stopped
+/// does, and a run that can't be queued ends it too. While the read goes,
+/// the plan has no run and is `reading`.
 fn advance(
     host: &dyn RunHost,
     session: &Arc<Mutex<Session>>,
     group: u64,
     index: usize,
     outcome: &Outcome,
-) -> anyhow::Result<Option<(usize, RunId)>> {
+) -> anyhow::Result<Option<Now>> {
     let mut going = GOING.lock();
     let Some(ours) = going.as_mut().filter(|going| going.plan.group == group) else {
         return Ok(None);
@@ -343,21 +517,28 @@ fn advance(
     let step = next_step(&ours.plan.groups, index, outcome, |page| {
         project.page(page).is_ok() && !ours.failed.contains(&page)
     });
-    let queued = narrowed(step, ours, session).and_then(|step| match step {
+    let next = narrowed(step, ours, session).and_then(|step| match step {
+        Step::Queue(at, next) if next.read => Ok(Some(Now::Read(at, next.pages, stops))),
         Step::Queue(at, next) => host
             .queue(session, request(Target::Pages(next.pages), &next.stages))
-            .map(|run| run.map(|run| (at, run))),
+            .map(|run| run.map(|run| Now::Run(at, run))),
         Step::End => Ok(None),
     });
-    match queued {
-        Ok(Some((at, run))) => {
-            ours.plan.run = Some(run);
+    match &next {
+        Ok(Some(Now::Run(at, run))) => {
+            ours.plan.run = Some(*run);
+            ours.plan.reading = false;
             ours.stops = stops;
-            host.announce(&ours.plan, at, run);
+            host.announce(&ours.plan, *at, *run);
+        }
+        Ok(Some(Now::Read(..))) => {
+            ours.plan.run = None;
+            ours.plan.reading = true;
+            ours.stops = stops;
         }
         _ => *going = None,
     }
-    queued
+    next
 }
 
 /// `step`, the next of the press `going`, as it takes it: when it's the
@@ -395,18 +576,19 @@ fn free(group: u64) {
     }
 }
 
-/// What a group does once one of its runs ends.
+/// What a group does once one of its runs, or its read, ends.
 #[derive(Debug, PartialEq, Eq)]
 enum Step {
-    /// Queue the `at`th group, on the pages of it the project still has.
+    /// Go on to the `at`th group, on the pages of it the project still has:
+    /// queue its run, or read.
     Queue(usize, PlanGroup),
     End,
 }
 
-/// What follows the run of the `index`th of `groups` ending with `outcome`:
-/// after Done or DoneWithProblems, the next group with a page the project
-/// still `has`, on those pages; after a run that failed or stopped, or the
-/// last group's, the end.
+/// What follows the run or read of the `index`th of `groups` ending with
+/// `outcome`: after Done or DoneWithProblems, the next group with a page the
+/// project still `has`, on those pages; after a run that failed or stopped,
+/// or the last group's, the end.
 fn next_step(
     groups: &[PlanGroup],
     index: usize,
@@ -433,7 +615,7 @@ fn next_step(
                     PlanGroup {
                         stages: group.stages.clone(),
                         pages,
-                        read: false,
+                        read: group.read,
                     },
                 )
             })
@@ -445,13 +627,13 @@ fn next_step(
 mod tests {
     use std::sync::atomic::AtomicBool;
 
-    use booharu_core::context::{ChapterContext, GlossaryEntry};
+    use booharu_core::context::{ChapterBrief, GlossaryEntry, side_file};
     use koharu_pipeline::{PageFailure, PipelineConfig};
     use koharu_scene::{Edit, Uuid};
     use serde_json::json;
 
     use super::*;
-    use crate::runs::every_stage;
+    use crate::{context::read::ReadSummary, jobs::tests::REGISTRY};
 
     fn page(number: u128) -> PageId {
         PageId(Uuid::from_u128(number))
@@ -471,6 +653,24 @@ mod tests {
         Stage::Inpaint,
         Stage::Translate,
     ];
+
+    /// The Run menu's stages for `stages`, with Read chapter when `read`.
+    fn run_stages(stages: &[Stage], read: bool) -> Vec<RunStage> {
+        let mut run: Vec<RunStage> = stages.iter().copied().map(RunStage::from).collect();
+        if read {
+            run.push(RunStage::Read);
+        }
+        run
+    }
+
+    /// The read of a press, on `pages`.
+    fn reading(pages: &[PageId]) -> PlanGroup {
+        PlanGroup {
+            stages: Vec::new(),
+            pages: pages.to_vec(),
+            read: true,
+        }
+    }
 
     #[test]
     fn the_next_group_follows_a_run_that_finished() {
@@ -526,6 +726,31 @@ mod tests {
             Step::Queue(2, group(&[Stage::Inpaint], &[3, 5]))
         );
         assert_eq!(next_step(&groups, 0, &Outcome::Done, |_| false), Step::End);
+    }
+
+    #[test]
+    fn the_read_follows_as_a_read_on_the_pages_left() {
+        let pages = [page(1), page(2), page(3)];
+        let groups = [
+            group(&[Stage::Detect], &[1, 2, 3]),
+            reading(&pages),
+            group(&[Stage::Translate], &[1, 2, 3]),
+        ];
+        // Page 2 was given up on, or removed.
+        let has = |kept: PageId| kept != page(2);
+        assert_eq!(
+            next_step(&groups, 0, &Outcome::Done, has),
+            Step::Queue(1, reading(&[page(1), page(3)]))
+        );
+        assert_eq!(
+            next_step(&groups, 1, &Outcome::Done, has),
+            Step::Queue(2, group(&[Stage::Translate], &[1, 3]))
+        );
+        // A read that stopped ends the group.
+        assert_eq!(
+            next_step(&groups, 1, &Outcome::Stopped, |_| true),
+            Step::End
+        );
     }
 
     #[test]
@@ -641,9 +866,41 @@ mod tests {
         .expect("the side file");
     }
 
+    /// Gives the chapter `session` holds a brief with `summary`, as the
+    /// Context tab's brief or a read writes one.
+    fn briefed(session: &Mutex<Session>, summary: &str) {
+        let path = session.lock().path().to_owned();
+        ChapterContext::update(&path, |context| {
+            context.brief = Some(ChapterBrief {
+                summary: summary.to_owned(),
+                ..ChapterBrief::default()
+            });
+        })
+        .expect("the side file");
+    }
+
+    /// Gives `page` of the project `session` holds a block with text to
+    /// read and translate.
+    fn written(session: &Mutex<Session>, page: PageId) {
+        let op = json!({"op": "add_layer", "page": page, "index": 0, "layer": {
+            "kind": "block",
+            "source": {"frame": {"box": {"bounds": {"x": 10, "y": 10, "width": 40, "height": 40}}},
+                "content": "先生!"},
+        }});
+        session
+            .lock()
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops: vec![serde_json::from_value(op).expect("an op")],
+            })
+            .expect("the block");
+    }
+
     /// The app as the tests' groups reach it, on a pipeline of its own: the
     /// targets it queued and their stages, and, for each run it announced,
-    /// its group and its group's index, in order.
+    /// its group and its group's index, in order; and each read it was
+    /// asked for, with its group, its pages and the count of Stops it began
+    /// from.
     struct Host {
         pipeline: Pipeline,
         queued: Mutex<Vec<Target>>,
@@ -654,11 +911,30 @@ mod tests {
         broken: AtomicBool,
         /// Holds `queue` until the test lets it go, once it told it came.
         gate: Option<Gate>,
+        reads: Mutex<Vec<(u64, Vec<PageId>, u64)>>,
+        /// How its reads end.
+        answer: Mutex<Answer>,
+        /// Holds a read until the test lets it go, once it told it came.
+        holding: Option<Holding>,
     }
 
     struct Gate {
         came: tokio::sync::mpsc::UnboundedSender<()>,
         released: Mutex<std::sync::mpsc::Receiver<()>>,
+    }
+
+    struct Holding {
+        came: tokio::sync::mpsc::UnboundedSender<()>,
+        released: Arc<tokio::sync::Notify>,
+    }
+
+    /// How a read of the tests' host ends.
+    #[derive(Clone, Copy, Debug)]
+    enum Answer {
+        Done,
+        Skipped,
+        Failed,
+        Stopped,
     }
 
     impl Host {
@@ -671,7 +947,14 @@ mod tests {
                 closed: AtomicBool::new(false),
                 broken: AtomicBool::new(false),
                 gate: None,
+                reads: Mutex::default(),
+                answer: Mutex::new(Answer::Done),
+                holding: None,
             }
+        }
+
+        fn reads(&self) -> Vec<(u64, Vec<PageId>, u64)> {
+            self.reads.lock().clone()
         }
 
         fn queued(&self) -> Vec<Target> {
@@ -715,6 +998,31 @@ mod tests {
 
         fn announce(&self, plan: &RunPlan, index: usize, _: RunId) {
             self.announced.lock().push((plan.group, index));
+        }
+
+        fn read(
+            self: Arc<Self>,
+            _session: Arc<Mutex<Session>>,
+            group: u64,
+            pages: Vec<PageId>,
+            stops: u64,
+        ) -> Reading {
+            Box::pin(async move {
+                self.reads.lock().push((group, pages, stops));
+                if let Some(holding) = &self.holding {
+                    holding.came.send(()).expect("the test waits");
+                    holding.released.notified().await;
+                }
+                let answer = *self.answer.lock();
+                match answer {
+                    Answer::Done => Ok(ReadOutcome::Done(ReadSummary::default())),
+                    Answer::Skipped => Ok(ReadOutcome::Skipped(
+                        "No model can read the pages.".to_owned(),
+                    )),
+                    Answer::Failed => Err(anyhow::anyhow!("the model didn't answer")),
+                    Answer::Stopped => Ok(ReadOutcome::Stopped),
+                }
+            })
         }
     }
 
@@ -766,7 +1074,7 @@ mod tests {
             Arc::clone(&session),
             groups,
             false,
-            Some(first),
+            Some(First::Run(first)),
             &runtime,
         )
         .expect("the group");
@@ -777,7 +1085,7 @@ mod tests {
             held,
             Arc::clone(&session),
             &RunTarget::Project {},
-            &every_stage(),
+            &run_stages(&EVERY, true),
             unlinked,
             &runtime,
         )
@@ -862,6 +1170,7 @@ mod tests {
     #[tokio::test]
     async fn a_group_whose_caller_went_away_is_followed_to_its_end() {
         let _placing = PLACING.lock().await;
+        let _registry = REGISTRY.lock().await;
         let (_dir, session, _) = chapter(1);
         let (came, mut coming) = tokio::sync::mpsc::unbounded_channel();
         let (release, released) = std::sync::mpsc::channel();
@@ -876,7 +1185,7 @@ mod tests {
             host.clone(),
             Arc::clone(&session),
             RunTarget::Project {},
-            vec![Stage::Detect],
+            vec![RunStage::Detect],
         ));
         coming.recv().await.expect("the run being queued");
         // The caller goes away while its run is queued, as the agent's tool
@@ -895,7 +1204,7 @@ mod tests {
             Arc::new(Host::new()),
             session,
             RunTarget::Project {},
-            every_stage(),
+            run_stages(&EVERY, true),
         )
         .await
         .expect("a plan");
@@ -917,7 +1226,7 @@ mod tests {
             read: false,
         }];
         let plans = |stages: &[Stage], groups: &[PlanGroup]| {
-            translating(&session, groups.to_vec(), stages, unlinked).expect("the plan")
+            translating(&session, groups.to_vec(), stages, false, unlinked).expect("the plan")
         };
         assert_eq!(plans(&EVERY, &carrying_on), (carrying_on.clone(), false));
         assert_eq!(plans(&reading, &preset), (preset.clone(), false));
@@ -952,18 +1261,7 @@ mod tests {
     fn carrying_on_the_translation_run_takes_the_pages_that_still_need_it() {
         let (_dir, session, pages) = chapter(3);
         // A text to translate on the second page alone.
-        let op = json!({"op": "add_layer", "page": pages[1], "index": 0, "layer": {
-            "kind": "block",
-            "source": {"frame": {"box": {"bounds": {"x": 10, "y": 10, "width": 40, "height": 40}}},
-                "content": "先生!"},
-        }});
-        session
-            .lock()
-            .apply(Edit {
-                label: "test".to_owned(),
-                ops: vec![serde_json::from_value(op).expect("an op")],
-            })
-            .expect("the block");
+        written(&session, pages[1]);
         let going = |narrows| Going {
             plan: RunPlan {
                 group: 0,
@@ -1003,6 +1301,7 @@ mod tests {
     #[tokio::test]
     async fn a_press_on_a_chapter_with_notes_translates_last_and_chimes_once() {
         let _placing = PLACING.lock().await;
+        let _registry = REGISTRY.lock().await;
         let (_dir, session, pages) = chapter(2);
         noted(&session);
         let host = Arc::new(Host::new());
@@ -1012,7 +1311,7 @@ mod tests {
             held,
             Arc::clone(&session),
             &RunTarget::Project {},
-            &reading,
+            &run_stages(&reading, false),
             unlinked,
             &Handle::current(),
         )
@@ -1062,9 +1361,11 @@ mod tests {
                 reason: "the model didn't answer".to_owned(),
             }],
         };
-        let (at, run) = advance(&host, &session, group, 0, &problems)
-            .expect("the next run")
-            .expect("queued");
+        let Some(Now::Run(at, run)) =
+            advance(&host, &session, group, 0, &problems).expect("the next run")
+        else {
+            panic!("no run queued");
+        };
         assert_eq!(at, 1);
         assert_eq!(host.queued(), [Target::Pages(vec![pages[0], pages[2]])]);
         assert_eq!(host.asked(), [vec![Stage::Translate]]);
@@ -1073,5 +1374,322 @@ mod tests {
         assert!(matches!(outcome, Outcome::Done), "{outcome:?}");
         let next = advance(&host, &session, group, 1, &outcome).expect("the end");
         assert!(next.is_none() && GOING.lock().is_none());
+    }
+
+    #[test]
+    fn a_press_with_read_chapter_reads_before_translating_while_the_brief_is_missing() {
+        let (_dir, session, pages) = chapter(2);
+        let plans = |stages: &[Stage], read: bool, groups: &[PlanGroup]| {
+            translating(&session, groups.to_vec(), stages, read, unlinked).expect("the plan")
+        };
+        let carrying_on = vec![PlanGroup {
+            stages: EVERY.to_vec(),
+            pages: pages.clone(),
+            read: false,
+        }];
+        let finding = PlanGroup {
+            stages: EVERY[..3].to_vec(),
+            pages: pages.clone(),
+            read: false,
+        };
+        // Every group without Translation, then the read of every page,
+        // then the Translation run, whatever the chapter's notes.
+        let read_first = vec![finding.clone(), reading(&pages), translation(&pages)];
+        assert_eq!(
+            plans(&EVERY, true, &carrying_on),
+            (read_first.clone(), true)
+        );
+        // Off, as before: a chapter without notes runs as planned.
+        assert_eq!(
+            plans(&EVERY, false, &carrying_on),
+            (carrying_on.clone(), false)
+        );
+        // Stopped while it read, the work left without Translation, then
+        // the read, then Translation; with only Translation left, the read
+        // first.
+        let left = vec![
+            PlanGroup {
+                stages: vec![Stage::Inpaint, Stage::Translate],
+                pages: pages[..1].to_vec(),
+                read: false,
+            },
+            translation(&pages[1..]),
+        ];
+        assert_eq!(
+            plans(&EVERY, true, &left),
+            (
+                vec![
+                    alone(Stage::Inpaint, &pages[..1]),
+                    reading(&pages),
+                    translation(&pages)
+                ],
+                true
+            )
+        );
+        let translating_alone = vec![translation(&pages[1..])];
+        assert_eq!(
+            plans(&EVERY, true, &translating_alone),
+            (vec![reading(&pages), translation(&pages[1..])], true)
+        );
+        // With fewer stages, every page it names, as before.
+        let preset = vec![translation(&pages)];
+        assert_eq!(
+            plans(&[Stage::Translate], true, &preset),
+            (vec![reading(&pages), translation(&pages)], false)
+        );
+        // A press that doesn't translate doesn't read.
+        let cleaning = vec![finding.clone()];
+        assert_eq!(plans(&EVERY[..3], true, &cleaning), (cleaning, false));
+        // A blank summary is no brief.
+        briefed(&session, " ");
+        assert_eq!(plans(&EVERY, true, &carrying_on), (read_first, true));
+        // With a brief, no read: as stage 6 plans it, translating last for
+        // the brief.
+        briefed(&session, "Hina meets Sensei.");
+        assert_eq!(
+            plans(&EVERY, true, &carrying_on),
+            (vec![finding, translation(&pages)], true)
+        );
+        assert_eq!(
+            plans(&[Stage::Translate], true, &preset),
+            (preset.clone(), false)
+        );
+        // A side file that doesn't read fails the press that would read, as
+        // its translation would be refused; one that neither reads nor
+        // translates last never reads it.
+        let path = session.lock().path().to_owned();
+        std::fs::write(side_file(&path), "{").expect("a broken side file");
+        let broken = translating(
+            &session,
+            preset.clone(),
+            &[Stage::Translate],
+            true,
+            unlinked,
+        );
+        assert!(broken.is_err());
+        assert_eq!(plans(&[Stage::Translate], false, &preset), (preset, false));
+    }
+
+    #[tokio::test]
+    async fn a_read_done_skipped_or_failed_goes_on_to_translate_and_one_stopped_ends_the_press() {
+        let (_dir, session, pages) = chapter(2);
+        written(&session, pages[0]);
+        let host = Arc::new(Host::new());
+        let held: Arc<dyn RunHost> = host.clone();
+        let stops = host.pipeline.stops();
+        let ends = [
+            (Answer::Done, Outcome::Done),
+            (Answer::Skipped, Outcome::Done),
+            (Answer::Failed, Outcome::Done),
+            (Answer::Stopped, Outcome::Stopped),
+        ];
+        for (answer, outcome) in ends {
+            *host.answer.lock() = answer;
+            assert_eq!(
+                read_step(&held, &session, 7, pages.clone(), stops).await,
+                outcome,
+                "{answer:?}"
+            );
+        }
+        assert_eq!(host.reads(), vec![(7, pages.clone(), stops); 4]);
+        // A Stop since the press reached the read stops it, unread.
+        host.pipeline.stop();
+        assert_eq!(
+            read_step(&held, &session, 7, pages.clone(), stops).await,
+            Outcome::Stopped
+        );
+        // Checked again just before it reads: pages without text, or a
+        // chapter read meanwhile, skip it, unread, and the press goes on.
+        let stops = host.pipeline.stops();
+        assert_eq!(
+            read_step(&held, &session, 7, pages[1..].to_vec(), stops).await,
+            Outcome::Done
+        );
+        briefed(&session, "Hina meets Sensei.");
+        assert_eq!(
+            read_step(&held, &session, 7, pages.clone(), stops).await,
+            Outcome::Done
+        );
+        // A side file that doesn't read skips it too: the Translation run
+        // reads it and fails, saying why.
+        let path = session.lock().path().to_owned();
+        std::fs::write(side_file(&path), "{").expect("a broken side file");
+        assert_eq!(
+            read_step(&held, &session, 7, pages.clone(), stops).await,
+            Outcome::Done
+        );
+        assert_eq!(host.reads().len(), 4, "none of those was read");
+    }
+
+    #[tokio::test]
+    async fn a_press_that_reads_first_takes_its_place_reading_then_translates() {
+        let _placing = PLACING.lock().await;
+        let _registry = REGISTRY.lock().await;
+        for answer in [Answer::Done, Answer::Skipped, Answer::Failed] {
+            let (_dir, session, pages) = chapter(2);
+            // Text to read on the first page; the second, which it
+            // translates, has none, so its Translation run needs no model.
+            written(&session, pages[0]);
+            let host = Arc::new(Host::new());
+            *host.answer.lock() = answer;
+            let held: Arc<dyn RunHost> = host.clone();
+            let target = RunTarget::Pages {
+                pages: vec![pages[1]],
+            };
+            let (plan, following) = start(
+                held,
+                Arc::clone(&session),
+                &target,
+                &[RunStage::Read, RunStage::Translate],
+                unlinked,
+                &Handle::current(),
+            )
+            .expect("the plan");
+            assert_eq!(plan.groups, [reading(&pages), translation(&pages[1..])]);
+            assert!(plan.run.is_none() && plan.reading, "{plan:?}");
+            following
+                .expect("a follower")
+                .await
+                .expect("followed to the end");
+            // The whole chapter read, then the Translation run, whatever
+            // the read answered, announced as the last of the press's
+            // groups, which the read never is.
+            assert_eq!(host.reads(), [(plan.group, pages.clone(), 0)]);
+            assert_eq!(host.asked(), [vec![Stage::Translate]], "{answer:?}");
+            assert_eq!(host.queued(), [Target::Pages(pages[1..].to_vec())]);
+            assert_eq!(host.announced(), [(plan.group, 1)]);
+            assert!(GOING.lock().is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn a_press_reads_between_its_runs_and_a_stop_while_it_reads_ends_it() {
+        let _placing = PLACING.lock().await;
+        let _registry = REGISTRY.lock().await;
+        let (_dir, session, pages) = chapter(2);
+        written(&session, pages[0]);
+        let (came, mut coming) = tokio::sync::mpsc::unbounded_channel();
+        let released = Arc::new(tokio::sync::Notify::new());
+        let host = Arc::new(Host {
+            holding: Some(Holding {
+                came,
+                released: Arc::clone(&released),
+            }),
+            ..Host::new()
+        });
+        let held: Arc<dyn RunHost> = host.clone();
+        let target = RunTarget::Pages {
+            pages: vec![pages[1]],
+        };
+        let stages = [RunStage::Detect, RunStage::Read, RunStage::Translate];
+        let (plan, following) = start(
+            held,
+            Arc::clone(&session),
+            &target,
+            &stages,
+            unlinked,
+            &Handle::current(),
+        )
+        .expect("the plan");
+        assert_eq!(
+            plan.groups,
+            [
+                detection(&pages[1..]),
+                reading(&pages),
+                translation(&pages[1..])
+            ]
+        );
+        assert!(plan.run.is_some() && !plan.reading, "{plan:?}");
+        coming.recv().await.expect("the read");
+        // While it reads, a call answers the group reading, with no run.
+        let project = session.lock().id();
+        let going = answer(GOING.lock().as_ref(), project).expect("the group");
+        assert!(going.run.is_none() && going.reading, "{going:?}");
+        host.pipeline.stop();
+        released.notify_one();
+        following
+            .expect("a follower")
+            .await
+            .expect("followed to the end");
+        assert_eq!(host.reads(), [(plan.group, pages.clone(), 0)]);
+        assert_eq!(host.asked(), [vec![Stage::Detect]], "no Translation run");
+        assert_eq!(host.announced(), [(plan.group, 0)]);
+        assert!(GOING.lock().is_none());
+    }
+
+    #[tokio::test]
+    async fn a_press_leaves_the_pages_a_run_gave_up_on_out_of_its_read_and_translation() {
+        let _placing = PLACING.lock().await;
+        let (_dir, session, pages) = chapter(3);
+        let host = Host::new();
+        let group = MADE.fetch_add(1, Ordering::Relaxed) + 1;
+        *GOING.lock() = Some(Going {
+            plan: RunPlan {
+                group,
+                groups: vec![detection(&pages), reading(&pages), translation(&pages)],
+                run: Some(RunId(0)),
+                reading: false,
+            },
+            project: session.lock().id(),
+            stops: host.pipeline.stops(),
+            narrows: false,
+            failed: BTreeSet::new(),
+        });
+        let problems = Outcome::DoneWithProblems {
+            failures: vec![PageFailure {
+                page: pages[1],
+                stage: Stage::Detect,
+                reason: "the model didn't answer".to_owned(),
+            }],
+        };
+        let kept = vec![pages[0], pages[2]];
+        let stops = host.pipeline.stops();
+        assert_eq!(
+            advance(&host, &session, group, 0, &problems).expect("the read"),
+            Some(Now::Read(1, kept.clone(), stops))
+        );
+        let now = || {
+            GOING
+                .lock()
+                .as_ref()
+                .map(|going| (going.plan.run, going.plan.reading))
+        };
+        assert_eq!(now(), Some((None, true)));
+        assert!(host.queued().is_empty() && host.announced().is_empty());
+        let Some(Now::Run(at, run)) =
+            advance(&host, &session, group, 1, &Outcome::Done).expect("the Translation run")
+        else {
+            panic!("no run queued");
+        };
+        assert_eq!(at, 2);
+        assert_eq!(now(), Some((Some(run), false)));
+        assert_eq!(host.queued(), [Target::Pages(kept)]);
+        assert_eq!(host.announced(), [(group, 2)]);
+        let outcome = ended(&host.pipeline, run).await.expect("the run's end");
+        let next = advance(&host, &session, group, 2, &outcome).expect("the end");
+        assert!(next.is_none() && GOING.lock().is_none());
+    }
+
+    #[tokio::test]
+    async fn a_press_is_refused_while_read_chapter_reads_by_hand() {
+        let _placing = PLACING.lock().await;
+        let _registry = REGISTRY.lock().await;
+        let (_dir, session, _) = chapter(1);
+        let press = || {
+            start(
+                Arc::new(Host::new()),
+                Arc::clone(&session),
+                &RunTarget::Project {},
+                &run_stages(&EVERY, false),
+                unlinked,
+                &Handle::current(),
+            )
+        };
+        let read = jobs::start(JobKind::ReadChapter).expect("a read");
+        let error = press().expect_err("refused while it reads");
+        assert!(error.to_string().contains("Read chapter"), "{error}");
+        drop(read);
+        let (plan, following) = press().expect("a plan");
+        assert!(plan.groups.is_empty() && following.is_none(), "{plan:?}");
     }
 }

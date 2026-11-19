@@ -38,17 +38,23 @@
 //! whose plan would find text and translate runs every group without
 //! Translation first, then one run of Translation over the pages that need
 //! it ([`translate_last`]); with fewer stages, over every page it names.
+//!
+//! Reading first: a press with the Run menu's Read chapter on, whose plan
+//! translates, on a chapter without a brief ([`brief_missing`]), reads the
+//! whole chapter before it translates, so the Translation run sends the
+//! brief: every group without Translation, then the read, then the
+//! Translation run ([`read_before_translation`]), whatever the groups find.
+//! The read writes nothing until it has read every page, so a press stopped
+//! while it reads leaves the brief missing, and the next press reads again,
+//! first when only Translation is left.
 
 mod going;
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    path::Path,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Result;
 use booharu_core::{
-    context::{Chapter, SeriesStore},
+    context::{Chapter, ChapterContext},
     styles::recorded,
 };
 use koharu_pipeline::{Event, RunId, Stage, Target};
@@ -58,7 +64,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use strum::VariantArray as _;
 
-pub use self::going::{RunHost, carry_on, group_going};
+pub use self::going::{Reading, RunHost, carry_on, group_going};
 
 /// The `c2pa` step Koharu's Detection stage records on every panel,
 /// balloon, and block it adds.
@@ -212,20 +218,34 @@ pub fn plan(session: &Session, pages: &[PageId]) -> Result<Vec<PlanGroup>> {
     Ok(groups)
 }
 
+/// Whether `group` translates.
+fn translates(group: &PlanGroup) -> bool {
+    group.stages.contains(&Stage::Translate)
+}
+
 /// `groups`, a press's plan on `project`, translating last, when one of them
-/// would find text, through detection or recognition, and translate it:
-/// every group without Translation, in order, with those left with the same
-/// stages joined at the first one's place and those left with none dropped,
-/// then one group of Translation on every page a group translated, in page
-/// order. `None` when no group both finds text and translates, which runs as
-/// planned.
+/// would find text, through detection or recognition, and translate it, as
+/// [`translation_last`] splits it. `None` when no group both finds text and
+/// translates, which runs as planned.
 #[must_use]
 pub fn translate_last(project: &Project, groups: &[PlanGroup]) -> Option<Vec<PlanGroup>> {
-    let translates = |group: &PlanGroup| group.stages.contains(&Stage::Translate);
     let finds = |group: &PlanGroup| {
         group.stages.contains(&Stage::Detect) || group.stages.contains(&Stage::Recognize)
     };
     if !groups.iter().any(|group| translates(group) && finds(group)) {
+        return None;
+    }
+    translation_last(project, groups)
+}
+
+/// `groups`, a press's plan on `project`, with Translation last, whatever its
+/// groups find: every group without Translation, in order, with those left
+/// with the same stages joined at the first one's place and those left with
+/// none dropped, then one group of Translation on every page a group
+/// translated, in page order. `None` when no group translates.
+#[must_use]
+pub fn translation_last(project: &Project, groups: &[PlanGroup]) -> Option<Vec<PlanGroup>> {
+    if !groups.iter().any(translates) {
         return None;
     }
     let in_order = |pages: BTreeSet<PageId>| -> Vec<PageId> {
@@ -269,17 +289,54 @@ pub fn translate_last(project: &Project, groups: &[PlanGroup]) -> Option<Vec<Pla
     Some(before.chain([last]).collect())
 }
 
-/// Whether the chapter of the project file `project` has notes a translation
-/// run sends with it, so a press on it translates last: a linked series
-/// whose file is there, suggested terms, or a brief. `store` opens the
-/// series folder only when the chapter links a series. A side file or series
-/// file that doesn't read fails, naming it, as the press's translation
-/// would be refused.
-pub fn has_notes(project: &Path, store: impl FnOnce() -> Result<SeriesStore>) -> Result<bool> {
-    let chapter = Chapter::read(project, store)?;
-    Ok(chapter.series.is_some()
+/// `groups`, a press's plan on `project`, reading the chapter before it
+/// translates: with Translation last, as [`translation_last`] splits it
+/// whatever its groups find, and just before the Translation group the
+/// read, a group of no stages on every page of the project, as Read chapter
+/// reads the whole chapter. `None` when no group translates, which leaves
+/// the press without a read.
+#[must_use]
+pub fn read_before_translation(project: &Project, groups: &[PlanGroup]) -> Option<Vec<PlanGroup>> {
+    let mut split = translation_last(project, groups)?;
+    let read = PlanGroup {
+        stages: Vec::new(),
+        pages: project.pages().map(|page| page.id).collect(),
+        read: true,
+    };
+    split.insert(split.len() - 1, read);
+    Some(split)
+}
+
+/// Whether `chapter` has notes a translation run sends with it, so a press
+/// on it translates last: a linked series whose file is there, suggested
+/// terms, or a brief.
+#[must_use]
+pub fn has_notes(chapter: &Chapter) -> bool {
+    chapter.series.is_some()
         || !chapter.context.suggestions.is_empty()
-        || chapter.context.brief.is_some())
+        || chapter.context.brief.is_some()
+}
+
+/// Whether the chapter `context` holds has no brief to translate by, none or
+/// one whose summary is blank, as Booharu 0.0.4 read it, so a press with
+/// Read chapter on reads the chapter before it translates.
+#[must_use]
+pub fn brief_missing(context: &ChapterContext) -> bool {
+    context
+        .brief
+        .as_ref()
+        .is_none_or(|brief| brief.summary.trim().is_empty())
+}
+
+/// Whether a block on `pages` of `project` has text Read chapter can read:
+/// a source that isn't blank, as recognition writes it.
+#[must_use]
+pub fn has_text(project: &Project, pages: &[PageId]) -> bool {
+    project
+        .pages()
+        .filter(|page| pages.contains(&page.id))
+        .flat_map(blocks)
+        .any(|(_, block, _)| !block.source.content.text().trim().is_empty())
 }
 
 /// The pages of `pages` in `session`'s project that still need translation,
@@ -382,7 +439,7 @@ fn untranslated(layer: &Layer, block: &Block) -> bool {
 mod tests {
     use std::io::Cursor;
 
-    use booharu_core::context::{ChapterBrief, ChapterContext, GlossaryEntry, side_file};
+    use booharu_core::context::{ChapterBrief, GlossaryEntry, SeriesStore};
     use image::{ImageFormat, Rgb, RgbImage};
     use koharu_scene::{Created, Edit, Hash, LayerId, Op, Uuid};
     use serde_json::{Value, json};
@@ -923,27 +980,98 @@ mod tests {
     }
 
     #[test]
+    fn a_press_that_reads_translates_last_whatever_it_finds() -> Result<()> {
+        let chapter = Chapter::new(
+            &[("p1", true), ("p2", true), ("p3", true)],
+            [
+                // Inpainting and translation left.
+                block("p1", "a", 0, "どうして", &["detection", "ocr"], true),
+                // Translation alone.
+                block(
+                    "p2",
+                    "b",
+                    0,
+                    "ここに",
+                    &["detection", "ocr", "inpainting"],
+                    true,
+                ),
+            ]
+            .concat(),
+        )?;
+        let (p1, p2, p3) = (chapter.page("p1"), chapter.page("p2"), chapter.page("p3"));
+        let (session, project) = (&chapter.session, chapter.session.project());
+        let group = |stages: &[Stage], pages: Vec<PageId>| PlanGroup {
+            stages: stages.to_vec(),
+            pages,
+            read: false,
+        };
+        // Nothing is found, so the press translates as planned, but split
+        // around the read: every group without Translation, the read of
+        // every page of the project, then one Translation run.
+        let left = groups(
+            session,
+            &RunTarget::Pages {
+                pages: vec![p1, p2],
+            },
+            &EVERY,
+        )?;
+        assert_eq!(
+            left,
+            [
+                group(&[Stage::Inpaint, Stage::Translate], vec![p1]),
+                group(&[Stage::Translate], vec![p2]),
+            ]
+        );
+        assert_eq!(translate_last(&project, &left), None);
+        assert_eq!(
+            read_before_translation(&project, &left),
+            Some(vec![
+                group(&[Stage::Inpaint], vec![p1]),
+                PlanGroup {
+                    stages: Vec::new(),
+                    pages: vec![p1, p2, p3],
+                    read: true,
+                },
+                group(&[Stage::Translate], vec![p1, p2]),
+            ])
+        );
+        // With Translation alone left, the read comes first.
+        let translating = [group(&[Stage::Translate], vec![p2])];
+        let split = read_before_translation(&project, &translating).expect("a split");
+        assert!(split[0].read && split[0].stages.is_empty(), "{split:?}");
+        assert_eq!(split[1..], translating);
+        // A plan that doesn't translate neither splits nor reads.
+        let cleaning = [group(&[Stage::Inpaint], vec![p1])];
+        assert_eq!(translation_last(&project, &cleaning), None);
+        assert_eq!(read_before_translation(&project, &cleaning), None);
+        Ok(())
+    }
+
+    #[test]
     fn a_chapter_has_notes_with_a_series_suggested_terms_or_a_brief() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let project = dir.path().join("Ch.1.khr");
         let store = SeriesStore::new(dir.path().join("series"));
         let opened = || -> Result<SeriesStore> { Ok(store.clone()) };
         let none = || -> Result<SeriesStore> { anyhow::bail!("a chapter linking no series") };
-        assert!(!has_notes(&project, none)?);
+        // The chapter as its side file and series give it, which the test's
+        // own `Chapter` hides.
+        use booharu_core::context::Chapter as Notes;
+        assert!(!has_notes(&Notes::read(&project, none)?));
         let series = store.create("Blue Archive")?;
         ChapterContext::update(&project, |context| {
             context.series = Some(series.id.clone());
         })?;
-        assert!(has_notes(&project, opened)?);
+        assert!(has_notes(&Notes::read(&project, opened)?));
         // A series whose file is gone sends nothing.
         store.delete(&series.id)?;
-        assert!(!has_notes(&project, opened)?);
+        assert!(!has_notes(&Notes::read(&project, opened)?));
         ChapterContext::update(&project, |context| {
             context
                 .suggestions
                 .push(GlossaryEntry::new("先生", "Sensei"));
         })?;
-        assert!(has_notes(&project, opened)?);
+        assert!(has_notes(&Notes::read(&project, opened)?));
         ChapterContext::update(&project, |context| {
             context.series = None;
             context.suggestions.clear();
@@ -952,10 +1080,40 @@ mod tests {
                 ..ChapterBrief::default()
             });
         })?;
-        assert!(has_notes(&project, none)?);
-        // A side file that doesn't read fails, as the translation would.
-        std::fs::write(side_file(&project), "{")?;
-        assert!(has_notes(&project, none).is_err());
+        assert!(has_notes(&Notes::read(&project, none)?));
+        Ok(())
+    }
+
+    #[test]
+    fn a_brief_is_missing_without_one_or_with_a_blank_summary() {
+        let briefed = |summary: &str| ChapterContext {
+            brief: Some(ChapterBrief {
+                summary: summary.to_owned(),
+                edited: true,
+                ..ChapterBrief::default()
+            }),
+            ..ChapterContext::default()
+        };
+        assert!(brief_missing(&ChapterContext::default()));
+        assert!(brief_missing(&briefed(" \n")));
+        assert!(!brief_missing(&briefed("Hina meets Sensei.")));
+    }
+
+    #[test]
+    fn a_page_has_text_to_read_once_a_block_has_a_source() -> Result<()> {
+        let chapter = Chapter::new(
+            &[("blank", true), ("unread", true), ("read", true)],
+            [
+                block("unread", "a", 0, " ", &["detection"], true),
+                block("read", "b", 0, "どうして", &["detection", "ocr"], true),
+            ]
+            .concat(),
+        )?;
+        let project = chapter.session.project();
+        let page = |name| chapter.page(name);
+        assert!(!has_text(&project, &[page("blank"), page("unread")]));
+        assert!(has_text(&project, &[page("unread"), page("read")]));
+        assert!(!has_text(&project, &[]));
         Ok(())
     }
 

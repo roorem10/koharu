@@ -7,6 +7,7 @@
 use std::sync::Arc;
 
 use booharu::runs::{self, RunHost, RunPlan, RunTarget};
+use booharu_core::runs::RunStage;
 use koharu_pipeline::{Pipeline, Request, RunId, Stage};
 use koharu_scene::Session;
 use parking_lot::Mutex;
@@ -83,7 +84,12 @@ impl Tool for Run {
             .as_ref()
             .and_then(|host| host.runs())
             .unwrap_or_else(|| Arc::new(Alone(tools.pipeline.clone())));
-        let stages = args.stages.unwrap_or_else(runs::every_stage);
+        let stages = args
+            .stages
+            .unwrap_or_else(runs::every_stage)
+            .into_iter()
+            .map(RunStage::from)
+            .collect();
         runs::carry_on(host, Arc::clone(&tools.session), args.target, stages)
             .await
             .map_err(|error| failed(format!("{error:#}")))
