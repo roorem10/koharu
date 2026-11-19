@@ -4,9 +4,10 @@
 //! (`styles`), the lettering categories and the font each letters its text
 //! in (`lettering`), the shapes of balloons (`shape`), the run policy and
 //! the Run menu's presets (`runs`), what Koharu's stages did to a page's
-//! blocks (`status`), the series glossaries and the chapter notes every
-//! translation follows (`context`), the quality check's Mark OK record
-//! (`qc`), and its version.
+//! blocks (`status`), which sound effects stay as art and their subtitles
+//! (`sfx`), the series glossaries and the chapter notes every translation
+//! follows (`context`), the quality check's Mark OK record (`qc`), and its
+//! version.
 //!
 //! The crate sits just above the scene and the config, never above
 //! koharu-pipeline, koharu-agent, or koharu-desktop, so koharu-pipeline's
@@ -19,6 +20,7 @@ pub mod lettering;
 pub mod qc;
 pub mod runs;
 pub mod settings;
+pub mod sfx;
 pub mod shape;
 pub mod status;
 pub mod styles;

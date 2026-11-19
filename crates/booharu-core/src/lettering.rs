@@ -343,9 +343,27 @@ pub fn effective_with(
     let Content::Block(found) = &layer.content else {
         return None;
     };
+    effective_as(page, block, label, found.role == Role::Sfx, settings)
+}
+
+/// The category the block `block` on `page` would have with the label
+/// `label` and Koharu's role `sfx`, a sound effect when true, in place of
+/// its own, as one whose label and role are both being changed gets; none
+/// for a layer that isn't a block there.
+pub fn effective_as(
+    page: &Page,
+    block: LayerId,
+    label: Option<&Lettering>,
+    sfx: bool,
+    settings: &LetteringSettings,
+) -> Option<EffectiveCategory> {
+    let (layer, _) = shape::find(page, block)?;
+    let Content::Block(found) = &layer.content else {
+        return None;
+    };
     Some(decide(
         label,
-        found.role == Role::Sfx,
+        sfx,
         || small_text(page, &found.source, settings),
         || shape::block_shape(page, block).map(|shape| shape.shape),
         settings,
