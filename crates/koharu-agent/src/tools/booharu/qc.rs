@@ -90,38 +90,49 @@ impl Tool for GetQcFindings {
         context: &mut ToolContext,
         args: PagesArgs,
     ) -> Result<Vec<PageFinding>, Self::Error> {
-        // What the check reads is taken with the tools, which are let go
-        // before any page is laid out: they hold the session, which keeps
-        // its project's file locked while it's held, so a project closed
-        // meanwhile would open again only once every page was laid out.
-        let (renderer, project, inputs) = blocking(context, |tools, host| {
-            let (file, project) = opened(tools);
-            let inputs = inputs(host, &file, &project)?;
-            Ok((tools.renderer.clone(), project, inputs))
-        })
-        .await?;
         // A call dropped, as when the agent is stopped, lays out no more
         // pages.
         let dropped = CancellationToken::new();
         let _stops = dropped.clone().drop_guard();
-        tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<PageFinding>> {
-            let mut found = Vec::new();
-            for (page_number, page) in numbered(&project, args.page)? {
-                if dropped.is_cancelled() {
-                    break;
-                }
-                let findings = qc::check_page(&renderer, &project, page, &inputs)?;
-                found.extend(findings.into_iter().map(|finding| PageFinding {
-                    page_number,
-                    finding,
-                }));
-            }
-            Ok(found)
-        })
-        .await
-        .map_err(failed)?
-        .map_err(|error| failed(format!("{error:#}")))
+        findings(context, args.page, move || dropped.is_cancelled()).await
     }
+}
+
+/// The findings on `page`, or on every page, of the open project, as
+/// booharu_get_qc_findings answers them: the pages are laid out one at a
+/// time, `stopped` asked before each, and none once it says to stop. What
+/// the check reads is taken with the tools, which are let go before any page
+/// is laid out: they hold the session, which keeps its project's file locked
+/// while it's held, so a project closed meanwhile would open again only once
+/// every page was laid out.
+async fn findings(
+    context: &ToolContext,
+    page: Option<PageId>,
+    stopped: impl Fn() -> bool + Send + 'static,
+) -> Result<Vec<PageFinding>, ToolExecutionError> {
+    let (renderer, project, inputs) = blocking(context, |tools, host| {
+        let (file, project) = opened(tools);
+        let inputs = inputs(host, &file, &project)?;
+        Ok((tools.renderer.clone(), project, inputs))
+    })
+    .await?;
+    tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<PageFinding>> {
+        let mut found = Vec::new();
+        for (page_number, page) in numbered(&project, page)? {
+            if stopped() {
+                break;
+            }
+            let findings = qc::check_page(&renderer, &project, page, &inputs)?;
+            found.extend(findings.into_iter().map(|finding| PageFinding {
+                page_number,
+                finding,
+            }));
+        }
+        Ok(found)
+    })
+    .await
+    .map_err(failed)?
+    .map_err(|error| failed(format!("{error:#}")))
 }
 
 /// A glossary slip: a block whose translation leaves out a term of the
@@ -440,7 +451,13 @@ async fn apply_if<T: Send + 'static>(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::{
+        collections::BTreeMap,
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            mpsc,
+        },
+    };
 
     use booharu_core::{
         context::{GlossaryEntry, SeriesStore},
@@ -632,6 +649,14 @@ mod tests {
             "layer": layer})
     }
 
+    /// A chapter with an empty line on each of its two pages, which each
+    /// page finds.
+    fn empty_on_each_page() -> Chapter {
+        let mut early = block("early", 0, " ", None);
+        early["page"] = json!("$first");
+        Chapter::new(vec![early, block("late", 0, " ", None)])
+    }
+
     #[test]
     fn every_quality_check_tool_is_offered_inlined_and_marked_as_it_reads() {
         let definitions = Tools::toolset().tool_definitions();
@@ -798,5 +823,54 @@ mod tests {
             found.contains(&("glossary:魔王".to_owned(), qc::Source::Auto, false)),
             "{found:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn the_findings_stop_before_the_next_page_once_stopped() {
+        let chapter = empty_on_each_page();
+        let pages = |found: Vec<PageFinding>| -> Vec<usize> {
+            found.iter().map(|found| found.page_number).collect()
+        };
+        let every = findings(&chapter.tools.tool_context(), None, || false)
+            .await
+            .expect("every page's findings");
+        assert_eq!(pages(every), [1, 2]);
+        let asked = AtomicUsize::new(0);
+        let stopped = move || asked.fetch_add(1, Ordering::SeqCst) > 0;
+        let first = findings(&chapter.tools.tool_context(), None, stopped)
+            .await
+            .expect("the first page's findings");
+        assert_eq!(pages(first), [1]);
+    }
+
+    #[tokio::test]
+    async fn the_pages_are_laid_out_holding_no_session() {
+        let Chapter { _dir, tools, .. } = empty_on_each_page();
+        let session = Arc::downgrade(&tools.session);
+        let (reached, mut laying_out) = tokio::sync::mpsc::unbounded_channel();
+        let (go, waiting) = mpsc::channel::<()>();
+        let context = tools.tool_context();
+        let call = tokio::spawn(async move {
+            findings(&context, None, move || {
+                let _ = reached.send(());
+                // No more pages once the test lets go.
+                waiting.recv().is_err()
+            })
+            .await
+        });
+        laying_out
+            .recv()
+            .await
+            .expect("a page about to be laid out");
+        // The call dropped while a page is laid out, as when the agent is
+        // stopped, and the project closed.
+        call.abort();
+        let _ = call.await;
+        drop(tools);
+        assert!(
+            session.upgrade().is_none(),
+            "the page loop holds the session"
+        );
+        drop(go);
     }
 }
