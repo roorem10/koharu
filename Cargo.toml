@@ -79,6 +79,7 @@ hayro = "0.8.0"
 heck = "0.5.0"
 hf-hub = "1.0.0"
 http = "1.5.0"
+# Booharu: when Read chapter read a chapter, as RFC 3339.
 humantime = "2.4.0"
 hypher = "0.1.8"
 i_overlay = "9.1.0"
