@@ -17,8 +17,8 @@
 //! - The content keys, [`Lettering`], [`Auto`], [`QcOk`], and [`ReadNote`],
 //!   describe a block's text, so a join or split that rewrites a block drops
 //!   them; a join keeps the joined block's hand-edit record, and a split
-//!   gives its halves one of their own, drawn by hand, with the kept mark,
-//!   as they keep the clean-up as it was.
+//!   gives its halves one of their own, drawn by hand, with the kept mark
+//!   and a line given back's record, as they keep the clean-up as it was.
 
 use anyhow::ensure;
 use koharu_scene::{Layer, LayerId, Op, Ref, Rgba, Role};
