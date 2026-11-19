@@ -281,14 +281,22 @@ impl Tool for ResetLettering {
 /// none; outside the app, both as the file holds them. A section that can't
 /// be read is an error, so nothing is restyled by a value never chosen.
 pub(super) fn look(tools: &Tools) -> anyhow::Result<(LetteringSettings, Option<String>)> {
-    let (settings, families) = match &tools.booharu {
-        Some(host) => (host.preferences()?.lettering, host.font_families()?),
-        None => (
-            koharu_config::get::<LetteringSettings>()?,
-            koharu_config::get::<RendererConfig>()?.font_families,
-        ),
+    let settings = lettering(tools)?;
+    let families = match &tools.booharu {
+        Some(host) => host.font_families()?,
+        None => koharu_config::get::<RendererConfig>()?.font_families,
     };
     Ok((settings, first_font(&families).map(str::to_owned)))
+}
+
+/// `[booharu-lettering]` as the app holds it now, or outside the app as the
+/// file holds it, which the SFX mode a run follows is read from; a section
+/// that can't be read is an error.
+pub(super) fn lettering(tools: &Tools) -> anyhow::Result<LetteringSettings> {
+    Ok(match &tools.booharu {
+        Some(host) => host.preferences()?.lettering,
+        None => koharu_config::get()?,
+    })
 }
 
 #[cfg(test)]

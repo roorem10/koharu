@@ -5,19 +5,33 @@
 //! the interface each run and reads the chapter for a press that names Read
 //! chapter; outside it, on the tools' own pipeline, which never reads. The
 //! agent's and MCP's presses read only when they name it.
+//!
+//! And Redo boxes, as the app's commands do it, through `booharu::redo`:
+//! `booharu_count_redo` tells how chosen blocks stand for reading,
+//! translating, or cleaning them again, so the agent can ask before it
+//! takes the ones fixed by hand too, and `booharu_redo_boxes` queues the one
+//! run that does it, as the tools start their runs.
 
 use std::sync::Arc;
 
-use booharu::runs::{self, RunHost, RunPlan, RunTarget};
+use anyhow::Context as _;
+use booharu::{
+    redo::{self, RedoAnswer, RedoCounts},
+    runs::{self, RunHost, RunPlan, RunTarget},
+};
 use booharu_core::runs::RunStage;
 use koharu_pipeline::{Pipeline, Request, RunId, pipeline_stage};
-use koharu_scene::Session;
+use koharu_scene::{LayerId, Session};
 use parking_lot::Mutex;
-use rig_core::tool::{Tool, ToolContext, ToolExecutionError};
+use rig_core::{
+    completion::ToolAnnotations,
+    tool::{Tool, ToolContext, ToolExecutionError},
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
 
+use super::{context::blocking, styles::lettering};
 use crate::tools::{failed, project, schema};
 
 /// What else Koharu's `wait` tells, as every run follows Booharu's run
@@ -146,18 +160,179 @@ impl RunHost for Alone {
     fn announce(&self, _: &RunPlan, _: usize, _: RunId) {}
 }
 
+/// A stage Redo boxes runs again.
+#[derive(Clone, Copy, Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum RedoStage {
+    /// Reading the source again.
+    Recognize,
+    /// Translating again.
+    Translate,
+    /// Cleaning the art under the block again.
+    Inpaint,
+}
+
+impl From<RedoStage> for RunStage {
+    fn from(stage: RedoStage) -> Self {
+        match stage {
+            RedoStage::Recognize => Self::Recognize,
+            RedoStage::Translate => Self::Translate,
+            RedoStage::Inpaint => Self::Inpaint,
+        }
+    }
+}
+
+fn redo_stages(stages: Vec<RedoStage>) -> Vec<RunStage> {
+    stages.into_iter().map(RunStage::from).collect()
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct CountRedoArgs {
+    /// The blocks.
+    blocks: Vec<LayerId>,
+    /// The stages to run again: `recognize`, reading the source,
+    /// `translate`, and `inpaint`, cleaning the art under the block.
+    #[schemars(length(min = 1))]
+    stages: Vec<RedoStage>,
+}
+
+pub(super) struct CountRedo;
+
+impl Tool for CountRedo {
+    const NAME: &'static str = "booharu_count_redo";
+    type Args = CountRedoArgs;
+    type Output = RedoCounts;
+    type Error = ToolExecutionError;
+
+    fn description(&self) -> String {
+        "How the blocks `blocks` stand now for booharu_redo_boxes running `stages` again, \
+         changing nothing: how many the stages would work on as they are (`ready`), how many \
+         they would take only with `include_hand_fixed`, as fixed by hand for one of them \
+         (`hand_fixed`: a source corrected by hand, for `recognize`; a translation written or \
+         fixed by hand, by the user or by you, or a clean-up hidden by hand on a block with no \
+         translation, for `translate`), and how many are, or are in, a locked layer, which no \
+         redo changes (`locked`). A block named twice counts once. Call it before \
+         booharu_redo_boxes, and when it counts any `hand_fixed`, ask the user whether to \
+         redo those too. A layer that isn't a block is refused."
+            .to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        schema::<CountRedoArgs>()
+    }
+
+    fn annotations(&self) -> ToolAnnotations {
+        ToolAnnotations::default().with_read_only(true)
+    }
+
+    async fn call(
+        &self,
+        context: &mut ToolContext,
+        args: CountRedoArgs,
+    ) -> Result<RedoCounts, Self::Error> {
+        let CountRedoArgs { blocks, stages } = args;
+        let stages = redo_stages(stages);
+        blocking(context, move |tools, _| {
+            let settings = lettering(tools)?;
+            let project = tools.session.lock().project();
+            redo::count_redo(&project, &blocks, &stages, &settings)
+        })
+        .await
+    }
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RedoBoxesArgs {
+    /// The blocks.
+    blocks: Vec<LayerId>,
+    /// The stages to run again: `recognize`, reading the source,
+    /// `translate`, and `inpaint`, cleaning the art under the block.
+    #[schemars(length(min = 1))]
+    stages: Vec<RedoStage>,
+    /// Whether to take the blocks fixed by hand too, replacing the user's
+    /// own reading or translation of them; false, the default, leaves them
+    /// alone. Set it only once the user agreed.
+    #[serde(default)]
+    include_hand_fixed: bool,
+}
+
+pub(super) struct RedoBoxes;
+
+impl Tool for RedoBoxes {
+    const NAME: &'static str = "booharu_redo_boxes";
+    type Args = RedoBoxesArgs;
+    type Output = RedoAnswer;
+    type Error = ToolExecutionError;
+
+    fn description(&self) -> String {
+        "Read, translate, or clean chosen blocks again on purpose, as Redo boxes does: one \
+         ordinary run of `stages` (`recognize`, reading the source again, `translate`, and \
+         `inpaint`, cleaning the art under the block again) on `blocks`, which goes on in the \
+         background and which you follow with wait. Every run, those of run and booharu_run \
+         included, leaves out a block fixed by hand for its stage: a source corrected by hand \
+         when reading, and when translating, a translation written or fixed by hand, by the user \
+         or by you, or a clean-up hidden by hand on a block with no translation. This tool takes \
+         those too only with `include_hand_fixed`, which replaces the user's own work: call \
+         booharu_count_redo first, and when it counts any `hand_fixed`, ask the user before \
+         you set it. A locked block, or one in a locked layer, is always left alone, and a \
+         sound effect the SFX mode (`sfx` in `booharu-lettering`) keeps as art, or one with a \
+         subtitle, stays untranslated, as the run's `skipped` tells. Answers the `run`, none \
+         when no block was left to run on, and how many blocks it left alone as `hand_fixed` \
+         (none with `include_hand_fixed`) and `locked`; tell the user about any it left alone. \
+         A layer that isn't a block is refused."
+            .to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        schema::<RedoBoxesArgs>()
+    }
+
+    async fn call(
+        &self,
+        context: &mut ToolContext,
+        args: RedoBoxesArgs,
+    ) -> Result<RedoAnswer, Self::Error> {
+        let RedoBoxesArgs {
+            blocks,
+            stages,
+            include_hand_fixed,
+        } = args;
+        let stages = redo_stages(stages);
+        blocking(context, move |tools, host| {
+            let settings = lettering(tools)?;
+            let config = host.pipeline_config()?;
+            let project = tools.session.lock().project();
+            let redo =
+                redo::redo_targets(&project, &blocks, &stages, &settings, include_hand_fixed)?;
+            // Queued with the session let go, as the run takes it.
+            let run = match redo.request(&stages, include_hand_fixed, config) {
+                Some(request) => Some(
+                    host.start_run(&tools.pipeline, &tools.session, request)?
+                        .context("the project closed")?,
+                ),
+                None => None,
+            };
+            Ok(redo.answer(run, include_hand_fixed))
+        })
+        .await
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{collections::BTreeSet, time::Duration};
 
     use booharu::runs::PlanGroup;
-    use koharu_pipeline::{Event, Outcome, PipelineConfig, Stage};
+    use booharu_core::settings::BooharuPreferences;
+    use koharu_pipeline::{Event, Outcome, PipelineConfig, Stage, Target};
     use koharu_renderer::{Renderer, RendererConfig};
     use koharu_scene::{Created, Edit, PageId};
-    use serde_json::json;
+    use serde_json::{Map, json};
 
     use super::*;
-    use crate::tools::Tools;
+    use crate::tools::{Tools, booharu::BooharuHost};
 
     /// Tools on a project of one blank page, with no scan, so detection
     /// loads no model, outside the app; and the page.
@@ -285,5 +460,205 @@ mod tests {
                 outcome: Outcome::Done,
             })
         );
+    }
+
+    /// The app as Redo boxes reaches it: Booharu's settings at their
+    /// defaults, the pipeline's saved settings translating into French, and
+    /// the runs it was asked to start, which it never starts, as reading and
+    /// translating would load models.
+    #[derive(Default)]
+    struct App {
+        started: Mutex<Vec<Request>>,
+    }
+
+    impl BooharuHost for App {
+        fn preferences(&self) -> anyhow::Result<BooharuPreferences> {
+            Ok(BooharuPreferences::default())
+        }
+
+        fn save_section(
+            &self,
+            _: &str,
+            _: Map<String, Value>,
+        ) -> anyhow::Result<BooharuPreferences> {
+            anyhow::bail!("nothing here saves settings")
+        }
+
+        fn font_families(&self) -> anyhow::Result<Vec<String>> {
+            Ok(Vec::new())
+        }
+
+        fn pipeline_config(&self) -> anyhow::Result<PipelineConfig> {
+            let mut config = PipelineConfig::default();
+            config.translator.target = "fr".parse()?;
+            Ok(config)
+        }
+
+        fn start_run(
+            &self,
+            _: &Pipeline,
+            _: &Arc<Mutex<Session>>,
+            request: Request,
+        ) -> anyhow::Result<Option<RunId>> {
+            self.started.lock().push(request);
+            Ok(Some(RunId(7)))
+        }
+    }
+
+    /// A page holding the blocks `ready`; `read`, whose source was corrected
+    /// by hand; `typed`, whose translation was typed by hand; and `locked`,
+    /// each found by Koharu's stages; the tools on it in [`App`], the app,
+    /// and the blocks' ids.
+    fn boxes() -> (tempfile::TempDir, Tools, Arc<App>, impl Fn(&str) -> LayerId) {
+        let dir = tempfile::tempdir().expect("a folder");
+        let mut session = Session::create(dir.path().join("test.khr")).expect("a project");
+        let block = |name: &str, index: usize, read: bool, locked: bool| {
+            let mut c2pa = json!({"detection": {"action": "c2pa.created"}});
+            if read {
+                c2pa["ocr"] = json!({"action": "c2pa.created"});
+            }
+            let x = 10.0 + 50.0 * index as f64;
+            let mut layer = json!({"kind": "block", "locked": locked, "source": {
+                "content": "どうして",
+                "frame": {"box": {"bounds": {"x": x, "y": 20.0, "width": 40.0, "height": 40.0}}},
+            }, "attributes": {"c2pa": c2pa}});
+            if name == "typed" {
+                layer["translation"] = json!({"content": "Why?"});
+            }
+            json!({"op": "add_layer", "id": format!("${name}"), "page": "$p", "index": index,
+                "layer": layer})
+        };
+        let ops = [
+            json!({"op": "add_page", "id": "$p", "index": 0, "size": {"width": 400, "height": 400}}),
+            block("ready", 0, true, false),
+            block("read", 1, false, false),
+            block("typed", 2, true, false),
+            block("locked", 3, true, true),
+        ];
+        let change = session
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops: ops
+                    .into_iter()
+                    .map(|op| serde_json::from_value(op).expect("an op"))
+                    .collect(),
+            })
+            .expect("a page");
+        let ids: Vec<(String, LayerId)> = change
+            .created
+            .into_iter()
+            .filter_map(|created| match created {
+                Created::Layer {
+                    id,
+                    label: Some(label),
+                } => Some((label, id)),
+                _ => None,
+            })
+            .collect();
+        let id = move |name: &str| {
+            ids.iter()
+                .find_map(|(found, id)| (found == name).then_some(*id))
+                .expect("a block")
+        };
+        let app = Arc::new(App::default());
+        let tools = Tools::new(
+            Arc::new(Mutex::new(session)),
+            Pipeline::new(PipelineConfig::default()),
+            Renderer::new(RendererConfig::default()),
+        )
+        .with_booharu(Arc::clone(&app) as Arc<dyn BooharuHost>);
+        (dir, tools, app, id)
+    }
+
+    #[tokio::test]
+    async fn redo_takes_the_hand_fixed_blocks_only_when_asked_and_never_the_locked() {
+        let (_dir, tools, app, id) = boxes();
+        let names = |names: &[&str]| names.iter().map(|name| id(name)).collect::<Vec<_>>();
+        let stages = vec![RedoStage::Recognize, RedoStage::Translate];
+        let count = CountRedo
+            .call(
+                &mut tools.tool_context(),
+                CountRedoArgs {
+                    blocks: names(&["ready", "read", "typed", "locked", "ready"]),
+                    stages: stages.clone(),
+                },
+            )
+            .await
+            .expect("a count");
+        assert_eq!(
+            count,
+            RedoCounts {
+                ready: 1,
+                hand_fixed: 2,
+                locked: 1,
+            }
+        );
+
+        let redo = async |blocks: &[&str], include_hand_fixed| {
+            let args = RedoBoxesArgs {
+                blocks: names(blocks),
+                stages: stages.clone(),
+                include_hand_fixed,
+            };
+            RedoBoxes
+                .call(&mut tools.tool_context(), args)
+                .await
+                .expect("a redo")
+        };
+        let every = ["ready", "read", "typed", "locked"];
+        let answer = |run, hand_fixed| RedoAnswer {
+            run,
+            hand_fixed,
+            locked: 1,
+        };
+        assert_eq!(redo(&every, false).await, answer(Some(RunId(7)), 2));
+        assert_eq!(redo(&every, true).await, answer(Some(RunId(7)), 0));
+        // No block left to run on queues nothing.
+        assert_eq!(redo(&["locked"], true).await, answer(None, 0));
+
+        // One run of the stages named, with the pipeline's saved settings,
+        // whose redo flag lifts the hand-fixed rule only when asked.
+        let started = app.started.lock().clone();
+        let [without, with] = started.as_slice() else {
+            panic!("{started:?}");
+        };
+        for (request, blocks, redo) in [
+            (without, names(&["ready"]), false),
+            (with, names(&["ready", "read", "typed"]), true),
+        ] {
+            assert_eq!(request.target, Target::Blocks(blocks));
+            assert_eq!(
+                request.stages,
+                BTreeSet::from([Stage::Recognize, Stage::Translate])
+            );
+            let config = request.config.as_ref().expect("the saved settings");
+            assert_eq!(config.booharu.redo, redo);
+            assert!(!config.booharu.subtitle_run);
+            assert_eq!(config.translator.target.to_string(), "fr");
+        }
+    }
+
+    #[test]
+    fn only_reading_translating_and_cleaning_are_redone() {
+        let block = "00000000-0000-0000-0000-000000000001";
+        for schema in [CountRedo.parameters(), RedoBoxes.parameters()] {
+            let args = |stages: Value| json!({"blocks": [block], "stages": stages});
+            let every = json!(["recognize", "translate", "inpaint"]);
+            assert_eq!(crate::tools::refusal(&schema, &args(every)), None);
+            for refused in [json!(["detect"]), json!(["read"]), json!([])] {
+                assert!(
+                    crate::tools::refusal(&schema, &args(refused.clone())).is_some(),
+                    "{refused}"
+                );
+            }
+        }
+        // Hand-fixed blocks are left alone unless the call says otherwise.
+        let args: RedoBoxesArgs =
+            serde_json::from_value(json!({"blocks": [block], "stages": ["translate"]}))
+                .expect("the arguments");
+        assert!(!args.include_hand_fixed);
+        // Counting changes nothing; a redo does.
+        assert_eq!(CountRedo.annotations().read_only_hint, Some(true));
+        assert_ne!(RedoBoxes.annotations().read_only_hint, Some(true));
     }
 }
