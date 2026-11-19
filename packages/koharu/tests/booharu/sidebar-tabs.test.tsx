@@ -1,7 +1,14 @@
+import { QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
+import { RightSidebar } from '@/components/editor/RightSidebar'
 import { measureTabRow, tabsFit, type TabRow, useSidebarTabsFit } from '@/lib/booharu/sidebarTabs'
+import { queryClient } from '@/lib/queries'
+import { TooltipProvider } from '@koharu/ui/components/tooltip'
+
+import { listenToEvents, qcDesktop, settle } from './qc'
 
 /** How the row of tabs `element` is in, or is, fits now. */
 const fitOf = (element: Element) =>
@@ -27,12 +34,23 @@ const tabStyle = (tight: boolean) => ({
 })
 const iconStyle = { width: '16px' }
 
-/** Gives each element's style as `style` says, the others' as jsdom does. */
-function styled(style: (element: Element) => object | undefined) {
-  const real = window.getComputedStyle.bind(window)
-  vi.spyOn(window, 'getComputedStyle').mockImplementation(
-    (element) => (style(element) as CSSStyleDeclaration | undefined) ?? real(element),
-  )
+/** jsdom's own styles, which `styled` starts from however many rows a test lays out. */
+const jsdomStyle = window.getComputedStyle.bind(window)
+
+/** Gives each element's style as `style` says, the rest of it, and the others', as jsdom does. */
+function styled(style: (element: Element) => Record<string, string | undefined> | undefined) {
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+    const computed = jsdomStyle(element, pseudo)
+    const given = style(element)
+    if (!given) return computed
+    return new Proxy(computed, {
+      get(target, key) {
+        if (typeof key === 'string' && key in given) return given[key]
+        const value: unknown = Reflect.get(target, key, target)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+  })
 }
 
 /** Whether `element`'s tab is held from shrinking, as while it's measured. */
@@ -103,6 +121,24 @@ function laidOut(width: number) {
 
 /** How the row of tabs on screen fits now. */
 const shownFit = () => screen.getByRole('tablist').getAttribute('data-booharu-tabs')
+
+/** The right pane, with no project open, its row of tabs `width` wide, laid out as `laidOut` lays
+ * rows out, and its tooltips showing at once, as the app shows them. */
+function pane(width: number) {
+  listenToEvents()
+  qcDesktop(null)
+  laidOut(width)
+  render(
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider delay={0}>
+        <RightSidebar />
+      </TooltipProvider>
+    </QueryClientProvider>,
+  )
+}
+
+/** The tooltip showing, if one is. */
+const tooltip = () => document.querySelector('[data-slot="tooltip-content"]')
 
 /** A row of tabs `available` wide whose labels are `labels` wide whole, laid out as RightSidebar
  * lays them out, the last QC's with its count at 12 on a 22.45 px badge. */
@@ -276,6 +312,29 @@ describe('Booharu right pane tabs', () => {
     // Layers back in the first language: 92 px without the icons.
     view.rerender(<Row labels={['Layers', 'QC']} count={10} />)
     await waitFor(() => expect(shownFit()).toBe('labels'))
+  })
+
+  it('names each tab in a tooltip while the icons show alone, as the desktop draws no title', async () => {
+    const user = userEvent.setup()
+    // Layers, Story, Context and Agent, 23 letters: 176 px tight in 170.
+    pane(170)
+    expect(shownFit()).toBe('icons')
+    const story = screen.getByRole('tab', { name: 'Story' })
+    expect(story).not.toHaveAttribute('title')
+    await user.hover(story)
+    await waitFor(() => expect(tooltip()).toHaveTextContent(/^Story$/))
+    await user.click(story)
+    expect(story).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('names no tab in a tooltip while its label shows', async () => {
+    const user = userEvent.setup()
+    // 262 px with the icons in 270.
+    pane(270)
+    expect(shownFit()).toBeNull()
+    await user.hover(screen.getByRole('tab', { name: 'Story' }))
+    await settle()
+    expect(tooltip()).toBeNull()
   })
 
   it('fits the tabs whole while the row isn’t laid out', () => {

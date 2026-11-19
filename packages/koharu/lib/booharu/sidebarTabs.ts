@@ -17,8 +17,8 @@ export interface TabRow {
 
 /** How the right pane's tabs fit its width, the first of these that does: `whole`, each tab with its
  * icon and its whole label; `labels`, the whole labels without the icons; `tight`, the whole labels
- * with less room around and between the tabs; and `icons`, the icons alone, each tab named in its
- * title and to screen readers, never a label cut to a letter or two. */
+ * with less room around and between the tabs; and `icons`, the icons alone, each tab named in a
+ * tooltip and to screen readers, never a label cut to a letter or two. */
 export type TabsFit = 'whole' | 'labels' | 'tight' | 'icons'
 
 /** How `row`'s tabs fit. Widths come in layout units, a 64th of a pixel, so only a hundredth over,
@@ -110,7 +110,7 @@ export function measureTabRow(list: HTMLElement): TabRow {
  * label fits whole beside them; gives its icon's room to its label once one wouldn't, as in English
  * at the pane's default 340 px once the QC tab shows; takes less room around itself once the labels
  * still don't fit, as in Japanese there, or in Portuguese at its 280 px minimum; and shows its icon
- * alone once even that's too narrow, as in Japanese at 280 px, its title and screen readers naming
+ * alone once even that's too narrow, as in Japanese at 280 px, a tooltip and screen readers naming
  * it. Spread over the row of tabs: its ref, measured again as the row resizes or its tabs or labels
  * change, and `data-booharu-tabs`, how they fit while it's other than whole, which the tabs' class
  * follows. */
