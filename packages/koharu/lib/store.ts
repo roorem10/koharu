@@ -222,6 +222,9 @@ function koharuFold(job: Job | undefined, event: PipelineEvent): Job {
     case 'retrying':
     case 'page_failed':
       return current
+    // Booharu: blocks a page stage left alone change no count of Koharu's.
+    case 'skipped':
+      return current
   }
 }
 

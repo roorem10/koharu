@@ -101,6 +101,9 @@ export function foldRun(job: Job, event: PipelineEvent): Job {
     }
     case 'ended':
       return change({ retrying: [], failures: failuresAtEnd(record.failures, event.outcome) })
+    // Blocks a page stage left alone, which the record doesn't count yet.
+    case 'skipped':
+      return job
   }
 }
 

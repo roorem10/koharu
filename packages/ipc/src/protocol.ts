@@ -366,7 +366,10 @@ export type CantRead =
  *  changed by hand, which counts in `changed` and in `kept_hand_edited`.
  */
 export type CategoryCounts = {
-  /**  Blocks whose label, font, or record changed. */
+  /**
+   *  Blocks whose label, role, font, or record changed, or whose clean-up
+   *  was hidden to keep the original art.
+   */
   changed: number
   /**  Blocks left out because they, or a layer holding them, are locked. */
   locked: number
@@ -1017,15 +1020,23 @@ export type LayerId = string
 
 /**
  *  `lettering`: `{"category": category id, "source": "user" | "model",
- *  "confidence"?: number}`, on a block: its lettering category, such as
- *  `"shout"`, who chose it, and how sure a model was of its choice, from 0
- *  to 1. A user's choice is never replaced by a model's. An id Booharu
- *  doesn't know reads as no label, as a bad value does.
+ *  "confidence"?: number, "role"?: "text" | "sfx"}`, on a block: its
+ *  lettering category, such as `"shout"`, who chose it, how sure a model was
+ *  of its choice, from 0 to 1, and the block's Koharu role before a category
+ *  chosen by hand changed it, so choosing Automatic restores it. A user's
+ *  choice is never replaced by a model's. An id Booharu doesn't know reads as
+ *  no label, as a bad value does.
  */
 export type Lettering = {
   category: LetteringCategory
   source: LetteringSource
   confidence?: number | null
+  /**
+   *  The block's role before a category chosen by hand changed it, which
+   *  the first such choice records and later ones keep; none when no
+   *  choice changed it.
+   */
+  role?: Role | null
 }
 
 /**
@@ -1111,6 +1122,17 @@ export type LetteringSettings = {
    *  shape.
    */
   model_confidence?: number
+  /**
+   *  Which sound effects a run translates and cleans: one it skips keeps
+   *  the original art, its clean-up hidden. A block is a sound effect when
+   *  its lettering category, as Booharu reads it, is Sound Effect.
+   */
+  sfx?: SfxMode
+  /**
+   *  How a sound effect's subtitle looks: the small plain translation
+   *  written beside an effect kept as art.
+   */
+  subtitle?: SubtitleStyle
 }
 
 /**  Who chose a [`Lettering`] category. */
@@ -1395,6 +1417,24 @@ export type PipelineEvent =
    *  run goes on with its other pages.
    */
   | { kind: 'page_failed'; run: RunId; page: PageId; stage: Stage; reason: string }
+  /**
+   *  Booharu: a page stage left blocks of the page alone, sent once for
+   *  the page when any count is above 0: `sound_effects` kept as art by the
+   *  SFX mode, `hand_fixed` fixed by hand (for Detect, the blocks it kept
+   *  because they were made, fixed, labelled, noted, or subtitled by hand),
+   *  and `locked` locked or in a locked layer. `blocks` is whether the run
+   *  named blocks.
+   */
+  | {
+      kind: 'skipped'
+      run: RunId
+      page: PageId
+      stage: Stage
+      sound_effects: number
+      hand_fixed: number
+      locked: number
+      blocks: boolean
+    }
 
 /**
  *  Pages that need the same stages, which one run works on; or a press's
@@ -1637,6 +1677,33 @@ export type Rect = {
 }
 
 /**
+ *  What Redo boxes did: the run it queued, none when no box was left to
+ *  run on, with how many boxes it left alone as fixed by hand or locked.
+ */
+export type RedoAnswer = {
+  run: RunId | null
+  hand_fixed: number
+  locked: number
+}
+
+/**
+ *  How many of the boxes named Redo boxes would run its stages on as they
+ *  are, how many it would take only on purpose as fixed by hand, and how
+ *  many it leaves alone as locked.
+ */
+export type RedoCounts = {
+  /**  Boxes the stages work on as they are. */
+  ready: number
+  /**
+   *  Boxes fixed by hand for one of the stages, which they leave out
+   *  unless the redo takes them on purpose.
+   */
+  hand_fixed: number
+  /**  Boxes that are, or are in, a locked layer, which no stage changes. */
+  locked: number
+}
+
+/**
  *  An existing page or layer id, or `$label` for one created earlier in the
  *  same edit.
  */
@@ -1644,6 +1711,23 @@ export type Ref = string
 
 export type RendererConfig = {
   font_families?: string[]
+}
+
+/**
+ *  How many layers Reset to lettering default changed, left alone as
+ *  locked, and found untranslated. A layer that has its default already
+ *  counts in none.
+ */
+export type ResetCounts = {
+  /**  Layers given their lettering default. */
+  changed: number
+  /**
+   *  Layers left as they are because they, or a layer holding them, are
+   *  locked.
+   */
+  locked: number
+  /**  Blocks without a translation, which have no lettering to reset. */
+  untranslated: number
 }
 
 export type Result<T, E> = ({ Ok: T } & { Err?: never }) | ({ Err: E } & { Ok?: never })
@@ -1789,6 +1873,29 @@ export type Series = {
 export type SeriesImport = {
   series: Series
   exists: boolean
+}
+
+/**
+ *  Which sound effects a run translates, `[booharu-lettering] sfx`. A
+ *  sound effect a run skips keeps the original art: no translation, its
+ *  clean-up hidden. One with a subtitle is skipped whatever the mode.
+ */
+export type SfxMode =
+  /**  None: every sound effect stays as art. */
+  | 'skip'
+  /**  Only those inside a speech balloon, which are lettered like speech. */
+  | 'inside_bubbles'
+  /**  Every one, as Koharu translates them. */
+  | 'translate_all'
+
+/**
+ *  What the desktop's Add subtitle answers: the subtitle, the one the
+ *  effect had or the one just added, or else the Translate run in subtitle
+ *  mode that makes it.
+ */
+export type SfxSubtitleAnswer = {
+  layer: LayerId | null
+  run: RunId | null
 }
 
 /**  A vector path with an optional fill and stroke, in page coordinates. */
@@ -1953,6 +2060,24 @@ export type StyleScope =
   | { kind: 'pages'; pages: PageId[] }
   /**  Every block on every page. */
   | { kind: 'project' }
+
+/**
+ *  How a sound effect's subtitle looks, `[booharu-lettering] subtitle`: a
+ *  small plain line beside the effect, outlined `size / 9` wide.
+ */
+export type SubtitleStyle = {
+  /**  Its font; none for the default font. Never blank. */
+  family?: string | null
+  /**
+   *  Its drawn size, as a share of the page's shorter side, above 0 and at
+   *  most 0.1: 0.015 is 18 pixels on a page 1,200 wide.
+   */
+  size?: number
+  /**  The text's colour. */
+  fill?: Rgba
+  /**  The outline's colour. */
+  stroke?: Rgba
+}
 
 /**
  *  What a run works on. It runs every stage it's given on everything it
@@ -2353,6 +2478,22 @@ export const commands = {
   /** Dismisses the agent's flag on `layer`, a block or a text layer, with the message `message`, or every flag there when null, as one undo step labelled `booharu_dismiss_flag`, then checks the layer's page again. A locked layer, or one inside a locked layer, refuses it. Null when no flag matches, which makes no undo step. */
   booharuDismissFlag: (layer: LayerId, message: string | null) =>
     invoke<Change | null>('booharu_dismiss_flag', { layer, message }, { headers: headers() }),
+  /** Gives the sound effect `block` a subtitle, a small text layer beside it while the effect keeps its art: from `text` when given, 1 to 500 characters once trimmed, else from the effect's translation, as one undo step labelled `booharu_add_sfx_subtitle`, answering the subtitle's layer. An effect with a subtitle answers that one and changes nothing. An effect with no words to subtitle it with is translated first: one Translate run on it, with the saved pipeline settings, in subtitle mode, which adds the subtitle as it writes, answered as the run. Refuses a layer that isn't a sound effect, and one that is, or is in, a locked layer. */
+  booharuAddSfxSubtitle: (block: LayerId, text: string | null) =>
+    invoke<SfxSubtitleAnswer>('booharu_add_sfx_subtitle', { block, text }, { headers: headers() }),
+  /** Gives the layers `layers` their lettering default back, as one undo step labelled `booharu_reset_lettering`: a translated box the look its first translation got, at its current size, with its role and, while Pick fonts automatically is on, its category's font; a sound effect's subtitle its subtitle look; and any other text layer the default look. Only the look changes: the text, size, frame, and the rest stay. Locked layers and untranslated boxes are left alone and counted. Answers how many layers it changed, and how many it left alone as locked or untranslated; with nothing to change, it makes no undo step. */
+  booharuResetLettering: (layers: LayerId[]) =>
+    invoke<ResetCounts>('booharu_reset_lettering', { layers }, { headers: headers() }),
+  /** How the boxes `blocks` stand for running `stages` again: how many the stages would work on as they are, how many they'd take only on purpose, as fixed by hand, and how many are, or are in, a locked layer, which no redo changes. A box named twice counts once. Refuses no stages, a stage other than `recognize`, `translate`, and `inpaint`, and a layer that isn't a box. */
+  booharuCountRedo: (blocks: LayerId[], stages: RunStage[]) =>
+    invoke<RedoCounts>('booharu_count_redo', { blocks, stages }, { headers: headers() }),
+  /** Runs `stages` again on the boxes `blocks`, as `booharu_count_redo` counts them: one ordinary run on the unlocked ones, without those fixed by hand unless `include_hand_fixed`, with the saved pipeline settings, which with `include_hand_fixed` reads and translates the hand-fixed ones again too. A sound effect the SFX mode keeps as art stays art. Answers the run, none when no box is left to run on, with how many boxes it left alone as fixed by hand or locked. Refuses what `booharu_count_redo` refuses. */
+  booharuRedoBoxes: (blocks: LayerId[], stages: RunStage[], includeHandFixed: boolean) =>
+    invoke<RedoAnswer>(
+      'booharu_redo_boxes',
+      { blocks, stages, includeHandFixed },
+      { headers: headers() },
+    ),
 }
 
 export const events = {

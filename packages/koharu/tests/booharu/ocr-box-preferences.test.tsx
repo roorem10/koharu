@@ -19,6 +19,8 @@ const OTHERS = {
     categories: {},
     small_text: 0.012,
     model_confidence: 0.6,
+    sfx: 'skip',
+    subtitle: { family: null, size: 0.015, fill: [0, 0, 0, 1], stroke: [1, 1, 1, 1] },
   },
   'booharu-fonts': { favorites: [] },
   'booharu-runs': builtInRuns,
