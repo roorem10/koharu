@@ -32,7 +32,7 @@ use booharu_core::{
     edited,
 };
 use koharu_pipeline::{RunId, Stage, Target};
-use koharu_scene::{Content, Hash, Layer, LayerId, Project};
+use koharu_scene::{Content, Hash, Layer, LayerId, PageId, Project};
 use serde::Serialize;
 
 /// Where a glossary term is used in a project: the blocks whose source it
@@ -466,11 +466,8 @@ pub fn outline(
         missing,
     } = Chapter::read(path, store)?;
     let found = found_terms(project, &context, series.as_ref());
-    let unread = context
-        .brief
-        .as_ref()
-        .is_none_or(|brief| brief.summary.trim().is_empty())
-        && has_text(project);
+    let pages: Vec<PageId> = project.pages().map(|page| page.id).collect();
+    let unread = crate::runs::brief_missing(&context) && crate::runs::has_text(project, &pages);
     Ok(ChapterOutline {
         more: found.len().saturating_sub(MAX_TERMS) as u32,
         glossary: found
@@ -495,19 +492,6 @@ pub fn outline(
 
 fn is_zero(count: &u32) -> bool {
     *count == 0
-}
-
-/// Whether a block of `project` has text Read chapter can read: a source
-/// that isn't blank, as recognition writes it.
-fn has_text(project: &Project) -> bool {
-    fn any(layers: &[Layer]) -> bool {
-        layers.iter().any(|layer| {
-            matches!(&layer.content,
-                Content::Block(block) if !block.source.content.text().trim().is_empty())
-                || any(&layer.children)
-        })
-    }
-    project.pages().any(|page| any(&page.layers))
 }
 
 /// What linking a chapter to a series by its name did.
