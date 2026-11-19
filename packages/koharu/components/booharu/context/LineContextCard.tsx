@@ -53,112 +53,116 @@ export function LineContextCard({ box: { layer, locked } }: BoxDetailsProps) {
           {failed}
         </p>
       )}
-      {!answer && (
-        <Button
-          type='button'
-          variant='outline'
-          size='xs'
-          className='justify-self-start text-[11px]'
-          disabled={explaining || !known || model === null}
-          onClick={() => void explainLine(layer.id)}
-        >
-          {explaining && <LoaderCircle aria-hidden className='animate-spin' />}
-          {t(
-            explaining
-              ? 'booharu.context.explaining'
-              : failed
-                ? 'errors.tryAgain'
-                : 'booharu.context.explain',
-          )}
-        </Button>
-      )}
-      {!answer && model === null && (
-        <p className='text-[11px] leading-4 text-muted-foreground'>
-          <Trans
-            t={t}
-            i18n={i18n}
-            i18nKey='booharu.context.explainNeedsModel'
-            values={{
-              setting: t('booharu.context.readingModel'),
-              tab: t('settings.tabs.pipeline'),
-            }}
-            components={{
-              a: (
-                <button
-                  type='button'
-                  className='text-primary underline underline-offset-2 hover:text-foreground'
-                  onClick={() => openSettingsSection('pipeline', readingSection)}
-                />
-              ),
-            }}
-          />
-        </p>
-      )}
-      {answer && (
-        <div className='grid gap-2 rounded-md border border-border/70 bg-muted/30 p-2'>
-          <p className='break-words whitespace-pre-wrap select-text'>{answer.explanation}</p>
-          {answer.alternatives.length > 0 && (
-            <ul aria-label={t('booharu.context.alternatives')} className='grid gap-1.5'>
-              {answer.alternatives.map((text, index) => (
-                <li
-                  key={index}
-                  className='flex min-w-0 items-start gap-2 border-t border-border/60 pt-1.5'
-                >
-                  <p
-                    id={`${alternatives}-${index}`}
-                    className='min-w-0 flex-1 break-words whitespace-pre-wrap select-text'
-                  >
-                    {text}
-                  </p>
-                  <Button
-                    type='button'
-                    variant='outline'
-                    size='xs'
-                    className='shrink-0 text-[11px]'
-                    aria-describedby={`${alternatives}-${index}`}
-                    disabled={locked}
-                    onClick={() => commitTranslation(layer, text)}
-                  >
-                    {t('booharu.context.useThis')}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {locked && answer.alternatives.length > 0 && (
-            <p className='text-[11px] leading-4 text-muted-foreground'>
-              {t('booharu.context.useThisLocked')}
-            </p>
-          )}
-          <div className='flex min-w-0 items-center gap-2'>
-            <p
-              className='min-w-0 flex-1 truncate text-[10px] text-muted-foreground'
-              title={modelName(models, answer.model)}
-            >
-              {t('booharu.context.answeredBy', { model: modelName(models, answer.model) })}
-            </p>
-            <Button
-              type='button'
-              variant='ghost'
-              size='xs'
-              className='shrink-0 text-[11px]'
-              onClick={() => {
-                closeBoxDetails()
-                discussInAgent(
-                  t('booharu.context.discussPrompt', {
-                    layer: layer.id,
-                    source: answer.source,
-                    translation: answer.translation,
-                    explanation: answer.explanation,
-                  }),
-                )
+      {/* A polite live region that stays, so a screen reader tells the explaining and the answer
+          as they come: the focused Explain this line goes as the answer shows. */}
+      <div role='status' aria-live='polite' className='grid gap-2'>
+        {!answer && (
+          <Button
+            type='button'
+            variant='outline'
+            size='xs'
+            className='justify-self-start text-[11px]'
+            disabled={explaining || !known || model === null}
+            onClick={() => void explainLine(layer.id)}
+          >
+            {explaining && <LoaderCircle aria-hidden className='animate-spin' />}
+            {t(
+              explaining
+                ? 'booharu.context.explaining'
+                : failed
+                  ? 'errors.tryAgain'
+                  : 'booharu.context.explain',
+            )}
+          </Button>
+        )}
+        {!answer && model === null && (
+          <p className='text-[11px] leading-4 text-muted-foreground'>
+            <Trans
+              t={t}
+              i18n={i18n}
+              i18nKey='booharu.context.explainNeedsModel'
+              values={{
+                setting: t('booharu.context.readingModel'),
+                tab: t('settings.tabs.pipeline'),
               }}
-            >
-              {t('booharu.context.discuss')}
-            </Button>
+              components={{
+                a: (
+                  <button
+                    type='button'
+                    className='text-primary underline underline-offset-2 hover:text-foreground'
+                    onClick={() => openSettingsSection('pipeline', readingSection)}
+                  />
+                ),
+              }}
+            />
+          </p>
+        )}
+        {answer && (
+          <div className='grid gap-2 rounded-md border border-border/70 bg-muted/30 p-2'>
+            <p className='break-words whitespace-pre-wrap select-text'>{answer.explanation}</p>
+            {answer.alternatives.length > 0 && (
+              <ul aria-label={t('booharu.context.alternatives')} className='grid gap-1.5'>
+                {answer.alternatives.map((text, index) => (
+                  <li
+                    key={index}
+                    className='flex min-w-0 items-start gap-2 border-t border-border/60 pt-1.5'
+                  >
+                    <p
+                      id={`${alternatives}-${index}`}
+                      className='min-w-0 flex-1 break-words whitespace-pre-wrap select-text'
+                    >
+                      {text}
+                    </p>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='xs'
+                      className='shrink-0 text-[11px]'
+                      aria-describedby={`${alternatives}-${index}`}
+                      disabled={locked}
+                      onClick={() => commitTranslation(layer, text)}
+                    >
+                      {t('booharu.context.useThis')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {locked && answer.alternatives.length > 0 && (
+              <p className='text-[11px] leading-4 text-muted-foreground'>
+                {t('booharu.context.useThisLocked')}
+              </p>
+            )}
+            <div className='flex min-w-0 items-center gap-2'>
+              <p
+                className='min-w-0 flex-1 truncate text-[10px] text-muted-foreground'
+                title={modelName(models, answer.model)}
+              >
+                {t('booharu.context.answeredBy', { model: modelName(models, answer.model) })}
+              </p>
+              <Button
+                type='button'
+                variant='ghost'
+                size='xs'
+                className='shrink-0 text-[11px]'
+                onClick={() => {
+                  closeBoxDetails()
+                  discussInAgent(
+                    t('booharu.context.discussPrompt', {
+                      layer: layer.id,
+                      source: answer.source,
+                      translation: answer.translation,
+                      explanation: answer.explanation,
+                    }),
+                  )
+                }}
+              >
+                {t('booharu.context.discuss')}
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

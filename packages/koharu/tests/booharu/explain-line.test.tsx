@@ -141,12 +141,14 @@ describe('Booharu Explain this line', () => {
       section: 'explain',
     })
     expect(card.getByText('Isagi names the skill he wins with.')).toBeInTheDocument()
-    expect(await card.findByRole('button', { name: 'Explaining…' })).toBeDisabled()
+    // Told politely to a screen reader as it goes, then as it's answered.
+    const told = within(card.getByRole('status'))
+    expect(await told.findByRole('button', { name: 'Explaining…' })).toBeDisabled()
     expect(ask.mock.calls).toEqual([['free']])
 
     act(() => answerLine(answer))
 
-    expect(await card.findByText(answer.explanation)).toBeInTheDocument()
+    expect(await told.findByText(answer.explanation)).toBeInTheDocument()
     const list = card.getByRole('list', { name: 'Other translations' })
     expect(
       within(list)
