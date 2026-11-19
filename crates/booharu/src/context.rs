@@ -402,6 +402,11 @@ pub fn notes(
     })
 }
 
+/// What the agent's outline says in place of the brief while the chapter
+/// has text but no brief, as the runs the agent and outside apps start never
+/// read the chapter on their own.
+pub const NO_BRIEF: &str = "No chapter brief yet: call booharu_read_chapter before translating.";
+
 /// The chapter in short, which goes with each of the agent's requests: the
 /// name of the series it links, its brief, and the glossary terms found in
 /// its text.
@@ -413,13 +418,24 @@ pub struct ChapterOutline {
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub missing: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub brief: Option<ChapterBrief>,
+    pub brief: Option<OutlinedBrief>,
     /// The terms found in the chapter's text ([`found_terms`]), at most 60.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub glossary: Vec<OutlinedTerm>,
     /// How many terms found past the first 60 were left out.
     #[serde(skip_serializing_if = "is_zero")]
     pub more: u32,
+}
+
+/// The brief as the agent's outline gives it.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum OutlinedBrief {
+    /// The brief, with when the chapter was read and with which model.
+    Brief(ChapterBrief),
+    /// [`NO_BRIEF`], while the chapter has text but no brief: none, or one
+    /// whose summary is blank, which a Run press reads again.
+    Unread(&'static str),
 }
 
 /// A glossary term as the agent's outline lists it.
@@ -436,8 +452,9 @@ pub struct OutlinedTerm {
 
 /// The chapter of the project file `path`, whose project is `project`, in
 /// short, with the series it links from the store `store` opens, which only
-/// a linked series needs. A side file or series file that doesn't read
-/// fails, naming it.
+/// a linked series needs: while the chapter has text but no brief, its brief
+/// is [`NO_BRIEF`]. A side file or series file that doesn't read fails,
+/// naming it.
 pub fn outline(
     path: &Path,
     project: &Project,
@@ -449,6 +466,11 @@ pub fn outline(
         missing,
     } = Chapter::read(path, store)?;
     let found = found_terms(project, &context, series.as_ref());
+    let unread = context
+        .brief
+        .as_ref()
+        .is_none_or(|brief| brief.summary.trim().is_empty())
+        && has_text(project);
     Ok(ChapterOutline {
         more: found.len().saturating_sub(MAX_TERMS) as u32,
         glossary: found
@@ -464,12 +486,28 @@ pub fn outline(
             .collect(),
         series: series.map(|series| series.name),
         missing,
-        brief: context.brief,
+        brief: match unread {
+            true => Some(OutlinedBrief::Unread(NO_BRIEF)),
+            false => context.brief.map(OutlinedBrief::Brief),
+        },
     })
 }
 
 fn is_zero(count: &u32) -> bool {
     *count == 0
+}
+
+/// Whether a block of `project` has text Read chapter can read: a source
+/// that isn't blank, as recognition writes it.
+fn has_text(project: &Project) -> bool {
+    fn any(layers: &[Layer]) -> bool {
+        layers.iter().any(|layer| {
+            matches!(&layer.content,
+                Content::Block(block) if !block.source.content.text().trim().is_empty())
+                || any(&layer.children)
+        })
+    }
+    project.pages().any(|page| any(&page.layers))
 }
 
 /// What linking a chapter to a series by its name did.
@@ -1134,7 +1172,7 @@ mod tests {
         assert!(none.series.is_none() && none.found.is_empty() && none.extras.is_empty());
         assert_eq!(
             json!(outline(path, &project, opened)?),
-            json!({"series": null})
+            json!({"series": null, "brief": NO_BRIEF})
         );
 
         let mut series = store.create("Blue Archive")?;
@@ -1165,7 +1203,7 @@ mod tests {
         );
         assert_eq!(
             json!(outline(path, &project, opened)?),
-            json!({"series": "Blue Archive", "glossary": [
+            json!({"series": "Blue Archive", "brief": NO_BRIEF, "glossary": [
                 {"source": "先生", "target": "Sensei", "note": "a title", "kind": "other",
                     "locked": true},
                 {"source": "ヒナ", "target": "Hina", "kind": "other"},

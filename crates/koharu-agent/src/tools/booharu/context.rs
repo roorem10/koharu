@@ -1152,7 +1152,11 @@ mod tests {
     async fn the_context_document_includes_the_linked_series_and_the_found_terms() {
         let chapter = Chapter::new(vec![block("hina", None, 0, "ヒナ先生!")]);
         let outline = chapter.tools.context().expect("the outline");
-        assert_eq!(outline["booharu"], json!({"series": null}), "{outline}");
+        assert_eq!(
+            outline["booharu"],
+            json!({"series": null, "brief": context::NO_BRIEF}),
+            "{outline}"
+        );
         assert!(outline["pages"].is_array(), "Koharu's outline is kept");
         let args = json!({"name": "Blue Archive", "create": true});
         chapter.call(LinkSeries, args).await.expect("linked");
@@ -1168,7 +1172,7 @@ mod tests {
         let outline = chapter.tools.context().expect("the outline");
         assert_eq!(
             outline["booharu"],
-            json!({"series": "Blue Archive", "glossary": [
+            json!({"series": "Blue Archive", "brief": context::NO_BRIEF, "glossary": [
                 {"source": "先生", "target": "Sensei", "kind": "other", "locked": true},
                 {"source": "ヒナ", "target": "Hina", "kind": "name"},
             ]})
