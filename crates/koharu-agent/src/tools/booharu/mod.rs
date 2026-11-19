@@ -42,6 +42,7 @@
 //! | `booharu_flag_line` | flags lines for human review, each with a short message, as one undo step, leaving out locked lines and flags a line has, and answers which it flagged, found flagged, and left out as locked | no |
 //! | `booharu_dismiss_flag` | dismisses a line's flag with a message, or every flag on it, as one undo step, and answers how many | no |
 //! | `booharu_add_sfx_subtitle` | gives a sound effect a subtitle beside it, from the words given or its translation, taking its translation away and hiding its clean-up so its art shows, as one undo step; with no words yet, starts the Translate run that writes it | no |
+//! | `booharu_reset_lettering` | gives blocks and text layers their lettering default back, every look key and word mark, hand-set or not, as one undo step whose look counts as automatic, leaving locked ones alone, and answers how many it changed, left locked, and found untranslated | no |
 
 mod boxes;
 mod context;
@@ -263,6 +264,7 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(qc::FlagLine);
     tools.add_tool(qc::DismissFlag);
     tools.add_tool(sfx::AddSfxSubtitle);
+    tools.add_tool(styles::ResetLettering);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one

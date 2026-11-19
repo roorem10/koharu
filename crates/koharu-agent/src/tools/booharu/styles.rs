@@ -8,8 +8,13 @@
 //! is its choice: each block it changes counts as styled by hand afterwards,
 //! so automatic steps, and an Apply that leaves hand-edited blocks alone,
 //! keep it.
+//!
+//! And Reset to lettering default, as the app's command does it: chosen
+//! blocks and text layers given back the look Booharu letters them in, hand
+//! edits and the agent's own look included, which counts as automatic
+//! again.
 
-use booharu::styles::{self, StyleCounts, StyleScope};
+use booharu::styles::{self, ResetCounts, StyleCounts, StyleScope};
 use booharu_core::{
     attrs::Origin,
     lettering::{self, LetteringCategory},
@@ -18,6 +23,7 @@ use booharu_core::{
     styles::first_font,
 };
 use koharu_renderer::RendererConfig;
+use koharu_scene::LayerId;
 use rig_core::{
     completion::ToolAnnotations,
     tool::{Tool, ToolContext, ToolExecutionError},
@@ -200,6 +206,76 @@ impl Tool for CountTextStyleTargets {
     }
 }
 
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ResetLetteringArgs {
+    /// The layers: blocks, whose translations take their default, and text
+    /// layers, sound effects' subtitles among them.
+    layers: Vec<LayerId>,
+}
+
+pub(super) struct ResetLettering;
+
+impl Tool for ResetLettering {
+    const NAME: &'static str = "booharu_reset_lettering";
+    type Args = ResetLetteringArgs;
+    type Output = ResetCounts;
+    type Error = ToolExecutionError;
+
+    fn description(&self) -> String {
+        "Give some layers their lettering default back, as Reset to lettering default does, as one \
+         undo step: a translated block the look a first translation of it gets, at its size now \
+         (the colours and outline Koharu measures from the original lettering, with a sound \
+         effect's legibility outline, or with colour detection (`detect_colors`) off the default \
+         colours and outline, in the default font, or while Pick fonts automatically (`auto`) is \
+         on in its lettering category's font), a sound effect's subtitle its subtitle look \
+         (`subtitle`), and any other text layer the default look, as `booharu-lettering` sets \
+         them; every mark a word carries goes too. Only the look changes: the words, the size, the \
+         frame, the alignment, and the rest stay. Translating a block again keeps its look, so \
+         this is the way back to the default: use it when the user asks for a box's default look \
+         again, or after booharu_set_lettering_category made a block a sound effect or no longer \
+         one, whose outline otherwise changes only at its next translation. It replaces a look \
+         changed by hand, the user's or booharu_apply_text_style's, and the look it gives counts \
+         as automatic. Locked layers, and layers in locked layers, are left alone; a block without \
+         a translation has no lettering to reset. Answers how many layers it `changed`, left alone \
+         as `locked`, and found `untranslated`: tell the user about any it left alone. A layer \
+         with its default already counts in none, and with nothing to change, it makes no undo \
+         step."
+            .to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        schema::<ResetLetteringArgs>()
+    }
+
+    async fn call(
+        &self,
+        context: &mut ToolContext,
+        args: ResetLetteringArgs,
+    ) -> Result<ResetCounts, Self::Error> {
+        let tools = project(context)?;
+        // On a blocking thread, as `edit` applies, and under one lock, so the
+        // layers counted are the ones changed.
+        tokio::task::spawn_blocking(move || -> anyhow::Result<ResetCounts> {
+            let (settings, font) = look(&tools)?;
+            let mut session = tools.session.lock();
+            let (edit, counts) = styles::reset_lettering(
+                &session.project(),
+                &args.layers,
+                &settings,
+                font.as_deref(),
+            )?;
+            if let Some(edit) = edit {
+                session.apply(edit)?;
+            }
+            Ok(counts)
+        })
+        .await
+        .map_err(failed)?
+        .map_err(|error| failed(format!("{error:#}")))
+    }
+}
+
 /// The default look as the app holds it now, `[booharu-lettering]`, and the
 /// default font, the first of Koharu's Preferred fonts, none when they list
 /// none; outside the app, both as the file holds them. A section that can't
@@ -224,7 +300,7 @@ mod tests {
     };
     use koharu_pipeline::{Pipeline, PipelineConfig};
     use koharu_renderer::Renderer;
-    use koharu_scene::{CharStyle, Content, Created, Edit, LayerId, Rgba, Session};
+    use koharu_scene::{CharStyle, Content, Created, Edit, LayerId, Rgba, RichText, Session, Span};
     use parking_lot::Mutex;
     use serde_json::json;
 
@@ -542,6 +618,131 @@ mod tests {
         ] {
             assert!(crate::tools::refusal(&schema, &args).is_some(), "{args}");
         }
+    }
+
+    #[tokio::test]
+    async fn a_reset_gives_each_layer_its_lettering_default_as_one_automatic_undo_step() {
+        let (_dir, tools, id) = open();
+        // The agent letters `auto` as a shout, a look of its own choosing, a
+        // word of `typed` is marked, and a text layer is set in a font of
+        // its own.
+        let shout = TextStyleArgs {
+            scope: StyleScope::Blocks {
+                blocks: vec![id("auto")],
+            },
+            include_hand_edited: false,
+            category: Some(LetteringCategory::Shout),
+            shape: None,
+        };
+        ApplyTextStyle
+            .call(&mut tools.tool_context(), shout)
+            .await
+            .expect("the shout's look");
+        let page = tools
+            .session
+            .lock()
+            .project()
+            .pages()
+            .next()
+            .expect("the page")
+            .id;
+        let ops = [
+            json!({"op": "set_rich_text", "layer": id("typed"), "spans": [
+                {"insert": "H", "attributes": {"italic": true}},
+                {"insert": "i"},
+            ]}),
+            json!({"op": "add_layer", "id": "$note", "page": page, "index": 0, "layer": {
+                "kind": "text",
+                "content": "Note",
+                "style": {"chars": {"family": "Wild Words", "size": 20.0}},
+            }}),
+        ];
+        let change = tools
+            .session
+            .lock()
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops: ops
+                    .into_iter()
+                    .map(|op| serde_json::from_value(op).expect("an op"))
+                    .collect(),
+            })
+            .expect("the edits");
+        let Some(&Created::Layer { id: note, .. }) = change.created.first() else {
+            panic!("{change:?}");
+        };
+        let steps = tools.session.lock().history().steps.len();
+
+        let named = vec![
+            id("auto"),
+            id("typed"),
+            id("locked"),
+            id("none"),
+            note,
+            id("auto"),
+        ];
+        let reset = async |layers: Vec<LayerId>| {
+            ResetLettering
+                .call(&mut tools.tool_context(), ResetLetteringArgs { layers })
+                .await
+                .expect("the reset")
+        };
+        let answer = |changed| ResetCounts {
+            changed,
+            locked: 1,
+            untranslated: 1,
+        };
+        assert_eq!(reset(named.clone()).await, answer(3));
+        let history = tools.session.lock().history();
+        assert_eq!(history.steps.len(), steps + 1);
+        assert_eq!(
+            history.steps.last().map(String::as_str),
+            Some(styles::RESET_LABEL)
+        );
+
+        let project = tools.session.lock().project();
+        let translation = |name: &str| match &project.layer(id(name)).expect("the block").content {
+            Content::Block(block) => block.translation.clone().expect("a translation"),
+            _ => panic!("{name} isn't a block"),
+        };
+        // The default look, the shout's font gone, the size kept.
+        let default = |size| CharStyle {
+            family: Some("Anime Ace".to_owned()),
+            size: Some(size),
+            fill: Some(RED),
+            ..CharStyle::default()
+        };
+        assert_eq!(translation("auto").style.chars, default(32.0));
+        assert_eq!(translation("typed").style.chars, default(32.0));
+        // The word's mark goes, and its words stay.
+        assert_eq!(
+            translation("typed").content,
+            RichText(vec![Span {
+                insert: "Hi".to_owned(),
+                attributes: CharStyle::default(),
+            }])
+        );
+        assert_eq!(translation("locked").style.chars.fill, Some(BLUE));
+        // The look counts as automatic again, not as the agent's choice.
+        let auto = project.layer(id("auto")).expect("the block");
+        assert_eq!(Auto::of(auto).origin, Origin::Automatic);
+        assert!(!edited(auto).style);
+        let Content::Text(text) = &project.layer(note).expect("the note").content else {
+            panic!("the note isn't a text");
+        };
+        assert_eq!(text.style.chars, default(20.0));
+
+        // With every layer at its default, nothing changes: no undo step.
+        assert_eq!(reset(named).await, answer(0));
+        assert_eq!(tools.session.lock().history().steps.len(), steps + 1);
+    }
+
+    #[test]
+    fn a_reset_changes_the_project() {
+        assert_ne!(ResetLettering.annotations().read_only_hint, Some(true));
+        let schema = ResetLettering.parameters();
+        assert_eq!(crate::tools::refusal(&schema, &json!({"layers": []})), None);
+        assert!(crate::tools::refusal(&schema, &json!({"blocks": []})).is_some());
     }
 
     #[test]
