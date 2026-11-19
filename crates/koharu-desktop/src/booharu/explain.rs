@@ -6,7 +6,7 @@
 //! closing the project end it, but tells no `booharu_job`: its command
 //! answers.
 
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Context as _;
 use booharu::{
@@ -41,9 +41,10 @@ const STOPPED: &str = "Explain this line was stopped.";
 /// loaded for it, once the pipeline unloads its own while no run goes, and
 /// dropped as it answers. Answers the explanation and two or three other
 /// translations, with the line as it was asked about and the model that
-/// answered, and adds them to the project's agent file as a note. Fails
-/// with no model to ask, an answer that doesn't read, or once Stop or
-/// closing the project stops it.
+/// answered, and adds them to the project's agent file as a note, unless
+/// that file can't be read or written, which is logged and never fails the
+/// answer. Fails with no model to ask, an answer that doesn't read, or once
+/// Stop or closing the project stops it.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_explain_line(
@@ -107,9 +108,54 @@ async fn explain_line(app: Arc<App>, layer: LayerId) -> anyhow::Result<ExplainAn
     let answer = explain::explain(&model, &reference, session, line, text, &stops).await;
     drop(model);
     let answer = answer?.context(STOPPED)?;
-    let noted = answer.clone();
-    if tokio::task::spawn_blocking(move || explain::record(&path, &noted)).await?? {
+    if note(path, answer.clone()).await {
         app.emit(AGENT_HISTORY_CHANGED, ());
     }
     Ok(answer)
+}
+
+/// Adds `answer` to the agent file of the project file `path` as a note, as
+/// the chat shows it, and answers whether it did. The note is the chat's,
+/// the answer the user's, already paid for: a note that can't be written,
+/// as when the agent file doesn't read, is logged, and the answer stands.
+async fn note(path: PathBuf, answer: ExplainAnswer) -> bool {
+    match tokio::task::spawn_blocking(move || explain::record(&path, &answer)).await {
+        Ok(Ok(noted)) => noted,
+        Ok(Err(error)) => {
+            tracing::warn!("Explain this line's answer isn't in the agent's chat: {error:#}");
+            false
+        }
+        Err(error) => {
+            tracing::warn!("Explain this line's answer isn't in the agent's chat: {error}");
+            false
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use koharu_scene::Uuid;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn an_answer_stands_when_its_note_cant_be_written() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let project = dir.path().join("Ch.1.khr");
+        std::fs::write(&project, b"").expect("a project file");
+        let file = booharu_core::context::agent_file(&project);
+        std::fs::write(&file, "{").expect("a broken agent file");
+        let answer = ExplainAnswer {
+            layer: LayerId(Uuid::now_v7()),
+            source: "ヒナです".to_owned(),
+            translation: "It's Hina.".to_owned(),
+            explanation: "She introduces herself.".to_owned(),
+            alternatives: vec!["Hina here.".to_owned(), "I'm Hina.".to_owned()],
+            model: "openai/gpt-5.4".to_owned(),
+        };
+        assert!(!note(project.clone(), answer.clone()).await);
+        assert_eq!(std::fs::read_to_string(&file).expect("kept"), "{");
+        std::fs::remove_file(&file).expect("removed");
+        assert!(note(project, answer).await, "noted once the file reads");
+    }
 }
