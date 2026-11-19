@@ -8,6 +8,11 @@
     "about": {
       "basedOn": "Based on {{name}} by Mayo Takanashi."
     },
+    "agent": {
+      "divider": "Previous conversation",
+      "explained": "Explained a line",
+      "memoryLost": "The agent couldn't read back what it remembered of the conversation above, so it starts afresh."
+    },
     "borders": {
       "decreaseSecondBorderWidth": "Decrease second border width",
       "increaseSecondBorderWidth": "Increase second border width",
@@ -33,6 +38,8 @@
       "addCharacter": "Add character",
       "addTerm": "Add term",
       "addToGlossary": "Add to glossary",
+      "alternatives": "Other translations",
+      "answeredBy": "Answered by {{model}}",
       "askBeforeReading": "Ask before reading a chapter",
       "askBeforeReadingDescription": "The Context tab asks before reading. Run never asks: its menu names the model.",
       "brief": "Chapter brief",

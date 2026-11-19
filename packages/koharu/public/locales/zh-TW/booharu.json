@@ -8,6 +8,11 @@
     "about": {
       "basedOn": "基於 Mayo Takanashi 開發的 {{name}}。"
     },
+    "agent": {
+      "divider": "上一段對話",
+      "explained": "解釋了一行",
+      "memoryLost": "代理無法讀回它對上方對話的記憶，因此重新開始。"
+    },
     "borders": {
       "decreaseSecondBorderWidth": "減少第二描邊寬度",
       "increaseSecondBorderWidth": "增加第二描邊寬度",
@@ -33,6 +38,8 @@
       "addCharacter": "新增角色",
       "addTerm": "新增術語",
       "addToGlossary": "新增至術語表",
+      "alternatives": "其他譯法",
+      "answeredBy": "由 {{model}} 回答",
       "askBeforeReading": "閱讀章節前詢問",
       "askBeforeReadingDescription": "「上下文」分頁在閱讀前會先詢問。「執行」從不詢問：其選單會顯示所用模型。",
       "brief": "章節摘要",

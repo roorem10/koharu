@@ -7,6 +7,7 @@ import { I18nextProvider } from 'react-i18next'
 import { StartupView } from '@/components/app/StartupView'
 import ClientOnly from '@/components/ClientOnly'
 import { refreshModels, refreshPreferences } from '@/lib/backend'
+import { useBooharuAgentChatEvents } from '@/lib/booharu/agentChat' // Booharu: the agent's chat.
 import { useBooharuJobEvents } from '@/lib/booharu/booharuJobs' // Booharu: its reads going.
 import { useBooharuRunGroups } from '@/lib/booharu/chime' // Booharu: carrying-on groups' runs.
 import { useBooharuContextChanges } from '@/lib/booharu/context' // Booharu: glossary changes.
@@ -112,6 +113,7 @@ export function Providers({ children }: { children: ReactNode }) {
   useBooharuRunGroups() // Booharu: which runs carry on a chapter together, so a group chimes once.
   useBooharuContextChanges() // Booharu: reads the series and the chapter again as they change.
   useBooharuJobEvents() // Booharu: follows each Read chapter going, which no run works on.
+  useBooharuAgentChatEvents() // Booharu: keeps the agent's chat with the project, as it changes.
 
   return (
     <QueryClientProvider client={queryClient}>

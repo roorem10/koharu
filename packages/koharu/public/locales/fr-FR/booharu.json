@@ -11,6 +11,11 @@
     "about": {
       "basedOn": "Basé sur {{name}}, par Mayo Takanashi."
     },
+    "agent": {
+      "divider": "Conversation précédente",
+      "explained": "Explication d’une ligne",
+      "memoryLost": "L’agent n’a pas pu relire ce qu’il retenait de la conversation ci-dessus ; il repart de zéro."
+    },
     "borders": {
       "decreaseSecondBorderWidth": "Réduire l’épaisseur du second contour",
       "increaseSecondBorderWidth": "Augmenter l’épaisseur du second contour",
@@ -36,6 +41,8 @@
       "addCharacter": "Ajouter un personnage",
       "addTerm": "Ajouter un terme",
       "addToGlossary": "Ajouter au glossaire",
+      "alternatives": "Autres traductions",
+      "answeredBy": "Réponse de {{model}}",
       "askBeforeReading": "Demander avant de lire un chapitre",
       "askBeforeReadingDescription": "L’onglet Contexte demande avant de lire. Lancer ne demande jamais : son menu indique le modèle.",
       "brief": "Résumé du chapitre",

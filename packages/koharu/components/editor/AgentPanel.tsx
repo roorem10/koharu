@@ -5,9 +5,18 @@ import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Square, SquarePen, X } 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ChatRow } from '@/components/booharu/agent/ChatRow' // Booharu: its rows in the chat.
 import { Markdown } from '@/components/controls/Markdown'
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { call, savePreferences } from '@/lib/backend'
+import {
+  chattedSinceDivider,
+  isBooharuTurn,
+  useBooharuAgentChat,
+  useBooharuAgentRun,
+  withDivider,
+  type BooharuTurn,
+} from '@/lib/booharu/agentChat' // Booharu: the chat kept with the project.
 import { useKoharuStore } from '@/lib/store'
 import { modelName, REASONING } from '@/lib/translation'
 import { commands, type AgentConfig, type AgentEvent, type Event } from '@koharu/ipc/protocol'
@@ -53,15 +62,16 @@ type Turn =
       state: 'running' | 'done' | 'failed' | 'cancelled'
       error?: string
     }
+  | BooharuTurn // Booharu: where a new conversation starts, and Explain this line's answers.
 
 /** The in-app agent's conversation about the open project, as Claude Desktop and Codex lay a chat
  * out: the user's messages in bubbles, the agent's replies as plain text with its thinking and
  * tool calls folded beside them, and a composer holding the model, its reasoning, and New chat. */
 export function AgentPanel() {
   const { t } = useTranslation()
-  const [turns, setTurns] = useState<Turn[]>([])
+  const [turns, setTurns] = useBooharuAgentChat<Turn>() // Booharu: kept with the project (D18).
   const [prompt, setPrompt] = useState('')
-  const [running, setRunning] = useState<number | null>(null)
+  const [running, setRunning] = useBooharuAgentRun() // Booharu: kept with the chat, for Stop.
   const [choosing, setChoosing] = useState(false)
   const busy = turns.some((turn) => turn.role === 'assistant' && turn.state === 'running')
   const models = useKoharuStore((state) => state.models).filter((model) => model.tools)
@@ -107,7 +117,10 @@ export function AgentPanel() {
         {turns.length ? (
           <div className='grid gap-4 pb-3'>
             {turns.map((turn) =>
-              turn.role === 'user' ? (
+              // Booharu: where a new conversation starts, and Explain this line's answers.
+              isBooharuTurn(turn) ? (
+                <ChatRow key={turn.id} turn={turn} />
+              ) : turn.role === 'user' ? (
                 <div
                   key={turn.id}
                   className='ml-auto max-w-[85%] rounded-2xl bg-muted px-3 py-2 text-xs leading-5 whitespace-pre-wrap select-text'
@@ -222,7 +235,8 @@ export function AgentPanel() {
                       variant='ghost'
                       size='icon-sm'
                       aria-label={t('agent.newChat')}
-                      disabled={busy || turns.length === 0}
+                      // Booharu: once something was said since the last New chat.
+                      disabled={busy || !chattedSinceDivider(turns)}
                       className='size-7 rounded-full text-muted-foreground hover:text-foreground'
                       onClick={() => void newChat()}
                     />
@@ -267,7 +281,7 @@ export function AgentPanel() {
 
   async function newChat() {
     await call(commands.resetAgent).catch(() => undefined)
-    setTurns([])
+    setTurns((current) => withDivider(current)) // Booharu: what was said stays, above a divider.
     following.current = true
   }
 

@@ -8,6 +8,11 @@
     "about": {
       "basedOn": "Mayo Takanashi'nin {{name}} uygulamasını temel alır."
     },
+    "agent": {
+      "divider": "Önceki konuşma",
+      "explained": "Satır açıklaması",
+      "memoryLost": "Ajan yukarıdaki konuşmadan hatırladıklarını geri okuyamadı, bu yüzden baştan başlıyor."
+    },
     "borders": {
       "decreaseSecondBorderWidth": "İkinci kenarlık genişliğini azalt",
       "increaseSecondBorderWidth": "İkinci kenarlık genişliğini artır",
@@ -33,6 +38,8 @@
       "addCharacter": "Karakter ekle",
       "addTerm": "Terim ekle",
       "addToGlossary": "Sözlüğe ekle",
+      "alternatives": "Diğer çeviriler",
+      "answeredBy": "Yanıtlayan: {{model}}",
       "askBeforeReading": "Bölümü okumadan önce sor",
       "askBeforeReadingDescription": "Bağlam sekmesi okumadan önce sorar. Çalıştır hiç sormaz; menüsünde model gösterilir.",
       "brief": "Bölüm özeti",

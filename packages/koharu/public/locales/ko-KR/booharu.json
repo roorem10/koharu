@@ -8,6 +8,11 @@
     "about": {
       "basedOn": "Mayo Takanashi의 {{name}} 기반입니다."
     },
+    "agent": {
+      "divider": "이전 대화",
+      "explained": "줄 설명",
+      "memoryLost": "에이전트가 위 대화에 대한 기억을 다시 읽어 오지 못해 새로 시작합니다."
+    },
     "borders": {
       "decreaseSecondBorderWidth": "두 번째 테두리 너비 줄이기",
       "increaseSecondBorderWidth": "두 번째 테두리 너비 늘리기",
@@ -33,6 +38,8 @@
       "addCharacter": "등장인물 추가",
       "addTerm": "용어 추가",
       "addToGlossary": "용어집에 추가",
+      "alternatives": "다른 번역",
+      "answeredBy": "{{model}}의 답변",
       "askBeforeReading": "챕터를 읽기 전에 확인",
       "askBeforeReadingDescription": "문맥 탭은 읽기 전에 확인합니다. 실행은 확인하지 않으며, 메뉴에 모델이 표시됩니다.",
       "brief": "챕터 요약",

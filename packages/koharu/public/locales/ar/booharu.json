@@ -14,6 +14,11 @@
     "about": {
       "basedOn": "مبني على {{name}} من تطوير Mayo Takanashi."
     },
+    "agent": {
+      "divider": "المحادثة السابقة",
+      "explained": "شرح سطر",
+      "memoryLost": "تعذّر على الوكيل استرجاع ما تذكّره من المحادثة أعلاه، لذا يبدأ من جديد."
+    },
     "borders": {
       "decreaseSecondBorderWidth": "تقليل عرض الحدود الثانية",
       "increaseSecondBorderWidth": "زيادة عرض الحدود الثانية",
@@ -39,6 +44,8 @@
       "addCharacter": "إضافة شخصية",
       "addTerm": "إضافة مصطلح",
       "addToGlossary": "إضافة إلى المسرد",
+      "alternatives": "ترجمات أخرى",
+      "answeredBy": "الإجابة من {{model}}",
       "askBeforeReading": "السؤال قبل قراءة فصل",
       "askBeforeReadingDescription": "يسأل تبويب السياق قبل القراءة. لا يسأل التشغيل أبدًا، إذ تعرض قائمته النموذج.",
       "brief": "ملخص الفصل",

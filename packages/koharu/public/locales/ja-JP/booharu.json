@@ -8,6 +8,11 @@
     "about": {
       "basedOn": "Mayo Takanashi による {{name}} をベースにしています。"
     },
+    "agent": {
+      "divider": "前の会話",
+      "explained": "行の解説",
+      "memoryLost": "エージェントは上の会話の記憶を読み戻せなかったため、最初からやり直します。"
+    },
     "borders": {
       "decreaseSecondBorderWidth": "外側の縁取り幅を縮小",
       "increaseSecondBorderWidth": "外側の縁取り幅を拡大",
@@ -33,6 +38,8 @@
       "addCharacter": "キャラクターを追加",
       "addTerm": "用語を追加",
       "addToGlossary": "用語集に追加",
+      "alternatives": "別の訳",
+      "answeredBy": "{{model}} による回答",
       "askBeforeReading": "章を読み込む前に確認する",
       "askBeforeReadingDescription": "「コンテキスト」タブでは読み込む前に確認します。「実行」は確認しません（メニューに使用モデルが表示されます）。",
       "brief": "章の要約",

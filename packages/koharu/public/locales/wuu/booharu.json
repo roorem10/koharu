@@ -8,6 +8,11 @@
     "about": {
       "basedOn": "基于 Mayo Takanashi 个 {{name}}。"
     },
+    "agent": {
+      "divider": "之前个对话",
+      "explained": "解释了一行",
+      "memoryLost": "智能体读勿转伊对上头对话个记性，所以重新开始。"
+    },
     "borders": {
       "decreaseSecondBorderWidth": "拿第二道描边调细点",
       "increaseSecondBorderWidth": "拿第二道描边调粗点",
@@ -33,6 +38,8 @@
       "addCharacter": "添加人物",
       "addTerm": "添加术语",
       "addToGlossary": "加到术语表",
+      "alternatives": "别样译法",
+      "answeredBy": "{{model}} 回答个",
       "askBeforeReading": "阅读章节之前先问一声",
       "askBeforeReadingDescription": "“上下文”标签页读之前会先问一声。“运行”从来勿问：伊个菜单浪会写明用啥模型。",
       "brief": "章节梗概",
