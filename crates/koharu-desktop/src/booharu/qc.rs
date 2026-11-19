@@ -537,17 +537,23 @@ async fn check_again(app: &Arc<App>, layer: LayerId) {
 /// replaced as `booharu_qc` tells. Empty while no project is open.
 #[tauri::command]
 #[specta::specta]
-pub fn booharu_get_qc(app: State<'_, Arc<App>>) -> Result<Vec<Finding>> {
-    let Ok(session) = app.session() else {
-        return Ok(Vec::new());
-    };
-    let project = session.lock().project();
-    let stored = FINDINGS.lock();
-    Ok(project
-        .pages()
-        .filter_map(|page| stored.get(&page.id))
-        .flat_map(|checked| checked.findings.iter().cloned())
-        .collect())
+pub async fn booharu_get_qc(app: State<'_, Arc<App>>) -> Result<Vec<Finding>> {
+    // Off the window's thread, as the session's lock is held while a page
+    // renders, as the first one does while a project opens.
+    let app = Arc::clone(&app);
+    Ok(tokio::task::spawn_blocking(move || {
+        let Ok(session) = app.session() else {
+            return Vec::new();
+        };
+        let project = session.lock().project();
+        let stored = FINDINGS.lock();
+        project
+            .pages()
+            .filter_map(|page| stored.get(&page.id))
+            .flat_map(|checked| checked.findings.iter().cloned())
+            .collect()
+    })
+    .await?)
 }
 
 /// Marks the finding of `check` on `layer`, a block or a text layer, OK
