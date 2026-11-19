@@ -5,7 +5,8 @@
 //! in (`lettering`), the shapes of balloons (`shape`), the run policy and
 //! the Run menu's presets (`runs`), what Koharu's stages did to a page's
 //! blocks (`status`), which sound effects stay as art and their subtitles
-//! (`sfx`), the series glossaries and the chapter notes every translation
+//! (`sfx`), what a run's stages and Detect again leave alone (`protect`),
+//! the series glossaries and the chapter notes every translation
 //! follows (`context`), the quality check's Mark OK record (`qc`), and its
 //! version.
 //!
@@ -17,6 +18,7 @@
 pub mod attrs;
 pub mod context;
 pub mod lettering;
+pub mod protect;
 pub mod qc;
 pub mod runs;
 pub mod settings;
