@@ -8,6 +8,7 @@ import { OcrBoxPreferences } from '@/components/booharu/boxes/OcrBoxPreferences'
 import { GlossaryRow } from '@/components/booharu/context/GlossaryRow' // Booharu: the glossary editor.
 import { ReadingPreferences } from '@/components/booharu/context/ReadingPreferences' // Booharu: Read chapter.
 import { ColourDetectionSwitch } from '@/components/booharu/pipeline/ColourDetectionSwitch' // Booharu: colour detection.
+import { QcPreferences } from '@/components/booharu/qc/QcPreferences' // Booharu: the quality check.
 import { ModelPicker } from '@/components/controls/ModelPicker'
 import { detectors, inpainters, recognizers, vendorName } from '@/components/preferences/models'
 import {
@@ -159,6 +160,8 @@ export function PipelinePreferences({
       <ReadingPreferences />
       {/* Booharu: the O tool's default mode, saved to its own section at once. */}
       <OcrBoxPreferences />
+      {/* Booharu: the quality check's smallest readable text, saved to its own section. */}
+      <QcPreferences />
     </PreferencePage>
   )
 }
