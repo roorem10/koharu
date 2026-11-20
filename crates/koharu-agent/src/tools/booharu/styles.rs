@@ -12,7 +12,7 @@
 //! And Reset to lettering default, as the app's command does it: chosen
 //! blocks and text layers given back the look Booharu letters them in, hand
 //! edits and the agent's own look included, which counts as automatic
-//! again.
+//! again, with their gradient fills, letter spacing and skew taken off.
 
 use booharu::styles::{self, ResetCounts, StyleCounts, StyleScope};
 use booharu_core::{
@@ -230,8 +230,12 @@ impl Tool for ResetLettering {
          colours and outline, in the default font, or while Pick fonts automatically (`auto`) is \
          on in its lettering category's font), a sound effect's subtitle its subtitle look \
          (`subtitle`), and any other text layer the default look, as `booharu-lettering` sets \
-         them; every mark a word carries goes too. Only the look changes: the words, the size, the \
-         frame, the alignment, and the rest stay. Translating a block again keeps its look, so \
+         them; every mark a word carries goes too, and so do the text effects \
+         booharu_get_text_effects lists: its own outlines, gradient fills on the box and on its \
+         words, and its skew, booharu_set_skew's, which comes off about the point the text \
+         leans about; letter spacing goes too. Only the look changes: the words, the size, the \
+         frame, the position, the rotation, the alignment, and the rest stay. Translating a \
+         block again keeps its look, so \
          this is the way back to the default: use it when the user asks for a box's default look \
          again, or after booharu_set_lettering_category made a block a sound effect or no longer \
          one, whose outline otherwise changes only at its next translation. It replaces a look \
