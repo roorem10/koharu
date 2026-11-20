@@ -14,6 +14,7 @@ import { useBooharuRunGroups } from '@/lib/booharu/chime' // Booharu: carrying-o
 import { useBooharuContextChanges } from '@/lib/booharu/context' // Booharu: glossary changes.
 import { useBooharuNotices } from '@/lib/booharu/notices' // Booharu: its notices, as toasts.
 import { useBooharuQcEvents } from '@/lib/booharu/qc' // Booharu: the quality check's findings.
+import { useTypingShortcuts } from '@/lib/booharu/typingKeys' // Booharu: Ctrl+B and Ctrl+I.
 import { usePageMenuGuard } from '@/lib/booharu/usePageMenuGuard' // Booharu: the menu guard.
 import i18n from '@/lib/i18n'
 import {
@@ -117,6 +118,7 @@ export function Providers({ children }: { children: ReactNode }) {
   useBooharuJobEvents() // Booharu: follows each Read chapter going, which no run works on.
   useBooharuAgentChatEvents() // Booharu: keeps the agent's chat with the project, as it changes.
   useBooharuQcEvents() // Booharu: keeps the quality check's findings with the project, page by page.
+  useTypingShortcuts() // Booharu: Ctrl+B and Ctrl+I make the characters typed bold or italic.
 
   return (
     <QueryClientProvider client={queryClient}>

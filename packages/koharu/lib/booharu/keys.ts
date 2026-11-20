@@ -27,15 +27,18 @@ export const booharuTools: ReadonlySet<CanvasTool> = new Set(
   Object.values<KeyAction>(keyActions).flatMap(({ tool }) => (tool ? [tool] : [])),
 )
 
-/** The keys Koharu's canvas takes in CanvasWorkspace's down(), which no Booharu key may take:
- * undo, redo, select all, deselect, fit, delete, clear the selection, the hand tool held on Space,
- * and the letter of each of Koharu's tools, which selects it with or without Shift. */
+/** The keys no Booharu key action may take: those Koharu's canvas takes in CanvasWorkspace's
+ * down(), undo, redo, select all, deselect, fit, delete, clear the selection, the hand tool held on
+ * Space, and the letter of each of Koharu's tools, which selects it with or without Shift; and
+ * bold and italic while the canvas types, which useTypingShortcuts takes. */
 export const reservedKeys: ReadonlySet<KeyName> = new Set([
   'ctrl+z',
   'ctrl+shift+z',
   'ctrl+a',
   'ctrl+d',
   'ctrl+0',
+  'ctrl+b',
+  'ctrl+i',
   'delete',
   'backspace',
   'escape',
