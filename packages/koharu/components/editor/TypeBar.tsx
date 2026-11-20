@@ -21,6 +21,8 @@ import { FontPicker } from '@/components/controls/FontPicker'
 import { ContextBar } from '@/components/editor/ContextBar'
 import { call, dispatch } from '@/lib/backend'
 import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: favourites and local names.
+// Booharu: the values the selected texts don't share (S11-h).
+import { borderCompanion, paragraphShare, setEach, type BorderKey } from '@/lib/booharu/mixed'
 import {
   chosenText,
   isItalic,
@@ -47,6 +49,7 @@ import {
   type CharStyle,
   type Direction,
   type FontFamily,
+  type Layer, // Booharu: a style edit of each target's own (S11-h).
   type LayerId,
   type StrokeMethod, // Booharu: the border method.
   type Text,
@@ -147,16 +150,23 @@ export function TypeBar() {
   // A box and a path fit their text alike, a balloon's translation in a path; point text has no fit.
   const fitted = typeof frame !== 'object' ? null : frame.box ? 'box' : 'path'
   const autoFit = typeof frame === 'object' && (frame.box ?? frame.path)?.fit === 'best'
+  // Booharu: what the targets' paragraphs share; a value they don't shows empty, unless the draft
+  // sets it, which every target then takes (S11-h).
+  const share = useMemo(() => paragraphShare(targets), [targets])
+  const fitMixed = share.fit.mixed
 
   /** Merges `patch` into each target's style, shown at once on the first. */
-  const apply = (patch: TextStyle) => {
+  // Booharu: or gives each target its own patch from `each`, in one edit, shown by `patch`, what
+  // every target takes (S11-h).
+  const apply = (patch: TextStyle, each?: (layer: Layer) => TextStyle | null) => {
     if (!current) return
     setDraft({
       layer: current.id,
-      style: { ...style, ...patch, chars: { ...chars, ...patch.chars } },
+      // Booharu: only what's set, so a value the targets don't share stays empty (S11-h).
+      style: { ...drafted, ...patch, chars: { ...drafted?.chars, ...patch.chars } },
     })
     const request = ++sequence.current
-    void call(setStyle, targets, patch)
+    void (each ? call(setEach, targets, each) : call(setStyle, targets, patch)) // Booharu: each (S11-h).
       .catch(() => undefined)
       .finally(() => {
         if (sequence.current === request) setDraft(null)
@@ -184,6 +194,19 @@ export function TypeBar() {
     for (const layer of targets) {
       dispatch(updateLayer, layer.id, isBlockLayer(layer) ? { translation: patch } : patch)
     }
+  }
+
+  /** Booharu: a border's colour or width, `patch`, with `companion`, the width or colour that goes
+   * with it (S11-h). Several boxes take it in one edit, each keeping its own companion, the bar's
+   * default only where one has none; while typing, for words chosen in Story or for one box, the
+   * characters take `own` with it, unless their companions differ, which they keep. */
+  const applyBorder = (patch: CharStyle, companion: BorderKey, own: CharStyle) => {
+    if (!typing && !chosen && targets.length > 1) {
+      return apply({ chars: patch }, (layer) => ({
+        chars: { ...patch, ...borderCompanion(layer, companion) },
+      }))
+    }
+    applyChars(mixed.has(companion) ? patch : { ...patch, ...own })
   }
 
   const families = useMemo(() => {
@@ -218,12 +241,18 @@ export function TypeBar() {
   const outer = chars.outer_stroke ?? null
   const outerEnabled = bordered && outer !== null && outer[3] > 0 && outerWidth > 0
   const strokeMethod: StrokeMethod = style.stroke_method ?? 'contour'
+  // Booharu: none shown while the targets' methods differ (S11-h).
+  const strokeMethodMixed = share.stroke_method.mixed && drafted?.stroke_method === undefined
   const strokeMethods: Record<StrokeMethod, string> = {
     contour: t('booharu.borders.outlineContour'),
     expansion: t('booharu.borders.outlineExpansion'),
   }
   const direction: Direction = lettering?.direction ?? 'horizontal'
-  const align: Align = style.align ?? (direction === 'vertical' ? 'start' : 'center')
+  // Booharu: none pressed while the targets' alignments differ (S11-h).
+  const alignMixed = share.align.mixed && drafted?.align === undefined
+  const align: Align | null = alignMixed
+    ? null
+    : (style.align ?? (direction === 'vertical' ? 'start' : 'center'))
 
   // The bar sits by the selection as the canvas lays it out, a point text's lines and the text
   // being typed included.
@@ -292,15 +321,23 @@ export function TypeBar() {
         >
           <Italic className='size-3.5' />
         </TooltipTrigger>
-        <TooltipContent>{t('inspector.fontStyles.italic')}</TooltipContent>
+        <TooltipContent>
+          {/* Booharu: or that the characters' italics differ, which a press turns on (S11-h). */}
+          {mixed.has('italic')
+            ? t('booharu.typebar.mixedToggle', { field: t('inspector.fontStyles.italic') })
+            : t('inspector.fontStyles.italic')}
+        </TooltipContent>
       </Tooltip>
       {/* Booharu: the star, which stresses words typed or chosen in Story, never a whole box. */}
       <EmphasisButton words={chosen} />
       <div className='w-[4.5rem]'>
         <FontSizeField
           disabled={false}
-          value={size}
-          autoFit={autoFit}
+          // Booharu: empty, "Mixed", and neither Auto nor a size chosen while the boxes' fits differ;
+          // "Mixed" too while their sizes do (S11-h).
+          value={fitMixed ? null : size}
+          autoFit={autoFit && !fitMixed}
+          mixed={fitMixed || size === null}
           canAutoFit={fitted !== null}
           onChange={(next) => {
             applyChars({ size: next })
@@ -340,18 +377,29 @@ export function TypeBar() {
             ],
           ] as const
         ).map(([value, Icon, label]) => (
-          <button
-            key={value}
-            type='button'
-            aria-label={label}
-            aria-pressed={align === value}
-            data-active={align === value}
-            disabled={!paragraph}
-            className='grid place-items-center rounded-[4px] text-muted-foreground hover:text-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90'
-            onClick={() => apply({ align: value })}
-          >
-            <Icon className='size-3' />
-          </button>
+          // Booharu: each button's name in a tooltip, which adds "Mixed" while the targets'
+          // alignments differ (S11-h).
+          <Tooltip key={value}>
+            <TooltipTrigger
+              render={
+                <button
+                  type='button'
+                  aria-label={label}
+                  aria-pressed={align === value}
+                  data-active={align === value}
+                  disabled={!paragraph}
+                  className='grid place-items-center rounded-[4px] text-muted-foreground hover:text-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90'
+                  onClick={() => apply({ align: value })}
+                />
+              }
+            >
+              <Icon className='size-3' />
+            </TooltipTrigger>
+            <TooltipContent>
+              {label}
+              {alignMixed && <span className='ml-2 opacity-60'>{t('booharu.typebar.mixed')}</span>}
+            </TooltipContent>
+          </Tooltip>
         ))}
       </div>
       <Tooltip>
@@ -363,7 +411,9 @@ export function TypeBar() {
               aria-label={t('inspector.vertical')}
               className={toggle}
               disabled={!paragraph}
-              pressed={direction === 'vertical'}
+              // Booharu: unpressed while the targets' directions differ, so a press makes every
+              // one vertical (S11-h).
+              pressed={!share.vertical.mixed && direction === 'vertical'}
               onPressedChange={(vertical) =>
                 update({ direction: vertical ? 'vertical' : 'horizontal' })
               }
@@ -384,8 +434,14 @@ export function TypeBar() {
           </svg>
         </TooltipTrigger>
         <TooltipContent>
-          {t('inspector.textDirection')}
-          <span className='ml-2 opacity-60'>{t(`inspector.${direction}`)}</span>
+          {share.vertical.mixed ? ( // Booharu: or that the directions differ (S11-h).
+            t('booharu.typebar.mixedDirection')
+          ) : (
+            <>
+              {t('inspector.textDirection')}
+              <span className='ml-2 opacity-60'>{t(`inspector.${direction}`)}</span>
+            </>
+          )}
         </TooltipContent>
       </Tooltip>
       <Popover>
@@ -419,29 +475,39 @@ export function TypeBar() {
               label={t('inspector.borderColor')}
               size='sm'
               allowTransparent
-              value={strokeEnabled && stroke ? rgbaToHex(stroke) : null}
+              value={
+                // Booharu: empty while the colours differ, and the colour shared while only the
+                // widths do (S11-h).
+                mixed.has('stroke')
+                  ? ''
+                  : stroke && stroke[3] > 0 && (strokeWidth > 0 || mixed.has('stroke_width'))
+                    ? rgbaToHex(stroke)
+                    : null
+              }
               onChange={(color) =>
-                applyChars(
-                  color === null
-                    ? { stroke: null }
-                    : {
-                        stroke: hexToRgba(color),
-                        stroke_width: strokeWidth > 0 ? strokeWidth : 1.5,
-                      },
-                )
+                // Booharu: through applyBorder, so each box keeps its own width (S11-h).
+                color === null
+                  ? applyChars({ stroke: null })
+                  : applyBorder({ stroke: hexToRgba(color) }, 'stroke_width', {
+                      stroke_width: strokeWidth > 0 ? strokeWidth : 1.5,
+                    })
               }
             />
             <NumberField
               id={borderWidthId}
               name='border-width'
               className='w-24'
-              value={strokeWidth > 0 ? strokeWidth : 1.5}
+              // Booharu: empty while the widths differ (S11-h).
+              value={mixed.has('stroke_width') ? null : strokeWidth > 0 ? strokeWidth : 1.5}
               min={0.5}
               max={32}
               step={0.5}
               onValueChange={(next) => {
                 if (next !== null && next >= 0.5 && next <= 32) {
-                  applyChars({ stroke_width: next, stroke: stroke ?? hexToRgba(WHITE) })
+                  // Booharu: through applyBorder, so each box keeps its own colour (S11-h).
+                  applyBorder({ stroke_width: next }, 'stroke', {
+                    stroke: stroke ?? hexToRgba(WHITE),
+                  })
                 }
               }}
             >
@@ -449,7 +515,11 @@ export function TypeBar() {
                 <NumberFieldDecrement aria-label={t('inspector.decreaseBorderWidth')}>
                   <Minus />
                 </NumberFieldDecrement>
-                <NumberFieldInput aria-label={t('inspector.borderWidth')} />
+                <NumberFieldInput
+                  aria-label={t('inspector.borderWidth')}
+                  // Booharu: "Mixed" while the widths differ (S11-h).
+                  placeholder={mixed.has('stroke_width') ? t('booharu.typebar.mixed') : undefined}
+                />
                 <NumberFieldIncrement aria-label={t('inspector.increaseBorderWidth')}>
                   <Plus />
                 </NumberFieldIncrement>
@@ -484,7 +554,15 @@ export function TypeBar() {
               allowTransparent
               disabled={!bordered}
               value={
-                mixed.has('outer_stroke') ? '' : outerEnabled && outer ? rgbaToHex(outer) : null
+                // Booharu: the colour shared while only the widths differ (S11-h).
+                mixed.has('outer_stroke')
+                  ? ''
+                  : bordered &&
+                      outer &&
+                      outer[3] > 0 &&
+                      (outerWidth > 0 || mixed.has('outer_stroke_width'))
+                    ? rgbaToHex(outer)
+                    : null
               }
               onChange={(color) => {
                 // Both keys go, so the text is as Koharu writes it again. While typing, or for
@@ -498,27 +576,34 @@ export function TypeBar() {
                   }
                   return
                 }
-                // Widths that differ stay each character's own.
-                const width =
-                  outerWidth > 0 || mixed.has('outer_stroke_width') ? {} : { outer_stroke_width: 3 }
-                applyChars({ outer_stroke: hexToRgba(color), ...width })
+                // Widths that differ stay each character's own, and each box's own, 3 only
+                // where one has none (S11-h).
+                applyBorder(
+                  { outer_stroke: hexToRgba(color) },
+                  'outer_stroke_width',
+                  outerWidth > 0 ? {} : { outer_stroke_width: 3 },
+                )
               }}
             />
             <NumberField
               id={secondBorderWidthId}
               name='second-border-width'
               className='w-24'
-              value={outerWidth > 0 ? outerWidth : 3}
+              // Empty while the widths differ (S11-h).
+              value={mixed.has('outer_stroke_width') ? null : outerWidth > 0 ? outerWidth : 3}
               min={0.5}
               max={32}
               step={0.5}
               disabled={!bordered}
               onValueChange={(next) => {
                 if (next !== null && next >= 0.5 && next <= 32) {
-                  // Colours that differ stay each character's own.
-                  const color =
-                    outer || mixed.has('outer_stroke') ? {} : { outer_stroke: hexToRgba(BLACK) }
-                  applyChars({ outer_stroke_width: next, ...color })
+                  // Colours that differ stay each character's own, and each box's own, black
+                  // only where one has none (S11-h).
+                  applyBorder(
+                    { outer_stroke_width: next },
+                    'outer_stroke',
+                    outer ? {} : { outer_stroke: hexToRgba(BLACK) },
+                  )
                 }
               }}
             >
@@ -526,7 +611,12 @@ export function TypeBar() {
                 <NumberFieldDecrement aria-label={t('booharu.borders.decreaseSecondBorderWidth')}>
                   <Minus />
                 </NumberFieldDecrement>
-                <NumberFieldInput aria-label={t('booharu.borders.secondBorderWidth')} />
+                <NumberFieldInput
+                  aria-label={t('booharu.borders.secondBorderWidth')}
+                  placeholder={
+                    mixed.has('outer_stroke_width') ? t('booharu.typebar.mixed') : undefined
+                  }
+                />
                 <NumberFieldIncrement aria-label={t('booharu.borders.increaseSecondBorderWidth')}>
                   <Plus />
                 </NumberFieldIncrement>
@@ -537,7 +627,7 @@ export function TypeBar() {
             {t('booharu.borders.outlineMethod')}
           </span>
           <Select
-            value={strokeMethod}
+            value={strokeMethodMixed ? null : strokeMethod} // Booharu: "Mixed" (S11-h).
             items={strokeMethods}
             disabled={!paragraph}
             onValueChange={(next) =>
@@ -550,7 +640,7 @@ export function TypeBar() {
               aria-label={t('booharu.borders.outlineMethod')}
               className='w-full'
             >
-              <SelectValue />
+              <SelectValue placeholder={t('booharu.typebar.mixed')} />
             </SelectTrigger>
             <SelectContent
               // A pick with the pointer leaves the keys to the canvas, as FillBar's model does, so
@@ -671,6 +761,7 @@ const fontSizePresets = [8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 7
 function FontSizeField({
   value,
   autoFit,
+  mixed, // Booharu: "Mixed" (S11-h).
   canAutoFit,
   disabled,
   onChange,
@@ -679,6 +770,8 @@ function FontSizeField({
   /** `null` when the characters don't share one. */
   value: number | null
   autoFit: boolean
+  /** Booharu: the boxes' sizes or fits differ, which the empty field says (S11-h). */
+  mixed?: boolean
   canAutoFit: boolean
   disabled: boolean
   onChange: (value: number) => void
@@ -730,7 +823,10 @@ function FontSizeField({
         <NumberFieldInput
           data-testid='type-size'
           aria-label={t('inspector.fontSize')}
-          placeholder={autoFit ? t('inspector.auto') : undefined}
+          placeholder={
+            // Booharu: or "Mixed" (S11-h).
+            autoFit ? t('inspector.auto') : mixed ? t('booharu.typebar.mixed') : undefined
+          }
           className='px-1.5 text-left text-ellipsis'
           // Booharu: Enter applies a typed size at once; the field commits only on blur.
           onKeyDown={(event) => {

@@ -3,7 +3,14 @@
 import { Bold } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { boldPatch, boldWords, isBold, typedWeight, type MixedKeys } from '@/lib/booharu/words'
+import {
+  boldPatch,
+  boldWords,
+  isBold,
+  isMixed,
+  typedWeight,
+  type MixedKeys,
+} from '@/lib/booharu/words'
 import { usePage } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import type { CharStyle, WordChange } from '@koharu/ipc/protocol'
@@ -15,7 +22,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/t
  * regular, 400, or while the canvas types into a text lighter than 600, gives that text's own
  * weight back, as a typed mark can't be taken off. For words chosen in the Story panel it asks
  * the words edit as the word toolbar's B does, whose off takes the words' own weight off. The
- * renderer makes a bold face a family lacks, so B is never disabled. */
+ * renderer makes a bold face a family lacks, so B is never disabled. While the weights differ, its
+ * tooltip says so, and that a press makes them all bold (S11-h). */
 export function BoldToggle({
   chars,
   mixed,
@@ -57,7 +65,12 @@ export function BoldToggle({
       >
         <Bold className='size-3.5' />
       </TooltipTrigger>
-      <TooltipContent>{t('booharu.words.bold')}</TooltipContent>
+      <TooltipContent>
+        {/* Or that the characters' weights differ, which a press makes bold (S11-h). */}
+        {isMixed(mixed, 'weight')
+          ? t('booharu.typebar.mixedToggle', { field: t('booharu.words.bold') })
+          : t('booharu.words.bold')}
+      </TooltipContent>
     </Tooltip>
   )
 }

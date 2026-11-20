@@ -32,7 +32,8 @@ export const REGULAR_WEIGHT = 400
  * them. */
 export type MixedKeys = ReadonlySet<CharKey> | readonly CharKey[]
 
-function isMixed(mixed: MixedKeys, key: CharKey): boolean {
+/** Whether the characters don't share `key`'s value. */
+export function isMixed(mixed: MixedKeys, key: CharKey): boolean {
   return 'has' in mixed ? mixed.has(key) : mixed.includes(key)
 }
 
