@@ -1040,6 +1040,35 @@ fn a_long_selection_is_cut_at_eighty_grapheme_clusters() {
     assert_eq!(quote(thumbs.repeat(80)), Some(Some(thumbs.repeat(80))));
 }
 
+#[test]
+fn a_drag_over_a_composition_quotes_no_characters_the_text_lacks() {
+    let Some((mut fixture, _)) = typing_into(json!("ab"), json!({"size": 40})) else {
+        return;
+    };
+    // A press held between "a" and "b", where the input method composes.
+    press_key(
+        &mut fixture.canvas,
+        NamedKey::ArrowRight,
+        Code::ArrowRight,
+        NONE,
+    );
+    let between = caret(&fixture.canvas).center();
+    let at = (between.x, between.y);
+    fixture.canvas.input(down(at, NONE)).expect("input");
+    fixture
+        .canvas
+        .compose("nihon", None)
+        .expect("a composition");
+    // The pointer runs past the composition, while the text is still "ab":
+    // Koharu's drag places the caret by the text shown, past its end.
+    let past = (at.0 + 200.0, at.1);
+    fixture.canvas.input(drag(1, past)).expect("input");
+    assert_eq!(quoted(&fixture.canvas), None);
+    fixture.canvas.input(up(1, past)).expect("input");
+    assert_eq!(quoted(&fixture.canvas), None);
+    assert!(fixture.canvas.draw().is_ok());
+}
+
 /// Where the caret shows while typing, in the window's pixels, which are
 /// the page's on an unscaled fixture.
 fn caret(canvas: &Canvas) -> Rect {

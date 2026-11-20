@@ -83,13 +83,19 @@ impl Typing {
     }
 
     /// The selected characters as the type bar quotes them: each line break
-    /// a space, cut to 80 grapheme clusters with "…" after; none at a caret.
+    /// a space, cut to 80 grapheme clusters with "…" after; none at a caret,
+    /// nor for a selection that isn't the content's own characters, as one
+    /// a drag over the input method's composition leaves, placed by the
+    /// text shown with the composition in it.
     pub(super) fn quoted(&self) -> Option<String> {
         let range = self.selected();
         if range.is_empty() {
             return None;
         }
-        let text = self.content.text()[range]
+        let text = self
+            .content
+            .text()
+            .get(range)?
             .replace("\r\n", " ")
             .replace(LINE_BREAKS, " ");
         let cut = GraphemeClusterSegmenter::new()
