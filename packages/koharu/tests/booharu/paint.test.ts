@@ -12,6 +12,7 @@ import {
   normalAngle,
   ownColor,
   paintUnit,
+  sameAngle,
   seedGradient,
   sharedColor,
   sharedPaint,
@@ -187,6 +188,15 @@ describe('Booharu gradient seed and ends (S12-c)', () => {
     expect([0, 90, 180, -180, 270, -190, 540, 360].map(normalAngle)).toEqual([
       0, 90, 180, -180, -90, 170, 180, 0,
     ])
+  })
+
+  it('tells an angle the same as the angle box shows it, its last digit moved or not', () => {
+    // 45.3 shows as 45.299999999999955.
+    expect(normalAngle(45.3)).not.toBe(45.3)
+    expect(sameAngle(45.3, normalAngle(45.3))).toBe(true)
+    expect(sameAngle(405.3, 45.3)).toBe(true)
+    expect(sameAngle(45.3, 45.31)).toBe(false)
+    expect(sameAngle(180, -180)).toBe(false)
   })
 })
 

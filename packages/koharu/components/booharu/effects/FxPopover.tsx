@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SkewSection } from '@/components/booharu/effects/SkewSection'
@@ -20,6 +20,7 @@ import {
   endColor,
   gradientShown,
   normalAngle,
+  sameAngle,
   seedGradient,
   sharedColor,
   sharedPaint,
@@ -281,8 +282,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** The gradient's angle, from -180 to 180 degrees in steps of one: a typed angle goes on Enter or
- * as the box loses the focus, a step of the arrow keys or the mouse wheel at once, as the type
- * bar's other number boxes. */
+ * as the box loses the focus, once, a step of the arrow keys or the mouse wheel at once, as the
+ * type bar's other number boxes. */
 function AngleField({
   value,
   disabled,
@@ -295,12 +296,21 @@ function AngleField({
   const { t } = useTranslation()
   const id = useId()
   const [draft, setDraft] = useState<number | null>(value)
+  // The angle the box last showed or sent, as the type bar's spacing boxes keep it, so leaving the
+  // box after Enter sends nothing more: words chosen and characters typed show no draft, an edit
+  // refused leaves the angle as it was, and an angle sent shows back through normalAngle.
+  const last = useRef(value)
 
-  useEffect(() => setDraft(value), [value])
+  useEffect(() => {
+    setDraft(value)
+    last.current = value
+  }, [value])
 
   const commit = (next: number | null) => {
     if (next === null || next < MIN_ANGLE || next > MAX_ANGLE) return setDraft(value)
-    if (next !== value) onChange(next)
+    if (sameAngle(next, last.current)) return
+    last.current = next
+    onChange(next)
   }
 
   return (

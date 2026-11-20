@@ -466,6 +466,55 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
     expect(angle).toHaveValue('180')
   })
 
+  it('sends a typed angle once, leaving the box after Enter sending nothing more', async () => {
+    const { edits, user } = renderBar(sharing(), { pending: true })
+
+    const effects = await openEffects(user)
+    const angle = effects.getByRole('textbox', { name: 'Gradient angle' })
+    // The box shows an angle sent as normalAngle gives it back: 45.3 as 45.299999999999955.
+    await user.clear(angle)
+    await user.type(angle, '45.3{Enter}')
+    fireEvent.blur(angle)
+
+    expect(edits).toEqual([shared({ ...GRADIENT, angle: 45.3 })])
+  })
+
+  it('sends an angle typed for words chosen in Story once, as no draft shows it', async () => {
+    const { user } = renderBar([hello({ fill_gradient: GRADIENT })])
+    act(() => setWordRange(world))
+
+    const effects = await openEffects(user)
+    const angle = effects.getByRole('textbox', { name: 'Gradient angle' })
+    await user.clear(angle)
+    await user.type(angle, '45{Enter}')
+    fireEvent.blur(angle)
+
+    expect(commands.booharuStyleWords).toHaveBeenCalledExactlyOnceWith(
+      'text',
+      6,
+      11,
+      'Hello world',
+      { set: { fill_gradient: { ...GRADIENT, angle: 45 } } },
+    )
+  })
+
+  it('sends an angle typed for the characters typed once, as the canvas tells it back', async () => {
+    const { user } = renderBar([hello({})], { typing: typing({ fill_gradient: GRADIENT }) })
+
+    const effects = await openEffects(user)
+    const angle = effects.getByRole('textbox', { name: 'Gradient angle' })
+    await user.clear(angle)
+    await user.type(angle, '45.3{Enter}')
+    act(() =>
+      useKoharuStore.setState({ typing: typing({ fill_gradient: { ...GRADIENT, angle: 45.3 } }) }),
+    )
+    fireEvent.blur(angle)
+
+    expect(commands.styleTyping).toHaveBeenCalledExactlyOnceWith({
+      fill_gradient: { ...GRADIENT, angle: 45.3 },
+    })
+  })
+
   it('colours the start and the end, each keeping its alpha', async () => {
     const { edits, user } = renderBar(sharing())
 

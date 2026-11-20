@@ -158,6 +158,13 @@ export function normalAngle(angle: number): number {
   return turned === 0 && angle > 0 ? 180 : turned - 180
 }
 
+/** Whether `left` and `right` are the same angle as the gradient's angle box shows them: the same
+ * once normalAngle turns each, which can move an angle's last digit, as 45.3 shows as
+ * 45.299999999999955. */
+export function sameAngle(left: number, right: number): boolean {
+  return Math.abs(normalAngle(left) - normalAngle(right)) < 1e-9
+}
+
 function shade(color: Rgba, channel: (value: number) => number): Rgba {
   const step = (value: number) => Math.round(Math.min(1, Math.max(0, channel(value))) * 255) / 255
   return [step(color[0]), step(color[1]), step(color[2]), color[3]]
