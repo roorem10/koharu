@@ -100,7 +100,7 @@ fn settings() -> anyhow::Result<(EmphasisSettings, LetteringSettings)> {
 
 /// What the page hears when the canvas takes a press, which the window gives
 /// the canvas alone: the words chosen in the Story panel go then, as with a
-/// press anywhere else outside them (`CANVAS_PRESS` in
+/// press outside them anywhere but the sidebar (`CANVAS_PRESS` in
 /// lib/booharu/wordSelection.ts).
 const PRESSED: &str = "dispatchEvent(new Event('booharu:canvas-press'))";
 
