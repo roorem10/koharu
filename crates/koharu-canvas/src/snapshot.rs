@@ -241,6 +241,11 @@ impl Walk<'_> {
                     );
                 }
                 match &block.translation {
+                    // Booharu: a box styled before it's translated shows its
+                    // source's control, as one with none does.
+                    Some(_) if crate::booharu::placeholder(layer) => {
+                        text_control(id, &block.source, None, locked)
+                    }
                     Some(text) => {
                         let laid = self
                             .frame

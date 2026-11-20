@@ -1037,6 +1037,11 @@ fn typable(layers: &[Layer], layer: LayerId) -> Option<(Text, bool)> {
     layers.iter().find_map(|found| match &found.content {
         _ if found.id != layer => typable(&found.children, layer),
         Content::Text(text) => Some(((**text).clone(), false)),
+        // Booharu: a box styled before it's translated types as one with
+        // none, its source taking that style.
+        Content::Block(block) if crate::booharu::placeholder(found) => {
+            Some((crate::booharu::styled_source(block), true))
+        }
         Content::Block(block) => Some(match &block.translation {
             Some(translation) => (translation.clone(), false),
             None => (block.source.clone(), true),

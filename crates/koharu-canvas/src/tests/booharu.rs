@@ -3,8 +3,9 @@
 //! clean-up such a translation shows again on a sound effect kept as art,
 //! and, while typing, Escape keeping what's typed, marks taken off, size
 //! steps, the selected text the type bar quotes and the empty line a line
-//! break typed at the end starts, and a right-click's box menu, on the
-//! canvas's harness.
+//! break typed at the end starts, a right-click's box menu, and a box styled
+//! before it's translated, which the canvas types into and outlines as a
+//! block with none, on the canvas's harness.
 
 use std::collections::BTreeMap;
 
@@ -12,7 +13,7 @@ use booharu_core::{
     attrs::{self, Auto},
     lettering::{CategoryFont, LetteringCategory},
     settings::{DefaultTextStyle, LetteringSettings},
-    sfx,
+    sfx, status,
 };
 use koharu_scene::{CharStyle, Fit, RichText};
 
@@ -1340,5 +1341,205 @@ fn a_primary_press_on_a_text_opens_no_menu() {
             .iter()
             .any(|effect| matches!(effect, Effect::Booharu(_))),
         "{effects:?}"
+    );
+}
+
+/// A colour set by hand, as the type bar's.
+const GREEN: Rgba = Rgba([0.0, 0.5, 0.0, 1.0]);
+
+/// Whether `block`'s translation is only a placeholder, by Booharu's rule.
+fn placeholder(fixture: &Fixture, block: LayerId) -> bool {
+    let project = fixture.session.lock().project();
+    let layer = project.layer(block).expect("the block");
+    let koharu_scene::Content::Block(found) = &layer.content else {
+        panic!("{block} isn't a block");
+    };
+    status::placeholder(layer, found)
+}
+
+/// Styles `block` before it's translated, as the type bar does, writing
+/// `translation` into the translation the block lacks, which the scene
+/// starts from empty point text at the page's corner: a placeholder.
+fn style_before_translating(fixture: &mut Fixture, block: LayerId, translation: Value) {
+    other_writer(
+        fixture,
+        vec![json!({"op": "update_layer", "layer": block,
+            "patch": {"translation": translation}})],
+    );
+    assert!(placeholder(fixture, block), "{}", layer(fixture, block));
+}
+
+/// Whether `inner` lies wholly in `outer`.
+fn within(outer: Rect, inner: Rect) -> bool {
+    outer.union(inner) == outer
+}
+
+#[test]
+fn a_box_styled_before_its_translated_types_a_first_translation_in_its_place() {
+    let Some((mut fixture, talk, boom)) = untranslated() else {
+        return;
+    };
+    // The type bar's font and colour on the dialogue, and only a colour on
+    // the sound effect, each set before it's translated.
+    style_before_translating(
+        &mut fixture,
+        talk,
+        json!({"style": {"chars": {"family": "Comic Neue", "fill": GREEN}}}),
+    );
+    style_before_translating(
+        &mut fixture,
+        boom,
+        json!({"style": {"chars": {"fill": GREEN}}}),
+    );
+
+    // A press types into the dialogue as into a block with none, its caret
+    // in the block's box rather than at the corner its placeholder lies
+    // at, and the type bar showing the style set by hand.
+    fixture.canvas.set_booharu(pushed(false, Some(WHITE)));
+    fixture.canvas.set_tool(Tool::Text);
+    let effects = gesture(&mut fixture.canvas, (100.0, 100.0), (100.0, 100.0));
+    assert_eq!(selections(&effects), [vec![talk]]);
+    let at = caret(&fixture.canvas);
+    assert!(within(Rect::new(49.0, 49.0, 151.0, 151.0), at), "{at:?}");
+    let typed = fixture.canvas.typing().expect("typing");
+    assert_eq!(typed.layer, Some(talk));
+    assert_eq!(
+        (typed.chars.family.as_deref(), typed.chars.fill),
+        (Some("Comic Neue"), Some(GREEN))
+    );
+    type_text(&mut fixture.canvas, "Hi");
+    let effects = leave(&mut fixture.canvas, Leave::Commit);
+    // Koharu's first translation: its place and style, then its words.
+    let ops = set_text(&effects);
+    assert!(
+        matches!(ops[..], [Op::UpdateLayer { .. }, Op::SetRichText { .. }]),
+        "{ops:?}"
+    );
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    let typed = layer(&fixture, talk);
+    let translation = &typed["translation"];
+    assert_eq!(translation["content"], json!([{"insert": "Hi"}]));
+    assert_eq!(translation["frame"], typed["source"]["frame"]);
+    assert_eq!(translation["transform"], typed["source"]["transform"]);
+    // With colour detection off, the font and colour set by hand stay, and
+    // the default look fills in the rest: its outline in place of the
+    // source's.
+    assert_eq!(
+        chars(translation),
+        CharStyle {
+            family: Some("Comic Neue".to_owned()),
+            size: Some(32.0),
+            fill: Some(GREEN),
+            stroke: Some(WHITE),
+            stroke_width: Some(2.0),
+            ..CharStyle::default()
+        }
+    );
+    assert!(!placeholder(&fixture, talk));
+
+    // The sound effect, with no font set, gets the default one; with
+    // detection on, its colour set by hand and its source's outline stay.
+    fixture.canvas.set_booharu(pushed(true, Some(WHITE)));
+    assert_eq!(
+        type_translation(&mut fixture, boom, (300.0, 100.0)),
+        CharStyle {
+            family: Some(FONT.to_owned()),
+            size: Some(32.0),
+            fill: Some(GREEN),
+            stroke: Some(WHITE),
+            stroke_width: Some(3.0),
+            ..CharStyle::default()
+        }
+    );
+}
+
+#[test]
+fn a_first_translation_keeps_the_paragraph_keys_and_a_vertical_direction_set_before() {
+    let Some((mut fixture, talk, boom)) = untranslated() else {
+        return;
+    };
+    // Every paragraph key on the dialogue, set vertical; on the sound
+    // effect, whose source runs vertically, only an alignment, so its
+    // placeholder holds the scene's horizontal, which no choice sets apart.
+    other_writer(
+        &mut fixture,
+        vec![json!({"op": "update_layer", "layer": boom,
+            "patch": {"source": {"direction": "vertical"}}})],
+    );
+    style_before_translating(
+        &mut fixture,
+        talk,
+        json!({"direction": "vertical", "style":
+            {"align": "center", "line_height": 1.5, "stroke_method": "expansion"}}),
+    );
+    style_before_translating(&mut fixture, boom, json!({"style": {"align": "end"}}));
+    for (block, at) in [(talk, (100.0, 100.0)), (boom, (300.0, 100.0))] {
+        let effects = commit_translation(&mut fixture, block, at);
+        assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    }
+    let typed = layer(&fixture, talk)["translation"].clone();
+    assert_eq!(
+        typed["style"],
+        json!({"chars": typed["style"]["chars"], "align": "center", "line_height": 1.5,
+            "stroke_method": "expansion"})
+    );
+    assert_eq!(typed["direction"], json!("vertical"));
+    let typed = layer(&fixture, boom)["translation"].clone();
+    assert_eq!(typed["style"]["align"], json!("end"));
+    assert_eq!(typed["direction"], json!("vertical"));
+}
+
+#[test]
+fn a_whole_box_style_written_while_typing_into_a_block_with_none_keeps_the_caret() {
+    let Some((mut fixture, talk, _)) = untranslated() else {
+        return;
+    };
+    fixture.canvas.set_tool(Tool::Text);
+    let effects = gesture(&mut fixture.canvas, (100.0, 100.0), (100.0, 100.0));
+    assert_eq!(selections(&effects), [vec![talk]]);
+    type_text(&mut fixture.canvas, "Hi");
+    let before = caret(&fixture.canvas);
+    // The type bar's border method, which styles the whole box, written
+    // into the translation the block lacks while it's typed into: typing
+    // takes the change on in the block's place.
+    style_before_translating(
+        &mut fixture,
+        talk,
+        json!({"style": {"stroke_method": "expansion"}}),
+    );
+    assert!(fixture.canvas.is_typing());
+    assert_eq!(caret(&fixture.canvas), before);
+    let effects = leave(&mut fixture.canvas, Leave::Commit);
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    let typed = layer(&fixture, talk);
+    assert_eq!(typed["translation"]["content"], json!([{"insert": "Hi"}]));
+    assert_eq!(typed["translation"]["frame"], typed["source"]["frame"]);
+    assert_eq!(
+        typed["translation"]["style"]["stroke_method"],
+        json!("expansion")
+    );
+}
+
+#[test]
+fn a_box_styled_before_its_translated_keeps_its_sources_control() {
+    let Some((mut fixture, talk, _)) = untranslated() else {
+        return;
+    };
+    style_before_translating(
+        &mut fixture,
+        talk,
+        json!({"style": {"chars": {"fill": GREEN}}}),
+    );
+    // A click in its source's box picks it, and the selection's bounds,
+    // which the type bar goes beside, hold that box.
+    let canvas = &mut fixture.canvas;
+    let mut effects = canvas.input(down((100.0, 100.0), NONE)).expect("input");
+    effects.extend(canvas.input(up(1, (100.0, 100.0))).expect("input"));
+    assert_eq!(selections(&effects), [vec![talk]]);
+    assert_eq!(fixture.canvas.selection(), [talk]);
+    let bounds = fixture.canvas.selection_bounds().expect("bounds");
+    assert!(
+        within(bounds, Rect::new(50.0, 50.0, 150.0, 150.0)),
+        "{bounds:?}"
     );
 }

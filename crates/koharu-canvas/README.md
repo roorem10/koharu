@@ -73,6 +73,11 @@ release that follow.
   right-click inside a selection of several keeps it, and answers Booharu's
   effect for the host to open the box's menu at the pointer. It starts no
   gesture, and anything else under the pointer answers nothing.
+- **Booharu: a box styled before it's translated acts as one with none.** The
+  type bar writes a style set on a block with no translation into an empty
+  point text, only a placeholder. The canvas shows such a block by its
+  source's frame, and typing into it starts from its source in that style
+  and adds the first translation in the source's place, keeping the style.
 
 ## Sources
 

@@ -12,9 +12,19 @@
 //! Direct Select or Text tool, while nothing is typed, selects it unless
 //! it's selected already and answers `Effect::Menu`, for the host to open
 //! the box's menu there.
+//!
+//! A box styled before it's translated holds a translation that is only a
+//! placeholder ([`status::placeholder`]): the type bar writes a style set on
+//! a block with no translation into an empty point text. The canvas reads
+//! such a block as one with none ([`placeholder`]): it shows its source's
+//! control, and typing into it starts from its source with that style laid
+//! over ([`styled_source`]) and makes a first translation in its source's
+//! place that keeps the style.
 
-use booharu_core::{lettering, settings::LetteringSettings, sfx, styles};
-use koharu_scene::{CharStyle, Content, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text};
+use booharu_core::{lettering, settings::LetteringSettings, sfx, status, styles};
+use koharu_scene::{
+    Block, Content, Direction, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text,
+};
 use kurbo::{Point, Rect, Size};
 use serde::{Deserialize, Serialize};
 use ui_events::keyboard::Modifiers;
@@ -75,7 +85,10 @@ pub(crate) fn drafted(mut text: Text, settings: &BooharuSettings) -> Text {
 /// category's while Pick fonts automatically is on, and with colour
 /// detection off the default colours in place of its source's, a sound
 /// effect keeping a legibility outline when the default sets none. With
-/// detection on, its source's colours stay.
+/// detection on, its source's colours stay. A block whose translation is
+/// only a placeholder has a style of its own, set by hand before it was
+/// translated, whose values the look keeps, as placement keeps a
+/// translation's: with detection off, a colour set there stays.
 pub(crate) fn untranslated(
     base: &mut Text,
     page: &Page,
@@ -84,7 +97,11 @@ pub(crate) fn untranslated(
 ) {
     let defaults = &settings.text;
     let sfx = role(&page.layers, layer) == Some(Role::Sfx);
-    let own = CharStyle::default();
+    let own = find(&page.layers, layer)
+        .and_then(styled)
+        .and_then(|block| block.translation.as_ref())
+        .map(|placeholder| placeholder.style.chars.clone())
+        .unwrap_or_default();
     let category = lettering::auto_category(page, layer, &defaults.lettering);
     let patch = styles::new_translation(
         &defaults.lettering,
@@ -113,6 +130,45 @@ pub(crate) fn shown_again(page: &Page, layer: LayerId) -> Vec<Op> {
     find(&page.layers, layer)
         .and_then(|found| sfx::shown_again(found).ok())
         .unwrap_or_default()
+}
+
+/// Whether `layer` is a block whose translation is only a placeholder
+/// ([`status::placeholder`]), a style set on it before it was translated,
+/// which the canvas reads as a block with none.
+pub(crate) fn placeholder(layer: &Layer) -> bool {
+    styled(layer).is_some()
+}
+
+/// The block `layer` holds, when its translation is only a placeholder.
+fn styled(layer: &Layer) -> Option<&Block> {
+    match &layer.content {
+        Content::Block(block) if status::placeholder(layer, block) => Some(block),
+        _ => None,
+    }
+}
+
+/// What typing into `block`, whose translation is only a placeholder, takes
+/// as its text, as typing into a block with none takes its source: its
+/// source, with the placeholder's character values and paragraph keys, its
+/// alignment, line spacing and border method, laid over the source's, so
+/// what's typed shows in the style set by hand and the first translation,
+/// which the commit writes from it whole, keeps it. Its direction is the
+/// placeholder's only when that isn't the scene's default, horizontal,
+/// which can't be told from one never chosen. Its frame, place and
+/// language are its source's, so the caret starts in the block's place.
+pub(crate) fn styled_source(block: &Block) -> Text {
+    let mut text = block.source.clone();
+    if let Some(placeholder) = &block.translation {
+        let (own, style) = (&placeholder.style, &mut text.style);
+        style.chars = own.chars.or(&style.chars);
+        style.align = own.align.or(style.align);
+        style.line_height = own.line_height.or(style.line_height);
+        style.stroke_method = own.stroke_method.or(style.stroke_method);
+        if placeholder.direction != Direction::default() {
+            text.direction = placeholder.direction;
+        }
+    }
+    text
 }
 
 /// The layer `id` among `layers` and their children.
@@ -289,7 +345,9 @@ mod tests {
         lettering::{CategoryFont, LetteringCategory},
         settings::DefaultTextStyle,
     };
-    use koharu_scene::{Bounds, Created, Edit, Op, Rgba, Session};
+    use koharu_scene::{
+        Align, Bounds, CharStyle, Created, Edit, Op, Rgba, Session, StrokeMethod, TextStyle,
+    };
     use serde_json::{Value, json};
 
     use super::*;
@@ -424,14 +482,29 @@ mod tests {
         (page, id("talk"), id("boom"))
     }
 
-    /// The source of `layer` on `page`, standing in for a translation typed
-    /// into it, with the look `untranslated` gives it under `settings`.
+    /// The block `layer` on `page`, with the layer holding it.
+    fn block_of(page: &Page, layer: LayerId) -> (&Layer, &Block) {
+        match find(&page.layers, layer) {
+            Some(
+                found @ Layer {
+                    content: Content::Block(block),
+                    ..
+                },
+            ) => (found, block),
+            _ => panic!("no block {layer}"),
+        }
+    }
+
+    /// What typing takes for `layer` on `page`, its source, in the style set
+    /// on it when it's a box styled before it's translated, standing in for
+    /// a translation typed into it, with the look `untranslated` gives it
+    /// under `settings`.
     fn typed(page: &Page, layer: LayerId, settings: &BooharuSettings) -> CharStyle {
-        let Some(Content::Block(block)) = find(&page.layers, layer).map(|found| &found.content)
-        else {
-            panic!("no block {layer}");
+        let (found, block) = block_of(page, layer);
+        let mut base = match placeholder(found) {
+            true => styled_source(block),
+            false => block.source.clone(),
         };
-        let mut base = block.source.clone();
         untranslated(&mut base, page, layer, settings);
         base.style.chars
     }
@@ -578,5 +651,142 @@ mod tests {
 
         // The T tool's free text has no category (T17): the default look.
         assert_eq!(drafted(boxed(), &on), drafted(boxed(), &off));
+    }
+
+    /// A colour set by hand, as the type bar's.
+    const GREEN: Rgba = Rgba([0.0, 0.5, 0.0, 1.0]);
+
+    /// The op the type bar sends for a style set on the block `label` while
+    /// it has no translation: `translation`, which the scene merges into an
+    /// empty point text, a placeholder.
+    fn styled_by_hand(label: &str, translation: Value) -> Value {
+        json!({"op": "update_layer", "layer": format!("${label}"),
+            "patch": {"translation": translation}})
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_types_from_its_source_in_that_style() {
+        // A block never styled; one given a font, a colour and every
+        // paragraph key, set vertical; one whose source is vertical, given
+        // an alignment, so its placeholder keeps the scene's horizontal; and
+        // one with a translation typed into it.
+        let mut upright = block("upright", "text", 110.0, json!({}));
+        upright["layer"]["source"]["direction"] = json!("vertical");
+        let mut translated = block("translated", "text", 160.0, json!({}));
+        translated["layer"]["translation"] = json!({"content": "Why?",
+            "frame": {"box": {"bounds": {"x": 160.0, "y": 20.0, "width": 40.0, "height": 120.0}}}});
+        let (page, id) = page_of(vec![
+            block("plain", "text", 10.0, json!({})),
+            block("styled", "text", 60.0, json!({})),
+            styled_by_hand(
+                "styled",
+                json!({"direction": "vertical", "style": {
+                    "chars": {"family": "Comic Neue", "fill": GREEN},
+                    "align": "center", "line_height": 1.5, "stroke_method": "expansion",
+                }}),
+            ),
+            upright,
+            styled_by_hand("upright", json!({"style": {"align": "end"}})),
+            translated,
+        ]);
+        let is_placeholder = |name| placeholder(block_of(&page, id(name)).0);
+        assert!(!is_placeholder("plain"));
+        assert!(is_placeholder("styled"));
+        assert!(is_placeholder("upright"));
+        assert!(!is_placeholder("translated"));
+
+        // The style laid over the source's, the source's values where it
+        // sets none; its frame, place and language the source's.
+        let (_, styled) = block_of(&page, id("styled"));
+        let typed = styled_source(styled);
+        assert_eq!(
+            typed.style,
+            TextStyle {
+                chars: CharStyle {
+                    family: Some("Comic Neue".to_owned()),
+                    size: Some(32.0),
+                    fill: Some(GREEN),
+                    stroke: Some(WHITE),
+                    stroke_width: Some(3.0),
+                    ..CharStyle::default()
+                },
+                align: Some(Align::Center),
+                line_height: Some(1.5),
+                stroke_method: Some(StrokeMethod::Expansion),
+            }
+        );
+        assert_eq!(typed.direction, Direction::Vertical);
+        let source = &styled.source;
+        assert_eq!(
+            (&typed.frame, typed.transform, &typed.language),
+            (&source.frame, source.transform, &source.language)
+        );
+        // A placeholder's horizontal, the scene's default, never turns a
+        // vertical source.
+        let (_, upright) = block_of(&page, id("upright"));
+        let typed = styled_source(upright);
+        assert_eq!(typed.direction, Direction::Vertical);
+        assert_eq!(typed.style.align, Some(Align::End));
+    }
+
+    #[test]
+    fn a_style_set_before_translating_is_kept_by_the_new_translations_look() {
+        // Dialogue given a font and a colour, and a sound effect given only
+        // a colour, each lettered as `block` letters it.
+        let (page, id) = page_of(vec![
+            block("talk", "text", 10.0, json!({})),
+            styled_by_hand(
+                "talk",
+                json!({"style": {"chars": {"family": "Comic Neue", "fill": GREEN}}}),
+            ),
+            block("boom", "sfx", 60.0, json!({})),
+            styled_by_hand("boom", json!({"style": {"chars": {"fill": GREEN}}})),
+        ]);
+        let source = CharStyle {
+            size: Some(32.0),
+            fill: Some(BLUE),
+            stroke: Some(WHITE),
+            stroke_width: Some(3.0),
+            ..CharStyle::default()
+        };
+        let hand = CharStyle {
+            family: Some("Comic Neue".to_owned()),
+            fill: Some(GREEN),
+            ..source.clone()
+        };
+        // With detection off, the colour set by hand stays, the default
+        // outline, none for dialogue, replaces the source's, and the font
+        // set by hand stays; the sound effect, with no font set, gets the
+        // default one and its legibility outline about its own colour.
+        let off = pushed(false, None);
+        assert_eq!(
+            typed(&page, id("talk"), &off),
+            CharStyle {
+                stroke: None,
+                stroke_width: None,
+                ..hand.clone()
+            }
+        );
+        assert_eq!(
+            typed(&page, id("boom"), &off),
+            CharStyle {
+                family: Some(FONT.to_owned()),
+                fill: Some(GREEN),
+                stroke: Some(WHITE),
+                stroke_width: Some(2.0),
+                ..source.clone()
+            }
+        );
+        // With it on, the source's colours stay where none was set.
+        let on = pushed(true, Some(WHITE));
+        assert_eq!(typed(&page, id("talk"), &on), hand);
+        assert_eq!(
+            typed(&page, id("boom"), &on),
+            CharStyle {
+                family: Some(FONT.to_owned()),
+                fill: Some(GREEN),
+                ..source
+            }
+        );
     }
 }
