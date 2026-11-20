@@ -14,6 +14,7 @@ import {
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { FxPopover } from '@/components/booharu/effects/FxPopover' // Booharu: S12-k.
 import { AppliesTo, WholeBoxOnly } from '@/components/booharu/typebar/AppliesTo' // Booharu: S11-f.
 import { ClearWordStyles } from '@/components/booharu/typebar/ClearWordStyles' // Booharu: S11-g.
 import { DoneButton } from '@/components/booharu/typebar/DoneButton' // Booharu: S11-c.
@@ -698,6 +699,16 @@ export function TypeBar() {
           </Select>
         </PopoverContent>
       </Popover>
+      {/* Booharu: Text effects, after the border's and before Done (S12-k). */}
+      <FxPopover
+        targets={targets}
+        typing={typing}
+        words={chosen}
+        chars={chars}
+        mixed={mixed}
+        onChars={applyChars}
+        onEach={apply}
+      />
       {/* Booharu: Done, last, while the canvas types (S11-c). */}
       <DoneButton />
     </ContextBar>

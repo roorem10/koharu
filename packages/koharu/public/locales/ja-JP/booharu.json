@@ -236,6 +236,18 @@
       "titleFor": "{{name}}のボックス詳細",
       "translation": "翻訳"
     },
+    "effects": {
+      "angle": "グラデーションの角度",
+      "end": "終了色",
+      "gradient": "グラデーションの塗り",
+      "kind": "グラデーションの種類",
+      "linear": "線形",
+      "radial": "放射状",
+      "screentoneLater": "スクリーントーンの塗り（今後対応）",
+      "start": "開始色",
+      "title": "テキスト効果",
+      "wavyLater": "波打ち・震え文字（今後対応）"
+    },
     "emphasis": {
       "aiHint": "汎用のチャットモデルで使われます。Koharu 独自の翻訳モデルは、この機能を使わずに翻訳します。",
       "category": "写植カテゴリ",

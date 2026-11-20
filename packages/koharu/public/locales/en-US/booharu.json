@@ -236,6 +236,18 @@
       "titleFor": "Box details for {{name}}",
       "translation": "Translation"
     },
+    "effects": {
+      "angle": "Gradient angle",
+      "end": "End color",
+      "gradient": "Gradient fill",
+      "kind": "Gradient kind",
+      "linear": "Linear",
+      "radial": "Radial",
+      "screentoneLater": "Screentone fill (later)",
+      "start": "Start color",
+      "title": "Text effects",
+      "wavyLater": "Wavy / shaky text (later)"
+    },
     "emphasis": {
       "aiHint": "Used with general chat models. Koharu's own translation models translate without it.",
       "category": "Lettering category",

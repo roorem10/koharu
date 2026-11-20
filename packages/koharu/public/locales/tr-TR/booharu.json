@@ -236,6 +236,18 @@
       "titleFor": "{{name}} için kutu ayrıntıları",
       "translation": "Çeviri"
     },
+    "effects": {
+      "angle": "Gradyan açısı",
+      "end": "Bitiş rengi",
+      "gradient": "Gradyan dolgu",
+      "kind": "Gradyan türü",
+      "linear": "Doğrusal",
+      "radial": "Radyal",
+      "screentoneLater": "Tram dolgusu (daha sonra)",
+      "start": "Başlangıç rengi",
+      "title": "Metin efektleri",
+      "wavyLater": "Dalgalı / titrek metin (daha sonra)"
+    },
     "emphasis": {
       "aiHint": "Genel sohbet modelleriyle kullanılır. Koharu'nun kendi çeviri modelleri bu özellik olmadan çevirir.",
       "category": "Dizgi kategorisi",

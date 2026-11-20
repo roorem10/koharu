@@ -236,6 +236,18 @@
       "titleFor": "{{name}} 的文本框详情",
       "translation": "译文"
     },
+    "effects": {
+      "angle": "渐变角度",
+      "end": "结束颜色",
+      "gradient": "渐变填充",
+      "kind": "渐变类型",
+      "linear": "线性",
+      "radial": "径向",
+      "screentoneLater": "网点填充（稍后推出）",
+      "start": "起始颜色",
+      "title": "文字效果",
+      "wavyLater": "波浪／抖动文字（稍后推出）"
+    },
     "emphasis": {
       "aiHint": "用于通用聊天模型。Koharu 自带的翻译模型翻译时不使用此功能。",
       "category": "排字类别",

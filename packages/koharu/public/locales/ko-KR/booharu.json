@@ -236,6 +236,18 @@
       "titleFor": "{{name}}의 상자 세부 정보",
       "translation": "번역"
     },
+    "effects": {
+      "angle": "그라디언트 각도",
+      "end": "끝 색상",
+      "gradient": "그라디언트 채우기",
+      "kind": "그라디언트 종류",
+      "linear": "선형",
+      "radial": "방사형",
+      "screentoneLater": "스크린톤 채우기 (추후 지원)",
+      "start": "시작 색상",
+      "title": "텍스트 효과",
+      "wavyLater": "물결 / 떨리는 텍스트 (추후 지원)"
+    },
     "emphasis": {
       "aiHint": "일반 채팅 모델에서 사용됩니다. Koharu 자체 번역 모델은 이 기능 없이 번역합니다.",
       "category": "레터링 범주",

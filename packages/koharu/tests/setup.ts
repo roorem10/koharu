@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, vi } from 'vitest'
 
+import { useFx } from '@/lib/booharu/fx' // Booharu: the type bar's Text effects.
 import { useWordRange } from '@/lib/booharu/words' // Booharu: the words chosen in Story.
 import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
@@ -95,6 +96,7 @@ beforeEach(() => {
     historyOpen: false,
   })
   useWordRange.setState({ range: null, field: null }) // Booharu: no words chosen in Story.
+  useFx.setState({ open: false, page: null }) // Booharu: Text effects closed.
 })
 
 afterEach(() => {

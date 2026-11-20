@@ -264,6 +264,18 @@
       "titleFor": "Detalles del cuadro de {{name}}",
       "translation": "Traducción"
     },
+    "effects": {
+      "angle": "Ángulo del degradado",
+      "end": "Color final",
+      "gradient": "Relleno degradado",
+      "kind": "Tipo de degradado",
+      "linear": "Lineal",
+      "radial": "Radial",
+      "screentoneLater": "Relleno de trama (más adelante)",
+      "start": "Color inicial",
+      "title": "Efectos de texto",
+      "wavyLater": "Texto ondulado / tembloroso (más adelante)"
+    },
     "emphasis": {
       "aiHint": "Se usa con modelos de chat generales. Los modelos de traducción propios de Koharu traducen sin esta opción.",
       "category": "Categoría de rotulación",

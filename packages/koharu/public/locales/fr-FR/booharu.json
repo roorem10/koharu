@@ -264,6 +264,18 @@
       "titleFor": "Détails de la zone de texte pour {{name}}",
       "translation": "Traduction"
     },
+    "effects": {
+      "angle": "Angle du dégradé",
+      "end": "Couleur d’arrivée",
+      "gradient": "Remplissage en dégradé",
+      "kind": "Type de dégradé",
+      "linear": "Linéaire",
+      "radial": "Radial",
+      "screentoneLater": "Remplissage par trame (à venir)",
+      "start": "Couleur de départ",
+      "title": "Effets de texte",
+      "wavyLater": "Texte ondulé / tremblant (à venir)"
+    },
     "emphasis": {
       "aiHint": "Utilisé avec les modèles de chat généralistes. Les modèles de traduction propres à Koharu traduisent sans.",
       "category": "Catégorie de lettrage",

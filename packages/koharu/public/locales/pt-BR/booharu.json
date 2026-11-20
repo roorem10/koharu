@@ -264,6 +264,18 @@
       "titleFor": "Detalhes da caixa de {{name}}",
       "translation": "Tradução"
     },
+    "effects": {
+      "angle": "Ângulo do gradiente",
+      "end": "Cor final",
+      "gradient": "Preenchimento em gradiente",
+      "kind": "Tipo de gradiente",
+      "linear": "Linear",
+      "radial": "Radial",
+      "screentoneLater": "Preenchimento com retícula (futuro)",
+      "start": "Cor inicial",
+      "title": "Efeitos de texto",
+      "wavyLater": "Texto ondulado / trêmulo (futuro)"
+    },
     "emphasis": {
       "aiHint": "Usado com modelos de chat gerais. Os modelos de tradução próprios do Koharu traduzem sem isso.",
       "category": "Categoria de letreiramento",

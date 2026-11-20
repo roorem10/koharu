@@ -236,6 +236,18 @@
       "titleFor": "{{name}} 的文字框詳細資料",
       "translation": "譯文"
     },
+    "effects": {
+      "angle": "漸層角度",
+      "end": "結束顏色",
+      "gradient": "漸層填色",
+      "kind": "漸層類型",
+      "linear": "線性",
+      "radial": "放射狀",
+      "screentoneLater": "網點填色（稍後推出）",
+      "start": "起始顏色",
+      "title": "文字效果",
+      "wavyLater": "波浪／抖動文字（稍後推出）"
+    },
     "emphasis": {
       "aiHint": "用於通用聊天模型。Koharu 內建的翻譯模型翻譯時不使用此功能。",
       "category": "排字類別",

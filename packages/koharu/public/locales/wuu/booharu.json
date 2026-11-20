@@ -236,6 +236,18 @@
       "titleFor": "{{name}} 个文字框详情",
       "translation": "译文"
     },
+    "effects": {
+      "angle": "渐变角度",
+      "end": "结束颜色",
+      "gradient": "渐变填充",
+      "kind": "渐变类型",
+      "linear": "线性",
+      "radial": "径向",
+      "screentoneLater": "网点填充（以后开放）",
+      "start": "起始颜色",
+      "title": "文字效果",
+      "wavyLater": "波浪／抖动文字（以后开放）"
+    },
     "emphasis": {
       "aiHint": "通用聊天模型会用到。Koharu 自家个翻译模型翻译个辰光勿用箇个功能。",
       "category": "文字排版类别",
