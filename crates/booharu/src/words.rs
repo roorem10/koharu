@@ -667,6 +667,64 @@ mod tests {
     }
 
     #[test]
+    fn a_fill_takes_a_words_gradient_off_and_letter_spacing_marks_the_words() -> Result<()> {
+        use koharu_scene::{Gradient, GradientKind, GradientStop};
+        let mut fixture = Fixture::new()?;
+        let gradient = Gradient {
+            kind: GradientKind::Linear,
+            angle: 0.0,
+            stops: vec![
+                GradientStop {
+                    offset: 0.0,
+                    color: RED,
+                },
+                GradientStop {
+                    offset: 1.0,
+                    color: BLUE,
+                },
+            ],
+        };
+        let set = |set: CharStyle| WordChange {
+            set,
+            ..WordChange::default()
+        };
+        let painted = CharStyle {
+            fill_gradient: Some(gradient.clone()),
+            ..CharStyle::default()
+        };
+        assert_eq!(
+            fixture.styled("plain", 11..13, &set(painted.clone()))?,
+            no_marked(painted)
+        );
+        // A flat colour is the words' paint now: their gradient goes.
+        let black = CharStyle {
+            fill: Some(BLACK),
+            ..CharStyle::default()
+        };
+        assert_eq!(
+            fixture.styled("plain", 11..13, &set(black.clone()))?,
+            no_marked(black.clone())
+        );
+        // Letter spacing marks the words, none at all included, beside
+        // their colour.
+        for tracking in [200.0, 0.0, -50.0] {
+            let spaced = CharStyle {
+                tracking: Some(tracking),
+                ..CharStyle::default()
+            };
+            assert_eq!(
+                fixture.styled("plain", 11..13, &set(spaced))?,
+                no_marked(CharStyle {
+                    tracking: Some(tracking),
+                    ..black.clone()
+                }),
+                "{tracking}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn clear_takes_off_only_the_marks_in_the_range() -> Result<()> {
         let mut fixture = Fixture::new()?;
         let red = WordChange {

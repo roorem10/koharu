@@ -8,7 +8,10 @@
 //! Koharu's Preferred fonts, in place of its family, or while Pick fonts
 //! automatically is on its block's category's font in place of its family,
 //! weight, and italic, and with `detect_colors` off the default colours and
-//! outline in place of its own; with it on, Apply never recolours. The
+//! outline in place of its own; with it on, Apply never recolours. Either
+//! way it takes off a gradient fill and letter spacing, the words' with the
+//! box's, so the look shows flat and evenly spaced, while a word's flat
+//! colour stays unless Apply writes a fill. The
 //! agent may name the category every block of the scope is lettered as
 //! instead, whatever its own and whether the switch is on. A block
 //! changed by hand ([`booharu_core::edited`]) is kept unless the caller
@@ -26,11 +29,12 @@
 //!
 //! Reset to lettering default ([`reset_lettering`]) gives chosen boxes and
 //! text layers their lettering default back, worked out from the scene
-//! ([`booharu_core::resolver`]): every look key, hand-set or not, and every
-//! word mark, as one undo step, leaving the words, size, frame and
-//! alignment. It is how a box whose role a picked category changed gets
-//! the outline of its new role at once, rather than at its next
-//! translation.
+//! ([`booharu_core::resolver`]): every look key, hand-set or not, its font,
+//! colours, gradient and letter spacing among them, and every word mark,
+//! and it takes the skew off, as one undo step, leaving the words, size,
+//! frame, position, rotation and alignment. It is how a box whose role a
+//! picked category changed gets the outline of its new role at once,
+//! rather than at its next translation.
 
 use std::collections::BTreeSet;
 
@@ -49,6 +53,8 @@ use koharu_scene::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
+
+use crate::effects;
 
 /// The undo step's label, which the History panel translates.
 pub const LABEL: &str = "booharu_apply_text_style";
@@ -101,9 +107,10 @@ pub fn count(
 }
 
 /// The edit giving the translations of `scope` in `project` the default
-/// look of `settings` and `font`, the first Preferred font, again, as one
-/// undo step labelled [`LABEL`] over any number of pages, with its numbers;
-/// none when it changes nothing. A block changed by hand takes it only with
+/// look of `settings` and `font`, the first Preferred font, again, with no
+/// gradient fill or letter spacing, as one undo step labelled [`LABEL`]
+/// over any number of pages, with its numbers; none when it changes
+/// nothing. A block changed by hand takes it only with
 /// `include_hand_edited`. With `category`, every block is lettered in that
 /// category's font, whatever its own and whether Pick fonts automatically is
 /// on. `origin` goes in each changed block's record: [`Origin::Agent`] makes
@@ -182,11 +189,15 @@ pub struct ResetCounts {
 ///
 /// For each unlocked layer that has a default, only the ops it needs: its
 /// text's [`resolver::LOOK`] keys and border method, every one written, null
-/// where the default sets none; its words as one unmarked span when a span
-/// has marks; and for a block its hand-edit record, automatic, with the new
-/// look as its style, no word marks, and its other fields as they were, so a
-/// translation typed by hand stays one. Never the words, the language, the size, the
-/// frame, the transform, the direction, the alignment, the line height, the
+/// where the default sets none, so a gradient and letter spacing go; its
+/// words as one unmarked span when a span has marks; for a block its
+/// hand-edit record, automatic, with the new look as its style, no word
+/// marks, and its other fields as they were, so a translation typed by hand
+/// stays one; and the skew it shows taken off its transform, about its
+/// record's pivot when the record still holds, with the record removed
+/// ([`crate::effects`]), which leaves its position, rotation and size as
+/// they are. Never the words, the language, the size, the frame, the
+/// position or rotation, the direction, the alignment, the line height, the
 /// clean-up, the source, the role, or any other attribute. A locked block
 /// or text layer, or one inside a locked layer, is counted and left, and an
 /// untranslated block counted; any other layer is left uncounted. A layer
@@ -261,6 +272,7 @@ pub fn reset_lettering(
                 ops.push(attrs::set(id, &record)?);
             }
         }
+        ops.extend(effects::unskewed(layer, text, block));
         counts.changed += u32::from(ops.len() > at);
     }
     let edit = (!ops.is_empty()).then(|| Edit {
@@ -319,7 +331,8 @@ fn planned<'p>(
             None => lettering::auto_category(project.parent(layer.id)?.0, layer.id, settings),
         };
         let sfx = block.role == Role::Sfx;
-        let patch = styles::restyle(settings, font, sfx, category, current);
+        let mut patch = styles::restyle(settings, font, sfx, category, current);
+        patch.extend(FLAT.map(|key| (key.to_owned(), Value::Null)));
         let after = styles::patched(current, &patch)?;
         let marked = |key: &String| category.is_none() || !FONT.contains(&key.as_str());
         let cleared: Vec<String> = patch.keys().filter(|key| marked(key)).cloned().collect();
@@ -386,6 +399,12 @@ pub(crate) fn locked(project: &Project, layer: &Layer) -> Result<bool> {
 /// The keys a category's font writes, whose marks it leaves.
 const FONT: [&str; 3] = ["family", "weight", "italic"];
 
+/// The keys Apply always clears, so its look shows flat and evenly spaced:
+/// a gradient fill, which would win over the fill beside it, and letter
+/// spacing. Their marks go with them, as the marks of every key Apply
+/// writes do, while a word's flat colour stays unless Apply writes a fill.
+const FLAT: [&str; 2] = ["fill_gradient", "tracking"];
+
 /// `marks`, a hand-edit record's, without their values for `keys`, which
 /// Apply took off the words, and without the marks left setting nothing.
 fn without_keys(marks: Vec<AutoMark>, keys: &[String]) -> Result<Vec<AutoMark>> {
@@ -430,10 +449,14 @@ mod tests {
     use anyhow::Context as _;
     use booharu_core::{
         Edited,
+        attrs::Skew,
         emphasis::{EmphasisSettings, EmphasisStyle, Marking},
         settings::DefaultTextStyle,
     };
-    use koharu_scene::{Created, LanguageIdentifier, Rgba, Session, Text};
+    use koharu_scene::{
+        Created, Gradient, GradientKind, GradientStop, LanguageIdentifier, Rgba, Session, Text,
+        Transform,
+    };
     use tempfile::TempDir;
 
     use super::*;
@@ -645,6 +668,16 @@ mod tests {
                 layer: block.into(),
                 patch: json!({"translation": {"style": {"chars": chars}}}),
             }])
+        }
+
+        /// Skews the translation of `name` `x` and `y` degrees, as the FX
+        /// window does.
+        fn skew(&mut self, name: &str, x: f64, y: f64) -> Result<()> {
+            let layers = [self.id(name)];
+            let change =
+                crate::effects::set_skew(&self.session.project(), &layers, Some(x), Some(y))?;
+            self.session.apply(change.edit.context("a skew")?)?;
+            Ok(())
         }
 
         /// Resets the lettering of `names` under `settings` with the default
@@ -1418,6 +1451,175 @@ mod tests {
         assert_eq!(counts.changed, 1);
         assert!(Auto::of(&fixture.layer("a")?).marks.is_empty());
         assert_eq!(fixture.translation("a")?.content, RichText::from("Why NO?"));
+        assert!(!edited(&fixture.layer("a")?).hand_edited());
+        Ok(())
+    }
+
+    /// A gradient from red at the bottom to yellow at the top.
+    fn gradient() -> Gradient {
+        Gradient {
+            kind: GradientKind::Linear,
+            angle: 90.0,
+            stops: vec![
+                GradientStop {
+                    offset: 0.0,
+                    color: RED,
+                },
+                GradientStop {
+                    offset: 1.0,
+                    color: YELLOW,
+                },
+            ],
+        }
+    }
+
+    fn gradient_mark() -> CharStyle {
+        CharStyle {
+            fill_gradient: Some(gradient()),
+            ..CharStyle::default()
+        }
+    }
+
+    fn close(a: Transform, b: Transform) -> bool {
+        a.0.iter()
+            .flatten()
+            .zip(b.0.iter().flatten())
+            .all(|(a, b)| (a - b).abs() <= 1e-9)
+    }
+
+    #[test]
+    fn reset_takes_gradients_letter_spacing_and_the_skew_off_in_one_undo_step() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = look(true, None);
+        fixture.translate(&["a", "b", "d"], &settings)?;
+        let placed = [fixture.translation("a")?, fixture.translation("b")?];
+        // By hand: a's gradient, letter spacing, a gradient on one of its
+        // words and a skew; b's skew alone; and d's skew, before its group
+        // g is locked.
+        fixture.restyle("a", json!({"fill_gradient": gradient(), "tracking": 300.0}))?;
+        let a = fixture.id("a");
+        fixture.edit(vec![Op::SetRichText {
+            layer: a.into(),
+            spans: vec![
+                span("Why", gradient_mark()),
+                span("?", CharStyle::default()),
+            ],
+        }])?;
+        fixture.skew("a", 20.0, 5.0)?;
+        fixture.skew("b", -10.0, 0.0)?;
+        fixture.skew("d", 15.0, 0.0)?;
+        let g = fixture.id("g");
+        fixture.edit(vec![Op::UpdateLayer {
+            layer: g.into(),
+            patch: json!({"locked": true}),
+        }])?;
+        let d = fixture.layer("d")?;
+        let before = fixture.session.project();
+        let steps = fixture.session.history().steps.len();
+
+        let counts = fixture.reset(&["a", "b", "d"], &settings)?;
+
+        assert_eq!(
+            counts,
+            ResetCounts {
+                changed: 2,
+                locked: 1,
+                untranslated: 0,
+            }
+        );
+        assert_eq!(fixture.session.history().steps.len(), steps + 1);
+        for (name, placed) in ["a", "b"].into_iter().zip(&placed) {
+            let reset = fixture.translation(name)?;
+            let chars = &reset.style.chars;
+            assert_eq!(
+                (&chars.fill_gradient, chars.tracking),
+                (&None, None),
+                "{name}"
+            );
+            assert!(
+                reset
+                    .content
+                    .0
+                    .iter()
+                    .all(|span| span.attributes == CharStyle::default()),
+                "{name}"
+            );
+            // The skew comes off: the transform as placed, the record gone.
+            assert!(close(reset.transform, placed.transform), "{name}");
+            let layer = fixture.layer(name)?;
+            assert_eq!(attrs::get::<Skew>(&layer), None, "{name}");
+            assert_eq!(edited(&layer), Edited::default(), "{name}");
+        }
+        // The locked box keeps all of it.
+        assert!(fixture.layer("d")? == d);
+        // A second press changes nothing; one undo puts every effect back.
+        assert_eq!(
+            fixture.reset(&["a", "b"], &settings)?,
+            ResetCounts::default()
+        );
+        fixture.session.undo()?;
+        assert!(fixture.session.project() == before);
+        Ok(())
+    }
+
+    #[test]
+    fn apply_takes_gradients_and_letter_spacing_off_with_the_look() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        fixture.translate(&["a", "b"], &look(true, None))?;
+        // By hand: a's gradient and letter spacing, a gradient on one of its
+        // words and a flat colour on another, and wider spacing on b's word.
+        fixture.restyle("a", json!({"fill_gradient": gradient(), "tracking": 300.0}))?;
+        let (a, b) = (fixture.id("a"), fixture.id("b"));
+        let yellow = CharStyle {
+            fill: Some(YELLOW),
+            ..CharStyle::default()
+        };
+        let wide = CharStyle {
+            tracking: Some(100.0),
+            ..CharStyle::default()
+        };
+        fixture.edit(vec![
+            Op::SetRichText {
+                layer: a.into(),
+                spans: vec![span("Why", gradient_mark()), span("?", yellow.clone())],
+            },
+            Op::SetRichText {
+                layer: b.into(),
+                spans: vec![span("Why", wide), span("?", CharStyle::default())],
+            },
+        ])?;
+        let page = StyleScope::Pages {
+            pages: vec![fixture.page("p1")],
+        };
+        // Hand edits, so kept unless included.
+        let kept = fixture.apply(&page, false, &look(true, None), Origin::Automatic)?;
+        assert_eq!(kept, counts(0, 2, 2));
+
+        // Included, with detection on: the gradients and the spacing go,
+        // so the box's own fill shows, flat; a word's colour stays, and so
+        // stays a hand edit.
+        let on = fixture.apply(&page, true, &look(true, None), Origin::Automatic)?;
+        assert_eq!(on, counts(2, 0, 2));
+        let chars = fixture.translation("a")?.style.chars;
+        assert_eq!(
+            (chars.fill, &chars.fill_gradient, chars.tracking),
+            (Some(BLUE), &None, None)
+        );
+        assert_eq!(
+            fixture.translation("a")?.content.0,
+            [span("Why", CharStyle::default()), span("?", yellow)]
+        );
+        assert!(edited(&fixture.layer("a")?).style);
+        assert_eq!(fixture.translation("b")?.content, RichText::from("Why?"));
+        assert!(!edited(&fixture.layer("b")?).hand_edited());
+
+        // Off: the default colour is the box's one paint, on every word.
+        let off = look(false, Some(RED));
+        fixture.apply(&page, true, &off, Origin::Automatic)?;
+        let translation = fixture.translation("a")?;
+        let chars = &translation.style.chars;
+        assert_eq!((chars.fill, &chars.fill_gradient), (Some(RED), &None));
+        assert_eq!(translation.content, RichText::from("Why?"));
         assert!(!edited(&fixture.layer("a")?).hand_edited());
         Ok(())
     }

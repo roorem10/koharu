@@ -16,7 +16,7 @@ use std::{
 
 use anyhow::{Context as _, Result, bail, ensure};
 use booharu_core::{
-    attrs::{self, Attr, Auto, Flags, Lettering, QcOk, ReadNote, ReviewNote},
+    attrs::{self, Attr, Auto, Flags, Lettering, QcOk, ReadNote, ReviewNote, Skew},
     settings::OcrBoxMode,
     sfx, status,
     styles::text_hash,
@@ -865,7 +865,9 @@ fn kept_side(
 /// place ([`half_record`]), as its halves are read and translated again,
 /// which records them anew. A join keeps it, so the joined block's style
 /// set by hand stays a hand edit, and its joined wording, which differs from
-/// what the record holds, counts as one too.
+/// what the record holds, counts as one too. Both drop the skew's record:
+/// a half has no translation to skew, and the joined translation is placed
+/// afresh, unskewed.
 fn dropped(layer: &Layer, target: &Ref, record: bool) -> Result<Vec<Op>> {
     fn drop<A: Attr>(layer: &Layer, target: &Ref, ops: &mut Vec<Op>) {
         if layer
@@ -883,6 +885,7 @@ fn dropped(layer: &Layer, target: &Ref, record: bool) -> Result<Vec<Op>> {
     }
     drop::<QcOk>(layer, target, &mut ops);
     drop::<ReadNote>(layer, target, &mut ops);
+    drop::<Skew>(layer, target, &mut ops);
     Ok(ops)
 }
 
@@ -2311,6 +2314,39 @@ mod tests {
         Ok(())
     }
 
+    /// Whether `layer` holds a skew record, one that doesn't read included.
+    fn holds_skew(layer: &Layer) -> bool {
+        layer
+            .attributes
+            .get(attrs::NAMESPACE)
+            .is_some_and(|keys| keys.contains_key(Skew::KEY))
+    }
+
+    /// Skews `block`'s translation 20 degrees as the FX window does.
+    fn skew(page: &mut Fixture, block: LayerId) -> Result<()> {
+        let change = crate::effects::set_skew(&page.session.project(), &[block], Some(20.0), None)?;
+        page.session.apply(change.edit.context("a skew")?)?;
+        assert!(holds_skew(page.session.project().layer(block)?));
+        Ok(())
+    }
+
+    #[test]
+    fn a_join_places_the_joined_translation_unskewed() -> Result<()> {
+        let (mut page, [first, second]) = two_cleaned("あ", "う")?;
+        run_on(&mut page, first, "Ah")?;
+        run_on(&mut page, second, "Oh")?;
+        skew(&mut page, first)?;
+
+        page.session.apply(join_balloon(&page.session, first)?)?;
+
+        let project = page.session.project();
+        assert!(!holds_skew(project.layer(first)?));
+        let translation = page.block(first)?.translation.context("a translation")?;
+        assert_eq!(translation.transform, Transform::default());
+        assert_eq!(booharu_core::skew::shown(&translation, None), (0.0, 0.0));
+        Ok(())
+    }
+
     #[test]
     fn a_locked_block_or_balloon_stops_a_join() -> Result<()> {
         let Split {
@@ -2825,6 +2861,27 @@ mod tests {
         page.session.go_to(before)?;
         let layer = page.session.project().layer(block)?.clone();
         assert!(recorded(&layer, status::OCR) && recorded(&layer, status::TRANSLATION));
+        Ok(())
+    }
+
+    #[test]
+    fn a_split_drops_the_skew_from_both_halves() -> Result<()> {
+        let mut page = Fixture::new(400, 400, &[rect(0.0, 0.0, 400.0, 400.0)])?;
+        let bounds = page_bounds(100.0, 20.0, 40.0, 100.0);
+        let block = page.add(None, text_block(bounds, Direction::Vertical, "あいう"))?;
+        run_on(&mut page, block, "Who?")?;
+        skew(&mut page, block)?;
+        let before = page.session.history().current;
+
+        let change = page.session.apply(split_block(&page.session, block)?)?;
+
+        let project = page.session.project();
+        for id in split_halves(block, &change)? {
+            assert!(!holds_skew(project.layer(id)?), "{id}");
+        }
+        // Undo gives the block its skew back.
+        page.session.go_to(before)?;
+        assert!(holds_skew(page.session.project().layer(block)?));
         Ok(())
     }
 

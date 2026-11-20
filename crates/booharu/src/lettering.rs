@@ -1209,6 +1209,71 @@ mod tests {
     }
 
     #[test]
+    fn a_category_font_keeps_gradients_and_letter_spacing() -> Result<()> {
+        use koharu_scene::{Gradient, GradientKind, GradientStop, Rgba};
+        let mut fixture = Fixture::new()?;
+        let gradient = Gradient {
+            kind: GradientKind::Radial,
+            angle: 0.0,
+            stops: vec![
+                GradientStop {
+                    offset: 0.0,
+                    color: Rgba([1.0, 1.0, 0.0, 1.0]),
+                },
+                GradientStop {
+                    offset: 1.0,
+                    color: Rgba([1.0, 0.0, 0.0, 1.0]),
+                },
+            ],
+        };
+        // By hand: a's gradient and letter spacing, and a gradient on a
+        // word.
+        let a = fixture.id("a");
+        let spans = vec![
+            Span {
+                insert: "Why".to_owned(),
+                attributes: CharStyle {
+                    fill_gradient: Some(gradient.clone()),
+                    ..CharStyle::default()
+                },
+            },
+            Span {
+                insert: "?".to_owned(),
+                attributes: CharStyle::default(),
+            },
+        ];
+        fixture.edit(vec![
+            Op::UpdateLayer {
+                layer: a.into(),
+                patch: json!({"translation": {"style": {"chars": {
+                    "fill_gradient": gradient, "tracking": 250.0,
+                }}}}),
+            },
+            Op::SetRichText {
+                layer: a.into(),
+                spans: spans.clone(),
+            },
+        ])?;
+        fixture.set(
+            &["a"],
+            Some(LetteringCategory::Shout),
+            Chooser::User,
+            &lettered(),
+        )?;
+        let translation = fixture.translation("a")?;
+        assert_eq!(fixture.font("a")?, font("Badaboom BB", Some(700)));
+        let chars = &translation.style.chars;
+        assert_eq!(
+            (&chars.fill_gradient, chars.tracking),
+            (&Some(gradient), Some(250.0))
+        );
+        assert_eq!(translation.content.0, spans);
+        // Still hand edits, which a model's pick leaves.
+        assert!(edited(&fixture.layer("a")?).style);
+        Ok(())
+    }
+
+    #[test]
     fn with_no_default_font_a_font_without_a_family_takes_the_one_before_away() -> Result<()> {
         let mut fixture = Fixture::new()?;
         // No default font; Whisper is italic, with no family of its own, and

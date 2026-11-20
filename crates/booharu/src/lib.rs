@@ -3,11 +3,12 @@
 //! check (`qc`), Read chapter, the run planner, script export and import,
 //! Apply's default text look and Reset to lettering default (`styles`),
 //! changing blocks' lettering categories (`lettering`), words made bold,
-//! italic or stressed by hand (`words`), sound effects' subtitles (`sfx`),
-//! Redo boxes (`redo`), and the series glossary and chapter notes as the
-//! user and the agent change them, Read chapter and Explain this line among
-//! them (`context`), with the model calls they make (`calls`), the models
-//! they choose (`models`), and the jobs they run as (`jobs`).
+//! italic or stressed by hand (`words`), the skew the FX window sets and
+//! the text effects the fx tag shows (`effects`), sound effects' subtitles
+//! (`sfx`), Redo boxes (`redo`), and the series glossary and chapter notes
+//! as the user and the agent change them, Read chapter and Explain this
+//! line among them (`context`), with the model calls they make (`calls`),
+//! the models they choose (`models`), and the jobs they run as (`jobs`).
 //!
 //! It may depend on koharu-pipeline, koharu-scene, koharu-llm, and
 //! koharu-renderer, as well as booharu-core. Koharu's pipeline calls only
@@ -17,6 +18,7 @@
 pub mod boxes;
 pub mod calls;
 pub mod context;
+pub mod effects;
 pub mod jobs;
 pub mod lettering;
 pub mod models;
