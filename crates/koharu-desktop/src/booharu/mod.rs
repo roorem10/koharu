@@ -30,6 +30,7 @@ pub(crate) mod settings;
 pub(crate) mod sfx;
 pub(crate) mod styles;
 pub(crate) mod translation;
+pub(crate) mod words;
 
 use std::sync::Arc;
 
