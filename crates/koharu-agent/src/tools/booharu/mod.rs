@@ -46,6 +46,7 @@
 //! | `booharu_count_redo` | how many of the blocks named Redo boxes would run its stages on as they are, would take only on purpose as fixed by hand, and leaves alone as locked | yes |
 //! | `booharu_redo_boxes` | reads, translates, or cleans chosen blocks again in one run, as Redo boxes does, leaving out locked ones and, unless told to take them, those fixed by hand, and answers the run and how many it left alone | no |
 //! | `booharu_style_words` | styles some words of a block's translation or a text layer, named by their wording or by character offsets, as one undo step: its lettering category's emphasis, a step bigger or smaller from each word's own size, bold, italic, a font, a size, colours, an outline and a second border of their own, or none of their own again, and answers the words, where they are, and what changed | no |
+//! | `booharu_clear_word_styles` | takes every word style off whole boxes, blocks' translations and text layers, so their words look as their boxes, as one undo step, leaving locked ones alone, and answers how many it cleared and left alone as locked | no |
 
 mod boxes;
 mod context;
@@ -276,6 +277,7 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(runs::CountRedo);
     tools.add_tool(runs::RedoBoxes);
     tools.add_tool(words::StyleWords);
+    tools.add_tool(words::ClearWordStyles);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one

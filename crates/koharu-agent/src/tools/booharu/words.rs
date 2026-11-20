@@ -3,13 +3,14 @@
 //! lettering category's emphasis says, made a step bigger or smaller, given
 //! values of their own, or cleared, as one undo step worked out by
 //! `booharu::words`, as the app's word toolbar and type bar style words
-//! chosen by hand. Koharu's `edit` can't: its schema leaves out
-//! `set_rich_text`, the op that marks single characters. The agent names
-//! the words by their wording, found as a translation run finds the words
-//! its model picks to stress, or by Unicode character offsets, which the
-//! tool turns into the UTF-8 byte offsets the scene takes. The edit leaves
-//! the hand-edit record as it is, so a word it styles is a hand edit, as
-//! one styled in the app is.
+//! chosen by hand; and every word style taken off whole boxes at once, as
+//! the type bar's Clear does with no words chosen. Koharu's `edit` can't:
+//! its schema leaves out `set_rich_text`, the op that marks single
+//! characters. The agent names the words by their wording, found as a
+//! translation run finds the words its model picks to stress, or by Unicode
+//! character offsets, which the tool turns into the UTF-8 byte offsets the
+//! scene takes. Both edits leave the hand-edit record as it is, as the
+//! app's do, so a word styled is a hand edit, as one styled in the app is.
 
 use std::{
     ops::{Range, RangeInclusive},
@@ -17,7 +18,7 @@ use std::{
 };
 
 use anyhow::{Context as _, ensure};
-use booharu::words::{self, SizeStep, WordChange};
+use booharu::words::{self, ClearedWords, SizeStep, WordChange};
 use booharu_core::{
     emphasis::{self, EmphasisSettings},
     settings::LetteringSettings,
@@ -261,7 +262,8 @@ impl Tool for StyleWords {
          outside the outline, and only with one, `outer_stroke` and `outer_stroke_width`, \
          colours as [red, green, blue, alpha] from 0 to 1 and widths in pixels from 0 to 100; \
          or `clear` true, which takes every value of the words' own off, a translation run's \
-         emphasis included, so they look as the rest of the box. `bold` false and `italic` false \
+         emphasis included, so they look as the rest of the box (booharu_clear_word_styles \
+         takes them off every word of whole boxes at once). `bold` false and `italic` false \
          give the words the box's own weight or slant back, so in a bold or italic box they set \
          regular or upright. A word's own values win over the box's: changing the box's look \
          with `edit` leaves them, so clear the words first when they should follow it. Words \
@@ -338,6 +340,73 @@ fn settings(tools: &Tools) -> anyhow::Result<(EmphasisSettings, LetteringSetting
     })
 }
 
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ClearWordStylesArgs {
+    /// The boxes, at least one: blocks, whose translations' words are
+    /// cleared, and text layers.
+    #[schemars(length(min = 1))]
+    layers: Vec<LayerId>,
+}
+
+pub(super) struct ClearWordStyles;
+
+impl Tool for ClearWordStyles {
+    const NAME: &'static str = "booharu_clear_word_styles";
+    type Args = ClearWordStylesArgs;
+    type Output = ClearedWords;
+    type Error = ToolExecutionError;
+
+    fn description(&self) -> String {
+        "Take every word style off whole boxes, as one undo step, as the type bar's Clear does \
+         with no words chosen: each of `layers`, a block, whose translation's words are cleared, \
+         or a text layer, has every value of its words' own taken off, bold, italic, a font, a \
+         size, colours and borders, a translation run's emphasis and the user's own styles \
+         included, so its words look as the box does; the box's own look, its words and the \
+         rest stay. Use it when the user wants plain words in those boxes again, or before \
+         changing a box's look with `edit` when its words should follow it, as a word's own \
+         values win over the box's; booharu_style_words's `clear` does it for some words, and \
+         booharu_reset_lettering gives a box its whole default look back, word styles and all. \
+         A locked layer, or one inside a locked layer, is left as it is; a block without a \
+         translation, a box whose words have no styles of their own, and any other layer are \
+         left out, and a box named twice counts once. Answers how many boxes it `cleared` and \
+         how many with word styles it left as they are as `locked`: tell the user about any it \
+         left alone. With nothing to clear, it makes no undo step. An empty `layers` is \
+         refused."
+            .to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        schema::<ClearWordStylesArgs>()
+    }
+
+    async fn call(
+        &self,
+        context: &mut ToolContext,
+        args: ClearWordStylesArgs,
+    ) -> Result<ClearedWords, Self::Error> {
+        if args.layers.is_empty() {
+            return Err(ToolExecutionError::invalid_args(
+                "name the boxes to clear in `layers`: blocks or text layers",
+            ));
+        }
+        let tools = project(context)?;
+        // On a blocking thread, as `edit` applies, and under one lock, so the
+        // boxes counted are the ones cleared.
+        tokio::task::spawn_blocking(move || -> anyhow::Result<ClearedWords> {
+            let mut session = tools.session.lock();
+            let mut cleared = words::clear_all(&session.project(), &args.layers)?;
+            if let Some(edit) = cleared.edit.take() {
+                session.apply(edit)?;
+            }
+            Ok(cleared)
+        })
+        .await
+        .map_err(failed)?
+        .map_err(|error| failed(format!("{error:#}")))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -347,7 +416,7 @@ mod tests {
     };
     use koharu_pipeline::{Pipeline, PipelineConfig};
     use koharu_renderer::{Renderer, RendererConfig};
-    use koharu_scene::{Content, Created, Edit, Layer, RichText, Session, Span};
+    use koharu_scene::{Content, Created, Edit, Layer, Op, RichText, Session, Span};
     use parking_lot::Mutex;
     use rig_core::tool::ToolErrorKind;
     use serde_json::{Map, json};
@@ -531,6 +600,41 @@ mod tests {
             size: Some(size),
             ..CharStyle::default()
         }
+    }
+
+    /// Calls the clearing tool with `args`, as the agent sends them.
+    async fn clear(tools: &Tools, args: Value) -> Result<ClearedWords, ToolExecutionError> {
+        let args = serde_json::from_value(args).expect("arguments the tool takes");
+        ClearWordStyles.call(&mut tools.tool_context(), args).await
+    }
+
+    /// The block `locked` with its first "NO" bold, marked straight through
+    /// the scene with its lock off for a moment, as a box styled before it
+    /// was locked; the words it then holds.
+    fn styled_before_locked(tools: &Tools, locked: LayerId) -> RichText {
+        let bold = CharStyle {
+            weight: Some(700),
+            ..CharStyle::default()
+        };
+        let words = RichText(vec![plain("🙂 "), span("NO", bold), plain("! KNOW NO.")]);
+        let lock = |locked_now: bool| Op::UpdateLayer {
+            layer: locked.into(),
+            patch: json!({"locked": locked_now}),
+        };
+        let mark = Op::SetRichText {
+            layer: locked.into(),
+            spans: words.0.clone(),
+        };
+        tools
+            .session
+            .lock()
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops: vec![lock(false), mark, lock(true)],
+            })
+            .expect("a box styled, then locked");
+        assert!(layer(tools, locked).locked);
+        words
     }
 
     #[tokio::test]
@@ -902,14 +1006,79 @@ mod tests {
         assert!(crate::tools::refusal(&schema, &huge).is_some());
     }
 
+    #[tokio::test]
+    async fn clearing_whole_boxes_is_one_undo_step_and_leaves_locked_ones_alone() {
+        let (_dir, tools, id) = opened();
+        let (line, note, locked) = (id("line"), id("note"), id("locked"));
+        let bold = json!({"layer": line, "text": "NO", "bold": true});
+        style(&tools, bold).await.expect("a bold word");
+        let bigger = json!({"layer": line, "text": "KNOW", "step": "bigger"});
+        style(&tools, bigger).await.expect("a bigger word");
+        let italic = json!({"layer": note, "text": "NO", "italic": true});
+        style(&tools, italic).await.expect("an italic word");
+        let kept = styled_before_locked(&tools, locked);
+        let before = steps(&tools).len();
+        // The two boxes cleared, the locked one counted and left as it is;
+        // the block without a translation and the raster are left out, and
+        // the line, named twice, counts once.
+        let names = json!({"layers": [line, note, locked, id("bare"), id("paint"), line]});
+        let cleared = clear(&tools, names.clone()).await.expect("cleared");
+        let answer = serde_json::to_value(&cleared).expect("an answer");
+        assert_eq!(answer, json!({"cleared": 2, "locked": 1}));
+        assert_eq!(held(&tools, line), RichText::from(LINE));
+        assert_eq!(held(&tools, note), RichText::from("Hey NO"));
+        assert_eq!(held(&tools, locked), kept);
+        // Its own size stays: only the words' own values come off.
+        let project = tools.session.lock().project();
+        let Content::Text(text) = &project.layer(note).expect("the note").content else {
+            panic!("the note is a text layer");
+        };
+        assert_eq!(text.style.chars.size, Some(20.0));
+        let labels = steps(&tools);
+        assert_eq!(labels.len(), before + 1);
+        assert_eq!(labels.last().map(String::as_str), Some(words::CLEAR_LABEL));
+        // Cleared again, nothing changes, with no undo step, and the locked
+        // box is still counted.
+        let cleared = clear(&tools, names).await.expect("cleared again");
+        let answer = serde_json::to_value(&cleared).expect("an answer");
+        assert_eq!(answer, json!({"cleared": 0, "locked": 1}));
+        assert_eq!(steps(&tools).len(), before + 1);
+    }
+
+    #[tokio::test]
+    async fn clearing_no_boxes_is_refused() {
+        let (_dir, tools, id) = opened();
+        let before = steps(&tools).len();
+        let error = clear(&tools, json!({"layers": []}))
+            .await
+            .expect_err("no boxes");
+        assert_eq!(error.kind(), ToolErrorKind::InvalidArgs, "{error}");
+        assert_eq!(steps(&tools).len(), before);
+        // The schema refuses an empty list and an unknown argument, and
+        // takes a box.
+        let schema = ClearWordStyles.parameters();
+        assert!(crate::tools::refusal(&schema, &json!({"layers": []})).is_some());
+        let blocks = json!({"layers": [id("line")], "blocks": []});
+        assert!(serde_json::from_value::<ClearWordStylesArgs>(blocks.clone()).is_err());
+        assert!(crate::tools::refusal(&schema, &blocks).is_some());
+        let taken = json!({"layers": [id("line")]});
+        assert_eq!(crate::tools::refusal(&schema, &taken), None);
+    }
+
     #[test]
-    fn styling_words_changes_the_project() {
-        assert_ne!(StyleWords.annotations().read_only_hint, Some(true));
+    fn styling_and_clearing_words_change_the_project() {
         let definitions = Tools::toolset().tool_definitions();
-        let tool = definitions
-            .iter()
-            .find(|tool| tool.name.as_str() == StyleWords::NAME)
-            .expect("booharu_style_words is offered");
-        assert!(!tool.parameters.to_string().contains("$ref"));
+        for (name, annotations) in [
+            (StyleWords::NAME, StyleWords.annotations()),
+            (ClearWordStyles::NAME, ClearWordStyles.annotations()),
+        ] {
+            assert_ne!(annotations.read_only_hint, Some(true), "{name}");
+            let tool = definitions
+                .iter()
+                .find(|tool| tool.name.as_str() == name)
+                .unwrap_or_else(|| panic!("{name} is offered"));
+            assert!(!tool.parameters.to_string().contains("$ref"), "{name}");
+            assert_ne!(tool.annotations.read_only_hint, Some(true), "{name}");
+        }
     }
 }
