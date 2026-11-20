@@ -15,9 +15,10 @@ use tauri::State;
 
 use crate::{app::App, commands::Result};
 
-/// Sets `block`'s translation to `text` as one undo step, placing a new one
+/// Sets `block`'s translation to `text` as one undo step, placing it first
 /// as the Translation stage places its own, in the translator's target
-/// language.
+/// language, when the block has none of its own: none, or only the
+/// placeholder a style set before translating leaves, whose values stay.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_set_translation(

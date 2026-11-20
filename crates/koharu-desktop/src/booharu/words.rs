@@ -26,10 +26,11 @@ use crate::{app::App, commands::Result};
 /// undo step. Refused, with why: a change asking for none or more than one
 /// of clear, emphasis, a step and explicit values; a layer that's neither a
 /// block nor a text layer, or is locked or inside a locked layer; a block
-/// without a translation; a text that changed since ("The text changed.
-/// Select the words again."); and a range that holds no character, or is
-/// past the text or off a character boundary. Only emphasis reads the saved
-/// settings, so a section that can't be read refuses it alone.
+/// without a translation of its own (none, or only the placeholder a style
+/// set before translating leaves); a text that changed since ("The text
+/// changed. Select the words again."); and a range that holds no character,
+/// or is past the text or off a character boundary. Only emphasis reads the
+/// saved settings, so a section that can't be read refuses it alone.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_style_words(

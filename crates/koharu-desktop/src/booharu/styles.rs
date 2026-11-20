@@ -86,9 +86,11 @@ pub async fn booharu_apply_text_styles(
 /// automatically is on, its category's font; a sound effect's subtitle its
 /// subtitle look; and any other text layer the default look. Only the look
 /// changes: the text, size, frame, and the rest stay. Locked layers and
-/// untranslated boxes are left alone and counted. Answers how many layers it
-/// changed, and how many it left alone as locked or untranslated; with
-/// nothing to change, it makes no undo step.
+/// boxes without a translation are left alone and counted, while a box with
+/// only the placeholder a style set before translating leaves has that style
+/// reset and stays untranslated. Answers how many layers it changed, and how
+/// many it left alone as locked or untranslated; with nothing to change, it
+/// makes no undo step.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_reset_lettering(

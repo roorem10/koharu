@@ -41,10 +41,11 @@ pub async fn booharu_text_effects(
 /// its position, rotation and frame stay: an axis left out keeps each box's
 /// own skew along it, and 0 along both takes the skew off. A box that is, or
 /// is inside, a locked layer is left as it is, a block without a translation
-/// too, and any other layer is left out. Answers how many boxes it changed,
-/// and how many it left as they are because they're locked or untranslated;
-/// with nothing to change, it makes no undo step. An angle out of range
-/// refuses the call.
+/// of its own (none, or only the placeholder a style set before translating
+/// leaves) too, and any other layer is left out. Answers how many boxes it
+/// changed, and how many it left as they are because they're locked or
+/// untranslated; with nothing to change, it makes no undo step. An angle out
+/// of range refuses the call.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_set_skew(
