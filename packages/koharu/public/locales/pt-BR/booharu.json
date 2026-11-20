@@ -590,6 +590,14 @@
     "tools": {
       "ocrBoxModifiers": "Alt: somente OCR. Shift: OCR, tradução e limpeza."
     },
+    "typebar": {
+      "lineSpacing": "Espaçamento entre linhas",
+      "lineSpacingReset": "Redefinir espaçamento entre linhas",
+      "mixed": "Misto",
+      "mixedDirection": "Direção do texto: mista; clique para deixar todas as caixas selecionadas na vertical",
+      "mixedToggle": "{{field}}: misto; clique para ativar em toda a seleção",
+      "wheelHint": "Clique em um campo numérico e use a roda do mouse para alterar o valor. Segure Shift para passos maiores."
+    },
     "typesetting": {
       "apply": {
         "categories": "Aplique a elas as fontes das categorias e, quando “{{setting}}” está desativado, as cores padrão.",

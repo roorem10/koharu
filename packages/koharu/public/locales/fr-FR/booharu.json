@@ -590,6 +590,14 @@
     "tools": {
       "ocrBoxModifiers": "Alt : lire uniquement. Maj : lire, traduire et nettoyer."
     },
+    "typebar": {
+      "lineSpacing": "Interligne",
+      "lineSpacingReset": "Réinitialiser l’interligne",
+      "mixed": "Valeurs mixtes",
+      "mixedDirection": "Sens du texte : mixte ; cliquez pour passer toutes les zones sélectionnées à la verticale",
+      "mixedToggle": "{{field}} : valeurs mixtes ; cliquez pour l’activer sur toute la sélection",
+      "wheelHint": "Cliquez dans un champ numérique et faites tourner la molette pour modifier sa valeur. Maintenez Maj enfoncée pour des pas plus grands."
+    },
     "typesetting": {
       "apply": {
         "categories": "Leur appliquer les polices de leur catégorie et, lorsque « {{setting}} » est désactivé, les couleurs par défaut.",

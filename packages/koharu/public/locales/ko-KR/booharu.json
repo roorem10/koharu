@@ -550,6 +550,14 @@
     "tools": {
       "ocrBoxModifiers": "Alt: OCR만. Shift: OCR, 번역 및 정리."
     },
+    "typebar": {
+      "lineSpacing": "줄 간격",
+      "lineSpacingReset": "줄 간격 초기화",
+      "mixed": "혼합",
+      "mixedDirection": "텍스트 방향: 혼합됨. 클릭하면 선택한 모든 상자가 세로쓰기가 됩니다",
+      "mixedToggle": "{{field}}: 혼합됨. 클릭하면 모두에 적용됩니다",
+      "wheelHint": "숫자 입력란을 클릭한 뒤 마우스 휠을 돌려 값을 변경하세요. Shift 키를 누른 채 돌리면 더 크게 바뀝니다."
+    },
     "typesetting": {
       "apply": {
         "categories": "각 범주의 글꼴을 적용하고, “{{setting}}” 옵션이 꺼져 있으면 기본 색상도 적용합니다.",

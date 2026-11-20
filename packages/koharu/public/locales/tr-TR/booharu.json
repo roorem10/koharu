@@ -550,6 +550,14 @@
     "tools": {
       "ocrBoxModifiers": "Alt: yalnızca oku. Shift: oku, çevir ve temizle."
     },
+    "typebar": {
+      "lineSpacing": "Satır aralığı",
+      "lineSpacingReset": "Satır aralığını sıfırla",
+      "mixed": "Karışık",
+      "mixedDirection": "Metin yönü: karışık; seçilen tüm kutuları dikey yapmak için tıklayın",
+      "mixedToggle": "{{field}}: karışık; tümünde açmak için tıklayın",
+      "wheelHint": "Değeri değiştirmek için sayı kutusuna tıklayıp fare tekerleğini kaydırın. Daha büyük adımlar için Shift tuşunu basılı tutun."
+    },
     "typesetting": {
       "apply": {
         "categories": "Kategorilerinin yazı tiplerini ve “{{setting}}” kapalıyken varsayılan renkleri onlara uygulayın.",

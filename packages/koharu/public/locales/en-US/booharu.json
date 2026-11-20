@@ -550,6 +550,14 @@
     "tools": {
       "ocrBoxModifiers": "Alt: read only. Shift: read, translate and clean."
     },
+    "typebar": {
+      "lineSpacing": "Line spacing",
+      "lineSpacingReset": "Reset line spacing",
+      "mixed": "Mixed",
+      "mixedDirection": "Text direction: mixed; click to make every selected box vertical",
+      "mixedToggle": "{{field}}: mixed; click to turn it on for all",
+      "wheelHint": "Click into a number box and turn the mouse wheel to change it. Hold Shift for bigger steps."
+    },
     "typesetting": {
       "apply": {
         "categories": "Give them their category fonts, and the default colors when “{{setting}}” is off.",

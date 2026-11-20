@@ -550,6 +550,14 @@
     "tools": {
       "ocrBoxModifiers": "Alt：光识别。Shift：识别、翻译搭清理。"
     },
+    "typebar": {
+      "lineSpacing": "行间距",
+      "lineSpacingReset": "重置行间距",
+      "mixed": "混合值",
+      "mixedDirection": "文本方向：混合值；点一下，让所有拣中个文字框侪变竖排",
+      "mixedToggle": "{{field}}：混合值；点一下，让全部侪启用",
+      "wheelHint": "点进数字框，再滚动鼠标滚轮就好改数值。揿牢 Shift 一步改得多一眼。"
+    },
     "typesetting": {
       "apply": {
         "categories": "替伊拉用各自类别个字体；“{{setting}}”关脱个辰光还有默认颜色。",

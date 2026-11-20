@@ -550,6 +550,14 @@
     "tools": {
       "ocrBoxModifiers": "Alt：僅辨識。Shift：辨識、翻譯並清理。"
     },
+    "typebar": {
+      "lineSpacing": "行距",
+      "lineSpacingReset": "重設行距",
+      "mixed": "混合",
+      "mixedDirection": "文字方向：狀態不一致；點選將所有所選文字框設為直排",
+      "mixedToggle": "{{field}}：狀態不一致；點選以全部啟用",
+      "wheelHint": "點選數值輸入框後，捲動滑鼠滾輪即可變更數值。按住 Shift 可加大步距。"
+    },
     "typesetting": {
       "apply": {
         "categories": "為它們套用各自類別的字型；「{{setting}}」關閉時還包括預設色彩。",

@@ -550,6 +550,14 @@
     "tools": {
       "ocrBoxModifiers": "Alt：OCRのみ。Shift：OCR・翻訳・クリーンアップ。"
     },
+    "typebar": {
+      "lineSpacing": "行間",
+      "lineSpacingReset": "行間をリセット",
+      "mixed": "混在",
+      "mixedDirection": "文字方向：混在しています。クリックすると選択したすべてのボックスが縦書きになります",
+      "mixedToggle": "{{field}}：混在しています。クリックするとすべてで有効になります",
+      "wheelHint": "数値欄をクリックし、マウスホイールで値を変更できます。Shift キーを押しながら回すと大きく変わります。"
+    },
     "typesetting": {
       "apply": {
         "categories": "それぞれのカテゴリのフォントと、「{{setting}}」がオフのときは既定の色を適用します。",

@@ -590,6 +590,14 @@
     "tools": {
       "ocrBoxModifiers": "Alt: solo leer. Mayús: leer, traducir y limpiar."
     },
+    "typebar": {
+      "lineSpacing": "Interlineado",
+      "lineSpacingReset": "Restablecer interlineado",
+      "mixed": "Mixto",
+      "mixedDirection": "Dirección del texto: mixta; haz clic para poner en vertical todos los cuadros seleccionados",
+      "mixedToggle": "{{field}}: mixto; haz clic para activarlo en toda la selección",
+      "wheelHint": "Haz clic en un campo numérico y gira la rueda del ratón para cambiar su valor. Mantén pulsada Mayús para avanzar a pasos más grandes."
+    },
     "typesetting": {
       "apply": {
         "categories": "Aplícales las fuentes de sus categorías y, si “{{setting}}” está desactivado, los colores predeterminados.",
