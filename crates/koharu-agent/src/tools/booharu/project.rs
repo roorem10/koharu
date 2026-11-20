@@ -343,7 +343,12 @@ mod tests {
             add("note", json!({"kind": "text", "content": "a"})),
             set("plain", "booharu", "lettering", lettering.clone()),
             set("plain", "c2pa", "ocr", json!({"action": "c2pa.created"})),
-            set("note", "booharu", "skew", json!({"x": 10.0, "y": 0.0})),
+            set(
+                "note",
+                "booharu",
+                "skew",
+                json!({"x": 10.0, "y": 0.0, "pivot": [0.0, 0.0]}),
+            ),
             set("done", "booharu", "skew", json!("not a skew")),
         ];
         let ops = ops
@@ -384,7 +389,7 @@ mod tests {
                 "translated": 1,
                 "attributes": {
                     id("plain"): {"lettering": lettering},
-                    id("note"): {"skew": {"x": 10.0, "y": 0.0}},
+                    id("note"): {"skew": {"x": 10.0, "y": 0.0, "pivot": [0.0, 0.0]}},
                 },
                 "hand_edited": {
                     id("plain"): ["drawn"],
