@@ -346,6 +346,26 @@ impl Canvas {
         }
     }
 
+    /// Booharu: takes marks off what's selected while typing for real, as
+    /// the type bar's Clear, B off and I off ask, or off the style held for
+    /// what's typed next at a caret; nothing when not typing.
+    pub fn unmark_typing(&mut self, what: crate::booharu::Unmark) -> anyhow::Result<()> {
+        match &mut self.typing {
+            Some(typing) => typing.unmark(what),
+            None => Ok(()),
+        }
+    }
+
+    /// Booharu: what's selected while typing a step bigger or smaller, as
+    /// the type bar's A+ and A− ask, or the size held for what's typed next
+    /// at a caret; nothing when not typing.
+    pub fn step_typing_size(&mut self, bigger: bool) -> anyhow::Result<()> {
+        match &mut self.typing {
+            Some(typing) => typing.step_size(bigger),
+            None => Ok(()),
+        }
+    }
+
     /// The input method's composition while typing, `selected` being the
     /// part it has selected; empty when it stops composing.
     pub fn compose(&mut self, text: &str, selected: Option<(usize, usize)>) -> anyhow::Result<()> {

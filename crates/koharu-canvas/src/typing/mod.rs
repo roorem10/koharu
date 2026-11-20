@@ -5,6 +5,8 @@
 //! layer, and leaving commits it as one step, as Photoshop's "Edit Type
 //! Layer". Offsets are UTF-8 offsets into its characters.
 
+// Booharu: Booharu's part of typing, which reads the session's own fields.
+mod booharu;
 mod keys;
 mod style;
 
@@ -456,6 +458,7 @@ impl Typing {
             layer: self.target(),
             chars,
             mixed,
+            selected: self.quoted(), // Booharu: the selected text the type bar quotes.
         }
     }
 

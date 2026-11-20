@@ -1,7 +1,9 @@
 //! The O tool's box, as the canvas answers it, the default look of the text
 //! the T tool adds and of a translation typed into a block with none, the
 //! clean-up such a translation shows again on a sound effect kept as art,
-//! and Escape keeping what's typed, on the canvas's harness.
+//! and, while typing, Escape keeping what's typed, marks taken off, size
+//! steps and the selected text the type bar quotes, on the canvas's
+//! harness.
 
 use std::collections::BTreeMap;
 
@@ -11,10 +13,10 @@ use booharu_core::{
     settings::{DefaultTextStyle, LetteringSettings},
     sfx,
 };
-use koharu_scene::{CharStyle, Fit};
+use koharu_scene::{CharStyle, Fit, RichText};
 
 use super::*;
-use crate::booharu::{BooharuSettings, BoxModifiers, Effect as Booharu, TextDefaults};
+use crate::booharu::{BooharuSettings, BoxModifiers, Effect as Booharu, TextDefaults, Unmark};
 
 const NONE: Modifiers = Modifiers::empty();
 
@@ -721,4 +723,319 @@ fn escape_during_a_composition_drops_only_the_composition() {
         panic!("one layer");
     };
     assert_eq!(layer(&fixture, added)["content"], json!([{"insert": "ab"}]));
+}
+
+/// A point text of `content` in the character values `chars`, its origin
+/// at (100, 200), typed into with the T tool, the caret at its start: the
+/// fixture and the text.
+fn typing_into(content: Value, chars: Value) -> Option<(Fixture, LayerId)> {
+    let mut fixture = unscaled(vec![
+        json!({"op": "add_layer", "page": "$page", "index": 0, "layer": {
+            "kind": "text", "content": content, "style": {"chars": chars},
+            "transform": [[1.0, 0.0, 100.0], [0.0, 1.0, 200.0]],
+        }}),
+    ])?;
+    let text = layers(&fixture)[0];
+    fixture.canvas.set_tool(Tool::Text);
+    let effects = gesture(&mut fixture.canvas, (101.0, 220.0), (101.0, 220.0));
+    assert_eq!(selections(&effects), [vec![text]]);
+    press_key(&mut fixture.canvas, NamedKey::Home, Code::Home, NONE);
+    Some((fixture, text))
+}
+
+/// Selects `count` graphemes after the first `skip`.
+fn select(canvas: &mut Canvas, skip: usize, count: usize) {
+    press_key(canvas, NamedKey::Home, Code::Home, NONE);
+    for _ in 0..skip {
+        press_key(canvas, NamedKey::ArrowRight, Code::ArrowRight, NONE);
+    }
+    for _ in 0..count {
+        press_key(canvas, NamedKey::ArrowRight, Code::ArrowRight, SHIFT);
+    }
+}
+
+fn select_all(canvas: &mut Canvas) {
+    let all = key_down(Key::Character("a".to_owned()), Code::KeyA, CONTROL);
+    canvas.key(&all).expect("a key");
+}
+
+/// The words of a content, as a layer's JSON holds it, each with its marks.
+fn spans(content: &Value) -> Vec<(String, CharStyle)> {
+    let content: RichText = serde_json::from_value(content.clone()).expect("spans");
+    content
+        .0
+        .into_iter()
+        .map(|span| (span.insert, span.attributes))
+        .collect()
+}
+
+/// Commits the typing in one step: the text's words, each with its marks.
+fn committed(fixture: &mut Fixture, text: LayerId) -> Vec<(String, CharStyle)> {
+    let effects = leave(&mut fixture.canvas, Leave::Commit);
+    assert_eq!(apply(fixture, effects), ["set_text"]);
+    spans(&layer(fixture, text)["content"])
+}
+
+fn marks(json: Value) -> CharStyle {
+    serde_json::from_value(json).expect("marks")
+}
+
+fn words(spans: &[(&str, Value)]) -> Vec<(String, CharStyle)> {
+    spans
+        .iter()
+        .map(|(insert, json)| ((*insert).to_owned(), marks(json.clone())))
+        .collect()
+}
+
+#[test]
+fn clear_takes_every_mark_off_the_selection_only() {
+    let content = json!([
+        {"insert": "Hello", "attributes": {"weight": 700, "size": 30}},
+        {"insert": " world", "attributes": {"italic": true}},
+    ]);
+    let Some((mut fixture, text)) = typing_into(content, json!({"size": 40})) else {
+        return;
+    };
+    // "lo wo".
+    select(&mut fixture.canvas, 3, 5);
+    fixture.canvas.unmark_typing(Unmark::All).expect("Clear");
+    let typing = fixture.canvas.typing().expect("typing");
+    assert_eq!(typing.chars.size, Some(40.0));
+    assert!(typing.mixed.is_empty(), "{:?}", typing.mixed);
+    assert_eq!(
+        committed(&mut fixture, text),
+        words(&[
+            ("Hel", json!({"weight": 700, "size": 30})),
+            ("lo wo", json!({})),
+            ("rld", json!({"italic": true})),
+        ])
+    );
+}
+
+#[test]
+fn clear_at_a_caret_types_the_next_characters_without_marks() {
+    let content = json!([{"insert": "Hello", "attributes": {"weight": 700}}]);
+    let Some((mut fixture, text)) = typing_into(content, json!({"size": 40})) else {
+        return;
+    };
+    press_key(&mut fixture.canvas, NamedKey::End, Code::End, NONE);
+    fixture.canvas.unmark_typing(Unmark::All).expect("Clear");
+    // The next character's style is the text's.
+    let typing = fixture.canvas.typing().expect("typing");
+    assert_eq!((typing.chars.weight, typing.chars.size), (None, Some(40.0)));
+    type_text(&mut fixture.canvas, "!");
+    assert_eq!(
+        committed(&mut fixture, text),
+        words(&[("Hello", json!({"weight": 700})), ("!", json!({}))])
+    );
+}
+
+#[test]
+fn bold_off_takes_the_weight_off_a_regular_text_and_writes_regular_over_a_bold_one() {
+    let content = json!([
+        {"insert": "Hello", "attributes": {"weight": 700, "size": 30}},
+        {"insert": " world"},
+    ]);
+    let Some((mut fixture, text)) = typing_into(content, json!({"size": 40})) else {
+        return;
+    };
+    select(&mut fixture.canvas, 0, 5);
+    fixture.canvas.unmark_typing(Unmark::Bold).expect("B off");
+    // The weight goes and the size stays.
+    assert_eq!(
+        committed(&mut fixture, text),
+        words(&[("Hello", json!({"size": 30})), (" world", json!({}))])
+    );
+
+    let bold = json!({"size": 40, "weight": 700});
+    let Some((mut fixture, text)) = typing_into(json!("Hello world"), bold) else {
+        return;
+    };
+    select(&mut fixture.canvas, 0, 5);
+    fixture.canvas.unmark_typing(Unmark::Bold).expect("B off");
+    let typing = fixture.canvas.typing().expect("typing");
+    assert_eq!(typing.chars.weight, Some(400));
+    assert_eq!(
+        committed(&mut fixture, text),
+        words(&[("Hello", json!({"weight": 400})), (" world", json!({}))])
+    );
+}
+
+#[test]
+fn italic_off_takes_the_mark_off_or_writes_upright_over_an_italic_text() {
+    let content =
+        json!([{"insert": "Hello", "attributes": {"italic": true}}, {"insert": " world"}]);
+    let Some((mut fixture, text)) = typing_into(content, json!({"size": 40})) else {
+        return;
+    };
+    select(&mut fixture.canvas, 0, 5);
+    fixture.canvas.unmark_typing(Unmark::Italic).expect("I off");
+    assert_eq!(
+        committed(&mut fixture, text),
+        words(&[("Hello world", json!({}))])
+    );
+
+    let italic = json!({"size": 40, "italic": true});
+    let Some((mut fixture, text)) = typing_into(json!("Hello world"), italic) else {
+        return;
+    };
+    select(&mut fixture.canvas, 0, 5);
+    fixture.canvas.unmark_typing(Unmark::Italic).expect("I off");
+    assert_eq!(
+        committed(&mut fixture, text),
+        words(&[("Hello", json!({"italic": false})), (" world", json!({}))])
+    );
+}
+
+#[test]
+fn marks_taken_off_back_to_the_text_as_it_was_commit_nothing() {
+    let Some((mut fixture, _)) = typing_into(json!("Hello world"), json!({"size": 40})) else {
+        return;
+    };
+    select(&mut fixture.canvas, 0, 5);
+    let bold = CharStyle {
+        weight: Some(700),
+        italic: Some(true),
+        ..CharStyle::default()
+    };
+    fixture.canvas.style_typing(&bold).expect("a style");
+    fixture.canvas.unmark_typing(Unmark::Bold).expect("B off");
+    fixture.canvas.unmark_typing(Unmark::Italic).expect("I off");
+    let before = steps(&fixture);
+    let effects = leave(&mut fixture.canvas, Leave::Commit);
+    assert!(apply(&mut fixture, effects).is_empty());
+    assert!(fixture.canvas.typing().is_none());
+    assert_eq!(steps(&fixture), before);
+}
+
+#[test]
+fn an_untranslated_blocks_marks_come_off_over_its_source() {
+    // A bold source: B off writes regular, as over a bold text.
+    let bold = json!({"kind": "block", "role": "text", "source": {
+        "frame": {"box": {"bounds": {"x": 50.0, "y": 50.0, "width": 100.0, "height": 100.0}}},
+        "content": "やあ",
+        "style": {"chars": {"size": 32.0, "weight": 700}},
+    }});
+    let Some(mut fixture) = unscaled(vec![
+        json!({"op": "add_layer", "page": "$page", "index": 0, "layer": bold}),
+    ]) else {
+        return;
+    };
+    let block = layers(&fixture)[0];
+    fixture.canvas.set_tool(Tool::Text);
+    gesture(&mut fixture.canvas, (100.0, 100.0), (100.0, 100.0));
+    type_text(&mut fixture.canvas, "Hi");
+    select_all(&mut fixture.canvas);
+    fixture.canvas.unmark_typing(Unmark::Bold).expect("B off");
+    let effects = leave(&mut fixture.canvas, Leave::Commit);
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    assert_eq!(
+        spans(&layer(&fixture, block)["translation"]["content"]),
+        words(&[("Hi", json!({"weight": 400}))])
+    );
+
+    // A regular source: B off takes the weight off again.
+    let Some((mut fixture, talk, _)) = untranslated() else {
+        return;
+    };
+    fixture.canvas.set_tool(Tool::Text);
+    gesture(&mut fixture.canvas, (100.0, 100.0), (100.0, 100.0));
+    type_text(&mut fixture.canvas, "Hi");
+    select_all(&mut fixture.canvas);
+    let bold = CharStyle {
+        weight: Some(700),
+        ..CharStyle::default()
+    };
+    fixture.canvas.style_typing(&bold).expect("a style");
+    fixture.canvas.unmark_typing(Unmark::Bold).expect("B off");
+    let effects = leave(&mut fixture.canvas, Leave::Commit);
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    assert_eq!(
+        spans(&layer(&fixture, talk)["translation"]["content"]),
+        words(&[("Hi", json!({}))])
+    );
+}
+
+#[test]
+fn a_size_step_steps_each_selected_character_from_its_own_size() {
+    let content = json!([{"insert": "Big", "attributes": {"size": 50}}, {"insert": " and small"}]);
+    let Some((mut fixture, text)) = typing_into(content, json!({"size": 40})) else {
+        return;
+    };
+    // "Big and": 50 and the text's 40.
+    select(&mut fixture.canvas, 0, 7);
+    fixture.canvas.step_typing_size(true).expect("A+");
+    let typing = fixture.canvas.typing().expect("typing");
+    assert!(typing.mixed.contains(&CharKey::Size));
+    // Stepped back, the text is as it was.
+    fixture.canvas.step_typing_size(false).expect("A-");
+    let unchanged = leave(&mut fixture.canvas, Leave::Commit);
+    assert!(apply(&mut fixture, unchanged).is_empty());
+
+    gesture(&mut fixture.canvas, (101.0, 220.0), (101.0, 220.0));
+    select(&mut fixture.canvas, 0, 7);
+    fixture.canvas.step_typing_size(true).expect("A+");
+    assert_eq!(
+        committed(&mut fixture, text),
+        words(&[
+            ("Big", json!({"size": 52.5})),
+            (" and", json!({"size": 42})),
+            (" small", json!({})),
+        ])
+    );
+}
+
+#[test]
+fn a_size_step_at_a_caret_holds_for_what_is_typed_next() {
+    let Some((mut fixture, text)) = typing_into(json!("Hello"), json!({"size": 40})) else {
+        return;
+    };
+    press_key(&mut fixture.canvas, NamedKey::End, Code::End, NONE);
+    fixture.canvas.step_typing_size(true).expect("A+");
+    let typing = fixture.canvas.typing().expect("typing");
+    assert_eq!(typing.chars.size, Some(42.0));
+    type_text(&mut fixture.canvas, "!");
+    assert_eq!(
+        committed(&mut fixture, text),
+        words(&[("Hello", json!({})), ("!", json!({"size": 42}))])
+    );
+}
+
+fn quoted(canvas: &Canvas) -> Option<String> {
+    canvas.typing().expect("typing").selected
+}
+
+#[test]
+fn the_selection_is_quoted_on_one_line_and_none_at_a_caret() {
+    let Some((mut fixture, _)) = typing_into(json!("Hello\nworld"), json!({"size": 40})) else {
+        return;
+    };
+    assert_eq!(quoted(&fixture.canvas), None);
+    select(&mut fixture.canvas, 0, 3);
+    assert_eq!(quoted(&fixture.canvas).as_deref(), Some("Hel"));
+    select_all(&mut fixture.canvas);
+    assert_eq!(quoted(&fixture.canvas).as_deref(), Some("Hello world"));
+    // A caret again quotes nothing.
+    press_key(&mut fixture.canvas, NamedKey::End, Code::End, NONE);
+    assert_eq!(quoted(&fixture.canvas), None);
+}
+
+#[test]
+fn a_long_selection_is_cut_at_eighty_grapheme_clusters() {
+    let quote = |content: String| -> Option<Option<String>> {
+        let (mut fixture, _) = typing_into(json!(content), json!({"size": 40}))?;
+        select_all(&mut fixture.canvas);
+        Some(quoted(&fixture.canvas))
+    };
+    let Some(cjk) = quote("魔".repeat(100)) else {
+        return;
+    };
+    assert_eq!(cjk, Some(format!("{}…", "魔".repeat(80))));
+    // A thumbs-up with its skin tone is one cluster of two characters.
+    let thumbs = "\u{1F44D}\u{1F3FD}";
+    assert_eq!(
+        quote(thumbs.repeat(81)),
+        Some(Some(format!("{}…", thumbs.repeat(80))))
+    );
+    assert_eq!(quote(thumbs.repeat(80)), Some(Some(thumbs.repeat(80))));
 }

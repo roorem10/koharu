@@ -5,11 +5,15 @@
 //! into a sound effect kept as art also shows its clean-up again, without
 //! the kept mark, in the same step. The Booharu settings the canvas needs
 //! are one `BooharuSettings`, which the host pushes at startup and whenever
-//! the settings they come from are saved.
+//! the settings they come from are saved. What the type bar takes off the
+//! characters being typed is an `Unmark`, which typing's own Booharu part,
+//! `typing/booharu.rs`, does, with the size steps and the selected text the
+//! type bar quotes.
 
 use booharu_core::{lettering, settings::LetteringSettings, sfx, styles};
 use koharu_scene::{CharStyle, Content, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text};
 use kurbo::{Point, Rect, Size};
+use serde::{Deserialize, Serialize};
 use ui_events::keyboard::Modifiers;
 
 use crate::{
@@ -122,6 +126,20 @@ fn role(layers: &[Layer], id: LayerId) -> Option<Role> {
         Content::Block(block) => Some(block.role),
         _ => None,
     }
+}
+
+/// What the type bar takes off the characters being typed, for real, as
+/// the words edit takes marks off Story's words, so they agree.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum Unmark {
+    /// Clear: every mark, so the characters look as the text.
+    All,
+    /// B off: the weight mark, or regular, 400, where the text itself is
+    /// bold (600 or more).
+    Bold,
+    /// I off: the italic mark, or upright where the text itself is italic.
+    Italic,
 }
 
 /// What one of Booharu's gestures did, for the host to act on.

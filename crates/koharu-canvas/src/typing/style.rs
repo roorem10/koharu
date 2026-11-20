@@ -33,6 +33,11 @@ pub struct Typed {
     /// The values the selected characters don't share, which `chars` leaves
     /// empty.
     pub mixed: Vec<CharKey>,
+    /// Booharu: the selected characters as the type bar quotes them, each
+    /// line break a space, cut to 80 grapheme clusters; none at a caret.
+    /// Left out when none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected: Option<String>,
 }
 
 /// What `styles`, each a character's whole style, share, and the values
