@@ -35,6 +35,11 @@ import type { Text } from '@koharu/ipc/protocol'
  * as the window gives the canvas its presses (koharu-desktop's `booharu::canvas::pressed`). */
 export const CANVAS_PRESS = 'booharu:canvas-press'
 
+/** The id of the word toolbar of `layer`'s Story field, which Alt+F10 there moves the focus to. */
+export function wordToolbarId(layer: string): string {
+  return `booharu-word-toolbar-${layer}`
+}
+
 /** What the characters of `text` that the run `range` holds share, each one's marks over the
  * text's style, and the values they don't, as the type bar reads its texts'. */
 export function chosenShare(text: Text, range: WordRange): ReturnType<typeof sharedChars> {
@@ -65,7 +70,9 @@ export function toggleWords(
  * another field choosing words, the field going, and a press outside the field, its word toolbar
  * and the type bar, popups they open included, a press on the canvas among them, which the desktop
  * tells the page of with `CANVAS_PRESS`; a press elsewhere in the sidebar hides the toolbar and
- * keeps the words. Ctrl+B and Ctrl+I in the field do what the toolbar's B and I do. */
+ * keeps the words. Ctrl+B and Ctrl+I in the field do what the toolbar's B and I do, and Alt+F10,
+ * as in editors with a floating toolbar, moves the focus to the toolbar, the field keeping its
+ * selection. */
 export function useWordSelection(layer: BlockLayer | TextLayer) {
   const lettering = letteringOf(layer)
   const saved = plainText(lettering)
@@ -136,6 +143,18 @@ export function useWordSelection(layer: BlockLayer | TextLayer) {
       if (event.key === 'Escape') {
         event.stopPropagation()
         setWordRange(null)
+        return
+      }
+      if (
+        event.key === 'F10' &&
+        event.altKey &&
+        !(event.ctrlKey || event.metaKey || event.shiftKey)
+      ) {
+        event.preventDefault()
+        document
+          .getElementById(wordToolbarId(layer.id))
+          ?.querySelector<HTMLElement>('[tabindex="0"]')
+          ?.focus()
         return
       }
       const kind = typingShortcut(event.nativeEvent)

@@ -1,7 +1,7 @@
 'use client'
 
 import { Bold, Italic, Star } from 'lucide-react'
-import { useLayoutEffect, useRef, useState, type ReactElement } from 'react'
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -14,7 +14,7 @@ import {
   styleWords,
   useWordRange,
 } from '@/lib/booharu/words'
-import { chosenShare } from '@/lib/booharu/wordSelection'
+import { chosenShare, wordToolbarId } from '@/lib/booharu/wordSelection'
 import { letteringOf, type BlockLayer, type TextLayer } from '@/lib/document'
 import type { WordChange } from '@koharu/ipc/protocol'
 import { Toggle } from '@koharu/ui/components/toggle'
@@ -44,13 +44,21 @@ const BUTTON =
  * one undo step each. It floats above the field, or below it near the window's top, in a portal,
  * so the sidebar's scrolling never clips it, and it never covers the words. A press on it leaves
  * the focus, and so the selection, in the field, which commits nothing as it would on losing the
- * focus. B and I show pressed as the type bar's do, by what the words' characters share. */
+ * focus. B and I show pressed as the type bar's do, by what the words' characters share.
+ *
+ * From the keyboard it's a toolbar: Alt+F10 in the field moves the focus to its one tab stop, the
+ * control focused last; the arrows, Home and End move along it, and Escape or Tab take the focus
+ * back to the field, its selection as it was. A key pressed there without Ctrl, Cmd or Alt never
+ * reaches the canvas's shortcuts, so Space presses the focused control and Delete removes no box,
+ * while Ctrl+Z still undoes. */
 export function StoryWordToolbar({ layer }: { layer: BlockLayer | TextLayer }) {
   const { t } = useTranslation()
   const range = useWordRange((state) => (state.range?.layer === layer.id ? state.range : null))
   const field = useWordRange((state) => (state.range?.layer === layer.id ? state.field : null))
   const bar = useRef<HTMLDivElement>(null)
   const [place, setPlace] = useState<Place | null>(null)
+  // The control holding the toolbar's one tab stop: the one focused last.
+  const [stop, setStop] = useState(0)
 
   useLayoutEffect(() => {
     if (!field) {
@@ -83,10 +91,34 @@ export function StoryWordToolbar({ layer }: { layer: BlockLayer | TextLayer }) {
   const bold = isBold(chars, mixed)
   const italic = isItalic(chars, mixed)
   const style = (change: WordChange) => () => void styleWords(range, change)
+  const tab = (at: number) => (at === stop ? 0 : -1)
+  const keys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    event.stopPropagation()
+    if (event.key === 'Escape' || event.key === 'Tab') {
+      event.preventDefault()
+      field.focus()
+      return
+    }
+    const controls = [...event.currentTarget.querySelectorAll('button')]
+    const at = controls.indexOf(event.target as HTMLButtonElement)
+    const count = controls.length
+    const moves: Partial<Record<string, number>> = {
+      ArrowRight: (at + 1) % count,
+      ArrowLeft: (at + count - 1) % count,
+      Home: 0,
+      End: count - 1,
+    }
+    const to = moves[event.key]
+    if (at < 0 || to === undefined) return
+    event.preventDefault()
+    controls[to].focus()
+  }
 
   return createPortal(
     <div
       ref={bar}
+      id={wordToolbarId(layer.id)}
       role='toolbar'
       aria-label={t('booharu.words.toolbar')}
       data-testid='story-word-toolbar'
@@ -103,6 +135,12 @@ export function StoryWordToolbar({ layer }: { layer: BlockLayer | TextLayer }) {
         event.preventDefault()
       }}
       onMouseDown={(event) => event.preventDefault()}
+      onFocus={(event) => {
+        const controls: Element[] = [...event.currentTarget.querySelectorAll('button')]
+        const at = controls.indexOf(event.target)
+        if (at >= 0) setStop(at)
+      }}
+      onKeyDown={keys}
     >
       <Labelled label={t('booharu.words.bold')}>
         <Toggle
@@ -110,6 +148,7 @@ export function StoryWordToolbar({ layer }: { layer: BlockLayer | TextLayer }) {
           size='sm'
           aria-label={t('booharu.words.bold')}
           className={TOGGLE}
+          tabIndex={tab(0)}
           pressed={bold}
           onPressedChange={style(boldWords(bold))}
         >
@@ -122,6 +161,7 @@ export function StoryWordToolbar({ layer }: { layer: BlockLayer | TextLayer }) {
           size='sm'
           aria-label={t('booharu.words.italic')}
           className={TOGGLE}
+          tabIndex={tab(1)}
           pressed={italic}
           onPressedChange={style(italicWords(italic))}
         >
@@ -133,12 +173,13 @@ export function StoryWordToolbar({ layer }: { layer: BlockLayer | TextLayer }) {
           type='button'
           aria-label={t('booharu.words.emphasis')}
           className={BUTTON}
+          tabIndex={tab(2)}
           onClick={style({ emphasis: true })}
         >
           <Star aria-hidden='true' className='size-3.5' />
         </button>
       </Labelled>
-      <button type='button' className={BUTTON} onClick={style({ clear: true })}>
+      <button type='button' className={BUTTON} tabIndex={tab(3)} onClick={style({ clear: true })}>
         {t('booharu.words.clear')}
       </button>
     </div>,

@@ -270,6 +270,59 @@ describe('Booharu words chosen in Story', () => {
     expect(range()).not.toBeNull()
   })
 
+  it('reaches the toolbar from the field with Alt+F10, a toolbar the arrows move along', async () => {
+    const user = userEvent.setup()
+    story(pageOf(block('block', [{ insert: 'Hello world' }])))
+    const field = (await screen.findByPlaceholderText('Translation')) as HTMLTextAreaElement
+    field.focus()
+    choose(field, 6, 11)
+    const bar = within(toolbar()!)
+    const controls = ['Bold', 'Italic', 'Emphasis', 'Clear'].map((name) =>
+      bar.getByRole('button', { name }),
+    )
+    const [bold, , emphasis, clear] = controls
+    const stops = () => controls.map((control) => control.tabIndex)
+
+    await user.keyboard('{Alt>}{F10}{/Alt}')
+    expect(bold).toHaveFocus()
+    // One tab stop, on the control focused last.
+    expect(stops()).toEqual([0, -1, -1, -1])
+
+    // The keys it takes never reach the canvas's shortcuts; a chord does.
+    const canvas = vi.fn((event: KeyboardEvent) => event.key)
+    window.addEventListener('keydown', canvas)
+    await user.keyboard('{ArrowRight}{ArrowRight}')
+    expect(emphasis).toHaveFocus()
+    expect(stops()).toEqual([-1, -1, 0, -1])
+    await user.keyboard('{Enter}{ArrowRight}{ArrowRight}{ArrowLeft}')
+    expect(clear).toHaveFocus()
+    await user.keyboard('{Home}')
+    expect(bold).toHaveFocus()
+    await user.keyboard('{End}[Space]{Delete}')
+    expect(clear).toHaveFocus()
+    expect(canvas).not.toHaveBeenCalled()
+    await user.keyboard('{Control>}z{/Control}')
+    expect(canvas.mock.results.map(({ value }) => value)).toEqual(['Control', 'z'])
+    window.removeEventListener('keydown', canvas)
+
+    const words = ['block', 6, 11, 'Hello world'] as const
+    expect(styled()).toEqual([
+      [...words, { emphasis: true }],
+      [...words, { clear: true }],
+    ])
+
+    // Escape takes the focus back to the field, its words still chosen, as does Tab; Alt+F10 there
+    // finds the control focused last.
+    await user.keyboard('{Escape}')
+    expect(field).toHaveFocus()
+    expect([field.selectionStart, field.selectionEnd]).toEqual([6, 11])
+    expect(range()).toEqual({ layer: 'block', start: 6, end: 11, text: 'Hello world' })
+    await user.keyboard('{Alt>}{F10}{/Alt}')
+    expect(clear).toHaveFocus()
+    await user.keyboard('{Tab}')
+    expect(field).toHaveFocus()
+  })
+
   it('does what B and I do for Ctrl+B and Ctrl+I in the field, only with words chosen', async () => {
     story(pageOf(textLayer('text', [{ insert: 'Hello world', attributes: { italic: true } }])))
     const field = await screen.findByPlaceholderText('Text')
