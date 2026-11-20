@@ -19,6 +19,10 @@
 //!   with its record.
 //! - A translated block's skew stays when it's translated again (D13,
 //!   [`translated`]).
+//! - A style set on a block before it's translated leaves a placeholder
+//!   translation (`status::placeholder`): [`edited`] counts its values as
+//!   set by hand but no text as typed, and a run translating the block keeps
+//!   them, filling in only the keys left unset.
 
 use std::collections::BTreeSet;
 
@@ -34,7 +38,7 @@ use crate::{
     emphasis::{self, Marking},
     lettering::{self, CategoryFont, LetteringCategory},
     settings::{DefaultTextStyle, LetteringSettings},
-    skew,
+    skew, status,
 };
 
 /// The `c2pa` namespace Koharu's stages record what they made in, by step.
@@ -375,7 +379,8 @@ fn merge(target: &mut Value, patch: &Value) {
 }
 
 /// The ops giving a translation typed by hand into `block` in `project`, a
-/// block with none, in the Story panel or through the agent, the default
+/// block with none, or only a placeholder ([`status::placeholder`]) whose
+/// values stay, in the Story panel or through the agent, the default
 /// look, its category's font among it while Pick fonts automatically is on,
 /// as [`new_translation`] gives one, after `placed`, placement's op for it,
 /// both read before the edit; none when they write nothing. It gets no
@@ -597,7 +602,9 @@ pub struct Edited {
     /// stage read the wording it has.
     pub source: bool,
     /// Its translation isn't what the Translation stage wrote, or no stage
-    /// wrote it, as one typed by hand.
+    /// wrote it, as one typed by hand; never for a placeholder
+    /// ([`status::placeholder`]), the empty point text a style set before
+    /// translating leaves, which holds no words.
     pub text: bool,
     /// A style value of its translation isn't the one recorded, a span of
     /// it is marked with one, but for the marks a run's emphasis gave it and
@@ -624,6 +631,12 @@ impl Edited {
 
 /// Which parts of `layer` were changed by hand. A text layer was made by
 /// hand, as the T tool makes one, and any other layer has no text to change.
+///
+/// A style set on a block before it's translated leaves a placeholder
+/// translation ([`status::placeholder`]): its values count as set by hand,
+/// so Detect again keeps the box, Apply leaves it alone and a category
+/// change keeps its font, but it holds no text typed by hand, so the next
+/// run still translates the box, keeping those values.
 pub fn edited(layer: &Layer) -> Edited {
     let block = match &layer.content {
         Content::Block(block) => block,
@@ -645,9 +658,12 @@ pub fn edited(layer: &Layer) -> Edited {
     let (text, style) = match &block.translation {
         None => (false, false),
         Some(translation) => {
+            // A placeholder, the empty point text a style set before
+            // translating leaves, holds no words typed by hand; a run's
+            // translation emptied by hand still differs from its hash.
             let text = match &record.text {
                 Some(hash) => *hash != text_hash(&translation.content.text()),
-                None => !recorded("translation"),
+                None => !recorded("translation") && !status::placeholder(layer, block),
             };
             // A span's marks are a hand edit but for the values a run's
             // emphasis set there and that still hold, and those whitespace
@@ -687,6 +703,7 @@ mod tests {
     use kurbo::{Affine, Point};
 
     use super::*;
+    use crate::testing::type_bar_style;
 
     const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
     const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
@@ -1219,6 +1236,46 @@ mod tests {
         let (_dir, session, block) = page("", &[]);
         let empty = edited(&layer(&session, block));
         assert_eq!((empty.source, empty.drawn), (false, true));
+    }
+
+    #[test]
+    fn a_style_set_before_translating_is_a_style_edit_with_no_text_typed() {
+        // The type bar's font and fill on a box not yet translated: values
+        // set by hand, in a placeholder holding no words.
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        apply(&mut session, vec![type_bar_style(block)]);
+        let styled = edited(&layer(&session, block));
+        assert_eq!((styled.text, styled.style), (false, true));
+        assert!(styled.hand_edited());
+
+        // Words typed into it are the user's.
+        apply(
+            &mut session,
+            vec![Op::SetText {
+                layer: block.into(),
+                text: "Why?".to_owned(),
+            }],
+        );
+        let typed = edited(&layer(&session, block));
+        assert_eq!((typed.text, typed.style), (true, true));
+
+        // A run's translation emptied by hand stays a text edit.
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let look = settings(false, Some(RED), None);
+        translate(&mut session, block, "Why?", &look, Some("CCWildWords"));
+        apply(
+            &mut session,
+            vec![Op::SetText {
+                layer: block.into(),
+                text: String::new(),
+            }],
+        );
+        let found = layer(&session, block);
+        let Content::Block(emptied) = &found.content else {
+            panic!("not a block");
+        };
+        assert!(!status::placeholder(&found, emptied));
+        assert!(edited(&found).text);
     }
 
     #[test]

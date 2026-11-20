@@ -7,8 +7,16 @@
 //! lettering, with no translation and its clean-up hidden, and only
 //! Booharu's hand-edit record, written in the same edit, says the stage wrote
 //! no text there ([`translation_ran`]).
+//!
+//! A box styled before it's translated has a translation that is only a
+//! placeholder ([`placeholder`]): Koharu's type bar, and Koharu's agent's
+//! edit tool, write a style change on a block with no translation into its
+//! translation, which the scene starts from empty point text. It holds no
+//! words and was never placed, so wherever the question is whether a block
+//! is translated, it counts as no translation ([`unwritten`]): the box stays
+//! translatable, and a run that translates it keeps the style set by hand.
 
-use koharu_scene::{Block, Content, Layer, Page};
+use koharu_scene::{Block, Content, Frame, Layer, Page};
 
 use crate::{
     attrs::Auto,
@@ -42,17 +50,54 @@ pub fn blocks(page: &Page) -> Vec<(&Layer, &Block, bool)> {
     blocks
 }
 
-/// Whether `block` has no translation, wasn't translated, and wasn't given
-/// back unchanged, which leaves no translation and hides its clean-up.
-pub fn untranslated(layer: &Layer, block: &Block) -> bool {
-    block.translation.is_none() && !recorded(layer, TRANSLATION) && block.cleanup.visible
+/// Whether `block`, which `layer` holds, has a translation that is only a
+/// placeholder: a style set on the block before it was translated, which
+/// Koharu's type bar and its agent's edit tool write into a block with no
+/// translation, and the scene starts from empty point text. Its words are
+/// blank, trimmed as the record's hash trims them ([`text_hash`]); its frame
+/// is still a point, as nothing placed it (Translate, typing on the canvas
+/// or in the Story panel, and the agent's typing all place a first
+/// translation, while a move or a skew changes only its transform, which
+/// isn't read); and no run wrote it: its hand-edit record holds no
+/// translation and Koharu's Translation stage recorded none, or the record
+/// holds the translation of no text a line given back leaves, styled since.
+/// A translation a run wrote and the user emptied isn't one, as its record
+/// holds the text the run wrote, so it stays a hand edit. False for a block
+/// with no translation at all.
+pub fn placeholder(layer: &Layer, block: &Block) -> bool {
+    let Some(translation) = &block.translation else {
+        return false;
+    };
+    let blank = translation.content.text().trim().is_empty();
+    let unplaced = matches!(translation.frame, Frame::Point);
+    let by_no_run = match Auto::of(layer).text {
+        Some(hash) => hash == text_hash(""),
+        None => !recorded(layer, TRANSLATION),
+    };
+    blank && unplaced && by_no_run
 }
 
-/// Whether `block` keeps the page's own lettering: no translation, and its
-/// clean-up hidden, as Koharu's Translation stage leaves a line it was given
-/// back unchanged, or as a clean-up hidden by hand leaves one.
-pub fn kept(block: &Block) -> bool {
-    block.translation.is_none() && !block.cleanup.visible
+/// Whether `block`, which `layer` holds, has no translation of its own: none
+/// at all, or only a [`placeholder`]. Every reader asking whether a block is
+/// translated asks this, so a box styled before it's translated stays
+/// translatable, while the values set on it stay the user's.
+pub fn unwritten(layer: &Layer, block: &Block) -> bool {
+    block.translation.is_none() || placeholder(layer, block)
+}
+
+/// Whether `block`, which `layer` holds, has no translation of its own
+/// ([`unwritten`]), wasn't translated, and wasn't given back unchanged,
+/// which hides its clean-up.
+pub fn untranslated(layer: &Layer, block: &Block) -> bool {
+    unwritten(layer, block) && !recorded(layer, TRANSLATION) && block.cleanup.visible
+}
+
+/// Whether `block`, which `layer` holds, keeps the page's own lettering: no
+/// translation of its own ([`unwritten`]), and its clean-up hidden, as
+/// Koharu's Translation stage leaves a line it was given back unchanged, or
+/// as a clean-up hidden by hand leaves one, styled since or not.
+pub fn kept(layer: &Layer, block: &Block) -> bool {
+    unwritten(layer, block) && !block.cleanup.visible
 }
 
 /// Whether Koharu's Translation stage wrote the block `layer` holds: it
@@ -66,7 +111,7 @@ pub fn translation_ran(layer: &Layer) -> bool {
 /// Koharu's Translation stage was given its source back unchanged: the
 /// stage wrote it ([`translation_ran`]) and it's [`kept`].
 pub fn given_back(layer: &Layer, block: &Block) -> bool {
-    kept(block) && translation_ran(layer)
+    kept(layer, block) && translation_ran(layer)
 }
 
 #[cfg(test)]
@@ -75,7 +120,7 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::*;
-    use crate::{attrs, styles};
+    use crate::{attrs, sfx, styles, testing::type_bar_style};
 
     /// A page holding a balloon, locked when `locked`, around one block,
     /// and a block of its own, with the `c2pa` records of `steps` on both.
@@ -142,6 +187,44 @@ mod tests {
         }
     }
 
+    fn op(value: Value) -> Op {
+        serde_json::from_value(value).expect("an op")
+    }
+
+    fn apply(session: &mut Session, ops: Vec<Op>) {
+        session
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops,
+            })
+            .expect("the edit");
+    }
+
+    /// Writes the block `id` as Koharu's Translation stage writes a line it
+    /// was given back: no translation, the clean-up hidden, and the record
+    /// of no text, with no `c2pa` record of its own.
+    fn give_back(session: &mut Session, id: LayerId) {
+        let project = session.project();
+        let layer = project.layer(id).expect("the block");
+        let ops = vec![
+            op(json!({"op": "update_layer", "layer": id,
+                "patch": {"translation": null, "cleanup": {"visible": false}}})),
+            styles::given_back(layer).expect("the record"),
+        ];
+        apply(session, ops);
+    }
+
+    /// Whether the block `id` has only a placeholder, and whether it has no
+    /// translation of its own.
+    fn read(session: &Session, id: LayerId) -> (bool, bool) {
+        let project = session.project();
+        let layer = project.layer(id).expect("the block");
+        (
+            placeholder(layer, block(layer)),
+            unwritten(layer, block(layer)),
+        )
+    }
+
     #[test]
     fn a_pages_blocks_come_in_tree_order_with_their_locks() {
         let (_dir, session, [held, free]) = page(true, &[]);
@@ -160,7 +243,7 @@ mod tests {
         let project = session.project();
         let layer = project.layer(id).expect("the block");
         assert!(untranslated(layer, block(layer)));
-        assert!(!kept(block(layer)) && !translation_ran(layer));
+        assert!(!kept(layer, block(layer)) && !translation_ran(layer));
 
         // As the Translation stage writes a line it was given back: no
         // translation, the clean-up hidden, and the record of no text,
@@ -180,7 +263,9 @@ mod tests {
         let project = session.project();
         let layer = project.layer(id).expect("the block");
         assert!(!recorded(layer, TRANSLATION));
-        assert!(kept(block(layer)) && translation_ran(layer) && given_back(layer, block(layer)));
+        assert!(
+            kept(layer, block(layer)) && translation_ran(layer) && given_back(layer, block(layer))
+        );
         assert!(!untranslated(layer, block(layer)));
 
         // A clean-up hidden by hand keeps the lettering too, but no stage
@@ -197,7 +282,109 @@ mod tests {
             .expect("hidden");
         let project = session.project();
         let layer = project.layer(id).expect("the block");
-        assert!(kept(block(layer)) && !given_back(layer, block(layer)));
+        assert!(kept(layer, block(layer)) && !given_back(layer, block(layer)));
         assert_eq!(attrs::get::<Auto>(layer), None);
+    }
+
+    #[test]
+    fn a_style_set_before_translating_leaves_only_a_placeholder() {
+        let typed = |id: LayerId, text: &str| Op::SetText {
+            layer: id.into(),
+            text: text.to_owned(),
+        };
+        let read_steps = [DETECTION, OCR];
+
+        // No translation at all is none of its own, but no placeholder.
+        let (_dir, mut session, [_, id]) = page(false, &read_steps);
+        assert_eq!(read(&session, id), (false, true));
+        // A font and a fill picked in the type bar start one from empty
+        // point text: a placeholder.
+        apply(&mut session, vec![type_bar_style(id)]);
+        assert_eq!(read(&session, id), (true, true));
+        // A move changes only its transform: still one.
+        apply(
+            &mut session,
+            vec![op(json!({"op": "transform_layer", "layer": id,
+                "transform": [[1.0, 0.0, 12.0], [0.0, 1.0, 8.0]]}))],
+        );
+        assert_eq!(read(&session, id), (true, true));
+        // Whitespace is no words.
+        apply(&mut session, vec![typed(id, " \n")]);
+        assert_eq!(read(&session, id), (true, true));
+        // Words typed in are a translation.
+        apply(&mut session, vec![typed(id, "Why?")]);
+        assert_eq!(read(&session, id), (false, false));
+
+        // Resized into a box, it was placed by hand.
+        let (_dir, mut session, [_, id]) = page(false, &read_steps);
+        let boxed = op(json!({"op": "update_layer", "layer": id,
+            "patch": {"translation": {"frame": {"box": {"bounds":
+                {"x": 0, "y": 0, "width": 40, "height": 20}}}}}}));
+        apply(&mut session, vec![type_bar_style(id), boxed]);
+        assert_eq!(read(&session, id), (false, false));
+
+        // Whitespace typed into a block with none, unstyled, is point text
+        // no run wrote too.
+        let (_dir, mut session, [_, id]) = page(false, &read_steps);
+        apply(&mut session, vec![typed(id, "  ")]);
+        assert_eq!(read(&session, id), (true, true));
+
+        // A run's translation emptied by hand: the record holds the text
+        // the run wrote.
+        let (_dir, mut session, [_, id]) = page(false, &read_steps);
+        let record = Auto {
+            text: Some(text_hash("Why?")),
+            ..Auto::default()
+        };
+        apply(
+            &mut session,
+            vec![
+                type_bar_style(id),
+                attrs::set(id, &record).expect("the record"),
+            ],
+        );
+        assert_eq!(read(&session, id), (false, false));
+
+        // Written by Koharu's Translation stage, with no Booharu record.
+        let (_dir, mut session, [_, id]) = page(false, &[DETECTION, OCR, TRANSLATION]);
+        apply(&mut session, vec![type_bar_style(id)]);
+        assert_eq!(read(&session, id), (false, false));
+
+        // A line given back, styled since: its record holds no text.
+        let (_dir, mut session, [_, id]) = page(false, &read_steps);
+        give_back(&mut session, id);
+        apply(&mut session, vec![type_bar_style(id)]);
+        assert_eq!(read(&session, id), (true, true));
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_reads_as_one_with_no_translation() {
+        // Its clean-up showing: still to translate.
+        let (_dir, mut session, [_, id]) = page(false, &[DETECTION, OCR]);
+        apply(&mut session, vec![type_bar_style(id)]);
+        let project = session.project();
+        let layer = project.layer(id).expect("the block");
+        assert!(untranslated(layer, block(layer)));
+        assert!(!kept(layer, block(layer)) && !given_back(layer, block(layer)));
+
+        // Its clean-up hidden by hand: the page's lettering, kept by hand.
+        let hidden = op(json!({"op": "update_layer", "layer": id,
+            "patch": {"cleanup": {"visible": false}}}));
+        apply(&mut session, vec![hidden]);
+        let project = session.project();
+        let layer = project.layer(id).expect("the block");
+        assert!(!untranslated(layer, block(layer)));
+        assert!(kept(layer, block(layer)) && !given_back(layer, block(layer)));
+        assert!(sfx::hand_kept(layer, block(layer)));
+
+        // Given back by the Translation stage, styled since: the stage's.
+        let (_dir, mut session, [_, id]) = page(false, &[DETECTION, OCR]);
+        give_back(&mut session, id);
+        apply(&mut session, vec![type_bar_style(id)]);
+        let project = session.project();
+        let layer = project.layer(id).expect("the block");
+        assert!(placeholder(layer, block(layer)) && !untranslated(layer, block(layer)));
+        assert!(given_back(layer, block(layer)) && translation_ran(layer));
+        assert!(!sfx::hand_kept(layer, block(layer)));
     }
 }

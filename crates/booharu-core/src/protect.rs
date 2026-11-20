@@ -6,9 +6,9 @@
 //!   and counted, rather than failing the page's edit.
 //! - Reading again leaves out a source corrected by hand, and translating
 //!   again a translation written or fixed by hand, or a clean-up hidden by
-//!   hand on a block with none, unless the run is Redo boxes taking them on
-//!   purpose. Cleaning again never asks: it leaves out only what a lock
-//!   keeps it from writing.
+//!   hand on a block with no translation of its own, unless the run is Redo
+//!   boxes taking them on purpose. Cleaning again never asks: it leaves out
+//!   only what a lock keeps it from writing.
 //! - Translating leaves out the sound effects the SFX mode keeps as art and
 //!   the subtitled ones (`sfx::skipped`), which no redo lifts; a subtitle
 //!   run translates the effects it names.
@@ -67,8 +67,8 @@ pub enum Reason {
 /// leaves out a source corrected by hand. Translating leaves out a sound
 /// effect [`sfx::skipped`] keeps as art first, as no redo would translate
 /// it, then a translation written or fixed by hand and a clean-up hidden by
-/// hand on a block with none ([`sfx::hand_kept`]). Cleaning leaves out a
-/// block it can't write ([`cleanable`]).
+/// hand on a block with no translation of its own ([`sfx::hand_kept`]).
+/// Cleaning leaves out a block it can't write ([`cleanable`]).
 pub fn left_out(
     page: &Page,
     layer: &Layer,
@@ -182,7 +182,9 @@ mod tests {
     use crate::{
         attrs::SfxSubtitle,
         settings::SfxMode,
+        status,
         styles::{given_back, recognized, text_hash},
+        testing::type_bar_style,
     };
 
     /// A page holding a detected balloon around the detected block `held`,
@@ -478,6 +480,134 @@ mod tests {
             fixture.left_out("effect", RunStage::Translate, &settings, true, false),
             None
         );
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_is_still_translated() {
+        let mut fixture = Fixture::new();
+        let settings = translate_all();
+        let translating = |fixture: &Fixture, name: &str, redo: bool| {
+            fixture.left_out(name, RunStage::Translate, &settings, redo, false)
+        };
+        // Styled in the type bar before it's translated: the stage still
+        // translates it, while Detect again keeps the values set by hand.
+        fixture.apply(vec![type_bar_style(fixture.id("held"))]);
+        assert_eq!(translating(&fixture, "held", false), None);
+        assert!(keeps(&fixture.page(), &fixture.layer("held")));
+
+        // Words typed into it are the user's.
+        fixture.apply(vec![Op::SetText {
+            layer: fixture.id("held").into(),
+            text: "Why?".to_owned(),
+        }]);
+        assert_eq!(
+            translating(&fixture, "held", false),
+            Some(Reason::HandFixed)
+        );
+
+        // Its clean-up hidden by hand: the page's lettering, kept by hand.
+        fixture.apply(vec![type_bar_style(fixture.id("text"))]);
+        fixture.op(json!({"op": "update_layer", "layer": fixture.id("text"),
+            "patch": {"cleanup": {"visible": false}}}));
+        assert_eq!(
+            translating(&fixture, "text", false),
+            Some(Reason::HandFixed)
+        );
+        // A redo takes both.
+        assert_eq!(translating(&fixture, "held", true), None);
+        assert_eq!(translating(&fixture, "text", true), None);
+    }
+
+    #[test]
+    fn what_the_planner_translates_is_never_left_out_as_fixed_by_hand() {
+        // Each block the planner sends to the Translation stage, as it has
+        // no translation of its own and wasn't given back, or carries the
+        // kept mark, the stage must translate, whether it's styled in the
+        // type bar, kept as art, given back, or shown again by hand.
+        type Step = fn(&mut Fixture, &str);
+        fn style(fixture: &mut Fixture, name: &str) {
+            fixture.apply(vec![type_bar_style(fixture.id(name))]);
+        }
+        fn moved(fixture: &mut Fixture, name: &str) {
+            fixture.op(json!({"op": "transform_layer", "layer": fixture.id(name),
+                "transform": [[1.0, 0.0, 6.0], [0.0, 1.0, 4.0]]}));
+        }
+        fn blank(fixture: &mut Fixture, name: &str) {
+            fixture.apply(vec![Op::SetText {
+                layer: fixture.id(name).into(),
+                text: " ".to_owned(),
+            }]);
+        }
+        fn keep(fixture: &mut Fixture, name: &str) {
+            let ops = sfx::kept_original(&fixture.layer(name));
+            fixture.apply(ops);
+        }
+        fn clean_up(fixture: &mut Fixture, name: &str, visible: bool) {
+            fixture.op(json!({"op": "update_layer", "layer": fixture.id(name),
+                "patch": {"cleanup": {"visible": visible}}}));
+        }
+        fn show(fixture: &mut Fixture, name: &str) {
+            clean_up(fixture, name, true);
+        }
+        fn hide(fixture: &mut Fixture, name: &str) {
+            clean_up(fixture, name, false);
+        }
+        /// As the Translation stage gives back a line, its translation
+        /// removed.
+        fn give_back(fixture: &mut Fixture, name: &str) {
+            let record = given_back(&fixture.layer(name)).expect("the record");
+            let removed = json!({"op": "update_layer", "layer": fixture.id(name),
+                "patch": {"translation": null, "cleanup": {"visible": false}}});
+            fixture.apply(vec![
+                serde_json::from_value(removed).expect("an op"),
+                record,
+            ]);
+        }
+        /// As the Translation stage gives back a line, its placeholder kept.
+        fn give_back_styled(fixture: &mut Fixture, name: &str) {
+            let record = given_back(&fixture.layer(name)).expect("the record");
+            hide(fixture, name);
+            fixture.apply(vec![record]);
+        }
+        let sequences: [&[Step]; 7] = [
+            &[style, moved, blank, hide, show],
+            &[blank, style, keep],
+            &[keep, style, show, hide],
+            &[style, keep, show, keep],
+            &[give_back, style, show],
+            &[style, give_back, show, style],
+            &[style, give_back_styled, show],
+        ];
+        let names = ["held", "text", "effect"];
+        let mut planned = 0;
+        for (sequence, steps) in sequences.into_iter().enumerate() {
+            let mut fixture = Fixture::new();
+            for (index, step) in steps.iter().enumerate() {
+                for name in names {
+                    step(&mut fixture, name);
+                }
+                for name in names {
+                    let layer = fixture.layer(name);
+                    let Content::Block(block) = &layer.content else {
+                        panic!("{name} isn't a block");
+                    };
+                    let translates = status::untranslated(&layer, block)
+                        || (status::unwritten(&layer, block) && Auto::of(&layer).kept);
+                    if !translates {
+                        continue;
+                    }
+                    planned += 1;
+                    for settings in [translate_all(), LetteringSettings::default()] {
+                        assert_ne!(
+                            fixture.left_out(name, RunStage::Translate, &settings, false, false),
+                            Some(Reason::HandFixed),
+                            "{name} after step {index} of sequence {sequence}"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(planned >= 40, "only {planned} blocks to translate");
     }
 
     #[test]

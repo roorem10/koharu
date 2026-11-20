@@ -55,6 +55,30 @@ fn release(fork: &str) -> &str {
         .map_or(fork, str::trim_start)
 }
 
+/// What the crate's tests share.
+#[cfg(test)]
+pub(crate) mod testing {
+    use koharu_scene::{LayerId, Op, Rgba};
+    use serde_json::json;
+
+    /// The font family [`type_bar_style`] sets.
+    pub(crate) const FAMILY: &str = "Comic Neue";
+    /// The fill [`type_bar_style`] sets.
+    pub(crate) const FILL: Rgba = Rgba([0.0, 0.5, 0.0, 1.0]);
+
+    /// The edit Koharu's type bar sends as a font and a fill are picked for
+    /// `block`, merged into its translation's style. On a block with no
+    /// translation the scene starts one from empty point text, so it leaves
+    /// a box styled before it's translated: a placeholder
+    /// (`status::placeholder`).
+    pub(crate) fn type_bar_style(block: LayerId) -> Op {
+        Op::UpdateLayer {
+            layer: block.into(),
+            patch: json!({"translation": {"style": {"chars": {"family": FAMILY, "fill": FILL}}}}),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

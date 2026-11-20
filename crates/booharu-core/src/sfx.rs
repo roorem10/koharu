@@ -9,11 +9,12 @@
 //! ([`skipped`]); one with a subtitle is never translated again, so its
 //! translation doesn't come back over the art.
 //!
-//! An effect a run skips keeps the page's own lettering: no translation, its
-//! clean-up hidden, with the kept mark in its hand-edit record
-//! ([`kept_original`]), so a clean-up hidden by hand can be told from
-//! Booharu's own ([`hand_kept`]), and one shown again by hand from one
-//! Booharu never kept ([`hand_shown`]). The mark is never the given-back
+//! An effect a run skips keeps the page's own lettering: no translation, or
+//! only the placeholder a style set before translating leaves
+//! ([`status::placeholder`]), its clean-up hidden, with the kept mark in its
+//! hand-edit record ([`kept_original`]), so a clean-up hidden by hand can be
+//! told from Booharu's own ([`hand_kept`]), and one shown again by hand from
+//! one Booharu never kept ([`hand_shown`]). The mark is never the given-back
 //! record, which [`crate::styles::given_back`] writes when Koharu's
 //! Translation stage is given its source back, as the stage records nothing
 //! there; it would have the quality check report every effect as given back
@@ -121,17 +122,18 @@ fn mode_skips(page: &Page, block: LayerId, mode: SfxMode) -> bool {
 
 /// The ops keeping the original art of the block `layer` holds, read before
 /// the edit: its clean-up hidden and the kept mark in its hand-edit record,
-/// for a block with no translation whose clean-up shows and that carries no
-/// mark. Anything else gets none: a translated block keeps its translation,
-/// and one whose clean-up shows while it carries the mark had it shown by
-/// hand ([`hand_shown`]). It never writes the given-back record or a `c2pa`
-/// one.
+/// for a block with no translation of its own ([`status::unwritten`]: none,
+/// or only the placeholder a style set before translating leaves, which
+/// stays with its style) whose clean-up shows and that carries no mark.
+/// Anything else gets none: a translated block keeps its translation, and
+/// one whose clean-up shows while it carries the mark had it shown by hand
+/// ([`hand_shown`]). It never writes the given-back record or a `c2pa` one.
 pub fn kept_original(layer: &Layer) -> Vec<Op> {
     let Content::Block(block) = &layer.content else {
         return Vec::new();
     };
     let record = Auto::of(layer);
-    if block.translation.is_some() || !block.cleanup.visible || record.kept {
+    if !status::unwritten(layer, block) || !block.cleanup.visible || record.kept {
         return Vec::new();
     }
     let marked = Auto {
@@ -154,17 +156,18 @@ pub fn kept_original(layer: &Layer) -> Vec<Op> {
 
 /// The inverse of [`kept_original`], for a first translation typed into an
 /// effect kept as art, read before the edit: for a block with no translation
-/// that carries the kept mark, its clean-up shown when hidden and its
-/// hand-edit record without the mark, or none at all when nothing else is
-/// left in it, as [`styles::typed`](crate::styles::typed) writes it. Any
-/// other layer gets none: a block with no mark has its clean-up as the user
-/// left it, hidden by hand or shown, and a translated block had its mark
-/// dealt with as the translation came.
+/// of its own ([`status::unwritten`]: none, or only a placeholder) that
+/// carries the kept mark, its clean-up shown when hidden and its hand-edit
+/// record without the mark, or none at all when nothing else is left in it,
+/// as [`styles::typed`](crate::styles::typed) writes it. Any other layer
+/// gets none: a block with no mark has its clean-up as the user left it,
+/// hidden by hand or shown, and a translated block had its mark dealt with
+/// as the translation came.
 pub fn shown_again(layer: &Layer) -> Result<Vec<Op>> {
     let Content::Block(block) = &layer.content else {
         return Ok(Vec::new());
     };
-    if block.translation.is_some() {
+    if !status::unwritten(layer, block) {
         return Ok(Vec::new());
     }
     let Some(unmark) = unmarked(layer)? else {
@@ -203,18 +206,19 @@ pub fn unmarked(layer: &Layer) -> Result<Option<Op>> {
 }
 
 /// Whether `block`, which `layer` holds, had its clean-up hidden by hand: it
-/// keeps the page's lettering ([`status::kept`]), but neither Koharu's
-/// Translation stage gave it back nor Booharu kept it as art.
+/// keeps the page's lettering ([`status::kept`]), styled since or not, but
+/// neither Koharu's Translation stage gave it back nor Booharu kept it as
+/// art.
 pub fn hand_kept(layer: &Layer, block: &Block) -> bool {
-    status::kept(block) && !status::given_back(layer, block) && !Auto::of(layer).kept
+    status::kept(layer, block) && !status::given_back(layer, block) && !Auto::of(layer).kept
 }
 
 /// Whether `block`, which `layer` holds, had its clean-up shown again by
-/// hand after Booharu kept it as art: it has no translation, and its
-/// clean-up shows though it carries the kept mark, which [`kept_original`]
-/// leaves alone as the user's choice.
+/// hand after Booharu kept it as art: it has no translation of its own
+/// ([`status::unwritten`]), and its clean-up shows though it carries the
+/// kept mark, which [`kept_original`] leaves alone as the user's choice.
 pub fn hand_shown(layer: &Layer, block: &Block) -> bool {
-    block.translation.is_none() && block.cleanup.visible && Auto::of(layer).kept
+    status::unwritten(layer, block) && block.cleanup.visible && Auto::of(layer).kept
 }
 
 /// Whether `source`, a sound effect's source lying at `rect` on the page,
@@ -354,6 +358,7 @@ mod tests {
         attrs::{LetteringSource, Origin},
         status::TRANSLATION,
         styles::{self, recorded, text_hash},
+        testing::{FAMILY, type_bar_style},
     };
 
     const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
@@ -850,6 +855,60 @@ mod tests {
             text: "BOOM".to_owned(),
         }]);
         assert!(!shown(&fixture));
+    }
+
+    #[test]
+    fn an_effect_styled_before_its_translated_is_kept_and_shown_as_one_with_none() {
+        let mut fixture = Fixture::new("sfx");
+        let id = fixture.outside;
+        let json = |ops: &[Op]| serde_json::to_value(ops).expect("JSON");
+        let show = Op::UpdateLayer {
+            layer: id.into(),
+            patch: json!({"cleanup": {"visible": true}}),
+        };
+        fixture.apply(vec![type_bar_style(id)]);
+        assert!(status::placeholder(&fixture.layer(id), &fixture.block(id)));
+        assert!(!hand_kept(&fixture.layer(id), &fixture.block(id)));
+
+        // Kept as art: hidden with the mark, the style staying.
+        let ops = kept_original(&fixture.layer(id));
+        assert_eq!(ops.len(), 2, "{ops:?}");
+        fixture.apply(ops);
+        let (layer, block) = (fixture.layer(id), fixture.block(id));
+        assert!(!block.cleanup.visible && Auto::of(&layer).kept);
+        let family = block
+            .translation
+            .as_ref()
+            .and_then(|translation| translation.style.chars.family.as_deref());
+        assert_eq!(family, Some(FAMILY));
+        assert!(!hand_kept(&layer, &block) && !hand_shown(&layer, &block));
+        assert!(kept_original(&layer).is_empty());
+        // A first translation typed in shows the clean-up and takes the mark
+        // off, the record going with it.
+        let ops = shown_again(&layer).expect("the ops");
+        assert_eq!(json(&ops), json(&[show.clone(), attrs::clear::<Auto>(id)]));
+
+        // Shown again by hand, the mark left: the user's choice.
+        fixture.apply(vec![show]);
+        let (layer, block) = (fixture.layer(id), fixture.block(id));
+        assert!(hand_shown(&layer, &block));
+        assert!(kept_original(&layer).is_empty());
+        let ops = shown_again(&layer).expect("the ops");
+        assert_eq!(json(&ops), json(&[attrs::clear::<Auto>(id)]));
+
+        // Hidden by hand with no mark: kept by hand.
+        let id = fixture.under;
+        fixture.apply(vec![
+            type_bar_style(id),
+            Op::UpdateLayer {
+                layer: id.into(),
+                patch: json!({"cleanup": {"visible": false}}),
+            },
+        ]);
+        let (layer, block) = (fixture.layer(id), fixture.block(id));
+        assert!(hand_kept(&layer, &block));
+        assert!(kept_original(&layer).is_empty());
+        assert!(shown_again(&layer).expect("the ops").is_empty());
     }
 
     #[test]

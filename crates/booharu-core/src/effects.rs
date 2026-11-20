@@ -12,6 +12,9 @@
 //!   spacing, direction, frame, position or rotation is never an effect.
 //! - Word marks count, after the marks a run's emphasis gave the words come
 //!   off (`emphasis::stripped`), so stressed words carry none.
+//! - A block with no translation of its own carries none, the placeholder a
+//!   style set before translating leaves among them (`status::unwritten`),
+//!   until it has text.
 //!
 //! The `booharu` crate's `effects::page_effects` lists a page's.
 
@@ -24,7 +27,7 @@ use crate::{
     emphasis,
     resolver::{self, Look},
     settings::LetteringSettings,
-    skew,
+    skew, status,
 };
 
 /// A text effect, as the fx tag names it.
@@ -72,7 +75,9 @@ const WIDTH: f64 = 0.01;
 /// The effects of `layer`, a text layer or a translated block on `page`,
 /// under `settings` and `font`, the default font, with `median` the page's
 /// lettering size (`resolver::lettering_size`); none for any other layer,
-/// and for one with no effect.
+/// for a block with no translation of its own, a placeholder's style set
+/// before translating included (`status::unwritten`), and for one with no
+/// effect.
 pub fn text_effects(
     page: &Page,
     layer: &Layer,
@@ -82,8 +87,8 @@ pub fn text_effects(
 ) -> Result<Option<TextEffects>> {
     let (text, record): (&Text, Auto) = match &layer.content {
         Content::Block(block) => match &block.translation {
-            Some(translation) => (translation, Auto::of(layer)),
-            None => return Ok(None),
+            Some(translation) if !status::unwritten(layer, block) => (translation, Auto::of(layer)),
+            _ => return Ok(None),
         },
         Content::Text(text) => (&**text, Auto::default()),
         _ => return Ok(None),
@@ -201,6 +206,7 @@ mod tests {
         emphasis::{EmphasisSettings, EmphasisStyle},
         settings::DefaultTextStyle,
         styles,
+        testing::type_bar_style,
     };
 
     const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
@@ -387,6 +393,48 @@ mod tests {
         let fixture = Fixture::new();
         assert_eq!(fixture.effects(fixture.block), None);
         assert_eq!(fixture.effects(fixture.typed), None);
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_carries_none_until_it_has_text() {
+        let mut fixture = Fixture::new();
+        // A second box, read but not translated, given a gradient and a
+        // border in the type bar.
+        let page = fixture.session.project().pages().next().expect("a page").id;
+        let add = json!({"op": "add_layer", "id": "$s", "page": page, "index": 2, "layer": {
+        "kind": "block", "source": {
+            "frame": {"box": {"bounds": {"x": 100.0, "y": 10.0, "width": 40.0, "height": 120.0}}},
+            "content": "なに",
+        }}});
+        let change = fixture
+            .session
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops: vec![serde_json::from_value(add).expect("an op")],
+            })
+            .expect("the box");
+        let id = change
+            .created
+            .iter()
+            .find_map(|created| match created {
+                Created::Layer { id, .. } => Some(*id),
+                _ => None,
+            })
+            .expect("the box");
+        fixture.apply(vec![type_bar_style(id)]);
+        fixture.patch(
+            id,
+            json!({"translation": {"style": {"chars": {"fill_gradient": gradient(),
+                "stroke": RED, "stroke_width": 4.0}}}}),
+        );
+        assert_eq!(fixture.effects(id), None);
+
+        // Words typed in make it a translation, which carries them.
+        fixture.apply(vec![Op::SetText {
+            layer: id.into(),
+            text: "What?".to_owned(),
+        }]);
+        assert!(fixture.tags(id).contains(&TextEffect::Gradient));
     }
 
     #[test]
