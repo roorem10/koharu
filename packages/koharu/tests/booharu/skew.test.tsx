@@ -71,6 +71,21 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
     expect(skew.getByRole('textbox', { name: 'Vertical (°)' })).toHaveValue('0')
   })
 
+  it('leaves out a block styled before it was translated, which shows no skew either (P-d)', async () => {
+    skewed({ one: { x: 12.5, y: 0 } })
+    // Blank point text with the size it was given, as the type bar leaves it.
+    const placeholder = { content: [], style: { chars: { size: 30 } }, frame: 'point' }
+    const { user } = renderBar([
+      styled('one', {}),
+      block('first', 'やあ', { translation: placeholder }),
+    ])
+
+    const skew = await openSkew(user)
+
+    expect(skew.getByRole('textbox', { name: 'Horizontal (°)' })).toHaveValue('12.5')
+    expect(skew.getByRole('textbox', { name: 'Vertical (°)' })).toHaveValue('0')
+  })
+
   it('shows angles that show alike as one, to the thousandth', async () => {
     skewed({ one: { x: 19.9999999, y: 0 }, two: { x: 20.0000001, y: -0.0000001 } })
     const { user } = renderBar([styled('one', {}), styled('two', {})])

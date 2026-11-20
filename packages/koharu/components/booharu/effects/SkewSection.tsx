@@ -6,7 +6,8 @@ import { useTranslation } from 'react-i18next'
 
 import { call } from '@/lib/backend'
 import { sharedSkew, type PageEffects } from '@/lib/booharu/effects'
-import { letteringOf } from '@/lib/document'
+import { isPlaceholder } from '@/lib/booharu/translation'
+import { isBlockLayer, letteringOf } from '@/lib/document'
 import { commands, type Layer, type SkewCounts, type Typed } from '@koharu/ipc/protocol'
 import { NumberField, NumberFieldGroup, NumberFieldInput } from '@koharu/ui/components/number-field'
 import { toast } from '@koharu/ui/components/toast'
@@ -44,8 +45,12 @@ export function SkewSection({
   effects: PageEffects | undefined
 }) {
   const { t } = useTranslation()
-  // A block with no translation has no skew to show, as the desktop skews none.
-  const lettered = targets.filter((layer) => letteringOf(layer) !== null).map(({ id }) => id)
+  // A block with no translation has no skew to show, as the desktop skews none, nor one with only a
+  // placeholder, styled before it was translated (P-d).
+  const lettered = targets
+    .filter((layer) => letteringOf(layer) !== null)
+    .filter((layer) => !(isBlockLayer(layer) && isPlaceholder(layer.translation)))
+    .map(({ id }) => id)
   const shown = effects ? sharedSkew(effects, lettered) : null
   const disabled = typing !== null || targets.length === 0
   const row = useRef<HTMLDivElement>(null)
