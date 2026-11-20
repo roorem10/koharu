@@ -4,11 +4,11 @@
 //! A change is one undo step labelled [`LABEL`] over any number of blocks,
 //! so one undo brings back each block's label and font together (#78). Each
 //! block gets its new label, `booharu.lettering`, or loses it for Automatic,
-//! and, while Pick fonts automatically is on and it has a translation, the
-//! font of the category it then has, with its hand-edit record. The step is
-//! built even when a label stays as it is, so picking the same category
-//! again applies a font changed in Settings since; a step that changes
-//! nothing adds no undo step.
+//! and, while Pick fonts automatically is on and it has a translation of
+//! its own, the font of the category it then has, with its hand-edit
+//! record. The step is built even when a label stays as it is, so picking
+//! the same category again applies a font changed in Settings since; a step
+//! that changes nothing adds no undo step.
 //!
 //! - A user's choice is an explicit pick: it restyles a block even when its
 //!   font was changed by hand, and Automatic clears any label.
@@ -27,7 +27,11 @@
 //!   block had before the first such pick changed it, which Automatic gives
 //!   back as it clears the label. Read chapter's labels never change the
 //!   role.
-//! - A block with no translation that the new label and role make a sound
+//! - A block with no translation of its own (`status::unwritten`: none, or
+//!   only the placeholder a style set before translating leaves) takes only
+//!   its label and role: a placeholder keeps the values set on it, and the
+//!   category's font comes with its first translation, unless a family was
+//!   set on it by hand. One that the new label and role make a sound
 //!   effect kept as art (`sfx::skipped_as`) gets its clean-up hidden with
 //!   the kept mark in the same step; one kept as art that no longer is
 //!   keeps its clean-up hidden until its translation shows it.
@@ -51,7 +55,7 @@ use booharu_core::{
     settings::LetteringSettings,
     sfx,
     shape::{self, BlockShape},
-    styles,
+    status, styles,
 };
 use koharu_scene::{Content, Edit, Layer, LayerId, Op, Page, PageId, Project, Role};
 use serde::{Deserialize, Serialize};
@@ -170,6 +174,9 @@ pub fn set_category(
 /// it, and keeps it through later picks. Without, as Read chapter labels,
 /// the role stays as it is. The category, the font, and whether a block
 /// with no translation is kept as art are read with the role being written.
+/// A block with no translation of its own ([`status::unwritten`]) counts as
+/// untranslated: a placeholder, the style set on it before it was
+/// translated, gets no category font, which its first translation brings.
 pub(crate) fn category_ops(
     project: &Project,
     layer: &Layer,
@@ -247,7 +254,11 @@ pub(crate) fn category_ops(
     let (page, _) = project.parent(id)?;
     let sfx_role = new_role == Role::Sfx;
 
-    let Some(translation) = &block.translation else {
+    let translation = block
+        .translation
+        .as_ref()
+        .filter(|_| !status::unwritten(layer, block));
+    let Some(translation) = translation else {
         counts.untranslated += 1;
         // An effect now kept as art keeps it in the same step; one that no
         // longer is keeps its clean-up hidden for its translation to show.
@@ -406,7 +417,7 @@ mod tests {
 
     use booharu_core::{
         emphasis::{EmphasisSettings, Marking},
-        settings::SfxMode,
+        settings::{SfxMode, Snapshot},
         shape::BubbleShape,
     };
     use koharu_scene::{CharStyle, Created, LanguageIdentifier, Session, Span, Text};
@@ -414,6 +425,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use crate::testing::{FAMILY, FILL, type_bar_style};
 
     /// The default font.
     const FONT: &str = "CCWildWords";
@@ -1154,6 +1166,101 @@ mod tests {
         };
         assert!(block.translation.is_none());
         assert_eq!(attrs::get::<Auto>(&layer), None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_gets_its_category_font_with_its_translation() -> Result<()>
+    {
+        let settings = lettered();
+        let look = Snapshot {
+            lettering: settings.clone(),
+            font: Some(FONT.to_owned()),
+            ..Snapshot::default()
+        };
+        let english: LanguageIdentifier = "en".parse()?;
+        // `style` picked on the type bar for c before it's translated leaves
+        // a placeholder, which a pick of Shout leaves as it is, counting c
+        // untranslated, and c's translation then typed is lettered in.
+        let lettered_with = |style: Value| -> Result<Text> {
+            let mut fixture = Fixture::new()?;
+            let c = fixture.id("c");
+            fixture.edit(vec![Op::UpdateLayer {
+                layer: c.into(),
+                patch: json!({"translation": {"style": {"chars": style}}}),
+            }])?;
+            let placeholder = fixture.translation("c")?;
+            let counts = fixture.set(
+                &["c"],
+                Some(LetteringCategory::Shout),
+                Chooser::User,
+                &settings,
+            )?;
+            assert_eq!(
+                counts,
+                CategoryCounts {
+                    changed: 1,
+                    untranslated: 1,
+                    ..CategoryCounts::default()
+                }
+            );
+            assert_eq!(fixture.label("c")?, user(LetteringCategory::Shout));
+            assert_eq!(fixture.translation("c")?, placeholder);
+            assert_eq!(attrs::get::<Auto>(&fixture.layer("c")?), None);
+            let typed = crate::translation::edit(
+                &fixture.session.project(),
+                c,
+                "Why?".to_owned(),
+                &english,
+                &look,
+            )?;
+            fixture.session.apply(typed)?;
+            fixture.translation("c")
+        };
+
+        // With only a fill set by hand, the translation gets Shout's font.
+        let filled = lettered_with(json!({"fill": FILL}))?;
+        let chars = &filled.style.chars;
+        assert_eq!(
+            (chars.family.as_deref(), chars.weight, chars.fill),
+            (Some("Badaboom BB"), Some(700), Some(FILL))
+        );
+        // A family set by hand stays, with no weight of Shout's.
+        let fonted = lettered_with(json!({"family": FAMILY, "fill": FILL}))?;
+        let chars = &fonted.style.chars;
+        assert_eq!(
+            (chars.family.as_deref(), chars.weight, chars.fill),
+            (Some(FAMILY), None, Some(FILL))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_picked_as_a_sound_effect_keeps_its_art() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let c = fixture.id("c");
+        fixture.edit(vec![type_bar_style(c)])?;
+        let placeholder = fixture.translation("c")?;
+        let counts = fixture.set(
+            &["c"],
+            Some(LetteringCategory::Sfx),
+            Chooser::User,
+            &lettered(),
+        )?;
+        assert_eq!(
+            counts,
+            CategoryCounts {
+                changed: 1,
+                untranslated: 1,
+                ..CategoryCounts::default()
+            }
+        );
+        // Its clean-up hides with the kept mark, as for one with no
+        // translation, and the style set on it stays (D1).
+        assert_eq!(fixture.role("c")?, Role::Sfx);
+        assert!(!fixture.cleaned("c")?);
+        assert!(Auto::of(&fixture.layer("c")?).kept);
+        assert_eq!(fixture.translation("c")?, placeholder);
         Ok(())
     }
 

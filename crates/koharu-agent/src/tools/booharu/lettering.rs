@@ -87,10 +87,12 @@ impl Tool for SetLetteringCategory {
          art shows. Placement follows the new role at the block's next translation; \
          booharu_reset_lettering gives a translated block the new role's outline at once. With \
          `auto` off no font changes; with it on, each translated block takes its category's font, \
-         and a block without a translation takes it once translated. Locked blocks, and blocks in \
-         locked layers, are left out. Answers how many blocks it `changed`, left out as `locked`, \
-         `kept_user_label`, `kept_hand_edited`, and found `untranslated`, which take no font until \
-         translated; tell the user about any it left out."
+         and a block without a translation, or with only the empty placeholder a style set on it \
+         before it was translated leaves, takes it once translated, unless a font family was set \
+         on it by hand. Locked blocks, and blocks in locked layers, are left out. Answers how \
+         many blocks it `changed`, left out as `locked`, `kept_user_label`, `kept_hand_edited`, \
+         and found `untranslated`, which take no font until translated; tell the user about any \
+         it left out."
             .to_owned()
     }
 
