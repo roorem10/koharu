@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { StoryPanel } from '@/components/editor/StoryPanel'
 import { TypeBar } from '@/components/editor/TypeBar'
 import { useWordRange } from '@/lib/booharu/words'
+import { CANVAS_PRESS } from '@/lib/booharu/wordSelection'
 import {
   fontsKey,
   pageKey,
@@ -174,6 +175,25 @@ describe('Booharu words chosen in Story', () => {
 
     // A press outside the sidebar still lets them go.
     await press(screen.getByTestId('canvas'))
+    expect(range()).toBeNull()
+  })
+
+  it("lets the words go for a press on the desktop's canvas, told of by its event", async () => {
+    story(pageOf(block('block', [{ insert: 'Hello world' }])))
+    const field = await screen.findByPlaceholderText('Translation')
+    // The window gives the canvas its presses, so the page hears no pointerdown, only the event.
+    const canvasPress = () => act(() => void window.dispatchEvent(new Event(CANVAS_PRESS)))
+
+    choose(field, 6, 11)
+    canvasPress()
+    expect(range()).toBeNull()
+    expect(toolbar()).toBeNull()
+
+    // Words kept by a press elsewhere in the sidebar go too.
+    choose(field, 0, 5)
+    await press(screen.getByPlaceholderText('Source text'))
+    expect(range()).not.toBeNull()
+    canvasPress()
     expect(range()).toBeNull()
   })
 
@@ -365,6 +385,22 @@ describe('Booharu type bar on words chosen in Story', () => {
 
     // A press outside lets the words go, and the bar shows the whole text again.
     await press(screen.getByTestId('canvas'))
+    expect(range()).toBeNull()
+    expect(bar.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it("styles the whole text again after a press on the desktop's canvas", async () => {
+    story(
+      pageOf(
+        textLayer('text', [{ insert: 'Hello ' }, { insert: 'world', attributes: { weight: 700 } }]),
+      ),
+      true,
+    )
+    choose(await screen.findByPlaceholderText('Text'), 6, 11)
+    const bar = within(await screen.findByTestId('type-bar'))
+    expect(bar.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'true')
+
+    act(() => void window.dispatchEvent(new Event(CANVAS_PRESS)))
     expect(range()).toBeNull()
     expect(bar.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'false')
   })

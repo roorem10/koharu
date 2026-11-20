@@ -31,6 +31,10 @@ import type { Text } from '@koharu/ipc/protocol'
 // them, which the word toolbar by the field and the type bar style. Kept apart from words.ts, which
 // the type bar imports, as it reads the type bar's sharedChars.
 
+/** The event the desktop sends the page when its canvas takes a press, which the page never sees,
+ * as the window gives the canvas its presses (koharu-desktop's `booharu::canvas::pressed`). */
+export const CANVAS_PRESS = 'booharu:canvas-press'
+
 /** What the characters of `text` that the run `range` holds share, each one's marks over the
  * text's style, and the values they don't, as the type bar reads its texts'. */
 export function chosenShare(text: Text, range: WordRange): ReturnType<typeof sharedChars> {
@@ -59,8 +63,9 @@ export function toggleWords(
  *
  * As 0.0.4's rows did, the words go too with Escape in the field, a change of the saved text,
  * another field choosing words, the field going, and a press outside the field, its word toolbar
- * and the type bar, popups they open included; a press elsewhere in the sidebar hides the toolbar
- * and keeps the words. Ctrl+B and Ctrl+I in the field do what the toolbar's B and I do. */
+ * and the type bar, popups they open included, a press on the canvas among them, which the desktop
+ * tells the page of with `CANVAS_PRESS`; a press elsewhere in the sidebar hides the toolbar and
+ * keeps the words. Ctrl+B and Ctrl+I in the field do what the toolbar's B and I do. */
 export function useWordSelection(layer: BlockLayer | TextLayer) {
   const lettering = letteringOf(layer)
   const saved = plainText(lettering)
@@ -84,7 +89,8 @@ export function useWordSelection(layer: BlockLayer | TextLayer) {
   )
 
   // This capturing listener hears a press before React's handlers mark the ones that keep the
-  // words, so it reads the mark a turn later.
+  // words, so it reads the mark a turn later. A press on the desktop's canvas reaches the page
+  // only as the event the desktop sends then.
   useEffect(() => {
     if (!mine) return
     const press = (event: Event) => {
@@ -96,8 +102,15 @@ export function useWordSelection(layer: BlockLayer | TextLayer) {
         setWordRange(inSidebar ? range : null)
       })
     }
+    const canvas = () => {
+      if (useWordRange.getState().range?.layer === layer.id) setWordRange(null)
+    }
     document.addEventListener('pointerdown', press, true)
-    return () => document.removeEventListener('pointerdown', press, true)
+    window.addEventListener(CANVAS_PRESS, canvas)
+    return () => {
+      document.removeEventListener('pointerdown', press, true)
+      window.removeEventListener(CANVAS_PRESS, canvas)
+    }
   }, [mine, layer.id])
 
   return {

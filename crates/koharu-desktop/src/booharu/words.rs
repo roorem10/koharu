@@ -3,6 +3,8 @@
 //! gives text typed on the canvas, each worked out by `booharu::words`,
 //! which the agent's tool shares, its emphasis under the saved
 //! `[booharu-emphasis]` and `[booharu-lettering]` as they are when called.
+//! And the press on the canvas the page is told of, which lets the words
+//! chosen in the Story panel go.
 
 use std::sync::Arc;
 
@@ -10,6 +12,7 @@ use booharu::words::{self, WordChange};
 use booharu_core::{emphasis::EmphasisSettings, settings::LetteringSettings};
 use koharu_scene::{CharStyle, LayerId};
 use tauri::State;
+use tauri_runtime_cef::cef::{CefString, Frame, ImplFrame as _};
 
 use super::apply_if;
 use crate::{app::App, commands::Result};
@@ -73,4 +76,35 @@ fn settings() -> anyhow::Result<(EmphasisSettings, LetteringSettings)> {
         EmphasisSettings::read()?,
         koharu_config::get::<LetteringSettings>()?,
     ))
+}
+
+/// What the page hears when the canvas takes a press, which the window gives
+/// the canvas alone: the words chosen in the Story panel go then, as with a
+/// press anywhere else outside them (`CANVAS_PRESS` in
+/// lib/booharu/wordSelection.ts).
+const PRESSED: &str = "dispatchEvent(new Event('booharu:canvas-press'))";
+
+/// Tells the page in `frame` that the canvas took a press.
+pub(crate) fn pressed(frame: &Frame) {
+    frame.execute_java_script(Some(&CefString::from(PRESSED)), None, 0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PRESSED;
+
+    #[test]
+    fn a_canvas_press_sends_the_event_the_story_words_listen_for() {
+        let hook = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../packages/koharu/lib/booharu/wordSelection.ts"
+        );
+        let hook = std::fs::read_to_string(hook).expect("the Story words' hook");
+        let name = hook
+            .split("export const CANVAS_PRESS = '")
+            .nth(1)
+            .and_then(|rest| rest.split('\'').next())
+            .expect("the event the hook listens for");
+        assert_eq!(PRESSED, format!("dispatchEvent(new Event('{name}'))"));
+    }
 }

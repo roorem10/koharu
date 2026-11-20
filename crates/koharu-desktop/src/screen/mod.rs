@@ -722,6 +722,7 @@ fn blur() {
             None,
             0,
         );
+        crate::booharu::words::pressed(&frame); // Booharu: lets words chosen in Story go.
     }
 }
 
