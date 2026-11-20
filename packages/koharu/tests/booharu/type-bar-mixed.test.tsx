@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import { commands, type CharStyle } from '@koharu/ipc/protocol'
 
+import { block } from './boxes'
 import { renderBar, restyled, styled, text } from './typeBar'
 
 const WHITE: CharStyle['stroke'] = [1, 1, 1, 1]
@@ -155,6 +156,44 @@ describe('Booharu type bar over texts whose paragraphs differ (S11-h)', () => {
     expect(await screen.findByRole('combobox', { name: 'Outline method' })).toHaveTextContent(
       'Mixed',
     )
+  })
+
+  it('shows what the lettered texts share with a block that has no translation first', async () => {
+    const { edits, bar, user } = renderBar(
+      [
+        block('first', 'やあ'),
+        text('two', {
+          direction: 'vertical',
+          frame: box('best'),
+          style: { align: 'end', line_height: 1.5, stroke_method: 'expansion' },
+        }),
+      ],
+      { pending: true },
+    )
+
+    // The paragraph of the text, as with the block after it, never a new text's.
+    expect(bar.getByRole('button', { name: 'Align bottom' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(bar.getByRole('button', { name: 'Vertical' })).toHaveAttribute('aria-pressed', 'true')
+    expect(bar.getByTestId('type-size')).toHaveAttribute('placeholder', 'Auto')
+    await openBorder(user)
+    expect(await screen.findByRole('combobox', { name: 'Outline method' })).toHaveTextContent(
+      'Expansion',
+    )
+    await user.keyboard('{Escape}')
+
+    await user.click(bar.getByRole('button', { name: 'Line spacing' }))
+    const spacing = await screen.findByRole('textbox', { name: 'Line spacing' })
+    expect(spacing).toHaveValue('1.5')
+    // A step goes on from the spacing shown.
+    fireEvent.keyDown(spacing, { key: 'ArrowUp' })
+    expect(edits.flatMap((edit) => edit.ops)).toContainEqual({
+      op: 'update_layer',
+      layer: 'two',
+      patch: { style: { line_height: 1.55 } },
+    })
   })
 })
 

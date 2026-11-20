@@ -123,7 +123,9 @@ export function TypeBar() {
       .filter((layer) => leaves.includes(layer.id) && (isTextLayer(layer) || isBlockLayer(layer)))
   }, [page, selectedIds])
   const current = targets[0]
-  const lettering: Text | null = current ? letteringOf(current) : null
+  // Booharu: the first lettered target's, as a block with no translation yet has none and the
+  // values the targets share leave it out (S11-h).
+  const lettering: Text | null = targets.map(letteringOf).find((text) => text !== null) ?? null
   const typing = useKoharuStore((state) => state.typing)
   const chosen = useChosenWords(targets, typing) // Booharu: words chosen in Story in the one text shown.
   const [draft, setDraft] = useState<{ layer: LayerId; style: TextStyle } | null>(null)
