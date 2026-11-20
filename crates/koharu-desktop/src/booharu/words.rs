@@ -6,11 +6,11 @@
 //! And the press on the canvas the page is told of, which lets the words
 //! chosen in the Story panel go.
 
-use std::sync::Arc;
+use std::{ops::Range, sync::Arc};
 
 use booharu::words::{self, WordChange};
 use booharu_core::{emphasis::EmphasisSettings, settings::LetteringSettings};
-use koharu_scene::{CharStyle, LayerId};
+use koharu_scene::{CharStyle, Edit, LayerId, Project};
 use tauri::State;
 use tauri_runtime_cef::cef::{CefString, Frame, ImplFrame as _};
 
@@ -39,19 +39,39 @@ pub async fn booharu_style_words(
     change: WordChange,
 ) -> Result<()> {
     apply_if(&app, move |session| {
-        let (emphasis, lettering) = words::settings(change.emphasis, settings)?;
-        words::style_words(
+        style(
             &session.project(),
             layer,
             start..end,
-            Some(&text),
+            &text,
             &change,
-            &emphasis,
-            &lettering,
+            settings,
         )
     })
     .await?;
     Ok(())
+}
+
+/// The words edit [`booharu_style_words`] applies to `project`, its
+/// settings read through `read` only when `change` stresses the words.
+fn style(
+    project: &Project,
+    layer: LayerId,
+    range: Range<usize>,
+    text: &str,
+    change: &WordChange,
+    read: impl FnOnce() -> anyhow::Result<(EmphasisSettings, LetteringSettings)>,
+) -> anyhow::Result<Option<Edit>> {
+    let (emphasis, lettering) = words::settings(change.emphasis, read)?;
+    words::style_words(
+        project,
+        layer,
+        range,
+        Some(text),
+        change,
+        &emphasis,
+        &lettering,
+    )
 }
 
 /// The marks the emphasis star gives the text typed into `layer`, a block
@@ -91,7 +111,13 @@ pub(crate) fn pressed(frame: &Frame) {
 
 #[cfg(test)]
 mod tests {
-    use super::PRESSED;
+    use anyhow::{Context as _, bail};
+    use booharu::words::WordChange;
+    use booharu_core::{emphasis::EmphasisSettings, settings::LetteringSettings};
+    use koharu_scene::{CharStyle, Created, Edit, Session};
+    use serde_json::json;
+
+    use super::{PRESSED, style};
 
     #[test]
     fn a_canvas_press_sends_the_event_the_story_words_listen_for() {
@@ -106,5 +132,77 @@ mod tests {
             .and_then(|rest| rest.split('\'').next())
             .expect("the event the hook listens for");
         assert_eq!(PRESSED, format!("dispatchEvent(new Event('{name}'))"));
+    }
+
+    #[test]
+    fn a_section_that_cant_be_read_refuses_only_the_star() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let mut session = Session::create(dir.path().join("test.khr"))?;
+        let frame =
+            json!({"box": {"bounds": {"x": 10.0, "y": 20.0, "width": 40.0, "height": 120.0}}});
+        let ops = [
+            json!({"op": "add_page", "id": "$p", "index": 0, "size": {"width": 400, "height": 400}}),
+            json!({"op": "add_layer", "id": "$block", "page": "$p", "index": 0, "layer": {
+                "kind": "block",
+                "source": {"frame": frame, "content": "こんにちは"},
+                "translation": {"frame": frame, "content": "Hello world",
+                    "style": {"chars": {"size": 30.0}}},
+            }}),
+        ];
+        let change = session.apply(Edit {
+            label: "test".to_owned(),
+            ops: ops
+                .into_iter()
+                .map(serde_json::from_value)
+                .collect::<Result<_, _>>()?,
+        })?;
+        let block = change
+            .created
+            .into_iter()
+            .find_map(|created| match created {
+                Created::Layer { id, .. } => Some(id),
+                _ => None,
+            })
+            .context("the block")?;
+        let project = session.project();
+        // A bad section edited into the file, as `settings` reads it then.
+        let unreadable = || -> anyhow::Result<(EmphasisSettings, LetteringSettings)> {
+            bail!("Booharu's emphasis can't be read from [booharu-emphasis]")
+        };
+        let words =
+            |change: WordChange| style(&project, block, 6..11, "Hello world", &change, unreadable);
+
+        // B and the type bar's values style the words without them, and
+        // Clear goes through, with nothing to take off here.
+        let bold = WordChange {
+            bold: Some(true),
+            ..WordChange::default()
+        };
+        assert!(words(bold)?.is_some());
+        let set = WordChange {
+            set: CharStyle {
+                size: Some(40.0),
+                ..CharStyle::default()
+            },
+            ..WordChange::default()
+        };
+        assert!(words(set)?.is_some());
+        let clear = WordChange {
+            clear: true,
+            ..WordChange::default()
+        };
+        assert!(words(clear)?.is_none());
+
+        // The star needs them, and is refused with why.
+        let star = WordChange {
+            emphasis: true,
+            ..WordChange::default()
+        };
+        let refused = words(star).expect_err("the star needs the settings");
+        assert!(
+            format!("{refused:#}").contains("[booharu-emphasis]"),
+            "{refused:#}"
+        );
+        Ok(())
     }
 }
