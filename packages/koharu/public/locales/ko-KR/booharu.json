@@ -244,6 +244,15 @@
       "linear": "선형",
       "radial": "방사형",
       "screentoneLater": "스크린톤 채우기 (추후 지원)",
+      "skew": "기울이기",
+      "skewLocked_one": "잠긴 상자 {{count}}개는 그대로 두었습니다.",
+      "skewLocked_other": "잠긴 상자 {{count}}개는 그대로 두었습니다.",
+      "skewReset": "기울이기 초기화",
+      "skewUntranslated_one": "상자 {{count}}개는 아직 번역이 없어 기울일 것이 없습니다.",
+      "skewUntranslated_other": "상자 {{count}}개는 아직 번역이 없어 기울일 것이 없습니다.",
+      "skewWholeBox": "상자 전체에 적용됩니다. 먼저 '완료'를 누르세요",
+      "skewX": "가로 (°)",
+      "skewY": "세로 (°)",
       "start": "시작 색상",
       "title": "텍스트 효과",
       "wavyLater": "물결 / 떨리는 텍스트 (추후 지원)"
@@ -653,6 +662,7 @@
       "booharu_reset_lettering": "레터링 기본값으로 초기화",
       "booharu_set_lettering_category": "레터링 범주 변경",
       "booharu_set_review_note": "메모 편집",
+      "booharu_set_skew": "기울이기",
       "booharu_set_translation": "번역 추가",
       "booharu_split_block": "텍스트 분할",
       "booharu_style_words": "단어 스타일 변경"

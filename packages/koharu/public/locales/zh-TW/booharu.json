@@ -244,6 +244,15 @@
       "linear": "線性",
       "radial": "放射狀",
       "screentoneLater": "網點填色（稍後推出）",
+      "skew": "傾斜",
+      "skewLocked_one": "{{count}} 個已鎖定的文字框保持不變。",
+      "skewLocked_other": "{{count}} 個已鎖定的文字框保持不變。",
+      "skewReset": "重設傾斜",
+      "skewUntranslated_one": "{{count}} 個文字框還沒有譯文，無法傾斜。",
+      "skewUntranslated_other": "{{count}} 個文字框還沒有譯文，無法傾斜。",
+      "skewWholeBox": "作用於整個文字框：請先按「完成」",
+      "skewX": "水平（°）",
+      "skewY": "垂直（°）",
       "start": "起始顏色",
       "title": "文字效果",
       "wavyLater": "波浪／抖動文字（稍後推出）"
@@ -653,6 +662,7 @@
       "booharu_reset_lettering": "重設為排字類別預設樣式",
       "booharu_set_lettering_category": "變更排字類別",
       "booharu_set_review_note": "編輯備註",
+      "booharu_set_skew": "傾斜",
       "booharu_set_translation": "新增譯文",
       "booharu_split_block": "分割文字",
       "booharu_style_words": "變更字詞樣式"

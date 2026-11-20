@@ -3,8 +3,10 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { SkewSection } from '@/components/booharu/effects/SkewSection'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { boxActions, runBoxAction, selectedBoxes } from '@/lib/booharu/boxActions'
+import { showsSkew, useTextEffects } from '@/lib/booharu/effects'
 import {
   closeFx,
   commonSeed,
@@ -83,18 +85,23 @@ export interface FxProps {
 }
 
 /** Booharu's Text effects in the type bar (S12-k): an italic "fx" button after the border's and
- * before Done, pressed while the bar's characters show a gradient, opening a popover of the text's
- * effects, as Booharu 0.0.4's Text Effects window held them: Gradient fill, the effects still to
- * come, shown off, and Reset to lettering default. It opens and closes through lib/booharu/fx.ts,
- * so Text effects… in a box's menu opens it too. */
+ * before Done, pressed while the bar's characters show a gradient or a target shows a skew, opening
+ * a popover of the text's effects, as Booharu 0.0.4's Text Effects window held them: Gradient fill,
+ * Skew, the effects still to come, shown off, and Reset to lettering default. It opens and closes
+ * through lib/booharu/fx.ts, so FX… in a box's menu and a box's fx tag open it too. */
 export function FxPopover(props: FxProps) {
   const { t } = useTranslation()
   const page = usePage().data
   const open = useFxOpen(page?.id)
+  const effects = useTextEffects(page?.id).data
   const { targets, typing, words, chars, mixed } = props
   const texts = styledTexts(targets, words, typing)
   const shown = gradientShown(chars, mixed, texts?.flatMap(spanStyles) ?? null)
-  const pressed = shown !== 'none'
+  const skewed = showsSkew(
+    effects,
+    targets.map(({ id }) => id),
+  )
+  const pressed = shown !== 'none' || skewed
   return (
     <Popover open={open} onOpenChange={(next) => (next ? openFx() : closeFx())}>
       <Tooltip>
@@ -117,6 +124,7 @@ export function FxPopover(props: FxProps) {
       <PopoverContent side='bottom' align='end' className='w-80 gap-3 rounded-xl p-3'>
         <PopoverTitle className='text-xs'>{t('booharu.effects.title')}</PopoverTitle>
         <GradientSection {...props} shown={shown} />
+        <SkewSection targets={targets} typing={typing} effects={effects} />
         <div className='flex flex-col gap-1.5 border-t pt-2.5'>
           {LATER.map((effect) => (
             <div key={effect} className='flex items-center justify-between gap-2'>

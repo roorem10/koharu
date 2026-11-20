@@ -244,6 +244,15 @@
       "linear": "Doğrusal",
       "radial": "Radyal",
       "screentoneLater": "Tram dolgusu (daha sonra)",
+      "skew": "Eğme",
+      "skewLocked_one": "Kilitli {{count}} kutu olduğu gibi bırakıldı.",
+      "skewLocked_other": "Kilitli {{count}} kutu olduğu gibi bırakıldı.",
+      "skewReset": "Eğmeyi sıfırla",
+      "skewUntranslated_one": "{{count}} kutunun eğilecek çevirisi yok.",
+      "skewUntranslated_other": "{{count}} kutunun eğilecek çevirisi yok.",
+      "skewWholeBox": "Kutunun tamamına uygulanır: önce Bitti'ye basın",
+      "skewX": "Yatay (°)",
+      "skewY": "Dikey (°)",
       "start": "Başlangıç rengi",
       "title": "Metin efektleri",
       "wavyLater": "Dalgalı / titrek metin (daha sonra)"
@@ -653,6 +662,7 @@
       "booharu_reset_lettering": "Dizgi kategorisinin varsayılan stiline sıfırla",
       "booharu_set_lettering_category": "Dizgi kategorisini değiştir",
       "booharu_set_review_note": "Notu düzenle",
+      "booharu_set_skew": "Eğ",
       "booharu_set_translation": "Çeviri ekle",
       "booharu_split_block": "Metni böl",
       "booharu_style_words": "Sözcüklere stil uygula"

@@ -244,6 +244,15 @@
       "linear": "線形",
       "radial": "放射状",
       "screentoneLater": "スクリーントーンの塗り（今後対応）",
+      "skew": "傾斜",
+      "skewLocked_one": "ロック中の{{count}}個のボックスはそのままです。",
+      "skewLocked_other": "ロック中の{{count}}個のボックスはそのままです。",
+      "skewReset": "傾斜をリセット",
+      "skewUntranslated_one": "{{count}}個のボックスにはまだ翻訳がないため、傾斜できません。",
+      "skewUntranslated_other": "{{count}}個のボックスにはまだ翻訳がないため、傾斜できません。",
+      "skewWholeBox": "ボックス全体に適用されます。先に「完了」を押してください",
+      "skewX": "水平方向（°）",
+      "skewY": "垂直方向（°）",
       "start": "開始色",
       "title": "テキスト効果",
       "wavyLater": "波打ち・震え文字（今後対応）"
@@ -653,6 +662,7 @@
       "booharu_reset_lettering": "写植カテゴリの既定値に戻す",
       "booharu_set_lettering_category": "写植カテゴリを変更",
       "booharu_set_review_note": "メモを編集",
+      "booharu_set_skew": "傾斜",
       "booharu_set_translation": "翻訳を追加",
       "booharu_split_block": "テキストを分割",
       "booharu_style_words": "単語のスタイルを変更"
