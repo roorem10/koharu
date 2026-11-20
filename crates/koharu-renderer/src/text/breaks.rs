@@ -149,6 +149,16 @@ fn opportunities(text: &str, hyphenate: Option<Lang>) -> Vec<Cut> {
             _ => pieces.push((start..end, next, after)),
         }
     }
+    // Booharu: a text ending in a line break ends with an empty line, as
+    // Photoshop shows one, so the caret after the break has a line to stand
+    // on and a hit below the line before reaches it, in horizontal and
+    // vertical text alike (GitHub #89).
+    if mandatory(text.len())
+        && let Some(last) = pieces.last_mut()
+    {
+        last.2 = Break::Mandatory;
+        pieces.push((text.len()..text.len(), text.len(), Break::End));
+    }
     pieces
 }
 
@@ -330,6 +340,24 @@ mod tests {
         assert_eq!(
             opportunities(text, None),
             [(0..7, 8, Break::Mandatory), (8..14, 14, Break::End)]
+        );
+    }
+
+    // Booharu: the empty last line (GitHub #89).
+    #[test]
+    fn a_text_ending_in_a_line_break_ends_with_an_empty_piece() {
+        assert_eq!(
+            opportunities("ab\n", None),
+            [(0..2, 3, Break::Mandatory), (3..3, 3, Break::End)]
+        );
+        // A break of two characters, and a break alone.
+        assert_eq!(
+            opportunities("ab\r\n", None),
+            [(0..2, 4, Break::Mandatory), (4..4, 4, Break::End)]
+        );
+        assert_eq!(
+            opportunities("\n", None),
+            [(0..0, 1, Break::Mandatory), (1..1, 1, Break::End)]
         );
     }
 

@@ -442,4 +442,51 @@ mod tests {
         assert!(laid.selection(0..0).is_empty());
         assert_eq!(laid.bounds(), Rect::from_points(caret.p0, caret.p1));
     }
+
+    // Booharu: the empty last line (GitHub #89).
+    #[test]
+    fn a_text_ending_in_a_line_break_ends_with_an_empty_line() {
+        let laid = lettering("ab\n", Frame::Point, Direction::Horizontal);
+        assert_eq!((laid.lines(), laid.line(2), laid.line(3)), (2, 0, 1));
+        // The caret after the break starts the empty line, right under the
+        // line before, where Home, End and a move down go.
+        let (end, after) = (laid.caret(2), laid.caret(3));
+        assert_eq!(after.p0.x, laid.caret(0).p0.x);
+        assert!(
+            (after.p0.y - end.p1.y).abs() < 1e-3,
+            "{after:?} under {end:?}"
+        );
+        assert!(after.p1.y - after.p0.y > 20.0);
+        assert_eq!(laid.line_text(1), 3..3);
+        assert_eq!(laid.nearest(1, laid.along(1)), 3);
+        // A hit below the first line reaches it, and the text covers it.
+        assert_eq!(laid.hit(Point::new(end.p0.x, end.p1.y + 5.0)), 3);
+        assert_eq!(laid.hit(end.p0.midpoint(end.p1)), 2);
+        assert!(laid.bounds().y1 + 1e-3 >= after.p1.y);
+        // A break alone, two at the end, and one in the middle, whose empty
+        // line was there already.
+        let alone = lettering("\n", Frame::Point, Direction::Horizontal);
+        assert_eq!((alone.lines(), alone.line(1)), (2, 1));
+        let twice = lettering("ab\n\n", Frame::Point, Direction::Horizontal);
+        assert_eq!((twice.lines(), twice.line(3), twice.line(4)), (3, 1, 2));
+        assert!(twice.caret(4).p0.y > twice.caret(3).p0.y);
+        let middle = lettering("a\n\nb", Frame::Point, Direction::Horizontal);
+        assert_eq!((middle.lines(), middle.line(2), middle.line(3)), (3, 1, 2));
+    }
+
+    // Booharu: the empty last line, as a column (GitHub #89).
+    #[test]
+    fn a_vertical_text_ending_in_a_line_break_ends_with_an_empty_column() {
+        let laid = lettering("ab\n", Frame::Point, Direction::Vertical);
+        assert_eq!((laid.lines(), laid.line(3)), (2, 1));
+        // Across the next column, left of the first, at its start.
+        let (end, after) = (laid.caret(2), laid.caret(3));
+        assert_eq!(after.p0.y, after.p1.y);
+        assert!(
+            (after.p0.x - end.p1.x).abs() < 1e-3,
+            "{after:?} beside {end:?}"
+        );
+        assert_eq!(after.p0.y, laid.caret(0).p0.y);
+        assert_eq!(laid.hit(Point::new(end.p1.x - 5.0, end.p0.y)), 3);
+    }
 }
