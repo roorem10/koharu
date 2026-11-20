@@ -284,6 +284,7 @@ mod tests {
         }
         Ok(())
     }
+
     /// A project of one 400-pixel page holding a block of `role` found and
     /// read by Koharu's stages, its source's box away from the page's
     /// corner, lettered at size 32 in blue outlined in white.
