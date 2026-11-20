@@ -194,6 +194,7 @@ fn shape_text(
     )
     .context("failed to shape text with HarfRust")?;
     let scale = font.scale(span.size);
+    // Booharu: the glyphs kept to take the letter spacing below, then returned.
     let mut glyphs: Vec<Glyph> = buffer
         .glyph_infos()
         .iter()
