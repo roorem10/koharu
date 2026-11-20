@@ -17,7 +17,7 @@ use booharu_core::{
     effects::{TextEffects, text_effects},
     resolver,
     settings::LetteringSettings,
-    skew,
+    skew, status,
 };
 use koharu_scene::{Content, Edit, Layer, LayerId, Op, Page, Project, Text, Transform};
 use serde::{Deserialize, Serialize};
@@ -43,8 +43,9 @@ pub struct SkewChange {
     /// Text layers and blocks it leaves as they are because they, or a
     /// layer holding them, are locked.
     pub locked: u32,
-    /// Blocks without a translation, which it leaves alone, as skewing one
-    /// would shear its source.
+    /// Blocks without a translation of their own, a placeholder a style
+    /// set before translating included (`status::unwritten`), which it
+    /// leaves alone, as there are no words to skew.
     pub untranslated: u32,
 }
 
@@ -85,7 +86,9 @@ pub struct SkewCounts {
 /// now (`skew::reskewed`), so its position, turn and size stay, and the
 /// record of the new skew, removed at 0 and 0. A locked layer, or one
 /// inside a locked layer, is counted and left, as is a block without a
-/// translation; any other kind of layer is left uncounted. A layer named
+/// translation of its own ([`status::unwritten`]), whose placeholder, a
+/// style set before translating, keeps its transform; any other kind of
+/// layer is left uncounted. A layer named
 /// twice counts once, and a layer not in `project` fails. An angle outside
 /// −60 to 60, or not a number, refuses the whole call.
 pub fn set_skew(
@@ -110,7 +113,13 @@ pub fn set_skew(
         }
         let layer = project.layer(id)?;
         let (text, block) = match &layer.content {
-            Content::Block(block) => (block.translation.as_ref(), true),
+            Content::Block(block) => {
+                let own = block
+                    .translation
+                    .as_ref()
+                    .filter(|_| !status::unwritten(layer, block));
+                (own, true)
+            }
             Content::Text(text) => (Some(&**text), false),
             _ => continue,
         };
@@ -521,6 +530,57 @@ mod tests {
                 untranslated: 1,
             }
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_is_left_unskewed_with_no_effects() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        // A border picked for bare before it's translated leaves a
+        // placeholder: no words to skew, and no effect to tag.
+        let bare = fixture.id("bare");
+        fixture.edit(vec![Op::UpdateLayer {
+            layer: bare.into(),
+            patch: json!({"translation": {"style": {"chars": {
+                "stroke": YELLOW, "stroke_width": 4.0,
+            }}}}),
+        }])?;
+        let placeholder = fixture.text("bare")?;
+        let change = set_skew(&fixture.session.project(), &[bare], Some(10.0), None)?;
+        assert!(change.edit.is_none());
+        assert_eq!(
+            change.counts(),
+            SkewCounts {
+                untranslated: 1,
+                ..SkewCounts::default()
+            }
+        );
+        assert_eq!(fixture.effects()?, []);
+        assert_eq!(fixture.text("bare")?, placeholder);
+
+        // Its translation typed in, the border shows, and it skews.
+        let english: LanguageIdentifier = "en".parse()?;
+        let look = booharu_core::settings::Snapshot {
+            font: Some(FONT.to_owned()),
+            ..booharu_core::settings::Snapshot::default()
+        };
+        let typed = crate::translation::edit(
+            &fixture.session.project(),
+            bare,
+            "Why?".to_owned(),
+            &english,
+            &look,
+        )?;
+        fixture.session.apply(typed)?;
+        assert_eq!(
+            fixture.effects()?,
+            [TextEffects {
+                layer: bare,
+                effects: vec![TextEffect::Border],
+                skew: None,
+            }]
+        );
+        assert_eq!(fixture.skew(&["bare"], Some(10.0), None)?.changed, 1);
         Ok(())
     }
 

@@ -16,7 +16,10 @@
 //! instead, whatever its own and whether the switch is on. A block
 //! changed by hand ([`booharu_core::edited`]) is kept unless the caller
 //! includes those, and a locked block, or one inside a locked layer, is
-//! always kept, so a lock never fails the edit. An included block also
+//! always kept, so a lock never fails the edit. A box styled before it's
+//! translated, whose translation is only the empty placeholder the style
+//! left ([`booharu_core::status::placeholder`]), counts as untranslated and
+//! is left alone, the values set on it the user's. An included block also
 //! loses its marks for the keys Apply writes, so the look shows on every
 //! character, but for a category's font, which never touches the marks, so
 //! word styles survive it.
@@ -34,7 +37,9 @@
 //! and it takes the skew off, as one undo step, leaving the words, size,
 //! frame, position, rotation and alignment. It is how a box whose role a
 //! picked category changed gets the outline of its new role at once,
-//! rather than at its next translation.
+//! rather than at its next translation. It reads a box styled before it's
+//! translated as it is, so it clears that style too, and the record it
+//! writes keeps no text, so the box stays a placeholder, still translatable.
 
 use std::collections::BTreeSet;
 
@@ -45,7 +50,7 @@ use booharu_core::{
     lettering::{self, LetteringCategory},
     resolver,
     settings::LetteringSettings,
-    styles,
+    status, styles,
 };
 use koharu_scene::{
     CharStyle, Content, Edit, Layer, LayerId, Op, PageId, Project, RichText, Role, Span,
@@ -111,7 +116,9 @@ pub fn count(
 /// gradient fill or letter spacing, as one undo step labelled [`LABEL`]
 /// over any number of pages, with its numbers; none when it changes
 /// nothing. A block changed by hand takes it only with
-/// `include_hand_edited`. With `category`, every block is lettered in that
+/// `include_hand_edited`. A block whose translation is only a placeholder
+/// ([`status::unwritten`]) counts as untranslated and is never restyled,
+/// even then. With `category`, every block is lettered in that
 /// category's font, whatever its own and whether Pick fonts automatically is
 /// on. `origin` goes in each changed block's record: [`Origin::Agent`] makes
 /// the look the agent's choice, which a later automatic step keeps as it
@@ -200,7 +207,10 @@ pub struct ResetCounts {
 /// position or rotation, the direction, the alignment, the line height, the
 /// clean-up, the source, the role, or any other attribute. A locked block
 /// or text layer, or one inside a locked layer, is counted and left, and an
-/// untranslated block counted; any other layer is left uncounted. A layer
+/// untranslated block counted; any other layer is left uncounted. A block
+/// whose translation is only the placeholder a style set before translating
+/// left ([`status::placeholder`]) is reset as it is: its style goes, and its
+/// record keeps no text, so it stays untranslated. A layer
 /// named twice counts once, and a layer not in `project` fails.
 pub fn reset_lettering(
     project: &Project,
@@ -217,6 +227,7 @@ pub fn reset_lettering(
         }
         let layer = project.layer(id)?;
         let (text, block) = match &layer.content {
+            // A placeholder is read as it is, so its style can go too.
             Content::Block(block) => (block.translation.as_ref(), true),
             Content::Text(text) => (Some(&**text), false),
             _ => continue,
@@ -317,7 +328,13 @@ fn planned<'p>(
         let Content::Block(block) = &layer.content else {
             continue;
         };
-        let Some(translation) = &block.translation else {
+        // A placeholder is no translation, so a style set on the box before
+        // it's translated stays the user's.
+        let translation = block
+            .translation
+            .as_ref()
+            .filter(|_| !status::unwritten(layer, block));
+        let Some(translation) = translation else {
             plan.counts.untranslated += 1;
             continue;
         };
@@ -460,6 +477,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use crate::testing::{FILL, type_bar_style};
 
     const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
     const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
@@ -1356,6 +1374,56 @@ mod tests {
                 .all(|span| span.attributes == CharStyle::default())
         );
         assert_eq!(attrs::get::<Auto>(&t), None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_is_left_out_of_apply_as_untranslated() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = look(false, Some(BLACK));
+        fixture.edit(vec![type_bar_style(fixture.id("a"))])?;
+        let before = fixture.layer("a")?;
+        let scope = StyleScope::Blocks {
+            blocks: vec![fixture.id("a")],
+        };
+
+        // Hand edits included or not, the style set before translating is
+        // no translation to restyle, and stays the user's.
+        for include_hand_edited in [false, true] {
+            let applied =
+                fixture.apply(&scope, include_hand_edited, &settings, Origin::Automatic)?;
+            assert_eq!(applied, counts(0, 0, 1));
+            assert!(fixture.layer("a")? == before);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn reset_clears_a_style_set_before_translating_and_the_box_stays_translatable() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = look(false, Some(BLACK));
+        fixture.edit(vec![type_bar_style(fixture.id("a"))])?;
+
+        let counts = fixture.reset(&["a"], &settings)?;
+        assert_eq!(
+            counts,
+            ResetCounts {
+                changed: 1,
+                locked: 0,
+                untranslated: 0,
+            }
+        );
+        let a = fixture.layer("a")?;
+        let Content::Block(block) = &a.content else {
+            anyhow::bail!("a isn't a block");
+        };
+        let translation = block.translation.as_ref().context("the placeholder")?;
+        assert_eq!(translation.style.chars.fill, Some(BLACK));
+        assert_ne!(Some(FILL), translation.style.chars.fill);
+        // Its record keeps no text, so the box is still one to translate.
+        assert_eq!(attrs::get::<Auto>(&a).context("a record")?.text, None);
+        assert!(status::placeholder(&a, block));
+        assert!(status::untranslated(&a, block));
         Ok(())
     }
 
