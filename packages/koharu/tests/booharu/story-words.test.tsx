@@ -26,8 +26,8 @@ import { comicFonts } from './fonts'
 
 const style = { chars: { size: 24, family: 'Wild Words' } }
 
-/** A block, its translation's spans `spans`. */
-function block(id: string, spans: Span[]): Layer {
+/** A block, its translation's spans `spans`, or with null untranslated. */
+function block(id: string, spans: Span[] | null): Layer {
   return {
     id,
     name: id,
@@ -38,7 +38,7 @@ function block(id: string, spans: Span[]): Layer {
     attributes: {},
     kind: 'block',
     source: { content: [{ insert: 'こんにちは' }] },
-    translation: { content: spans, style },
+    translation: spans && { content: spans, style },
   }
 }
 
@@ -338,6 +338,49 @@ describe('Booharu words chosen in Story', () => {
     act(() => useKoharuStore.setState({ typing: null }))
     await user.keyboard('{Alt>}{F10}{/Alt}')
     expect(within(toolbar()!).getByRole('button', { name: 'Bold' })).toHaveFocus()
+  })
+
+  it('gives the focus back to the field when its words go while the toolbar holds it', async () => {
+    const user = userEvent.setup()
+    story(pageOf(block('block', [{ insert: 'Hello world' }])))
+    const field = await screen.findByPlaceholderText('Translation')
+    const reach = async (text: string) => {
+      await waitFor(() => expect(field).toHaveValue(text))
+      field.focus()
+      choose(field, 0, 5)
+      await user.keyboard('{Alt>}{F10}{/Alt}')
+      expect(within(toolbar()!).getByRole('button', { name: 'Bold' })).toHaveFocus()
+    }
+
+    // An undo, a run or the agent changing the text lets the words go, and the toolbar with them.
+    await reach('Hello world')
+    await act(async () => show(pageOf(block('block', [{ insert: 'Hello there' }]))))
+    await waitFor(() => expect(toolbar()).toBeNull())
+    expect(field).toHaveFocus()
+
+    // As does an undo taking a first translation away.
+    await reach('Hello there')
+    await act(async () => show(pageOf(block('block', null))))
+    await waitFor(() => expect(toolbar()).toBeNull())
+    expect(field).toHaveFocus()
+
+    // A press on the desktop's canvas blurs the page's focus first, and it stays with the canvas.
+    await act(async () => show(pageOf(block('block', [{ insert: 'Hello world' }]))))
+    await reach('Hello world')
+    act(() => {
+      ;(document.activeElement as HTMLElement).blur()
+      window.dispatchEvent(new Event(CANVAS_PRESS))
+    })
+    expect(toolbar()).toBeNull()
+    expect(document.body).toHaveFocus()
+
+    // A press elsewhere in the sidebar takes the focus before it hides the toolbar.
+    await reach('Hello world')
+    const source = screen.getByPlaceholderText('Source text')
+    await user.click(source)
+    await waitFor(() => expect(toolbar()).toBeNull())
+    expect(range()).not.toBeNull()
+    expect(source).toHaveFocus()
   })
 
   it('does what B and I do for Ctrl+B and Ctrl+I in the field, only with words chosen', async () => {

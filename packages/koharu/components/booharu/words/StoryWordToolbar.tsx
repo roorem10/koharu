@@ -1,7 +1,14 @@
 'use client'
 
 import { Bold, Italic, Star } from 'lucide-react'
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactElement,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -48,9 +55,10 @@ const BUTTON =
  *
  * From the keyboard it's a toolbar: Alt+F10 in the field, while the canvas isn't typing, moves the
  * focus to its one tab stop, the control focused last; the arrows, Home and End move along it, and
- * Escape or Tab take the focus back to the field, its selection as it was. A key pressed there
- * without Ctrl, Cmd or Alt never reaches the canvas's shortcuts, so Space presses the focused
- * control and Delete removes no box, while Ctrl+Z still undoes. */
+ * Escape or Tab take the focus back to the field, its selection as it was, as does the toolbar
+ * going while it holds the focus. A key pressed there without Ctrl, Cmd or Alt never reaches the
+ * canvas's shortcuts, so Space presses the focused control and Delete removes no box, while Ctrl+Z
+ * still undoes. */
 export function StoryWordToolbar({ layer }: { layer: BlockLayer | TextLayer }) {
   const { t } = useTranslation()
   const range = useWordRange((state) => (state.range?.layer === layer.id ? state.range : null))
@@ -85,9 +93,23 @@ export function StoryWordToolbar({ layer }: { layer: BlockLayer | TextLayer }) {
     }
   }, [field])
 
-  const text = letteringOf(layer)
-  if (!range || !field || !text) return null
-  const { chars, mixed } = chosenShare(text, range)
+  // Words going while the toolbar holds the focus, as when an undo, a run or the agent changes
+  // their text, give the focus back to the field, not to the page, where the canvas's shortcuts
+  // would take Escape and Delete. The store tells of it while the toolbar is still there to ask.
+  useEffect(() => {
+    if (!field) return
+    return useWordRange.subscribe((state) => {
+      const going = state.range?.layer !== layer.id || state.field !== field
+      if (going && field.isConnected && bar.current?.contains(document.activeElement)) {
+        field.focus()
+      }
+    })
+  }, [field, layer.id])
+
+  if (!range || !field) return null
+  // A text gone, as an undo takes a first translation away, lets the words go, and the toolbar
+  // with them, only once the store tells of it.
+  const { chars, mixed } = chosenShare(letteringOf(layer) ?? {}, range)
   const bold = isBold(chars, mixed)
   const italic = isItalic(chars, mixed)
   const style = (change: WordChange) => () => void styleWords(range, change)
