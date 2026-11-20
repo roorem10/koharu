@@ -162,7 +162,46 @@ describe('Booharu text colour over a gradient fill (S12-c)', () => {
     await user.click(await screen.findByRole('button', { name: 'Swap fill and outline colors' }))
 
     expect(edits).toEqual([
-      restyled([['box', { chars: { fill: [1, 1, 1, 1], stroke: RED, stroke_width: 1.5 } }]]),
+      restyled([
+        [
+          'box',
+          { chars: { fill: [1, 1, 1, 1], fill_gradient: null, stroke: RED, stroke_width: 1.5 } },
+        ],
+      ]),
+    ])
+  })
+
+  it("keeps a box gradient its words' own colours hide off as it swaps", async () => {
+    const hidden = text('text', {
+      style: { chars: { fill_gradient: GRADIENT } },
+      content: [{ insert: 'Hello world', attributes: { fill: RED } }],
+    })
+    const { edits, user } = renderBar([hidden])
+
+    await user.click(screen.getByRole('button', { name: 'Border' }))
+    await user.click(await screen.findByRole('button', { name: 'Swap fill and outline colors' }))
+
+    // The words' colour goes to the box with its gradient off, which would show again otherwise.
+    expect(edits).toEqual([
+      {
+        label: 'set_style',
+        ops: [
+          {
+            op: 'update_layer',
+            layer: 'text',
+            patch: {
+              style: {
+                chars: { fill: [1, 1, 1, 1], fill_gradient: null, stroke: RED, stroke_width: 1.5 },
+              },
+            },
+          },
+          {
+            op: 'set_rich_text',
+            layer: 'text',
+            spans: [{ insert: 'Hello world', attributes: {} }],
+          },
+        ],
+      },
     ])
   })
 })

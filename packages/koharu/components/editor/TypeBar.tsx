@@ -721,16 +721,20 @@ export function TypeBar() {
 
 /** Booharu: `chars` with the text's colour and its border's swapped, as Booharu 0.0.4 swapped them.
  * Text without a visible border gets one in its colour, at the bar's default width, over a black
- * or white fill, whichever stands out from that colour. */
+ * or white fill, whichever stands out from that colour. The new fill takes off any gradient, as a
+ * colour picked in the colour well does, a fill and a gradient fill being one paint (S12-c), so a
+ * box gradient its words' own colours hid doesn't show again. */
 export function swappedColors(chars: CharStyle): CharStyle {
   const fill = chars.fill ?? hexToRgba(BLACK)
   const stroke = chars.stroke ?? null
   const width = chars.stroke_width ?? 0
-  if (stroke && stroke[3] > 0 && width > 0) return { fill: stroke, stroke: fill }
+  if (stroke && stroke[3] > 0 && width > 0)
+    return { fill: stroke, fill_gradient: null, stroke: fill }
   const [red, green, blue] = fill
   const light = 0.2126 * red + 0.7152 * green + 0.0722 * blue > 0.5
   return {
     fill: hexToRgba(light ? BLACK : WHITE),
+    fill_gradient: null,
     stroke: [red, green, blue, 1],
     stroke_width: width > 0 ? width : 1.5,
   }

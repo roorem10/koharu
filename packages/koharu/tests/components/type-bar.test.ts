@@ -7,6 +7,7 @@ describe('Booharu swap of text and border colours', () => {
   it('swaps a visible border with the text colour', () => {
     expect(swappedColors({ fill: [0, 0, 0, 1], stroke: [1, 1, 1, 1], stroke_width: 4 })).toEqual({
       fill: [1, 1, 1, 1],
+      fill_gradient: null,
       stroke: [0, 0, 0, 1],
     })
   })
@@ -15,11 +16,13 @@ describe('Booharu swap of text and border colours', () => {
     // Dark red text gets a white fill; yellow text, transparent border or not, a black one.
     expect(swappedColors({ fill: [0.5, 0, 0, 1] })).toEqual({
       fill: [1, 1, 1, 1],
+      fill_gradient: null,
       stroke: [0.5, 0, 0, 1],
       stroke_width: 1.5,
     })
     expect(swappedColors({ fill: [1, 1, 0, 1], stroke: [0, 0, 0, 0], stroke_width: 6 })).toEqual({
       fill: [0, 0, 0, 1],
+      fill_gradient: null,
       stroke: [1, 1, 0, 1],
       stroke_width: 6,
     })
