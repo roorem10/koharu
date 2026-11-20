@@ -459,6 +459,39 @@ fn a_line_given_back_unchanged_is_leftover_source_not_missing() -> Result<()> {
 }
 
 #[test]
+fn a_line_given_back_and_styled_since_is_still_leftover_source() -> Result<()> {
+    let mut page = Fixture::new(
+        400,
+        400,
+        vec![translated("done", 0, "Done."), untranslated("back", 1)],
+    );
+    let back = page.id("back");
+    let ops = vec![
+        serde_json::from_value::<Op>(json!({"op": "update_layer", "layer": back,
+            "patch": {"cleanup": {"visible": false}}}))?,
+        styles::given_back(&page.layer("back"))?,
+    ];
+    page.session.apply(Edit {
+        label: "test".to_owned(),
+        ops,
+    })?;
+    // A style picked on it since leaves a placeholder, no translation: the
+    // page still shows its source.
+    page.session.apply(Edit {
+        label: "test".to_owned(),
+        ops: vec![crate::testing::type_bar_style(back)],
+    })?;
+    let found: Vec<Problem> = page
+        .check()
+        .into_iter()
+        .filter(|finding| finding.layer == back)
+        .map(|finding| finding.problem)
+        .collect();
+    assert_eq!(found, [Problem::LeftoverSource { unchanged: true }]);
+    Ok(())
+}
+
+#[test]
 fn locked_and_hand_set_fonts_count_toward_the_majority() -> Result<()> {
     let frame = || boxed(10.0, 10.0, 300.0, 150.0, "best");
     let automatic = || c2pa(&["detection", "ocr", "translation"]);

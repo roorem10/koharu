@@ -968,6 +968,22 @@ mod tests {
     }
 
     #[test]
+    fn fix_it_everywhere_translates_a_box_styled_before_its_translated() -> Result<()> {
+        let mut chapter = Chapter::new(vec![block("styled", None, 0, "ヒナです")])?;
+        let styled = chapter.layers["styled"];
+        // A style picked before translating leaves a placeholder, no
+        // translation changed by hand.
+        chapter.session.apply(Edit {
+            label: "test".to_owned(),
+            ops: vec![crate::testing::type_bar_style(styled)],
+        })?;
+        let found = usage(&chapter.session.project(), "ヒナ");
+        assert_eq!(found.translate, [styled]);
+        assert_eq!((found.hand_edited, found.locked), (0, 0));
+        Ok(())
+    }
+
+    #[test]
     fn an_accepted_suggestion_replaces_the_series_term_with_its_source() -> Result<()> {
         let chapter = Chapter::new(Vec::new())?;
         let (path, store) = (chapter.path(), chapter.store());

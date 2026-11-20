@@ -316,6 +316,28 @@ mod tests {
     }
 
     #[test]
+    fn a_box_styled_before_its_translated_is_ready_to_translate_again() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let ready = fixture.id("ready");
+        // A style picked before translating leaves a placeholder, no
+        // translation fixed by hand.
+        fixture.session.apply(Edit {
+            label: "test".to_owned(),
+            ops: vec![crate::testing::type_bar_style(ready)],
+        })?;
+        let redo = redo_targets(
+            &fixture.session.project(),
+            &[ready],
+            &[RunStage::Translate],
+            &LetteringSettings::default(),
+            false,
+        )?;
+        assert_eq!(redo.counts, counts(1, 0, 0));
+        assert_eq!(redo.blocks, [ready]);
+        Ok(())
+    }
+
+    #[test]
     fn it_refuses_other_stages_none_and_a_layer_that_isnt_a_block() -> Result<()> {
         let fixture = Fixture::new()?;
         for stages in [&[RunStage::Detect][..], &[RunStage::Read], &[]] {
