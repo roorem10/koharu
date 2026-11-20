@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   boldPatch,
   boldWords,
+  chosenText,
   isBold,
   isItalic,
   italicPatch,
@@ -17,7 +18,8 @@ import {
   weightChoices,
   type WordRange,
 } from '@/lib/booharu/words'
-import { commands, type Layer, type Typed } from '@koharu/ipc/protocol'
+import { commands, type Layer, type Text, type Typed } from '@koharu/ipc/protocol'
+import { toast } from '@koharu/ui/components/toast'
 
 /** A text layer whose own style has `weight`, or none. */
 function textLayer(id: string, weight?: number): Layer {
@@ -114,6 +116,45 @@ describe('Booharu word ranges', () => {
     expect(utf8Offset('世界です', 2)).toBe(6)
     expect(utf8Offset('😀 hi', 2)).toBe(4)
     expect(utf8Offset('a😀b', 4)).toBe(6)
+    // An index between an emoji's two UTF-16 units counts from the emoji's start.
+    expect(utf8Offset('a😀b', 2)).toBe(1)
+  })
+
+  it('cuts the chosen characters out of their spans by UTF-8 bytes, each with its marks', () => {
+    const text: Text = {
+      content: [
+        { insert: '世界' },
+        { insert: '😀 hi', attributes: { weight: 700 } },
+        { insert: ' end', attributes: { italic: true } },
+      ],
+      style: { chars: { size: 24 } },
+    }
+    const range = (start: number, end: number): WordRange => ({
+      layer: 'text',
+      start,
+      end,
+      text: '世界😀 hi end',
+    })
+
+    // 界 is bytes 3 to 6, 😀 6 to 10, and the space and h 10 to 12.
+    expect(chosenText(text, range(3, 12))).toEqual({
+      content: [{ insert: '界' }, { insert: '😀 h', attributes: { weight: 700 } }],
+      style: { chars: { size: 24 } },
+    })
+    // A run that ends where a span starts, or starts where one ends, takes nothing of it.
+    expect(chosenText(text, range(0, 6)).content).toEqual([{ insert: '世界' }])
+    expect(chosenText(text, range(13, 17)).content).toEqual([
+      { insert: ' end', attributes: { italic: true } },
+    ])
+  })
+
+  it('shows the toolbar by the field the words were chosen in, never once they go', () => {
+    const field = document.createElement('textarea')
+    setWordRange({ layer: 'text', start: 0, end: 5, text: 'Hello' }, field)
+    expect(useWordRange.getState().field).toBe(field)
+
+    setWordRange(null, field)
+    expect(useWordRange.getState()).toEqual({ range: null, field: null })
   })
 
   it("styles the chosen words through the words edit with the text they're in", async () => {
@@ -129,18 +170,29 @@ describe('Booharu word ranges', () => {
   })
 
   it('lets the words go when their text changed, and keeps them on another refusal', async () => {
+    const shown = vi.spyOn(toast, 'add')
     const styled = vi
       .spyOn(commands, 'booharuStyleWords')
       .mockRejectedValueOnce('block 7 has no translation, so it has no words to style')
-      .mockRejectedValueOnce('The text changed. Select the words again.')
+      .mockRejectedValueOnce(new Error('The text changed. Select the words again.'))
     const range: WordRange = { layer: 'block', start: 0, end: 5, text: 'Hello' }
-    setWordRange({ ...range })
+    setWordRange({ ...range }, document.createElement('textarea'))
 
+    // Each says why, in the interface's language: the refusal's own words after a failure's.
     await expect(styleWords(range, { bold: true })).resolves.toBe(false)
     expect(useWordRange.getState().range).toEqual(range)
+    expect(shown).toHaveBeenLastCalledWith({
+      type: 'error',
+      title: "Couldn't style the words: block 7 has no translation, so it has no words to style",
+    })
     await expect(styleWords(range, { bold: true })).resolves.toBe(false)
-    expect(useWordRange.getState().range).toBeNull()
+    expect(useWordRange.getState()).toEqual({ range: null, field: null })
+    expect(shown).toHaveBeenLastCalledWith({
+      type: 'info',
+      title: 'The text changed. Select the words again.',
+    })
     expect(styled).toHaveBeenCalledTimes(2)
+    expect(shown).toHaveBeenCalledTimes(2)
   })
 
   it('keeps other words chosen since when the text changed under the old ones', async () => {
@@ -152,5 +204,13 @@ describe('Booharu word ranges', () => {
 
     await styleWords({ layer: 'block', start: 0, end: 5, text: 'Hello' }, { italic: true })
     expect(useWordRange.getState().range).toEqual(chosen)
+  })
+
+  it('shows no toast for words it styles', async () => {
+    const shown = vi.spyOn(toast, 'add')
+    vi.spyOn(commands, 'booharuStyleWords').mockResolvedValue(null)
+
+    await styleWords({ layer: 'block', start: 0, end: 2, text: 'Hi' }, { clear: true })
+    expect(shown).not.toHaveBeenCalled()
   })
 })

@@ -94,7 +94,7 @@ beforeEach(() => {
     settingsOpen: false,
     historyOpen: false,
   })
-  useWordRange.setState({ range: null }) // Booharu: no words chosen in Story.
+  useWordRange.setState({ range: null, field: null }) // Booharu: no words chosen in Story.
 })
 
 afterEach(() => {

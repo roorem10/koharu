@@ -9,10 +9,12 @@ import { StoryBoxActions } from '@/components/booharu/boxes/BoxActionItems' // B
 import { GlossaryTextMenu } from '@/components/booharu/context/GlossaryTextMenu' // Booharu: Add to glossary.
 import { BoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the row's Box details tag.
 import { CategoryTag } from '@/components/booharu/lettering/CategoryTag' // Booharu: the row's lettering category.
+import { StoryWordToolbar } from '@/components/booharu/words/StoryWordToolbar' // Booharu: the word toolbar.
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
 import { call, dispatch } from '@/lib/backend'
 import { redoBoxes } from '@/lib/booharu/redo' // Booharu: Translate through Redo boxes.
 import { commitTranslation } from '@/lib/booharu/translation' // Booharu: a block's first translation.
+import { useWordSelection } from '@/lib/booharu/wordSelection' // Booharu: words chosen to style.
 import {
   findLayer,
   isBlockLayer,
@@ -214,6 +216,7 @@ function StoryText({
     state.selectedLayers.some((selected) => ids.includes(selected)),
   )
   const setStoryHover = useKoharuStore((state) => state.setStoryHover)
+  const words = useWordSelection(layer) // Booharu: words chosen in the text's field to style.
 
   useEffect(() => {
     const element = row.current
@@ -348,6 +351,7 @@ function StoryText({
                 value={plainText(layer.translation)}
                 // Booharu: a block's first translation goes in its frame, not the page's corner (#128).
                 onCommit={(text) => commitTranslation(layer, text)}
+                {...words} // Booharu: choosing words to style.
               />
             </GlossaryTextMenu>
           </>
@@ -360,9 +364,12 @@ function StoryText({
             className={field}
             value={plainText(layer)}
             onCommit={(text) => dispatch(setText, layer.id, text)}
+            {...words} // Booharu: choosing words to style.
           />
         )}
       </div>
+      {/* Booharu: the word toolbar, which floats by the field while words are chosen there. */}
+      <StoryWordToolbar layer={layer} />
     </div>
   )
 }

@@ -2,17 +2,20 @@
 
 import { create } from 'zustand'
 
-import { call } from '@/lib/backend'
-import { findLayer, letteringOf } from '@/lib/document'
+import { findLayer, letteringOf, plainText } from '@/lib/document'
+import i18n from '@/lib/i18n'
 import {
   commands,
   type CharKey,
   type CharStyle,
   type Layer,
   type LayerId,
+  type Span,
+  type Text,
   type Typed,
   type WordChange,
 } from '@koharu/ipc/protocol'
+import { toast } from '@koharu/ui/components/toast'
 
 // Booharu's word styles: the B and I rules that the type bar, Ctrl+B and Ctrl+I while typing, and
 // the Story panel's word toolbar share, so the three agree; the run of a text's characters chosen
@@ -115,18 +118,77 @@ export interface WordRange {
   text: string
 }
 
-/** The run of characters chosen in the Story panel, or none. */
-export const useWordRange = create<{ range: WordRange | null }>(() => ({ range: null }))
+/** The run of characters chosen in the Story panel, or none, and the Story field it was chosen
+ * in, which the word toolbar shows by; none while a press elsewhere in the sidebar hides the
+ * toolbar and keeps the run, as Booharu 0.0.4's did. */
+export const useWordRange = create<{
+  range: WordRange | null
+  field: HTMLTextAreaElement | null
+}>(() => ({ range: null, field: null }))
 
-/** Chooses `range`, or with null lets the chosen run go. */
-export function setWordRange(range: WordRange | null): void {
-  useWordRange.setState({ range })
+/** Chooses `range`, its word toolbar showing by `field`, or with null lets the chosen run go. */
+export function setWordRange(
+  range: WordRange | null,
+  field: HTMLTextAreaElement | null = null,
+): void {
+  useWordRange.setState({ range, field: range ? field : null })
 }
 
 /** Where the character at `index` of `text`, a UTF-16 index as a textarea's selection gives it,
- * starts in UTF-8 bytes, as the scene counts. */
+ * starts in UTF-8 bytes, as the scene counts. An index inside a character that takes two UTF-16
+ * units, as an emoji does, counts from that character's start, as 0.0.4's offsets did. */
 export function utf8Offset(text: string, index: number): number {
-  return new TextEncoder().encode(text.slice(0, index)).length
+  const before = text.charCodeAt(index - 1)
+  const after = text.charCodeAt(index)
+  const inside = before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff
+  return new TextEncoder().encode(text.slice(0, inside ? index - 1 : index)).length
+}
+
+/** The characters of `text` the run `range` holds, each with its own marks: its spans cut at the
+ * run's ends, in UTF-8 bytes, under the text's own style, which the type bar and the word toolbar
+ * read the run's values from. */
+export function chosenText(text: Text, range: WordRange): Text {
+  const encoder = new TextEncoder()
+  const decoder = new TextDecoder()
+  const content: Span[] = []
+  let at = 0
+  for (const span of text.content ?? []) {
+    const bytes = encoder.encode(span.insert)
+    const from = Math.max(range.start - at, 0)
+    const to = Math.min(range.end - at, bytes.length)
+    if (from < to) content.push({ ...span, insert: decoder.decode(bytes.subarray(from, to)) })
+    at += bytes.length
+  }
+  return { ...text, content }
+}
+
+/** The run chosen in the Story panel, when the type bar styles it rather than whole texts: while
+ * the canvas isn't typing, `targets`, the texts the bar shows, being only the run's, whose saved
+ * text is still the one the run was chosen in. */
+export function useChosenWords(targets: Layer[], typing: Typed | null): WordRange | null {
+  const range = useWordRange((state) => state.range)
+  if (!range || typing || targets.length !== 1) return null
+  const [target] = targets
+  const lettering = target ? letteringOf(target) : null
+  return target?.id === range.layer && lettering && plainText(lettering) === range.text
+    ? range
+    : null
+}
+
+/** The presses that keep the chosen run, which the React handlers of the parts that style it mark:
+ * the word toolbar's, the Story field's and the type bar's. React hands them the presses in the
+ * popups they open too, which portals put elsewhere in the page, so those count as inside. */
+const keeping = new WeakSet<Event>()
+
+/** Marks a press, from a React pointerdown handler, as one that keeps the chosen run. */
+export function keepWords(event: { nativeEvent: Event }): void {
+  keeping.add(event.nativeEvent)
+}
+
+/** Whether a React handler marked `event`, a press, as keeping the chosen run. It's read after
+ * the press has reached them: a document listener catching it first waits a turn. */
+export function keepsWords(event: Event): boolean {
+  return keeping.has(event)
 }
 
 /** The words edit's refusal of a run whose text changed since it was chosen. */
@@ -142,19 +204,22 @@ function sameRange(left: WordRange, right: WordRange): boolean {
 }
 
 /** Styles the run `range` holds as `change` says, through the words edit, as one undo step, and
- * answers whether it did. A refusal or failure shows, with why, as every failed command's does;
- * a text that changed since also lets the run go when it's still the one chosen, as its words may
- * be gone. */
+ * answers whether it did. A refusal or failure shows a toast, with why, in the interface's
+ * language; a text that changed since also lets the run go when it's still the one chosen, as its
+ * words may be gone. */
 export async function styleWords(range: WordRange, change: WordChange): Promise<boolean> {
   try {
-    await call(commands.booharuStyleWords, range.layer, range.start, range.end, range.text, change)
+    await commands.booharuStyleWords(range.layer, range.start, range.end, range.text, change)
     return true
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (message.includes(TEXT_CHANGED)) {
+      toast.add({ type: 'info', title: i18n.t('booharu.words.textChanged') })
       useWordRange.setState((state) =>
-        state.range && sameRange(state.range, range) ? { range: null } : state,
+        state.range && sameRange(state.range, range) ? { range: null, field: null } : state,
       )
+    } else {
+      toast.add({ type: 'error', title: i18n.t('booharu.words.failed', { message }) })
     }
     return false
   }
