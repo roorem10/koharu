@@ -11,7 +11,12 @@
 //!   read. For a run that translates it also appends the chapter's
 //!   glossary and notes, from its side file and the series it links, to the
 //!   Instructions in the run's config, never in the saved setting, or
-//!   refuses the run when either file can't be read.
+//!   refuses the run when either file can't be read; and takes
+//!   `[booharu-emphasis]`, with whether the run asks its model which words
+//!   to stress, which appends the instruction to ask after those
+//!   (`emphasis`).
+//! - `emphasis_schema` and `emphasis_answers`, in a translation's turn that
+//!   asks, are the answer's shape and the words read back from it.
 //! - `translated`, in the Translation stage's `written`, gives each new
 //!   translation the default look, its block's lettering category's font
 //!   among it while the run's Pick fonts automatically is on, and records
@@ -34,13 +39,14 @@
 //!   again as it writes, what Detect again keeps, and the page's
 //!   `Event::Skipped`.
 
+pub(crate) mod emphasis;
 mod filters;
 
 use std::{collections::BTreeSet, future::Future, path::Path, time::Duration};
 
 use booharu_core::{
     context::{self, Chapter, Extras, MAX_TERMS, SeriesStore},
-    emphasis::Marking,
+    emphasis::{EmphasisSettings, Marking},
     runs::{RunPolicy, RunStage},
     settings::Snapshot,
     styles,
@@ -59,7 +65,10 @@ use parking_lot::Mutex;
 use rig_agent::run::PromptError;
 use serde::Serialize;
 
-pub(crate) use self::filters::{Left, stays};
+pub(crate) use self::{
+    emphasis::{emphasis_answers, emphasis_schema},
+    filters::{Left, stays},
+};
 use crate::{
     PipelineConfig, Stage, TranslatorConfig,
     stages::translate::{Conversation, turn},
@@ -71,7 +80,9 @@ use crate::{
 /// `[booharu-runs]`'s run policy, which the run then follows whoever queued
 /// it; the flags only its caller knows, kept from `config`'s own snapshot
 /// ([`snapshot`]); and, when it translates, the chapter's glossary and notes
-/// after its Instructions ([`chapter`]). A section that can't be read
+/// after its Instructions ([`chapter`]), and `[booharu-emphasis]`, with the
+/// instruction to pick the words to stress after those when the run asks
+/// its model for them ([`emphasis::asked`]). A section that can't be read
 /// refuses the run, as a bad stored value is an error, never replaced by its
 /// default.
 pub(crate) fn queued(
@@ -92,6 +103,8 @@ pub(crate) fn queued(
         stages,
         SeriesStore::open,
     )?;
+    let (booharu, translator) =
+        emphasis::asked(booharu, translator, stages, EmphasisSettings::read)?;
     Ok(PipelineConfig {
         booharu,
         translator,
@@ -844,6 +857,38 @@ mod tests {
                 assert!(run.booharu.runs.is_some(), "the run policy is read");
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn a_queued_translation_takes_the_emphasis_and_a_translation_model_keeps_its_request()
+    -> Result<()> {
+        let Page {
+            _dir: _held,
+            session,
+            blocks: _,
+        } = Page::new(&[("a", "text")])?;
+        let session = Mutex::new(session);
+        // Koharu's default model, Index-Translate, which is never asked.
+        let config = PipelineConfig {
+            translator: TranslatorConfig {
+                instructions: "Keep honorifics.".to_owned(),
+                ..TranslatorConfig::default()
+            },
+            ..PipelineConfig::default()
+        };
+        for stages in [
+            &[Stage::Translate][..],
+            &[Stage::Recognize, Stage::Translate],
+        ] {
+            let run = queued(config.clone(), &session, &stages.iter().copied().collect())?;
+            assert!(run.booharu.emphasis.is_some(), "{stages:?}");
+            assert!(!run.booharu.asks_emphasis, "{stages:?}");
+            assert_eq!(run.translator, config.translator, "{stages:?}");
+        }
+        // A run that doesn't translate takes none.
+        let run = queued(config.clone(), &session, &[Stage::Recognize].into())?;
+        assert_eq!(run.booharu.emphasis, None);
         Ok(())
     }
 

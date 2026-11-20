@@ -7,6 +7,10 @@
 //! copyright line or a "!?", is in the target's script already, so it keeps
 //! its own lettering.
 
+// Booharu: the tests of a turn that asks its model which words to stress,
+// which drive the stage's own turn.
+#[cfg(test)]
+mod booharu;
 mod conversation;
 mod model;
 mod placement;
@@ -154,13 +158,16 @@ pub(crate) async fn translate(
         }
     };
     let system = system(&translator)?;
+    let picks = parking_lot::Mutex::new(Vec::new()); // Booharu: the words to stress the model picks.
     let turn = Turn::new(
         system,
         &page.texts,
         page.image.as_deref(),
         translator.reasoning,
         &member.cancel,
-    );
+    )
+    // Booharu: asks for them too, when the run does.
+    .asking_emphasis(config.booharu.asks_emphasis.then_some(&picks));
     let Some(translations) = turn
         .take(conversation, &model)
         .instrument(info_span!("llm", texts = page.texts.len()))

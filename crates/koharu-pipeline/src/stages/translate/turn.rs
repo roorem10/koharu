@@ -25,6 +25,10 @@ pub(super) struct Turn<'a> {
     image: Option<&'a str>,
     reasoning: Option<Reasoning>,
     cancel: &'a CancellationToken,
+    /// Booharu: where the page's answer leaves the words of each text the
+    /// model picked to stress, in order, when the run asks it for them;
+    /// none asks Koharu's plain request.
+    emphasis: Option<&'a parking_lot::Mutex<Vec<Vec<String>>>>,
 }
 
 impl<'a> Turn<'a> {
@@ -44,6 +48,21 @@ impl<'a> Turn<'a> {
             image,
             reasoning,
             cancel,
+            emphasis: None, // Booharu: asked for by `asking_emphasis`.
+        }
+    }
+
+    /// Booharu: the turn, asking its model which words of each text to
+    /// stress too, when `picks` is its slot, each text's answer an object
+    /// of the translation and those words, which the answer leaves in
+    /// `picks`; as it is with none.
+    pub(super) fn asking_emphasis(
+        self,
+        picks: Option<&'a parking_lot::Mutex<Vec<Vec<String>>>>,
+    ) -> Self {
+        Self {
+            emphasis: picks,
+            ..self
         }
     }
 
@@ -106,7 +125,13 @@ impl<'a> Turn<'a> {
         if let Some(reasoning) = self.reasoning {
             options = options.reasoning(reasoning);
         }
-        let request = koharu_llm::answers(model, schema(&self.keys)?)
+        // Booharu: each text's answer an object of its translation and the
+        // words to stress, when the run asks for them.
+        let schema = match self.emphasis {
+            Some(_) => crate::booharu::emphasis_schema(&self.keys)?,
+            None => schema(&self.keys)?,
+        };
+        let request = koharu_llm::answers(model, schema)
             .preamble(&self.system)
             .options(options)
             .build()
@@ -117,7 +142,10 @@ impl<'a> Turn<'a> {
             response = crate::booharu::answered(model, request.into_future()) => response?,
             () = self.cancel.cancelled() => return Ok(None),
         };
-        let translations = answers(&response.output(), &self.keys)?;
+        // Booharu: the words to stress, when the run asks for them, into the
+        // slot, the texts going on as Koharu's plain answer gives them.
+        let output = crate::booharu::emphasis_answers(response.output(), &self.keys, self.emphasis);
+        let translations = answers(&output, &self.keys)?;
         let usage = response
             .completion_calls
             .last()

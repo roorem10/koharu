@@ -5929,6 +5929,7 @@ dependencies = [
  "petgraph 0.8.3",
  "rayon",
  "rig-agent",
+ "rig-core",
  "schemars 1.2.3",
  "serde",
  "serde_json",

@@ -50,5 +50,8 @@ tracing = { workspace = true }
 [dev-dependencies]
 clap = { workspace = true }
 fs-err = { workspace = true }
+# Booharu: rig's scripted model, which answers a translation's turn in the
+# tests of the words a run asks its model to stress.
+rig-core = { workspace = true, features = ["test-utils"] }
 tempfile = { workspace = true }
 tracing-subscriber = { workspace = true }
