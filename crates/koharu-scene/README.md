@@ -146,12 +146,14 @@ them. `fill_gradient` is a `linear` or `radial` gradient of 2 to 8 stops, each
 an `offset` from 0 to 1, none below the one before it, and a `color`, laid
 along an `angle` in degrees as Photoshop's are, 0 running left to right and 90
 bottom to top, over the ink of the text, or of the run of characters whose mark
-it is, drawn in place of the fill. `tracking` is letter spacing in thousandths
-of an em, as Photoshop's tracking is, from -500 to 2000. A value out of these
-bounds is refused, and a project file holding one fails to open, unchanged.
-Both keys are left out of the file while unset and the project version stays
-Koharu's, so a project that doesn't use them still opens in Koharu, and one
-that does fails to open there, unchanged.
+it is. A fill and a gradient are one paint: a gradient wins over a fill beside
+it, and a fill with no gradient beside it wins over a gradient it would
+inherit, so a word given a colour shows it in a gradient box. `tracking` is
+letter spacing in thousandths of an em, as Photoshop's tracking is, from -500
+to 2000. A value out of these bounds is refused, and a project file holding one
+fails to open, unchanged. Both keys are left out of the file while unset and
+the project version stays Koharu's, so a project that doesn't use them still
+opens in Koharu, and one that does fails to open there, unchanged.
 
 A text holds its own values. Nothing is shared between texts, because a
 balloon's text length and size differ from its neighbours', so no one style

@@ -39,8 +39,12 @@ pub struct CharStyle {
     /// Booharu: the second border's width, outward from the first border.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outer_stroke_width: Option<f64>,
-    /// Booharu: a gradient fill, drawn in place of `fill`. Left out when
-    /// unset, so a text without one stays readable by Koharu.
+    /// Booharu: a gradient fill, drawn in place of `fill`. The two are one
+    /// paint: a gradient wins over a `fill` beside it, and a `fill` with no
+    /// gradient beside it wins over a gradient it would inherit, so a word
+    /// given a colour shows it in a gradient box, and a patch giving a text
+    /// with a gradient a flat colour sets this to null beside the `fill`.
+    /// Left out when unset, so a text without one stays readable by Koharu.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fill_gradient: Option<Gradient>,
     /// Booharu: letter spacing in thousandths of an em, as Photoshop's
@@ -72,11 +76,16 @@ impl CharStyle {
             // Booharu: the second border.
             outer_stroke: self.outer_stroke.or(base.outer_stroke),
             outer_stroke_width: self.outer_stroke_width.or(base.outer_stroke_width),
-            // Booharu: the gradient fill and letter spacing.
-            fill_gradient: self
-                .fill_gradient
-                .clone()
-                .or_else(|| base.fill_gradient.clone()),
+            // Booharu: a fill and a gradient are one paint, so a fill set
+            // here with no gradient beside it hides the gradient `base` has.
+            fill_gradient: if self.fill.is_some() && self.fill_gradient.is_none() {
+                None
+            } else {
+                self.fill_gradient
+                    .clone()
+                    .or_else(|| base.fill_gradient.clone())
+            },
+            // Booharu: letter spacing.
             tracking: self.tracking.or(base.tracking),
         }
     }

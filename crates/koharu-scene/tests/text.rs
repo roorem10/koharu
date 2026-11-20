@@ -326,3 +326,88 @@ fn booharu_gradient_and_letter_spacing_are_left_out_until_set() {
     .expect("a gradient");
     assert_eq!(gradient.angle, 0.0);
 }
+
+// Booharu: a fill and a gradient are one paint, so a word given a colour
+// shows it in a gradient box, and a word with neither takes the box's paint.
+#[test]
+fn booharu_a_fill_and_a_gradient_are_one_paint() {
+    use koharu_scene::{Gradient, GradientKind, GradientStop, Rgba};
+
+    let (red, blue) = (Rgba([1.0, 0.0, 0.0, 1.0]), Rgba([0.0, 0.0, 1.0, 1.0]));
+    let gradient = |angle: f64| Gradient {
+        kind: GradientKind::Linear,
+        angle,
+        stops: vec![
+            GradientStop {
+                offset: 0.0,
+                color: red,
+            },
+            GradientStop {
+                offset: 1.0,
+                color: blue,
+            },
+        ],
+    };
+    let boxed = CharStyle {
+        fill: Some(blue),
+        fill_gradient: Some(gradient(90.0)),
+        tracking: Some(100.0),
+        ..CharStyle::default()
+    };
+    let coloured = CharStyle {
+        fill: Some(red),
+        ..CharStyle::default()
+    };
+    let own = CharStyle {
+        fill_gradient: Some(gradient(0.0)),
+        ..CharStyle::default()
+    };
+
+    // A colour on a word beats the gradient the box gives it.
+    let word = coloured.or(&boxed);
+    assert_eq!((word.fill, word.fill_gradient), (Some(red), None));
+    // A word's own gradient beats the box's colour and gradient alike.
+    let word = own.or(&CharStyle {
+        fill: Some(blue),
+        ..CharStyle::default()
+    });
+    assert_eq!(
+        (word.fill, word.fill_gradient),
+        (Some(blue), Some(gradient(0.0)))
+    );
+    assert_eq!(own.or(&boxed).fill_gradient, Some(gradient(0.0)));
+    // A word with neither takes the box's paint, and its letter spacing.
+    let word = CharStyle::default().or(&boxed);
+    assert_eq!(
+        (word.fill, word.fill_gradient, word.tracking),
+        (Some(blue), Some(gradient(90.0)), Some(100.0))
+    );
+    // A gradient beside a colour keeps it, and so wins.
+    let both = CharStyle {
+        fill: Some(red),
+        fill_gradient: Some(gradient(0.0)),
+        ..CharStyle::default()
+    };
+    assert_eq!(both.or(&boxed).fill_gradient, Some(gradient(0.0)));
+    // A word's letter spacing beats the box's.
+    let spaced = CharStyle {
+        tracking: Some(-50.0),
+        ..CharStyle::default()
+    };
+    assert_eq!(spaced.or(&boxed).tracking, Some(-50.0));
+
+    // So colouring words takes their gradient mark off, as a selection
+    // styled while typing and the words edit both mark through `or`.
+    let text = RichText(vec![Span {
+        insert: "Hello".to_owned(),
+        attributes: own.clone(),
+    }]);
+    assert_eq!(text.marked(0..5, &coloured).0[0].attributes, coloured);
+    assert_eq!(
+        text.marked(0..5, &spaced).0[0].attributes,
+        CharStyle {
+            tracking: Some(-50.0),
+            ..own
+        }
+    );
+}
