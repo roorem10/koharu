@@ -111,10 +111,11 @@ pub struct Auto {
     /// The word marks the Translation stage gave the translation it wrote,
     /// the words its model picked for emphasis, by their offsets into that
     /// text, which [`Auto::trusted_marks`] reads only while the translation
-    /// is still that text. A list that doesn't read as marks reads as none,
-    /// so it never costs the rest of the record. A line given back, Reset to
-    /// lettering default and a split drop them; Apply takes off the keys it
-    /// clears from the words.
+    /// is still that text, but for whitespace added at either end, which
+    /// the record's hash doesn't count. A list that doesn't read as marks
+    /// reads as none, so it never costs the rest of the record. A line given
+    /// back, Reset to lettering default and a split drop them; Apply takes
+    /// off the keys it clears from the words.
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
@@ -160,30 +161,43 @@ impl Attr for Auto {
 
 impl Auto {
     /// The marks, while they still describe `content`, the block's
-    /// translation: its text is the one the record's `text` hashes, and each
-    /// mark is a run of its characters, on character boundaries, in order
-    /// and apart from the others. None otherwise, as after the text changed
-    /// by hand, a join, or typing, so marks never land on other words.
-    pub fn trusted_marks(&self, content: &RichText) -> &[AutoMark] {
+    /// translation, by their offsets into its text: its text, trimmed, is
+    /// the one the record's `text` hashes, the translation as the stage
+    /// wrote it, and each mark is a run of that text's characters, on
+    /// character boundaries, in order and apart from the others. Whitespace
+    /// added before the text, which the hash doesn't count, moves each mark
+    /// on by its length, so a mark stays on its words. None otherwise, as
+    /// after the text changed by hand, a join, or typing, so marks never
+    /// land on other words.
+    pub fn trusted_marks(&self, content: &RichText) -> Vec<AutoMark> {
         if self.marks.is_empty() {
-            return &[];
+            return Vec::new();
         }
         let text = content.text();
-        if self.text.as_deref() != Some(crate::styles::text_hash(&text).as_str()) {
-            return &[];
+        let written = text.trim();
+        if self.text.as_deref() != Some(crate::styles::text_hash(written).as_str()) {
+            return Vec::new();
         }
         let mut end = 0;
         for mark in &self.marks {
             if mark.start < end
                 || mark.start >= mark.end
-                || !text.is_char_boundary(mark.start)
-                || !text.is_char_boundary(mark.end)
+                || !written.is_char_boundary(mark.start)
+                || !written.is_char_boundary(mark.end)
             {
-                return &[];
+                return Vec::new();
             }
             end = mark.end;
         }
-        &self.marks
+        let lead = text.len() - text.trim_start().len();
+        self.marks
+            .iter()
+            .map(|mark| AutoMark {
+                start: lead + mark.start,
+                end: lead + mark.end,
+                style: mark.style.clone(),
+            })
+            .collect()
     }
 }
 
@@ -826,5 +840,32 @@ mod tests {
         // Neighbours may touch.
         let touching = marked(text, &[(4, 7), (7, 10)]);
         assert_eq!(touching.trusted_marks(&content).len(), 2);
+    }
+
+    #[test]
+    fn whitespace_typed_around_the_text_keeps_each_mark_on_its_words() {
+        let record = marked("Why NO?", &[(4, 6)]);
+        // Whitespace typed before the text, which its hash doesn't count,
+        // a line break or an ideographic space, moves the mark on by its
+        // length; whitespace typed after it moves nothing.
+        for (text, at) in [
+            ("Why NO?", 4..6),
+            ("\nWhy NO?", 5..7),
+            ("\u{3000}Why NO?", 7..9),
+            (" \n\nWhy NO?\n", 7..9),
+            ("Why NO? ", 4..6),
+        ] {
+            let trusted: Vec<_> = record
+                .trusted_marks(&RichText::from(text))
+                .iter()
+                .map(|mark| mark.start..mark.end)
+                .collect();
+            assert_eq!(trusted, [at.clone()], "{text:?}");
+            assert_eq!(&text[at], "NO", "{text:?}");
+        }
+        // A mark is checked against the text as it was written, so one
+        // reaching into whitespace typed after it is none.
+        let past = marked("Why NO", &[(4, 8)]);
+        assert!(past.trusted_marks(&RichText::from("Why NO  ")).is_empty());
     }
 }

@@ -1434,13 +1434,20 @@ mod tests {
             ops,
         })?;
         // The last line was retyped by hand since: its run's marks no longer
-        // describe it.
+        // describe it. The first was pushed down a line, which leaves its
+        // run's mark on its word.
         chapter.session.lock().apply(Edit {
             label: "test".to_owned(),
-            ops: vec![Op::SetText {
-                layer: blocks[2].into(),
-                text: "Why NOT?".to_owned(),
-            }],
+            ops: vec![
+                Op::SetText {
+                    layer: blocks[2].into(),
+                    text: "Why NOT?".to_owned(),
+                },
+                Op::SetText {
+                    layer: blocks[0].into(),
+                    text: "\nIt's Hina.".to_owned(),
+                },
+            ],
         })?;
         let asks = Snapshot {
             asks_emphasis: true,

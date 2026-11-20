@@ -323,12 +323,26 @@ impl<'a> Marking<'a> {
 /// `content`, a block's translation, without the values `record`'s trusted
 /// marks ([`Auto::trusted_marks`]) set, on the characters each covers and
 /// only where they still have them: what's left was marked, or changed, by
-/// hand.
+/// hand. A mark that starts or ends the text the stage wrote covers too the
+/// whitespace added before or after it, which the scene gives the marks of
+/// the character beside it ([`RichText::replaced`]), so none of the run's
+/// values stays behind there to ride onto the next translation.
 pub fn stripped(content: &RichText, record: &Auto) -> RichText {
+    let marks = record.trusted_marks(content);
+    if marks.is_empty() {
+        return content.clone();
+    }
+    let text = content.text();
+    let (first, last) = (text.len() - text.trim_start().len(), text.trim_end().len());
     let mut out = content.clone();
-    for mark in record.trusted_marks(content) {
-        let range = mark.start..mark.end;
-        if let Some(next) = restyled(&out, range, |marks| without(marks, &mark.style)) {
+    for mark in marks {
+        let start = if mark.start == first { 0 } else { mark.start };
+        let end = if mark.end == last {
+            text.len()
+        } else {
+            mark.end
+        };
+        if let Some(next) = restyled(&out, start..end, |marks| without(marks, &mark.style)) {
             out = next;
         }
     }

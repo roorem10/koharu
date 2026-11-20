@@ -210,9 +210,8 @@ pub(super) fn stressed(layer: &Layer, translation: &RichText) -> Vec<String> {
     let record = Auto::of(layer);
     record
         .trusted_marks(translation)
-        .iter()
-        .filter_map(|mark| text.get(mark.start..mark.end))
-        .map(str::to_owned)
+        .into_iter()
+        .filter_map(|mark| text.get(mark.start..mark.end).map(str::to_owned))
         .collect()
 }
 

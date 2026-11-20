@@ -1925,6 +1925,177 @@ mod tests {
     }
 
     #[test]
+    fn whitespace_typed_before_a_runs_line_keeps_its_marks_on_their_words() {
+        let look = settings(true, None, None);
+        let emphasis = crate::emphasis::EmphasisSettings::default();
+        let (no, not) = (words(&["NO"]), words(&["not"]));
+        let stress = |picks| Marking {
+            settings: Some(&emphasis),
+            words: picks,
+        };
+        let marks = |session: &Session, block: LayerId| -> Vec<(usize, usize)> {
+            Auto::of(&layer(session, block))
+                .marks
+                .iter()
+                .map(|mark| (mark.start, mark.end))
+                .collect()
+        };
+        for lead in ["\n", "\u{3000}", " \n\n"] {
+            let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+            translate_marking(&mut session, block, "Why NO?", &look, None, &stress(&no));
+            let run = translation(&session, block).content.0[1].attributes.clone();
+            // Typed before the line in Story, which sets a text as Koharu
+            // does: the hash doesn't count it, and the run's marks are still
+            // its own, on their word.
+            apply(
+                &mut session,
+                vec![Op::SetText {
+                    layer: block.into(),
+                    text: format!("{lead}Why NO?"),
+                }],
+            );
+            assert_eq!(
+                edited(&layer(&session, block)),
+                Edited::default(),
+                "{lead:?}"
+            );
+
+            // Translated again, the old mark comes off its own word and
+            // only the new pick is marked.
+            translate_marking(&mut session, block, "Why not?", &look, None, &stress(&not));
+            assert_eq!(
+                translation(&session, block).content,
+                RichText(vec![
+                    span("Why ", CharStyle::default()),
+                    span("not", run.clone()),
+                    span("?", CharStyle::default()),
+                ]),
+                "{lead:?}"
+            );
+            assert_eq!(marks(&session, block), [(4, 7)], "{lead:?}");
+
+            // And with no word picked, as with the switch off or a
+            // translation-only model, none of the old marks is left.
+            apply(
+                &mut session,
+                vec![Op::SetText {
+                    layer: block.into(),
+                    text: format!("{lead}Why not?"),
+                }],
+            );
+            translate_marking(
+                &mut session,
+                block,
+                "Why NOT?",
+                &look,
+                None,
+                &Marking::default(),
+            );
+            assert_eq!(
+                translation(&session, block).content,
+                RichText::from("Why NOT?"),
+                "{lead:?}"
+            );
+            assert!(marks(&session, block).is_empty(), "{lead:?}");
+        }
+    }
+
+    #[test]
+    fn whitespace_typed_before_a_runs_line_never_costs_a_hand_mark() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let look = settings(true, None, None);
+        let emphasis = crate::emphasis::EmphasisSettings::default();
+        let picks = words(&["NO"]);
+        let marking = Marking {
+            settings: Some(&emphasis),
+            words: &picks,
+        };
+        translate_marking(&mut session, block, "REALLY NO?", &look, None, &marking);
+        let run = translation(&session, block).content.0[1].attributes.clone();
+        // "REALLY" made bold by hand, at the weight the run's emphasis
+        // sets, then two line breaks typed before the line.
+        let bold = CharStyle {
+            weight: Some(700),
+            ..CharStyle::default()
+        };
+        assert_eq!(run.weight, bold.weight);
+        apply(
+            &mut session,
+            vec![
+                Op::SetRichText {
+                    layer: block.into(),
+                    spans: vec![
+                        span("REALLY", bold.clone()),
+                        span(" ", CharStyle::default()),
+                        span("NO", run),
+                        span("?", CharStyle::default()),
+                    ],
+                },
+                Op::SetText {
+                    layer: block.into(),
+                    text: "\n\nREALLY NO?".to_owned(),
+                },
+            ],
+        );
+        // Translated again, the run's mark comes off "NO" alone.
+        translate_marking(
+            &mut session,
+            block,
+            "REALLY NOT?",
+            &look,
+            None,
+            &Marking::default(),
+        );
+        assert_eq!(
+            translation(&session, block).content,
+            RichText(vec![
+                span("REALLY", bold),
+                span(" NOT?", CharStyle::default()),
+            ])
+        );
+    }
+
+    #[test]
+    fn whitespace_typed_beside_a_runs_marked_word_loses_its_marks_with_it() {
+        let look = settings(true, None, None);
+        let emphasis = crate::emphasis::EmphasisSettings::default();
+        let picks = words(&["NO"]);
+        let marking = Marking {
+            settings: Some(&emphasis),
+            words: &picks,
+        };
+        // The marked word starts the line, then ends it, and the line
+        // break typed beside it takes its marks, as Koharu gives a
+        // character typed at either end its neighbour's.
+        for (written, typed, again) in [
+            ("NO! Why?", "\nNO! Why?", "Hey NO! Why?"),
+            ("Why NO", "Why NO\n", "Why NO NO"),
+        ] {
+            let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+            translate_marking(&mut session, block, written, &look, None, &marking);
+            apply(
+                &mut session,
+                vec![Op::SetText {
+                    layer: block.into(),
+                    text: typed.to_owned(),
+                }],
+            );
+            assert_eq!(
+                edited(&layer(&session, block)),
+                Edited::default(),
+                "{typed:?}"
+            );
+            // Translated again with no word picked, no mark is left.
+            translate_marking(&mut session, block, again, &look, None, &Marking::default());
+            assert_eq!(
+                translation(&session, block).content,
+                RichText::from(again),
+                "{typed:?}"
+            );
+        }
+    }
+
+    #[test]
     fn a_line_given_back_drops_the_runs_marks() {
         let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
         let emphasis = crate::emphasis::EmphasisSettings::default();
