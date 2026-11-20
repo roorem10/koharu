@@ -29,8 +29,10 @@
     },
     "boxes": {
       "clean": "Nettoyer à nouveau",
+      "fx": "FX…",
       "join": "Fusionner avec la bulle",
       "joinPage": "Fusionner les textes divisés de cette page",
+      "menu": "Actions de la zone de texte",
       "read": "Relire",
       "reset": "Rétablir le style de lettrage par défaut",
       "resetAlready": "Le style de lettrage par défaut est déjà appliqué",

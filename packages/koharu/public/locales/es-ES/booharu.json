@@ -29,8 +29,10 @@
     },
     "boxes": {
       "clean": "Volver a limpiar",
+      "fx": "FX…",
       "join": "Unir con el globo",
       "joinPage": "Unir los textos divididos de esta página",
+      "menu": "Acciones del cuadro",
       "read": "Volver a leer",
       "reset": "Restablecer al estilo predeterminado de rotulación",
       "resetAlready": "El estilo predeterminado de rotulación ya está aplicado",

@@ -78,6 +78,23 @@ function StoryItem({ className, ...props }: ItemProps) {
   )
 }
 
+/** The box actions for the selection on `page`, the page the canvas shows, each an `Item` of the
+ * menu they sit in: the Edit menu's, and the box menu a right-click on the canvas opens. */
+export function SelectionBoxActions({
+  page,
+  Item,
+}: {
+  page: Page | null
+  Item: ComponentType<ItemProps>
+}) {
+  const selected = useKoharuStore((state) => state.selectedLayers)
+  const selection = useMemo(
+    () => (page ? { page: page.id, boxes: selectedBoxes(page.layers, selected) } : null),
+    [page, selected],
+  )
+  return <ActionItems selection={selection} Item={Item} />
+}
+
 /** The Edit menu's box items, after a `Separator`, each an `Item` of the menu: the box actions for
  * the selection on `page`, the page the canvas shows, then joining every split balloon there,
  * disabled while a lock in any of them would refuse the join. */
@@ -91,17 +108,12 @@ export function BoxMenuItems({
   Separator: ComponentType
 }) {
   const { t } = useTranslation()
-  const selected = useKoharuStore((state) => state.selectedLayers)
-  const selection = useMemo(
-    () => (page ? { page: page.id, boxes: selectedBoxes(page.layers, selected) } : null),
-    [page, selected],
-  )
   const split = useSplitBalloons(page?.id ?? null)
   const joins = page !== null && split !== undefined && joinsPage(page.layers, split)
   return (
     <>
       <Separator />
-      <ActionItems selection={selection} Item={Item} />
+      <SelectionBoxActions page={page} Item={Item} />
       <Item
         disabled={!joins}
         onClick={() => {

@@ -66,19 +66,22 @@ export function isTextEntry(target: EventTarget | null): boolean {
 }
 
 /** Whether `target` is inside an open dialog, such as Box details or Settings (Base UI gives its
- * popup the role dialog or alertdialog). */
+ * popup the role dialog or alertdialog), or an open menu, such as the box menu a right-click on the
+ * canvas opens, or a Story row's (the role menu). */
 export function inDialog(target: EventTarget | null): boolean {
   return (
-    target instanceof Element && target.closest('[role="dialog"], [role="alertdialog"]') !== null
+    target instanceof Element &&
+    target.closest('[role="dialog"], [role="alertdialog"], [role="menu"]') !== null
   )
 }
 
 /** Whether the canvas's shortcuts leave `event` to the control it reached. Text entry keeps every
- * key, and so does everything inside a dialog: Space presses its focused button, and Delete never
- * removes the layers behind it, as Koharu's canvas did from a dialog's buttons. Any other input,
- * such as a slider, a checkbox or a colour input, keeps its own keys too: Space, the arrows, Enter,
- * Delete, Escape, and every Ctrl, Cmd or Alt chord. Only a bare printable character other than
- * Space, which means nothing to such an input, goes on to switch tools. */
+ * key, and so does everything inside a dialog or a menu: Space presses its focused button, Escape
+ * closes a menu and keeps the selection, a letter finds a menu's item, and Delete never removes the
+ * layers behind it, as Koharu's canvas did from a dialog's buttons. Any other input, such as a
+ * slider, a checkbox or a colour input, keeps its own keys too: Space, the arrows, Enter, Delete,
+ * Escape, and every Ctrl, Cmd or Alt chord. Only a bare printable character other than Space, which
+ * means nothing to such an input, goes on to switch tools. */
 export function controlKeepsKey(event: KeyboardEvent): boolean {
   if (isTextEntry(event.target) || inDialog(event.target)) return true
   if (!(event.target instanceof HTMLInputElement)) return false

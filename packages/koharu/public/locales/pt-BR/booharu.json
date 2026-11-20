@@ -29,8 +29,10 @@
     },
     "boxes": {
       "clean": "Limpar novamente",
+      "fx": "FX…",
       "join": "Unir ao balão",
       "joinPage": "Unir textos divididos nesta página",
+      "menu": "Ações da caixa",
       "read": "Refazer OCR",
       "reset": "Redefinir para o padrão de letreiramento",
       "resetAlready": "O padrão de letreiramento já está aplicado",

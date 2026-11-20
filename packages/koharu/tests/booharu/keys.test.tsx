@@ -131,6 +131,31 @@ describe('Booharu tool keys in a focused control', () => {
       dialog.remove()
     }
   })
+
+  it('leaves every key to an open menu, so Escape keeps the selection and Delete removes nothing', () => {
+    // A menu such as the box menu a right-click on the canvas opens, which takes the focus.
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    const item = document.createElement('div')
+    item.setAttribute('role', 'menuitem')
+    menu.append(item)
+    // A menu bar's trigger is no menu: its keys reach the canvas, as a button's do.
+    const bar = document.createElement('div')
+    bar.setAttribute('role', 'menubar')
+    const trigger = document.createElement('button')
+    trigger.setAttribute('role', 'menuitem')
+    bar.append(trigger)
+    document.body.append(menu, bar)
+
+    for (const target of [menu, item]) {
+      for (const init of [{ key: 'v' }, { key: 'o' }, ...controlKeys]) {
+        const role = target.getAttribute('role')
+        expect(controlKeepsKey(press(target, init)), `${role} ${JSON.stringify(init)}`).toBe(true)
+      }
+    }
+    expect(controlKeepsKey(press(trigger, { key: 'v' }))).toBe(false)
+    expect(controlKeepsKey(press(trigger, { key: 'Delete' }))).toBe(false)
+  })
 })
 
 describe('Booharu tool keys on the canvas', () => {

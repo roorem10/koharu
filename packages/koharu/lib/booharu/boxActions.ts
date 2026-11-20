@@ -4,6 +4,7 @@ import { call } from '@/lib/backend'
 import { openBoxDetails, showLayer } from '@/lib/booharu/boxDetails'
 import { fetchLettering } from '@/lib/booharu/boxLettering'
 import { openExplanation } from '@/lib/booharu/explain'
+import { openFxOn } from '@/lib/booharu/fx'
 import { redoBoxes } from '@/lib/booharu/redo'
 import {
   findLayer,
@@ -226,6 +227,18 @@ function selectJoined(joins: BlockLayer[][]): void {
 
 /** Every per-box action, in the order the menus list them. A later one goes in as one more entry. */
 export const boxActions: readonly BoxAction[] = [
+  {
+    id: 'fx',
+    label: 'booharu.boxes.fx',
+    enabled: (selection) => selection.boxes.length > 0,
+    // Text effects over the texts, which it selects first unless the canvas shows them selected,
+    // with the Select tool unless a type bar tool is on, as a text's fx tag opens it (S12-l).
+    run: (selection) =>
+      openFxOn(
+        selection.page,
+        selection.boxes.map(({ layer }) => layer.id),
+      ),
+  },
   {
     id: 'read',
     label: 'booharu.boxes.read',

@@ -39,6 +39,7 @@ function pageLettering(
 }
 
 const none = {
+  fx: false,
   read: false,
   translate: false,
   clean: false,
@@ -51,6 +52,9 @@ const none = {
   details: false,
 }
 const runs = { read: true, translate: true, clean: true }
+/** What any texts take: FX…, which opens Text effects over them, even locked, as the type bar
+ * shows for them. */
+const texts = { ...none, fx: true }
 
 const translation = { content: [{ insert: 'Translated' }] }
 
@@ -80,7 +84,7 @@ describe('Booharu box actions', () => {
     // A text block in a balloon with another: all of them but those a sound effect or a translation
     // asks for.
     expect(enabled(['first'])).toEqual({
-      ...none,
+      ...texts,
       ...runs,
       join: true,
       split: true,
@@ -91,21 +95,21 @@ describe('Booharu box actions', () => {
     // Its part stands for it.
     expect(enabled(['second-mask'])).toEqual(enabled(['second']))
     // Several blocks: the runs only.
-    expect(enabled(['first', 'free'])).toEqual({ ...none, ...runs })
+    expect(enabled(['first', 'free'])).toEqual({ ...texts, ...runs })
     // A text layer: Box details and Reset only, as it has no category, and a text layer beside a
     // block leaves the runs to it.
-    expect(enabled(['caption'])).toEqual({ ...none, reset: true, details: true })
-    expect(enabled(['caption', 'free'])).toEqual({ ...none, ...runs, reset: true })
+    expect(enabled(['caption'])).toEqual({ ...texts, reset: true, details: true })
+    expect(enabled(['caption', 'free'])).toEqual({ ...texts, ...runs, reset: true })
     // A locked block, or one in a locked balloon: no change at all, though its line can be
-    // explained, which changes nothing.
-    expect(enabled(['locked'])).toEqual({ ...none, explain: true, details: true })
-    expect(enabled(['held-first'])).toEqual({ ...none, explain: true, details: true })
-    expect(enabled(['locked', 'held-first'])).toEqual(none)
+    // explained, which changes nothing, and its text effects shown.
+    expect(enabled(['locked'])).toEqual({ ...texts, explain: true, details: true })
+    expect(enabled(['held-first'])).toEqual({ ...texts, explain: true, details: true })
+    expect(enabled(['locked', 'held-first'])).toEqual(texts)
     // A locked one among others: the runs, which leave it alone and count it.
-    expect(enabled(['free', 'locked'])).toEqual({ ...none, ...runs })
+    expect(enabled(['free', 'locked'])).toEqual({ ...texts, ...runs })
     // A balloon with one text block, or a block in none, has nothing to join with.
     const alone = {
-      ...none,
+      ...texts,
       ...runs,
       split: true,
       category: true,

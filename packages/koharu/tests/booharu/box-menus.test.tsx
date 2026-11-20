@@ -41,6 +41,7 @@ async function openEdit(user: ReturnType<typeof userEvent.setup>) {
 
 /** Booharu's items in the Edit menu, in order. */
 const boxItems = [
+  'FX…',
   'Read again',
   'Translate again',
   'Clean again',
@@ -65,6 +66,7 @@ describe('Booharu box actions in the menus', () => {
 
     await openRow(user, 'lo')
     expect(await items()).toEqual([
+      ['FX…', true],
       ['Read again', true],
       ['Translate again', true],
       ['Clean again', true],
@@ -86,9 +88,10 @@ describe('Booharu box actions in the menus', () => {
 
     // A text layer has nothing to read, translate, clean, join, split or explain, and no category,
     // though its look can be reset; a locked block takes no change, though its line can be
-    // explained.
+    // explained; either opens its text effects.
     await openRow(user, 'Caption')
     expect((await items()).filter(([, on]) => on).map(([name]) => name)).toEqual([
+      'FX…',
       'Reset to lettering default',
       'Box details',
       'Delete',
@@ -96,6 +99,7 @@ describe('Booharu box actions in the menus', () => {
     await user.keyboard('{Escape}')
     await openRow(user, 'Locked')
     expect((await items()).filter(([, on]) => on).map(([name]) => name)).toEqual([
+      'FX…',
       'Explain this line',
       'Box details',
     ])
@@ -185,6 +189,7 @@ describe('Booharu box actions in the menus', () => {
     expect(
       (await items()).filter(([name, on]) => on && boxItems.includes(name)).map(([name]) => name),
     ).toEqual([
+      'FX…',
       'Read again',
       'Translate again',
       'Clean again',

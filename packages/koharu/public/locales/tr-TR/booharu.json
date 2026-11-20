@@ -26,8 +26,10 @@
     },
     "boxes": {
       "clean": "Yeniden temizle",
+      "fx": "FX…",
       "join": "Balonla birleştir",
       "joinPage": "Bu sayfadaki bölünmüş metinleri birleştir",
+      "menu": "Kutu işlemleri",
       "read": "Yeniden oku",
       "reset": "Dizgi kategorisinin varsayılan stiline sıfırla",
       "resetAlready": "Dizgi kategorisinin varsayılan stili zaten uygulanmış",

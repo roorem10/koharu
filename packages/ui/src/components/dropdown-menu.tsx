@@ -24,13 +24,17 @@ function DropdownMenuContent({
   alignOffset = 0,
   side = "bottom",
   sideOffset = 4,
+  // Booharu: what the menu opens beside in place of its trigger, such as the point a right-click on
+  // the canvas pressed, where the box menu opens (a virtual element); its trigger when none.
+  anchor,
   className,
   children,
   ...props
 }: MenuPrimitive.Popup.Props &
   Pick<
     MenuPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset"
+    // Booharu: and anchor, as above.
+    "align" | "alignOffset" | "side" | "sideOffset" | "anchor"
   >) {
   return (
     <MenuPrimitive.Portal>
@@ -40,6 +44,7 @@ function DropdownMenuContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
+        anchor={anchor} // Booharu: as above.
       >
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"

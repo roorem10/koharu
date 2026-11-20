@@ -26,8 +26,10 @@
     },
     "boxes": {
       "clean": "Clean again",
+      "fx": "FX…",
       "join": "Join with balloon",
       "joinPage": "Join split texts on this page",
+      "menu": "Box actions",
       "read": "Read again",
       "reset": "Reset to lettering default",
       "resetAlready": "Already at the lettering default",

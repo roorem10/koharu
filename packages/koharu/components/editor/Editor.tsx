@@ -1,5 +1,6 @@
 'use client'
 
+import { BoxMenu } from '@/components/booharu/boxes/BoxMenu' // Booharu: a box's right-click menu.
 import { RedoDialog } from '@/components/booharu/boxes/RedoDialog' // Booharu: Redo boxes' confirmation.
 import { BoxDetailsDialog } from '@/components/booharu/details/BoxDetailsDialog' // Booharu: Box details.
 import { ColorSamplingProvider } from '@/components/controls/ColorSampling'
@@ -31,6 +32,8 @@ export function Editor() {
         <BoxDetailsDialog />
         {/* Booharu: the confirmation before a box's Read or Translate replaces text fixed by hand. */}
         <RedoDialog />
+        {/* Booharu: the menu a right-click on a box on the canvas opens (S12-l). */}
+        <BoxMenu />
         <ResizablePanelGroup
           id='editor'
           orientation='horizontal'

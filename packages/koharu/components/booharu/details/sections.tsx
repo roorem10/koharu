@@ -165,8 +165,9 @@ function NoteSection({ box: { layer, locked } }: BoxDetailsProps) {
 }
 
 /** The text's box actions, as its menus list them, those that open Box details left out: Box
- * details itself, and Change category and Explain this line, whose sections are here. They follow
- * the page's lettering, as the menus do. */
+ * details itself, and Change category and Explain this line, whose sections are here; and FX…,
+ * whose Text effects open in the type bar, which this dialog covers. They follow the page's
+ * lettering, as the menus do. */
 function ActionsSection({ page, box }: BoxDetailsProps) {
   const { t } = useTranslation()
   const lettering = useLettering(page).data
@@ -174,7 +175,7 @@ function ActionsSection({ page, box }: BoxDetailsProps) {
   return (
     <div className='flex flex-wrap gap-1.5'>
       {boxActions
-        .filter(({ id }) => id !== 'details' && id !== 'category' && id !== 'explain')
+        .filter(({ id }) => !['fx', 'details', 'category', 'explain'].includes(id))
         .map((action) => (
           <Button
             key={action.id}
