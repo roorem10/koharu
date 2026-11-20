@@ -1,7 +1,8 @@
 //! Booharu's part of the renderer: the names font families go by in other
 //! languages, which Booharu's font picker shows muted after a family's name
-//! and searches, so typing 游ゴシック finds Yu Gothic. Koharu's `FontFamily`
-//! stays as it is.
+//! and searches, so typing 游ゴシック finds Yu Gothic, with Koharu's
+//! `FontFamily` as it is; and which of a family's faces sets a text asked
+//! for bold or italic, so they stay apart (`faces`).
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -13,6 +14,10 @@ use anyhow::Result;
 use fontique::{Collection, CollectionOptions, SourceCache};
 use parking_lot::Mutex;
 use skrifa::{FontRef, MetadataProvider, string::StringId};
+
+pub(crate) use self::faces::{Traits, better, repick};
+
+mod faces;
 
 /// Each family with names in other languages, by the name the font list
 /// shows, with those names: the installed families', and the bundled
@@ -132,6 +137,60 @@ fn merge(found: &mut BTreeMap<String, (String, Vec<String>)>, family: &str, name
 /// A family name as Koharu matches it: trimmed, in any case.
 fn normalize(name: &str) -> String {
     name.trim().to_lowercase()
+}
+
+/// An installed sans-serif with no variation axes, as tests of faked bold
+/// and slant need: the repository's own font is variable. `None` when none
+/// is installed.
+#[cfg(test)]
+pub(crate) fn static_sans() -> Option<crate::fonts::Font> {
+    let mut library = crate::fonts::Library::new();
+    ["Arial", "DejaVu Sans", "Liberation Sans", "Helvetica"]
+        .into_iter()
+        .filter_map(|family| library.family(family).ok())
+        .find(|font| font.coords.is_empty())
+}
+
+/// A collection of only `family`, its `faces` each a slant and a weight given
+/// to `static_sans`'s file, as tests of which face a text takes need; `None`,
+/// saying why, when there's no such sans or its file holds several faces.
+#[cfg(test)]
+pub(crate) fn test_family(
+    family: &str,
+    faces: &[(fontique::FontStyle, f32)],
+) -> Option<Collection> {
+    let Some(sans) = static_sans() else {
+        eprintln!("skipped: no static sans-serif is installed");
+        return None;
+    };
+    let mut collection = Collection::new(CollectionOptions {
+        shared: false,
+        system_fonts: false,
+    });
+    for &(style, weight) in faces {
+        let registered = collection.register_fonts(
+            fontique::Blob::from(sans.data.data.as_ref().to_vec()),
+            Some(fontique::FontInfoOverride {
+                family_name: Some(family),
+                style: Some(style),
+                weight: Some(fontique::FontWeight::new(weight)),
+                ..fontique::FontInfoOverride::default()
+            }),
+        );
+        if registered
+            .iter()
+            .map(|(_, fonts)| fonts.len())
+            .sum::<usize>()
+            != 1
+        {
+            eprintln!(
+                "skipped: {}'s file holds several faces",
+                sans.post_script_name
+            );
+            return None;
+        }
+    }
+    Some(collection)
 }
 
 #[cfg(test)]

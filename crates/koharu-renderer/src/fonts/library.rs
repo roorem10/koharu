@@ -156,6 +156,8 @@ impl Library {
     fn matches(&mut self, request: Request) -> Vec<QueryFont> {
         let mut found = Vec::new();
         for script in fontique_scripts(request.text) {
+            // Booharu: where this script's faces start, for the re-pick below.
+            let start = found.len();
             let mut query = self.collection.query(&mut self.sources);
             if request.families.is_empty() {
                 query.set_families([QueryFamily::Generic(GenericFamily::SansSerif)]);
@@ -174,6 +176,16 @@ impl Library {
                 QueryStatus::Continue
             });
             drop(query);
+            // Booharu: light text takes a light face, slanted, before a heavy
+            // slanted one, so bold and italic stay apart (D12).
+            crate::booharu::repick(
+                &mut self.collection,
+                &mut self.sources,
+                request.families,
+                request.attributes,
+                &mut found,
+                start,
+            );
             if !request.symbols.is_empty() {
                 let mut query = self.collection.query(&mut self.sources);
                 query.set_families(
@@ -307,5 +319,39 @@ mod tests {
         let mut library = Library::new();
         covers_simplified(&mut library, "ja");
         assert_eq!(covers_simplified(&mut library, "zh"), fresh);
+    }
+
+    // Booharu: the chain starts with the face Booharu re-picks (D12).
+    #[test]
+    fn a_light_italic_chain_starts_with_the_regular_face_slanted() {
+        // CC Wild Words' faces: Regular and Bold Italic.
+        let faces = [(FontStyle::Normal, 400.0), (FontStyle::Italic, 700.0)];
+        let Some(collection) = crate::booharu::test_family("Comic", &faces) else {
+            return;
+        };
+        let mut library = Library {
+            collection,
+            sources: SourceCache::default(),
+            fonts: HashMap::new(),
+        };
+        let chain = library
+            .chain(Request {
+                families: &["Comic".to_owned()],
+                symbols: &[],
+                attributes: Attributes {
+                    style: FontStyle::Italic,
+                    ..Attributes::default()
+                },
+                text: "Hi",
+                language: None,
+            })
+            .expect("a chain");
+        assert_eq!(
+            chain[0].synthesis.skew(),
+            Some(14.0),
+            "the Regular, slanted"
+        );
+        assert!(!chain[0].synthesis.embolden());
+        assert_eq!(chain[1].synthesis.skew(), None, "the Bold Italic behind it");
     }
 }

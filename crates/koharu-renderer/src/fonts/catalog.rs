@@ -66,7 +66,8 @@ pub(super) fn family(name: &str) -> Result<Option<&'static Family>> {
 /// Registers `family`'s face nearest `attributes` into the library,
 /// downloaded on this thread the first time.
 pub(super) fn register(family: &Family, attributes: Attributes) -> Result<()> {
-    let face = nearest(family, attributes);
+    // Booharu: nearest()'s face, unless it sets light text in a heavy one (D12).
+    let face = chosen(family, attributes);
     REGISTERED.get_or_insert_with(face.post_script_name.as_str(), || {
         let data = download(&face.file)?;
         library::with(|library| library.register(data, &family.name))
@@ -156,6 +157,33 @@ fn nearest(family: &Family, attributes: Attributes) -> &Face {
                 )
         })
         .expect("a catalog family has a face")
+}
+
+// Booharu: register()'s face, apart from it so a test needs no download.
+/// `family`'s face nearest `attributes`, unless it sets light text in a
+/// heavy face where a light upright one can be slanted: then that one, as
+/// for an installed family (`booharu::better`). The index says nothing of a
+/// face's slant axis, so it's taken to have none.
+fn chosen(family: &Family, attributes: Attributes) -> &Face {
+    let nearest = nearest(family, attributes);
+    let picked = family
+        .faces
+        .iter()
+        .position(|face| std::ptr::eq(face, nearest))
+        .unwrap_or_default();
+    let chosen = crate::booharu::better(
+        &family.faces,
+        picked,
+        |face| crate::booharu::Traits {
+            style: face.style,
+            weight: f32::from(face.weight),
+            width: f32::from(face.stretch),
+            weight_axis: face.weight_range.is_some(),
+            slant_axis: false,
+        },
+        attributes,
+    );
+    &family.faces[chosen]
 }
 
 /// The families the dataset's `index` describes, by normalized name. A
@@ -255,4 +283,49 @@ static DOWNLOADS: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
 fn download(file: &str) -> Result<Vec<u8>> {
     let [path] = DOWNLOADS.block_on(DATASET.resolve([file]))?;
     Ok(fs_err::read(path)?)
+}
+
+// Booharu: register()'s choice of face.
+#[cfg(test)]
+mod tests {
+    use fontique::FontWeight;
+
+    use super::*;
+
+    #[test]
+    fn a_light_italic_registers_the_regular_face_rather_than_the_bold_italic() {
+        // Booharu 0.0.4's fixture, CC Wild Words' faces: Regular and Bold
+        // Italic.
+        let families = parse(
+            br#"{ "families": [{ "family_name": "Comic", "weights": [
+                { "weight": 400, "fonts": [{ "file_name": "Comic-Regular.ttf",
+                  "postscript_name": "Comic-Regular", "style": "normal",
+                  "width": 1.0, "preview": { "file": "a.webp" } }] },
+                { "weight": 700, "fonts": [{ "file_name": "Comic-BoldItalic.ttf",
+                  "postscript_name": "Comic-BoldItalic", "style": "italic",
+                  "width": 1.0, "preview": { "file": "b.webp" } }] }
+            ] }] }"#,
+        )
+        .expect("the fixture parses");
+        let comic = &families["comic"];
+        let asked = |weight, style| Attributes {
+            weight: FontWeight::new(weight),
+            style,
+            ..Attributes::default()
+        };
+        let pick = |weight, style| {
+            chosen(comic, asked(weight, style))
+                .post_script_name
+                .as_str()
+        };
+        // The nearest face alone would download the Bold Italic.
+        assert_eq!(
+            nearest(comic, asked(400.0, FontStyle::Italic)).post_script_name,
+            "Comic-BoldItalic"
+        );
+        assert_eq!(pick(400.0, FontStyle::Italic), "Comic-Regular");
+        assert_eq!(pick(700.0, FontStyle::Italic), "Comic-BoldItalic");
+        assert_eq!(pick(700.0, FontStyle::Normal), "Comic-Regular");
+        assert_eq!(pick(400.0, FontStyle::Normal), "Comic-Regular");
+    }
 }
