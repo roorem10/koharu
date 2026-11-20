@@ -23,6 +23,7 @@ use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use crate::{
     attrs::{Auto, AutoMark},
     lettering::LetteringCategory,
+    sizes::SIZE,
 };
 
 /// `[booharu-emphasis]`: how a stressed word looks, the Emphasis button's
@@ -151,9 +152,6 @@ impl EmphasisStyle {
 
 /// The weight the renderer draws a text with none at: regular.
 const REGULAR: u16 = 400;
-
-/// The size the renderer draws a text with none at, in pixels.
-const SIZE: f64 = 24.0;
 
 /// The marks `style` gives a word over `base`, its text's own character
 /// values, as the renderer draws the characters with no marks: each value

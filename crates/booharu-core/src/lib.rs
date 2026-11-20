@@ -3,8 +3,9 @@
 //! (`attrs`), the default look of new text and the hand-edit record
 //! (`styles`), the lettering categories and the font each letters its text
 //! in (`lettering`), how a stressed word looks and which words a run
-//! stresses (`emphasis`), the shapes of balloons (`shape`), the run policy and
-//! the Run menu's presets (`runs`), what Koharu's stages did to a page's
+//! stresses (`emphasis`), words made a step bigger or smaller (`sizes`), the
+//! shapes of balloons (`shape`), the run policy and the Run menu's presets
+//! (`runs`), what Koharu's stages did to a page's
 //! blocks (`status`), which sound effects stay as art and their subtitles
 //! (`sfx`), what a run's stages and Detect again leave alone (`protect`),
 //! the look Reset to lettering default gives back (`resolver`), the series
@@ -28,6 +29,7 @@ pub mod runs;
 pub mod settings;
 pub mod sfx;
 pub mod shape;
+pub mod sizes;
 pub mod status;
 pub mod styles;
 
