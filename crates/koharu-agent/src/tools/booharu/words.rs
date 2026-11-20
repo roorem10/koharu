@@ -24,7 +24,7 @@ use booharu_core::{
     settings::LetteringSettings,
     sizes,
 };
-use koharu_scene::{Change, CharStyle, LayerId, Rgba};
+use koharu_scene::{Change, CharStyle, Gradient, LayerId, Rgba};
 use rig_core::tool::{Tool, ToolContext, ToolExecutionError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,10 @@ const SIZE_PERCENT: RangeInclusive<f64> = 25.0..=400.0;
 
 /// The widest border a word takes, in pixels, as an emphasis look takes.
 const MAX_WIDTH: f64 = 100.0;
+
+/// The letter spacings a word takes, in thousandths of an em, as the scene
+/// takes them (`CharStyle::tracking`).
+const TRACKING: RangeInclusive<f64> = -500.0..=2000.0;
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -87,6 +91,19 @@ pub(super) struct StyleWordsArgs {
     /// The second border's width in pixels, from 0 to 100.
     #[schemars(range(min = 0.0, max = 100.0))]
     outer_stroke_width: Option<f64>,
+    /// A gradient fill, drawn across the words' own ink in place of a
+    /// colour: `kind` `linear` or `radial`, `angle` in degrees (0 runs left
+    /// to right, 90 bottom to top; a radial one ignores it), and 2 to 8
+    /// `stops` in order, each an `offset` from 0 to 1, never below the one
+    /// before it, and a `color` as [red, green, blue, alpha] from 0 to 1.
+    /// Not with `fill`: a colour and a gradient are one paint.
+    gradient: Option<Gradient>,
+    /// Letter spacing in thousandths of an em, as Photoshop's tracking,
+    /// from -500 to 2000: the space after each character grows by that
+    /// share of its size, or shrinks when negative; 0 sets none, also in a
+    /// box spaced out as a whole.
+    #[schemars(range(min = -500.0, max = 2000.0))]
+    tracking: Option<f64>,
     /// Take every value of the words' own off, so they look as the rest of
     /// the box. Not with `emphasis`, `step`, or values of the words' own.
     #[serde(default)]
@@ -143,8 +160,11 @@ impl StyleWordsArgs {
     }
 
     /// Refuses a value of the words' own out of bounds: a blank family, a
-    /// size out of 25 to 400 percent, a colour channel out of 0 to 1, or a
-    /// width out of 0 to 100 pixels.
+    /// size out of 25 to 400 percent, a colour channel out of 0 to 1, a
+    /// gradient's stops' among them, a width out of 0 to 100 pixels, or a
+    /// letter spacing out of -500 to 2000; and a colour beside a gradient,
+    /// which are one paint. A gradient's stops, offsets and angle are held
+    /// to the scene's own bounds as the arguments are read.
     fn check(&self) -> Result<(), ToolExecutionError> {
         let refused = |problem: String| Err(ToolExecutionError::invalid_args(problem));
         if self
@@ -163,19 +183,42 @@ impl StyleWordsArgs {
                 SIZE_PERCENT.end()
             ));
         }
+        if self.fill.is_some() && self.gradient.is_some() {
+            return refused(
+                "`fill` and `gradient` are one paint: give the words a colour or a gradient"
+                    .to_owned(),
+            );
+        }
+        let stops = self.gradient.iter().flat_map(|gradient| &gradient.stops);
         let colours = [
-            ("fill", self.fill),
-            ("outline", self.outline),
-            ("outer_stroke", self.outer_stroke),
-        ];
+            ("`fill`".to_owned(), self.fill),
+            ("`outline`".to_owned(), self.outline),
+            ("`outer_stroke`".to_owned(), self.outer_stroke),
+        ]
+        .into_iter()
+        .chain(stops.enumerate().map(|(index, stop)| {
+            (
+                format!("`gradient` stop {}'s `color`", index + 1),
+                Some(stop.color),
+            )
+        }));
         for (name, colour) in colours {
             if let Some(Rgba(channels)) = colour
                 && !channels.iter().all(|channel| (0.0..=1.0).contains(channel))
             {
                 return refused(format!(
-                    "`{name}` {channels:?} isn't four channels from 0 to 1"
+                    "{name} {channels:?} isn't four channels from 0 to 1"
                 ));
             }
+        }
+        if let Some(tracking) = self.tracking
+            && !TRACKING.contains(&tracking)
+        {
+            return refused(format!(
+                "`tracking` {tracking} isn't from {} to {} thousandths of an em",
+                TRACKING.start(),
+                TRACKING.end()
+            ));
         }
         let widths = [
             ("outline_width", self.outline_width),
@@ -209,6 +252,8 @@ impl StyleWordsArgs {
                 stroke_width: self.outline_width,
                 outer_stroke: self.outer_stroke,
                 outer_stroke_width: self.outer_stroke_width,
+                fill_gradient: self.gradient.clone(),
+                tracking: self.tracking,
                 ..CharStyle::default()
             },
             bold: self.bold,
@@ -258,15 +303,24 @@ impl Tool for StyleWords {
          different sizes keep their order (for words a little bigger or smaller than they are \
          now; `size_percent` sets a share of the box's size instead); values of the words' \
          own, which go together: `bold`, `italic`, `family`, `size_percent` (25 to 400, of the \
-         box's own size), `fill`, `outline` and `outline_width`, and a second border drawn \
-         outside the outline, and only with one, `outer_stroke` and `outer_stroke_width`, \
-         colours as [red, green, blue, alpha] from 0 to 1 and widths in pixels from 0 to 100; \
-         or `clear` true, which takes every value of the words' own off, a translation run's \
-         emphasis included, so they look as the rest of the box (booharu_clear_word_styles \
-         takes them off every word of whole boxes at once). `bold` false and `italic` false \
-         give the words the box's own weight or slant back, so in a bold or italic box they set \
-         regular or upright. A word's own values win over the box's: changing the box's look \
-         with `edit` leaves them, so clear the words first when they should follow it. Words \
+         box's own size), `fill`, or in its place a `gradient` fill spread across the words' \
+         own ink (`kind` `linear`, at its `angle` in degrees, 0 running left to right and 90 \
+         bottom to top, or `radial`, out from their centre; and 2 to 8 `stops` in order, each \
+         an `offset` from 0 to 1, never below the one before it, and a `color`), `outline` and \
+         `outline_width`, a second border drawn outside the outline, and only with one, \
+         `outer_stroke` and `outer_stroke_width`, and letter spacing, `tracking`, in \
+         thousandths of an em from -500 to 2000, as Photoshop's tracking (0 for none, also in a \
+         box spaced out as a whole), colours as [red, green, blue, alpha] from 0 to 1 and \
+         widths in pixels from 0 to 100; or `clear` true, which takes every value of the words' \
+         own off, a translation run's emphasis included, so they look as the rest of the box \
+         (booharu_clear_word_styles takes them off every word of whole boxes at once). A \
+         colour and a gradient are one paint: a `fill` takes the words' gradient off, so words \
+         given a colour of their own show it in a box with a gradient, and a call giving both \
+         is refused. `bold` false and `italic` false give the words the box's own weight or \
+         slant back, so in a bold or italic box they set regular or upright. A word's own \
+         values win over the box's: changing the box's look with `edit` (its `style.chars`, \
+         where a whole box's `fill_gradient` and `tracking` go too) leaves them, so clear the \
+         words first when they should follow it. Words \
          given values of their own, an emphasis included, count as a hand edit of the block's \
          look unless the only one is a size, a step's among them, as words styled in the app \
          do, so booharu_apply_text_style leaves the block alone unless told to include \
@@ -1062,6 +1116,177 @@ mod tests {
         assert!(serde_json::from_value::<ClearWordStylesArgs>(blocks.clone()).is_err());
         assert!(crate::tools::refusal(&schema, &blocks).is_some());
         let taken = json!({"layers": [id("line")]});
+        assert_eq!(crate::tools::refusal(&schema, &taken), None);
+    }
+
+    /// A gradient fill as the agent sends it: yellow at the words' bottom,
+    /// red at their top.
+    fn gradient_json() -> Value {
+        json!({"kind": "linear", "angle": 90.0, "stops": [
+            {"offset": 0.0, "color": [1.0, 1.0, 0.0, 1.0]},
+            {"offset": 1.0, "color": RED},
+        ]})
+    }
+
+    /// Words whose own paint is [`gradient_json`]'s gradient.
+    fn painted() -> CharStyle {
+        CharStyle {
+            fill_gradient: Some(serde_json::from_value(gradient_json()).expect("a gradient")),
+            ..CharStyle::default()
+        }
+    }
+
+    /// Words spaced out by `tracking`, in thousandths of an em.
+    fn spaced(tracking: f64) -> CharStyle {
+        CharStyle {
+            tracking: Some(tracking),
+            ..CharStyle::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn a_gradient_and_letter_spacing_style_words_by_wording_or_offsets() {
+        let (_dir, tools, id) = opened();
+        let line = id("line");
+        let before = steps(&tools).len();
+        assert!(!edited(&layer(&tools, line)).style);
+        // By their wording, "KNOW" filled with a gradient; by offsets, past
+        // the emoji's four bytes, the last "NO" spaced out.
+        let gradient = json!({"layer": line, "text": "KNOW", "gradient": gradient_json()});
+        let styled = style(&tools, gradient.clone())
+            .await
+            .expect("a gradient word");
+        assert_eq!(found(&styled), ("KNOW", 6, 10));
+        assert!(styled.change.is_some());
+        let tracking = json!({"layer": line, "start": 11, "end": 13, "tracking": 200});
+        let styled = style(&tools, tracking).await.expect("a spaced word");
+        assert_eq!(found(&styled), ("NO", 11, 13));
+        assert_eq!(
+            held(&tools, line),
+            RichText(vec![
+                plain("🙂 NO! "),
+                span("KNOW", painted()),
+                plain(" "),
+                span("NO", spaced(200.0)),
+                plain("."),
+            ])
+        );
+        // One undo step each, under the words edit's label; a word given
+        // either is a hand edit, as one given a colour is.
+        let labels = steps(&tools);
+        assert_eq!(labels.len(), before + 2);
+        assert_eq!(labels.last().map(String::as_str), Some(words::LABEL));
+        assert!(edited(&layer(&tools, line)).style);
+        // Given again, nothing changes, with no undo step; cleared, both go.
+        let styled = style(&tools, gradient).await.expect("the same gradient");
+        assert!(styled.change.is_none());
+        assert_eq!(steps(&tools).len(), before + 2);
+        let clear = json!({"layer": line, "start": 0, "end": 14, "clear": true});
+        style(&tools, clear).await.expect("cleared");
+        assert_eq!(held(&tools, line), RichText::from(LINE));
+    }
+
+    #[tokio::test]
+    async fn a_colour_takes_a_words_gradient_off_and_keeps_its_letter_spacing() {
+        let (_dir, tools, id) = opened();
+        let line = id("line");
+        let gradient =
+            json!({"layer": line, "text": "KNOW", "gradient": gradient_json(), "tracking": -50});
+        style(&tools, gradient).await.expect("a gradient word");
+        assert_eq!(
+            held(&tools, line),
+            RichText(vec![
+                plain("🙂 NO! "),
+                span("KNOW", painted().or(&spaced(-50.0))),
+                plain(" NO."),
+            ])
+        );
+        // A colour and a gradient are one paint: the colour is the words'
+        // paint now, and their letter spacing stays.
+        let red = json!({"layer": line, "start": 6, "end": 10, "fill": RED});
+        let styled = style(&tools, red).await.expect("a red word");
+        assert_eq!(found(&styled), ("KNOW", 6, 10));
+        assert!(styled.change.is_some());
+        let red = CharStyle {
+            fill: Some(RED),
+            ..spaced(-50.0)
+        };
+        assert_eq!(
+            held(&tools, line),
+            RichText(vec![plain("🙂 NO! "), span("KNOW", red), plain(" NO.")])
+        );
+    }
+
+    #[tokio::test]
+    async fn a_bad_gradient_or_letter_spacing_changes_nothing() {
+        let (_dir, tools, id) = opened();
+        let line = id("line");
+        let before = steps(&tools).len();
+        let schema = StyleWords.parameters();
+        let stop = |offset: f64| json!({"offset": offset, "color": RED});
+        let gradient = |stops: Vec<Value>| json!({"kind": "linear", "stops": stops});
+        // A gradient the scene can't hold isn't read: one stop, nine, an
+        // offset past 1, an unknown key, or an unknown kind, all of which
+        // the schema refuses too, and stops falling back, which it can't
+        // say.
+        let nine: Vec<Value> = (0..9).map(|at| stop(f64::from(at) / 8.0)).collect();
+        let spread = json!({"kind": "linear", "stops": [stop(0.0), stop(1.0)], "spread": "repeat"});
+        let conic = json!({"kind": "conic", "stops": [stop(0.0), stop(1.0)]});
+        for (bad, schema_refuses) in [
+            (gradient(vec![stop(0.0)]), true),
+            (gradient(nine), true),
+            (gradient(vec![stop(0.0), stop(1.1)]), true),
+            (spread, true),
+            (conic, true),
+            (gradient(vec![stop(0.7), stop(0.2)]), false),
+        ] {
+            let args = json!({"layer": line, "text": "KNOW", "gradient": bad});
+            assert!(
+                serde_json::from_value::<StyleWordsArgs>(args.clone()).is_err(),
+                "{args}"
+            );
+            assert_eq!(
+                crate::tools::refusal(&schema, &args).is_some(),
+                schema_refuses,
+                "{args}"
+            );
+        }
+        // The tool refuses a letter spacing out of -500 to 2000, a stop's
+        // colour out of 0 to 1, and a colour beside a gradient.
+        let bright = gradient(vec![
+            stop(0.0),
+            json!({"offset": 1.0, "color": [1.5, 0, 0, 1]}),
+        ]);
+        for (args, reason) in [
+            (
+                json!({"layer": line, "text": "KNOW", "tracking": 2001}),
+                "`tracking` 2001 isn't from -500 to 2000",
+            ),
+            (
+                json!({"layer": line, "text": "KNOW", "tracking": -501}),
+                "`tracking` -501 isn't from -500 to 2000",
+            ),
+            (
+                json!({"layer": line, "text": "KNOW", "gradient": bright}),
+                "`gradient` stop 2's `color`",
+            ),
+            (
+                json!({"layer": line, "text": "KNOW", "fill": RED, "gradient": gradient_json()}),
+                "`fill` and `gradient` are one paint",
+            ),
+        ] {
+            let error = style(&tools, args.clone()).await.expect_err("refused");
+            assert_eq!(error.kind(), ToolErrorKind::InvalidArgs, "{args}: {error}");
+            assert!(error.to_string().contains(reason), "{args}: {error}");
+        }
+        assert_eq!(steps(&tools).len(), before);
+        assert_eq!(held(&tools, line), RichText::from(LINE));
+        // The schema refuses the letter spacing out of bounds and takes it
+        // at a bound, beside a gradient.
+        let wide = json!({"layer": line, "text": "KNOW", "tracking": 2001});
+        assert!(crate::tools::refusal(&schema, &wide).is_some());
+        let taken =
+            json!({"layer": line, "text": "KNOW", "tracking": 2000, "gradient": gradient_json()});
         assert_eq!(crate::tools::refusal(&schema, &taken), None);
     }
 
