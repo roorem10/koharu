@@ -20,7 +20,7 @@ use booharu_core::{
     lettering::{self, LetteringCategory},
     resolver,
     settings::LetteringSettings,
-    sizes,
+    sizes, status,
 };
 use koharu_scene::{CharStyle, Content, Edit, LayerId, Op, Project, RichText, Text};
 use schemars::JsonSchema;
@@ -122,8 +122,8 @@ impl WordChange {
 /// a step and explicit values, or for a weight and bold or italic twice; a layer
 /// that's neither a block nor a text layer; one that is, or is inside, a
 /// locked layer ([`crate::boxes::Refusal::Locked`]); a block without a
-/// translation; and an empty range, or one past the text or off a
-/// character boundary.
+/// translation of its own, a box styled before it's translated among them;
+/// and an empty range, or one past the text or off a character boundary.
 pub fn style_words(
     project: &Project,
     layer: LayerId,
@@ -292,8 +292,9 @@ pub fn settings(
 /// a block or a text layer: the emphasis `emphasis` gives its lettering
 /// category, as `lettering` reads it, a text layer's the default, over its
 /// text's own character values, or for a block not yet translated the ones
-/// Koharu's placement would give its translation. Refused as
-/// [`style_words`] refuses the layer.
+/// Koharu's placement would give its translation, under the values a style
+/// set on the box before it's translated left, which the typed text keeps.
+/// Refused as [`style_words`] refuses the layer.
 pub fn emphasis_patch(
     project: &Project,
     layer: LayerId,
@@ -305,7 +306,16 @@ pub fn emphasis_patch(
         None => {
             let (page, _) = project.parent(layer)?;
             match &project.layer(layer)?.content {
-                Content::Block(block) => resolver::koharu_chars(page, block, None),
+                Content::Block(block) => {
+                    // A placeholder's values stay on the text typed into it,
+                    // and placement fills in the rest.
+                    let set = block
+                        .translation
+                        .as_ref()
+                        .map(|placeholder| placeholder.style.chars.clone())
+                        .unwrap_or_default();
+                    set.or(&resolver::koharu_chars(page, block, set.size))
+                }
                 _ => CharStyle::default(),
             }
         }
@@ -319,7 +329,7 @@ pub fn emphasis_patch(
 /// in it first, as the agent's tool finds them by their wording or by
 /// character offsets. Refused as [`style_words`] refuses the layer: one
 /// that's neither a block nor a text layer, one that is, or is inside, a
-/// locked layer, and a block without a translation.
+/// locked layer, and a block without a translation of its own.
 pub fn text(project: &Project, layer: LayerId) -> Result<&Text> {
     match words(project, layer)? {
         Some(text) => Ok(text),
@@ -328,10 +338,16 @@ pub fn text(project: &Project, layer: LayerId) -> Result<&Text> {
 }
 
 /// The text of `layer` in `project` whose words are styled, none for a
-/// block without a translation. Refuses any other layer, and a locked one.
+/// block without a translation of its own ([`status::unwritten`]): a
+/// placeholder, the empty text a style set before translating leaves, holds
+/// no words. Refuses any other layer, and a locked one.
 fn words(project: &Project, layer: LayerId) -> Result<Option<&Text>> {
-    let words = match &project.layer(layer)?.content {
-        Content::Block(block) => block.translation.as_ref(),
+    let found = project.layer(layer)?;
+    let words = match &found.content {
+        Content::Block(block) => block
+            .translation
+            .as_ref()
+            .filter(|_| !status::unwritten(found, block)),
         Content::Text(text) => Some(&**text),
         _ => bail!("layer {layer} is neither a block nor a text, so it has no words to style"),
     };
@@ -364,7 +380,10 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::boxes::Refusal;
+    use crate::{
+        boxes::Refusal,
+        testing::{FILL, type_bar_style},
+    };
 
     const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
     const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
@@ -1161,6 +1180,43 @@ mod tests {
         for refused in ["bare", "paint", "locked", "held"] {
             assert!(text(&project, fixture.id(refused)).is_err(), "{refused}");
         }
+        Ok(())
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_has_no_words_and_stars_as_typed_text() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let bare = fixture.id("bare");
+        fixture.session.apply(Edit {
+            label: "test".to_owned(),
+            ops: vec![type_bar_style(bare)],
+        })?;
+        let project = fixture.session.project();
+
+        // Its placeholder holds no words to style.
+        let refused = text(&project, bare).expect_err("no words");
+        assert_eq!(
+            refused.to_string(),
+            format!("block {bare} has no translation, so it has no words to style")
+        );
+        let refused = fixture
+            .style("bare", 0..1, &bold(true))
+            .expect_err("no words");
+        assert!(refused.to_string().contains("no translation"), "{refused}");
+
+        // The star stresses the text typed in over what Koharu's placement
+        // gives it, at the page's lettering size, 30, under the fill set
+        // before translating, which the typed text keeps.
+        let mut settings = emphasis();
+        settings.default.fill = Some(FILL);
+        assert_eq!(
+            emphasis_patch(&project, bare, &settings, &LetteringSettings::default())?,
+            CharStyle {
+                weight: Some(700),
+                size: Some(34.5),
+                ..CharStyle::default()
+            }
+        );
         Ok(())
     }
 
