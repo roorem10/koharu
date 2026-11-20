@@ -744,8 +744,7 @@ function placeholderFamily(name: string): FontFamily {
   }
 }
 
-// Booharu: with the gradient fill and letter spacing, which the canvas's CharKey has yet to name.
-const CHAR_KEYS: (CharKey | 'fill_gradient' | 'tracking')[] = [
+const CHAR_KEYS: CharKey[] = [
   'family',
   'weight',
   'italic',
@@ -767,7 +766,7 @@ const CHAR_KEYS: (CharKey | 'fill_gradient' | 'tracking')[] = [
  * second border, whether every character has a border of its own. */
 export function sharedChars(texts: Text[]): {
   chars: CharStyle
-  mixed: (CharKey | 'fill_gradient' | 'tracking')[] // Booharu: CHAR_KEYS's (S12-c).
+  mixed: CharKey[]
   bordered: boolean
 } {
   const styles: CharStyle[] = texts.flatMap((text) => {
