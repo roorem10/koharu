@@ -25,7 +25,7 @@ use image::{DynamicImage, Rgb, RgbImage};
 use koharu_pipeline::{RunId, Stage};
 use koharu_scene::{
     Block, Bounds, Change, Content, Created, Direction, Edit, Frame, Hash, Layer, LayerId, Op,
-    Page, PageId, PixelFormat, Project, Rect, Ref, Role, Session, Tile, Transform,
+    Page, PageId, PixelFormat, Project, Rect, Ref, Role, Session, Text, Tile, Transform,
 };
 use kurbo::{Affine, BezPath, PathEl, Point, Shape as _};
 use serde::{Deserialize, Serialize};
@@ -255,7 +255,12 @@ pub fn find_split_balloons(project: &Project, page: Option<PageId>) -> Result<Ve
 /// record, so a style set on it by hand stays a hand edit, and its joined
 /// wording, which no automatic step wrote, counts as changed by hand; the
 /// record loses the kept mark of a sound effect kept as art when the joined
-/// clean-up shows or the join writes a translation.
+/// clean-up shows or the join writes a translation. A placeholder, the
+/// style set on a block before it was translated (`status::placeholder`),
+/// is no translation: it gives no line and no language, and the first
+/// block's keeps its values under the joined translation. With no
+/// translation in any block, the first keeps a placeholder, its own or else
+/// the first other block's, so the style set by hand stays (D1).
 pub fn join_balloon(session: &Session, block: LayerId) -> Result<Edit> {
     let project = session.project();
     let layer = project.layer(block)?;
@@ -552,6 +557,13 @@ fn joined(session: &Session, project: &Project, page: PageId, groups: &[Group]) 
 /// translation to hold that wording, the join is refused. When no clean-up
 /// showed over lettering, the joined one is hidden, so every block's
 /// lettering shows as it did.
+///
+/// A block's translation is its own ([`status::unwritten`]): a placeholder,
+/// the style set on a block before it was translated, counts as none, so it
+/// adds no line, the joined translation takes no language from it, and with
+/// a translation of none of them to join, the first block keeps one rather
+/// than a blank translation placed in no language: its own, or else the
+/// first other block's, which would go with its block (D1).
 fn join(
     session: &Session,
     project: &Project,
@@ -605,23 +617,36 @@ fn join(
         .iter()
         .zip(&cleaned)
         .any(|((_, block), &cleaned)| cleaned && block.cleanup.visible);
+    // Each block's translation of its own, none for a placeholder.
+    let owned: Vec<Option<&Text>> = group
+        .blocks
+        .iter()
+        .map(|(id, block)| {
+            let layer = project.layer(*id)?;
+            Ok(block
+                .translation
+                .as_ref()
+                .filter(|_| !status::unwritten(layer, block)))
+        })
+        .collect::<Result<_>>()?;
     // Each block's line of the joined translation: its translation, or the
     // source wording of lettering the joined clean-up covers anew.
     let wording: Vec<String> = group
         .blocks
         .iter()
         .zip(&cleaned)
-        .filter_map(|((_, block), &cleaned)| match &block.translation {
+        .zip(&owned)
+        .filter_map(|(((_, block), &cleaned), owned)| match owned {
             Some(translation) => Some(translation.content.text()),
             None => {
                 (covered && cleaned && !block.cleanup.visible).then(|| block.source.content.text())
             }
         })
         .collect();
-    let target = group
-        .blocks
+    let target = owned
         .iter()
-        .find_map(|(_, block)| block.translation.as_ref())
+        .flatten()
+        .next()
         .map(|translation| translation.language.clone());
     let translated = target.is_some();
     if let Some(target) = target {
@@ -652,7 +677,9 @@ fn join(
             layer: (*kept).into(),
             patch,
         });
-        if first.translation.is_none() {
+        // The kept block with none of its own, or a placeholder in no
+        // language, takes the joined translation's.
+        if matches!(owned.first(), Some(None)) {
             ops.push(Op::UpdateLayer {
                 layer: (*kept).into(),
                 patch: json!({"translation": {"language": target}}),
@@ -665,6 +692,23 @@ fn join(
              erase lettering; translate them first",
             group.balloon.id
         );
+        // Any translation here is a placeholder: the kept block keeps its
+        // own, or takes the first other block's, blank in its point frame.
+        if first.translation.is_none()
+            && let Some(placeholder) = rest
+                .iter()
+                .find_map(|(_, block)| block.translation.as_ref())
+        {
+            let mut carried = serde_json::to_value(placeholder)?;
+            if let Some(fields) = carried.as_object_mut() {
+                // Blank, and only `set_text` writes it.
+                fields.remove("content");
+            }
+            ops.push(Op::UpdateLayer {
+                layer: (*kept).into(),
+                patch: json!({"translation": carried}),
+            });
+        }
     }
     // With no clean-up to show, a translated block's shows, as the
     // Translation stage leaves one.
@@ -1333,10 +1377,10 @@ fn created(change: &Change, label: &str) -> Result<LayerId> {
 mod tests {
     use booharu_core::attrs::Flag;
     use image::ImageFormat;
-    use koharu_scene::Text;
     use serde_json::Value;
 
     use super::*;
+    use crate::testing::{FAMILY, FILL, type_bar_style};
 
     /// A project of one page whose scan is white, with lines of black
     /// lettering over each of `ink`.
@@ -2112,6 +2156,107 @@ mod tests {
         Ok(())
     }
 
+    /// Styles `block` before it's translated, as Koharu's type bar does.
+    fn style_by_hand(page: &mut Fixture, block: LayerId) -> Result<()> {
+        page.session.apply(edit(vec![type_bar_style(block)]))?;
+        let project = page.session.project();
+        let layer = project.layer(block)?;
+        let Content::Block(found) = &layer.content else {
+            bail!("{block} isn't a block");
+        };
+        assert!(status::placeholder(layer, found));
+        Ok(())
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_gives_a_join_no_line_and_no_language() -> Result<()> {
+        // The kept text styled by hand before it's translated, the other
+        // translated: the joined translation is the other's, in its
+        // language, placed in the balloon in the style set by hand.
+        let (mut page, [first, second]) = two_cleaned("あ", "う")?;
+        style_by_hand(&mut page, first)?;
+        translate(&mut page, second, "Oh")?;
+        page.session.apply(join_balloon(&page.session, first)?)?;
+        let joined = page.block(first)?;
+        let translation = joined.translation.clone().context("a translation")?;
+        assert_eq!(translation.content.text(), "Oh");
+        assert_eq!(translation.language.to_string(), "en");
+        assert!(matches!(translation.frame, Frame::Path { .. }));
+        let chars = &translation.style.chars;
+        assert_eq!(
+            (chars.family.as_deref(), chars.fill),
+            (Some(FAMILY), Some(FILL))
+        );
+        let layer = page.session.project().layer(first)?.clone();
+        assert!(!status::unwritten(&layer, &joined));
+        assert!(booharu_core::edited(&layer).style);
+
+        // Read after a translated text, one given back with its lettering
+        // showing and styled since: the joined clean-up covers it, so the
+        // translation carries its wording, as for one with no translation.
+        let (mut page, [first, second]) = two_cleaned("どうして", "♡")?;
+        translate(&mut page, first, "Why?")?;
+        unchanged(&mut page, second)?;
+        style_by_hand(&mut page, second)?;
+        page.session.apply(join_balloon(&page.session, first)?)?;
+        assert_eq!(
+            joined_translation(&page, first)?.as_deref(),
+            Some("Why?\n♡")
+        );
+
+        // With none translated, its lettering showing beside a cleaned
+        // text: refused, as with no translation.
+        let (mut page, [first, second]) = two_cleaned("あ", "♡")?;
+        unchanged(&mut page, second)?;
+        style_by_hand(&mut page, second)?;
+        let steps = page.steps().len();
+        assert!(
+            join_balloon(&page.session, first)
+                .is_err_and(|error| error.to_string().contains("translate them first"))
+        );
+        assert_eq!(page.steps().len(), steps);
+        Ok(())
+    }
+
+    #[test]
+    fn a_join_of_boxes_styled_before_theyre_translated_keeps_the_first_style() -> Result<()> {
+        // The first read with no translation, the other styled by hand: the
+        // joined block takes the other's placeholder, never a blank
+        // translation placed in no language, and stays untranslated.
+        let (mut page, [first, second]) = two_cleaned("あ", "う")?;
+        style_by_hand(&mut page, second)?;
+        let styled = page.block(second)?.translation.context("a placeholder")?;
+        page.session.apply(join_balloon(&page.session, first)?)?;
+        let project = page.session.project();
+        let layer = project.layer(first)?;
+        let joined = page.block(first)?;
+        assert_eq!(joined.translation.as_ref(), Some(&styled));
+        assert!(status::placeholder(layer, &joined));
+        assert!(status::untranslated(layer, &joined));
+        assert!(booharu_core::edited(layer).style);
+
+        // Both styled by hand: the first's own stays.
+        let (mut page, [first, second]) = two_cleaned("あ", "う")?;
+        style_by_hand(&mut page, first)?;
+        page.update(
+            second,
+            json!({"translation": {"style": {"chars": {"family": "Badaboom BB"}}}}),
+        )?;
+        let own = page.block(first)?.translation.context("a placeholder")?;
+        page.session.apply(join_balloon(&page.session, first)?)?;
+        let project = page.session.project();
+        let layer = project.layer(first)?;
+        let joined = page.block(first)?;
+        assert_eq!(joined.translation.as_ref(), Some(&own));
+        assert!(status::untranslated(layer, &joined));
+
+        // Neither styled: still no translation.
+        let (mut page, [first, _]) = two_cleaned("あ", "う")?;
+        page.session.apply(join_balloon(&page.session, first)?)?;
+        assert_eq!(joined_translation(&page, first)?, None);
+        Ok(())
+    }
+
     #[test]
     fn a_join_showing_or_translating_a_line_kept_as_art_drops_its_mark() -> Result<()> {
         use booharu_core::{lettering::LetteringCategory, settings::LetteringSettings};
@@ -2861,6 +3006,45 @@ mod tests {
         page.session.go_to(before)?;
         let layer = page.session.project().layer(block)?.clone();
         assert!(recorded(&layer, status::OCR) && recorded(&layer, status::TRANSLATION));
+        Ok(())
+    }
+
+    #[test]
+    fn a_split_of_a_box_styled_before_its_translated_leaves_both_halves_to_translate() -> Result<()>
+    {
+        use booharu_core::settings::LetteringSettings;
+        let mut page = Fixture::new(400, 400, &[rect(0.0, 0.0, 400.0, 400.0)])?;
+        let bounds = page_bounds(100.0, 20.0, 40.0, 100.0);
+        let block = page.add(None, text_block(bounds, Direction::Vertical, "あいう"))?;
+        // Found, read and cleaned by the stages, then styled by hand before
+        // it's translated: only Translate is left.
+        let project = page.session.project();
+        page.session.apply(edit(vec![
+            made(block, "detection", "c2pa.created"),
+            made(block, "ocr", "c2pa.created"),
+            made(block, "inpainting", "c2pa.created"),
+            booharu_core::styles::recognized(project.layer(block)?, "あいう")?,
+        ]))?;
+        style_by_hand(&mut page, block)?;
+        let settings = LetteringSettings::default();
+        let plan = crate::runs::plan(&page.session, &[page.page], &settings)?;
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan[0].stages, [Stage::Translate]);
+
+        let change = page.session.apply(split_block(&page.session, block)?)?;
+
+        // Both halves have no translation, the placeholder going with the
+        // block's (a known limit), and wait to be read and translated.
+        let project = page.session.project();
+        for id in split_halves(block, &change)? {
+            let layer = project.layer(id)?;
+            let half = page.block(id)?;
+            assert_eq!(half.translation, None);
+            assert!(status::untranslated(layer, &half));
+        }
+        let plan = crate::runs::plan(&page.session, &[page.page], &settings)?;
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan[0].stages, [Stage::Recognize, Stage::Translate]);
         Ok(())
     }
 

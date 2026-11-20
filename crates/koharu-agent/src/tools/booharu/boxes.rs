@@ -165,10 +165,13 @@ impl Tool for JoinBalloonBlocks {
          others' masks and clean-ups merge into its own before they go, their reviewer's notes \
          and flags joining its own, and a text left as scanned, as the Translation stage leaves \
          one the model gave back unchanged, gives the translation its wording once the joined \
-         clean-up covers it. Unless the user asked for this join, tell them which balloons are \
-         split, as booharu_find_split_balloons finds them, and ask first. A balloon of one text \
-         block has nothing to join, and a locked block or balloon refuses it. Answers what \
-         changed."
+         clean-up covers it. A style set on a block before it was translated is no translation: \
+         it gives no line, the first block's keeps its values under the joined translation, and \
+         when no block has a translation, the first keeps that style, its own or else the first \
+         other block's, untranslated. Unless the user asked for this join, tell them which \
+         balloons are split, as booharu_find_split_balloons finds them, and ask first. A \
+         balloon of one text block has nothing to join, and a locked block or balloon refuses \
+         it. Answers what changed."
             .to_owned()
     }
 
@@ -256,13 +259,13 @@ impl Tool for SplitBlock {
          and translates both halves again; the run goes on in the background, and wait follows \
          it. The half read first, the right one of vertical text and the top one of horizontal \
          text, keeps the block's id, and a copy just after it takes the other; each keeps its \
-         part of the mask and clean-up and loses its wording and translation until the run \
-         writes them again. Detecting the page again keeps both halves from then on, as their \
-         boxes were cut by hand; nothing else counts them as changed by hand, so \
-         booharu_apply_text_style restyles them as any other box. A block whose halves would \
-         be under 4 pixels across its lines, or a locked one, is refused. Answers the halves \
-         in reading order and the run's id. To read or translate a block again without \
-         splitting it, use booharu_redo_boxes."
+         part of the mask and clean-up and loses its wording and translation, a style set on \
+         the block before it was translated too, until the run writes them again. Detecting \
+         the page again keeps both halves from then on, as their boxes were cut by hand; \
+         nothing else counts them as changed by hand, so booharu_apply_text_style restyles \
+         them as any other box. A block whose halves would be under 4 pixels across its lines, \
+         or a locked one, is refused. Answers the halves in reading order and the run's id. To \
+         read or translate a block again without splitting it, use booharu_redo_boxes."
             .to_owned()
     }
 
