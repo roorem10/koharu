@@ -1,17 +1,25 @@
-//! Booharu's tests of the Translation stage's turn when its run asks the
-//! model which words to stress (S10-e), mounted by a marked line in
-//! `mod.rs`, as they drive the stage's own turn, private to it, with rig's
-//! scripted model in place of a real one.
+//! Booharu's tests of the Translation stage when its run asks the model
+//! which words to stress (S10-e), mounted by a marked line in `mod.rs`, as
+//! they drive the stage's own turn, private to it, and the stage itself,
+//! with rig's scripted model in place of a real one.
+
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::{Context as _, Result};
-use booharu_core::{emphasis::EmphasisSettings, settings::Snapshot};
-use parking_lot::Mutex;
+use booharu_core::{attrs::Auto, emphasis::EmphasisSettings, settings::Snapshot};
+use koharu_scene::{Content, Created, Edit, LayerId, Op, PageId, RichText, Session};
+use parking_lot::{Mutex, RwLock};
 use rig_core::{
     catalog::ModelSpec,
     completion::{CompletionRequest, Message},
     providers::registry::ProviderId,
     test_utils::{MockCompletionModel, MockTurn},
 };
+use serde_json::json;
 use tokio_util::sync::CancellationToken;
 
 use super::{
@@ -19,11 +27,14 @@ use super::{
     turn::{Turn, keys},
 };
 use crate::{
-    Stage,
+    Event, Outcome, PipelineConfig, RunId, Stage, Target,
     booharu::{
         emphasis::{INSTRUCTION, asked},
         emphasis_schema,
+        stand_in::Hosted,
     },
+    event::Events,
+    scheduler::{Command, Plan, Run, Scheduler},
 };
 
 /// A model giving each of `answers` in turn, as rig's scripted model does,
@@ -253,5 +264,242 @@ async fn an_answer_in_the_shape_fails_koharus_checks_in_koharus_words() -> Resul
         assert_eq!(failure(plain, false).await?, words, "{plain}");
         assert_eq!(failure(shaped, true).await?, words, "{shaped}");
     }
+    Ok(())
+}
+
+/// A project of two pages, each with a block of a line read on it, as the
+/// Detection and Recognition stages leave one.
+struct Chapter {
+    _dir: tempfile::TempDir,
+    session: Arc<Mutex<Session>>,
+    pages: Vec<PageId>,
+    blocks: Vec<LayerId>,
+}
+
+impl Chapter {
+    fn new(lines: [&str; 2]) -> Result<Self> {
+        let dir = tempfile::tempdir()?;
+        let mut session = Session::create(dir.path().join("test.khr"))?;
+        let mut ops = Vec::new();
+        for (index, line) in lines.iter().enumerate() {
+            let page = format!("$p{index}");
+            ops.push(json!({"op": "add_page", "id": page, "index": index,
+                "size": {"width": 200, "height": 200}}));
+            let block = json!({"kind": "block", "role": "text", "source": {
+                "frame": {"box": {"bounds": {"x": 20.0, "y": 20.0, "width": 20.0, "height": 40.0}}},
+                "content": line,
+            }, "attributes": {"c2pa": {
+                "detection": {"action": "c2pa.created"},
+                "ocr": {"action": "c2pa.created"},
+            }}});
+            ops.push(
+                json!({"op": "add_layer", "id": format!("$b{index}"), "page": page,
+                "index": 0, "layer": block}),
+            );
+        }
+        let ops = ops
+            .into_iter()
+            .map(serde_json::from_value)
+            .collect::<Result<Vec<Op>, _>>()?;
+        let change = session.apply(Edit {
+            label: "test".to_owned(),
+            ops,
+        })?;
+        let (mut pages, mut blocks) = (BTreeMap::new(), BTreeMap::new());
+        for created in change.created {
+            match created {
+                Created::Page {
+                    id,
+                    label: Some(label),
+                } => {
+                    pages.insert(label, id);
+                }
+                Created::Layer {
+                    id,
+                    label: Some(label),
+                } => {
+                    blocks.insert(label, id);
+                }
+                _ => {}
+            }
+        }
+        // A block's parts are labelled after it, as `$b0.mask` is.
+        let (pages, blocks) = ["0", "1"]
+            .iter()
+            .map(|at| {
+                Some((
+                    *pages.get(&format!("p{at}"))?,
+                    *blocks.get(&format!("b{at}"))?,
+                ))
+            })
+            .collect::<Option<(Vec<_>, Vec<_>)>>()
+            .context("each page and its block")?;
+        Ok(Self {
+            _dir: dir,
+            session: Arc::new(Mutex::new(session)),
+            pages,
+            blocks,
+        })
+    }
+
+    /// Translates the pages `target` names, as a run with `booharu`, its
+    /// model `model`, through a scheduler of its own, as `Pipeline::run`
+    /// queues a run but with no setting read, to its end, done.
+    async fn translate(&self, target: Target, model: &str, booharu: Snapshot) -> Result<()> {
+        let events = Events::new();
+        let config = PipelineConfig {
+            translator: TranslatorConfig {
+                model: model.to_owned(),
+                ..TranslatorConfig::default()
+            },
+            booharu,
+            ..PipelineConfig::default()
+        };
+        let commands = Scheduler::spawn(Arc::new(RwLock::new(config.clone())), events.clone());
+        let stages = BTreeSet::from([Stage::Translate]);
+        let project = self.session.lock().project();
+        let plan = Plan::new(&project, &target, &stages)?;
+        let run = RunId(1);
+        events.send(Event::Queued {
+            run,
+            steps: plan.pages(),
+            stages: vec![Stage::Translate],
+            pages: true,
+        });
+        let queued = Run::new(
+            run,
+            Arc::clone(&self.session),
+            project.id(),
+            config,
+            plan,
+            &stages,
+        );
+        commands
+            .send(Command::Run(queued))
+            .map_err(|_| anyhow::anyhow!("the scheduler ended"))?;
+        let told = events
+            .history(run, Duration::from_secs(60))
+            .await
+            .context("a history")?;
+        let done = Event::Ended {
+            run,
+            outcome: Outcome::Done,
+        };
+        anyhow::ensure!(told.last() == Some(&done), "{told:#?}");
+        Ok(())
+    }
+
+    /// The translation of the block on the page at `index`, and the words
+    /// its run's marks cover.
+    fn translation(&self, index: usize) -> Result<(RichText, Vec<String>)> {
+        let project = self.session.lock().project();
+        let layer = project.layer(self.blocks[index])?;
+        let Content::Block(block) = &layer.content else {
+            anyhow::bail!("not a block");
+        };
+        let translation = block.translation.as_ref().context("a translation")?;
+        let text = translation.content.text();
+        let marked = Auto::of(layer)
+            .marks
+            .iter()
+            .map(|mark| text[mark.start..mark.end].to_owned())
+            .collect();
+        Ok((translation.content.clone(), marked))
+    }
+}
+
+/// A run's snapshot with `[booharu-emphasis]` as it starts, asking its model
+/// for the words to stress when `asks`, as `queued` leaves one.
+fn emphasis(asks: bool) -> Snapshot {
+    Snapshot {
+        emphasis: Some(EmphasisSettings::default()),
+        asks_emphasis: asks,
+        ..Snapshot::default()
+    }
+}
+
+#[tokio::test]
+async fn a_translating_run_that_asks_marks_its_models_picks_and_seeds_the_page_before_in_its_shape()
+-> Result<()> {
+    let chapter = Chapter::new(["まさか!", "どうして"])?;
+    let reference = "mock/s10e-asking";
+    let model = model(&[
+        r#"{"1": {"text": "No way!", "emphasis": ["No"]}}"#,
+        r#"{"1": {"text": "Why?", "emphasis": []}}"#,
+    ]);
+    let _hosted = Hosted::new(reference, model.clone().erase());
+    // The first page, alone: asked for the words to stress, and the one it
+    // picks marked, as the run's own.
+    let first = Target::Pages(vec![chapter.pages[0]]);
+    chapter.translate(first, reference, emphasis(true)).await?;
+    let requests = model.requests();
+    assert_eq!(
+        requests[0].output_schema.as_ref(),
+        Some(&emphasis_schema(&keys(1))?)
+    );
+    let (translation, marked) = chapter.translation(0)?;
+    assert_eq!(translation.text(), "No way!");
+    assert_eq!(translation.0[0].insert, "No");
+    assert_eq!(translation.0[0].attributes.weight, Some(700));
+    assert_eq!(marked, ["No"]);
+
+    // The second page by a run of its own, in a conversation of its own:
+    // the page before goes ahead of it, its answer in the shape asked for,
+    // with the words its marks cover.
+    let second = Target::Pages(vec![chapter.pages[1]]);
+    chapter.translate(second, reference, emphasis(true)).await?;
+    let requests = model.requests();
+    assert_eq!(requests.len(), 2);
+    let history: Vec<&Message> = requests[1].chat_history.iter().map(|m| &**m).collect();
+    let seeded = [
+        Message::user("{\n  \"1\": \"まさか!\"\n}"),
+        Message::assistant("{\n  \"1\": {\"text\": \"No way!\", \"emphasis\": [\"No\"]}\n}"),
+    ];
+    assert!(
+        history
+            .windows(2)
+            .any(|pair| pair[0] == &seeded[0] && pair[1] == &seeded[1]),
+        "{history:#?}"
+    );
+    let (translation, marked) = chapter.translation(1)?;
+    assert_eq!(translation.text(), "Why?");
+    assert_eq!(translation.0.len(), 1);
+    assert!(marked.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_translating_run_that_doesnt_ask_takes_its_old_marks_off_and_seeds_koharus_shape()
+-> Result<()> {
+    let chapter = Chapter::new(["まさか!", "どうして"])?;
+    let (asking, plain) = ("mock/s10e-asked", "mock/s10e-plain");
+    let marking = model(&[r#"{"1": {"text": "No way!", "emphasis": ["No"]}}"#]);
+    let _marking = Hosted::new(asking, marking.clone().erase());
+    let first = Target::Pages(vec![chapter.pages[0]]);
+    chapter
+        .translate(first.clone(), asking, emphasis(true))
+        .await?;
+    assert_eq!(chapter.translation(0)?.1, ["No"]);
+    // A run that doesn't ask, as one on a translation model: Koharu's plain
+    // answer, and the run's old mark taken off.
+    let model = model(&[r#"{"1": "No way!"}"#, r#"{"1": "Why?"}"#]);
+    let _plain = Hosted::new(plain, model.clone().erase());
+    chapter.translate(first, plain, emphasis(false)).await?;
+    let requests = model.requests();
+    assert_ne!(
+        requests[0].output_schema.as_ref(),
+        Some(&emphasis_schema(&keys(1))?)
+    );
+    let (translation, marked) = chapter.translation(0)?;
+    assert_eq!(translation.text(), "No way!");
+    assert_eq!(translation.0.len(), 1, "{translation:?}");
+    assert!(marked.is_empty());
+    // Its page before is seeded in Koharu's shape.
+    let second = Target::Pages(vec![chapter.pages[1]]);
+    chapter.translate(second, plain, emphasis(false)).await?;
+    let requests = model.requests();
+    let history: Vec<&Message> = requests[1].chat_history.iter().map(|m| &**m).collect();
+    let seeded = Message::assistant("{\n  \"1\": \"No way!\"\n}");
+    assert!(history.contains(&&seeded), "{history:#?}");
     Ok(())
 }

@@ -7,8 +7,8 @@
 //! copyright line or a "!?", is in the target's script already, so it keeps
 //! its own lettering.
 
-// Booharu: the tests of a turn that asks its model which words to stress,
-// which drive the stage's own turn.
+// Booharu: the tests of the stage when its run asks its model which words
+// to stress, which drive its own turn and the stage itself.
 #[cfg(test)]
 mod booharu;
 mod conversation;

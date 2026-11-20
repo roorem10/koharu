@@ -495,7 +495,8 @@ async fn within<T, E: Into<anyhow::Error>>(
 
 /// Stand-ins for the stages in the scheduler's tests, which load no model:
 /// what each page stage of a scripted project does, try by try, and a log of
-/// the tasks that ran and the models the scheduler unloaded, in order.
+/// the tasks that ran and the models the scheduler unloaded, in order; and
+/// for a hosted model in the Translation stage's own tests, a scripted one.
 #[cfg(test)]
 pub(crate) mod stand_in {
     use std::{
@@ -503,6 +504,7 @@ pub(crate) mod stand_in {
         time::Duration,
     };
 
+    use koharu_llm::rig::{driver::DynModel, operation::Completion};
     use koharu_scene::ProjectId;
     use parking_lot::Mutex;
     use tokio::time::Instant;
@@ -631,6 +633,32 @@ pub(crate) mod stand_in {
             kept.sort();
             script.log.push(Entry::Unloaded(kept));
         }
+    }
+
+    /// The scripted models standing in for hosted ones, by the `vendor/model`
+    /// reference a test's runs name, each test its own.
+    static HOSTED: Mutex<BTreeMap<String, DynModel<Completion>>> = Mutex::new(BTreeMap::new());
+
+    /// A scripted model a translation connects for its reference while it's
+    /// held, as it would a hosted one.
+    pub(crate) struct Hosted(String);
+
+    impl Hosted {
+        pub(crate) fn new(reference: &str, model: DynModel<Completion>) -> Self {
+            HOSTED.lock().insert(reference.to_owned(), model);
+            Self(reference.to_owned())
+        }
+    }
+
+    impl Drop for Hosted {
+        fn drop(&mut self) {
+            HOSTED.lock().remove(&self.0);
+        }
+    }
+
+    /// The scripted model a test holds for `reference`, if any.
+    pub(crate) fn hosted(reference: &str) -> Option<DynModel<Completion>> {
+        HOSTED.lock().get(reference).cloned()
     }
 }
 
