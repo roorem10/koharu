@@ -257,10 +257,12 @@ impl Tool for SplitBlock {
          it. The half read first, the right one of vertical text and the top one of horizontal \
          text, keeps the block's id, and a copy just after it takes the other; each keeps its \
          part of the mask and clean-up and loses its wording and translation until the run \
-         writes them again. Both halves count as drawn by hand from then on, so detecting the \
-         page again keeps them. A block whose halves would be under 4 pixels across its lines, \
-         or a locked one, is refused. Answers the halves in reading order and the run's id. To \
-         read or translate a block again without splitting it, use booharu_redo_boxes."
+         writes them again. Detecting the page again keeps both halves from then on, as their \
+         boxes were cut by hand; nothing else counts them as changed by hand, so \
+         booharu_apply_text_style restyles them as any other box. A block whose halves would \
+         be under 4 pixels across its lines, or a locked one, is refused. Answers the halves \
+         in reading order and the run's id. To read or translate a block again without \
+         splitting it, use booharu_redo_boxes."
             .to_owned()
     }
 

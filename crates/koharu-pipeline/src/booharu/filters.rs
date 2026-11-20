@@ -1879,8 +1879,8 @@ mod tests {
     #[test]
     fn detect_again_keeps_a_splits_halves_and_adds_no_block_over_them() -> Result<()> {
         // A block detection found, split in two by hand: each half keeps the
-        // detection record it was copied with, its own record saying a hand
-        // cut its box, and is read again.
+        // detection record it was copied with, its own record saying it's a
+        // half of a block split by hand, and is read again.
         let fixture = Fixture::new(
             false,
             vec![
@@ -1889,11 +1889,12 @@ mod tests {
             ],
         )?;
         for label in ["first", "second"] {
-            let cut = Auto {
-                drawn: true,
+            let half = Auto {
+                split: true,
                 ..Auto::of(&fixture.layer(label)?)
             };
-            fixture.edit(vec![attrs::set(fixture.id(label), &cut)?])?;
+            fixture.edit(vec![attrs::set(fixture.id(label), &half)?])?;
+            assert!(!booharu_core::edited(&fixture.layer(label)?).hand_edited());
         }
         // What detection finds again: the block as it was before the split.
         let at = fixture.page;

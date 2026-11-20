@@ -23,7 +23,7 @@ use koharu_scene::{Content, Layer, LayerId, Page};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    attrs::{self, Lettering, LetteringSource, ReviewNote},
+    attrs::{self, Auto, Lettering, LetteringSource, ReviewNote},
     runs::RunStage,
     settings::LetteringSettings,
     sfx,
@@ -129,12 +129,12 @@ pub fn cleanable(page: &Page, layer: &Layer) -> bool {
 /// Whether Detect again keeps `layer`, on `page`, rather than replace it
 /// with what it detects: a locked layer; a block changed by hand (its
 /// source, translation, or style, or drawn by hand, as
-/// [`edited`](crate::edited) reports it, a split's halves among them),
-/// whose clean-up was hidden by hand ([`sfx::hand_kept`]) or shown again by
-/// hand after Booharu kept it as art ([`sfx::hand_shown`]), labelled by a
-/// user, given a reviewer's note, or subtitled; a panel or balloon Koharu's
-/// Detection stage didn't make; and any text layer, the T tool's and
-/// subtitles. Anything else, a block, panel, or balloon detection made and
+/// [`edited`](crate::edited) reports it), cut from a block split by hand,
+/// though it keeps detection's record ([`Auto::split`]), whose clean-up was
+/// hidden by hand ([`sfx::hand_kept`]) or shown again by hand after Booharu
+/// kept it as art ([`sfx::hand_shown`]), labelled by a user, given a
+/// reviewer's note, or subtitled; a panel or balloon Koharu's Detection
+/// stage didn't make; and any text layer, the T tool's and subtitles. Anything else, a block, panel, or balloon detection made and
 /// nobody changed among them, is detected again, a block whose clean-up
 /// Booharu hid to keep it as art (the kept mark) or the Translation stage
 /// hid giving it back among them, as no hand hid those.
@@ -145,6 +145,7 @@ pub fn keeps(page: &Page, layer: &Layer) -> bool {
     match &layer.content {
         Content::Block(block) => {
             edited(layer).hand_edited()
+                || Auto::of(layer).split
                 || sfx::hand_kept(layer, block)
                 || sfx::hand_shown(layer, block)
                 || attrs::get::<Lettering>(layer)
@@ -165,7 +166,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        attrs::{Auto, SfxSubtitle},
+        attrs::SfxSubtitle,
         settings::SfxMode,
         styles::{given_back, recognized, text_hash},
     };
@@ -624,15 +625,17 @@ mod tests {
         let mut fixture = Fixture::new();
         let settings = translate_all();
         // A split's half keeps the detection record it was copied with, and
-        // its record says a hand cut its box.
+        // its record says it's a half of a block split by hand, which counts
+        // as no other hand edit.
         let held = fixture.id("held");
-        let cut = Auto {
-            drawn: true,
+        let half = Auto {
+            split: true,
             ..Auto::of(&fixture.layer("held"))
         };
-        fixture.apply(vec![attrs::set(held, &cut).expect("the record")]);
+        fixture.apply(vec![attrs::set(held, &half).expect("the record")]);
         let layer = fixture.layer("held");
         assert!(recorded(&layer, DETECTION));
+        assert!(!edited(&layer).hand_edited());
         assert!(keeps(&fixture.page(), &layer));
         // Every stage still reads, cleans, and translates it, as the split's
         // own run does.

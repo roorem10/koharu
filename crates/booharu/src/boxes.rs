@@ -315,10 +315,9 @@ const HALF_SIZE: f64 = 4.0;
 /// source wording and their translation, for the Recognition and
 /// Translation stages to write again, and keep the clean-up shown or hidden
 /// as it was, a sound effect kept as art with its kept mark and a line given
-/// back with its record. Both count as drawn by hand from then on, so Detect
-/// again keeps them; [`split_halves`]
-/// finds both in the edit's change. A block whose halves would be under 4
-/// pixels is refused.
+/// back with its record. Both are marked as split from then on, so Detect
+/// again keeps them; [`split_halves`] finds both in the edit's change. A
+/// block whose halves would be under 4 pixels is refused.
 pub fn split_block(session: &Session, block: LayerId) -> Result<Edit> {
     let project = session.project();
     let layer = project.layer(block)?;
@@ -877,14 +876,15 @@ fn dropped(layer: &Layer, target: &Ref, record: bool) -> Result<Vec<Op>> {
 }
 
 /// The hand-edit record a split gives each half of the block `layer` holds,
-/// read before the edit: drawn, as the split cut the half's box by hand
+/// read before the edit: split, as the split cut the half's box by hand
 /// though it keeps the detection record it was copied with, so Detect again
-/// keeps it (D1), as it keeps a box drawn with the O tool; the kept mark of
-/// an effect Booharu kept as art; and, for a line the Translation stage gave
-/// back unchanged, the translation of no text that records it
-/// (`styles::given_back`), as Koharu's stage leaves no record of its own
-/// there. The half keeps the clean-up as it shows, so neither reads as
-/// hidden by hand (`sfx::hand_kept`), which the split's run would leave
+/// keeps it (D1), as it keeps a box drawn with the O tool, while Apply
+/// restyles it, as a split changes neither its wording nor its look; the
+/// kept mark of an effect Booharu kept as art; and, for a line the
+/// Translation stage gave back unchanged, the translation of no text that
+/// records it (`styles::given_back`), as Koharu's stage leaves no record of
+/// its own there. The half keeps the clean-up as it shows, so neither reads
+/// as hidden by hand (`sfx::hand_kept`), which the split's run would leave
 /// untranslated. Nothing else: that run reads and translates the half
 /// again, which records it anew.
 fn half_record(layer: &Layer) -> Auto {
@@ -893,7 +893,7 @@ fn half_record(layer: &Layer) -> Auto {
         _ => false,
     };
     Auto {
-        drawn: true,
+        split: true,
         kept: Auto::of(layer).kept,
         text: given_back.then(|| text_hash("")),
         ..Auto::default()
@@ -2108,24 +2108,35 @@ mod tests {
         Ok(())
     }
 
-    /// Leaves `block` as a run of Koharu's stages leaves one, with Booharu's
-    /// hooks: found and read, its wording recorded, then translated as
-    /// `text`, with the default look and the record of what it wrote.
-    fn run_on(page: &mut Fixture, block: LayerId, text: &str) -> Result<()> {
-        let english: koharu_scene::LanguageIdentifier = "en".parse()?;
-        let made = |step: &str, action: &str| Op::SetAttribute {
+    /// The op recording on `block` that a Koharu stage made its part `step`
+    /// by `action`, as the stages record it in `c2pa`.
+    fn made(block: LayerId, step: &str, action: &str) -> Op {
+        Op::SetAttribute {
             layer: block.into(),
             namespace: "c2pa".to_owned(),
             key: step.to_owned(),
             value: Some(json!({"action": action})),
-        };
+        }
+    }
+
+    /// Leaves `block` as a run of Koharu's stages leaves one, with Booharu's
+    /// hooks: found and read, its wording recorded, then translated as
+    /// `text`, with the default look and the record of what it wrote.
+    fn run_on(page: &mut Fixture, block: LayerId, text: &str) -> Result<()> {
         let project = page.session.project();
         let wording = page.block(block)?.source.content.text();
         page.session.apply(edit(vec![
-            made("detection", "c2pa.created"),
-            made("ocr", "c2pa.created"),
+            made(block, "detection", "c2pa.created"),
+            made(block, "ocr", "c2pa.created"),
             booharu_core::styles::recognized(project.layer(block)?, &wording)?,
         ]))?;
+        stage_translates(page, block, text)
+    }
+
+    /// Translates `block` as `text` as Koharu's Translation stage does, with
+    /// Booharu's hook: the default look and the record of what it wrote.
+    fn stage_translates(page: &mut Fixture, block: LayerId, text: &str) -> Result<()> {
+        let english: koharu_scene::LanguageIdentifier = "en".parse()?;
         let project = page.session.project();
         let placed = koharu_pipeline::placement(&project, block, &english)?;
         let mut ops = vec![
@@ -2147,7 +2158,7 @@ mod tests {
             layer: block.into(),
             patch: json!({"translation": {"language": english}, "cleanup": {"visible": true}}),
         });
-        ops.push(made("translation", "c2pa.translated"));
+        ops.push(made(block, "translation", "c2pa.translated"));
         page.session.apply(edit(ops))?;
         Ok(())
     }
@@ -2629,7 +2640,7 @@ mod tests {
     }
 
     #[test]
-    fn a_splits_halves_are_drawn_by_hand_so_detect_again_keeps_them() -> Result<()> {
+    fn detect_again_keeps_a_splits_halves_and_apply_restyles_them() -> Result<()> {
         use booharu_core::{protect, runs::RunStage, settings::LetteringSettings};
         let mut page = Fixture::new(400, 400, &[rect(0.0, 0.0, 400.0, 400.0)])?;
         let bounds = page_bounds(100.0, 20.0, 40.0, 100.0);
@@ -2658,18 +2669,60 @@ mod tests {
             }
             page.update(id, json!({"source": {"content": words}}))?;
             run_on(&mut page, id, text)?;
-            // Each half keeps the detection record it was copied with, yet
-            // counts as drawn by hand, and nothing else about it does.
+            // Each half keeps the detection record it was copied with and is
+            // marked as split, which Detect again keeps, and nothing about
+            // it counts as changed by hand.
             let layer = page.session.project().layer(id)?.clone();
             assert!(booharu_core::styles::recorded(&layer, "detection"));
-            assert!(Auto::of(&layer).drawn);
-            let edited = booharu_core::edited(&layer);
+            assert!(Auto::of(&layer).split);
             assert_eq!(
-                (edited.source, edited.text, edited.style, edited.drawn),
-                (false, false, false, true)
+                booharu_core::edited(&layer),
+                booharu_core::Edited::default()
             );
             assert!(keeps(&page, id)?);
         }
+
+        // A box drawn with the O tool, translated by the stage, is drawn by
+        // hand, which Apply keeps; the halves, whose run wrote their look,
+        // take the new font, as a split changes neither wording nor look.
+        let drawn = page.add_box(page_bounds(250.0, 20.0, 40.0, 100.0), OcrBoxMode::Read)?;
+        stage_translates(&mut page, drawn, "Hey")?;
+        assert!(booharu_core::edited(page.session.project().layer(drawn)?).drawn);
+        let project = page.session.project();
+        let mut named = halves.clone();
+        named.push(drawn);
+        let scope = crate::styles::StyleScope::Blocks { blocks: named };
+        let font = Some("CCWildWords");
+        let counted = crate::styles::count(&project, &scope, false, None, &settings, font)?;
+        let (restyled, applied) = crate::styles::apply(
+            &project,
+            &scope,
+            false,
+            None,
+            &settings,
+            font,
+            booharu_core::attrs::Origin::Automatic,
+        )?;
+        assert_eq!(counted, applied);
+        assert_eq!(
+            (
+                applied.changed,
+                applied.kept_hand_edited,
+                applied.untranslated
+            ),
+            (2, 1, 0)
+        );
+        page.session.apply(restyled.context("Apply's edit")?)?;
+        let family = |id: LayerId| -> Result<Option<String>> {
+            Ok(page
+                .block(id)?
+                .translation
+                .and_then(|translation| translation.style.chars.family))
+        };
+        for &half in &halves {
+            assert_eq!(family(half)?.as_deref(), Some("CCWildWords"));
+        }
+        assert_ne!(family(drawn)?.as_deref(), Some("CCWildWords"));
         Ok(())
     }
 
