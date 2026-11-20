@@ -18,6 +18,7 @@ use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned, de::Erro
 use serde_json::{Map, Value, map::Entry};
 
 use crate::{
+    emphasis::EmphasisSettings,
     lettering::{CategoryFont, LetteringCategory},
     runs::{RunPolicy, RunsSettings},
 };
@@ -210,7 +211,7 @@ impl Default for DefaultTextStyle {
 }
 
 /// A colour of four channels, each from 0 to 1, as the scene holds one.
-fn colour<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Rgba>, D::Error> {
+pub(crate) fn colour<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Rgba>, D::Error> {
     let colour = Option::<Rgba>::deserialize(deserializer)?;
     if let Some(Rgba(channels)) = colour
         && !channels.iter().all(|channel| (0.0..=1.0).contains(channel))
@@ -497,6 +498,14 @@ pub struct Snapshot {
     /// hand. False as [`read`](Self::read) leaves it; only Booharu's own
     /// Rust callers set it, as `redo`.
     pub subtitle_run: bool,
+    /// `[booharu-emphasis]`, for a run that translates: how a stressed word
+    /// looks, and whether the words its model picks are marked. None, as
+    /// [`read`](Self::read) leaves it, marks no word, though a translation
+    /// still takes off the marks a run left on the one it replaces.
+    pub emphasis: Option<EmphasisSettings>,
+    /// Whether this run's translation asks its model which words to stress.
+    /// False as [`read`](Self::read) leaves it.
+    pub asks_emphasis: bool,
 }
 
 impl Snapshot {
@@ -523,6 +532,8 @@ impl Snapshot {
             runs: None,
             redo: false,
             subtitle_run: false,
+            emphasis: None,
+            asks_emphasis: false,
         })
     }
 }
@@ -547,6 +558,8 @@ pub struct BooharuPreferences {
     pub qc: QcSettings,
     #[serde(rename = "booharu-start")]
     pub start: StartSettings,
+    #[serde(rename = "booharu-emphasis")]
+    pub emphasis: EmphasisSettings,
 }
 
 impl BooharuPreferences {
@@ -562,6 +575,7 @@ impl BooharuPreferences {
             reading: koharu_config::get()?,
             qc: koharu_config::get()?,
             start: koharu_config::get()?,
+            emphasis: koharu_config::get()?,
         })
     }
 
@@ -581,6 +595,7 @@ impl BooharuPreferences {
             reading,
             qc,
             start,
+            emphasis,
         } = self;
         koharu_config::update(|section: &mut McpSettings| *section = mcp)?;
         koharu_config::update(|section: &mut OcrBoxSettings| *section = ocr_box)?;
@@ -590,6 +605,7 @@ impl BooharuPreferences {
         koharu_config::update(|section: &mut ReadingSettings| *section = reading)?;
         koharu_config::update(|section: &mut QcSettings| *section = qc)?;
         koharu_config::update(|section: &mut StartSettings| *section = start)?;
+        koharu_config::update(|section: &mut EmphasisSettings| *section = emphasis)?;
         Self::get()
     }
 
@@ -649,7 +665,7 @@ type Saver = fn(Map<String, Value>) -> anyhow::Result<()>;
 /// How the section named `name` is saved alone; none for a name Booharu has
 /// no section of.
 fn saver(name: &str) -> Option<Saver> {
-    let savers: [(&str, Saver); 8] = [
+    let savers: [(&str, Saver); 9] = [
         (McpSettings::NAME, saved::<McpSettings>),
         (OcrBoxSettings::NAME, saved::<OcrBoxSettings>),
         (LetteringSettings::NAME, saved::<LetteringSettings>),
@@ -658,6 +674,7 @@ fn saver(name: &str) -> Option<Saver> {
         (ReadingSettings::NAME, saved::<ReadingSettings>),
         (QcSettings::NAME, saved::<QcSettings>),
         (StartSettings::NAME, saved::<StartSettings>),
+        (EmphasisSettings::NAME, saved::<EmphasisSettings>),
     ];
     savers
         .into_iter()
@@ -812,6 +829,7 @@ mod tests {
         assert_eq!(
             names,
             [
+                EmphasisSettings::NAME,
                 FontSettings::NAME,
                 LetteringSettings::NAME,
                 McpSettings::NAME,
@@ -1247,6 +1265,8 @@ mod tests {
                 runs: None,
                 redo: false,
                 subtitle_run: false,
+                emphasis: None,
+                asks_emphasis: false,
             })
         );
         // A bad stored value is an error, never Koharu's look or no font.
@@ -1269,11 +1289,95 @@ mod tests {
         );
         // Koharu's own, for what read nothing: no font, the colours Koharu
         // gives kept, and no run policy. Nor a redo or a subtitle run, which
-        // no read sets.
+        // no read sets, nor emphasis, which only a run's snapshot sets.
         let default = Snapshot::default();
         assert!(default.lettering.detect_colors && default.font.is_none());
         assert_eq!(default.runs, None);
         assert!(!default.redo && !default.subtitle_run);
+        assert!(default.emphasis.is_none() && !default.asks_emphasis);
+    }
+
+    #[test]
+    fn the_preferences_commands_carry_the_emphasis_both_ways() {
+        let mut preferences = BooharuPreferences::default();
+        assert_eq!(preferences.emphasis, EmphasisSettings::default());
+        preferences.emphasis.ai = false;
+        preferences.emphasis.categories.insert(
+            LetteringCategory::Shout,
+            crate::emphasis::EmphasisStyle {
+                outer_stroke: Some(Rgba([1.0, 1.0, 1.0, 1.0])),
+                outer_stroke_width: Some(4.0),
+                ..crate::emphasis::EmphasisStyle::default()
+            },
+        );
+        // As `booharu_get_preferences` answers them and
+        // `booharu_save_preferences` takes them, and as `save` checks them.
+        let sent = serde_json::to_value(&preferences).expect("JSON");
+        assert_eq!(sent["booharu-emphasis"]["ai"], json!(false));
+        assert_eq!(
+            sent["booharu-emphasis"]["default"],
+            json!({
+                "family": null, "weight": 700, "italic": null, "size_factor": 1.15,
+                "fill": null, "stroke": null, "stroke_width": null,
+                "outer_stroke": null, "outer_stroke_width": null,
+            })
+        );
+        let taken: BooharuPreferences = serde_json::from_value(sent).expect("taken back");
+        assert_eq!(taken, preferences);
+        taken.check().expect("a value the file takes");
+        let text = toml::to_string(&preferences).expect("tables");
+        assert_eq!(
+            toml::from_str::<BooharuPreferences>(&text).ok(),
+            Some(preferences.clone())
+        );
+
+        // The section changes by its name, a table only in the keys it
+        // names, a null value clearing it, and a null entry removing it.
+        preferences
+            .set_section(
+                EmphasisSettings::NAME,
+                values(json!({
+                    "default": {"size_factor": null, "italic": true},
+                    "categories": {"whisper": {"weight": 300}},
+                })),
+            )
+            .expect("an italic default and a whisper's weight");
+        let emphasis = &preferences.emphasis;
+        assert_eq!(
+            (emphasis.default.weight, emphasis.default.italic),
+            (Some(700), Some(true))
+        );
+        assert_eq!(emphasis.default.size_factor, None);
+        assert_eq!(
+            emphasis.categories[&LetteringCategory::Whisper].weight,
+            Some(300)
+        );
+        assert!(emphasis.categories.contains_key(&LetteringCategory::Shout));
+        preferences
+            .set_section(
+                EmphasisSettings::NAME,
+                values(json!({"categories": {"shout": null}})),
+            )
+            .expect("no shout entry");
+        assert!(
+            !preferences
+                .emphasis
+                .categories
+                .contains_key(&LetteringCategory::Shout)
+        );
+        // A bad value, or a default setting nothing, changes nothing.
+        let before = preferences.clone();
+        for refused in [
+            json!({"default": {"weight": 0}}),
+            json!({"default": {"weight": null, "italic": null}}),
+            json!({"categories": {"tone": {"weight": 900}}}),
+            json!({"categories": {"whisper": {"weight": null}}}),
+            json!({"oblique": true}),
+        ] {
+            let error = preferences.set_section(EmphasisSettings::NAME, values(refused.clone()));
+            assert!(error.is_err(), "took {refused}");
+            assert_eq!(preferences, before, "{refused}");
+        }
     }
 
     #[test]

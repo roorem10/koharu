@@ -2,7 +2,8 @@
 //! the Booharu home's `config.toml` (`settings`), its data on scene layers
 //! (`attrs`), the default look of new text and the hand-edit record
 //! (`styles`), the lettering categories and the font each letters its text
-//! in (`lettering`), the shapes of balloons (`shape`), the run policy and
+//! in (`lettering`), how a stressed word looks and which words a run
+//! stresses (`emphasis`), the shapes of balloons (`shape`), the run policy and
 //! the Run menu's presets (`runs`), what Koharu's stages did to a page's
 //! blocks (`status`), which sound effects stay as art and their subtitles
 //! (`sfx`), what a run's stages and Detect again leave alone (`protect`),
@@ -18,6 +19,7 @@
 
 pub mod attrs;
 pub mod context;
+pub mod emphasis;
 pub mod lettering;
 pub mod protect;
 pub mod qc;
