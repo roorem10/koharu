@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { CharStyle } from '@koharu/ipc/protocol'
-
 import { sharedChars, swappedColors } from '@/components/editor/TypeBar'
+import type { CharStyle } from '@koharu/ipc/protocol'
 
 describe('Booharu swap of text and border colours', () => {
   it('swaps a visible border with the text colour', () => {
@@ -42,5 +41,72 @@ describe('Booharu second border', () => {
       { content: [{ insert: 'quiet' }] },
     ])
     expect(one.bordered).toBe(false)
+  })
+})
+
+describe('Booharu paint the characters share (S12-c)', () => {
+  const gradient: CharStyle['fill_gradient'] = {
+    kind: 'linear',
+    angle: 90,
+    stops: [
+      { offset: 0, color: [1, 0, 0, 1] },
+      { offset: 1, color: [0, 0, 1, 1] },
+    ],
+  }
+
+  it('shares the gradient of a gradient box, and its letter spacing', () => {
+    const shared = sharedChars([
+      {
+        content: [{ insert: 'Boom' }],
+        style: { chars: { fill: [0, 0, 0, 1], fill_gradient: gradient, tracking: 50 } },
+      },
+    ])
+    expect(shared).toMatchObject({
+      chars: { fill: [0, 0, 0, 1], fill_gradient: gradient, tracking: 50 },
+      mixed: [],
+    })
+  })
+
+  it('reads a word given a colour in a gradient box as showing that colour alone', () => {
+    const shared = sharedChars([
+      {
+        content: [{ insert: 'Boom ' }, { insert: 'bang', attributes: { fill: [1, 0, 0, 1] } }],
+        style: { chars: { fill: [0, 0, 0, 1], fill_gradient: gradient } },
+      },
+    ])
+    expect(shared.mixed).toEqual(['fill', 'fill_gradient'])
+    expect(shared.chars).toEqual({})
+
+    const word = sharedChars([
+      {
+        content: [{ insert: 'bang', attributes: { fill: [1, 0, 0, 1] } }],
+        style: { chars: { fill_gradient: gradient } },
+      },
+    ])
+    expect(word).toMatchObject({ chars: { fill: [1, 0, 0, 1] }, mixed: [] })
+    expect('fill_gradient' in word.chars).toBe(false)
+  })
+
+  it('tells the gradients and the letter spacings that differ', () => {
+    const shared = sharedChars([
+      { content: [{ insert: 'Boom' }], style: { chars: { fill_gradient: gradient } } },
+      {
+        content: [{ insert: 'Bang', attributes: { tracking: 200 } }],
+        style: { chars: { fill_gradient: { ...gradient!, angle: 0 } } },
+      },
+    ])
+    expect(shared.mixed).toEqual(['fill_gradient', 'tracking'])
+    // A colour differing under a gradient is no mixed paint.
+    const fills = sharedChars([
+      {
+        content: [
+          { insert: 'Boom ' },
+          { insert: 'bang', attributes: { fill: [1, 0, 0, 1], fill_gradient: gradient } },
+        ],
+        style: { chars: { fill_gradient: gradient } },
+      },
+    ])
+    expect(fills.mixed).toEqual(['fill'])
+    expect(fills.chars.fill_gradient).toEqual(gradient)
   })
 })

@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { borderCompanion, paragraphShare, setEach } from '@/lib/booharu/mixed'
 import { setStyle } from '@/lib/scene'
 import { hexToRgba } from '@/lib/store'
-import { commands, type Edit, type Layer, type Text } from '@koharu/ipc/protocol'
+import {
+  commands,
+  type CharStyle,
+  type Edit,
+  type Gradient,
+  type Layer,
+  type Text,
+} from '@koharu/ipc/protocol'
 
 import { block } from './boxes'
 
@@ -210,5 +217,68 @@ describe('Booharu border value going with the one set (S11-h)', () => {
     expect(borderCompanion(block('untranslated', 'やあ'), 'stroke_width')).toEqual({
       stroke_width: 1.5,
     })
+  })
+})
+
+describe('Booharu fill and gradient fill, one paint, in style edits (S12-c)', () => {
+  const gradient: Gradient = {
+    kind: 'linear',
+    angle: 90,
+    stops: [
+      { offset: 0, color: [1, 0, 0, 1] },
+      { offset: 1, color: [0, 0, 1, 1] },
+    ],
+  }
+  const painted = text('painted', {
+    content: [
+      { insert: 'Hel', attributes: { fill: [1, 0, 0, 1], weight: 700 } },
+      { insert: 'lo', attributes: { fill_gradient: gradient } },
+    ],
+  })
+
+  it.each<[string, CharStyle]>([
+    ['a colour', { fill: [0, 1, 0, 1], fill_gradient: null }],
+    ['a colour alone', { fill: [0, 1, 0, 1] }],
+    ['a gradient', { fill_gradient: gradient }],
+    ['no gradient', { fill_gradient: null }],
+  ])(
+    'takes both paint keys off the marks for %s, in setStyle and setEach alike',
+    async (_, chars) => {
+      const style = await editsOf(() => setStyle([painted], { chars }))
+      const each = await editsOf(() => setEach([painted], () => ({ chars })))
+
+      expect(each).toEqual(style)
+      expect(style).toEqual([
+        {
+          label: 'set_style',
+          ops: [
+            { op: 'update_layer', layer: 'painted', patch: { style: { chars } } },
+            {
+              op: 'set_rich_text',
+              layer: 'painted',
+              spans: [
+                { insert: 'Hel', attributes: { weight: 700 } },
+                { insert: 'lo', attributes: {} },
+              ],
+            },
+          ],
+        },
+      ])
+    },
+  )
+
+  it('leaves the paint marks for an edit setting neither', async () => {
+    const patch = { chars: { tracking: 100, size: 30 } }
+
+    const style = await editsOf(() => setStyle([painted], patch))
+    const each = await editsOf(() => setEach([painted], () => patch))
+
+    expect(each).toEqual(style)
+    expect(style).toEqual([
+      {
+        label: 'set_style',
+        ops: [{ op: 'update_layer', layer: 'painted', patch: { style: patch } }],
+      },
+    ])
   })
 })

@@ -1,5 +1,6 @@
 'use client'
 
+import { paintUnit } from '@/lib/booharu/paint' // Booharu: a fill and a gradient fill, one paint.
 import {
   commands,
   type Change,
@@ -91,7 +92,8 @@ export function setSourceText(layer: LayerId, text: string): Promise<Change> {
  * block's translation's, which is what it draws. A character value it sets is every character's,
  * as Photoshop styles a selected type layer, so the characters marked with their own drop it. */
 export function setStyle(layers: Layer[], style: TextStyle): Promise<Change> {
-  const keys = Object.keys(style.chars ?? {}) as (keyof CharStyle)[]
+  // Booharu: either paint key takes both off the marks, as they're one paint (S12-c).
+  const keys = paintUnit(Object.keys(style.chars ?? {}) as (keyof CharStyle)[])
   return edit(
     'set_style',
     layers

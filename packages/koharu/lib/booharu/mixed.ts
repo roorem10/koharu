@@ -1,5 +1,6 @@
 'use client'
 
+import { paintUnit } from '@/lib/booharu/paint'
 import { isBlockLayer, isTextLayer, letteringOf } from '@/lib/document'
 import { hexToRgba } from '@/lib/store'
 import {
@@ -68,8 +69,9 @@ export function paragraphShare(targets: Layer[]): ParagraphShare {
 /** Styles each of `targets` with its own patch, from `patchFor`, or leaves it be where that gives
  * none, in one edit labelled as the type bar's other style edits, so one undo step. A target's ops
  * are those `setStyle` (lib/scene.ts) writes for it: its lettering's style merged with the patch,
- * and, for a character key the patch sets, its characters' own marks of that key taken off. A
- * selection whose values differ thus keeps each text's own of every value not edited. */
+ * and, for a character key the patch sets, its characters' own marks of that key taken off, both
+ * paint keys for either. A selection whose values differ thus keeps each text's own of every value
+ * not edited. */
 export function setEach(
   targets: Layer[],
   patchFor: (layer: Layer) => TextStyle | null,
@@ -110,9 +112,10 @@ export function borderCompanion(layer: Layer, key: BorderKey): CharStyle {
   return has ? {} : { [key]: BORDER_DEFAULTS[key] }
 }
 
-/** The ops `setStyle` writes to style `layer` with `style`. */
+/** The ops `setStyle` writes to style `layer` with `style`: either paint key takes both off the
+ * marks, a fill and a gradient fill being one paint (S12-c). */
 function styleOps(layer: Layer, style: TextStyle): Op[] {
-  const keys = Object.keys(style.chars ?? {}) as (keyof CharStyle)[]
+  const keys = paintUnit(Object.keys(style.chars ?? {}) as (keyof CharStyle)[])
   const patch: Value = isBlockLayer(layer) ? { translation: { style } } : { style }
   const restyle: Op = { op: 'update_layer', layer: layer.id, patch }
   const spans = letteringOf(layer)?.content ?? []

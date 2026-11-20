@@ -28,6 +28,7 @@ import { call, dispatch } from '@/lib/backend'
 import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: favourites and local names.
 // Booharu: the values the selected texts don't share (S11-h).
 import { borderCompanion, paragraphShare, setEach, type BorderKey } from '@/lib/booharu/mixed'
+import { charsOr, sharedPaint } from '@/lib/booharu/paint' // Booharu: a fill and a gradient, one paint.
 import {
   chosenText,
   isItalic,
@@ -236,6 +237,8 @@ export function TypeBar() {
     weight,
   )
   const size = mixed.has('size') ? null : Math.round((chars.size ?? 24) * 100) / 100
+  // Booharu: the colour, or the gradient, every character shows, none while they differ (S12-c).
+  const paint = sharedPaint(chars, mixed)
   const strokeWidth = chars.stroke_width ?? 0
   const stroke = chars.stroke ?? null
   const strokeEnabled = stroke !== null && stroke[3] > 0 && strokeWidth > 0
@@ -367,8 +370,10 @@ export function TypeBar() {
       <ColorWell
         label={t('inspector.textColor')}
         size='sm'
-        value={mixed.has('fill') ? '' : chars.fill ? rgbaToHex(chars.fill) : BLACK}
-        onChange={(color) => color && applyChars({ fill: hexToRgba(color) })}
+        // Booharu: empty too while a gradient shows, and a colour picked takes the gradient off,
+        // a fill and a gradient fill being one paint (S12-c).
+        value={paint && 'color' in paint ? rgbaToHex(paint.color) : ''}
+        onChange={(color) => color && applyChars({ fill: hexToRgba(color), fill_gradient: null })}
       />
       <div
         role='group'
@@ -561,7 +566,13 @@ export function TypeBar() {
                   <button
                     type='button'
                     aria-label={t('booharu.borders.swapFillOutline')}
-                    disabled={mixed.has('fill') || mixed.has('stroke') || mixed.has('stroke_width')}
+                    // Not while a gradient shows, or the paints differ, the fill being the paint
+                    // (S12-c).
+                    disabled={
+                      !(paint && 'color' in paint) ||
+                      mixed.has('stroke') ||
+                      mixed.has('stroke_width')
+                    }
                     className='grid size-6 shrink-0 place-items-center rounded-md border border-input bg-background text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50'
                     onClick={() => applyChars(swappedColors(chars))}
                   />
@@ -718,7 +729,8 @@ function placeholderFamily(name: string): FontFamily {
   }
 }
 
-const CHAR_KEYS: CharKey[] = [
+// Booharu: with the gradient fill and letter spacing, which the canvas's CharKey has yet to name.
+const CHAR_KEYS: (CharKey | 'fill_gradient' | 'tracking')[] = [
   'family',
   'weight',
   'italic',
@@ -729,6 +741,9 @@ const CHAR_KEYS: CharKey[] = [
   // Booharu: the second border's keys.
   'outer_stroke',
   'outer_stroke_width',
+  // Booharu: the gradient fill and letter spacing (S12-c).
+  'fill_gradient',
+  'tracking',
 ]
 
 // Booharu: exported for its test, and it says whether every character has a border.
@@ -737,18 +752,15 @@ const CHAR_KEYS: CharKey[] = [
  * second border, whether every character has a border of its own. */
 export function sharedChars(texts: Text[]): {
   chars: CharStyle
-  mixed: CharKey[]
+  mixed: (CharKey | 'fill_gradient' | 'tracking')[] // Booharu: CHAR_KEYS's (S12-c).
   bordered: boolean
 } {
   const styles: CharStyle[] = texts.flatMap((text) => {
     const base = text.style?.chars ?? {}
     const spans = text.content?.length ? text.content : [{ insert: '' }]
-    return spans.map((span) => ({
-      ...base,
-      ...Object.fromEntries(
-        Object.entries(span.attributes ?? {}).filter(([, value]) => value != null),
-      ),
-    }))
+    // Booharu: merged as koharu-scene's CharStyle::or merges them, a fill and a gradient fill
+    // being one paint (S12-c).
+    return spans.map((span) => charsOr(span.attributes ?? {}, base))
   })
   const [first, ...rest] = styles
   if (!first) return { chars: {}, mixed: [], bordered: false }

@@ -7,7 +7,6 @@ import { letteringOf, plainText } from '@/lib/document'
 import i18n from '@/lib/i18n'
 import {
   commands,
-  type CharKey,
   type CharStyle,
   type Layer,
   type LayerId,
@@ -31,11 +30,12 @@ export const BOLD_WEIGHT = 700
 export const REGULAR_WEIGHT = 400
 
 /** The keys whose values characters don't share, as the type bar holds them or the canvas tells
- * them. */
-export type MixedKeys = ReadonlySet<CharKey> | readonly CharKey[]
+ * them: any character key, as the type bar's hold the gradient fill and letter spacing too, which
+ * the canvas's CharKey has yet to name (S12-c). */
+export type MixedKeys = ReadonlySet<keyof CharStyle> | readonly (keyof CharStyle)[]
 
 /** Whether the characters don't share `key`'s value. */
-export function isMixed(mixed: MixedKeys, key: CharKey): boolean {
+export function isMixed(mixed: MixedKeys, key: keyof CharStyle): boolean {
   return 'has' in mixed ? mixed.has(key) : mixed.includes(key)
 }
 
