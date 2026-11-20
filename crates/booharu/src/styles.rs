@@ -20,8 +20,9 @@
 //!
 //! Each block Apply changes gets its hand-edit record in the same edit: the
 //! keys Apply wrote take their new values and the others keep theirs, so a
-//! hand edit Apply left stays one, and the record's origin says who applied
-//! the look.
+//! hand edit Apply left stays one, the record's origin says who applied the
+//! look, and the words a run marked for emphasis lose in the record the
+//! keys Apply took off them, a mark left setting nothing going.
 //!
 //! Reset to lettering default ([`reset_lettering`]) gives chosen boxes and
 //! text layers their lettering default back, worked out from the scene
@@ -35,7 +36,7 @@ use std::collections::BTreeSet;
 
 use anyhow::{Result, ensure};
 use booharu_core::{
-    attrs::{self, Auto, AutoStyle, Origin},
+    attrs::{self, Auto, AutoMark, AutoStyle, Origin},
     edited,
     lettering::{self, LetteringCategory},
     resolver,
@@ -139,11 +140,14 @@ pub fn apply(
                 spans,
             });
         }
-        let record = Auto {
+        let mut record = Auto {
             origin,
             ..Auto::of(restyled.layer)
         }
         .restyled(&restyled.after, &written);
+        // The words lost their marks for the keys Apply wrote, so the run's
+        // record of them does too.
+        record.marks = without_keys(record.marks, &restyled.cleared)?;
         ops.push(attrs::set(id, &record)?);
     }
     let edit = (!ops.is_empty()).then(|| Edit {
@@ -180,8 +184,8 @@ pub struct ResetCounts {
 /// text's [`resolver::LOOK`] keys and border method, every one written, null
 /// where the default sets none; its words as one unmarked span when a span
 /// has marks; and for a block its hand-edit record, automatic, with the new
-/// look as its style and its other fields as they were, so a translation
-/// typed by hand stays one. Never the words, the language, the size, the
+/// look as its style, no word marks, and its other fields as they were, so a
+/// translation typed by hand stays one. Never the words, the language, the size, the
 /// frame, the transform, the direction, the alignment, the line height, the
 /// clean-up, the source, the role, or any other attribute. A locked block
 /// or text layer, or one inside a locked layer, is counted and left, and an
@@ -250,6 +254,7 @@ pub fn reset_lettering(
             let record = Auto {
                 origin: Origin::Automatic,
                 style: Some(AutoStyle::of(&look.chars)),
+                marks: Vec::new(),
                 ..Auto::of(layer)
             };
             if attrs::get::<Auto>(layer).as_ref() != Some(&record) {
@@ -280,6 +285,8 @@ struct Restyled<'p> {
     after: CharStyle,
     /// Its spans without their marks for the patch's keys, when one had one.
     spans: Option<Vec<Span>>,
+    /// The keys whose marks it takes off.
+    cleared: Vec<String>,
 }
 
 fn planned<'p>(
@@ -315,7 +322,8 @@ fn planned<'p>(
         let patch = styles::restyle(settings, font, sfx, category, current);
         let after = styles::patched(current, &patch)?;
         let marked = |key: &String| category.is_none() || !FONT.contains(&key.as_str());
-        let spans = unmarked(&translation.content, patch.keys().filter(|key| marked(key)))?;
+        let cleared: Vec<String> = patch.keys().filter(|key| marked(key)).cloned().collect();
+        let spans = unmarked(&translation.content, &cleared)?;
         if after == *current && spans.is_none() {
             continue;
         }
@@ -325,6 +333,7 @@ fn planned<'p>(
             patch,
             after,
             spans,
+            cleared,
         });
     }
     Ok(plan)
@@ -377,6 +386,20 @@ pub(crate) fn locked(project: &Project, layer: &Layer) -> Result<bool> {
 /// The keys a category's font writes, whose marks it leaves.
 const FONT: [&str; 3] = ["family", "weight", "italic"];
 
+/// `marks`, a hand-edit record's, without their values for `keys`, which
+/// Apply took off the words, and without the marks left setting nothing.
+fn without_keys(marks: Vec<AutoMark>, keys: &[String]) -> Result<Vec<AutoMark>> {
+    let cleared: Map<String, Value> = keys.iter().map(|key| (key.clone(), Value::Null)).collect();
+    let mut kept = Vec::with_capacity(marks.len());
+    for mark in marks {
+        let style = styles::patched(&mark.style, &cleared)?;
+        if style != CharStyle::default() {
+            kept.push(AutoMark { style, ..mark });
+        }
+    }
+    Ok(kept)
+}
+
 /// `content`'s spans without their marks for `keys`, so the values Apply
 /// writes for them show on every character; none when no span has one.
 fn unmarked<'k>(
@@ -405,7 +428,11 @@ mod tests {
     use std::collections::BTreeMap;
 
     use anyhow::Context as _;
-    use booharu_core::{Edited, settings::DefaultTextStyle};
+    use booharu_core::{
+        Edited,
+        emphasis::{EmphasisSettings, EmphasisStyle, Marking},
+        settings::DefaultTextStyle,
+    };
     use koharu_scene::{Created, LanguageIdentifier, Rgba, Session, Text};
     use tempfile::TempDir;
 
@@ -552,6 +579,7 @@ mod tests {
                     &placed,
                     settings,
                     Some(OLD),
+                    &booharu_core::emphasis::Marking::default(),
                 )?);
                 ops.push(Op::UpdateLayer {
                     layer: block.into(),
@@ -564,6 +592,49 @@ mod tests {
                     value: Some(json!({"action": "c2pa.translated"})),
                 });
             }
+            self.edit(ops)
+        }
+
+        /// Translates `name` as [`Fixture::translate`] does, as `text`, its
+        /// model picking `words` to stress as `emphasis` says.
+        fn emphasize(
+            &mut self,
+            name: &str,
+            text: &str,
+            words: &[&str],
+            emphasis: &EmphasisSettings,
+        ) -> Result<()> {
+            let project = self.session.project();
+            let english: LanguageIdentifier = "en".parse()?;
+            let block = self.id(name);
+            let placed = koharu_pipeline::placement(&project, block, &english)?;
+            let words: Vec<String> = words.iter().map(|&word| word.to_owned()).collect();
+            let marking = Marking {
+                settings: Some(emphasis),
+                words: &words,
+            };
+            let mut ops = vec![
+                Op::SetText {
+                    layer: block.into(),
+                    text: text.to_owned(),
+                },
+                placed.clone(),
+            ];
+            ops.extend(styles::translated(
+                &project,
+                block,
+                text,
+                &placed,
+                &look(true, None),
+                Some(OLD),
+                &marking,
+            )?);
+            ops.push(Op::SetAttribute {
+                layer: block.into(),
+                namespace: "c2pa".to_owned(),
+                key: "translation".to_owned(),
+                value: Some(json!({"action": "c2pa.translated"})),
+            });
             self.edit(ops)
         }
 
@@ -1252,6 +1323,102 @@ mod tests {
                 .all(|span| span.attributes == CharStyle::default())
         );
         assert_eq!(attrs::get::<Auto>(&t), None);
+        Ok(())
+    }
+
+    fn span(insert: &str, attributes: CharStyle) -> Span {
+        Span {
+            insert: insert.to_owned(),
+            attributes,
+        }
+    }
+
+    #[test]
+    fn apply_takes_the_keys_it_clears_off_the_runs_marks() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let red = EmphasisSettings {
+            default: EmphasisStyle {
+                fill: Some(RED),
+                ..EmphasisSettings::default().default
+            },
+            ..EmphasisSettings::default()
+        };
+        fixture.emphasize("a", "Why NO?", &["NO"], &red)?;
+        let marks = |fixture: &Fixture| -> Result<Vec<AutoMark>> {
+            Ok(Auto::of(&fixture.layer("a")?).marks)
+        };
+        let run = marks(&fixture)?;
+        assert_eq!(run.len(), 1);
+        assert_eq!(
+            (run[0].style.weight, run[0].style.fill),
+            (Some(700), Some(RED))
+        );
+        // The run's marks are no hand edit, so Apply takes the block.
+        assert!(!edited(&fixture.layer("a")?).hand_edited());
+        let a = StyleScope::Blocks {
+            blocks: vec![fixture.id("a")],
+        };
+
+        // With detection on, the font alone: the words keep their marks, and
+        // the record its.
+        let on = fixture.apply(&a, false, &look(true, None), Origin::Automatic)?;
+        assert_eq!(on, counts(1, 0, 0));
+        assert_eq!(marks(&fixture)?, run);
+
+        // Off, the default colour replaces the words' red, in the record
+        // too, so they're still the run's.
+        let off = fixture.apply(&a, false, &look(false, Some(YELLOW)), Origin::Automatic)?;
+        assert_eq!(off, counts(1, 0, 0));
+        let bold = CharStyle {
+            fill: None,
+            ..run[0].style.clone()
+        };
+        assert_eq!(
+            fixture.translation("a")?.content.0,
+            [
+                span("Why ", CharStyle::default()),
+                span("NO", bold.clone()),
+                span("?", CharStyle::default()),
+            ]
+        );
+        assert_eq!(
+            marks(&fixture)?,
+            [AutoMark {
+                style: bold,
+                ..run[0].clone()
+            }]
+        );
+        assert!(!edited(&fixture.layer("a")?).hand_edited());
+
+        // A mark left setting nothing goes.
+        let only_red = EmphasisSettings {
+            default: EmphasisStyle {
+                fill: Some(RED),
+                ..EmphasisStyle::default()
+            },
+            ..EmphasisSettings::default()
+        };
+        fixture.emphasize("b", "Why NO?", &["NO"], &only_red)?;
+        assert_eq!(Auto::of(&fixture.layer("b")?).marks.len(), 1);
+        let b = StyleScope::Blocks {
+            blocks: vec![fixture.id("b")],
+        };
+        fixture.apply(&b, false, &look(false, Some(YELLOW)), Origin::Automatic)?;
+        assert!(Auto::of(&fixture.layer("b")?).marks.is_empty());
+        assert_eq!(fixture.translation("b")?.content, RichText::from("Why NO?"));
+        Ok(())
+    }
+
+    #[test]
+    fn reset_drops_the_runs_marks_with_the_words_marks() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        fixture.emphasize("a", "Why NO?", &["NO"], &EmphasisSettings::default())?;
+        assert_eq!(Auto::of(&fixture.layer("a")?).marks.len(), 1);
+        let counts = fixture.reset(&["a"], &look(true, None))?;
+        assert_eq!(counts.changed, 1);
+        assert!(Auto::of(&fixture.layer("a")?).marks.is_empty());
+        assert_eq!(fixture.translation("a")?.content, RichText::from("Why NO?"));
+        assert!(!edited(&fixture.layer("a")?).hand_edited());
         Ok(())
     }
 }

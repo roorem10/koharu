@@ -2237,6 +2237,7 @@ mod tests {
             &placed,
             &booharu_core::settings::LetteringSettings::default(),
             None,
+            &booharu_core::emphasis::Marking::default(),
         )?);
         ops.push(Op::UpdateLayer {
             layer: block.into(),

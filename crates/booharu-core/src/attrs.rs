@@ -21,8 +21,8 @@
 //!   and a line given back's record, as they keep the clean-up as it was.
 
 use anyhow::ensure;
-use koharu_scene::{Layer, LayerId, Op, Ref, Rgba, Role};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use koharu_scene::{CharStyle, Layer, LayerId, Op, Ref, Rgba, RichText, Role};
+use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 
 use crate::lettering::LetteringCategory;
 
@@ -81,14 +81,16 @@ pub enum LetteringSource {
 
 /// `auto`: `{"origin"?: "agent", "source"?: hash, "text"?: hash, "style"?:
 /// {family, weight, italic, fill, stroke, stroke_width, outer_stroke,
-/// outer_stroke_width}, "kept"?: true, "split"?: true}`, on a block: the
-/// hand-edit record, what Booharu's automatic steps last wrote there, so
-/// `styles::edited` tells a hand edit, a part that now differs, from their
-/// own, whether Booharu hid its clean-up to keep the original art, and
-/// whether it's a half of a block split by hand, whose box a hand cut where
-/// Koharu's records say detection made it. Hand edits win. Each part is left out until a step writes it; later
-/// stages add their own, such as the marks and the category they applied,
-/// which is why it takes keys it doesn't know.
+/// outer_stroke_width}, "marks"?: [{start, end, style}], "kept"?: true,
+/// "split"?: true}`, on a block: the hand-edit record, what Booharu's
+/// automatic steps last wrote there, so `styles::edited` tells a hand edit,
+/// a part that now differs, from their own, the word marks a run's emphasis
+/// gave the translation, whether Booharu hid its clean-up to keep the
+/// original art, and whether it's a half of a block split by hand, whose box
+/// a hand cut where Koharu's records say detection made it. Hand edits win.
+/// Each part is left out until a step writes it; later stages add their
+/// own, such as the category they applied, which is why it takes keys it
+/// doesn't know.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct Auto {
     /// Who chose the style: Booharu's automatic steps, or the agent on
@@ -106,6 +108,20 @@ pub struct Auto {
     /// The style values an automatic step left on the translation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub style: Option<AutoStyle>,
+    /// The word marks the Translation stage gave the translation it wrote,
+    /// the words its model picked for emphasis, by their offsets into that
+    /// text, which [`Auto::trusted_marks`] reads only while the translation
+    /// is still that text. A list that doesn't read as marks reads as none,
+    /// so it never costs the rest of the record. A line given back, Reset to
+    /// lettering default and a split drop them; Apply takes off the keys it
+    /// clears from the words.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "marks"
+    )]
+    #[specta(type = Vec<AutoMark>)]
+    pub marks: Vec<AutoMark>,
     /// Whether Booharu hid the block's clean-up to keep the original art:
     /// a sound effect a run skips, or one given a subtitle (`sfx`). A
     /// translation, typed or written by a stage, a line given back, or a
@@ -136,8 +152,58 @@ impl Attr for Auto {
                         .all(|digit| matches!(digit, '0'..='9' | 'a'..='f'))
             })
         };
+        // Never the marks: marks that don't fit the text cost only
+        // themselves (`trusted_marks`), never the rest of the record.
         hashed(&self.source) && hashed(&self.text)
     }
+}
+
+impl Auto {
+    /// The marks, while they still describe `content`, the block's
+    /// translation: its text is the one the record's `text` hashes, and each
+    /// mark is a run of its characters, on character boundaries, in order
+    /// and apart from the others. None otherwise, as after the text changed
+    /// by hand, a join, or typing, so marks never land on other words.
+    pub fn trusted_marks(&self, content: &RichText) -> &[AutoMark] {
+        if self.marks.is_empty() {
+            return &[];
+        }
+        let text = content.text();
+        if self.text.as_deref() != Some(crate::styles::text_hash(&text).as_str()) {
+            return &[];
+        }
+        let mut end = 0;
+        for mark in &self.marks {
+            if mark.start < end
+                || mark.start >= mark.end
+                || !text.is_char_boundary(mark.start)
+                || !text.is_char_boundary(mark.end)
+            {
+                return &[];
+            }
+            end = mark.end;
+        }
+        &self.marks
+    }
+}
+
+/// A run of a translation's characters an automatic step marked, with the
+/// marks it gave them: `start` and `end`, end exclusive, are UTF-8 byte
+/// offsets into the translation as the step wrote it, the text the record's
+/// `text` hashes, and `style` holds exactly the values it set there.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(deny_unknown_fields)]
+pub struct AutoMark {
+    pub start: usize,
+    pub end: usize,
+    pub style: CharStyle,
+}
+
+/// [`Auto::marks`] as stored, or none for a value that doesn't read as
+/// marks, so a bad list never costs the rest of the record.
+fn marks<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<AutoMark>, D::Error> {
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value(value).unwrap_or_default())
 }
 
 /// Who chose an [`Auto`] record's style.
@@ -412,6 +478,14 @@ mod tests {
                 stroke_width: Some(1.5),
                 ..AutoStyle::default()
             }),
+            marks: vec![AutoMark {
+                start: 0,
+                end: 3,
+                style: CharStyle {
+                    weight: Some(700),
+                    ..CharStyle::default()
+                },
+            }],
             kept: true,
             split: true,
         };
@@ -626,5 +700,131 @@ mod tests {
         };
         session.apply(edit(vec![raw])).expect("a bad label");
         assert_eq!(get::<Lettering>(&layer(&session, id)), None);
+    }
+
+    /// A record of the translation `text` as a run wrote it, with `marks`.
+    fn marked(text: &str, marks: &[(usize, usize)]) -> Auto {
+        Auto {
+            text: Some(crate::styles::text_hash(text)),
+            marks: marks
+                .iter()
+                .map(|&(start, end)| AutoMark {
+                    start,
+                    end,
+                    style: CharStyle {
+                        weight: Some(700),
+                        ..CharStyle::default()
+                    },
+                })
+                .collect(),
+            ..Auto::default()
+        }
+    }
+
+    #[test]
+    fn the_marks_read_back_and_are_left_out_when_there_are_none() {
+        let (_dir, mut session, id) = project();
+        let record = marked("Why NO?", &[(4, 6)]);
+        assert_eq!(
+            json!(record)["marks"],
+            json!([{"start": 4, "end": 6, "style": {
+                "family": null, "weight": 700, "italic": null, "size": null,
+                "fill": null, "stroke": null, "stroke_width": null,
+            }}])
+        );
+        session
+            .apply(edit(vec![set(id, &record).expect("the record")]))
+            .expect("the record");
+        assert_eq!(get::<Auto>(&layer(&session, id)), Some(record.clone()));
+        // A record with no marks leaves the key out, and reads as none.
+        let unmarked = Auto {
+            marks: Vec::new(),
+            ..record
+        };
+        assert!(
+            json!(unmarked).get("marks").is_none(),
+            "{}",
+            json!(unmarked)
+        );
+        assert_eq!(
+            serde_json::from_value::<Auto>(json!(unmarked)).expect("a record"),
+            unmarked
+        );
+        // A mark holding a key Booharu doesn't know is no mark.
+        let unknown = json!({"marks": [{"start": 0, "end": 1, "style": {}, "by": "model"}]});
+        assert!(
+            serde_json::from_value::<Auto>(unknown)
+                .expect("a record")
+                .marks
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_bad_marks_list_costs_only_the_marks() {
+        let (_dir, mut session, id) = project();
+        let hash = crate::styles::text_hash("Why NO?");
+        for marks in [
+            json!("NO"),
+            json!([{"start": 4}]),
+            json!([{"start": -1, "end": 6, "style": {}}]),
+            json!([{"start": 4, "end": 6, "style": {"weight": "bold"}}]),
+            json!(null),
+        ] {
+            let raw = Op::SetAttribute {
+                layer: id.into(),
+                namespace: NAMESPACE.to_owned(),
+                key: Auto::KEY.to_owned(),
+                value: Some(json!({"text": hash, "kept": true, "marks": marks})),
+            };
+            session.apply(edit(vec![raw])).expect("the attribute");
+            assert_eq!(
+                get::<Auto>(&layer(&session, id)),
+                Some(Auto {
+                    text: Some(hash.clone()),
+                    kept: true,
+                    ..Auto::default()
+                }),
+                "{marks}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_marks_are_trusted_only_on_the_text_they_were_made_on() {
+        let text = "Why 魔王 NO?";
+        let content = RichText::from(text);
+        // 魔 and 王 are three bytes each, so "魔王" is 4..10 and "NO" 11..13.
+        let record = marked(text, &[(4, 10), (11, 13)]);
+        assert_eq!(record.trusted_marks(&content), record.marks.as_slice());
+        // Another text, a hand edit or a join, trusts none, nor does a
+        // record with no text.
+        assert!(
+            record
+                .trusted_marks(&RichText::from("Why 魔王 no?"))
+                .is_empty()
+        );
+        let untexted = Auto {
+            text: None,
+            ..record.clone()
+        };
+        assert!(untexted.trusted_marks(&content).is_empty());
+        // Marks out of order, overlapping, empty, past the text, or off a
+        // character boundary are none, all of them.
+        for marks in [
+            vec![(11, 13), (4, 10)],
+            vec![(4, 10), (9, 13)],
+            vec![(4, 4)],
+            vec![(6, 4)],
+            vec![(11, 15)],
+            vec![(5, 10)],
+            vec![(4, 10), (11, 13), (12, 13)],
+        ] {
+            let record = marked(text, &marks);
+            assert!(record.trusted_marks(&content).is_empty(), "{marks:?}");
+        }
+        // Neighbours may touch.
+        let touching = marked(text, &[(4, 7), (7, 10)]);
+        assert_eq!(touching.trusted_marks(&content).len(), 2);
     }
 }

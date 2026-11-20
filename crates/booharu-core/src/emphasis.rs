@@ -7,6 +7,11 @@
 //! - [`find_words`] finds the words a model picked in a translation, as
 //!   Booharu 0.0.4 found them, and [`restyled`] changes the marks of a range
 //!   of a text's characters, never panicking on a range it can't take.
+//! - A run's translation takes off the marks a run left on the one it
+//!   replaces ([`stripped`]), where they still hold, and marks the words its
+//!   model picked ([`marked`]), recording each in the block's hand-edit
+//!   record ([`AutoMark`]), so `styles::edited` never counts them as a hand
+//!   edit.
 
 use std::{collections::BTreeMap, ops::Range};
 
@@ -15,7 +20,10 @@ use koharu_config::Section;
 use koharu_scene::{CharStyle, Rgba, RichText, Span};
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 
-use crate::lettering::LetteringCategory;
+use crate::{
+    attrs::{Auto, AutoMark},
+    lettering::LetteringCategory,
+};
 
 /// `[booharu-emphasis]`: how a stressed word looks, the Emphasis button's
 /// and a run's alike, and whether a run's translation stresses the words its
@@ -285,6 +293,96 @@ pub fn unmarked(content: &RichText, range: Range<usize>) -> bool {
         start = end;
         !overlaps || span.attributes == CharStyle::default()
     })
+}
+
+/// What a run's translation marks for emphasis: how a stressed word looks,
+/// and the words its model picked. The default marks none, though the
+/// translation still takes off the marks a run left on the one it replaces.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Marking<'a> {
+    /// `[booharu-emphasis]`, as the run's snapshot holds it; none, or one
+    /// with `ai` off, marks no word.
+    pub settings: Option<&'a EmphasisSettings>,
+    /// The words the model picked, as [`find_words`] takes them.
+    pub words: &'a [String],
+}
+
+impl<'a> Marking<'a> {
+    /// The settings the words are marked with: none while no word was
+    /// picked, or the settings mark none.
+    pub fn active(&self) -> Option<&'a EmphasisSettings> {
+        self.settings
+            .filter(|settings| settings.ai && !self.words.is_empty())
+    }
+}
+
+/// `content`, a block's translation, without the values `record`'s trusted
+/// marks ([`Auto::trusted_marks`]) set, on the characters each covers and
+/// only where they still have them: what's left was marked, or changed, by
+/// hand.
+pub fn stripped(content: &RichText, record: &Auto) -> RichText {
+    let mut out = content.clone();
+    for mark in record.trusted_marks(content) {
+        let range = mark.start..mark.end;
+        if let Some(next) = restyled(&out, range, |marks| without(marks, &mark.style)) {
+            out = next;
+        }
+    }
+    out
+}
+
+/// `marks` without each value `set` holds too.
+fn without(marks: &CharStyle, set: &CharStyle) -> CharStyle {
+    fn kept<T: PartialEq + Clone>(value: &Option<T>, set: &Option<T>) -> Option<T> {
+        value.clone().filter(|_| value != set)
+    }
+    CharStyle {
+        family: kept(&marks.family, &set.family),
+        weight: kept(&marks.weight, &set.weight),
+        italic: kept(&marks.italic, &set.italic),
+        size: kept(&marks.size, &set.size),
+        fill: kept(&marks.fill, &set.fill),
+        stroke: kept(&marks.stroke, &set.stroke),
+        stroke_width: kept(&marks.stroke_width, &set.stroke_width),
+        outer_stroke: kept(&marks.outer_stroke, &set.outer_stroke),
+        outer_stroke_width: kept(&marks.outer_stroke_width, &set.outer_stroke_width),
+    }
+}
+
+/// A run's translation `text` over `content`, the block's translation
+/// before it, whose hand-edit record is `record`, and the marks to record:
+/// `content` without the run's own marks ([`stripped`]), carried over to
+/// `text` as Koharu carries a text's marks ([`RichText::replaced`]), then
+/// each of `words` [`find_words`] finds marked with `patch` where none of
+/// its characters has a mark yet, with one [`AutoMark`] holding exactly
+/// `patch` for each. With no words, or no patch, or one setting nothing, it
+/// only strips.
+pub fn marked(
+    content: &RichText,
+    record: &Auto,
+    text: &str,
+    words: &[String],
+    patch: Option<&CharStyle>,
+) -> (RichText, Vec<AutoMark>) {
+    let mut out = stripped(content, record).replaced(text);
+    let mut marks = Vec::new();
+    let Some(patch) = patch.filter(|patch| **patch != CharStyle::default()) else {
+        return (out, marks);
+    };
+    for range in find_words(text, words) {
+        if !unmarked(&out, range.clone()) {
+            continue;
+        }
+        if let Some(next) = restyled(&out, range.clone(), |marks| patch.or(marks)) {
+            out = next;
+            marks.push(AutoMark {
+                start: range.start,
+                end: range.end,
+                style: patch.clone(),
+            });
+        }
+    }
+    (out, marks)
 }
 
 /// `spans` with empty ones dropped and equal neighbours joined, as the scene
@@ -576,7 +674,8 @@ mod tests {
             [0..6, 9..15]
         );
         assert!(find_words("cafe\u{301}", &words(&["cafe"])).is_empty());
-        assert_eq!(find_words("say NO now", &words(&["NO now", "NO"])), [4..10]);
+        let found = find_words("say NO now", &words(&["NO now", "NO"]));
+        assert_eq!((found.len(), found.first()), (1, Some(&(4..10))));
         assert_eq!(
             find_words(
                 "NO! NO 魔王だ魔王",
@@ -622,9 +721,168 @@ mod tests {
         );
         assert!(unmarked(&restyled_text, 0..7));
         assert!(!unmarked(&restyled_text, 6..8));
-        for range in [4..5, 5..8, 0..20, 7..4] {
+        // Off a boundary, past the text, and backwards.
+        let backwards = Range { start: 7, end: 4 };
+        for range in [4..5, 5..8, 0..20, backwards] {
             assert_eq!(restyled(&content, range.clone(), unbold), None, "{range:?}");
         }
         assert_eq!(restyled(&content, 2..2, unbold), Some(content.clone()));
+    }
+
+    /// A span of `insert` with the marks `attributes`.
+    fn span(insert: &str, attributes: CharStyle) -> Span {
+        Span {
+            insert: insert.to_owned(),
+            attributes,
+        }
+    }
+
+    /// Marks of weight `weight` and size `size`.
+    fn heavy(weight: u16, size: Option<f64>) -> CharStyle {
+        CharStyle {
+            weight: Some(weight),
+            size,
+            ..CharStyle::default()
+        }
+    }
+
+    /// A record of the translation `text` as a run wrote it, with `marks`.
+    fn record(text: &str, marks: &[(usize, usize, CharStyle)]) -> Auto {
+        Auto {
+            text: Some(crate::styles::text_hash(text)),
+            marks: marks
+                .iter()
+                .map(|(start, end, style)| AutoMark {
+                    start: *start,
+                    end: *end,
+                    style: style.clone(),
+                })
+                .collect(),
+            ..Auto::default()
+        }
+    }
+
+    #[test]
+    fn a_runs_own_marks_come_off_only_where_they_still_hold() {
+        let run = heavy(700, Some(27.6));
+        // "NO" as the run marked it, "now" with its weight changed by hand,
+        // and "you" marked by hand.
+        let content = RichText(vec![
+            span("Say ", CharStyle::default()),
+            span("NO", run.clone()),
+            span(" ", CharStyle::default()),
+            span("now", heavy(900, Some(27.6))),
+            span(" to ", CharStyle::default()),
+            span("you", heavy(700, None)),
+        ]);
+        let text = content.text();
+        let record = record(&text, &[(4, 6, run.clone()), (7, 10, run.clone())]);
+        assert_eq!(
+            stripped(&content, &record),
+            RichText(vec![
+                span("Say NO ", CharStyle::default()),
+                span("now", heavy(900, None)),
+                span(" to ", CharStyle::default()),
+                span("you", heavy(700, None)),
+            ])
+        );
+        // Once the text changed, the marks aren't the run's any more.
+        let retyped = RichText(vec![
+            span("Say ", CharStyle::default()),
+            span("NO!", run.clone()),
+        ]);
+        assert_eq!(stripped(&retyped, &record), retyped);
+    }
+
+    #[test]
+    fn a_runs_translation_marks_the_free_words_it_finds() {
+        let bold = heavy(700, Some(27.6));
+        let picks = words(&["NO", "you", "missing", "now"]);
+        let at = |marks: &[AutoMark]| -> Vec<(usize, usize)> {
+            marks.iter().map(|mark| (mark.start, mark.end)).collect()
+        };
+        // New wording: the run's mark on the old one comes off, and each
+        // word picked is marked.
+        let old_text = "NO, I said NO";
+        let old = RichText(vec![
+            span("NO", bold.clone()),
+            span(", I said NO", CharStyle::default()),
+        ]);
+        let old_record = record(old_text, &[(0, 2, bold.clone())]);
+        let text = "Say NO to you now";
+        let (content, marks) = marked(&old, &old_record, text, &picks, Some(&bold));
+        assert_eq!(
+            content,
+            RichText(vec![
+                span("Say ", CharStyle::default()),
+                span("NO", bold.clone()),
+                span(" to ", CharStyle::default()),
+                span("you", bold.clone()),
+                span(" ", CharStyle::default()),
+                span("now", bold.clone()),
+            ])
+        );
+        assert_eq!(at(&marks), [(4, 6), (10, 13), (14, 17)]);
+        assert!(marks.iter().all(|mark| mark.style == bold));
+        let written = Auto {
+            marks,
+            ..record(text, &[])
+        };
+        assert_eq!(written.trusted_marks(&content), written.marks.as_slice());
+
+        // "you" restyled by hand: translated again, it keeps the hand mark,
+        // so its pick marks nothing there.
+        let mut edited = content.clone();
+        edited.0[3].attributes = heavy(900, None);
+        let (again, marks) = marked(&edited, &written, text, &picks, Some(&bold));
+        assert_eq!(
+            again,
+            RichText(vec![
+                span("Say ", CharStyle::default()),
+                span("NO", bold.clone()),
+                span(" to ", CharStyle::default()),
+                span("you", heavy(900, None)),
+                span(" ", CharStyle::default()),
+                span("now", bold.clone()),
+            ])
+        );
+        assert_eq!(at(&marks), [(4, 6), (14, 17)]);
+
+        // With no words, or no patch, or one setting nothing, it only
+        // strips.
+        for (picks, patch) in [
+            (Vec::new(), Some(&bold)),
+            (words(&["NO"]), None),
+            (words(&["NO"]), Some(&CharStyle::default())),
+        ] {
+            let (content, marks) = marked(&edited, &written, text, &picks, patch);
+            assert!(marks.is_empty());
+            assert_eq!(
+                content,
+                RichText(vec![
+                    span("Say NO to ", CharStyle::default()),
+                    span("you", heavy(900, None)),
+                    span(" now", CharStyle::default()),
+                ]),
+                "{picks:?} {patch:?}"
+            );
+        }
+        // A first translation, with nothing before it, and picks that
+        // aren't all there.
+        let (content, marks) = marked(
+            &RichText::default(),
+            &Auto::default(),
+            "魔王だ",
+            &words(&["魔王", "", "王だ"]),
+            Some(&bold),
+        );
+        assert_eq!(at(&marks), [(0, 6)]);
+        assert_eq!(
+            content,
+            RichText(vec![
+                span("魔王", bold.clone()),
+                span("だ", CharStyle::default())
+            ])
+        );
     }
 }

@@ -14,18 +14,20 @@
 //!   here writes a category font.
 //! - Each automatic write records itself in the block's [`Auto`], in the
 //!   same edit: the source wording the Recognition stage wrote, the
-//!   translation the Translation stage wrote, and the style values a step
-//!   left. [`edited`] compares a block with its record.
+//!   translation the Translation stage wrote, the words it marked for
+//!   emphasis, and the style values a step left. [`edited`] compares a block
+//!   with its record.
 
 use std::collections::BTreeSet;
 
 use anyhow::{Result, bail, ensure};
-use koharu_scene::{CharStyle, Content, Layer, LayerId, Op, Project, Rgba, Role};
+use koharu_scene::{CharStyle, Content, Layer, LayerId, Op, Project, Rgba, RichText, Role};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::{
     attrs::{self, Auto, AutoStyle, Origin},
+    emphasis::{self, Marking},
     lettering::{self, CategoryFont, LetteringCategory},
     settings::{DefaultTextStyle, LetteringSettings},
 };
@@ -216,12 +218,21 @@ pub fn patched(chars: &CharStyle, patch: &Map<String, Value>) -> Result<CharStyl
 /// both read before the edit, as placement reads the project: after
 /// placement's op in the same edit, the default look as a patch on the
 /// translation's style when it writes anything, its category's font while
-/// Pick fonts automatically is on, then the hand-edit record, written on
-/// every translation, styled or not, so a translation the run wrote never
-/// counts as typed by hand, while the style values one typed by hand had,
-/// and the run left, stay hand edits. The values the look writes, a
-/// category's family, weight, and italic among them, are recorded as
-/// automatic. The record drops the kept mark.
+/// Pick fonts automatically is on, then the translation's word marks when
+/// they aren't the ones the stage's text op leaves, then the hand-edit
+/// record, written on every translation, styled or not, so a translation
+/// the run wrote never counts as typed by hand, while the style values one
+/// typed by hand had, and the run left, stay hand edits. The values the
+/// look writes, a category's family, weight, and italic among them, are
+/// recorded as automatic. The record drops the kept mark.
+///
+/// The marks a run left on the translation this one replaces come off,
+/// where they still hold, whatever `marking` holds, and the words
+/// `marking` picked are marked with the emphasis of the block's category
+/// (`lettering::effective`, whether or not Pick fonts automatically is on)
+/// over the translation's character values once placed and given the look,
+/// where none of their characters has a mark yet ([`emphasis::marked`]);
+/// the record holds those marks ([`Auto::marks`]).
 pub fn translated(
     project: &Project,
     block: LayerId,
@@ -229,10 +240,37 @@ pub fn translated(
     placed: &Op,
     settings: &LetteringSettings,
     font: Option<&str>,
+    marking: &Marking<'_>,
 ) -> Result<Vec<Op>> {
     let layer = project.layer(block)?;
     let looked = looked(project, block, placed, settings, font)?;
     let mut record = Auto::of(layer);
+    let before = match &layer.content {
+        Content::Block(found) => found
+            .translation
+            .as_ref()
+            .map(|translation| translation.content.clone())
+            .unwrap_or_default(),
+        _ => RichText::default(),
+    };
+    let patch = match marking.active() {
+        Some(emphasis) => {
+            let page = project.parent(block)?.0;
+            let category =
+                lettering::effective(page, block, settings).map(|effective| effective.category);
+            let found = emphasis::find_words(text, marking.words).len();
+            let missed = marking.words.len().saturating_sub(found);
+            if missed > 0 {
+                tracing::debug!(%block, missed, "emphasis picks matching no word were left out");
+            }
+            Some(emphasis::patch(
+                &emphasis.style_for(category),
+                &looked.after,
+            ))
+        }
+        None => None,
+    };
+    let (content, marks) = emphasis::marked(&before, &record, text, marking.words, patch.as_ref());
     // A new translation's style owes nothing to one the block had before,
     // nor to whoever chose that one's. One no stage wrote was made by hand,
     // so with nothing recorded its values stay hand edits, but for those
@@ -244,10 +282,19 @@ pub fn translated(
         record.style = Some(AutoStyle::default());
     }
     record.text = Some(text_hash(text));
+    record.marks = marks;
     // A translation drops the kept mark: its clean-up shows under it.
     record.kept = false;
     let record = record.restyled(&looked.after, &looked.written);
     let mut ops = Vec::from_iter(looked.op);
+    // The stage's text op carries the marks over as they were, the run's
+    // own among them.
+    if content != before.replaced(text) {
+        ops.push(Op::SetRichText {
+            layer: layer.id.into(),
+            spans: content.0,
+        });
+    }
     ops.push(attrs::set(layer.id, &record)?);
     Ok(ops)
 }
@@ -277,14 +324,15 @@ pub fn typed(
 /// Translation stage was given its source back unchanged, so it wrote no
 /// translation, in the stage's edit: the record's translation is no text,
 /// so one typed there later counts as typed by hand, even as the wording
-/// the stage was given, and the record keeps no style or origin, which went
-/// with any translation the block had, nor the kept mark, as the stage's
-/// own keeping replaces Booharu's. Its source part is kept.
+/// the stage was given, and the record keeps no style, marks or origin,
+/// which went with any translation the block had, nor the kept mark, as the
+/// stage's own keeping replaces Booharu's. Its source part is kept.
 pub fn given_back(layer: &Layer) -> Result<Op> {
     let record = Auto {
         origin: Origin::Automatic,
         text: Some(text_hash("")),
         style: None,
+        marks: Vec::new(),
         kept: false,
         ..Auto::of(layer)
     };
@@ -460,8 +508,10 @@ pub struct Edited {
     /// wrote it, as one typed by hand.
     pub text: bool,
     /// A style value of its translation isn't the one recorded, a span of
-    /// it is marked with one, or the agent chose its style on purpose; with
-    /// nothing recorded, no stage wrote the translation.
+    /// it is marked with one, but for the marks a run's emphasis gave it and
+    /// that still hold ([`Auto::trusted_marks`]), or the agent chose its
+    /// style on purpose; with nothing recorded, no stage wrote the
+    /// translation.
     pub style: bool,
     /// It was drawn by hand: no detection made it, as the O tool's boxes.
     /// A split's halves keep the detection record they were copied with, so
@@ -505,8 +555,9 @@ pub fn edited(layer: &Layer) -> Edited {
                 Some(hash) => *hash != text_hash(&translation.content.text()),
                 None => !recorded("translation"),
             };
-            let marked = translation
-                .content
+            // A span's marks are a hand edit but for the values a run's
+            // emphasis set there and that still hold; size never counts.
+            let marked = emphasis::stripped(&translation.content, &record)
                 .0
                 .iter()
                 .any(|span| AutoStyle::of(&span.attributes) != AutoStyle::default());
@@ -878,7 +929,7 @@ mod tests {
     }
 
     /// Translates `block` as the Translation stage does, with its Booharu
-    /// hook, under `look` and `font`.
+    /// hook, under `look` and `font`, its model picking no word.
     fn translate(
         session: &mut Session,
         block: LayerId,
@@ -886,8 +937,23 @@ mod tests {
         look: &LetteringSettings,
         font: Option<&str>,
     ) {
+        translate_marking(session, block, text, look, font, &Marking::default());
+    }
+
+    /// Translates `block` as [`translate`] does, its model picking the words
+    /// `marking` holds; answers the hook's ops.
+    fn translate_marking(
+        session: &mut Session,
+        block: LayerId,
+        text: &str,
+        look: &LetteringSettings,
+        font: Option<&str>,
+        marking: &Marking<'_>,
+    ) -> Vec<Op> {
         let project = session.project();
         let placed = placement(session, block);
+        let hook = translated(&project, block, text, &placed, look, font, marking)
+            .expect("the hook's ops");
         let mut ops = vec![
             Op::SetText {
                 layer: block.into(),
@@ -895,7 +961,7 @@ mod tests {
             },
             placed.clone(),
         ];
-        ops.extend(translated(&project, block, text, &placed, look, font).expect("the hook's ops"));
+        ops.extend(hook.iter().cloned());
         ops.push(Op::SetAttribute {
             layer: block.into(),
             namespace: C2PA.to_owned(),
@@ -903,6 +969,7 @@ mod tests {
             value: Some(json!({"action": "c2pa.translated"})),
         });
         apply(session, ops);
+        hook
     }
 
     fn translation(session: &Session, block: LayerId) -> koharu_scene::Text {
@@ -1608,5 +1675,280 @@ mod tests {
             Value::Object(category_chars(&look, None, LetteringCategory::Shout)),
             json!({"family": null, "weight": null, "italic": null})
         );
+    }
+
+    fn words(words: &[&str]) -> Vec<String> {
+        words.iter().map(|&word| word.to_owned()).collect()
+    }
+
+    fn span(insert: &str, attributes: CharStyle) -> koharu_scene::Span {
+        koharu_scene::Span {
+            insert: insert.to_owned(),
+            attributes,
+        }
+    }
+
+    /// The default emphasis, with a shout's stressed words red too.
+    fn emphasized() -> crate::emphasis::EmphasisSettings {
+        let mut settings = crate::emphasis::EmphasisSettings::default();
+        settings.categories.insert(
+            LetteringCategory::Shout,
+            crate::emphasis::EmphasisStyle {
+                fill: Some(RED),
+                ..crate::emphasis::EmphasisStyle::default()
+            },
+        );
+        settings
+    }
+
+    fn rich_ops(ops: &[Op]) -> usize {
+        ops.iter()
+            .filter(|op| matches!(op, Op::SetRichText { .. }))
+            .count()
+    }
+
+    #[test]
+    fn a_run_marks_the_words_its_model_picked_in_its_categorys_emphasis() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        label(&mut session, block, LetteringCategory::Shout);
+        // Pick fonts automatically is off: the category still says how its
+        // words are stressed.
+        let look = settings(true, None, None);
+        let emphasis = emphasized();
+        let picks = words(&["NO", "missing"]);
+        let marking = Marking {
+            settings: Some(&emphasis),
+            words: &picks,
+        };
+        let hook = translate_marking(&mut session, block, "Why NO?", &look, None, &marking);
+        assert_eq!(rich_ops(&hook), 1, "{hook:?}");
+        assert!(
+            matches!(hook.last(), Some(Op::SetAttribute { .. })),
+            "the record comes last: {hook:?}"
+        );
+
+        // Over the translation's own values, bold, larger and red.
+        let written = translation(&session, block);
+        let shout = emphasis.style_for(Some(LetteringCategory::Shout));
+        let patch = crate::emphasis::patch(&shout, &written.style.chars);
+        assert_eq!((patch.weight, patch.fill), (Some(700), Some(RED)));
+        assert!(patch.size.is_some());
+        assert_eq!(
+            written.content,
+            RichText(vec![
+                span("Why ", CharStyle::default()),
+                span("NO", patch.clone()),
+                span("?", CharStyle::default()),
+            ])
+        );
+        let found = layer(&session, block);
+        assert_eq!(
+            Auto::of(&found).marks,
+            [attrs::AutoMark {
+                start: 4,
+                end: 6,
+                style: patch,
+            }]
+        );
+        assert_eq!(edited(&found), Edited::default());
+
+        // With the switch off, the same text keeps none of the run's marks.
+        let off = crate::emphasis::EmphasisSettings {
+            ai: false,
+            ..emphasis.clone()
+        };
+        let marking = Marking {
+            settings: Some(&off),
+            words: &picks,
+        };
+        let hook = translate_marking(&mut session, block, "Why NO?", &look, None, &marking);
+        assert_eq!(rich_ops(&hook), 1, "{hook:?}");
+        let found = layer(&session, block);
+        assert_eq!(
+            translation(&session, block).content,
+            RichText::from("Why NO?")
+        );
+        assert!(Auto::of(&found).marks.is_empty());
+        assert_eq!(edited(&found), Edited::default());
+
+        // Nothing to take off and nothing to mark: the text op's spans
+        // stand.
+        let hook = translate_marking(&mut session, block, "Why NO!?", &look, None, &marking);
+        assert_eq!(rich_ops(&hook), 0, "{hook:?}");
+        let hook = translate_marking(
+            &mut session,
+            block,
+            "Why NO!?",
+            &look,
+            None,
+            &Marking::default(),
+        );
+        assert_eq!(rich_ops(&hook), 0, "{hook:?}");
+    }
+
+    #[test]
+    fn translating_again_keeps_a_hand_mark_and_marks_only_free_words() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let look = settings(true, None, None);
+        let emphasis = crate::emphasis::EmphasisSettings::default();
+        let picks = words(&["NO"]);
+        let marking = Marking {
+            settings: Some(&emphasis),
+            words: &picks,
+        };
+        translate_marking(&mut session, block, "Why NO?", &look, None, &marking);
+        let run = translation(&session, block).content.0[1].attributes.clone();
+        assert_eq!(run.weight, Some(700));
+
+        // "Why" coloured by hand.
+        let yellow = CharStyle {
+            fill: Some(YELLOW),
+            ..CharStyle::default()
+        };
+        apply(
+            &mut session,
+            vec![Op::SetRichText {
+                layer: block.into(),
+                spans: vec![
+                    span("Why", yellow.clone()),
+                    span(" ", CharStyle::default()),
+                    span("NO", run.clone()),
+                    span("?", CharStyle::default()),
+                ],
+            }],
+        );
+        assert!(edited(&layer(&session, block)).style);
+
+        // Translated again, with "Why" picked too: the hand mark stays and
+        // takes no emphasis, and the run's own is given again.
+        let picks = words(&["Why", "NO"]);
+        let marking = Marking {
+            settings: Some(&emphasis),
+            words: &picks,
+        };
+        translate_marking(&mut session, block, "Why NO?!", &look, None, &marking);
+        assert_eq!(
+            translation(&session, block).content,
+            RichText(vec![
+                span("Why", yellow),
+                span(" ", CharStyle::default()),
+                span("NO", run.clone()),
+                span("?!", CharStyle::default()),
+            ])
+        );
+        let found = layer(&session, block);
+        let marks = Auto::of(&found).marks;
+        assert_eq!(
+            marks
+                .iter()
+                .map(|mark| (mark.start, mark.end))
+                .collect::<Vec<_>>(),
+            [(4, 6)]
+        );
+        let after = edited(&found);
+        assert_eq!((after.text, after.style), (false, true));
+    }
+
+    #[test]
+    fn a_runs_marks_are_no_hand_edit_but_a_hand_change_to_them_is() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let look = settings(true, None, None);
+        let emphasis = crate::emphasis::EmphasisSettings::default();
+        let picks = words(&["NO"]);
+        let marking = Marking {
+            settings: Some(&emphasis),
+            words: &picks,
+        };
+        translate_marking(&mut session, block, "Why NO?", &look, None, &marking);
+        let run = translation(&session, block).content.0[1].attributes.clone();
+        assert!(run.weight.is_some() && run.size.is_some(), "{run:?}");
+        assert_eq!(edited(&layer(&session, block)), Edited::default());
+
+        let restyle = |session: &mut Session, why: CharStyle, no: CharStyle| {
+            apply(
+                session,
+                vec![Op::SetRichText {
+                    layer: block.into(),
+                    spans: vec![
+                        span("Why", why),
+                        span(" ", CharStyle::default()),
+                        span("NO", no),
+                        span("?", CharStyle::default()),
+                    ],
+                }],
+            );
+            edited(&layer(session, block)).style
+        };
+        let none = CharStyle::default;
+        // A value the run set, changed by hand, is a hand edit.
+        let heavier = CharStyle {
+            weight: Some(900),
+            ..run.clone()
+        };
+        assert!(restyle(&mut session, none(), heavier));
+        // One taken off by hand isn't, nor is a size changed by hand.
+        let unbolded = CharStyle {
+            weight: None,
+            ..run.clone()
+        };
+        assert!(!restyle(&mut session, none(), unbolded));
+        let larger = CharStyle {
+            size: Some(50.0),
+            ..run.clone()
+        };
+        assert!(!restyle(&mut session, none(), larger));
+        // Another word marked by hand is, but for its size.
+        let red = CharStyle {
+            fill: Some(RED),
+            ..CharStyle::default()
+        };
+        assert!(restyle(&mut session, red, run.clone()));
+        let resized = CharStyle {
+            size: Some(40.0),
+            ..CharStyle::default()
+        };
+        assert!(!restyle(&mut session, resized, run.clone()));
+        // As the run left it, it's automatic again.
+        assert!(!restyle(&mut session, none(), run.clone()));
+
+        // Once the text changes by hand, the run's marks are no longer told
+        // from a hand's: a known, careful limit.
+        apply(
+            &mut session,
+            vec![Op::SetText {
+                layer: block.into(),
+                text: "Why NO!".to_owned(),
+            }],
+        );
+        let retyped = edited(&layer(&session, block));
+        assert_eq!((retyped.text, retyped.style), (true, true));
+    }
+
+    #[test]
+    fn a_line_given_back_drops_the_runs_marks() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let emphasis = crate::emphasis::EmphasisSettings::default();
+        let picks = words(&["NO"]);
+        let marking = Marking {
+            settings: Some(&emphasis),
+            words: &picks,
+        };
+        let look = settings(true, None, None);
+        translate_marking(&mut session, block, "Why NO?", &look, None, &marking);
+        assert_eq!(Auto::of(&layer(&session, block)).marks.len(), 1);
+        let given = given_back(&layer(&session, block)).expect("the record");
+        apply(
+            &mut session,
+            vec![
+                Op::UpdateLayer {
+                    layer: block.into(),
+                    patch: json!({"translation": null}),
+                },
+                given,
+            ],
+        );
+        let record = Auto::of(&layer(&session, block));
+        assert!(record.marks.is_empty(), "{record:?}");
+        assert_eq!(record.text, Some(text_hash("")));
     }
 }

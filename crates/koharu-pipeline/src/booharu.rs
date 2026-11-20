@@ -40,6 +40,7 @@ use std::{collections::BTreeSet, future::Future, path::Path, time::Duration};
 
 use booharu_core::{
     context::{self, Chapter, Extras, MAX_TERMS, SeriesStore},
+    emphasis::Marking,
     runs::{RunPolicy, RunStage},
     settings::Snapshot,
     styles,
@@ -197,8 +198,10 @@ impl From<Stage> for RunStage {
 /// edit for `block`'s new translation `text`, both read before the edit, as
 /// placement reads the project: the run's default look, when it changes
 /// anything, with the block's category font while the run's Pick fonts
-/// automatically is on, then the hand-edit record, on every translation the
-/// stage writes. None when placement failed, which fails the stage.
+/// automatically is on, the translation's word marks when the marks a run
+/// left on the one it replaces come off, then the hand-edit record, on
+/// every translation the stage writes. None when placement failed, which
+/// fails the stage.
 pub(crate) fn translated(
     project: &Project,
     block: LayerId,
@@ -209,6 +212,12 @@ pub(crate) fn translated(
     let Some(placed) = placed else {
         return Ok(Vec::new());
     };
+    // No words picked yet: the model isn't asked for them until the turn
+    // reads its answer's picks.
+    let marking = Marking {
+        settings: booharu.emphasis.as_ref(),
+        words: &[],
+    };
     styles::translated(
         project,
         block,
@@ -216,6 +225,7 @@ pub(crate) fn translated(
         placed,
         &booharu.lettering,
         booharu.font.as_deref(),
+        &marking,
     )
 }
 

@@ -572,6 +572,7 @@ mod tests {
                     &placed,
                     &LetteringSettings::default(),
                     Some(FONT),
+                    &booharu_core::emphasis::Marking::default(),
                 )?);
                 ops.push(Op::SetAttribute {
                     layer: block.into(),
