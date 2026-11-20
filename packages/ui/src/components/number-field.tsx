@@ -38,7 +38,8 @@ const NumberField = React.forwardRef<HTMLDivElement, NumberFieldPrimitive.Root.P
       change: NumberFieldPrimitive.Root.ChangeEventDetails
       commit?: NumberFieldPrimitive.Root.CommitEventDetails
     } | null>(null)
-    // The value a burst last committed, so the commit right after it with that value isn't sent.
+    // The value a burst last committed, so a commit of that value right after it isn't sent again,
+    // as Base UI's on releasing a stepper press that changed nothing.
     const flushed = React.useRef<{ value: number | null } | null>(null)
     const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     // The latest callbacks, which a burst sent later calls.

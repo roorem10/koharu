@@ -2,7 +2,12 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { NumberField, NumberFieldGroup, NumberFieldInput } from '@koharu/ui/components/number-field'
+import {
+  NumberField,
+  NumberFieldGroup,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from '@koharu/ui/components/number-field'
 
 type Callback = (value: number | null, details: unknown) => void
 
@@ -53,6 +58,36 @@ function wheelUp(input: HTMLElement, shift = false): WheelEvent {
   return tick
 }
 
+/** A whole-number box from 10 with a stepper, which Alt steps by 0.1 and so by nothing, as the
+ * box rounds it away, telling `change` and `commit` what Booharu's NumberField tells its callers. */
+function WholeField({ change, commit }: { change: Callback; commit: Callback }) {
+  const [value, setValue] = useState<number | null>(10)
+  return (
+    <NumberField
+      value={value}
+      step={1}
+      format={{ maximumFractionDigits: 0 }}
+      onValueChange={(next, details) => {
+        setValue(next)
+        change(next, details)
+      }}
+      onValueCommitted={commit}
+    >
+      <NumberFieldGroup>
+        <NumberFieldInput aria-label='Value' />
+        <NumberFieldIncrement aria-label='Increase'>+</NumberFieldIncrement>
+      </NumberFieldGroup>
+    </NumberField>
+  )
+}
+
+/** A press of `button` with the pointer and its release, with Alt held when `alt`. */
+function press(button: HTMLElement, alt = false) {
+  const init = { bubbles: true, cancelable: true, button: 0, altKey: alt }
+  act(() => void button.dispatchEvent(new MouseEvent('pointerdown', init)))
+  act(() => void window.dispatchEvent(new MouseEvent('pointerup', init)))
+}
+
 function renderField(props: Partial<Parameters<typeof Field>[0]> = {}) {
   vi.useFakeTimers()
   const change = vi.fn<Callback>()
@@ -84,7 +119,7 @@ describe('Booharu number box wheel (D29)', () => {
     expect(commit).toHaveBeenCalledExactlyOnceWith(13, expect.objectContaining({ reason: 'wheel' }))
     expect(change.mock.invocationCallOrder[0]).toBeLessThan(commit.mock.invocationCallOrder[0]!)
 
-    // Leaving the box commits nothing more.
+    // Leaving the box commits nothing more: Base UI commits each tick, not the blur after them.
     fireEvent.blur(input)
     expect(commit).toHaveBeenCalledTimes(1)
     expect(input).toHaveValue('13')
@@ -163,6 +198,34 @@ describe('Booharu number box wheel (D29)', () => {
     expect(laterCommit.mock.calls.map(([value]) => value)).toEqual([10.5, 11])
     act(() => vi.advanceTimersByTime(400))
     expect(later).toHaveBeenCalledTimes(2)
+  })
+
+  it('sends no second commit of the value a burst just committed, and later commits as they come', () => {
+    vi.useFakeTimers()
+    const change = vi.fn<Callback>()
+    const commit = vi.fn<Callback>()
+    render(<WholeField change={change} commit={commit} />)
+    const input = screen.getByRole('textbox', { name: 'Value' })
+    const increase = screen.getByRole('button', { name: 'Increase' })
+    act(() => input.focus())
+    wheelUp(input)
+    act(() => vi.advanceTimersByTime(300))
+    expect(commit).toHaveBeenCalledExactlyOnceWith(11, expect.objectContaining({ reason: 'wheel' }))
+
+    // A stepper press that changes nothing still commits on its release, the burst's value again.
+    press(increase, true)
+    expect(change).toHaveBeenCalledTimes(1)
+    expect(commit).toHaveBeenCalledTimes(1)
+
+    // Another value goes, and so does a press that changes nothing with no burst just before it.
+    press(increase)
+    expect(change).toHaveBeenLastCalledWith(12, expect.anything())
+    expect(commit).toHaveBeenLastCalledWith(
+      12,
+      expect.objectContaining({ reason: 'increment-press' }),
+    )
+    press(increase, true)
+    expect(commit.mock.calls.map(([value]) => value)).toEqual([11, 12, 12])
   })
 
   it('shows the burst until the value given changes, as when a write is still on its way', () => {
