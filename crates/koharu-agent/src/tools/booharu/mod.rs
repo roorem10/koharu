@@ -47,9 +47,12 @@
 //! | `booharu_redo_boxes` | reads, translates, or cleans chosen blocks again in one run, as Redo boxes does, leaving out locked ones and, unless told to take them, those fixed by hand, and answers the run and how many it left alone | no |
 //! | `booharu_style_words` | styles some words of a block's translation or a text layer, named by their wording or by character offsets, as one undo step: its lettering category's emphasis, a step bigger or smaller from each word's own size, bold, italic, a font, a size, colours or a gradient fill, an outline, a second border and letter spacing of their own, or none of their own again, and answers the words, where they are, and what changed | no |
 //! | `booharu_clear_word_styles` | takes every word style off whole boxes, blocks' translations and text layers, so their words look as their boxes, as one undo step, leaving locked ones alone, and answers how many it cleared and left alone as locked | no |
+//! | `booharu_set_skew` | skews whole boxes, blocks' translations and text layers, along their width, their height or both, about each box's centre, as one undo step, an axis left out keeping each box's own skew, leaving locked and untranslated ones alone, and answers how many it changed and left alone as locked or untranslated | no |
+//! | `booharu_get_text_effects` | each box of a page carrying text effects beyond its lettering default, as its fx tag shows them, a border, a second border, the outline method, a gradient fill or a skew, with the skew it shows | yes |
 
 mod boxes;
 mod context;
+mod effects;
 mod lettering;
 mod mcp;
 mod notes;
@@ -278,6 +281,8 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(runs::RedoBoxes);
     tools.add_tool(words::StyleWords);
     tools.add_tool(words::ClearWordStyles);
+    tools.add_tool(effects::SetSkew);
+    tools.add_tool(effects::GetTextEffects);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one
