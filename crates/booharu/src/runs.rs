@@ -14,17 +14,20 @@
 //!   recognition, and the translation a block with that source would;
 //! - a block with no inpainting record needs inpainting;
 //! - a block with a source, no translation, and no translation record needs
-//!   translation, and one the Translation stage was given back unchanged (no
-//!   translation, its clean-up hidden) or with a blank source counts as
-//!   translated;
+//!   translation, a box styled before it's translated among them, whose
+//!   translation is only a placeholder (`status::placeholder`: blank point
+//!   text no run wrote, which counts as none, `status::unwritten`), and one
+//!   the Translation stage was given back unchanged (no translation, its
+//!   clean-up hidden) or with a blank source counts as translated;
 //! - a sound effect the SFX mode keeps as art, or one with a subtitle
 //!   (`sfx::skipped` under the lettering settings, read once per plan, as a
 //!   run's snapshot reads them), needs translation only while the
 //!   Translation stage would hide its clean-up to show the art
-//!   (`sfx::kept_original` writing something: no translation, its clean-up
-//!   showing, no kept mark); any other block carrying the kept mark with no
-//!   translation needs it too, as an effect kept as art before the mode
-//!   changed, whose translation shows its clean-up again.
+//!   (`sfx::kept_original` writing something: no translation of its own,
+//!   its clean-up showing, no kept mark); any other block carrying the kept
+//!   mark with no translation of its own needs it too, as an effect kept as
+//!   art before the mode changed, whose translation shows its clean-up
+//!   again.
 //!
 //! A stage that would leave a block as it is isn't needed for it, so a page
 //! that's done reads as done however often it's run: Koharu's stages read
@@ -67,7 +70,7 @@ use booharu_core::{
     context::{Chapter, ChapterContext},
     settings::LetteringSettings,
     sfx,
-    status::{DETECTION, INPAINTING, OCR, blocks, untranslated},
+    status::{DETECTION, INPAINTING, OCR, blocks, untranslated, unwritten},
     styles::recorded,
 };
 use koharu_pipeline::{Event, RunId, Stage, Target};
@@ -398,7 +401,7 @@ fn needs(session: &Session, page: &Page, settings: &LetteringSettings) -> Result
         let translates = match sfx::skipped(page, layer.id, settings) {
             true => !sfx::kept_original(layer).is_empty(),
             false => {
-                untranslated(layer, block) || (block.translation.is_none() && Auto::of(layer).kept)
+                untranslated(layer, block) || (unwritten(layer, block) && Auto::of(layer).kept)
             }
         };
         if !blank && translates {
@@ -446,14 +449,17 @@ mod tests {
 
     use booharu_core::{
         context::{ChapterBrief, GlossaryEntry, SeriesStore},
+        emphasis::Marking,
         settings::SfxMode,
+        styles,
     };
     use image::{ImageFormat, Rgb, RgbImage};
-    use koharu_scene::{Created, Edit, Hash, LayerId, Op, Uuid};
+    use koharu_scene::{Created, Edit, Hash, LanguageIdentifier, LayerId, Op, Uuid};
     use serde_json::{Value, json};
     use tempfile::TempDir;
 
     use super::*;
+    use crate::testing::type_bar_style;
 
     const SIZE: u32 = 400;
 
@@ -532,6 +538,50 @@ mod tests {
                     .into_iter()
                     .collect(),
             )
+        }
+
+        fn edit(&mut self, ops: Vec<Op>) -> Result<()> {
+            self.session.apply(Edit {
+                label: "test".to_owned(),
+                ops,
+            })?;
+            Ok(())
+        }
+
+        /// Translates the block `name` as Koharu's Translation stage does,
+        /// into English, with Booharu's hook.
+        fn translate(&mut self, name: &str) -> Result<()> {
+            let block = self.layers[name];
+            let project = self.session.project();
+            let english: LanguageIdentifier = "en".parse()?;
+            let placed = koharu_pipeline::placement(&project, block, &english)?;
+            let mut ops = vec![
+                Op::SetText {
+                    layer: block.into(),
+                    text: "Why?".to_owned(),
+                },
+                placed.clone(),
+            ];
+            ops.extend(styles::translated(
+                &project,
+                block,
+                "Why?",
+                &placed,
+                &LetteringSettings::default(),
+                None,
+                &Marking::default(),
+            )?);
+            ops.push(Op::UpdateLayer {
+                layer: block.into(),
+                patch: json!({"translation": {"language": english}, "cleanup": {"visible": true}}),
+            });
+            ops.push(Op::SetAttribute {
+                layer: block.into(),
+                namespace: "c2pa".to_owned(),
+                key: "translation".to_owned(),
+                value: Some(json!({"action": "c2pa.translated"})),
+            });
+            self.edit(ops)
         }
 
         fn plan(&self, pages: &[&str]) -> Result<Vec<(Vec<Stage>, Vec<PageId>)>> {
@@ -834,6 +884,84 @@ mod tests {
         assert_eq!(chapter.needs_under("shown", &all)?, [Stage::Translate]);
         assert_eq!(chapter.needs_under("kept", &all)?, [Stage::Translate]);
         assert_eq!(chapter.needs_under("hidden", &all)?, NOTHING);
+        Ok(())
+    }
+
+    /// The op showing or hiding the clean-up of the block `id`.
+    fn clean_up(id: LayerId, visible: bool) -> Op {
+        Op::UpdateLayer {
+            layer: id.into(),
+            patch: json!({"cleanup": {"visible": visible}}),
+        }
+    }
+
+    #[test]
+    fn a_box_styled_before_its_translated_needs_translation_once() -> Result<()> {
+        let read = ["detection", "ocr", "inpainting"];
+        let ops = [
+            block("styled", "a", 0, "どうして", &read, false),
+            block("hidden", "b", 0, "どうして", &read, false),
+            block("given", "c", 0, "どうして", &read, false),
+        ]
+        .concat();
+        let mut chapter =
+            Chapter::new(&[("styled", true), ("hidden", true), ("given", true)], ops)?;
+        let styled = ["a", "b", "c"].map(|name| type_bar_style(chapter.layers[name]));
+        chapter.edit(styled.into())?;
+        // Styled in the type bar before it's translated, a box still needs
+        // its translation.
+        for page in ["styled", "hidden", "given"] {
+            assert_eq!(chapter.needs(page)?, [Stage::Translate], "{page}");
+        }
+        // Not with its clean-up hidden by hand, keeping the page's lettering,
+        // nor given back by the Translation stage, its style kept.
+        chapter.edit(vec![clean_up(chapter.layers["b"], false)])?;
+        let project = chapter.session.project();
+        let record = styles::given_back(project.layer(chapter.layers["c"])?)?;
+        chapter.edit(vec![clean_up(chapter.layers["c"], false), record])?;
+        assert_eq!(chapter.needs("hidden")?, NOTHING);
+        assert_eq!(chapter.needs("given")?, NOTHING);
+
+        // Translated by the stage, it needs nothing more.
+        chapter.translate("a")?;
+        assert_eq!(chapter.needs("styled")?, NOTHING);
+        assert_eq!(chapter.plan(&["styled", "hidden", "given"])?, Vec::new());
+        Ok(())
+    }
+
+    #[test]
+    fn a_sound_effect_styled_before_its_translated_is_kept_as_art_as_one_with_none() -> Result<()> {
+        let mut ops = block(
+            "p",
+            "a",
+            0,
+            "ドン",
+            &["detection", "ocr", "inpainting"],
+            false,
+        );
+        ops.push(patched("a", json!({"role": "sfx"})));
+        let mut chapter = Chapter::new(&[("p", true)], ops)?;
+        let id = chapter.layers["a"];
+        chapter.edit(vec![type_bar_style(id)])?;
+        // Kept as art: the Translation stage hides its clean-up, with the
+        // kept mark, once.
+        assert_eq!(chapter.needs("p")?, [Stage::Translate]);
+        let project = chapter.session.project();
+        let kept = sfx::kept_original(project.layer(id)?);
+        assert_eq!(kept.len(), 2, "{kept:?}");
+        chapter.edit(kept)?;
+        assert_eq!(chapter.needs("p")?, NOTHING);
+
+        // With every sound effect translated, it needs its translation,
+        // once.
+        let all = LetteringSettings {
+            sfx: SfxMode::TranslateAll,
+            ..LetteringSettings::default()
+        };
+        assert_eq!(chapter.needs_under("p", &all)?, [Stage::Translate]);
+        chapter.translate("a")?;
+        assert_eq!(chapter.needs_under("p", &all)?, NOTHING);
+        assert_eq!(chapter.needs("p")?, NOTHING);
         Ok(())
     }
 
