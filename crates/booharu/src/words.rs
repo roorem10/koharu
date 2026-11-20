@@ -89,9 +89,10 @@ impl WordChange {
 /// The edit styling the characters `range`, UTF-8 byte offsets, of the text
 /// of `layer` in `project`, a block's translation or a text layer's, as
 /// `change` says, the emphasis by `emphasis` and the block's category by
-/// `lettering`, as one undo step labelled [`LABEL`] holding one
-/// `SetRichText`; none when nothing changes. With `expected`, the plain text
-/// the range was taken from, a text that has changed since is refused.
+/// `lettering`, which only `change.emphasis` reads, as one undo step
+/// labelled [`LABEL`] holding one `SetRichText`; none when nothing changes.
+/// With `expected`, the plain text the range was taken from, a text that has
+/// changed since is refused.
 ///
 /// Refused: a change asking for none or more than one of clear, emphasis
 /// and explicit values, or for a weight and bold or italic twice; a layer
@@ -109,10 +110,7 @@ pub fn style_words(
     lettering: &LetteringSettings,
 ) -> Result<Option<Edit>> {
     let mode = change.mode()?;
-    let (text, category) = words(project, layer, lettering)?;
-    let Some(text) = text else {
-        bail!("block {layer} has no translation, so it has no words to style");
-    };
+    let text = text(project, layer)?;
     let plain = text.content.text();
     if let Some(expected) = expected {
         ensure!(
@@ -134,7 +132,13 @@ pub fn style_words(
         plain.len()
     );
     let own = &text.style.chars;
-    let stressed = emphasis::patch(&emphasis.style_for(category), own);
+    let stressed = match mode {
+        Mode::Emphasis => {
+            let category = category(project, layer, lettering)?;
+            emphasis::patch(&emphasis.style_for(category), own)
+        }
+        Mode::Clear | Mode::Explicit => CharStyle::default(),
+    };
     let bold = change.bold.map(|bold| match bold {
         true => Some(BOLD),
         false if own.weight.is_some_and(|weight| weight >= BOLD_FROM) => Some(REGULAR),
@@ -189,8 +193,7 @@ pub fn emphasis_patch(
     emphasis: &EmphasisSettings,
     lettering: &LetteringSettings,
 ) -> Result<CharStyle> {
-    let (text, category) = words(project, layer, lettering)?;
-    let own = match text {
+    let own = match words(project, layer)? {
         Some(text) => text.style.chars.clone(),
         None => {
             let (page, _) = project.parent(layer)?;
@@ -200,31 +203,44 @@ pub fn emphasis_patch(
             }
         }
     };
+    let category = category(project, layer, lettering)?;
     Ok(emphasis::patch(&emphasis.style_for(category), &own))
 }
 
+/// The text of `layer` in `project` whose words [`style_words`] styles, a
+/// block's translation or a text layer's, for a caller that finds the words
+/// in it first, as the agent's tool finds them by their wording or by
+/// character offsets. Refused as [`style_words`] refuses the layer: one
+/// that's neither a block nor a text layer, one that is, or is inside, a
+/// locked layer, and a block without a translation.
+pub fn text(project: &Project, layer: LayerId) -> Result<&Text> {
+    match words(project, layer)? {
+        Some(text) => Ok(text),
+        None => bail!("block {layer} has no translation, so it has no words to style"),
+    }
+}
+
 /// The text of `layer` in `project` whose words are styled, none for a
-/// block without a translation, and its lettering category, as `lettering`
-/// reads it, none for a text layer. Refuses any other layer, and a locked
-/// one.
-fn words<'p>(
-    project: &'p Project,
-    layer: LayerId,
-    lettering: &LetteringSettings,
-) -> Result<(Option<&'p Text>, Option<LetteringCategory>)> {
-    let found = project.layer(layer)?;
-    let words = match &found.content {
-        Content::Block(block) => {
-            let (page, _) = project.parent(layer)?;
-            let category =
-                lettering::effective(page, layer, lettering).map(|effective| effective.category);
-            (block.translation.as_ref(), category)
-        }
-        Content::Text(text) => (Some(&**text), None),
+/// block without a translation. Refuses any other layer, and a locked one.
+fn words(project: &Project, layer: LayerId) -> Result<Option<&Text>> {
+    let words = match &project.layer(layer)?.content {
+        Content::Block(block) => block.translation.as_ref(),
+        Content::Text(text) => Some(&**text),
         _ => bail!("layer {layer} is neither a block nor a text, so it has no words to style"),
     };
     unlocked(project, layer)?;
     Ok(words)
+}
+
+/// The lettering category of `layer` in `project` as `lettering` reads it:
+/// a block's, none for a text layer, which has none.
+fn category(
+    project: &Project,
+    layer: LayerId,
+    lettering: &LetteringSettings,
+) -> Result<Option<LetteringCategory>> {
+    let (page, _) = project.parent(layer)?;
+    Ok(lettering::effective(page, layer, lettering).map(|effective| effective.category))
 }
 
 #[cfg(test)]
@@ -716,6 +732,21 @@ mod tests {
             ),
             "{locked}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn the_text_words_are_found_in_is_refused_as_its_layer_is() -> Result<()> {
+        let fixture = Fixture::new()?;
+        let project = fixture.session.project();
+        assert_eq!(text(&project, fixture.id("plain"))?.content.text(), TEXT);
+        assert_eq!(
+            text(&project, fixture.id("typed"))?.style.chars.size,
+            Some(20.0)
+        );
+        for refused in ["bare", "paint", "locked", "held"] {
+            assert!(text(&project, fixture.id(refused)).is_err(), "{refused}");
+        }
         Ok(())
     }
 
