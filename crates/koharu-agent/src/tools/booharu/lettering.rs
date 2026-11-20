@@ -67,8 +67,9 @@ impl Tool for SetLetteringCategory {
          and why. `category` is a category's id, or `automatic` to take back your label, so each \
          block takes the category its own rules give. Your label counts as an automatic one: it \
          never replaces a category the user chose (`kept_user_label`), and a block whose look was \
-         changed by hand, by the user or by booharu_apply_text_style, takes your label but keeps \
-         its font (`kept_hand_edited`). A presentation category (`title`, `phone_text`, `sfx`, \
+         changed by hand, by the user, by booharu_apply_text_style, or by booharu_style_words \
+         giving words values of their own other than a size, takes your label but keeps its \
+         font (`kept_hand_edited`). A presentation category (`title`, `phone_text`, `sfx`, \
          `handwritten`, `sign`, `electronic_voice`) wins at any `confidence`; a delivery category \
          (`thoughts`, `weak_shout`, `moan`, `whisper`, `shy`, `crying`, `menacing`, `shout`) wins \
          over small text and the balloon's shape only when `confidence` is at least \

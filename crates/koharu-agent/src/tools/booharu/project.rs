@@ -36,8 +36,10 @@ impl Tool for GetProjectOverview {
          size, how many blocks it has and how many of them have a translation, Booharu's \
          attributes of each of its layers that has any, by layer id, and as `hand_edited` the \
          parts of each block changed by hand, by layer id, only for blocks with any: `source`, \
-         its wording, `text`, its translation, `style`, its translation's look, also when the \
-         agent chose it with booharu_apply_text_style, and `drawn`, a block drawn by hand rather \
+         its wording, `text`, its translation, `style`, its translation's look, words given \
+         values of their own among it but for their size and the words a translation run \
+         stressed, also when the agent chose it with booharu_apply_text_style or \
+         booharu_style_words, and `drawn`, a block drawn by hand rather \
          than detected; the translator's model, target language, and instructions, with \
          `connected`: whether the model's vendor has its API key or sign-in stored, as the \
          Providers settings show it, never the key itself (Koharu's own models need neither, \
