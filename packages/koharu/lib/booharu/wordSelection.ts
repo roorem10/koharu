@@ -25,6 +25,7 @@ import {
   type WordRange,
 } from '@/lib/booharu/words'
 import { letteringOf, plainText, type BlockLayer, type TextLayer } from '@/lib/document'
+import { useKoharuStore } from '@/lib/store'
 import type { Text } from '@koharu/ipc/protocol'
 
 // Booharu: words chosen in the Story panel's fields (S10-l), as Booharu 0.0.4's layer rows chose
@@ -72,7 +73,7 @@ export function toggleWords(
  * tells the page of with `CANVAS_PRESS`; a press elsewhere in the sidebar hides the toolbar and
  * keeps the words. Ctrl+B and Ctrl+I in the field do what the toolbar's B and I do, and Alt+F10,
  * as in editors with a floating toolbar, moves the focus to the toolbar, the field keeping its
- * selection. */
+ * selection, unless the canvas types. */
 export function useWordSelection(layer: BlockLayer | TextLayer) {
   const lettering = letteringOf(layer)
   const saved = plainText(lettering)
@@ -151,6 +152,9 @@ export function useWordSelection(layer: BlockLayer | TextLayer) {
         !(event.ctrlKey || event.metaKey || event.shiftKey)
       ) {
         event.preventDefault()
+        // While the canvas types, it takes the keys from any control but a text field, so the
+        // toolbar's keys would type there, and its Escape would drop what was typed.
+        if (useKoharuStore.getState().typing) return
         document
           .getElementById(wordToolbarId(layer.id))
           ?.querySelector<HTMLElement>('[tabindex="0"]')

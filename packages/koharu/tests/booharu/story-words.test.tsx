@@ -323,6 +323,23 @@ describe('Booharu words chosen in Story', () => {
     expect(field).toHaveFocus()
   })
 
+  it('keeps the focus in the field for Alt+F10 while the canvas types', async () => {
+    const user = userEvent.setup()
+    story(pageOf(block('block', [{ insert: 'Hello world' }])))
+    const field = await screen.findByPlaceholderText('Translation')
+    field.focus()
+    choose(field, 6, 11)
+    // The desktop's canvas takes the keys from any control but a text field while it types.
+    act(() => useKoharuStore.setState({ typing: { layer: 'block', chars: {}, mixed: [] } }))
+
+    await user.keyboard('{Alt>}{F10}{/Alt}')
+    expect(field).toHaveFocus()
+
+    act(() => useKoharuStore.setState({ typing: null }))
+    await user.keyboard('{Alt>}{F10}{/Alt}')
+    expect(within(toolbar()!).getByRole('button', { name: 'Bold' })).toHaveFocus()
+  })
+
   it('does what B and I do for Ctrl+B and Ctrl+I in the field, only with words chosen', async () => {
     story(pageOf(textLayer('text', [{ insert: 'Hello world', attributes: { italic: true } }])))
     const field = await screen.findByPlaceholderText('Text')

@@ -46,11 +46,11 @@ const BUTTON =
  * the focus, and so the selection, in the field, which commits nothing as it would on losing the
  * focus. B and I show pressed as the type bar's do, by what the words' characters share.
  *
- * From the keyboard it's a toolbar: Alt+F10 in the field moves the focus to its one tab stop, the
- * control focused last; the arrows, Home and End move along it, and Escape or Tab take the focus
- * back to the field, its selection as it was. A key pressed there without Ctrl, Cmd or Alt never
- * reaches the canvas's shortcuts, so Space presses the focused control and Delete removes no box,
- * while Ctrl+Z still undoes. */
+ * From the keyboard it's a toolbar: Alt+F10 in the field, while the canvas isn't typing, moves the
+ * focus to its one tab stop, the control focused last; the arrows, Home and End move along it, and
+ * Escape or Tab take the focus back to the field, its selection as it was. A key pressed there
+ * without Ctrl, Cmd or Alt never reaches the canvas's shortcuts, so Space presses the focused
+ * control and Delete removes no box, while Ctrl+Z still undoes. */
 export function StoryWordToolbar({ layer }: { layer: BlockLayer | TextLayer }) {
   const { t } = useTranslation()
   const range = useWordRange((state) => (state.range?.layer === layer.id ? state.range : null))
