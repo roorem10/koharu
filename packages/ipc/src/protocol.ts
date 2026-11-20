@@ -2575,7 +2575,7 @@ export const commands = {
       { blocks, stages, includeHandFixed },
       { headers: headers() },
     ),
-  /** Styles the characters `start` to `end`, UTF-8 byte offsets, of the text of `layer`, a block's translation or a text layer's, as `change` says, as one undo step labelled `booharu_style_words`, `text` being the plain text the words were chosen in. A change that changes nothing makes no undo step. Refused, with why: a change asking for none or more than one of clear, emphasis and explicit values; a layer that's neither a block nor a text layer, or is locked or inside a locked layer; a block without a translation; a text that changed since ("The text changed. Select the words again."); and a range that holds no character, or is past the text or off a character boundary. */
+  /** Styles the characters `start` to `end`, UTF-8 byte offsets, of the text of `layer`, a block's translation or a text layer's, as `change` says, as one undo step labelled `booharu_style_words`, `text` being the plain text the words were chosen in. A change that changes nothing makes no undo step. Refused, with why: a change asking for none or more than one of clear, emphasis and explicit values; a layer that's neither a block nor a text layer, or is locked or inside a locked layer; a block without a translation; a text that changed since ("The text changed. Select the words again."); and a range that holds no character, or is past the text or off a character boundary. Only emphasis reads the saved settings, so a section that can't be read refuses it alone. */
   booharuStyleWords: (
     layer: LayerId,
     start: number,

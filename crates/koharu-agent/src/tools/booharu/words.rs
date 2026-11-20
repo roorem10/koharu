@@ -283,11 +283,7 @@ impl Tool for StyleWords {
         tokio::task::spawn_blocking(move || -> anyhow::Result<Styled> {
             // Only emphasis reads the settings: the other changes set the
             // values the call names.
-            let (emphasis, lettering) = if args.emphasis {
-                settings(&tools)?
-            } else {
-                Default::default()
-            };
+            let (emphasis, lettering) = words::settings(args.emphasis, || settings(&tools))?;
             let mut session = tools.session.lock();
             let project = session.project();
             let text = words::text(&project, args.layer)?;

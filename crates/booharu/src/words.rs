@@ -181,6 +181,21 @@ pub fn style_words(
     }))
 }
 
+/// The emphasis and lettering settings for a words edit, through `read`,
+/// which reads them as the app holds them, only when it stresses the words
+/// (`emphasis`): the other changes set the values they name, so a section
+/// that can't be read never stops them, and they take the defaults, which
+/// [`style_words`] doesn't read.
+pub fn settings(
+    emphasis: bool,
+    read: impl FnOnce() -> Result<(EmphasisSettings, LetteringSettings)>,
+) -> Result<(EmphasisSettings, LetteringSettings)> {
+    match emphasis {
+        true => read(),
+        false => Ok(Default::default()),
+    }
+}
+
 /// The marks the emphasis star gives text typed into `layer` in `project`,
 /// a block or a text layer: the emphasis `emphasis` gives its lettering
 /// category, as `lettering` reads it, a text layer's the default, over its
@@ -480,6 +495,31 @@ mod tests {
                 .is_some()
         );
         assert!(fixture.style("plain", 4..7, &bold(true))?.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn only_emphasis_reads_the_settings() -> Result<()> {
+        // A section that can't be read, as a bad one edited into the file.
+        let unreadable = || -> Result<(EmphasisSettings, LetteringSettings)> {
+            bail!("Booharu's emphasis can't be read from [booharu-emphasis]")
+        };
+        assert!(settings(true, unreadable).is_err());
+        // B, I, Clear and the type bar's values go through without them.
+        let (emphasis, lettering) = settings(false, unreadable)?;
+        let mut fixture = Fixture::new()?;
+        let edit = style_words(
+            &fixture.session.project(),
+            fixture.id("plain"),
+            11..13,
+            None,
+            &bold(true),
+            &emphasis,
+            &lettering,
+        )?
+        .context("a change")?;
+        fixture.session.apply(edit)?;
+        assert_eq!(fixture.words("plain")?, no_marked(weight(700)));
         Ok(())
     }
 

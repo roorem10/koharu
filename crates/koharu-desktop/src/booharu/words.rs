@@ -1,8 +1,8 @@
 //! The words edit's commands: styling a run of a text's characters by hand,
 //! as the TypeBar and the Story toolbar do, and the marks the emphasis star
 //! gives text typed on the canvas, each worked out by `booharu::words`,
-//! which the agent's tool shares, under the saved `[booharu-emphasis]` and
-//! `[booharu-lettering]` as they are when called.
+//! which the agent's tool shares, its emphasis under the saved
+//! `[booharu-emphasis]` and `[booharu-lettering]` as they are when called.
 
 use std::sync::Arc;
 
@@ -23,7 +23,8 @@ use crate::{app::App, commands::Result};
 /// nor a text layer, or is locked or inside a locked layer; a block without
 /// a translation; a text that changed since ("The text changed. Select the
 /// words again."); and a range that holds no character, or is past the text
-/// or off a character boundary.
+/// or off a character boundary. Only emphasis reads the saved settings, so
+/// a section that can't be read refuses it alone.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_style_words(
@@ -35,7 +36,7 @@ pub async fn booharu_style_words(
     change: WordChange,
 ) -> Result<()> {
     apply_if(&app, move |session| {
-        let (emphasis, lettering) = settings()?;
+        let (emphasis, lettering) = words::settings(change.emphasis, settings)?;
         words::style_words(
             &session.project(),
             layer,
