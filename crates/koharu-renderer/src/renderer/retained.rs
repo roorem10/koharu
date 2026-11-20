@@ -27,8 +27,8 @@ use crate::{
 pub(super) type Cache = quick_cache::sync::Cache<Hash, Option<Content>, Weight>;
 
 /// What retained content may take, in bytes: pixels count with their levels;
-/// a text's layout or a shape counts as a kilobyte, and a text's Contour
-/// border regions (Booharu) as what they hold.
+/// a text's layout or a shape counts as a kilobyte.
+/// Booharu: a text's Contour border regions count as what they hold.
 const CACHE_BYTES: u64 = 2 << 30;
 
 #[derive(Clone)]
@@ -174,6 +174,7 @@ impl Renderer {
     }
 }
 
+// Booharu: a text weighs what its Contour borders hold.
 #[cfg(test)]
 mod tests {
     use koharu_scene::{CharStyle, Rgba, StrokeMethod, TextStyle};

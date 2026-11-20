@@ -6,10 +6,11 @@ use std::ops::Range;
 
 use anyhow::Result;
 use harfrust::Buffer;
-use koharu_scene::{Align, Color, StrokeMethod};
-use kurbo::{BezPath, Rect, Shape as _};
+use koharu_scene::{Align, Color, StrokeMethod}; // Booharu: text borders.
+use kurbo::{BezPath, Rect, Shape as _}; // Booharu: text borders.
 use unicode_bidi::{BidiInfo, Level};
 
+// Booharu: `contour`, the Contour borders.
 use super::{
     ResolvedText, TextRun,
     breaks::{Break, Segment},
@@ -114,7 +115,7 @@ pub(super) fn arrange(
     }
 
     let (runs, text_runs) = runs(shaped, &glyphs, scale);
-    // A second border reaches past the first.
+    // Booharu: text borders. A second border reaches past the first.
     let stroke = styled
         .spans
         .iter()
@@ -141,7 +142,7 @@ pub(super) fn arrange(
             line_height: styled.line_height,
             uncovered: shaped.uncovered.clone(),
         },
-        // A Contour border covers its region, which a slanted or bold
+        // Booharu: a Contour border covers its region, which a slanted or bold
         // letter's ink can carry past the lines.
         bounds: contours.iter().flatten().fold(
             bounds
@@ -416,6 +417,7 @@ fn runs(shaped: &ShapedText, glyphs: &[Positioned], scale: f32) -> (Vec<GlyphRun
             size: span.size * scale,
             fill: span.fill,
             stroke: span.stroke.map(|(color, width)| (color, width * scale)),
+            // Booharu: the second border.
             outer_stroke: span
                 .outer_stroke
                 .map(|(color, width)| (color, width * scale)),
@@ -557,7 +559,7 @@ mod tests {
                 size: 16.0,
                 fill: koharu_scene::Color::BLACK,
                 stroke: None,
-                outer_stroke: None,
+                outer_stroke: None, // Booharu: the second border.
             }],
             vertical: false,
             align: Align::Start,
@@ -565,7 +567,7 @@ mod tests {
             hyphenation: None,
             chinese: false,
             frame: Frame::Point,
-            stroke_method: Default::default(),
+            stroke_method: Default::default(), // Booharu: the border method.
         }
     }
 

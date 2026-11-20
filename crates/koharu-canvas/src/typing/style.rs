@@ -17,6 +17,7 @@ pub enum CharKey {
     Fill,
     Stroke,
     StrokeWidth,
+    // Booharu: the second border's keys.
     OuterStroke,
     OuterStrokeWidth,
 }
@@ -57,6 +58,7 @@ pub(super) fn shared(mut styles: impl Iterator<Item = CharStyle>) -> (CharStyle,
             CharKey::StrokeWidth,
             chars.stroke_width == style.stroke_width,
         );
+        // Booharu: the second border.
         differs(
             CharKey::OuterStroke,
             chars.outer_stroke == style.outer_stroke,
@@ -75,6 +77,7 @@ pub(super) fn shared(mut styles: impl Iterator<Item = CharStyle>) -> (CharStyle,
             CharKey::Fill => chars.fill = None,
             CharKey::Stroke => chars.stroke = None,
             CharKey::StrokeWidth => chars.stroke_width = None,
+            // Booharu: the second border.
             CharKey::OuterStroke => chars.outer_stroke = None,
             CharKey::OuterStrokeWidth => chars.outer_stroke_width = None,
         }

@@ -345,7 +345,7 @@ mod tests {
                 size: 16.0,
                 fill: Color::BLACK,
                 stroke: None,
-                outer_stroke: None,
+                outer_stroke: None, // Booharu: the second border.
             }],
             vertical: false,
             align: Align::Start,
@@ -353,7 +353,7 @@ mod tests {
             hyphenation: None,
             chinese: false,
             frame: Frame::Point,
-            stroke_method: Default::default(),
+            stroke_method: Default::default(), // Booharu: the border method.
         }
     }
 
@@ -376,7 +376,7 @@ mod tests {
             size: 16.0,
             fill: Color::BLACK,
             stroke: None,
-            outer_stroke: None,
+            outer_stroke: None, // Booharu: the second border.
         };
         let styled = Styled {
             spans: vec![span(0..4), span(4..text.len())],

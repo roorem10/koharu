@@ -53,6 +53,7 @@ impl CharStyle {
             fill: self.fill.or(base.fill),
             stroke: self.stroke.or(base.stroke),
             stroke_width: self.stroke_width.or(base.stroke_width),
+            // Booharu: the second border.
             outer_stroke: self.outer_stroke.or(base.outer_stroke),
             outer_stroke_width: self.outer_stroke_width.or(base.outer_stroke_width),
         }

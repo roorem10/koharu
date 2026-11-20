@@ -14,7 +14,7 @@ use crate::fonts::Font;
 
 mod arrange;
 mod breaks;
-mod contour;
+mod contour; // Booharu: the Contour borders.
 mod draw;
 mod fit;
 mod itemize;

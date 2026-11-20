@@ -4,10 +4,10 @@
 use anyhow::Result;
 use glifo::FontEmbolden;
 use kurbo::{Affine, Diagonal2, Join};
-use vello_gpu::peniko::{Color, Fill};
+use vello_gpu::peniko::{Color, Fill}; // Booharu: Fill, for the Contour borders.
 
 use super::TextLayout;
-use crate::{Drawing, fonts::Font};
+use crate::{Drawing, fonts::Font}; // Booharu: Font, for bold and turn.
 
 /// What one pass over a layout's glyph runs draws.
 #[derive(Clone, Copy)]
@@ -21,8 +21,9 @@ enum Pass {
 /// Draws `layout`'s glyph runs onto `drawing` through `transform`, its
 /// strokes too when `strokes` says so. Strokes draw first, under every fill,
 /// as Photoshop draws an Outside stroke under its type: as the glyphs grown
-/// by the stroke's width with round joins, or, by Booharu's Contour method,
-/// as the regions the layout grew from its merged letters.
+/// by the stroke's width with round joins.
+/// Booharu: or, by its Contour method, as the regions the layout grew from
+/// its merged letters.
 pub(crate) fn draw(
     drawing: &mut Drawing,
     layout: &TextLayout,
@@ -30,6 +31,8 @@ pub(crate) fn draw(
     strokes: bool,
 ) -> Result<()> {
     drawing.scene.set_transform(transform);
+    // Booharu: Contour borders fill their regions under every fill; otherwise a
+    // second border draws under the stroke, and the stroke under the fill.
     let passes: &[Pass] = match (strokes, &layout.contours) {
         (true, Some(regions)) => {
             drawing.scene.set_fill_rule(Fill::NonZero);
@@ -67,6 +70,7 @@ pub(crate) fn draw(
     Ok(())
 }
 
+// Booharu: bold and turn, out of `draw` for contour.rs to share.
 /// How far `font`'s synthetic bold grows each side of its glyphs at `size`:
 /// a fiftieth of the size.
 pub(super) fn bold(font: &Font, size: f32) -> f64 {

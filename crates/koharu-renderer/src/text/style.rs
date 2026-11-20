@@ -5,6 +5,7 @@ use std::ops::Range;
 
 use anyhow::Result;
 use hypher::Lang;
+// Booharu: StrokeMethod, the border method.
 use koharu_scene::{Align, CharStyle, Color, Direction, Frame, StrokeMethod, Text};
 
 use crate::fonts::Font;
@@ -68,6 +69,7 @@ impl Styled {
                     }
                     _ => None,
                 },
+                // Booharu: the second border.
                 outer_stroke: match (style.stroke, style.stroke_width, style.outer_stroke) {
                     (Some(_), Some(inner), Some(color)) if inner > 0.0 => style
                         .outer_stroke_width
@@ -94,6 +96,7 @@ impl Styled {
                 .and_then(Lang::from_iso),
             chinese: text.language.language.as_str() == "zh",
             frame: text.frame.clone(),
+            // Booharu: the border method.
             stroke_method: text.style.stroke_method.unwrap_or_default(),
         })
     }

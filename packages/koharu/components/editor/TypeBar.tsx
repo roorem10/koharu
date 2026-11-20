@@ -4,7 +4,7 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
-  ArrowRightLeft,
+  ArrowRightLeft, // Booharu: the colour swap.
   ChevronDown,
   Italic,
   Minus,
@@ -37,7 +37,7 @@ import {
   type Direction,
   type FontFamily,
   type LayerId,
-  type StrokeMethod,
+  type StrokeMethod, // Booharu: the border method.
   type Text,
   type TextStyle,
   type Value,
@@ -86,7 +86,7 @@ export function TypeBar() {
   const { t } = useTranslation()
   const tool = useKoharuStore((state) => state.tool)
   const borderWidthId = useId()
-  const secondBorderWidthId = useId()
+  const secondBorderWidthId = useId() // Booharu: the second border's width.
   const page = usePage().data
   const selectedIds = useKoharuStore((state) => state.selectedLayers)
   const defaultFont = useKoharuStore(
@@ -148,6 +148,7 @@ export function TypeBar() {
   const applyChars = (patch: CharStyle) => {
     if (!typing) return apply({ chars: patch })
     // A mark can't unset a value, so no border on some characters is a border no wide.
+    // Booharu: the same for the second border, so `marked` is a let.
     let marked: CharStyle =
       patch.stroke === null ? { ...patch, stroke: undefined, stroke_width: 0 } : patch
     if (marked.outer_stroke === null) {
@@ -179,7 +180,7 @@ export function TypeBar() {
   const strokeWidth = chars.stroke_width ?? 0
   const stroke = chars.stroke ?? null
   const strokeEnabled = stroke !== null && stroke[3] > 0 && strokeWidth > 0
-  // Booharu's second border, which only a first border has: each character's own, whatever its
+  // Booharu: the second border, which only a first border has: each character's own, whatever its
   // colour or width. While typing, the canvas doesn't say, so differing borders count.
   const bordered =
     strokeEnabled ||
@@ -429,6 +430,7 @@ export function TypeBar() {
                 </NumberFieldIncrement>
               </NumberFieldGroup>
             </NumberField>
+            {/* Booharu: swap the text's colour and its border's. */}
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -573,10 +575,12 @@ const CHAR_KEYS: CharKey[] = [
   'fill',
   'stroke',
   'stroke_width',
+  // Booharu: the second border's keys.
   'outer_stroke',
   'outer_stroke_width',
 ]
 
+// Booharu: exported for its test, and it says whether every character has a border.
 /** What every character of `texts` shares, each span's marks over its text's style, and the values
  * they don't, which it leaves empty, as the canvas reports a typed selection's; and, for Booharu's
  * second border, whether every character has a border of its own. */

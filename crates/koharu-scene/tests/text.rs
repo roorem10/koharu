@@ -214,6 +214,7 @@ fn a_blocks_translation_comes_and_goes_with_its_own_ops() {
     assert!(matches!(error, Error::Locked { .. }), "{error}");
 }
 
+// Booharu: the border keys stay out of the file until set.
 #[test]
 fn booharu_border_keys_are_left_out_until_set() {
     use koharu_scene::{Rgba, StrokeMethod, TextStyle};

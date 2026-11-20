@@ -131,6 +131,7 @@ A typed character takes the marks of the one before it, or the first one's at
 the start, as typing does in an editor, and spans whose marks end up alike
 join.
 
+<!-- Booharu: text borders. -->
 Booharu adds a second border, `outer_stroke` and `outer_stroke_width`,
 character keys drawn around the stroke and only with one, and a paragraph key,
 `stroke_method`: `contour` (no value) grows the borders from the letters merged
