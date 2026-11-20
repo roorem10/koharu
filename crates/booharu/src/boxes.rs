@@ -917,8 +917,11 @@ fn half_record(layer: &Layer) -> Auto {
 /// translation, which neither half holds any more, and the split's run
 /// writes fresh ones. Until it does, the planner plans reading and
 /// translating the half, and wording typed into it counts as typed by hand
-/// (`edited`), which the run then leaves alone. Detection's record stays, as
-/// the half is still part of the box detection found, and so does
+/// (`edited`), which the run then leaves alone. A half of a translated block
+/// whose clean-up was hidden by hand has no translation and its clean-up
+/// hidden, as one hidden by hand on a block with none (`sfx::hand_kept`),
+/// which the run leaves untranslated, for Redo boxes. Detection's record
+/// stays, as the half is still part of the box detection found, and so does
 /// inpainting's, as the half keeps its part of the clean-up. Undo puts them
 /// back with the rest of the block.
 fn unread(layer: &Layer, target: &Ref) -> Vec<Op> {
