@@ -14,11 +14,14 @@ import {
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { BoldToggle } from '@/components/booharu/words/BoldToggle' // Booharu: B (D12).
+import { EmphasisButton } from '@/components/booharu/words/EmphasisButton' // Booharu: the star.
 import { ColorWell } from '@/components/controls/ColorWell'
 import { FontPicker } from '@/components/controls/FontPicker'
 import { ContextBar } from '@/components/editor/ContextBar'
 import { call, dispatch } from '@/lib/backend'
 import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: favourites and local names.
+import { isItalic, weightChoices } from '@/lib/booharu/words' // Booharu: I and the weights (D12).
 import {
   expandLayerSelection,
   isBlockLayer,
@@ -172,10 +175,16 @@ export function TypeBar() {
   }, [availableFonts, defaultFont])
   const family = mixed.has('family') ? '' : (chars.family ?? defaultFont)
   const selectedFamily = families.find((candidate) => sameFont(candidate.name, family))
-  const italics = hasItalic(selectedFamily)
-  const italic = Boolean(chars.italic) && italics
+  // Booharu: italic as the characters have it, on every font, as the renderer slants a family with
+  // no italic face (D12), by the rule Ctrl+I and the Story panel share.
+  const italic = isItalic(chars, mixed)
   const weight = chars.weight ?? 400
-  const weights = usableFontWeights(selectedFamily, italic)
+  // Booharu: the family's own weights of either style, with regular, bold and the weight shown, none
+  // snapped to a face, as the renderer makes a weight a family lacks (D12).
+  const weights = weightChoices(
+    [...usableFontWeights(selectedFamily, false), ...usableFontWeights(selectedFamily, true)],
+    weight,
+  )
   const size = mixed.has('size') ? null : Math.round((chars.size ?? 24) * 100) / 100
   const strokeWidth = chars.stroke_width ?? 0
   const stroke = chars.stroke ?? null
@@ -222,15 +231,9 @@ export function TypeBar() {
           families={families}
           size='sm'
           {...booharuFonts} // Booharu: favourites and local names.
-          onChange={(next) => {
-            const nextFamily = families.find((candidate) => sameFont(candidate.name, next))
-            const nextItalic = italic && hasItalic(nextFamily)
-            applyChars({
-              family: next,
-              italic: nextItalic,
-              weight: nearestFontWeight(usableFontWeights(nextFamily, nextItalic), weight),
-            })
-          }}
+          // Booharu: only the family, so B and I stay on, on the box and on single words, and a font
+          // change resets only the words' families (D22).
+          onChange={(next) => applyChars({ family: next })}
         />
       </div>
       <Select
@@ -248,6 +251,8 @@ export function TypeBar() {
           ))}
         </SelectContent>
       </Select>
+      {/* Booharu: B beside the weights, pressed while every character is bold (D12). */}
+      <BoldToggle chars={chars} mixed={mixed} className={toggle} onChange={applyChars} />
       <Tooltip>
         <TooltipTrigger
           render={
@@ -256,14 +261,10 @@ export function TypeBar() {
               size='sm'
               aria-label={t('inspector.fontStyles.italic')}
               className={toggle}
-              disabled={!italics && !italic}
               pressed={italic}
-              onPressedChange={(nextItalic) =>
-                applyChars({
-                  italic: nextItalic,
-                  weight: nearestFontWeight(usableFontWeights(selectedFamily, nextItalic), weight),
-                })
-              }
+              // Booharu: never disabled, and only italic, as the renderer slants a family with no
+              // italic face (D12).
+              onPressedChange={(nextItalic) => applyChars({ italic: nextItalic })}
             />
           }
         >
@@ -271,6 +272,8 @@ export function TypeBar() {
         </TooltipTrigger>
         <TooltipContent>{t('inspector.fontStyles.italic')}</TooltipContent>
       </Tooltip>
+      {/* Booharu: the star, which stresses words typed or chosen in Story, never a whole box. */}
+      <EmphasisButton layer={current?.id} />
       <div className='w-[4.5rem]'>
         <FontSizeField
           disabled={false}
@@ -611,9 +614,7 @@ export function sharedChars(texts: Text[]): {
   return { chars, mixed, bordered }
 }
 
-function hasItalic(family: FontFamily | undefined): boolean {
-  return Boolean(family?.faces.some((face) => face.italic))
-}
+// Booharu: no hasItalic, as italic shows on every font (D12).
 
 function usableFontWeights(family: FontFamily | undefined, italic: boolean): number[] {
   if (!family) return [400]
@@ -632,13 +633,7 @@ function usableFontWeights(family: FontFamily | undefined, italic: boolean): num
   return [...weights].sort((left, right) => left - right)
 }
 
-function nearestFontWeight(weights: number[], target: number): number {
-  return weights.reduce(
-    (nearest, weight) =>
-      Math.abs(weight - target) < Math.abs(nearest - target) ? weight : nearest,
-    weights[0] ?? target,
-  )
-}
+// Booharu: no nearestFontWeight, as no weight is snapped to a face (D12).
 
 function sameFont(left: string, right: string): boolean {
   const normalize = (value: string) =>

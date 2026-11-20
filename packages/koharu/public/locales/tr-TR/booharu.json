@@ -547,6 +547,11 @@
       "outlineWidth": "Kenarlık genişliği",
       "title": "Varsayılan metin stili",
       "width": "Genişlik"
+    },
+    "words": {
+      "bold": "Kalın",
+      "emphasis": "Vurgu",
+      "italic": "İtalik"
     }
   },
   "errors": {

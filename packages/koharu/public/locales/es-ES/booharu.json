@@ -592,6 +592,11 @@
       "outlineWidth": "Ancho del contorno",
       "title": "Estilo de texto predeterminado",
       "width": "Ancho"
+    },
+    "words": {
+      "bold": "Negrita",
+      "emphasis": "Énfasis",
+      "italic": "Cursiva"
     }
   },
   "errors": {

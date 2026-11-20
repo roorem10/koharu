@@ -547,6 +547,11 @@
       "outlineWidth": "描边宽度",
       "title": "默认文字样式",
       "width": "宽度"
+    },
+    "words": {
+      "bold": "粗体",
+      "emphasis": "强调",
+      "italic": "斜体"
     }
   },
   "errors": {

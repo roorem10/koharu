@@ -547,6 +547,11 @@
       "outlineWidth": "테두리 너비",
       "title": "기본 텍스트 스타일",
       "width": "너비"
+    },
+    "words": {
+      "bold": "굵게",
+      "emphasis": "강조",
+      "italic": "기울임꼴"
     }
   },
   "errors": {

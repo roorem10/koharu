@@ -547,6 +547,11 @@
       "outlineWidth": "Outline width",
       "title": "Default text style",
       "width": "Width"
+    },
+    "words": {
+      "bold": "Bold",
+      "emphasis": "Emphasis",
+      "italic": "Italic"
     }
   },
   "errors": {

@@ -721,6 +721,11 @@
       "outlineWidth": "عرض الحدود",
       "title": "نمط النص الافتراضي",
       "width": "العرض"
+    },
+    "words": {
+      "bold": "عريض",
+      "emphasis": "إبراز",
+      "italic": "مائل"
     }
   },
   "errors": {

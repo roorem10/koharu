@@ -592,6 +592,11 @@
       "outlineWidth": "Épaisseur du contour",
       "title": "Style de texte par défaut",
       "width": "Épaisseur"
+    },
+    "words": {
+      "bold": "Gras",
+      "emphasis": "Mise en valeur",
+      "italic": "Italique"
     }
   },
   "errors": {

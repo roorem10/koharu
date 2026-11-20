@@ -592,6 +592,11 @@
       "outlineWidth": "Largura do contorno",
       "title": "Estilo de texto padrão",
       "width": "Largura"
+    },
+    "words": {
+      "bold": "Negrito",
+      "emphasis": "Ênfase",
+      "italic": "Itálico"
     }
   },
   "errors": {

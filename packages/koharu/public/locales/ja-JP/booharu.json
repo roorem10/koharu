@@ -547,6 +547,11 @@
       "outlineWidth": "縁取り幅",
       "title": "既定のテキストスタイル",
       "width": "幅"
+    },
+    "words": {
+      "bold": "太字",
+      "emphasis": "強調",
+      "italic": "斜体"
     }
   },
   "errors": {

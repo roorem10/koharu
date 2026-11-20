@@ -547,6 +547,11 @@
       "outlineWidth": "描邊寬度",
       "title": "預設文字樣式",
       "width": "寬度"
+    },
+    "words": {
+      "bold": "粗體",
+      "emphasis": "強調",
+      "italic": "斜體"
     }
   },
   "errors": {
