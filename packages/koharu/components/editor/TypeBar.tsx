@@ -30,6 +30,7 @@ import {
   italicWords,
   keepWords,
   styleWords,
+  unmarkTyping,
   useChosenWords,
   weightChoices,
 } from '@/lib/booharu/words' // Booharu: I, the weights (D12) and words chosen in Story.
@@ -313,9 +314,12 @@ export function TypeBar() {
               className={toggle}
               pressed={italic}
               // Booharu: never disabled, and only italic, as the renderer slants a family with no
-              // italic face (D12); for words chosen in Story, as the word toolbar's I.
+              // italic face (D12); for words chosen in Story, as the word toolbar's I; off while
+              // typing takes the italic off the characters for real (S11-d).
               onPressedChange={(nextItalic) =>
-                applyChars({ italic: nextItalic }, italicWords(italic))
+                typing && italic
+                  ? unmarkTyping('italic')
+                  : applyChars({ italic: nextItalic }, italicWords(italic))
               }
             />
           }

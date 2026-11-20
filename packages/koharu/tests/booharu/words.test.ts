@@ -8,34 +8,16 @@ import {
   isItalic,
   italicPatch,
   italicWords,
+  pressTyped,
   setWordRange,
   styleWords,
-  typedBold,
-  typedItalic,
-  typedWeight,
   useWordRange,
   utf8Offset,
   weightChoices,
   type WordRange,
 } from '@/lib/booharu/words'
-import { commands, type Layer, type Text, type Typed } from '@koharu/ipc/protocol'
+import { commands, type Text, type Typed } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
-
-/** A text layer whose own style has `weight`, or none. */
-function textLayer(id: string, weight?: number): Layer {
-  return {
-    id,
-    name: id,
-    visible: true,
-    locked: false,
-    opacity: 1,
-    blend: 'normal',
-    attributes: {},
-    kind: 'text',
-    content: [{ insert: 'Hello' }],
-    style: { chars: weight === undefined ? { size: 24 } : { size: 24, weight } },
-  }
-}
 
 describe('Booharu B and I rules', () => {
   it('shows B pressed only while every character shares a weight of 600 or more', () => {
@@ -54,16 +36,10 @@ describe('Booharu B and I rules', () => {
     expect(isItalic({}, ['italic'])).toBe(false)
   })
 
-  it('gives bold from off and from mixed weights, and regular or the typed text weight back', () => {
+  it('gives bold from off and from mixed weights, and regular back', () => {
     expect(boldPatch(false)).toEqual({ weight: 700 })
     expect(boldPatch(isBold({}, ['weight']))).toEqual({ weight: 700 })
     expect(boldPatch(true)).toEqual({ weight: 400 })
-    // Typing on a light text gives its own weight back; on a bold one, regular.
-    expect(boldPatch(true, 300)).toEqual({ weight: 300 })
-    expect(boldPatch(true, 400)).toEqual({ weight: 400 })
-    expect(boldPatch(true, 700)).toEqual({ weight: 400 })
-    expect(boldPatch(true, null)).toEqual({ weight: 400 })
-    expect(boldPatch(false, 300)).toEqual({ weight: 700 })
   })
 
   it('gives italic unless every character is italic', () => {
@@ -79,26 +55,33 @@ describe('Booharu B and I rules', () => {
     expect(italicWords(false)).toEqual({ italic: true })
   })
 
-  it("reads the typed text's own weight, which a new text has none of", () => {
-    const layers = [textLayer('light', 300), textLayer('plain')]
-    expect(typedWeight(layers, 'light')).toBe(300)
-    expect(typedWeight(layers, 'plain')).toBeUndefined()
-    expect(typedWeight(layers, null)).toBeUndefined()
-    expect(typedWeight(layers, 'gone')).toBeUndefined()
-    expect(typedWeight(undefined, 'light')).toBeUndefined()
-
-    const typing = (layer: string | null, typed: Partial<Typed>): Typed => ({
-      layer,
+  it('styles the characters typed on, and takes the mark off them for real off (S11-d)', () => {
+    const styled = vi.spyOn(commands, 'styleTyping').mockResolvedValue(null)
+    const unmarked = vi.spyOn(commands, 'booharuUnmarkTyping').mockResolvedValue(null)
+    const typing = (typed: Partial<Typed>): Typed => ({
+      layer: 'text',
       chars: {},
       mixed: [],
       ...typed,
     })
-    expect(typedBold(typing('light', { chars: { weight: 700 } }), layers)).toEqual({ weight: 300 })
-    expect(typedBold(typing('plain', { chars: { weight: 700 } }), layers)).toEqual({ weight: 400 })
-    expect(typedBold(typing(null, { chars: { weight: 700 } }), layers)).toEqual({ weight: 400 })
-    expect(typedBold(typing('light', { mixed: ['weight'] }), layers)).toEqual({ weight: 700 })
-    expect(typedItalic(typing('plain', { chars: { italic: true } }))).toEqual({ italic: false })
-    expect(typedItalic(typing('plain', { mixed: ['italic'] }))).toEqual({ italic: true })
+
+    pressTyped('bold', typing({ chars: { weight: 400 } }))
+    pressTyped('bold', typing({ mixed: ['weight'] }))
+    pressTyped('italic', typing({ chars: { italic: false } }))
+    pressTyped('italic', typing({ mixed: ['italic'] }))
+    expect(styled.mock.calls).toEqual([
+      [{ weight: 700 }],
+      [{ weight: 700 }],
+      [{ italic: true }],
+      [{ italic: true }],
+    ])
+    expect(unmarked).not.toHaveBeenCalled()
+
+    // A new text being typed too: the canvas knows its own style.
+    pressTyped('bold', typing({ layer: null, chars: { weight: 600 } }))
+    pressTyped('italic', typing({ chars: { italic: true } }))
+    expect(unmarked.mock.calls).toEqual([['bold'], ['italic']])
+    expect(styled).toHaveBeenCalledTimes(4)
   })
 
   it("offers the family's weights with regular, bold and the one shown, never snapped", () => {

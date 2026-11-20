@@ -3,32 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { reservedKeys } from '@/lib/booharu/keys'
 import { typingShortcut, useTypingShortcuts } from '@/lib/booharu/typingKeys'
-import { pageKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { commands, type CharStyle, type Page, type Typed } from '@koharu/ipc/protocol'
-
-/** A page whose text layer `text` has the style `chars`. */
-function pageWith(chars: CharStyle): Page {
-  return {
-    id: 'page',
-    size: { width: 800, height: 1200 },
-    background: null,
-    layers: [
-      {
-        id: 'text',
-        name: 'Text',
-        visible: true,
-        locked: false,
-        opacity: 1,
-        blend: 'normal',
-        attributes: {},
-        kind: 'text',
-        content: [{ insert: 'Hello' }],
-        style: { chars: { size: 24, ...chars } },
-      },
-    ],
-  }
-}
+import { commands, type CharStyle, type Typed } from '@koharu/ipc/protocol'
 
 /** A key pressed on `target`, the page itself unless named; `keyCode` stands in for the one
  * Chromium gives, which jsdom leaves out. */
@@ -49,10 +25,11 @@ function typing(chars: CharStyle, mixed: Typed['mixed'] = []): Typed {
 }
 
 let styled: ReturnType<typeof vi.spyOn>
+let unmarked: ReturnType<typeof vi.spyOn>
 
 beforeEach(() => {
   styled = vi.spyOn(commands, 'styleTyping').mockResolvedValue(undefined as never)
-  queryClient.setQueryData(pageKey, pageWith({}))
+  unmarked = vi.spyOn(commands, 'booharuUnmarkTyping').mockResolvedValue(undefined as never)
 })
 
 afterEach(() => {
@@ -66,48 +43,41 @@ describe('Booharu Ctrl+B and Ctrl+I while typing', () => {
     expect(reservedKeys.has('ctrl+i')).toBe(true)
   })
 
-  it('makes the characters typed bold, and regular again, with Ctrl or Cmd', () => {
+  it('makes the characters typed bold with Ctrl or Cmd, and takes the bold off them (S11-d)', () => {
     renderHook(() => useTypingShortcuts())
     useKoharuStore.setState({ typing: typing({ weight: 400 }) })
 
     expect(press(ctrlB).defaultPrevented).toBe(true)
     expect(styled).toHaveBeenLastCalledWith({ weight: 700 })
 
+    // Off takes the weight mark off for real, so the text's own weight shows again.
     useKoharuStore.setState({ typing: typing({ weight: 700 }) })
     expect(press({ key: 'b', code: 'KeyB', metaKey: true }).defaultPrevented).toBe(true)
-    expect(styled).toHaveBeenLastCalledWith({ weight: 400 })
+    expect(unmarked).toHaveBeenCalledExactlyOnceWith('bold')
 
     // Mixed weights go bold, every one.
     useKoharuStore.setState({ typing: typing({}, ['weight']) })
     press(ctrlB)
     expect(styled).toHaveBeenLastCalledWith({ weight: 700 })
-    expect(styled).toHaveBeenCalledTimes(3)
+    expect(styled).toHaveBeenCalledTimes(2)
+    expect(unmarked).toHaveBeenCalledOnce()
   })
 
-  it("gives a light text's own weight back as B goes off", () => {
-    queryClient.setQueryData(pageKey, pageWith({ weight: 300 }))
-    renderHook(() => useTypingShortcuts())
-    useKoharuStore.setState({ typing: typing({ weight: 700 }) })
-
-    press(ctrlB)
-
-    expect(styled).toHaveBeenCalledExactlyOnceWith({ weight: 300 })
-  })
-
-  it('makes the characters typed italic unless every one is', () => {
+  it('makes the characters typed italic unless every one is, and takes the italic off them', () => {
     renderHook(() => useTypingShortcuts())
     useKoharuStore.setState({ typing: typing({ italic: false }) })
     expect(press(ctrlI).defaultPrevented).toBe(true)
     expect(styled).toHaveBeenLastCalledWith({ italic: true })
 
     useKoharuStore.setState({ typing: typing({ italic: true }) })
-    press(ctrlI)
-    expect(styled).toHaveBeenLastCalledWith({ italic: false })
+    expect(press(ctrlI).defaultPrevented).toBe(true)
+    expect(unmarked).toHaveBeenCalledExactlyOnceWith('italic')
 
     useKoharuStore.setState({ typing: typing({}, ['italic']) })
     press(ctrlI)
     expect(styled).toHaveBeenLastCalledWith({ italic: true })
-    expect(styled).toHaveBeenCalledTimes(3)
+    expect(styled).toHaveBeenCalledTimes(2)
+    expect(unmarked).toHaveBeenCalledOnce()
   })
 
   it('goes by the letter a layout types, or the place of B and I where it types none', () => {
@@ -144,19 +114,21 @@ describe('Booharu Ctrl+B and Ctrl+I while typing', () => {
 
     expect(left.map((event) => event.defaultPrevented)).toEqual(left.map(() => false))
     expect(styled).not.toHaveBeenCalled()
+    expect(unmarked).not.toHaveBeenCalled()
   })
 
   it('leaves a key another handler took, and stops listening once unmounted', () => {
     const shortcuts = renderHook(() => useTypingShortcuts())
-    useKoharuStore.setState({ typing: typing({ weight: 400 }) })
+    useKoharuStore.setState({ typing: typing({ weight: 700 }) })
     const taken = (event: KeyboardEvent) => event.preventDefault()
     document.body.addEventListener('keydown', taken)
     press(ctrlB)
     document.body.removeEventListener('keydown', taken)
-    expect(styled).not.toHaveBeenCalled()
+    expect(unmarked).not.toHaveBeenCalled()
 
     shortcuts.unmount()
     expect(press(ctrlB).defaultPrevented).toBe(false)
     expect(styled).not.toHaveBeenCalled()
+    expect(unmarked).not.toHaveBeenCalled()
   })
 })

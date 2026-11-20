@@ -111,7 +111,7 @@ describe('Booharu italic and the font picker in the TypeBar', () => {
     expect(edits).toEqual([restyled({ italic: false })])
   })
 
-  it('styles the characters typed with italic alone', async () => {
+  it('takes the italic off the characters typed for real (S11-d)', async () => {
     const user = userEvent.setup()
     const { bar } = renderBar(pageWith({ family: 'Wild Words' }), {
       layer: 'text',
@@ -121,7 +121,8 @@ describe('Booharu italic and the font picker in the TypeBar', () => {
 
     await user.click(bar.getByRole('button', { name: 'Italic' }))
 
-    expect(commands.styleTyping).toHaveBeenCalledExactlyOnceWith({ italic: false })
+    expect(commands.booharuUnmarkTyping).toHaveBeenCalledExactlyOnceWith('italic')
+    expect(commands.styleTyping).not.toHaveBeenCalled()
   })
 
   it('changes only the family, so bold words stay bold and the box stays italic (D22)', async () => {
@@ -229,9 +230,9 @@ describe('Booharu weights and B in the TypeBar', () => {
     ])
   })
 
-  it("gives a light text's own weight back when B goes off while typing", async () => {
+  it('takes the bold off the characters typed for real when B goes off (S11-d)', async () => {
     const user = userEvent.setup()
-    const { bar } = renderBar(pageWith({ family: 'Comic', weight: 300 }), {
+    const { edits, bar } = renderBar(pageWith({ family: 'Comic', weight: 300 }), {
       layer: 'text',
       chars: { family: 'Comic', weight: 700 },
       mixed: [],
@@ -241,25 +242,29 @@ describe('Booharu weights and B in the TypeBar', () => {
     expect(bold).toHaveAttribute('aria-pressed', 'true')
     await user.click(bold)
 
-    expect(commands.styleTyping).toHaveBeenCalledExactlyOnceWith({ weight: 300 })
+    expect(commands.booharuUnmarkTyping).toHaveBeenCalledExactlyOnceWith('bold')
+    expect(commands.styleTyping).not.toHaveBeenCalled()
+    expect(edits).toEqual([])
   })
 
-  it('gives regular back while typing on a regular or bold text, and bold on', async () => {
+  it('makes the characters typed bold while typing, mixed weights too', async () => {
     const user = userEvent.setup()
     const { bar } = renderBar(pageWith({ family: 'Comic', weight: 700 }), {
       layer: 'text',
-      chars: { family: 'Comic', weight: 700 },
+      chars: { family: 'Comic', weight: 400 },
       mixed: [],
     })
     await user.click(bar.getByRole('button', { name: 'Bold' }))
-    expect(commands.styleTyping).toHaveBeenLastCalledWith({ weight: 400 })
+    expect(commands.styleTyping).toHaveBeenLastCalledWith({ weight: 700 })
 
     useKoharuStore.setState({ typing: { layer: 'text', chars: {}, mixed: ['weight'] } })
     await waitFor(() =>
       expect(bar.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'false'),
     )
     await user.click(bar.getByRole('button', { name: 'Bold' }))
+    expect(commands.styleTyping).toHaveBeenCalledTimes(2)
     expect(commands.styleTyping).toHaveBeenLastCalledWith({ weight: 700 })
+    expect(commands.booharuUnmarkTyping).not.toHaveBeenCalled()
   })
 })
 

@@ -2,7 +2,8 @@
 
 import { create } from 'zustand'
 
-import { findLayer, letteringOf, plainText } from '@/lib/document'
+import { call } from '@/lib/backend'
+import { letteringOf, plainText } from '@/lib/document'
 import i18n from '@/lib/i18n'
 import {
   commands,
@@ -13,6 +14,7 @@ import {
   type Span,
   type Text,
   type Typed,
+  type Unmark,
   type WordChange,
 } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
@@ -47,13 +49,11 @@ export function isItalic(chars: CharStyle, mixed: MixedKeys): boolean {
   return !isMixed(mixed, 'italic') && chars.italic === true
 }
 
-/** What pressing B gives characters, `bold` being whether it shows pressed: bold, 700, unless
- * every one already is, so mixed weights go bold too; then regular, 400. While typing, `typedOver`
- * is the weight of the text typed into: under 600, B off gives that weight back, since a typed
- * mark can't be taken off, so the characters look as if it were. */
-export function boldPatch(bold: boolean, typedOver?: number | null): CharStyle {
-  if (!bold) return { weight: BOLD_WEIGHT }
-  return { weight: typedOver != null && typedOver < BOLD_FROM ? typedOver : REGULAR_WEIGHT }
+/** What pressing B gives the characters of whole texts, `bold` being whether it shows pressed:
+ * bold, 700, unless every one already is, so mixed weights go bold too; then regular, 400. While
+ * typing, B off takes the mark off instead (`pressTyped`). */
+export function boldPatch(bold: boolean): CharStyle {
+  return { weight: bold ? REGULAR_WEIGHT : BOLD_WEIGHT }
 }
 
 /** What pressing I gives characters, `italic` being whether it shows pressed: italic, unless every
@@ -76,27 +76,22 @@ export function italicWords(italic: boolean): WordChange {
   return { italic: !italic }
 }
 
-/** The weight of the text being typed into, `layer` among `layers`, under its characters' marks:
- * a block's translation's or a text layer's own; none for a new text, a text with no weight of its
- * own, or a layer `layers` lacks. */
-export function typedWeight(
-  layers: Layer[] | undefined,
-  layer: LayerId | null,
-): number | undefined {
-  if (!layers || layer === null) return undefined
-  const placed = findLayer(layers, layer)
-  return (placed && letteringOf(placed.layer)?.style?.chars?.weight) ?? undefined
+/** Takes `what` off the characters the canvas types, for real (S11-d): every mark, the weight or
+ * the italic, or regular or upright where the text itself is bold or italic, as the words edit
+ * takes bold and italic off chosen words; at a caret, off the next ones typed. */
+export function unmarkTyping(what: Unmark): void {
+  void call(commands.booharuUnmarkTyping, what).catch(() => undefined)
 }
 
-/** What B gives the characters the canvas types, as the type bar's B and Ctrl+B give it, `layers`
- * being the shown page's. */
-export function typedBold(typing: Typed, layers: Layer[] | undefined): CharStyle {
-  return boldPatch(isBold(typing.chars, typing.mixed), typedWeight(layers, typing.layer))
-}
-
-/** What I gives the characters the canvas types, as the type bar's I and Ctrl+I give it. */
-export function typedItalic(typing: Typed): CharStyle {
-  return italicPatch(isItalic(typing.chars, typing.mixed))
+/** Presses B, or I, for the characters the canvas types, sharing what `typing` says, as the type
+ * bar's B and I and Ctrl+B and Ctrl+I do: bold, 700, or italic, unless every one already is; then
+ * off, which takes the mark off them (`unmarkTyping`). */
+export function pressTyped(kind: 'bold' | 'italic', typing: Typed): void {
+  const on =
+    kind === 'bold' ? isBold(typing.chars, typing.mixed) : isItalic(typing.chars, typing.mixed)
+  if (on) return unmarkTyping(kind)
+  const patch = kind === 'bold' ? boldPatch(false) : italicPatch(false)
+  void call(commands.styleTyping, patch).catch(() => undefined)
 }
 
 /** The weights the type bar's list offers: `real`, the family's own of either style, with
