@@ -465,8 +465,8 @@ pub struct Edited {
     pub style: bool,
     /// It was drawn by hand: no detection made it, as the O tool's boxes.
     /// A split's halves keep the detection record they were copied with, so
-    /// they aren't: a split changes neither their wording nor their look,
-    /// and only Detect again keeps them, by their record's [`Auto::split`].
+    /// they aren't: a split writes no wording or look of its own, and only
+    /// Detect again keeps them, by their record's [`Auto::split`].
     pub drawn: bool,
 }
 
@@ -1046,8 +1046,8 @@ mod tests {
     #[test]
     fn a_split_half_isnt_drawn_by_hand() {
         // A split's half keeps the detection record it was copied with, and
-        // its record says it's a half of a block split by hand, which
-        // changed neither its wording nor its look.
+        // its record says it's a half of a block split by hand, which wrote
+        // no wording or look of its own.
         let (_dir, mut session, block) = page("", &["detection"]);
         let half = Auto {
             split: true,

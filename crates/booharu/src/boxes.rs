@@ -313,11 +313,12 @@ const HALF_SIZE: f64 = 4.0;
 /// the source's own coordinates, so a tilted source stays tilted; each mask
 /// and clean-up keeps only its pixels on its side of the cut. Both lose their
 /// source wording and their translation, for the Recognition and
-/// Translation stages to write again, and keep the clean-up shown or hidden
-/// as it was, a sound effect kept as art with its kept mark and a line given
-/// back with its record. Both are marked as split from then on, so Detect
-/// again keeps them; [`split_halves`] finds both in the edit's change. A
-/// block whose halves would be under 4 pixels is refused.
+/// Translation stages to write again, with Koharu's records of reading and
+/// translating the whole block ([`unread`]), and keep the clean-up shown or
+/// hidden as it was, a sound effect kept as art with its kept mark and a
+/// line given back with its record. Both are marked as split from then on,
+/// so Detect again keeps them; [`split_halves`] finds both in the edit's
+/// change. A block whose halves would be under 4 pixels is refused.
 pub fn split_block(session: &Session, block: LayerId) -> Result<Edit> {
     let project = session.project();
     let layer = project.layer(block)?;
@@ -406,8 +407,10 @@ pub fn split_block(session: &Session, block: LayerId) -> Result<Edit> {
             !first_side(point)
         })?);
     }
-    ops.extend(dropped(layer, &block.into(), true)?);
-    ops.extend(dropped(layer, &copy, true)?);
+    for half in [block.into(), copy] {
+        ops.extend(dropped(layer, &half, true)?);
+        ops.extend(unread(layer, &half));
+    }
     Ok(Edit {
         label: SPLIT_BLOCK.to_owned(),
         ops,
@@ -879,7 +882,7 @@ fn dropped(layer: &Layer, target: &Ref, record: bool) -> Result<Vec<Op>> {
 /// read before the edit: split, as the split cut the half's box by hand
 /// though it keeps the detection record it was copied with, so Detect again
 /// keeps it (D1), as it keeps a box drawn with the O tool, while Apply
-/// restyles it, as a split changes neither its wording nor its look; the
+/// restyles it, as a split writes no wording or look of its own; the
 /// kept mark of an effect Booharu kept as art; and, for a line the
 /// Translation stage gave back unchanged, the translation of no text that
 /// records it (`styles::given_back`), as Koharu's stage leaves no record of
@@ -898,6 +901,29 @@ fn half_record(layer: &Layer) -> Auto {
         text: given_back.then(|| text_hash("")),
         ..Auto::default()
     }
+}
+
+/// The ops dropping from `layer`, as `target`, a half a split makes of it,
+/// Koharu's records of reading and translating it, `c2pa.ocr` and
+/// `c2pa.translation`: they describe the whole block's source and
+/// translation, which neither half holds any more, and the split's run
+/// writes fresh ones. Until it does, the planner plans reading and
+/// translating the half, and wording typed into it counts as typed by hand
+/// (`edited`), which the run then leaves alone. Detection's record stays, as
+/// the half is still part of the box detection found, and so does
+/// inpainting's, as the half keeps its part of the clean-up. Undo puts them
+/// back with the rest of the block.
+fn unread(layer: &Layer, target: &Ref) -> Vec<Op> {
+    [status::OCR, status::TRANSLATION]
+        .into_iter()
+        .filter(|step| booharu_core::styles::recorded(layer, step))
+        .map(|step| Op::SetAttribute {
+            layer: target.clone(),
+            namespace: "c2pa".to_owned(),
+            key: step.to_owned(),
+            value: None,
+        })
+        .collect()
 }
 
 /// Refuses when `layer`, or a layer holding it, is locked.
@@ -2589,53 +2615,134 @@ mod tests {
     #[test]
     fn a_split_line_given_back_stays_given_back_so_its_run_translates_it() -> Result<()> {
         use booharu_core::{protect, runs::RunStage, settings::LetteringSettings, sfx};
+        // Given back on its first translation, and on a later one, which
+        // leaves the earlier one's record, which the split drops.
+        for earlier in [false, true] {
+            let mut page = Fixture::new(400, 400, &[rect(0.0, 0.0, 400.0, 400.0)])?;
+            let block = page.add(
+                None,
+                json!({"kind": "block", "source": {
+                    "frame": {"box": {"bounds": page_bounds(100.0, 20.0, 40.0, 100.0)}},
+                    "direction": "vertical",
+                    "content": "!?",
+                }, "attributes": {"c2pa": {
+                    "detection": {"action": "c2pa.created"},
+                    "ocr": {"action": "c2pa.created"},
+                }}}),
+            )?;
+            if earlier {
+                page.session
+                    .apply(edit(vec![made(block, "translation", "c2pa.translated")]))?;
+            }
+            // Given back unchanged, as the Translation stage leaves such a
+            // line: no translation, its clean-up hidden, and only Booharu's
+            // record of a translation of no text, as Koharu's stage records
+            // none there.
+            let given = booharu_core::styles::given_back(page.session.project().layer(block)?)?;
+            page.session.apply(edit(vec![
+                Op::UpdateLayer {
+                    layer: block.into(),
+                    patch: json!({"cleanup": {"visible": false}}),
+                },
+                given,
+            ]))?;
+            let change = page.session.apply(split_block(&page.session, block)?)?;
+            let halves = split_halves(block, &change)?;
+            let settings = LetteringSettings::default();
+            for (&id, words) in halves.iter().zip(["!", "?"]) {
+                // The split's own run reads each half.
+                page.update(id, json!({"source": {"content": words}}))?;
+                let read =
+                    booharu_core::styles::recognized(page.session.project().layer(id)?, words)?;
+                page.session.apply(edit(vec![read]))?;
+                let project = page.session.project();
+                let (on, layer, half) = (
+                    project.page(page.page)?,
+                    project.layer(id)?,
+                    page.block(id)?,
+                );
+                assert!(!half.cleanup.visible && half.translation.is_none());
+                assert!(!booharu_core::styles::recorded(layer, status::TRANSLATION));
+                // Still a line given back, never a clean-up hidden by hand,
+                // so the run translates it.
+                assert!(status::given_back(layer, &half));
+                assert!(!sfx::hand_kept(layer, &half));
+                assert_eq!(
+                    protect::left_out(on, layer, RunStage::Translate, &settings, false, false),
+                    None
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_split_drops_the_blocks_reading_and_translation_for_its_run_to_write() -> Result<()> {
+        use booharu_core::{
+            protect::{self, Reason},
+            runs::RunStage,
+            settings::{LetteringSettings, QcSettings},
+            styles::recorded,
+        };
         let mut page = Fixture::new(400, 400, &[rect(0.0, 0.0, 400.0, 400.0)])?;
-        let block = page.add(
-            None,
-            json!({"kind": "block", "source": {
-                "frame": {"box": {"bounds": page_bounds(100.0, 20.0, 40.0, 100.0)}},
-                "direction": "vertical",
-                "content": "!?",
-            }, "attributes": {"c2pa": {
-                "detection": {"action": "c2pa.created"},
-                "ocr": {"action": "c2pa.created"},
-            }}}),
-        )?;
-        // Given back unchanged, as the Translation stage leaves such a line:
-        // no translation, its clean-up hidden, and only Booharu's record of a
-        // translation of no text, as Koharu's stage records none there.
-        let given = booharu_core::styles::given_back(page.session.project().layer(block)?)?;
-        page.session.apply(edit(vec![
-            Op::UpdateLayer {
-                layer: block.into(),
-                patch: json!({"cleanup": {"visible": false}}),
-            },
-            given,
-        ]))?;
+        let bounds = page_bounds(100.0, 20.0, 40.0, 100.0);
+        let block = page.add(None, text_block(bounds, Direction::Vertical, "あいう"))?;
+        // Detected, read, cleaned and translated by the stages.
+        run_on(&mut page, block, "Who?")?;
+        page.session
+            .apply(edit(vec![made(block, "inpainting", "c2pa.created")]))?;
+        let settings = LetteringSettings::default();
+        assert!(crate::runs::plan(&page.session, &[page.page], &settings)?.is_empty());
+        let before = page.session.history().current;
+
         let change = page.session.apply(split_block(&page.session, block)?)?;
         let halves = split_halves(block, &change)?;
-        let settings = LetteringSettings::default();
-        for (&id, words) in halves.iter().zip(["!", "?"]) {
-            // The split's own run reads each half.
-            page.update(id, json!({"source": {"content": words}}))?;
-            let read = booharu_core::styles::recognized(page.session.project().layer(id)?, words)?;
-            page.session.apply(edit(vec![read]))?;
-            let project = page.session.project();
-            let (on, layer, half) = (
-                project.page(page.page)?,
-                project.layer(id)?,
-                page.block(id)?,
-            );
-            assert!(!half.cleanup.visible && half.translation.is_none());
-            // Still a line given back, never a clean-up hidden by hand, so
-            // the run translates it.
-            assert!(status::given_back(layer, &half));
-            assert!(!sfx::hand_kept(layer, &half));
+
+        // Until the split's run reads and translates the halves, the planner
+        // plans both, and the quality check takes neither for a block read
+        // as empty.
+        let plan = crate::runs::plan(&page.session, &[page.page], &settings)?;
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan[0].stages, [Stage::Recognize, Stage::Translate]);
+        let project = page.session.project();
+        let renderer = koharu_renderer::Renderer::new(koharu_renderer::RendererConfig {
+            font_families: Vec::new(),
+        });
+        let qc = QcSettings { min_size: 0.01 };
+        let inputs = crate::qc::Inputs::new(&project, &qc, "en".parse()?, settings.clone(), None);
+        let found = crate::qc::check_page(&renderer, &project, page.page, &inputs)?;
+        assert!(found.is_empty(), "{found:?}");
+
+        // Wording typed into a half before its run is typed by hand, which
+        // the run leaves alone, as Redo boxes counts it.
+        translate(&mut page, halves[0], "Wh")?;
+        page.update(halves[1], json!({"source": {"content": "う"}}))?;
+        let project = page.session.project();
+        let on = project.page(page.page)?;
+        for (id, stage) in [
+            (halves[0], RunStage::Translate),
+            (halves[1], RunStage::Recognize),
+        ] {
+            let layer = project.layer(id)?;
             assert_eq!(
-                protect::left_out(on, layer, RunStage::Translate, &settings, false, false),
-                None
+                protect::left_out(on, layer, stage, &settings, false, false),
+                Some(Reason::HandFixed)
             );
+            let counts = crate::redo::count_redo(&project, &[id], &[stage], &settings)?;
+            assert_eq!((counts.ready, counts.hand_fixed), (0, 1));
         }
+
+        // The halves keep detection's and inpainting's records, and undo
+        // gives the block back Koharu's records of reading and translating
+        // it.
+        for &id in &halves {
+            let layer = project.layer(id)?;
+            assert!(recorded(layer, status::DETECTION) && recorded(layer, status::INPAINTING));
+            assert!(!recorded(layer, status::OCR) && !recorded(layer, status::TRANSLATION));
+        }
+        page.session.go_to(before)?;
+        let layer = page.session.project().layer(block)?.clone();
+        assert!(recorded(&layer, status::OCR) && recorded(&layer, status::TRANSLATION));
         Ok(())
     }
 
@@ -2684,7 +2791,7 @@ mod tests {
 
         // A box drawn with the O tool, translated by the stage, is drawn by
         // hand, which Apply keeps; the halves, whose run wrote their look,
-        // take the new font, as a split changes neither wording nor look.
+        // take the new font, as a split writes no wording or look of its own.
         let drawn = page.add_box(page_bounds(250.0, 20.0, 40.0, 100.0), OcrBoxMode::Read)?;
         stage_translates(&mut page, drawn, "Hey")?;
         assert!(booharu_core::edited(page.session.project().layer(drawn)?).drawn);

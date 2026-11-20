@@ -116,8 +116,8 @@ pub struct Auto {
     /// cut by hand, though it keeps the detection record it was copied
     /// with. `protect::keeps` reads it, so Detect again keeps the half, as
     /// it keeps a box drawn by hand; nothing else counts it as changed by
-    /// hand, as a split changes neither wording nor look, so Apply restyles
-    /// it as any other box. Automatic steps keep it.
+    /// hand, as a split writes no wording or look of its own, so Apply
+    /// restyles it as any other box. Automatic steps keep it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub split: bool,
 }
