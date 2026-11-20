@@ -14,6 +14,7 @@ import {
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { LineSpacing } from '@/components/booharu/typebar/LineSpacing' // Booharu: S11-i.
 import { BoldToggle } from '@/components/booharu/words/BoldToggle' // Booharu: B (D12).
 import { EmphasisButton } from '@/components/booharu/words/EmphasisButton' // Booharu: the star.
 import { ColorWell } from '@/components/controls/ColorWell'
@@ -402,6 +403,13 @@ export function TypeBar() {
           </Tooltip>
         ))}
       </div>
+      {/* Booharu: line spacing, which only the paragraph has (S11-i). */}
+      <LineSpacing
+        value={style.line_height ?? null}
+        mixed={share.line_height.mixed && drafted?.line_height === undefined}
+        disabled={!paragraph}
+        onChange={(lineHeight) => apply({ line_height: lineHeight })}
+      />
       <Tooltip>
         <TooltipTrigger
           render={
