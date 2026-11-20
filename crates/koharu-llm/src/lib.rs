@@ -2,6 +2,7 @@
 //! connected with rig's own types: a `vendor/model` reference, its
 //! `ModelSpec`, and a `DynModel`.
 
+pub mod booharu; // Booharu: what a run knows of a model before it connects one.
 mod context;
 mod hosted;
 mod local;
