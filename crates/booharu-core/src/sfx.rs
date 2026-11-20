@@ -13,9 +13,11 @@
 //! clean-up hidden, with the kept mark in its hand-edit record
 //! ([`kept_original`]), so a clean-up hidden by hand can be told from
 //! Booharu's own ([`hand_kept`]), and one shown again by hand from one
-//! Booharu never kept ([`hand_shown`]). The mark is never Koharu's given-back
-//! record, which would have the quality check report every effect as given
-//! back untranslated. A first translation typed into such an effect on the
+//! Booharu never kept ([`hand_shown`]). The mark is never the given-back
+//! record, which [`crate::styles::given_back`] writes when Koharu's
+//! Translation stage is given its source back, as the stage records nothing
+//! there; it would have the quality check report every effect as given back
+//! untranslated. A first translation typed into such an effect on the
 //! canvas shows its clean-up again and takes the mark off ([`shown_again`]),
 //! as one typed in the Story panel does.
 //!
