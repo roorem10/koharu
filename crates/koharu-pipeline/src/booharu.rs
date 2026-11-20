@@ -23,7 +23,9 @@
 //!   among it while the run's Pick fonts automatically is on, and the marks
 //!   of the words its model picked to stress, taking off those a run left on
 //!   the one it replaces, and records what the stage wrote; `given_back`
-//!   records a translation it cleared, given back unchanged.
+//!   records a translation it cleared, given back unchanged, and
+//!   `given_back_patch` clears it, but keeps a placeholder, the style set by
+//!   hand on a block before it was translated (D1).
 //! - `recognized`, in the Recognition stage, records the wording it read.
 //! - `seed`, right after the Translation stage's `keep`, starts a project's
 //!   translation conversation that holds nothing yet, as one does the first
@@ -57,7 +59,7 @@ use booharu_core::{
     emphasis::{EmphasisSettings, Marking},
     runs::{RunPolicy, RunStage},
     settings::Snapshot,
-    styles,
+    status, styles,
 };
 use koharu_llm::rig::{
     catalog::ModelSpec,
@@ -68,7 +70,7 @@ use koharu_llm::rig::{
     operation::Completion,
 };
 use koharu_renderer::RendererConfig;
-use koharu_scene::{LayerId, Op, PageId, Project, Session};
+use koharu_scene::{Content, LayerId, Op, PageId, Project, Session};
 use parking_lot::Mutex;
 use rig_agent::run::PromptError;
 use serde::Serialize;
@@ -258,6 +260,26 @@ pub(crate) fn translated(
 /// no translation, read before the edit.
 pub(crate) fn given_back(project: &Project, block: LayerId) -> anyhow::Result<Op> {
     styles::given_back(project.layer(block)?)
+}
+
+/// The patch of the Translation stage's clearing of `block`'s translation,
+/// given back unchanged, read before its edit: Koharu's, the translation
+/// gone and the clean-up hidden, so the page keeps its own lettering. A
+/// placeholder (`status::placeholder`), a style set by hand on the block
+/// before it was translated, stays (D1): it shows no words, so only the
+/// clean-up hides, and [`given_back`]'s record tells the block was given
+/// back (`status::given_back`), its values still the user's.
+pub(crate) fn given_back_patch(project: &Project, block: LayerId) -> serde_json::Value {
+    let styled = project
+        .layer(block)
+        .is_ok_and(|layer| match &layer.content {
+            Content::Block(found) => status::placeholder(layer, found),
+            _ => false,
+        });
+    match styled {
+        true => serde_json::json!({"cleanup": {"visible": false}}),
+        false => serde_json::json!({"translation": null, "cleanup": {"visible": false}}),
+    }
 }
 
 /// The op recording `text`, the wording the Recognition stage read for

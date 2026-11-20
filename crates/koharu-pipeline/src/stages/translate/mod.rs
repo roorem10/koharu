@@ -276,7 +276,8 @@ pub(crate) fn written(
         let Some(placed) = placed else {
             ops.push(Op::UpdateLayer {
                 layer: block.into(),
-                patch: json!({"translation": null, "cleanup": {"visible": false}}),
+                // Booharu: Koharu's, but a placeholder styled by hand stays (D1).
+                patch: crate::booharu::given_back_patch(project, block),
             });
             // Booharu: the hand-edit record of no translation.
             ops.push(crate::booharu::given_back(project, block)?);

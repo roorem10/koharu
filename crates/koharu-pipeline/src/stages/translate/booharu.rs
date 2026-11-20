@@ -1,8 +1,9 @@
 //! Booharu's tests of the Translation stage when its run asks the model
-//! which words to stress (S10-e), and when it translates a block skewed by
-//! hand again (S12-h), mounted by a marked line in `mod.rs`, as they drive
-//! the stage's own turn, private to it, and the stage itself, with rig's
-//! scripted model in place of a real one.
+//! which words to stress (S10-e), when it translates a block skewed by hand
+//! again (S12-h), and when it translates, or is given back, a block styled
+//! by hand before it was translated, mounted by a marked line in `mod.rs`,
+//! as they drive the stage's own turn, private to it, and the stage itself,
+//! with rig's scripted model in place of a real one.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -13,11 +14,17 @@ use std::{
 use anyhow::{Context as _, Result};
 use booharu_core::{
     attrs::{self, Auto, Skew},
+    edited,
     emphasis::EmphasisSettings,
-    settings::Snapshot,
-    skew,
+    lettering::{CategoryFont, LetteringCategory},
+    settings::{DefaultTextStyle, LetteringSettings, Snapshot},
+    sfx, skew, status,
+    styles::text_hash,
 };
-use koharu_scene::{Content, Created, Edit, LayerId, Op, PageId, RichText, Session, Text};
+use koharu_scene::{
+    Block, Content, Created, Direction, Edit, Frame, Layer, LayerId, Op, PageId, Rgba, RichText,
+    Session, Text,
+};
 use kurbo::{Affine, Point};
 use parking_lot::{Mutex, RwLock};
 use rig_core::{
@@ -425,6 +432,29 @@ impl Chapter {
         let translation = block.translation.clone().context("a translation")?;
         Ok((translation, attrs::get::<Skew>(layer)))
     }
+
+    /// The layer of the block on the page at `index`, as it is now.
+    fn layer(&self, index: usize) -> Result<Layer> {
+        let project = self.session.lock().project();
+        Ok(project.layer(self.blocks[index])?.clone())
+    }
+
+    /// Applies `ops` as one edit, as the user's.
+    fn edit(&self, ops: Vec<Op>) -> Result<()> {
+        self.session.lock().apply(Edit {
+            label: "test".to_owned(),
+            ops,
+        })?;
+        Ok(())
+    }
+}
+
+/// The block `layer` holds.
+fn block(layer: &Layer) -> Result<&Block> {
+    match &layer.content {
+        Content::Block(block) => Ok(block),
+        _ => anyhow::bail!("not a block"),
+    }
 }
 
 /// A run's snapshot with `[booharu-emphasis]` as it starts, asking its model
@@ -576,5 +606,176 @@ async fn a_block_skewed_by_hand_keeps_its_skew_when_translated_again() -> Result
             .all(|(a, b)| (a - b).abs() <= 1e-9),
         "{drawn:?}"
     );
+    Ok(())
+}
+
+const GREEN: Rgba = Rgba([0.0, 0.5, 0.0, 1.0]);
+const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
+const BLACK: Rgba = Rgba([0.0, 0.0, 0.0, 1.0]);
+
+/// The op Koharu's type bar sends to style `block`, which has no translation
+/// yet, with `patch` on its translation, as a family or a colour picked
+/// before translating: the scene starts the translation from empty point
+/// text, a placeholder (`status::placeholder`).
+fn type_bar(block: LayerId, patch: serde_json::Value) -> Op {
+    Op::UpdateLayer {
+        layer: block.into(),
+        patch: json!({"translation": patch}),
+    }
+}
+
+/// A run's snapshot lettering new text in CCWildWords, Floating, which every
+/// block of a [`Chapter`] is, italic in it while Pick fonts automatically is
+/// on, and with colour detection off, so the default look's red fill and
+/// black outline 2.5 wide replace what placement measured.
+fn lettered() -> Snapshot {
+    let floating = CategoryFont {
+        family: None,
+        bold: false,
+        italic: true,
+    };
+    Snapshot {
+        lettering: LetteringSettings {
+            default: DefaultTextStyle {
+                fill: Some(RED),
+                stroke: Some(BLACK),
+                stroke_width: 2.5,
+            },
+            detect_colors: false,
+            auto: true,
+            categories: BTreeMap::from([(LetteringCategory::Floating, floating)]),
+            ..LetteringSettings::default()
+        },
+        font: Some("CCWildWords".to_owned()),
+        ..Snapshot::default()
+    }
+}
+
+#[tokio::test]
+async fn a_box_styled_before_its_translated_is_translated_in_the_style_set_by_hand() -> Result<()> {
+    let chapter = Chapter::new(["まさか!", "どうして"])?;
+    let reference = "mock/pfix-styled";
+    let model = model(&[r#"{"1": "No way!"}"#, r#"{"1": "Why?"}"#]);
+    let _hosted = Hosted::new(reference, model.clone().erase());
+    // Styled on the type bar before either is translated: the first in a
+    // family and a colour of the user's, vertical, the second in a colour
+    // alone. Each is a placeholder the planner still translates.
+    chapter.edit(vec![
+        type_bar(
+            chapter.blocks[0],
+            json!({"style": {"chars": {"family": "Comic Neue", "fill": GREEN}},
+                "direction": "vertical"}),
+        ),
+        type_bar(
+            chapter.blocks[1],
+            json!({"style": {"chars": {"fill": GREEN}}}),
+        ),
+    ])?;
+    for index in 0..2 {
+        let layer = chapter.layer(index)?;
+        let found = block(&layer)?;
+        assert!(status::placeholder(&layer, found), "{index}");
+        assert!(status::untranslated(&layer, found), "{index}");
+    }
+    let pages = Target::Pages(chapter.pages.clone());
+    chapter.translate(pages, reference, lettered()).await?;
+    for (index, text) in [(0, "No way!"), (1, "Why?")] {
+        let layer = chapter.layer(index)?;
+        let found = block(&layer)?;
+        let translation = found.translation.as_ref().context("a translation")?;
+        // Sent and written, in placement's place: its source's box filled,
+        // horizontal for English whatever was set before (D13).
+        assert_eq!(translation.content.text(), text, "{index}");
+        assert!(
+            matches!(translation.frame, Frame::Box { .. }),
+            "{index}: {:?}",
+            translation.frame
+        );
+        assert_eq!(translation.direction, Direction::Horizontal, "{index}");
+        assert!(found.cleanup.visible, "{index}");
+        assert!(!status::unwritten(&layer, found), "{index}");
+        // The colour set by hand stays; the default look's outline fills
+        // the keys left unset.
+        let chars = &translation.style.chars;
+        assert_eq!(
+            (chars.fill, chars.stroke, chars.stroke_width),
+            (Some(GREEN), Some(BLACK), Some(2.5)),
+            "{index}"
+        );
+        // The record holds the run's text and the keys the look wrote as
+        // automatic, and none of the user's, which stay hand edits.
+        let record = Auto::of(&layer);
+        assert_eq!(record.text, Some(text_hash(text)), "{index}");
+        let style = record.style.context("a style")?;
+        assert_eq!(
+            (style.fill, style.stroke, style.stroke_width),
+            (None, Some(BLACK), Some(2.5)),
+            "{index}"
+        );
+        let hand = edited(&layer);
+        assert_eq!((hand.text, hand.style), (false, true), "{index}");
+    }
+    // The family set by hand stays, with no category font, and isn't
+    // recorded; the box without one takes its category's, Floating's
+    // italic in the default font, recorded as automatic.
+    type Font = (Option<String>, Option<bool>);
+    let font = |index: usize| -> Result<(Font, Font)> {
+        let layer = chapter.layer(index)?;
+        let translation = block(&layer)?
+            .translation
+            .clone()
+            .context("a translation")?;
+        let chars = translation.style.chars;
+        let style = Auto::of(&layer).style.context("a style")?;
+        Ok(((chars.family, chars.italic), (style.family, style.italic)))
+    };
+    assert_eq!(
+        font(0)?,
+        ((Some("Comic Neue".to_owned()), None), (None, None))
+    );
+    let floating = (Some("CCWildWords".to_owned()), Some(true));
+    assert_eq!(font(1)?, (floating.clone(), floating));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_box_styled_before_its_translated_and_given_back_keeps_its_style() -> Result<()> {
+    let chapter = Chapter::new(["まさか!", "どうして"])?;
+    let reference = "mock/pfix-given-back";
+    // Each answer is its source: a line given back unchanged.
+    let model = model(&[r#"{"1": "まさか!"}"#, r#"{"1": "どうして"}"#]);
+    let _hosted = Hosted::new(reference, model.clone().erase());
+    let styled = json!({"style": {"chars": {"family": "Comic Neue", "fill": GREEN}}});
+    chapter.edit(vec![type_bar(chapter.blocks[0], styled)])?;
+    let pages = Target::Pages(chapter.pages.clone());
+    chapter.translate(pages, reference, lettered()).await?;
+    // The first keeps its placeholder and the style set by hand on it (D1),
+    // while its clean-up hides, so the page's own lettering shows, and it
+    // reads as given back: neither hidden by hand nor still to translate,
+    // so the planner plans nothing more for it.
+    let layer = chapter.layer(0)?;
+    let found = block(&layer)?;
+    let translation = found.translation.as_ref().context("the placeholder")?;
+    assert!(status::placeholder(&layer, found));
+    assert_eq!(
+        (
+            translation.style.chars.family.as_deref(),
+            translation.style.chars.fill
+        ),
+        (Some("Comic Neue"), Some(GREEN))
+    );
+    assert!(!found.cleanup.visible);
+    assert_eq!(Auto::of(&layer).text, Some(text_hash("")));
+    assert!(status::given_back(&layer, found));
+    assert!(!sfx::hand_kept(&layer, found));
+    assert!(!status::untranslated(&layer, found));
+    assert!(!Auto::of(&layer).kept);
+    assert!(edited(&layer).style, "its values stay the user's");
+    // A block with no translation is given back as Koharu gives one back.
+    let layer = chapter.layer(1)?;
+    let found = block(&layer)?;
+    assert_eq!(found.translation, None);
+    assert!(!found.cleanup.visible);
+    assert!(status::given_back(&layer, found));
     Ok(())
 }
