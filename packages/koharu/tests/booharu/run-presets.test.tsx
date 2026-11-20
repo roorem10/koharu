@@ -10,7 +10,13 @@ import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands } from '@koharu/ipc/protocol'
 
-import { builtInLettering, builtInReading, builtInRuns, settingsDesktop } from './settings'
+import {
+  builtInEmphasis,
+  builtInLettering,
+  builtInReading,
+  builtInRuns,
+  settingsDesktop,
+} from './settings'
 
 /** The interface's strings, as the tests' setup has them. */
 const { i18n } = reactI18next.useTranslation()
@@ -84,6 +90,7 @@ describe('Booharu run presets in the Run menu', () => {
       'booharu-reading': builtInReading,
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
+      'booharu-emphasis': builtInEmphasis,
     })
     // The menu goes back to its root view, where the new preset shows as the stages on.
     const saved = await within(screen.getByRole('group', { name: 'Presets' })).findByRole(

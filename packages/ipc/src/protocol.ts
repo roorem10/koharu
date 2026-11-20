@@ -292,6 +292,7 @@ export type BooharuPreferences = {
   'booharu-reading': ReadingSettings
   'booharu-qc': QcSettings
   'booharu-start': StartSettings
+  'booharu-emphasis': EmphasisSettings
 }
 
 /**
@@ -639,6 +640,58 @@ export type Edit = {
   /**  The undo menu label. */
   label: string
   ops: Op[]
+}
+
+/**
+ *  `[booharu-emphasis]`: how a stressed word looks, the Emphasis button's
+ *  and a run's alike, and whether a run's translation stresses the words its
+ *  model picks.
+ */
+export type EmphasisSettings = {
+  /**
+   *  Whether a run's translation marks the words its model picked for
+   *  emphasis. Off, it marks none, though it still takes off the marks a
+   *  run left on the translation it replaces.
+   */
+  ai?: boolean
+  /**
+   *  How every category's stressed words look, but for the values a
+   *  category's own sets: bold at 115% of the text's size to start with.
+   *  It sets at least one value.
+   */
+  default?: EmphasisStyle
+  /**
+   *  The categories whose stressed words look different, by id: each
+   *  entry sets at least one value, which replaces the default's. A null
+   *  entry, which only a JSON caller can send, as the settings tool does,
+   *  removes it.
+   */
+  categories?: Partial<{ [key in LetteringCategory]: EmphasisStyle }>
+}
+
+/**
+ *  The values a stressed word gets in place of its text's own, each none to
+ *  keep the text's. Its default sets none.
+ */
+export type EmphasisStyle = {
+  /**  The font family, never blank. */
+  family?: string | null
+  /**  The weight, from 1 to 1000: 400 is regular and 700 bold. */
+  weight?: number | null
+  /**  Whether it's italic; false sets it upright in an italic text. */
+  italic?: boolean | null
+  /**  Its size as a multiple of the text's, from 0.25 to 4. */
+  size_factor?: number | null
+  /**  The text's colour. */
+  fill?: Rgba | null
+  /**  The outline's colour. */
+  stroke?: Rgba | null
+  /**  The outline's width in pixels, from 0 to 100. */
+  stroke_width?: number | null
+  /**  The second border's colour, drawn outside the first. */
+  outer_stroke?: Rgba | null
+  /**  The second border's width in pixels, from 0 to 100. */
+  outer_stroke_width?: number | null
 }
 
 /**
@@ -2232,6 +2285,34 @@ export type Vendor = {
   connected: boolean
 }
 
+/**
+ *  What a words edit does to its words: exactly one of `clear`, `emphasis`,
+ *  or the explicit values, `set`, `bold` and `italic`, which may go
+ *  together.
+ */
+export type WordChange = {
+  /**  The values the words get, each one set written over theirs. */
+  set?: CharStyle
+  /**
+   *  Bold, weight 700; false takes the words' weight off, or sets regular,
+   *  400, where the text itself is bold (600 or more). Not with a weight
+   *  in `set`.
+   */
+  bold?: boolean | null
+  /**
+   *  Italic; false takes the words' italic off, or sets upright where the
+   *  text itself is italic. Not with an italic in `set`.
+   */
+  italic?: boolean | null
+  /**
+   *  Stressed as `[booharu-emphasis]` says for the layer's lettering
+   *  category, a text layer's as the default emphasis.
+   */
+  emphasis?: boolean
+  /**  Every value of the words' own taken off, so they look as the text. */
+  clear?: boolean
+}
+
 export const commands = {
   listProjects: () => invoke<string[]>('list_projects', {}, { headers: headers() }),
   /** Creates a project and opens it. */
@@ -2494,6 +2575,22 @@ export const commands = {
       { blocks, stages, includeHandFixed },
       { headers: headers() },
     ),
+  /** Styles the characters `start` to `end`, UTF-8 byte offsets, of the text of `layer`, a block's translation or a text layer's, as `change` says, as one undo step labelled `booharu_style_words`, `text` being the plain text the words were chosen in. A change that changes nothing makes no undo step. Refused, with why: a change asking for none or more than one of clear, emphasis and explicit values; a layer that's neither a block nor a text layer, or is locked or inside a locked layer; a block without a translation; a text that changed since ("The text changed. Select the words again."); and a range that holds no character, or is past the text or off a character boundary. */
+  booharuStyleWords: (
+    layer: LayerId,
+    start: number,
+    end: number,
+    text: string,
+    change: WordChange,
+  ) =>
+    invoke<null>(
+      'booharu_style_words',
+      { layer, start, end, text, change },
+      { headers: headers() },
+    ),
+  /** The marks the emphasis star gives the text typed into `layer`, a block or a text layer: its lettering category's emphasis, a text layer's the default, over its text's own values, so only what changes is set. Refused for a layer that's neither, and for a locked one. */
+  booharuEmphasisPatch: (layer: LayerId) =>
+    invoke<CharStyle>('booharu_emphasis_patch', { layer }, { headers: headers() }),
 }
 
 export const events = {

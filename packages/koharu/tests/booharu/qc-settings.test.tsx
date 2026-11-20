@@ -7,7 +7,13 @@ import { PipelinePreferences } from '@/components/preferences/PipelinePreference
 import { minSizePercent, minSizeShare } from '@/lib/booharu/qc'
 import { queryClient } from '@/lib/queries'
 
-import { builtInLettering, builtInReading, builtInRuns, settingsDesktop } from './settings'
+import {
+  builtInEmphasis,
+  builtInLettering,
+  builtInReading,
+  builtInRuns,
+  settingsDesktop,
+} from './settings'
 
 describe('Booharu quality check settings', () => {
   it('shows the smallest readable text as a percentage, and takes only 0.1% to 10%', () => {
@@ -58,6 +64,7 @@ describe('Booharu quality check settings', () => {
       'booharu-reading': builtInReading,
       'booharu-qc': { min_size: 0.015 },
       'booharu-start': { fresh_start_note_seen: false },
+      'booharu-emphasis': builtInEmphasis,
     })
 
     await user.click(section.getByRole('button', { name: 'Increase smallest readable text' }))

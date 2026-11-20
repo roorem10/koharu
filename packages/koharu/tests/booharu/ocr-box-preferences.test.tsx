@@ -8,7 +8,7 @@ import { queryClient } from '@/lib/queries'
 import { commands, type BooharuPreferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
-import { builtInReading, builtInRuns } from './settings'
+import { builtInEmphasis, builtInReading, builtInRuns } from './settings'
 
 /** The sections these tests leave alone, as the desktop answers them. */
 const OTHERS = {
@@ -27,6 +27,7 @@ const OTHERS = {
   'booharu-reading': builtInReading,
   'booharu-qc': { min_size: 0.01 },
   'booharu-start': { fresh_start_note_seen: false },
+  'booharu-emphasis': builtInEmphasis,
 } satisfies Partial<BooharuPreferences>
 
 /** The Booharu settings the desktop's file holds, which another writer, such as the agent's

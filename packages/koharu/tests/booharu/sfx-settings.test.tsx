@@ -7,7 +7,13 @@ import { PipelinePreferences } from '@/components/preferences/PipelinePreference
 import { queryClient } from '@/lib/queries'
 import { toast } from '@koharu/ui/components/toast'
 
-import { builtInLettering, builtInReading, builtInRuns, settingsDesktop } from './settings'
+import {
+  builtInEmphasis,
+  builtInLettering,
+  builtInReading,
+  builtInRuns,
+  settingsDesktop,
+} from './settings'
 
 const NOTE =
   'Koharu marks every sound effect it finds. Pick another category for a box to translate it anyway, or add a subtitle from its menu.'
@@ -66,6 +72,7 @@ describe('Booharu sound effects setting', () => {
       'booharu-reading': builtInReading,
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
+      'booharu-emphasis': builtInEmphasis,
     })
     await waitFor(() => expect(shownMode(select)).toBe('Translate all'))
     expect(select).toHaveAccessibleDescription(`Translate and letter every sound effect. ${NOTE}`)

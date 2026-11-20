@@ -3,6 +3,7 @@ import { vi } from 'vitest'
 import {
   commands,
   type BooharuPreferences,
+  type EmphasisSettings,
   type LetteringSettings,
   type ReadingSettings,
   type RunsSettings,
@@ -39,6 +40,23 @@ export const builtInReading = {
   pages_per_request: 20,
 } satisfies ReadingSettings
 
+/** `[booharu-emphasis]` as the desktop answers it while the file sets nothing. */
+export const builtInEmphasis = {
+  ai: true,
+  default: {
+    family: null,
+    weight: 700,
+    italic: null,
+    size_factor: 1.15,
+    fill: null,
+    stroke: null,
+    stroke_width: null,
+    outer_stroke: null,
+    outer_stroke_width: null,
+  },
+  categories: {},
+} satisfies EmphasisSettings
+
 /** The desktop with every command answering null, and the Booharu settings its file holds, which
  * another writer, such as the agent's settings tool, may change while a page shows them; `saves`
  * lists what each save sent. */
@@ -55,6 +73,7 @@ export function settingsDesktop(lettering: LetteringSettings = builtInLettering)
       'booharu-reading': structuredClone(builtInReading),
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
+      'booharu-emphasis': structuredClone(builtInEmphasis),
     },
   }
   const saves: BooharuPreferences[] = []

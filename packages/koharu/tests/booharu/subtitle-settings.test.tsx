@@ -9,7 +9,13 @@ import { queryClient } from '@/lib/queries'
 import { commands, type FontFamily } from '@koharu/ipc/protocol'
 
 import { fontFamilies } from './fonts'
-import { builtInLettering, builtInReading, builtInRuns, settingsDesktop } from './settings'
+import {
+  builtInEmphasis,
+  builtInLettering,
+  builtInReading,
+  builtInRuns,
+  settingsDesktop,
+} from './settings'
 
 const SIZE = 'Sound effect subtitle size'
 
@@ -90,6 +96,7 @@ describe('Booharu sound effect subtitles settings', () => {
       'booharu-reading': builtInReading,
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
+      'booharu-emphasis': builtInEmphasis,
     })
 
     await user.click(region.getByRole('button', { name: 'Increase sound effect subtitle size' }))
