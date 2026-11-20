@@ -17,19 +17,24 @@
 //!   translation the Translation stage wrote, the words it marked for
 //!   emphasis, and the style values a step left. [`edited`] compares a block
 //!   with its record.
+//! - A translated block's skew stays when it's translated again (D13,
+//!   [`translated`]).
 
 use std::collections::BTreeSet;
 
 use anyhow::{Result, bail, ensure};
-use koharu_scene::{CharStyle, Content, Layer, LayerId, Op, Project, Rgba, RichText, Role};
+use koharu_scene::{
+    CharStyle, Content, Layer, LayerId, Op, Project, Rgba, RichText, Role, Transform,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::{
-    attrs::{self, Auto, AutoStyle, Origin},
+    attrs::{self, Auto, AutoStyle, Origin, Skew},
     emphasis::{self, Marking},
     lettering::{self, CategoryFont, LetteringCategory},
     settings::{DefaultTextStyle, LetteringSettings},
+    skew,
 };
 
 /// The `c2pa` namespace Koharu's stages record what they made in, by step.
@@ -233,6 +238,12 @@ pub fn patched(chars: &CharStyle, patch: &Map<String, Value>) -> Result<CharStyl
 /// over the translation's character values once placed and given the look,
 /// where none of their characters has a mark yet ([`emphasis::marked`]);
 /// the record holds those marks ([`Auto::marks`]).
+///
+/// A skew the block's translation shows stays (D13): placement's fresh
+/// transform takes it composed in about the new frame's pivot, and the
+/// skew's record moves to that pivot ([`skew::carried`]). With no skew to
+/// carry, as for a first translation, a record left beside the translation
+/// goes.
 pub fn translated(
     project: &Project,
     block: LayerId,
@@ -296,7 +307,71 @@ pub fn translated(
         });
     }
     ops.push(attrs::set(layer.id, &record)?);
+    if let Op::UpdateLayer { patch, .. } = placed {
+        ops.extend(carried_skew(layer, patch)?);
+    }
     Ok(ops)
+}
+
+/// The ops carrying the skew `layer`'s translation shows onto the placement
+/// `placement`, placement's patch, gives it, both read before the edit: the
+/// fresh transform with the skew composed in about the new frame's pivot,
+/// and the skew's record at that pivot ([`skew::carried`]). None when
+/// placement keeps the transform as it is; with no skew to carry, the op
+/// clearing a record left beside the translation.
+fn carried_skew(layer: &Layer, placement: &Value) -> Result<Vec<Op>> {
+    let record = attrs::get::<Skew>(layer);
+    let stale = || Vec::from_iter(record.map(|_| attrs::clear::<Skew>(layer.id)));
+    let Content::Block(block) = &layer.content else {
+        return Ok(Vec::new());
+    };
+    let Some(old) = &block.translation else {
+        return Ok(stale());
+    };
+    let Some(transform) = placement.pointer("/translation/transform") else {
+        return Ok(Vec::new());
+    };
+    let transform: Transform = serde_json::from_value(transform.clone())?;
+    let frame = match placement.pointer("/translation/frame") {
+        Some(patch) => {
+            let mut frame = serde_json::to_value(&old.frame)?;
+            merge(&mut frame, patch);
+            serde_json::from_value(frame)?
+        }
+        None => old.frame.clone(),
+    };
+    match skew::carried(old, record.as_ref(), transform, &frame) {
+        Some((transform, carried)) => Ok(vec![
+            Op::UpdateLayer {
+                layer: layer.id.into(),
+                patch: json!({"translation": {"transform": transform}}),
+            },
+            attrs::set(layer.id, &carried)?,
+        ]),
+        None => Ok(stale()),
+    }
+}
+
+/// `target` with the merge patch `patch` merged in, as the scene merges an
+/// `update_layer` patch (RFC 7396): null removes a key, an object merges
+/// into an object, and anything else replaces what was there.
+fn merge(target: &mut Value, patch: &Value) {
+    let Value::Object(patch) = patch else {
+        *target = patch.clone();
+        return;
+    };
+    if !target.is_object() {
+        *target = Value::Object(Map::new());
+    }
+    if let Value::Object(target) = target {
+        for (key, value) in patch {
+            if value.is_null() {
+                target.remove(key);
+            } else {
+                merge(target.entry(key.clone()).or_insert(Value::Null), value);
+            }
+        }
+    }
 }
 
 /// The ops giving a translation typed by hand into `block` in `project`, a
@@ -306,7 +381,9 @@ pub fn translated(
 /// both read before the edit; none when they write nothing. It gets no
 /// record of its own: it's hand-made. A block carrying the kept mark has the
 /// record written without it, as the translation shows its clean-up: the
-/// record's part of [`crate::sfx::shown_again`].
+/// record's part of [`crate::sfx::shown_again`]. A skew's record left
+/// from a translation the block had before goes, as there's no skew to
+/// carry.
 pub fn typed(
     project: &Project,
     block: LayerId,
@@ -317,6 +394,9 @@ pub fn typed(
     let layer = project.layer(block)?;
     let mut ops = Vec::from_iter(looked(project, block, placed, settings, font)?.op);
     ops.extend(crate::sfx::unmarked(layer)?);
+    if let Op::UpdateLayer { patch, .. } = placed {
+        ops.extend(carried_skew(layer, patch)?);
+    }
     Ok(ops)
 }
 
@@ -469,6 +549,16 @@ impl Auto {
                     } else {
                         kept.outer_stroke_width
                     },
+                    fill_gradient: if wrote("fill_gradient") {
+                        now.fill_gradient
+                    } else {
+                        kept.fill_gradient
+                    },
+                    tracking: if wrote("tracking") {
+                        now.tracking
+                    } else {
+                        kept.tracking
+                    },
                 }
             }
         };
@@ -491,6 +581,8 @@ impl AutoStyle {
             stroke_width: chars.stroke_width,
             outer_stroke: chars.outer_stroke,
             outer_stroke_width: chars.outer_stroke_width,
+            fill_gradient: chars.fill_gradient.clone(),
+            tracking: chars.tracking,
         }
     }
 }
@@ -592,6 +684,7 @@ pub fn recorded(layer: &Layer, step: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use koharu_scene::{Created, Edit, LayerId, Session};
+    use kurbo::{Affine, Point};
 
     use super::*;
 
@@ -954,8 +1047,22 @@ mod tests {
         font: Option<&str>,
         marking: &Marking<'_>,
     ) -> Vec<Op> {
-        let project = session.project();
         let placed = placement(session, block);
+        translate_placed(session, block, text, look, font, marking, placed)
+    }
+
+    /// Translates `block` as [`translate_marking`] does, placed by `placed`,
+    /// placement's op; answers the hook's ops.
+    fn translate_placed(
+        session: &mut Session,
+        block: LayerId,
+        text: &str,
+        look: &LetteringSettings,
+        font: Option<&str>,
+        marking: &Marking<'_>,
+        placed: Op,
+    ) -> Vec<Op> {
+        let project = session.project();
         let hook = translated(&project, block, text, &placed, look, font, marking)
             .expect("the hook's ops");
         let mut ops = vec![
@@ -2125,5 +2232,209 @@ mod tests {
         let record = Auto::of(&layer(&session, block));
         assert!(record.marks.is_empty(), "{record:?}");
         assert_eq!(record.text, Some(text_hash("")));
+    }
+
+    /// Placement's op for `block`'s translation, as [`placement`] gives it,
+    /// placing it in `frame`, a merge patch on its frame, drawn with
+    /// `transform`, as Koharu's placement places one.
+    fn placed_in(session: &Session, block: LayerId, frame: Value, transform: Affine) -> Op {
+        let Op::UpdateLayer { layer, mut patch } = placement(session, block) else {
+            panic!("placement's op isn't a patch");
+        };
+        patch["translation"]["frame"] = frame;
+        patch["translation"]["transform"] = json!(Transform::from(transform));
+        Op::UpdateLayer { layer, patch }
+    }
+
+    /// A box frame's merge patch, as placement fills a free block's.
+    fn boxed() -> Value {
+        json!({"box": {"bounds": {"x": 10.0, "y": 10.0, "width": 40.0, "height": 120.0},
+            "fit": "best", "anchor": "center"}, "path": null})
+    }
+
+    /// A room 40 by 100 at `x` turned by `turn` about its centre, as
+    /// placement places a translation in a turned balloon: its frame's merge
+    /// patch, its transform, and its centre.
+    fn room(x: f64, turn: f64) -> (Value, Affine, Point) {
+        let centre = Point::new(x + 20.0, 70.0);
+        let path = format!("M{x} 20 L{} 20 L{} 120 L{x} 120 Z", x + 40.0, x + 40.0);
+        let frame = json!({"path": {"path": path, "fit": "best", "anchor": "center"},
+            "box": null});
+        (frame, Affine::rotate_about(turn, centre), centre)
+    }
+
+    /// Skews `block`'s translation to `x` and `y` degrees, as the FX window
+    /// does.
+    fn skew_to(session: &mut Session, block: LayerId, x: f64, y: f64) {
+        let shown = translation(session, block);
+        let pivot = skew::pivot(&shown.frame);
+        let record = attrs::get::<Skew>(&layer(session, block));
+        let transform = skew::reskewed(shown.transform, record.as_ref(), (x, y), pivot);
+        let skewed = Skew {
+            x,
+            y,
+            pivot: [pivot.x, pivot.y],
+        };
+        apply(
+            session,
+            vec![
+                Op::UpdateLayer {
+                    layer: block.into(),
+                    patch: json!({"translation": {"transform": transform}}),
+                },
+                attrs::set(block, &skewed).expect("the record"),
+            ],
+        );
+    }
+
+    fn close(a: Transform, b: Affine) -> bool {
+        let a = Affine::from(a).as_coeffs();
+        a.iter()
+            .zip(b.as_coeffs())
+            .all(|(a, b)| (a - b).abs() <= 1e-9)
+    }
+
+    /// The skew of `x` and `y` degrees about `pivot`.
+    fn about(pivot: Point, x: f64, y: f64) -> Affine {
+        let to = Affine::translate(pivot.to_vec2());
+        to * skew::matrix(x, y) * to.inverse()
+    }
+
+    #[test]
+    fn a_skew_stays_when_the_block_is_translated_again() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let look = settings(true, None, None);
+        let none = Marking::default();
+        let placed = placed_in(&session, block, boxed(), Affine::IDENTITY);
+        translate_placed(&mut session, block, "Why?", &look, None, &none, placed);
+        skew_to(&mut session, block, 20.0, 0.0);
+        let pivot = Point::new(30.0, 70.0);
+        let before = Affine::from(translation(&session, block).transform) * pivot;
+        // Translated again: placement's fresh transform, the skew composed in
+        // about the frame's centre, which stays put on the page.
+        let placed = placed_in(&session, block, boxed(), Affine::IDENTITY);
+        translate_placed(&mut session, block, "Why not?", &look, None, &none, placed);
+        let written = translation(&session, block);
+        assert!(close(written.transform, about(pivot, 20.0, 0.0)));
+        assert!(((Affine::from(written.transform) * pivot) - before).hypot() <= 1e-9);
+        let found = layer(&session, block);
+        let record = attrs::get::<Skew>(&found);
+        assert_eq!(
+            record,
+            Some(Skew {
+                x: 20.0,
+                y: 0.0,
+                pivot: [30.0, 70.0],
+            })
+        );
+        assert_eq!(skew::shown(&written, record.as_ref()), (20.0, 0.0));
+        assert_eq!(edited(&found), Edited::default(), "no hand edit");
+    }
+
+    #[test]
+    fn a_skew_stays_in_a_turned_balloons_room() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let look = settings(true, None, None);
+        let none = Marking::default();
+        let (frame, turn, _) = room(10.0, 0.3);
+        let placed = placed_in(&session, block, frame, turn);
+        translate_placed(&mut session, block, "Why?", &look, None, &none, placed);
+        skew_to(&mut session, block, 15.0, -10.0);
+        // The balloon changed: another room, turned another way.
+        let (frame, turn, centre) = room(60.0, -0.2);
+        let placed = placed_in(&session, block, frame, turn);
+        translate_placed(&mut session, block, "Why not?", &look, None, &none, placed);
+        let written = translation(&session, block);
+        assert!(close(written.transform, turn * about(centre, 15.0, -10.0)));
+        let on_page = Affine::from(written.transform) * centre;
+        assert!(
+            (on_page - turn * centre).hypot() <= 1e-9,
+            "the pivot stays put"
+        );
+        let record = attrs::get::<Skew>(&layer(&session, block)).expect("a record");
+        assert_eq!((record.x, record.y), (15.0, -10.0));
+        assert!((Point::new(record.pivot[0], record.pivot[1]) - centre).hypot() <= 1e-9);
+        assert_eq!(skew::shown(&written, Some(&record)), (15.0, -10.0));
+    }
+
+    #[test]
+    fn a_line_given_back_loses_its_skew() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let look = settings(true, None, None);
+        let none = Marking::default();
+        let placed = placed_in(&session, block, boxed(), Affine::IDENTITY);
+        translate_placed(&mut session, block, "Why?", &look, None, &none, placed);
+        skew_to(&mut session, block, 20.0, 0.0);
+        let given = given_back(&layer(&session, block)).expect("the record");
+        apply(
+            &mut session,
+            vec![
+                Op::UpdateLayer {
+                    layer: block.into(),
+                    patch: json!({"translation": null}),
+                },
+                given,
+            ],
+        );
+        // Translated again, as a first translation: no skew, no record.
+        let placed = placed_in(&session, block, boxed(), Affine::IDENTITY);
+        translate_placed(&mut session, block, "Why?", &look, None, &none, placed);
+        assert!(close(
+            translation(&session, block).transform,
+            Affine::IDENTITY
+        ));
+        assert_eq!(attrs::get::<Skew>(&layer(&session, block)), None);
+    }
+
+    #[test]
+    fn a_record_that_no_longer_holds_goes_and_carries_nothing() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let look = settings(true, None, None);
+        let none = Marking::default();
+        let placed = placed_in(&session, block, boxed(), Affine::IDENTITY);
+        translate_placed(&mut session, block, "Why?", &look, None, &none, placed);
+        // A record written by something else, the transform never skewed.
+        let stale = Skew {
+            x: 20.0,
+            y: 0.0,
+            pivot: [30.0, 70.0],
+        };
+        apply(
+            &mut session,
+            vec![attrs::set(block, &stale).expect("the record")],
+        );
+        let placed = placed_in(&session, block, boxed(), Affine::IDENTITY);
+        translate_placed(&mut session, block, "Why?", &look, None, &none, placed);
+        assert!(close(
+            translation(&session, block).transform,
+            Affine::IDENTITY
+        ));
+        assert_eq!(attrs::get::<Skew>(&layer(&session, block)), None);
+    }
+
+    #[test]
+    fn a_typed_first_translation_carries_no_skew() {
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        let look = settings(true, None, None);
+        // A record left beside no translation.
+        let stale = Skew {
+            x: 20.0,
+            y: 0.0,
+            pivot: [30.0, 70.0],
+        };
+        apply(
+            &mut session,
+            vec![attrs::set(block, &stale).expect("the record")],
+        );
+        let placed = placed_in(&session, block, boxed(), Affine::IDENTITY);
+        let ops = typed(&session.project(), block, &placed, &look, None).expect("the ops");
+        let ops = serde_json::to_value(&ops).expect("ops");
+        let ops = ops.as_array().expect("a list");
+        assert!(ops.contains(&json!(attrs::clear::<Skew>(block))), "{ops:?}");
+        assert!(
+            ops.iter()
+                .all(|op| op.pointer("/patch/translation/transform").is_none()),
+            "{ops:?}"
+        );
     }
 }

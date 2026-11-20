@@ -157,7 +157,11 @@ const REGULAR: u16 = 400;
 /// values, as the renderer draws the characters with no marks: each value
 /// the style sets, its size `size_factor` times the text's, or 24 pixels'
 /// without one, to a hundredth of a pixel, but for a value the text already
-/// draws, regular and upright counting as no weight and no italic.
+/// draws, regular and upright counting as no weight and no italic. A text
+/// with a gradient fill draws the gradient, not its own fill, so there the
+/// style's fill is kept even when it's the text's own: a fill beside no
+/// gradient hides the gradient for its word, as a fill and a gradient are
+/// one paint.
 pub fn patch(style: &EmphasisStyle, base: &CharStyle) -> CharStyle {
     fn new<T: PartialEq + Clone>(value: &Option<T>, base: &Option<T>) -> Option<T> {
         value.clone().filter(|value| base.as_ref() != Some(value))
@@ -175,7 +179,10 @@ pub fn patch(style: &EmphasisStyle, base: &CharStyle) -> CharStyle {
             .size_factor
             .map(|factor| (size * factor * 100.0).round() / 100.0)
             .filter(|scaled| *scaled != size),
-        fill: new(&style.fill, &base.fill),
+        fill: match base.fill_gradient {
+            Some(_) => style.fill,
+            None => new(&style.fill, &base.fill),
+        },
         stroke: new(&style.stroke, &base.stroke),
         stroke_width: new(&style.stroke_width, &base.stroke_width),
         outer_stroke: new(&style.outer_stroke, &base.outer_stroke),
@@ -680,6 +687,49 @@ mod tests {
                 ..CharStyle::default()
             }
         );
+    }
+
+    #[test]
+    fn a_gradient_text_keeps_a_fill_the_same_as_its_own() {
+        use koharu_scene::{Gradient, GradientKind, GradientStop};
+
+        let gradient = Gradient {
+            kind: GradientKind::Linear,
+            angle: 90.0,
+            stops: vec![
+                GradientStop {
+                    offset: 0.0,
+                    color: RED,
+                },
+                GradientStop {
+                    offset: 1.0,
+                    color: Rgba([0.0, 0.0, 1.0, 1.0]),
+                },
+            ],
+        };
+        let base = CharStyle {
+            fill: Some(RED),
+            fill_gradient: Some(gradient),
+            ..CharStyle::default()
+        };
+        let style = EmphasisStyle {
+            fill: Some(RED),
+            ..EmphasisStyle::default()
+        };
+        // The text draws its gradient, so the word gets its own fill, which
+        // hides the gradient for it.
+        let marks = patch(&style, &base);
+        assert_eq!(
+            (marks.fill, marks.fill_gradient.as_ref()),
+            (Some(RED), None)
+        );
+        assert_eq!(marks.or(&base).fill_gradient, None);
+        // A flat text drawing the same fill gets none.
+        let flat = CharStyle {
+            fill_gradient: None,
+            ..base
+        };
+        assert_eq!(patch(&style, &flat).fill, None);
     }
 
     #[test]

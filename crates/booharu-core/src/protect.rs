@@ -12,21 +12,22 @@
 //! - Translating leaves out the sound effects the SFX mode keeps as art and
 //!   the subtitled ones (`sfx::skipped`), which no redo lifts; a subtitle
 //!   run translates the effects it names.
-//! - Detect again keeps what was made or changed by hand, a split's halves
-//!   and a clean-up hidden by hand, or shown again by hand on an effect kept
-//!   as art, among it, and what is locked ([`keeps`]).
+//! - Detect again keeps what was made or changed by hand, a split's halves,
+//!   a clean-up hidden by hand, or shown again by hand on an effect kept as
+//!   art, and a translation skewed by hand among it, and what is locked
+//!   ([`keeps`]).
 //!
 //! koharu-pipeline's Booharu glue calls [`left_out`] from each stage's hook
 //! and [`keeps`] from Detect's, and the redo counts read [`left_out`] too.
 
-use koharu_scene::{Content, Layer, LayerId, Page};
+use koharu_scene::{Block, Content, Layer, LayerId, Page};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    attrs::{self, Auto, Lettering, LetteringSource, ReviewNote},
+    attrs::{self, Auto, Lettering, LetteringSource, ReviewNote, Skew},
     runs::RunStage,
     settings::LetteringSettings,
-    sfx,
+    sfx, skew,
     status::DETECTION,
     styles::{edited, recorded},
 };
@@ -133,7 +134,8 @@ pub fn cleanable(page: &Page, layer: &Layer) -> bool {
 /// though it keeps detection's record ([`Auto::split`]), whose clean-up was
 /// hidden by hand ([`sfx::hand_kept`]) or shown again by hand after Booharu
 /// kept it as art ([`sfx::hand_shown`]), labelled by a user, given a
-/// reviewer's note, or subtitled; a panel or balloon Koharu's Detection
+/// reviewer's note, subtitled, or whose translation shows a skew
+/// ([`skewed`]); a panel or balloon Koharu's Detection
 /// stage didn't make; and any text layer, the T tool's and subtitles. Anything else, a block, panel, or balloon detection made and
 /// nobody changed among them, is detected again, a block whose clean-up
 /// Booharu hid to keep it as art (the kept mark) or the Translation stage
@@ -152,11 +154,23 @@ pub fn keeps(page: &Page, layer: &Layer) -> bool {
                     .is_some_and(|label| label.source == LetteringSource::User)
                 || attrs::get::<ReviewNote>(layer).is_some()
                 || sfx::subtitled(page, layer.id)
+                || skewed(layer, block)
         }
         Content::Panel(_) | Content::Balloon(_) => !recorded(layer, DETECTION),
         Content::Text(_) => true,
         _ => false,
     }
+}
+
+/// Whether the translation of `block`, `layer`'s, shows a skew
+/// ([`skew::skewed`]), which only the FX window, by hand, sets. Not a hand
+/// edit by [`edited`]'s reckoning, so Apply and the runs restyle the box as
+/// any other, but Detect again keeps it.
+pub fn skewed(layer: &Layer, block: &Block) -> bool {
+    block
+        .translation
+        .as_ref()
+        .is_some_and(|translation| skew::skewed(translation, attrs::get::<Skew>(layer).as_ref()))
 }
 
 #[cfg(test)]
@@ -703,5 +717,52 @@ mod tests {
         assert!(!edited(&layer).hand_edited());
         assert!(sfx::kept_original(&layer).is_empty());
         assert!(keeps(&fixture.page(), &layer));
+    }
+
+    #[test]
+    fn detect_again_keeps_a_translation_skewed_by_hand() {
+        let mut fixture = Fixture::new();
+        fixture.translate("text", "Why?");
+        assert!(!keeps(&fixture.page(), &fixture.layer("text")));
+        // Skewed in the FX window: its transform and the skew's record.
+        let id = fixture.id("text");
+        let skew_to = |fixture: &mut Fixture, x: f64| {
+            let layer = fixture.layer("text");
+            let Content::Block(block) = &layer.content else {
+                panic!("not a block");
+            };
+            let translation = block.translation.as_ref().expect("a translation");
+            let pivot = skew::pivot(&translation.frame);
+            let record = attrs::get::<Skew>(&layer);
+            let transform = skew::reskewed(translation.transform, record.as_ref(), (x, 0.0), pivot);
+            let record = if x == 0.0 {
+                attrs::clear::<Skew>(id)
+            } else {
+                let skew = Skew {
+                    x,
+                    y: 0.0,
+                    pivot: [pivot.x, pivot.y],
+                };
+                attrs::set(id, &skew).expect("the record")
+            };
+            fixture.apply(vec![
+                Op::UpdateLayer {
+                    layer: id.into(),
+                    patch: json!({"translation": {"transform": transform}}),
+                },
+                record,
+            ]);
+        };
+        skew_to(&mut fixture, 20.0);
+        let layer = fixture.layer("text");
+        assert!(!edited(&layer).hand_edited(), "a skew is no hand edit");
+        let Content::Block(block) = &layer.content else {
+            panic!("not a block");
+        };
+        assert!(skewed(&layer, block));
+        assert!(keeps(&fixture.page(), &layer));
+        // Skewed back to none: detected again.
+        skew_to(&mut fixture, 0.0);
+        assert!(!keeps(&fixture.page(), &fixture.layer("text")));
     }
 }

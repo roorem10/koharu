@@ -4,6 +4,8 @@
 //! (`styles`), the lettering categories and the font each letters its text
 //! in (`lettering`), how a stressed word looks and which words a run
 //! stresses (`emphasis`), words made a step bigger or smaller (`sizes`), the
+//! FX window's skew (`skew`) and the text effects a box carries beyond its
+//! lettering default (`effects`), the
 //! shapes of balloons (`shape`), the run policy and the Run menu's presets
 //! (`runs`), what Koharu's stages did to a page's
 //! blocks (`status`), which sound effects stay as art and their subtitles
@@ -20,6 +22,7 @@
 
 pub mod attrs;
 pub mod context;
+pub mod effects;
 pub mod emphasis;
 pub mod lettering;
 pub mod protect;
@@ -30,6 +33,7 @@ pub mod settings;
 pub mod sfx;
 pub mod shape;
 pub mod sizes;
+pub mod skew;
 pub mod status;
 pub mod styles;
 

@@ -27,8 +27,9 @@ use crate::{
 };
 
 /// The character keys a lettering default sets, every one of them, null
-/// where it sets none: the hand-edit record's style keys (`AutoStyle`'s).
-pub const LOOK: [&str; 8] = [
+/// where it sets none: the hand-edit record's style keys (`AutoStyle`'s),
+/// a gradient fill and the letter spacing among them, which no default sets.
+pub const LOOK: [&str; 10] = [
     "family",
     "weight",
     "italic",
@@ -37,6 +38,8 @@ pub const LOOK: [&str; 8] = [
     "stroke_width",
     "outer_stroke",
     "outer_stroke_width",
+    "fill_gradient",
+    "tracking",
 ];
 
 /// A lettering default: the character values of the [`LOOK`] keys, beside
@@ -60,7 +63,12 @@ pub struct Look {
 /// which this crate can't call: keep it in step with them. A parity test in
 /// koharu-pipeline's Booharu tests compares the two.
 pub fn koharu_chars(page: &Page, block: &Block, size: Option<f64>) -> CharStyle {
-    let size = size.or_else(|| lettering_size(&page.layers));
+    measured(block, size.or_else(|| lettering_size(&page.layers)))
+}
+
+/// [`koharu_chars`] of `block` at `size`, the page's lettering size already
+/// standing in for none.
+fn measured(block: &Block, size: Option<f64>) -> CharStyle {
     let source = &block.source.style.chars;
     let outline = match (source.stroke, source.stroke_width) {
         (Some(stroke), Some(width)) => {
@@ -92,10 +100,10 @@ pub fn contrasting(fill: Option<Rgba>) -> Rgba {
     }
 }
 
-/// The page's lettering size, as placement's `lettering` finds it: the
-/// lower median size of the sources of its text blocks, inside other layers
-/// included, if any has one.
-fn lettering_size(layers: &[Layer]) -> Option<f64> {
+/// The lettering size of the page holding `layers`, as placement's
+/// `lettering` finds it: the lower median size of the sources of its text
+/// blocks, inside other layers included, if any has one.
+pub fn lettering_size(layers: &[Layer]) -> Option<f64> {
     fn sizes(layers: &[Layer], found: &mut Vec<f64>) {
         for layer in layers {
             if let Content::Block(block) = &layer.content
@@ -127,18 +135,31 @@ pub fn lettering_default(
     font: Option<&str>,
 ) -> Result<Option<Look>> {
     let layer = project.layer(id)?;
+    let (page, _) = project.parent(id)?;
+    lettering_default_on(page, layer, settings, font, lettering_size(&page.layers))
+}
+
+/// [`lettering_default`] of `layer`, on `page`, with `median` the page's
+/// lettering size ([`lettering_size`]), so a caller going over a page's
+/// layers works it out once.
+pub fn lettering_default_on(
+    page: &Page,
+    layer: &Layer,
+    settings: &LetteringSettings,
+    font: Option<&str>,
+    median: Option<f64>,
+) -> Result<Option<Look>> {
     let chars = match &layer.content {
         Content::Block(block) => {
             let Some(translation) = &block.translation else {
                 return Ok(None);
             };
-            let (page, _) = project.parent(id)?;
-            let base = koharu_chars(page, block, translation.style.chars.size);
+            let base = measured(block, translation.style.chars.size.or(median));
             let look = styles::new_translation(
                 settings,
                 font,
                 block.role == Role::Sfx,
-                lettering::auto_category(page, id, settings),
+                lettering::auto_category(page, layer.id, settings),
                 &CharStyle::default(),
                 &base,
             );
@@ -169,8 +190,9 @@ pub fn lettering_default(
 }
 
 /// The merge patch on a text's `style` giving it `look`: each [`LOOK`] key
-/// of its characters, null where the look sets none, and how its borders
-/// are drawn. Never its size, its alignment, or its line height.
+/// of its characters, null where the look sets none, so a gradient fill and
+/// letter spacing go, and how its borders are drawn. Never its size, its
+/// alignment, or its line height.
 pub fn reset_patch(look: &Look) -> Value {
     let chars = &look.chars;
     json!({
@@ -183,6 +205,8 @@ pub fn reset_patch(look: &Look) -> Value {
             "stroke_width": chars.stroke_width,
             "outer_stroke": chars.outer_stroke,
             "outer_stroke_width": chars.outer_stroke_width,
+            "fill_gradient": chars.fill_gradient,
+            "tracking": chars.tracking,
         },
         "stroke_method": look.stroke_method,
     })
@@ -592,8 +616,25 @@ mod tests {
         expected.sort_unstable();
         assert_eq!(keys, expected, "never the size");
         assert_eq!(patch["chars"]["weight"], Value::Null);
+        assert_eq!(patch["chars"]["fill_gradient"], Value::Null);
+        assert_eq!(patch["chars"]["tracking"], Value::Null);
         assert_eq!(patch["chars"]["fill"], json!(BLUE));
         assert_eq!(patch["stroke_method"], Value::Null);
         assert_eq!(patch.as_object().map(|patch| patch.len()), Some(2));
+    }
+
+    #[test]
+    fn the_look_keys_are_the_records_style_keys() {
+        let record = serde_json::to_value(crate::attrs::AutoStyle::default()).expect("a record");
+        let mut keys: Vec<&str> = record
+            .as_object()
+            .expect("an object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        let mut expected = LOOK.to_vec();
+        expected.sort_unstable();
+        assert_eq!(keys, expected);
     }
 }

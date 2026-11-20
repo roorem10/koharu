@@ -14,14 +14,15 @@
 //!   since any agent can write these keys through the generic edit tool. That
 //!   is the deliberate exception to the scene's rule that a namespace's
 //!   owner fails closed on a value it can't read.
-//! - The content keys, [`Lettering`], [`Auto`], [`QcOk`], and [`ReadNote`],
-//!   describe a block's text, so a join or split that rewrites a block drops
-//!   them; a join keeps the joined block's hand-edit record, and a split
-//!   gives its halves one of their own, marked as split, with the kept mark
-//!   and a line given back's record, as they keep the clean-up as it was.
+//! - The content keys, [`Lettering`], [`Auto`], [`QcOk`], [`ReadNote`], and
+//!   [`Skew`], describe a block's text, so a join or split that rewrites a
+//!   block drops them; a join keeps the joined block's hand-edit record, and
+//!   a split gives its halves one of their own, marked as split, with the
+//!   kept mark and a line given back's record, as they keep the clean-up as
+//!   it was.
 
 use anyhow::ensure;
-use koharu_scene::{CharStyle, Layer, LayerId, Op, Ref, Rgba, RichText, Role};
+use koharu_scene::{CharStyle, Gradient, Layer, LayerId, Op, Ref, Rgba, RichText, Role};
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 
 use crate::lettering::LetteringCategory;
@@ -81,7 +82,7 @@ pub enum LetteringSource {
 
 /// `auto`: `{"origin"?: "agent", "source"?: hash, "text"?: hash, "style"?:
 /// {family, weight, italic, fill, stroke, stroke_width, outer_stroke,
-/// outer_stroke_width}, "marks"?: [{start, end, style}], "kept"?: true,
+/// outer_stroke_width, fill_gradient, tracking}, "marks"?: [{start, end, style}], "kept"?: true,
 /// "split"?: true}`, on a block: the hand-edit record, what Booharu's
 /// automatic steps last wrote there, so `styles::edited` tells a hand edit,
 /// a part that now differs, from their own, the word marks a run's emphasis
@@ -239,7 +240,9 @@ impl Origin {
 }
 
 /// The character style values an automatic step left on a translation, each
-/// null when unset: the keys a hand restyle changes.
+/// null when unset: the keys a hand restyle changes, a gradient fill and the
+/// letter spacing among them, which a record written before they were kept
+/// reads as unset.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(default)]
 pub struct AutoStyle {
@@ -251,6 +254,8 @@ pub struct AutoStyle {
     pub stroke_width: Option<f64>,
     pub outer_stroke: Option<Rgba>,
     pub outer_stroke_width: Option<f64>,
+    pub fill_gradient: Option<Gradient>,
+    pub tracking: Option<f64>,
 }
 
 /// `qc_ok`: `[string]`, on a block or a text layer: the quality check's
@@ -347,21 +352,28 @@ impl Attr for OriginalScan {
     }
 }
 
-/// `skew`: `{"x": number, "y": number}`, on a text: the FX popup's skew, in
-/// degrees along each axis, kept only to show it again: what's drawn is the
-/// scene's.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+/// `skew`: `{"x": number, "y": number, "pivot": [number, number]}`, on a
+/// text layer or a translated block: the skew the FX window set, in degrees
+/// along each axis from −60 to 60, and the point it leans about, in the
+/// text's own coordinates. What's drawn is the text's transform, which the
+/// skew is composed into (`skew`); the record lets the skew be shown and
+/// undone exactly, while it still describes that transform
+/// (`skew::trusted`), and a skew set back to 0 on both axes clears it.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(deny_unknown_fields)]
 pub struct Skew {
     pub x: f64,
     pub y: f64,
+    pub pivot: [f64; 2],
 }
 
 impl Attr for Skew {
     const KEY: &'static str = "skew";
 
     fn valid(&self) -> bool {
-        self.x.is_finite() && self.y.is_finite()
+        crate::skew::in_range(self.x)
+            && crate::skew::in_range(self.y)
+            && self.pivot.iter().all(|value| value.is_finite())
     }
 }
 
@@ -512,7 +524,11 @@ mod tests {
         let review_note = ReviewNote("Reads well".to_owned());
         let sfx_subtitle = SfxSubtitle { block: id };
         let original_scan = OriginalScan(true);
-        let skew = Skew { x: 10.0, y: 0.0 };
+        let skew = Skew {
+            x: 10.0,
+            y: 0.0,
+            pivot: [30.0, 80.0],
+        };
         let ops = [
             set(id, &lettering),
             set(id, &auto),
@@ -582,7 +598,7 @@ mod tests {
             ),
             raw(NAMESPACE, "qc_ok", json!("overflow")),
             raw(NAMESPACE, "auto", json!({"text": "Hello"})),
-            raw(NAMESPACE, "skew", json!({"x": 1.0})),
+            raw(NAMESPACE, "skew", json!({"x": 1.0, "y": 0.0})),
             raw(NAMESPACE, "original_scan", json!(false)),
             raw(NAMESPACE, "review_note", json!(5)),
             raw(NAMESPACE, "read_note", json!("A pun on the name")),
@@ -623,11 +639,32 @@ mod tests {
             ..Auto::default()
         };
         assert!(set(id, &unhashed).is_err());
-        let skew = Skew {
-            x: f64::NAN,
-            y: 0.0,
+        // A skew past 60 degrees either way, or a pivot that isn't a point.
+        for skew in [
+            Skew {
+                x: f64::NAN,
+                y: 0.0,
+                pivot: [0.0, 0.0],
+            },
+            Skew {
+                x: 0.0,
+                y: -60.5,
+                pivot: [0.0, 0.0],
+            },
+            Skew {
+                x: 10.0,
+                y: 0.0,
+                pivot: [f64::INFINITY, 0.0],
+            },
+        ] {
+            assert!(set(id, &skew).is_err(), "{skew:?}");
+        }
+        let steepest = Skew {
+            x: -60.0,
+            y: 60.0,
+            pivot: [0.0, 0.0],
         };
-        assert!(set(id, &skew).is_err());
+        assert!(set(id, &steepest).is_ok());
     }
 
     #[test]
