@@ -18,7 +18,7 @@ import { FxPopover } from '@/components/booharu/effects/FxPopover' // Booharu: S
 import { AppliesTo, WholeBoxOnly } from '@/components/booharu/typebar/AppliesTo' // Booharu: S11-f.
 import { ClearWordStyles } from '@/components/booharu/typebar/ClearWordStyles' // Booharu: S11-g.
 import { DoneButton } from '@/components/booharu/typebar/DoneButton' // Booharu: S11-c.
-import { LineSpacing } from '@/components/booharu/typebar/LineSpacing' // Booharu: S11-i.
+import { Spacing } from '@/components/booharu/typebar/Spacing' // Booharu: S11-i, S12-k.
 import { WordSizeSteps } from '@/components/booharu/typebar/WordSizeSteps' // Booharu: S11-e.
 import { BoldToggle } from '@/components/booharu/words/BoldToggle' // Booharu: B (D12).
 import { EmphasisButton } from '@/components/booharu/words/EmphasisButton' // Booharu: the star.
@@ -427,13 +427,17 @@ export function TypeBar() {
           </Tooltip>
         ))}
       </div>
-      {/* Booharu: line spacing, which only the paragraph has (S11-i), the whole box's (S11-f). */}
-      <LineSpacing
-        value={style.line_height ?? null}
-        mixed={share.line_height.mixed && drafted?.line_height === undefined}
-        disabled={!paragraph}
+      {/* Booharu: spacing: line spacing, which only the paragraph has (S11-i), the whole box's
+          (S11-f), and letter spacing, at the bar's scope (S12-k). */}
+      <Spacing
+        lineHeight={style.line_height ?? null}
+        lineHeightMixed={share.line_height.mixed && drafted?.line_height === undefined}
+        paragraph={paragraph}
+        tracking={chars.tracking ?? null}
+        trackingMixed={mixed.has('tracking')}
         words={chosen}
-        onChange={(lineHeight) => apply({ line_height: lineHeight })}
+        onLineHeight={(lineHeight) => apply({ line_height: lineHeight })}
+        onTracking={(tracking) => applyChars({ tracking })}
       />
       <Tooltip>
         <TooltipTrigger

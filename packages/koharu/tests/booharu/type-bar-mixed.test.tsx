@@ -184,7 +184,7 @@ describe('Booharu type bar over texts whose paragraphs differ (S11-h)', () => {
     )
     await user.keyboard('{Escape}')
 
-    await user.click(bar.getByRole('button', { name: 'Line spacing' }))
+    await user.click(bar.getByRole('button', { name: 'Spacing' }))
     const spacing = await screen.findByRole('textbox', { name: 'Line spacing' })
     expect(spacing).toHaveValue('1.5')
     // A step goes on from the spacing shown.

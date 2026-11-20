@@ -92,12 +92,14 @@ describe('Booharu Applies to in the type bar (S11-f)', () => {
       /^Text directionHorizontalApplies to the whole box$/,
     )
 
-    const spacing = bar.getByRole('button', { name: 'Line spacing' })
-    expect(spacing).toBeEnabled()
-    await user.hover(spacing)
-    expect(await tooltip('Line spacing')).toHaveTextContent(
+    // Line spacing sits in Spacing, beside letter spacing, which goes to the characters typed
+    // (S12-k).
+    await user.click(bar.getByRole('button', { name: 'Spacing' }))
+    expect(await screen.findByRole('textbox', { name: 'Line spacing' })).toBeEnabled()
+    expect(screen.getByText('Line spacing')).toHaveTextContent(
       /^Line spacingApplies to the whole box$/,
     )
+    await user.keyboard('{Escape}')
 
     await user.click(bar.getByRole('button', { name: 'Border' }))
     expect(await screen.findByText('Outline method')).toHaveTextContent(
