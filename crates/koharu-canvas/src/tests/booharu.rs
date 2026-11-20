@@ -1041,6 +1041,21 @@ fn a_long_selection_is_cut_at_eighty_grapheme_clusters() {
 }
 
 #[test]
+fn each_line_break_is_quoted_as_one_space() {
+    // A CRLF pair, as stored text can hold one, then each of Unicode's
+    // other mandatory breaks.
+    let content = "a\r\nb\rc\u{000B}d\u{000C}e\u{0085}f\u{2028}g\u{2029}h\ni";
+    let Some((mut fixture, _)) = typing_into(json!(content), json!({"size": 40})) else {
+        return;
+    };
+    select_all(&mut fixture.canvas);
+    assert_eq!(
+        quoted(&fixture.canvas).as_deref(),
+        Some("a b c d e f g h i")
+    );
+}
+
+#[test]
 fn a_drag_over_a_composition_quotes_no_characters_the_text_lacks() {
     let Some((mut fixture, _)) = typing_into(json!("ab"), json!({"size": 40})) else {
         return;
