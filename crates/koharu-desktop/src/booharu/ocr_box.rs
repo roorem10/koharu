@@ -1,35 +1,27 @@
-//! The O tool's box, which the canvas answers as its Booharu effect: a text
-//! block made by hand over the box, selected as a layer a canvas edit makes
-//! is, then read and, as the modifiers held or the settings say, translated
-//! and cleaned.
+//! The O tool's box, which the canvas answers as its Booharu effect's `Box`
+//! and `canvas::carry` hands here: a text block made by hand over the box,
+//! selected as a layer a canvas edit makes is, then read and, as the
+//! modifiers held or the settings say, translated and cleaned.
 
 use std::sync::Arc;
 
 use anyhow::{Context as _, Result};
 use booharu::boxes::{self, Refusal};
 use booharu_core::settings::{OcrBoxMode, OcrBoxSettings};
-use koharu_canvas::{
-    Rect,
-    booharu::{BoxModifiers, Effect},
-};
+use koharu_canvas::{Rect, booharu::BoxModifiers};
 use koharu_pipeline::Target;
 use koharu_scene::{Bounds, PageId};
 
 use super::events::{BooharuNotice, NOTICE};
 use crate::{app::App, events};
 
-/// Carries out `effect` off the window's thread, since looking for ink in the
-/// page's scan takes longer than applying an edit, so the page shows the new
-/// block once the session tells its change; the scan is decoded without the
-/// session's lock, so the window's own edits don't wait on it either. What
-/// went wrong goes to the interface as Booharu's notice, a failure to the log
-/// as well.
-pub(crate) fn carry(app: &Arc<App>, effect: Effect) {
-    let Effect::Box {
-        page,
-        rect,
-        modifiers,
-    } = effect;
+/// Carries out the box drawn over `rect` of `page` with `modifiers` held off
+/// the window's thread, since looking for ink in the page's scan takes
+/// longer than applying an edit, so the page shows the new block once the
+/// session tells its change; the scan is decoded without the session's lock,
+/// so the window's own edits don't wait on it either. What went wrong goes
+/// to the interface as Booharu's notice, a failure to the log as well.
+pub(crate) fn carry(app: &Arc<App>, page: PageId, rect: Rect, modifiers: BoxModifiers) {
     let app = Arc::clone(app);
     tauri::async_runtime::spawn_blocking(move || {
         let Err(error) = add(&app, page, rect, modifiers) else {

@@ -67,6 +67,12 @@ release that follow.
   reach is at most a third of the frame across it, so a press in the middle of
   any frame, however small, moves it rather than resizing it. This answers
   Koharu issue #1064.
+- **Booharu: a right-click opens a box's menu.** With the select, direct
+  selection or text tool, while nothing is typed, a right-click on a text or a
+  block a click would pick selects it, unless it's selected already, so a
+  right-click inside a selection of several keeps it, and answers Booharu's
+  effect for the host to open the box's menu at the pointer. It starts no
+  gesture, and anything else under the pointer answers nothing.
 
 ## Sources
 

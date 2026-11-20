@@ -634,6 +634,12 @@ impl Canvas {
             }
             // Booharu: the O tool drags out a box.
             (Tool::OcrBox, Some(PointerButton::Primary)) => crate::booharu::press(sample),
+            // Booharu: a right-click on a text or a block opens its menu.
+            (Tool::Select | Tool::DirectSelect | Tool::Text, Some(PointerButton::Secondary))
+                if self.typing.is_none() =>
+            {
+                crate::booharu::menu(&cx, sample)
+            }
             (tool, Some(PointerButton::Primary)) if tool.is_brush() => {
                 tools::brush::press(&cx, sample)
             }

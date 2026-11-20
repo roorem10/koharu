@@ -360,9 +360,9 @@ impl App {
                     )
                     .map(drop),
                 // Booharu: a box drawn with the O tool, which Booharu adds
-                // and reads off this thread.
+                // and reads off this thread, or a box's menu to open.
                 Effect::Booharu(effect) => {
-                    crate::booharu::ocr_box::carry(self, effect);
+                    crate::booharu::canvas::carry(self, effect);
                     Ok(())
                 }
             };

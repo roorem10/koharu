@@ -3,7 +3,8 @@
 //! clean-up such a translation shows again on a sound effect kept as art,
 //! and, while typing, Escape keeping what's typed, marks taken off, size
 //! steps, the selected text the type bar quotes and the empty line a line
-//! break typed at the end starts, on the canvas's harness.
+//! break typed at the end starts, and a right-click's box menu, on the
+//! canvas's harness.
 
 use std::collections::BTreeMap;
 
@@ -1130,5 +1131,214 @@ fn a_line_break_typed_at_the_end_puts_the_caret_on_a_new_empty_line() {
     assert_eq!(
         layer(&fixture, added)["content"],
         json!([{"insert": "ab\nc"}])
+    );
+}
+
+/// What a right-click answers, which is nothing but selections and
+/// Booharu's effects.
+#[derive(Debug, PartialEq)]
+enum Answer {
+    Selection(Vec<LayerId>),
+    Booharu(Booharu),
+}
+
+/// The secondary button pressed at `at`, in window pixels, and released
+/// there: what the press answered. It starts no gesture, so its release
+/// answers nothing.
+fn right_click(canvas: &mut Canvas, at: (f64, f64)) -> Vec<Answer> {
+    let event = |held: PointerState| PointerButtonEvent {
+        button: Some(PointerButton::Secondary),
+        pointer: mouse(1),
+        state: held,
+    };
+    let effects = canvas
+        .input(PointerEvent::Down(event(state(at, NONE))))
+        .expect("input");
+    let released = canvas
+        .input(PointerEvent::Up(event(state(at, NONE))))
+        .expect("input");
+    assert!(released.is_empty(), "{released:?}");
+    effects
+        .into_iter()
+        .map(|effect| match effect {
+            Effect::Selection(layers) => Answer::Selection(layers),
+            Effect::Booharu(effect) => Answer::Booharu(effect),
+            other => panic!("{other:?} isn't a selection or a menu"),
+        })
+        .collect()
+}
+
+/// A box text 100 by 40 at `(x, y)` on the page, with its layer values
+/// merged in.
+fn boxed_text(index: usize, at: (f64, f64), extra: Value) -> Value {
+    let mut layer = json!({
+        "kind": "text", "content": "Hello",
+        "frame": {"box": {"bounds": {"x": 0, "y": 0, "width": 100, "height": 40}}},
+        "transform": [[1.0, 0.0, at.0], [0.0, 1.0, at.1]],
+    });
+    if let (Some(layer), Some(extra)) = (layer.as_object_mut(), extra.as_object()) {
+        layer.extend(extra.clone());
+    }
+    json!({"op": "add_layer", "page": "$page", "index": index, "layer": layer})
+}
+
+/// A 400×400 page holding a text over (40, 40) to (140, 80), a block
+/// translated over (200, 40) to (300, 80), a locked text over (40, 200) to
+/// (140, 240) and a 10×10 image at (300, 300), shown at scale 2 in a
+/// viewport 100 by 60 window pixels in from the window's corner, the camera
+/// moving the page on by 40 by 20 of its pixels: the page point `p` shows
+/// at the window pixel `2p + (140, 80)`, which is the CSS pixel
+/// `p + (70, 40)`. The fixture, and the text's, the block's, the locked
+/// text's and the image's ids.
+fn menu_page() -> Option<(Fixture, [LayerId; 4])> {
+    let (bytes, hash) = png();
+    let mut fixture = fixture(
+        (400, 400),
+        vec![
+            boxed_text(0, (40.0, 40.0), json!({})),
+            json!({"op": "add_layer", "page": "$page", "index": 1, "layer": {
+                "kind": "block", "source": {"content": "やあ"}, "translation": {
+                    "content": "Hi",
+                    "frame": {"box": {"bounds": {"x": 0, "y": 0, "width": 100, "height": 40}}},
+                    "transform": [[1.0, 0.0, 200.0], [0.0, 1.0, 40.0]],
+                },
+            }}),
+            boxed_text(2, (40.0, 200.0), json!({"locked": true})),
+            json!({"op": "add_file", "bytes": bytes}),
+            json!({"op": "add_layer", "page": "$page", "index": 3, "layer": {
+                "kind": "image", "file": hash, "transform": [[1.0, 0.0, 300.0], [0.0, 1.0, 300.0]],
+            }}),
+        ],
+    )?;
+    let canvas = &mut fixture.canvas;
+    canvas.set_viewport(Rect::new(100.0, 60.0, 900.0, 860.0), 2.0);
+    canvas.set_camera(TranslateScale::new(Vec2::new(40.0, 20.0), 2.0));
+    let [text, block, locked, image] = layers(&fixture)[..] else {
+        panic!("four layers");
+    };
+    Some((fixture, [text, block, locked, image]))
+}
+
+/// The window pixel `menu_page` shows the page point `p` at.
+fn window(p: (f64, f64)) -> (f64, f64) {
+    (2.0 * p.0 + 140.0, 2.0 * p.1 + 80.0)
+}
+
+#[test]
+fn a_right_click_on_a_text_or_block_selects_it_and_opens_its_menu_at_the_pointer() {
+    let Some((mut fixture, [text, block, ..])) = menu_page() else {
+        return;
+    };
+    let page = fixture.page;
+    for tool in [Tool::Select, Tool::DirectSelect, Tool::Text] {
+        let canvas = &mut fixture.canvas;
+        canvas.set_tool(tool);
+        canvas.select(Vec::new());
+        // At the CSS pixel the window shows the press at.
+        assert_eq!(
+            right_click(canvas, window((90.0, 61.0))),
+            [
+                Answer::Selection(vec![text]),
+                Answer::Booharu(Booharu::Menu {
+                    page,
+                    layer: text,
+                    at: Point::new(160.0, 101.0),
+                }),
+            ],
+            "{tool:?}"
+        );
+        assert_eq!(
+            right_click(canvas, window((250.5, 70.0))),
+            [
+                Answer::Selection(vec![block]),
+                Answer::Booharu(Booharu::Menu {
+                    page,
+                    layer: block,
+                    at: Point::new(320.5, 110.0),
+                }),
+            ],
+            "{tool:?}"
+        );
+    }
+}
+
+#[test]
+fn a_right_click_inside_the_selection_keeps_it() {
+    let Some((mut fixture, [text, block, ..])) = menu_page() else {
+        return;
+    };
+    let page = fixture.page;
+    let canvas = &mut fixture.canvas;
+    canvas.select(vec![text, block]);
+    assert_eq!(
+        right_click(canvas, window((90.0, 60.0))),
+        [Answer::Booharu(Booharu::Menu {
+            page,
+            layer: text,
+            at: Point::new(160.0, 100.0),
+        })]
+    );
+    // A selected box alone is still told, without a selection.
+    canvas.select(vec![block]);
+    assert_eq!(right_click(canvas, window((250.0, 60.0))).len(), 1);
+}
+
+#[test]
+fn a_right_click_off_a_box_or_on_a_locked_text_or_an_image_answers_nothing() {
+    let Some((mut fixture, _)) = menu_page() else {
+        return;
+    };
+    let canvas = &mut fixture.canvas;
+    for tool in [Tool::Select, Tool::DirectSelect, Tool::Text] {
+        canvas.set_tool(tool);
+        for at in [(200.0, 150.0), (90.0, 220.0), (305.0, 305.0)] {
+            assert_eq!(right_click(canvas, window(at)), [], "{tool:?} at {at:?}");
+        }
+    }
+}
+
+#[test]
+fn a_right_click_while_typing_or_with_another_tool_answers_nothing() {
+    let Some((mut fixture, [text, ..])) = menu_page() else {
+        return;
+    };
+    let on = window((90.0, 60.0));
+    let canvas = &mut fixture.canvas;
+    for tool in [
+        Tool::Marquee,
+        Tool::Lasso,
+        Tool::Draw,
+        Tool::Eraser,
+        Tool::ColorPicker,
+        Tool::Remove,
+        Tool::Pan,
+        Tool::OcrBox,
+    ] {
+        canvas.set_tool(tool);
+        assert_eq!(right_click(canvas, on), [], "{tool:?}");
+    }
+    // Typing into the text, a right-click on it leaves it typing.
+    canvas.set_tool(Tool::Text);
+    let effects = gesture(canvas, on, on);
+    assert_eq!(selections(&effects), [vec![text]]);
+    assert!(canvas.typing().is_some());
+    assert_eq!(right_click(canvas, on), []);
+    assert_eq!(right_click(canvas, window((250.0, 60.0))), []);
+    assert!(canvas.typing().is_some());
+}
+
+#[test]
+fn a_primary_press_on_a_text_opens_no_menu() {
+    let Some((mut fixture, [text, ..])) = menu_page() else {
+        return;
+    };
+    let on = window((90.0, 60.0));
+    let effects = gesture(&mut fixture.canvas, on, on);
+    assert_eq!(selections(&effects), [vec![text]]);
+    assert!(
+        !effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::Booharu(_))),
+        "{effects:?}"
     );
 }

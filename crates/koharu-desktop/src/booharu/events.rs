@@ -3,7 +3,7 @@
 
 use booharu::{jobs::BooharuJob, qc::Finding};
 use koharu_pipeline::RunId;
-use koharu_scene::PageId;
+use koharu_scene::{LayerId, PageId};
 use serde::Serialize;
 use specta::Type;
 
@@ -71,3 +71,20 @@ pub struct BooharuQc {
 /// A page's findings, each time a check of it stores them: as the page
 /// changes, and at once after Mark OK or Dismiss on it.
 pub const QC: Event<BooharuQc> = Event::new("booharu_qc");
+
+/// A right-click on a box on the canvas: `layer`, a text or a block of
+/// `page`, which the selection holds by then, and where the pointer
+/// pressed, `x` and `y` in the window's CSS pixels.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Type)]
+pub struct BooharuBoxMenu {
+    pub page: PageId,
+    pub layer: LayerId,
+    pub x: f64,
+    pub y: f64,
+}
+
+/// A box's menu to open, as the canvas answers a right-click on one with
+/// the Select, Direct Select or Text tool while nothing is typed; the
+/// window gives the interface the keys, so the menu takes arrows, Enter and
+/// Escape.
+pub const BOX_MENU: Event<BooharuBoxMenu> = Event::new("booharu_box_menu");

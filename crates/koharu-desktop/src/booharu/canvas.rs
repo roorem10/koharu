@@ -1,17 +1,54 @@
-//! Booharu's settings on the canvas: the `BooharuSettings` built from the
-//! saved `[booharu-lettering]` and the first of Koharu's Preferred fonts,
-//! which the window holds for its canvas and every one made later. They're
-//! pushed at startup, and again whenever either is saved: after Booharu's
-//! preferences, from the interface or the agent, and after Koharu's.
+//! Booharu's part of the canvas on the desktop: what the canvas's Booharu
+//! effect does, which `carry` dispatches, and Booharu's settings on the
+//! canvas: the `BooharuSettings` built from the saved `[booharu-lettering]`
+//! and the first of Koharu's Preferred fonts, which the window holds for its
+//! canvas and every one made later. They're pushed at startup, and again
+//! whenever either is saved: after Booharu's preferences, from the interface
+//! or the agent, and after Koharu's.
 
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use booharu_core::settings::Snapshot;
-use koharu_canvas::booharu::{BooharuSettings, TextDefaults};
+use koharu_canvas::{
+    Effect as CanvasEffect,
+    booharu::{BooharuSettings, Effect, TextDefaults},
+};
 use koharu_renderer::RendererConfig;
 use koharu_scene::Fit;
 
-use crate::screen::Screen;
+use super::events::{BOX_MENU, BooharuBoxMenu};
+use crate::{app::App, screen::Screen};
+
+/// Carries out what the canvas's Booharu `effect` asks: a box drawn with the
+/// O tool, which Booharu adds and reads off the window's thread
+/// (`ocr_box`), or a right-click on a box, whose menu the interface opens
+/// where the pointer pressed, told as `booharu_box_menu`.
+pub(crate) fn carry(app: &Arc<App>, effect: Effect) {
+    match effect {
+        Effect::Box {
+            page,
+            rect,
+            modifiers,
+        } => super::ocr_box::carry(app, page, rect, modifiers),
+        Effect::Menu { page, layer, at } => app.emit(
+            BOX_MENU,
+            BooharuBoxMenu {
+                page,
+                layer,
+                x: at.x,
+                y: at.y,
+            },
+        ),
+    }
+}
+
+/// Whether `effects`, what the canvas answered a pointer event with, open a
+/// box's menu, so the window gives the interface the keys for it.
+pub(crate) fn opens_menu(effects: &[CanvasEffect]) -> bool {
+    effects
+        .iter()
+        .any(|effect| matches!(effect, CanvasEffect::Booharu(Effect::Menu { .. })))
+}
 
 /// Pushes the settings as the file holds them now to `screen`'s window.
 /// Pushes from different saves run one at a time, each read and posted to
@@ -52,9 +89,29 @@ fn of(snapshot: Snapshot) -> BooharuSettings {
 #[cfg(test)]
 mod tests {
     use booharu_core::settings::{DefaultTextStyle, LetteringSettings};
-    use koharu_scene::Rgba;
+    use koharu_canvas::{Point, Rect, booharu::BoxModifiers};
+    use koharu_scene::{LayerId, PageId, Rgba, Uuid};
 
     use super::*;
+
+    #[test]
+    fn only_a_boxs_menu_takes_the_keys_for_the_interface() {
+        let (page, layer) = (PageId(Uuid::nil()), LayerId(Uuid::from_u128(1)));
+        let menu = CanvasEffect::Booharu(Effect::Menu {
+            page,
+            layer,
+            at: Point::new(160.0, 101.0),
+        });
+        let drawn = CanvasEffect::Booharu(Effect::Box {
+            page,
+            rect: Rect::new(0.0, 0.0, 10.0, 10.0),
+            modifiers: BoxModifiers::default(),
+        });
+        let selected = CanvasEffect::Selection(vec![layer]);
+        assert!(opens_menu(&[selected.clone(), menu]));
+        assert!(!opens_menu(&[selected, drawn]));
+        assert!(!opens_menu(&[]));
+    }
 
     #[test]
     fn the_saved_look_and_the_default_font_reach_the_canvas() {

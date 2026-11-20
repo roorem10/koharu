@@ -1,6 +1,7 @@
 //! Booharu's part of the app: its commands, which the Booharu block of
 //! `commands` lists, its events, which `events::bindings` lists, what the
-//! canvas's Booharu effect does, the Booharu settings pushed to the canvas,
+//! canvas's Booharu effect does (`canvas::carry`: an O tool box, or a box's
+//! menu to open), the Booharu settings pushed to the canvas,
 //! the MCP server's start on Booharu's own port, Read chapter and Explain
 //! this line as jobs Stop and closing the project end (`jobs`), the agent's
 //! chat kept beside its project (`agent_history`), the quality check's

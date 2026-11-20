@@ -577,6 +577,10 @@ fn canvas(app: &Arc<App>, window: &dyn Window, event: PointerEvent) {
             if !left {
                 set_cursor(window, cursor);
             }
+            // Booharu: a box's menu takes the keys, so arrows, Enter and Escape reach it.
+            if crate::booharu::canvas::opens_menu(&effects) {
+                with(|main| main.input.keyboard = Side::Web);
+            }
             carry(app, effects);
         }
         Some(Err(error)) => tracing::error!("the canvas failed a pointer event: {error:#}"),

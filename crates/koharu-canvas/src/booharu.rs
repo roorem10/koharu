@@ -8,7 +8,10 @@
 //! the settings they come from are saved. What the type bar takes off the
 //! characters being typed is an `Unmark`, which typing's own Booharu part,
 //! `typing/booharu.rs`, does, with the size steps and the selected text the
-//! type bar quotes.
+//! type bar quotes. A right-click on a text or a block with the Select,
+//! Direct Select or Text tool, while nothing is typed, selects it unless
+//! it's selected already and answers `Effect::Menu`, for the host to open
+//! the box's menu there.
 
 use booharu_core::{lettering, settings::LetteringSettings, sfx, styles};
 use koharu_scene::{CharStyle, Content, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text};
@@ -142,7 +145,7 @@ pub enum Unmark {
     Italic,
 }
 
-/// What one of Booharu's gestures did, for the host to act on.
+/// What one of Booharu's gestures or presses did, for the host to act on.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Effect {
     /// A box drawn with the O tool over `rect` of `page`, in page pixels, cut
@@ -152,6 +155,14 @@ pub enum Effect {
         page: PageId,
         rect: Rect,
         modifiers: BoxModifiers,
+    },
+    /// A right-click on `layer`, a text or a block of `page`, for the host
+    /// to open the box's menu `at` the pointer, in the window's CSS pixels.
+    /// The selection holds the layer by then.
+    Menu {
+        page: PageId,
+        layer: LayerId,
+        at: Point,
     },
 }
 
@@ -174,6 +185,36 @@ const SMALLEST: f64 = 4.0;
 /// isn't dropped.
 pub(crate) fn outlasts(gesture: Option<&gesture::Gesture>) -> bool {
     matches!(gesture, Some(gesture::Gesture::Booharu(_)))
+}
+
+/// A right-click, with the Select, Direct Select or Text tool while nothing
+/// is typed: on a text or a block a click picks, so one neither locked nor
+/// hidden, the box's menu at the pointer, after a selection of the layer
+/// unless it's selected already, so a right-click inside a selection of
+/// several keeps it; on anything else, nothing. It starts no gesture.
+pub(crate) fn menu(cx: &Context, sample: Sample) -> Press {
+    let Some(layer) = cx.snapshot.hit(sample.page).map(|control| control.layer) else {
+        return Press::default();
+    };
+    let boxed = cx
+        .snapshot
+        .layer(layer)
+        .is_some_and(|found| matches!(found.content, Content::Text(_) | Content::Block(_)));
+    if !boxed {
+        return Press::default();
+    }
+    let mut effects = Vec::new();
+    if !cx.selection.contains(layer) {
+        effects.push(crate::Effect::Selection(vec![layer]));
+    }
+    // The viewport's physical pixels to the window's CSS pixels.
+    let window = sample.screen.to_vec2() + cx.view.viewport().origin().to_vec2();
+    effects.push(crate::Effect::Booharu(Effect::Menu {
+        page: cx.snapshot.page().id,
+        layer,
+        at: (window / cx.view.scale()).to_point(),
+    }));
+    Press::answers(effects)
 }
 
 /// A press with the O tool starts a box.
