@@ -2,8 +2,9 @@
 //! stressed as its lettering category's emphasis says, a step bigger or
 //! smaller, given values of its own, or cleared, as one undo step labelled
 //! [`LABEL`], which the desktop's command and the agent's tool share
-//! ([`style_words`]), and the marks the emphasis star gives text typed on
-//! the canvas ([`emphasis_patch`]).
+//! ([`style_words`]); every word style taken off whole boxes at once, as one
+//! undo step labelled [`CLEAR_LABEL`] ([`clear_all`]); and the marks the
+//! emphasis star gives text typed on the canvas ([`emphasis_patch`]).
 //!
 //! The words are UTF-8 byte offsets into the text of a block's translation
 //! or of a text layer. The edit writes the text's spans whole, as Koharu's
@@ -11,7 +12,7 @@
 //! hand is a hand edit, and so is a change to one a run's emphasis set
 //! (`booharu_core::edited`).
 
-use std::{cell::Cell, ops::Range};
+use std::{cell::Cell, collections::BTreeSet, ops::Range};
 
 use anyhow::{Result, bail, ensure};
 use booharu_core::{
@@ -21,14 +22,18 @@ use booharu_core::{
     settings::LetteringSettings,
     sizes,
 };
-use koharu_scene::{CharStyle, Content, Edit, LayerId, Op, Project, Text};
+use koharu_scene::{CharStyle, Content, Edit, LayerId, Op, Project, RichText, Text};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::boxes::unlocked;
+use crate::{boxes::unlocked, styles::locked};
 
 /// The undo step's label, which the History panel translates.
 pub const LABEL: &str = "booharu_style_words";
+
+/// The label of [`clear_all`]'s undo step, which the History panel
+/// translates.
+pub const CLEAR_LABEL: &str = "booharu_clear_word_styles";
 
 /// The weight bold sets.
 const BOLD: u16 = 700;
@@ -203,6 +208,72 @@ pub fn style_words(
     }))
 }
 
+/// What [`clear_all`] does to the boxes named: its edit, none when nothing
+/// changes, with how many texts it clears and how many it leaves alone as
+/// locked, which the desktop answers without the edit, which it applies.
+#[derive(Clone, Debug, Default, Serialize, specta::Type)]
+pub struct ClearedWords {
+    /// The edit, one undo step labelled [`CLEAR_LABEL`]; never in the
+    /// answer.
+    #[serde(skip)]
+    pub edit: Option<Edit>,
+    /// Texts whose word styles it takes off.
+    pub cleared: usize,
+    /// Texts with word styles that it leaves as they are because they, or
+    /// a layer holding them, are locked.
+    pub locked: usize,
+}
+
+/// The edit taking every word style off the texts of `layers` in `project`,
+/// each a block's translation or a text layer's, so their words look as
+/// their texts, as Clear takes them off chosen words: one undo step
+/// labelled [`CLEAR_LABEL`] holding one `SetRichText` for each text whose
+/// spans carry any mark, its words then one unmarked span, with how many
+/// texts it clears and leaves alone as locked; none when nothing changes. A
+/// text that is, or is inside, a locked layer is left out and counted; a
+/// text without marks, a block without a translation, and any other kind of
+/// layer are left out. The hand-edit record stays as it is, as
+/// [`style_words`] leaves it.
+pub fn clear_all(project: &Project, layers: &[LayerId]) -> Result<ClearedWords> {
+    let mut cleared = ClearedWords::default();
+    let mut ops = Vec::new();
+    let mut seen = BTreeSet::new();
+    for &id in layers {
+        if !seen.insert(id) {
+            continue;
+        }
+        let layer = project.layer(id)?;
+        let text = match &layer.content {
+            Content::Block(block) => block.translation.as_ref(),
+            Content::Text(text) => Some(&**text),
+            _ => None,
+        };
+        let marked = |text: &&Text| {
+            text.content
+                .0
+                .iter()
+                .any(|span| span.attributes != CharStyle::default())
+        };
+        let Some(text) = text.filter(marked) else {
+            continue;
+        };
+        if locked(project, layer)? {
+            cleared.locked += 1;
+            continue;
+        }
+        cleared.cleared += 1;
+        ops.push(Op::SetRichText {
+            layer: id.into(),
+            spans: RichText::from(text.content.text().as_str()).0,
+        });
+    }
+    cleared.edit = (!ops.is_empty()).then(|| Edit {
+        label: CLEAR_LABEL.to_owned(),
+        ops,
+    });
+    Ok(cleared)
+}
+
 /// The emphasis and lettering settings for a words edit, through `read`,
 /// which reads them as the app holds them, only when it stresses the words
 /// (`emphasis`): the other changes set the values they name, so a section
@@ -289,7 +360,7 @@ mod tests {
         attrs::{self, Lettering, LetteringSource},
         emphasis::EmphasisStyle,
     };
-    use koharu_scene::{Created, Rgba, RichText, Session, Span};
+    use koharu_scene::{Created, Ref, Rgba, RichText, Session, Span};
     use serde_json::{Value, json};
     use tempfile::TempDir;
 
@@ -888,6 +959,136 @@ mod tests {
         )?;
         assert!(fixture.style("plain", 11..13, &step(true))?.is_none());
         assert!(fixture.style("plain", 11..13, &step(false))?.is_some());
+        Ok(())
+    }
+
+    /// Marks `name`'s "NO" bold straight through the scene, unlocking the
+    /// group `locked` around it for a moment, as a box styled before it was
+    /// locked.
+    fn mark(fixture: &mut Fixture, name: &str) -> Result<()> {
+        let lock = |locked: bool| Edit {
+            label: "test".to_owned(),
+            ops: vec![Op::UpdateLayer {
+                layer: fixture.id("locked").into(),
+                patch: json!({"locked": locked}),
+            }],
+        };
+        let (unlock, relock) = (lock(false), lock(true));
+        let mark = Edit {
+            label: "test".to_owned(),
+            ops: vec![Op::SetRichText {
+                layer: fixture.id(name).into(),
+                spans: no_marked(weight(700)).0,
+            }],
+        };
+        for edit in [unlock, mark, relock] {
+            fixture.session.apply(edit)?;
+        }
+        Ok(())
+    }
+
+    fn clear(fixture: &Fixture, names: &[&str]) -> Result<ClearedWords> {
+        let layers: Vec<LayerId> = names.iter().map(|name| fixture.id(name)).collect();
+        clear_all(&fixture.session.project(), &layers)
+    }
+
+    /// The layers whose words an edit sets, each by one `SetRichText`.
+    fn set_words(edit: &Edit) -> Vec<Ref> {
+        edit.ops
+            .iter()
+            .map(|op| match op {
+                Op::SetRichText { layer, .. } => layer.clone(),
+                op => panic!("only words set: {op:?}"),
+            })
+            .collect()
+    }
+
+    fn refs(fixture: &Fixture, names: &[&str]) -> Vec<Ref> {
+        names.iter().map(|name| fixture.id(name).into()).collect()
+    }
+
+    #[test]
+    fn clearing_two_boxes_is_one_undo_step() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        fixture.styled(
+            "plain",
+            0..3,
+            &WordChange {
+                set: sized(40.0),
+                ..WordChange::default()
+            },
+        )?;
+        fixture.styled("plain", 11..13, &bold(true))?;
+        fixture.styled("typed", 4..10, &italic(true))?;
+        let styled = (fixture.words("plain")?, fixture.words("typed")?);
+        let cleared = clear(&fixture, &["plain", "typed", "plain"])?;
+        assert_eq!((cleared.cleared, cleared.locked), (2, 0));
+        let edit = cleared.edit.context("an edit")?;
+        assert_eq!(edit.label, CLEAR_LABEL);
+        assert_eq!(set_words(&edit), refs(&fixture, &["plain", "typed"]));
+        let steps = fixture.session.history().steps.len();
+        fixture.session.apply(edit)?;
+        assert_eq!(fixture.session.history().steps.len(), steps + 1);
+        assert_eq!(fixture.words("plain")?, RichText::from(TEXT));
+        assert_eq!(fixture.words("typed")?, RichText::from(TEXT));
+        // One undo gives both their word styles back.
+        fixture.session.undo()?;
+        assert_eq!((fixture.words("plain")?, fixture.words("typed")?), styled);
+        Ok(())
+    }
+
+    #[test]
+    fn a_locked_box_is_counted_and_left_as_it_is() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        mark(&mut fixture, "plain")?;
+        mark(&mut fixture, "held")?;
+        // The locked group itself is no text, so it counts in neither.
+        let cleared = clear(&fixture, &["plain", "held", "locked"])?;
+        assert_eq!((cleared.cleared, cleared.locked), (1, 1));
+        let edit = cleared.edit.context("an edit")?;
+        assert_eq!(set_words(&edit), refs(&fixture, &["plain"]));
+        fixture.session.apply(edit)?;
+        assert_eq!(fixture.words("plain")?, RichText::from(TEXT));
+        assert_eq!(fixture.words("held")?, no_marked(weight(700)));
+        // Locked alone, there's nothing to clear.
+        let cleared = clear(&fixture, &["held"])?;
+        assert_eq!((cleared.cleared, cleared.locked), (0, 1));
+        assert!(cleared.edit.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn a_box_without_word_styles_is_left_as_it_is() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        mark(&mut fixture, "plain")?;
+        // "heavy" is bold italic as a whole, which is no word style.
+        let cleared = clear(&fixture, &["heavy", "plain", "shout"])?;
+        assert_eq!((cleared.cleared, cleared.locked), (1, 0));
+        let edit = cleared.edit.context("an edit")?;
+        assert_eq!(set_words(&edit), refs(&fixture, &["plain"]));
+        Ok(())
+    }
+
+    #[test]
+    fn a_block_without_a_translation_or_another_layer_is_ignored() -> Result<()> {
+        let fixture = Fixture::new()?;
+        let cleared = clear(&fixture, &["bare", "paint"])?;
+        assert_eq!((cleared.cleared, cleared.locked), (0, 0));
+        assert!(cleared.edit.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn nothing_to_clear_gives_no_edit() -> Result<()> {
+        let fixture = Fixture::new()?;
+        for names in [&["plain", "typed", "heavy"][..], &[]] {
+            let cleared = clear(&fixture, names)?;
+            assert_eq!((cleared.cleared, cleared.locked), (0, 0), "{names:?}");
+            assert!(cleared.edit.is_none(), "{names:?}");
+        }
+        // The answer the desktop gives holds the counts alone.
+        let answer = serde_json::to_value(clear(&fixture, &["plain"])?)?;
+        assert_eq!(answer, json!({"cleared": 0, "locked": 0}));
         Ok(())
     }
 
