@@ -46,7 +46,7 @@ do: with the scene's own queries and edits, its undo and redo, and its history.
 - **Outside agents** reach the open project over MCP at `127.0.0.1:7878`, always
   on, with the same tools as the agent panel. The port is fixed so a client's
   settings stay valid from one launch to the next.
-- **Booharu** serves MCP on its own port instead, so it runs beside Koharu:
+- **Booharu** serves MCP on its own port instead, so it runs beside Koharu: <!-- Booharu: its own MCP port. -->
   `port` in `[booharu-mcp]`, 47821 by default, read at launch and so kept from
   one launch to the next. A bad port, or one that's taken, leaves Booharu
   without the server rather than moving it, and an outside agent can't change

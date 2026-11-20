@@ -32,6 +32,7 @@ export function StartupView() {
           )}
         </div>
         <div className='grid h-full place-items-center text-[11px] text-muted-foreground select-none'>
+          {/* Booharu: the app's name. */}
           Booharu
         </div>
         {!macOS && <WindowControls />}

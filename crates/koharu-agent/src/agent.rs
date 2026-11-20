@@ -39,6 +39,7 @@ use crate::{Tools, tools::refusal};
 
 /// The system prompt: Koharu's own, not a setting, since it describes the
 /// tools and the project document, which Koharu owns.
+// Booharu: the agent works in Booharu, not Koharu.
 const PROMPT: &str = indoc! {"
     You are Booharu Agent, operating a manga translation project inside Booharu.
     The project's state when the request began is the JSON file with id project; tool results report changes since.

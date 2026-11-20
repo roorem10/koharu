@@ -19,6 +19,7 @@ pub fn install() {
             .map(|l| format!("{}:{}", l.file(), l.line()))
             .unwrap_or_default();
 
+        // Booharu: the app's name, in the title and the text.
         rfd::MessageDialog::new()
             .set_level(rfd::MessageLevel::Error)
             .set_title("Booharu has stopped")

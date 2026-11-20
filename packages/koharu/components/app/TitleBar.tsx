@@ -1,5 +1,6 @@
 'use client'
 
+// Booharu: no Sentry import, as Booharu has no feedback form.
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { FilePlus2, FolderOpen, LoaderCircle, Settings } from 'lucide-react'
 import Image from 'next/image'
@@ -59,6 +60,7 @@ export function TitleBar() {
 
   const closeProject = () => void call(commands.close).catch(() => undefined)
 
+  // Booharu: no Sentry feedback form; Help links to Booharu's GitHub instead.
   return (
     <>
       <header
@@ -72,7 +74,7 @@ export function TitleBar() {
             <Image
               className='pointer-events-none'
               src='/icon.png'
-              alt='Booharu'
+              alt='Booharu' // Booharu: the app's name.
               width={17}
               height={17}
               draggable={false}
@@ -201,6 +203,7 @@ export function TitleBar() {
           <MenubarMenu>
             <MenubarTrigger>{t('menu.help')}</MenubarTrigger>
             <MenubarContent>
+              {/* Booharu: Booharu's GitHub first, then Koharu's GitHub and Discord. */}
               <MenubarItem
                 onClick={() =>
                   void openUrl('https://github.com/roorem10/koharu').catch(() => undefined)
@@ -240,6 +243,7 @@ export function TitleBar() {
               )}
             </span>
           ) : (
+            // Booharu: the app's name.
             <span>Booharu</span>
           )}
         </div>

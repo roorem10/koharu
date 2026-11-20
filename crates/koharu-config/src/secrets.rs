@@ -13,7 +13,8 @@ use crate::{Error, Result, home, lock, read_file, save};
 
 pub use secrecy::{ExposeSecret, SecretString};
 
-/// The credential holding the file's key; Booharu's own, apart from Koharu's.
+/// Booharu: the credential holding the file's key, its own, so Booharu and
+/// Koharu never read or replace each other's.
 const SERVICE: &str = "booharu";
 const ACCOUNT: &str = "secrets";
 

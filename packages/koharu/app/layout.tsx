@@ -13,7 +13,7 @@ const notoSansCJK = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'Booharu',
+  title: 'Booharu', // Booharu: the app's name.
 }
 
 function RootLayout({

@@ -35,6 +35,7 @@ export function AboutDialog({
       .then((current) => {
         if (active) setVersion(current)
       })
+      // Booharu: a failed read leaves it unknown, and the Based on line names Koharu alone.
       .catch(() => undefined)
     return () => {
       active = false
@@ -49,11 +50,13 @@ export function AboutDialog({
             <Image src='/icon.png' alt='' width={30} height={30} priority />
           </div>
           <DialogHeader className='min-w-0 gap-1'>
+            {/* Booharu: the app's name. */}
             <DialogTitle className='text-[15px]'>Booharu</DialogTitle>
             <DialogDescription className='text-[11px]'>{t('about.description')}</DialogDescription>
           </DialogHeader>
         </div>
 
+        {/* Booharu: the fork's author and version, and the Koharu release it's based on. */}
         <div className='grid gap-2 border-t border-border/70 pt-3 text-[11px]'>
           {/* The version Tauri reports is the Koharu release Booharu is built on. */}
           <p className='text-muted-foreground'>

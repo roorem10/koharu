@@ -17,7 +17,7 @@ central list of them can drift from the component.
 
 | Part | Model | Cite |
 |---|---|---|
-| file | `~/.booharu/config.toml` (Booharu; Koharu uses `~/.koharu`), a table per component, which a user can edit to set what the app has no screen for yet | Codex keeps its settings in `~/.codex/config.toml` [Codex config] |
+| file | <!-- Booharu: its own settings, apart from Koharu's. --> `~/.booharu/config.toml` (Booharu; Koharu uses `~/.koharu`), a table per component, which a user can edit to set what the app has no screen for yet | Codex keeps its settings in `~/.codex/config.toml` [Codex config] |
 | owner | each component owns its table, its types, and its defaults, which are what an empty table reads as | |
 | reading | from the file every time, with no cache to go stale; a missing file or table is the defaults | |
 | writing | under a lock other processes respect, on what the file holds now, writing only what changed, so comments and other tables stay as they are; no change, no write; the file is replaced at once, never half written | |
@@ -33,7 +33,7 @@ differently.
 
 | Part | Model | Cite |
 |---|---|---|
-| file | `~/.booharu/secrets.age`: API keys and sign-in tokens, encrypted with age to an X25519 key | age's X25519 recipients [age] |
+| file | <!-- Booharu: its own secrets, apart from Koharu's. --> `~/.booharu/secrets.age`: API keys and sign-in tokens, encrypted with age to an X25519 key | age's X25519 recipients [age] |
 | key | the only thing in the operating system's credential store, made with the first secret, so a secret can be any length, though a store may limit an entry's size | Electron's safeStorage encrypts with a key the system keeps: in Keychain Access on macOS, and in a secret store such as KWallet on Linux [Electron safeStorage] |
 | no fallback | without a credential store there are no secrets: no environment variable, plain-text file, or passphrase stands in. On Linux the store is a Secret Service, such as GNOME Keyring, KWallet, or KeePassXC | |
 
