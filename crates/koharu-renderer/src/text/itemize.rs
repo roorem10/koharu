@@ -345,7 +345,7 @@ mod tests {
                 size: 16.0,
                 fill: Color::BLACK,
                 stroke: None,
-                outer_stroke: None, // Booharu: the second border.
+                booharu: Default::default(), // Booharu: none of its own values.
             }],
             vertical: false,
             align: Align::Start,
@@ -376,7 +376,7 @@ mod tests {
             size: 16.0,
             fill: Color::BLACK,
             stroke: None,
-            outer_stroke: None, // Booharu: the second border.
+            booharu: Default::default(), // Booharu: none of its own values.
         };
         let styled = Styled {
             spans: vec![span(0..4), span(4..text.len())],

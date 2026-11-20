@@ -194,7 +194,7 @@ fn shape_text(
     )
     .context("failed to shape text with HarfRust")?;
     let scale = font.scale(span.size);
-    Ok(buffer
+    let mut glyphs: Vec<Glyph> = buffer
         .glyph_infos()
         .iter()
         .zip(buffer.glyph_positions())
@@ -209,7 +209,23 @@ fn shape_text(
             y_offset: position.y_offset as f32 * scale,
             unsafe_to_break: info.unsafe_to_break(),
         })
-        .collect())
+        .collect();
+    // Booharu: letter spacing after each cluster, along the inline axis.
+    let advances = glyphs
+        .iter_mut()
+        .map(|glyph| (glyph.cluster, &mut glyph.advance));
+    crate::booharu::track(advances, gap(styled, run));
+    Ok(glyphs)
+}
+
+/// Booharu: the letter spacing after each cluster of `run`, its span's, but
+/// none in an upright group, which keeps its one cell.
+pub(super) fn gap(styled: &Styled, run: &Run) -> f32 {
+    let span = &styled.spans[run.span];
+    match run.orientation {
+        Orientation::TateChuYoko => 0.0,
+        Orientation::Upright | Orientation::Sideways => span.booharu.gap(span.size),
+    }
 }
 
 /// `text` with `!` and `?` in their full-width forms, or in their
@@ -258,7 +274,7 @@ mod tests {
                 size: 16.0,
                 fill: Color::BLACK,
                 stroke: None,
-                outer_stroke: None, // Booharu: the second border.
+                booharu: Default::default(), // Booharu: none of its own values.
             }],
             vertical: false,
             align: Align::Start,

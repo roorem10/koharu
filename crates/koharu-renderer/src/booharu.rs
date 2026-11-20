@@ -2,9 +2,11 @@
 //! languages, which Booharu's font picker shows muted after a family's name
 //! and searches, so typing 游ゴシック finds Yu Gothic, with Koharu's
 //! `FontFamily` as it is; which of a family's faces sets a text asked for
-//! bold or italic, so they stay apart (`faces`); and where the runs of a
-//! line of mixed sizes stand, and how far faked bold and slant reach past
-//! their glyphs (`lines`).
+//! bold or italic, so they stay apart (`faces`); where the runs of a line of
+//! mixed sizes stand, and how far faked bold and slant reach past their
+//! glyphs (`lines`); and a span's own values, which a span of Koharu's text
+//! carries in one field (`SpanStyle`): its second border, and its letter
+//! spacing, which follows each cluster (`track`).
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -14,6 +16,7 @@ use std::{
 
 use anyhow::Result;
 use fontique::{Collection, CollectionOptions, SourceCache};
+use koharu_scene::{CharStyle, Color};
 use parking_lot::Mutex;
 use skrifa::{FontRef, MetadataProvider, string::StringId};
 
@@ -24,6 +27,57 @@ pub(crate) use self::{
 
 mod faces;
 mod lines;
+
+/// A span's Booharu values, which a span of Koharu's text carries in one
+/// field.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct SpanStyle {
+    /// The colour and width of a second border around the stroke, which
+    /// only a stroke has.
+    pub outer_stroke: Option<(Color, f32)>,
+    /// Letter spacing in thousandths of an em.
+    pub tracking: f32,
+}
+
+impl SpanStyle {
+    /// The values of a span styled `style`: its own values over the text's.
+    pub(crate) fn new(style: &CharStyle) -> Self {
+        Self {
+            outer_stroke: match (style.stroke, style.stroke_width, style.outer_stroke) {
+                (Some(_), Some(inner), Some(color)) if inner > 0.0 => style
+                    .outer_stroke_width
+                    .filter(|width| *width > 0.0)
+                    .map(|width| (Color::from(color), width as f32)),
+                _ => None,
+            },
+            tracking: style
+                .tracking
+                .filter(|tracking| tracking.is_finite())
+                .unwrap_or(0.0) as f32,
+        }
+    }
+
+    /// The letter spacing after each cluster of the span set at `size`.
+    pub(crate) fn gap(&self, size: f32) -> f32 {
+        size * self.tracking / 1000.0
+    }
+}
+
+/// Adds `gap`, a letter spacing, to the advance of the last glyph of each
+/// cluster of `glyphs`, each its cluster and advance in the order shaping
+/// gave them, so the clusters after it move along and a ligature or a
+/// letter with marks takes one gap, its marks staying on it.
+pub(crate) fn track<'a>(glyphs: impl IntoIterator<Item = (usize, &'a mut f32)>, gap: f32) {
+    if gap == 0.0 {
+        return;
+    }
+    let mut glyphs = glyphs.into_iter().peekable();
+    while let Some((cluster, advance)) = glyphs.next() {
+        if glyphs.peek().is_none_or(|(next, _)| *next != cluster) {
+            *advance += gap;
+        }
+    }
+}
 
 /// Each family with names in other languages, by the name the font list
 /// shows, with those names: the installed families', and the bundled
@@ -320,5 +374,255 @@ mod tests {
                 vec!["ノート".to_owned(), "諾托".to_owned()]
             )]
         );
+    }
+
+    /// `text` laid out in `font` with its style's letter spacing `tracking`.
+    fn spaced(
+        font: &crate::fonts::Font,
+        text: &koharu_scene::Text,
+        tracking: f64,
+    ) -> Result<crate::text::TextLayout> {
+        let mut text = text.clone();
+        text.style.chars.tracking = Some(tracking);
+        Ok(crate::text::layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout"))
+    }
+
+    /// Where each glyph of `layout` stands along a horizontal line.
+    fn xs(layout: &crate::text::TextLayout) -> Vec<f32> {
+        layout
+            .runs
+            .iter()
+            .flat_map(|run| run.glyphs.iter().map(|glyph| glyph.x))
+            .collect()
+    }
+
+    /// Where each cluster of `layout`'s first line lies along it.
+    fn alongs(layout: &crate::text::TextLayout) -> Vec<std::ops::Range<f32>> {
+        layout.lines[0]
+            .clusters
+            .iter()
+            .map(|cluster| cluster.along.clone())
+            .collect()
+    }
+
+    fn near(a: f32, b: f32) -> bool {
+        (a - b).abs() < 1e-3
+    }
+
+    #[test]
+    fn letter_spacing_follows_each_cluster_once_not_each_mark() -> Result<()> {
+        // A cluster's last glyph takes the gap, so its marks stay on it.
+        let (mut letter, mut mark, mut next) = (10.0, 0.0, 12.0);
+        track([(0, &mut letter), (0, &mut mark), (3, &mut next)], 2.5);
+        assert_eq!((letter, mark, next), (10.0, 2.5, 14.5));
+        let Some(font) = static_sans() else {
+            eprintln!("skipped: no static sans-serif is installed");
+            return Ok(());
+        };
+        // An x with an acute, two glyphs of one cluster, then a y, at the
+        // default 24 pixels: the y moves one gap, 24 × 100 / 1000.
+        let text = koharu_scene::Text {
+            content: "x\u{301}y".into(),
+            ..koharu_scene::Text::default()
+        };
+        let (plain, spaced) = (
+            xs(&spaced(&font, &text, 0.0)?),
+            xs(&spaced(&font, &text, 100.0)?),
+        );
+        assert_eq!(plain.len(), 3, "{plain:?}");
+        assert_eq!(spaced[..2], plain[..2]);
+        assert!(
+            near(spaced[2] - plain[2], 2.4),
+            "{spaced:?} against {plain:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn each_size_spaces_its_letters_by_its_own_em() -> Result<()> {
+        let Some(font) = static_sans() else {
+            eprintln!("skipped: no static sans-serif is installed");
+            return Ok(());
+        };
+        let span = |words: &str, size: f64| koharu_scene::Span {
+            insert: words.to_owned(),
+            attributes: CharStyle {
+                size: Some(size),
+                ..CharStyle::default()
+            },
+        };
+        let text = koharu_scene::Text {
+            content: koharu_scene::RichText(vec![span("AB", 20.0), span("CD", 40.0)]),
+            ..koharu_scene::Text::default()
+        };
+        let (plain, spaced) = (
+            xs(&spaced(&font, &text, 0.0)?),
+            xs(&spaced(&font, &text, 100.0)?),
+        );
+        // A and B each add 2 pixels, a tenth of 20, and C adds 4.
+        let moved: Vec<f32> = spaced.iter().zip(&plain).map(|(a, b)| a - b).collect();
+        assert!(
+            moved
+                .iter()
+                .zip([0.0, 2.0, 4.0, 8.0])
+                .all(|(a, b)| near(*a, b)),
+            "{moved:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_line_opening_with_a_bracket_starts_where_it_did_spaced_out() -> Result<()> {
+        let Some(font) = static_sans() else {
+            eprintln!("skipped: no static sans-serif is installed");
+            return Ok(());
+        };
+        // A proportional bracket, which leads its line with no space to
+        // take off, however far its letter spacing reaches.
+        let text = koharu_scene::Text {
+            content: "(a)".into(),
+            ..koharu_scene::Text::default()
+        };
+        let (plain, spaced) = (
+            xs(&spaced(&font, &text, 0.0)?),
+            xs(&spaced(&font, &text, 1000.0)?),
+        );
+        assert_eq!((plain[0], spaced[0]), (0.0, 0.0));
+        Ok(())
+    }
+
+    #[test]
+    fn a_word_too_wide_for_its_box_fits_it_spaced_tighter() -> Result<()> {
+        let Some(font) = static_sans() else {
+            eprintln!("skipped: no static sans-serif is installed");
+            return Ok(());
+        };
+        let point = koharu_scene::Text {
+            content: "Lettering".into(),
+            ..koharu_scene::Text::default()
+        };
+        let along = alongs(&spaced(&font, &point, 0.0)?);
+        let width = along[along.len() - 1].end - along[0].start;
+        // A box 10 pixels narrower than the word, which a tracking of -100
+        // narrows by 2.4 pixels after each letter but the last.
+        let boxed = koharu_scene::Text {
+            frame: koharu_scene::Frame::Box {
+                bounds: koharu_scene::Bounds {
+                    x: 0.0,
+                    y: 0.0,
+                    width: f64::from(width) - 10.0,
+                    height: 100.0,
+                },
+                fit: koharu_scene::Fit::Shrink,
+                anchor: Default::default(),
+            },
+            ..point
+        };
+        let plain = spaced(&font, &boxed, 0.0)?;
+        assert!(plain.resolved.scale < 1.0, "{}", plain.resolved.scale);
+        let tight = spaced(&font, &boxed, -100.0)?;
+        assert_eq!(
+            (
+                tight.resolved.scale,
+                tight.resolved.overflowed,
+                tight.lines.len()
+            ),
+            (1.0, false, 1)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_centred_line_hangs_its_last_letter_s_spacing() -> Result<()> {
+        let Some(font) = static_sans() else {
+            eprintln!("skipped: no static sans-serif is installed");
+            return Ok(());
+        };
+        let text = koharu_scene::Text {
+            content: "Centred".into(),
+            style: koharu_scene::TextStyle {
+                align: Some(koharu_scene::Align::Center),
+                ..koharu_scene::TextStyle::default()
+            },
+            frame: koharu_scene::Frame::Box {
+                bounds: koharu_scene::Bounds {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 400.0,
+                    height: 100.0,
+                },
+                fit: koharu_scene::Fit::None,
+                anchor: Default::default(),
+            },
+            ..koharu_scene::Text::default()
+        };
+        // A gap of 12 pixels after each letter: the letters stand as far
+        // from either side, the last one's gap hanging past them.
+        let along = alongs(&spaced(&font, &text, 500.0)?);
+        let (start, end) = (along[0].start, along[along.len() - 1].end - 12.0);
+        assert!(near(start, 400.0 - end), "{start} against {end}");
+        Ok(())
+    }
+
+    #[test]
+    fn vertical_letter_spacing_runs_down_the_column() -> Result<()> {
+        let Some(font) = static_sans() else {
+            eprintln!("skipped: no static sans-serif is installed");
+            return Ok(());
+        };
+        // Sideways letters around an upright `!`.
+        let text = koharu_scene::Text {
+            content: "a!b".into(),
+            direction: koharu_scene::Direction::Vertical,
+            ..koharu_scene::Text::default()
+        };
+        let spaced_out = spaced(&font, &text, 250.0)?;
+        let sideways: Vec<bool> = spaced_out.runs.iter().map(|run| run.sideways).collect();
+        assert_eq!(sideways, [true, false, true]);
+        // A gap of 6 pixels after each, the upright mark's on its vertical
+        // advance.
+        let (plain, spaced) = (alongs(&spaced(&font, &text, 0.0)?), alongs(&spaced_out));
+        for (at, (plain, spaced)) in plain.iter().zip(&spaced).enumerate() {
+            assert!(
+                near(spaced.start - plain.start, 6.0 * at as f32),
+                "{spaced:?} against {plain:?}"
+            );
+            assert!(near(
+                spaced.end - spaced.start,
+                plain.end - plain.start + 6.0
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn an_upright_group_takes_no_letter_spacing() -> Result<()> {
+        let Some(font) = static_sans() else {
+            eprintln!("skipped: no static sans-serif is installed");
+            return Ok(());
+        };
+        // 12 set upright in one cell between sideways words.
+        let text = koharu_scene::Text {
+            content: "x 12 y".into(),
+            direction: koharu_scene::Direction::Vertical,
+            ..koharu_scene::Text::default()
+        };
+        let (plain, spaced) = (spaced(&font, &text, 0.0)?, spaced(&font, &text, 250.0)?);
+        // Its digits stand across the column as they did, and its cell is
+        // one em long, the space after it following straight on.
+        let digits = |layout: &crate::text::TextLayout| -> Vec<f32> {
+            layout
+                .runs
+                .iter()
+                .filter(|run| !run.sideways)
+                .flat_map(|run| run.glyphs.iter().map(|glyph| glyph.x))
+                .collect()
+        };
+        assert_eq!(digits(&plain).len(), 2);
+        assert_eq!(digits(&spaced), digits(&plain));
+        let along = alongs(&spaced);
+        assert!(near(along[4].start - along[2].start, 24.0), "{along:?}");
+        assert_eq!(along[2], along[3]);
+        Ok(())
     }
 }

@@ -15,7 +15,11 @@ use icu_segmenter::{
 };
 use jieba_rs::Jieba;
 
-use super::{itemize::Orientation, shape::ShapedText};
+// Booharu: `gap`, letter spacing.
+use super::{
+    itemize::Orientation,
+    shape::{ShapedText, gap},
+};
 
 static JIEBA: LazyLock<Jieba> = LazyLock::new(Jieba::new);
 
@@ -265,12 +269,17 @@ fn measure(shaped: &ShapedText, advances: &[f64], range: Range<usize>, after: Br
         // An empty paragraph has no runs, and keeps its span's leading, as
         // Photoshop's does.
         .unwrap_or_else(|| styled.spans[styled.span_at(range.start)].size);
+    // Booharu: the letter spacing that hangs past a line's end (`hangs`).
+    let (hang, hyphen_hang) = hangs(shaped, range.clone(), visible_end, after);
     Segment {
         visible_end,
         advance: advance(range.clone()),
-        trailing: advance(visible_end..range.end),
+        trailing: advance(visible_end..range.end) + hang, // Booharu: and letter spacing.
         hyphen: match after {
-            Break::Hyphen => shaped.hyphen(styled.span_at(range.end.saturating_sub(1))),
+            Break::Hyphen => {
+                // Booharu: less its own letter spacing.
+                shaped.hyphen(styled.span_at(range.end.saturating_sub(1))) - hyphen_hang
+            }
             _ => 0.0,
         },
         after,
@@ -278,6 +287,27 @@ fn measure(shaped: &ShapedText, advances: &[f64], range: Range<usize>, after: Br
         size,
         range,
     }
+}
+
+/// Booharu: the letter spacing that hangs past a line's end after the
+/// segment `range`, whose visible text ends at `visible_end` and which
+/// `after` ends, so a line fits and aligns by its letters: the spacing
+/// after its last visible character, which joins its trailing white space;
+/// or before a hyphen, which that spacing stays to part from the word, the
+/// hyphen's own, which comes off the hyphen's width. Returns the two, at
+/// most one of them more than none.
+fn hangs(shaped: &ShapedText, range: Range<usize>, visible_end: usize, after: Break) -> (f32, f32) {
+    let styled = shaped.styled;
+    if after == Break::Hyphen {
+        let hyphen = &shaped.hyphens[styled.span_at(range.end.saturating_sub(1))];
+        return (0.0, hyphen.as_ref().map_or(0.0, |run| gap(styled, run)));
+    }
+    let last = styled.text[range.start..visible_end]
+        .char_indices()
+        .next_back()
+        .map(|(at, _)| range.start + at);
+    let run = last.and_then(|at| shaped.runs.iter().find(|run| run.range.contains(&at)));
+    (run.map_or(0.0, |run| gap(styled, run)), 0.0)
 }
 
 #[cfg(test)]
@@ -314,7 +344,7 @@ mod tests {
                 size: 16.0,
                 fill: Color::BLACK,
                 stroke: None,
-                outer_stroke: None, // Booharu: the second border.
+                booharu: Default::default(), // Booharu: none of its own values.
             }],
             vertical: false,
             align: Align::Start,
@@ -426,6 +456,39 @@ mod tests {
                 .sum::<f32>();
         }
         assert!(alone > word + 1.0, "{alone} against {word}");
+        Ok(())
+    }
+
+    // Booharu: letter spacing hangs at a line's end, but before a hyphen.
+    #[test]
+    fn letter_spacing_hangs_at_a_line_s_end_and_after_a_hyphen() -> anyhow::Result<()> {
+        let mut styled = Styled {
+            hyphenation: Some(Lang::English),
+            chinese: false,
+            ..styled("CARAVAN")
+        };
+        let shaped = ShapedText::new(&styled)?;
+        let (plain, plain_hyphen) = (segments(&shaped, Breaking::Hyphens), shaped.hyphen(0));
+        // A gap of 4 pixels after each letter at 16 pixels.
+        styled.spans[0].booharu.tracking = 250.0;
+        let shaped = ShapedText::new(&styled)?;
+        let spaced = segments(&shaped, Breaking::Hyphens);
+        assert!(spaced.len() > 1, "{spaced:?}");
+        // The hyphen is shaped with its gap, which comes off its width.
+        assert!((shaped.hyphen(0) - plain_hyphen - 4.0).abs() < 1e-3);
+        for (plain, spaced) in plain.iter().zip(&spaced) {
+            let letters = styled.text[spaced.range.clone()].chars().count() as f32;
+            assert!((spaced.advance - plain.advance - 4.0 * letters).abs() < 1e-3);
+            match spaced.after {
+                // Before a hyphen the last letter keeps its gap.
+                Break::Hyphen => {
+                    assert_eq!(spaced.trailing, 0.0);
+                    assert!((spaced.hyphen - plain.hyphen).abs() < 1e-3, "{spaced:?}");
+                }
+                // At the end it hangs.
+                _ => assert!((spaced.trailing - plain.trailing - 4.0).abs() < 1e-3),
+            }
+        }
         Ok(())
     }
 

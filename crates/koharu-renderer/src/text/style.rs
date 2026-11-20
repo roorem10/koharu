@@ -37,9 +37,8 @@ pub(super) struct Span {
     pub fill: Color,
     /// The colour and width of a stroke.
     pub stroke: Option<(Color, f32)>,
-    /// Booharu: the colour and width of a second border around the stroke,
-    /// which only a stroke has.
-    pub outer_stroke: Option<(Color, f32)>,
+    /// Booharu: its own values, such as a second border and letter spacing.
+    pub booharu: crate::booharu::SpanStyle,
 }
 
 impl Styled {
@@ -69,14 +68,9 @@ impl Styled {
                     }
                     _ => None,
                 },
-                // Booharu: the second border.
-                outer_stroke: match (style.stroke, style.stroke_width, style.outer_stroke) {
-                    (Some(_), Some(inner), Some(color)) if inner > 0.0 => style
-                        .outer_stroke_width
-                        .filter(|width| *width > 0.0)
-                        .map(|width| (Color::from(color), width as f32)),
-                    _ => None,
-                },
+                // Booharu: its own values, such as a second border and letter
+                // spacing.
+                booharu: crate::booharu::SpanStyle::new(&style),
             });
         }
         Ok(Self {

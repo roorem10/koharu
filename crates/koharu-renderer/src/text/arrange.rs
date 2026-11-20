@@ -10,7 +10,7 @@ use koharu_scene::{Align, Color, StrokeMethod}; // Booharu: text borders.
 use kurbo::{BezPath, Rect, Shape as _}; // Booharu: text borders.
 use unicode_bidi::{BidiInfo, Level};
 
-// Booharu: `contour`, the Contour borders.
+// Booharu: `contour`, the Contour borders, and `gap`, letter spacing.
 use super::{
     ResolvedText, TextRun,
     breaks::{Break, Segment},
@@ -20,7 +20,7 @@ use super::{
     lettering::{LineMap, PlacedGlyph},
     lines,
     room::physical,
-    shape::{Glyph, ShapedText, shape_run},
+    shape::{Glyph, ShapedText, gap, shape_run},
 };
 use crate::fonts::Font;
 
@@ -120,7 +120,7 @@ pub(super) fn arrange(
         .spans
         .iter()
         .filter_map(|span| {
-            let outer = span.outer_stroke.map_or(0.0, |(_, width)| width);
+            let outer = span.booharu.outer_stroke.map_or(0.0, |(_, width)| width);
             span.stroke.map(|(_, width)| (width + outer) * scale)
         })
         .fold(0.0, f32::max);
@@ -437,6 +437,7 @@ fn runs(shaped: &ShapedText, glyphs: &[Positioned], scale: f32) -> (Vec<GlyphRun
             stroke: span.stroke.map(|(color, width)| (color, width * scale)),
             // Booharu: the second border.
             outer_stroke: span
+                .booharu
                 .outer_stroke
                 .map(|(color, width)| (color, width * scale)),
             // Booharu: what fontique fakes on the run's face, for Photoshop (D12).
@@ -519,7 +520,13 @@ fn opening_space(shaped: &ShapedText, pieces: &[Piece<'_>], scale: f32, head: us
     match glyphs.first() {
         Some(glyph) if opening && glyph.cluster == head && !shaped.rtl_at(head) => {
             let em = shaped.styled.spans[run.span].size * scale;
-            (glyph.advance * scale - em * 0.5).clamp(0.0, em * 0.5)
+            // Booharu: less the letter spacing after the bracket, on its
+            // cluster's last glyph.
+            let advance = match glyphs.get(1) {
+                Some(next) if next.cluster == head => glyph.advance,
+                _ => glyph.advance - gap(shaped.styled, run),
+            };
+            (advance * scale - em * 0.5).clamp(0.0, em * 0.5)
         }
         _ => 0.0,
     }
@@ -580,7 +587,7 @@ mod tests {
                 size: 16.0,
                 fill: koharu_scene::Color::BLACK,
                 stroke: None,
-                outer_stroke: None, // Booharu: the second border.
+                booharu: Default::default(), // Booharu: none of its own values.
             }],
             vertical: false,
             align: Align::Start,
