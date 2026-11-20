@@ -236,6 +236,45 @@
       "titleFor": "Box details for {{name}}",
       "translation": "Translation"
     },
+    "emphasis": {
+      "aiHint": "Used with general chat models. Koharu's own translation models translate without it.",
+      "category": "Lettering category",
+      "clear": "Clear",
+      "clearLabels": {
+        "color": "Clear emphasis color",
+        "outer_stroke_color": "Clear emphasis second outline color",
+        "stroke_color": "Clear emphasis outline color"
+      },
+      "color": "Color",
+      "default": "Default emphasis",
+      "description": "Set the style copied to selected words by ★ or the AI. Unset category fields use the emphasis default.",
+      "enabledForAi": "Let the AI emphasize words",
+      "font": "Font",
+      "italic": "Italic",
+      "labels": {
+        "category": "Emphasis category",
+        "color": "Emphasis color",
+        "font": "Emphasis font",
+        "italic": "Emphasis italic",
+        "outer_stroke_color": "Emphasis second outline color",
+        "outer_stroke_width": "Emphasis second outline width",
+        "sizePercent": "Emphasis size (%)",
+        "stroke_color": "Emphasis outline color",
+        "stroke_width": "Emphasis outline width",
+        "weight": "Emphasis weight"
+      },
+      "normal": "Normal",
+      "outer_stroke_color": "Second outline color",
+      "outer_stroke_width": "Second outline width",
+      "resetCategory": "Use default emphasis for this category",
+      "sameAsDefault": "Same as default",
+      "sizePercent": "Size (%)",
+      "stroke_color": "Outline color",
+      "stroke_width": "Outline width",
+      "title": "Emphasis",
+      "useBoxStyle": "Use box style",
+      "weight": "Weight"
+    },
     "fonts": {
       "addFavorite": "Add {{family}} to favorites",
       "allFonts": "All fonts",

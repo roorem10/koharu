@@ -236,6 +236,45 @@
       "titleFor": "{{name}} 个文字框详情",
       "translation": "译文"
     },
+    "emphasis": {
+      "aiHint": "通用聊天模型会用到。Koharu 自家个翻译模型翻译个辰光勿用箇个功能。",
+      "category": "文字排版类别",
+      "clear": "清除",
+      "clearLabels": {
+        "color": "清除强调颜色",
+        "outer_stroke_color": "清除强调第二道描边颜色",
+        "stroke_color": "清除强调描边颜色"
+      },
+      "color": "颜色",
+      "default": "默认强调样式",
+      "description": "设置点 ★ 或者用 AI 辰光，套到拣中个词语浪个样式。类别里向呒没设置个字段，会用默认强调样式。",
+      "enabledForAi": "允许 AI 强调词语",
+      "font": "字体",
+      "italic": "斜体",
+      "labels": {
+        "category": "强调类别",
+        "color": "强调颜色",
+        "font": "强调字体",
+        "italic": "强调斜体",
+        "outer_stroke_color": "强调第二道描边颜色",
+        "outer_stroke_width": "强调第二道描边宽度",
+        "sizePercent": "强调大小（%）",
+        "stroke_color": "强调描边颜色",
+        "stroke_width": "强调描边宽度",
+        "weight": "强调字重"
+      },
+      "normal": "常规",
+      "outer_stroke_color": "第二道描边颜色",
+      "outer_stroke_width": "第二道描边宽度",
+      "resetCategory": "箇个类别用默认强调样式",
+      "sameAsDefault": "搭默认一样",
+      "sizePercent": "大小（%）",
+      "stroke_color": "描边颜色",
+      "stroke_width": "描边宽度",
+      "title": "强调",
+      "useBoxStyle": "用文字框样式",
+      "weight": "字重"
+    },
     "fonts": {
       "addFavorite": "收藏{{family}}",
       "allFonts": "全部字体",

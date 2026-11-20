@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import { LetteringPreferences } from '@/components/booharu/lettering/LetteringPreferences' // Booharu: the lettering categories.
 import { DefaultTextStyleSection } from '@/components/booharu/typesetting/DefaultTextStyleSection' // Booharu: the default text style.
+import { EmphasisPreferences } from '@/components/booharu/typesetting/EmphasisPreferences' // Booharu: emphasis.
 import { FontPicker } from '@/components/controls/FontPicker'
 import { PreferencePage } from '@/components/preferences/PreferenceFields'
 import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: favourites and local names.
@@ -143,6 +144,8 @@ export function TypesettingPreferences({
       <DefaultTextStyleSection />
       {/* Booharu: the lettering categories' fonts, below the default text style, whose font is the first Preferred font. */}
       <LetteringPreferences />
+      {/* Booharu: how stressed words look, after the lettering categories each can set its own for. */}
+      <EmphasisPreferences />
     </PreferencePage>
   )
 }

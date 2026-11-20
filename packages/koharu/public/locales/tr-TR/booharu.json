@@ -236,6 +236,45 @@
       "titleFor": "{{name}} için kutu ayrıntıları",
       "translation": "Çeviri"
     },
+    "emphasis": {
+      "aiHint": "Genel sohbet modelleriyle kullanılır. Koharu'nun kendi çeviri modelleri bu özellik olmadan çevirir.",
+      "category": "Dizgi kategorisi",
+      "clear": "Temizle",
+      "clearLabels": {
+        "color": "Vurgu rengini temizle",
+        "outer_stroke_color": "Vurgu ikinci dış çizgi rengini temizle",
+        "stroke_color": "Vurgu dış çizgi rengini temizle"
+      },
+      "color": "Renk",
+      "default": "Varsayılan vurgu",
+      "description": "★ veya yapay zekâ ile seçilen sözcüklere uygulanan stili ayarlayın. Ayarlanmayan kategori alanları varsayılan vurguyu kullanır.",
+      "enabledForAi": "Yapay zekâ sözcükleri vurgulayabilsin",
+      "font": "Yazı tipi",
+      "italic": "İtalik",
+      "labels": {
+        "category": "Vurgu kategorisi",
+        "color": "Vurgu rengi",
+        "font": "Vurgu yazı tipi",
+        "italic": "Vurgu italiği",
+        "outer_stroke_color": "Vurgu ikinci dış çizgi rengi",
+        "outer_stroke_width": "Vurgu ikinci dış çizgi genişliği",
+        "sizePercent": "Vurgu boyutu (%)",
+        "stroke_color": "Vurgu dış çizgi rengi",
+        "stroke_width": "Vurgu dış çizgi genişliği",
+        "weight": "Vurgu kalınlığı"
+      },
+      "normal": "Normal",
+      "outer_stroke_color": "İkinci dış çizgi rengi",
+      "outer_stroke_width": "İkinci dış çizgi genişliği",
+      "resetCategory": "Bu kategori için varsayılan vurguyu kullan",
+      "sameAsDefault": "Varsayılanla aynı",
+      "sizePercent": "Boyut (%)",
+      "stroke_color": "Dış çizgi rengi",
+      "stroke_width": "Dış çizgi genişliği",
+      "title": "Vurgu",
+      "useBoxStyle": "Kutu stilini kullan",
+      "weight": "Kalınlık"
+    },
     "fonts": {
       "addFavorite": "{{family}} yazı tipini favorilere ekle",
       "allFonts": "Tüm yazı tipleri",

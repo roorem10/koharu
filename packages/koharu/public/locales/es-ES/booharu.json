@@ -264,6 +264,45 @@
       "titleFor": "Detalles del cuadro de {{name}}",
       "translation": "Traducción"
     },
+    "emphasis": {
+      "aiHint": "Se usa con modelos de chat generales. Los modelos de traducción propios de Koharu traducen sin esta opción.",
+      "category": "Categoría de rotulación",
+      "clear": "Borrar",
+      "clearLabels": {
+        "color": "Borrar color del énfasis",
+        "outer_stroke_color": "Borrar color del segundo contorno del énfasis",
+        "stroke_color": "Borrar color del contorno del énfasis"
+      },
+      "color": "Color",
+      "default": "Énfasis predeterminado",
+      "description": "Define el estilo que ★ o la IA copian a las palabras seleccionadas. Los campos de categoría sin definir usan el énfasis predeterminado.",
+      "enabledForAi": "Permitir que la IA enfatice palabras",
+      "font": "Fuente",
+      "italic": "Cursiva",
+      "labels": {
+        "category": "Categoría del énfasis",
+        "color": "Color del énfasis",
+        "font": "Fuente del énfasis",
+        "italic": "Cursiva del énfasis",
+        "outer_stroke_color": "Color del segundo contorno del énfasis",
+        "outer_stroke_width": "Ancho del segundo contorno del énfasis",
+        "sizePercent": "Tamaño del énfasis (%)",
+        "stroke_color": "Color del contorno del énfasis",
+        "stroke_width": "Ancho del contorno del énfasis",
+        "weight": "Grosor de fuente del énfasis"
+      },
+      "normal": "Normal",
+      "outer_stroke_color": "Color del segundo contorno",
+      "outer_stroke_width": "Ancho del segundo contorno",
+      "resetCategory": "Usar el énfasis predeterminado para esta categoría",
+      "sameAsDefault": "Igual que el predeterminado",
+      "sizePercent": "Tamaño (%)",
+      "stroke_color": "Color del contorno",
+      "stroke_width": "Ancho del contorno",
+      "title": "Énfasis",
+      "useBoxStyle": "Usar estilo del cuadro",
+      "weight": "Grosor de fuente"
+    },
     "fonts": {
       "addFavorite": "Añadir {{family}} a favoritos",
       "allFonts": "Todas las fuentes",

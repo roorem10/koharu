@@ -264,6 +264,45 @@
       "titleFor": "Détails de la zone de texte pour {{name}}",
       "translation": "Traduction"
     },
+    "emphasis": {
+      "aiHint": "Utilisé avec les modèles de chat généralistes. Les modèles de traduction propres à Koharu traduisent sans.",
+      "category": "Catégorie de lettrage",
+      "clear": "Effacer",
+      "clearLabels": {
+        "color": "Effacer la couleur de mise en valeur",
+        "outer_stroke_color": "Effacer la couleur du second contour de mise en valeur",
+        "stroke_color": "Effacer la couleur du contour de mise en valeur"
+      },
+      "color": "Couleur",
+      "default": "Mise en valeur par défaut",
+      "description": "Définissez le style que ★ ou l’IA applique aux mots sélectionnés. Les champs de catégorie non définis utilisent la mise en valeur par défaut.",
+      "enabledForAi": "Autoriser l’IA à mettre des mots en valeur",
+      "font": "Police",
+      "italic": "Italique",
+      "labels": {
+        "category": "Catégorie de mise en valeur",
+        "color": "Couleur de mise en valeur",
+        "font": "Police de mise en valeur",
+        "italic": "Italique de mise en valeur",
+        "outer_stroke_color": "Couleur du second contour de mise en valeur",
+        "outer_stroke_width": "Épaisseur du second contour de mise en valeur",
+        "sizePercent": "Taille de mise en valeur (%)",
+        "stroke_color": "Couleur du contour de mise en valeur",
+        "stroke_width": "Épaisseur du contour de mise en valeur",
+        "weight": "Graisse de mise en valeur"
+      },
+      "normal": "Normal",
+      "outer_stroke_color": "Couleur du second contour",
+      "outer_stroke_width": "Épaisseur du second contour",
+      "resetCategory": "Utiliser la mise en valeur par défaut pour cette catégorie",
+      "sameAsDefault": "Identique à la valeur par défaut",
+      "sizePercent": "Taille (%)",
+      "stroke_color": "Couleur du contour",
+      "stroke_width": "Épaisseur du contour",
+      "title": "Mise en valeur",
+      "useBoxStyle": "Utiliser le style de la zone de texte",
+      "weight": "Graisse"
+    },
     "fonts": {
       "addFavorite": "Ajouter {{family}} aux favoris",
       "allFonts": "Toutes les polices",

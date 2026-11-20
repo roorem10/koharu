@@ -264,6 +264,45 @@
       "titleFor": "Detalhes da caixa de {{name}}",
       "translation": "Tradução"
     },
+    "emphasis": {
+      "aiHint": "Usado com modelos de chat gerais. Os modelos de tradução próprios do Koharu traduzem sem isso.",
+      "category": "Categoria de letreiramento",
+      "clear": "Limpar",
+      "clearLabels": {
+        "color": "Limpar cor da ênfase",
+        "outer_stroke_color": "Limpar cor do segundo contorno da ênfase",
+        "stroke_color": "Limpar cor do contorno da ênfase"
+      },
+      "color": "Cor",
+      "default": "Ênfase padrão",
+      "description": "Defina o estilo aplicado às palavras selecionadas ao usar ★ ou a IA. Os campos não definidos da categoria usam a ênfase padrão.",
+      "enabledForAi": "Permitir que a IA enfatize palavras",
+      "font": "Fonte",
+      "italic": "Itálico",
+      "labels": {
+        "category": "Categoria da ênfase",
+        "color": "Cor da ênfase",
+        "font": "Fonte da ênfase",
+        "italic": "Itálico da ênfase",
+        "outer_stroke_color": "Cor do segundo contorno da ênfase",
+        "outer_stroke_width": "Largura do segundo contorno da ênfase",
+        "sizePercent": "Tamanho da ênfase (%)",
+        "stroke_color": "Cor do contorno da ênfase",
+        "stroke_width": "Largura do contorno da ênfase",
+        "weight": "Peso da ênfase"
+      },
+      "normal": "Normal",
+      "outer_stroke_color": "Cor do segundo contorno",
+      "outer_stroke_width": "Largura do segundo contorno",
+      "resetCategory": "Usar ênfase padrão nesta categoria",
+      "sameAsDefault": "Igual ao padrão",
+      "sizePercent": "Tamanho (%)",
+      "stroke_color": "Cor do contorno",
+      "stroke_width": "Largura do contorno",
+      "title": "Ênfase",
+      "useBoxStyle": "Usar estilo da caixa",
+      "weight": "Peso"
+    },
     "fonts": {
       "addFavorite": "Adicionar {{family}} aos favoritos",
       "allFonts": "Todas as fontes",

@@ -236,6 +236,45 @@
       "titleFor": "{{name}} 的文本框详情",
       "translation": "译文"
     },
+    "emphasis": {
+      "aiHint": "用于通用聊天模型。Koharu 自带的翻译模型翻译时不使用此功能。",
+      "category": "排字类别",
+      "clear": "清除",
+      "clearLabels": {
+        "color": "清除强调颜色",
+        "outer_stroke_color": "清除强调第二描边颜色",
+        "stroke_color": "清除强调描边颜色"
+      },
+      "color": "颜色",
+      "default": "默认强调样式",
+      "description": "设置通过 ★ 或 AI 应用于所选字词的样式。各类别中未设置的选项使用默认强调样式。",
+      "enabledForAi": "允许 AI 强调字词",
+      "font": "字体",
+      "italic": "斜体",
+      "labels": {
+        "category": "强调类别",
+        "color": "强调颜色",
+        "font": "强调字体",
+        "italic": "强调斜体",
+        "outer_stroke_color": "强调第二描边颜色",
+        "outer_stroke_width": "强调第二描边宽度",
+        "sizePercent": "强调大小（%）",
+        "stroke_color": "强调描边颜色",
+        "stroke_width": "强调描边宽度",
+        "weight": "强调字重"
+      },
+      "normal": "常规",
+      "outer_stroke_color": "第二描边颜色",
+      "outer_stroke_width": "第二描边宽度",
+      "resetCategory": "此类别使用默认强调样式",
+      "sameAsDefault": "与默认相同",
+      "sizePercent": "大小（%）",
+      "stroke_color": "描边颜色",
+      "stroke_width": "描边宽度",
+      "title": "强调",
+      "useBoxStyle": "使用文本框样式",
+      "weight": "字重"
+    },
     "fonts": {
       "addFavorite": "收藏{{family}}",
       "allFonts": "全部字体",

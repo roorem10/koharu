@@ -236,6 +236,45 @@
       "titleFor": "{{name}}のボックス詳細",
       "translation": "翻訳"
     },
+    "emphasis": {
+      "aiHint": "汎用のチャットモデルで使われます。Koharu 独自の翻訳モデルは、この機能を使わずに翻訳します。",
+      "category": "写植カテゴリ",
+      "clear": "クリア",
+      "clearLabels": {
+        "color": "強調の色をクリア",
+        "outer_stroke_color": "強調の外側の縁取りの色をクリア",
+        "stroke_color": "強調の縁取りの色をクリア"
+      },
+      "color": "色",
+      "default": "既定の強調",
+      "description": "選択した単語に★またはAIで適用するスタイルを設定します。カテゴリの未設定項目には、既定の強調スタイルを使用します。",
+      "enabledForAi": "AIによる単語の強調を許可",
+      "font": "フォント",
+      "italic": "斜体",
+      "labels": {
+        "category": "強調のカテゴリ",
+        "color": "強調の色",
+        "font": "強調のフォント",
+        "italic": "強調の斜体",
+        "outer_stroke_color": "強調の外側の縁取りの色",
+        "outer_stroke_width": "強調の外側の縁取り幅",
+        "sizePercent": "強調のサイズ（%）",
+        "stroke_color": "強調の縁取りの色",
+        "stroke_width": "強調の縁取り幅",
+        "weight": "強調の太さ"
+      },
+      "normal": "標準",
+      "outer_stroke_color": "外側の縁取りの色",
+      "outer_stroke_width": "外側の縁取り幅",
+      "resetCategory": "このカテゴリに既定の強調を使用",
+      "sameAsDefault": "既定と同じ",
+      "sizePercent": "サイズ（%）",
+      "stroke_color": "縁取りの色",
+      "stroke_width": "縁取り幅",
+      "title": "強調",
+      "useBoxStyle": "ボックスのスタイルを使用",
+      "weight": "太さ"
+    },
     "fonts": {
       "addFavorite": "{{family}}をお気に入りに追加",
       "allFonts": "すべてのフォント",
