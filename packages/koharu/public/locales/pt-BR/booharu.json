@@ -634,8 +634,12 @@
     },
     "words": {
       "bold": "Negrito",
+      "clear": "Limpar",
       "emphasis": "Ênfase",
-      "italic": "Itálico"
+      "failed": "Não foi possível aplicar o estilo às palavras: {{message}}",
+      "italic": "Itálico",
+      "textChanged": "O texto mudou. Selecione as palavras novamente.",
+      "toolbar": "Estilos de palavras"
     }
   },
   "errors": {
@@ -660,7 +664,8 @@
       "booharu_set_lettering_category": "Alterar categoria de letreiramento",
       "booharu_set_review_note": "Editar nota",
       "booharu_set_translation": "Adicionar tradução",
-      "booharu_split_block": "Dividir texto"
+      "booharu_split_block": "Dividir texto",
+      "booharu_style_words": "Aplicar estilo às palavras"
     }
   },
   "inference": {

@@ -589,8 +589,12 @@
     },
     "words": {
       "bold": "太字",
+      "clear": "クリア",
       "emphasis": "強調",
-      "italic": "斜体"
+      "failed": "単語のスタイルを設定できませんでした：{{message}}",
+      "italic": "斜体",
+      "textChanged": "テキストが変更されました。単語をもう一度選択してください。",
+      "toolbar": "単語のスタイル"
     }
   },
   "errors": {
@@ -612,7 +616,8 @@
       "booharu_set_lettering_category": "写植カテゴリを変更",
       "booharu_set_review_note": "メモを編集",
       "booharu_set_translation": "翻訳を追加",
-      "booharu_split_block": "テキストを分割"
+      "booharu_split_block": "テキストを分割",
+      "booharu_style_words": "単語のスタイルを変更"
     }
   },
   "menu": {

@@ -634,8 +634,12 @@
     },
     "words": {
       "bold": "Gras",
+      "clear": "Effacer",
       "emphasis": "Mise en valeur",
-      "italic": "Italique"
+      "failed": "Impossible de mettre en forme les mots : {{message}}",
+      "italic": "Italique",
+      "textChanged": "Le texte a changé. Sélectionnez à nouveau les mots.",
+      "toolbar": "Styles des mots"
     }
   },
   "errors": {
@@ -660,7 +664,8 @@
       "booharu_set_lettering_category": "Modifier la catégorie de lettrage",
       "booharu_set_review_note": "Modifier la note",
       "booharu_set_translation": "Ajouter une traduction",
-      "booharu_split_block": "Diviser le texte"
+      "booharu_split_block": "Diviser le texte",
+      "booharu_style_words": "Mettre en forme des mots"
     }
   },
   "inference": {

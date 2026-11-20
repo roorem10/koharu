@@ -589,8 +589,12 @@
     },
     "words": {
       "bold": "굵게",
+      "clear": "지우기",
       "emphasis": "강조",
-      "italic": "기울임꼴"
+      "failed": "단어 스타일을 지정하지 못했습니다: {{message}}",
+      "italic": "기울임꼴",
+      "textChanged": "텍스트가 변경되었습니다. 단어를 다시 선택하세요.",
+      "toolbar": "단어 스타일"
     }
   },
   "errors": {
@@ -612,7 +616,8 @@
       "booharu_set_lettering_category": "레터링 범주 변경",
       "booharu_set_review_note": "메모 편집",
       "booharu_set_translation": "번역 추가",
-      "booharu_split_block": "텍스트 분할"
+      "booharu_split_block": "텍스트 분할",
+      "booharu_style_words": "단어 스타일 변경"
     }
   },
   "settings": {

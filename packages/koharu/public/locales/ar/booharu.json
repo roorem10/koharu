@@ -763,8 +763,12 @@
     },
     "words": {
       "bold": "عريض",
+      "clear": "مسح",
       "emphasis": "إبراز",
-      "italic": "مائل"
+      "failed": "تعذّر تنسيق الكلمات: {{message}}",
+      "italic": "مائل",
+      "textChanged": "تغيّر النص. حدّد الكلمات مرة أخرى.",
+      "toolbar": "أنماط الكلمات"
     }
   },
   "errors": {
@@ -792,7 +796,8 @@
       "booharu_set_lettering_category": "تغيير فئة التنضيد",
       "booharu_set_review_note": "تحرير الملاحظة",
       "booharu_set_translation": "إضافة ترجمة",
-      "booharu_split_block": "تقسيم النص"
+      "booharu_split_block": "تقسيم النص",
+      "booharu_style_words": "تنسيق الكلمات"
     }
   },
   "inference": {

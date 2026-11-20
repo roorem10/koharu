@@ -589,8 +589,12 @@
     },
     "words": {
       "bold": "Bold",
+      "clear": "Clear",
       "emphasis": "Emphasis",
-      "italic": "Italic"
+      "failed": "Couldn't style the words: {{message}}",
+      "italic": "Italic",
+      "textChanged": "The text changed. Select the words again.",
+      "toolbar": "Word styles"
     }
   },
   "errors": {
@@ -612,7 +616,8 @@
       "booharu_set_lettering_category": "Change lettering category",
       "booharu_set_review_note": "Edit note",
       "booharu_set_translation": "Add translation",
-      "booharu_split_block": "Split text"
+      "booharu_split_block": "Split text",
+      "booharu_style_words": "Style words"
     }
   },
   "settings": {

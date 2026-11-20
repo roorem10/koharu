@@ -589,8 +589,12 @@
     },
     "words": {
       "bold": "粗体",
+      "clear": "清除",
       "emphasis": "强调",
-      "italic": "斜体"
+      "failed": "无法设置字词样式：{{message}}",
+      "italic": "斜体",
+      "textChanged": "文本已更改，请重新选择字词。",
+      "toolbar": "字词样式"
     }
   },
   "errors": {
@@ -612,7 +616,8 @@
       "booharu_set_lettering_category": "更改排字类别",
       "booharu_set_review_note": "编辑备注",
       "booharu_set_translation": "添加译文",
-      "booharu_split_block": "拆分文本"
+      "booharu_split_block": "拆分文本",
+      "booharu_style_words": "更改字词样式"
     }
   },
   "settings": {
