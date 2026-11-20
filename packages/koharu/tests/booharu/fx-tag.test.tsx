@@ -11,7 +11,7 @@ import { openFxOn, useFx } from '@/lib/booharu/fx'
 import { useBooharuQc } from '@/lib/booharu/qc'
 import { queryClient } from '@/lib/queries'
 import { useKoharuStore, type CanvasTool } from '@/lib/store'
-import { commands, type TextEffects } from '@koharu/ipc/protocol'
+import { commands, type Layer, type TextEffects } from '@koharu/ipc/protocol'
 import { TooltipProvider } from '@koharu/ui/components/tooltip'
 
 import { boxesPage, desktop, openProject } from './boxes'
@@ -166,6 +166,31 @@ describe('Booharu fx tag (S12-j)', () => {
     expect(useKoharuStore.getState().selectedLayers).toEqual(['first', 'second'])
     expect(useKoharuStore.getState().tool).toBe('select')
     expect(useFx.getState().open).toBe(true)
+  })
+
+  it('selects a text the canvas hides but opens nothing, as no bar shows over it', async () => {
+    desktop()
+    const page = boxesPage()
+    // The balloon holding "second" is hidden, and so the text in it.
+    const hide = (layers: Layer[]): Layer[] =>
+      layers.map((layer) =>
+        layer.id === 'split'
+          ? { ...layer, visible: false }
+          : layer.children
+            ? { ...layer, children: hide(layer.children) }
+            : layer,
+      )
+    openProject({ ...page, layers: hide(page.layers) })
+    queryClient.setQueryData(effectsKey('page'), EFFECTS)
+    useKoharuStore.setState({ tool: 'draw', selectedLayers: [], selectedPages: [] })
+    const user = userEvent.setup()
+    mount(<LayersPanel />)
+
+    await user.click(screen.getByRole('button', { name: 'Text effects for second' }))
+
+    expect(useKoharuStore.getState().selectedLayers).toEqual(['second'])
+    expect(useKoharuStore.getState().tool).toBe('draw')
+    expect(useFx.getState().open).toBe(false)
   })
 
   it('opens nothing when another text is selected while its page shows', async () => {

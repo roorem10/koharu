@@ -27,6 +27,7 @@ import { FontPicker } from '@/components/controls/FontPicker'
 import { ContextBar } from '@/components/editor/ContextBar'
 import { call, dispatch } from '@/lib/backend'
 import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: favourites and local names.
+import { useFxBar } from '@/lib/booharu/fx' // Booharu: Text effects goes with the bar (S12-k).
 // Booharu: the values the selected texts don't share (S11-h).
 import { borderCompanion, paragraphShare, setEach, type BorderKey } from '@/lib/booharu/mixed'
 import { charsOr, sharedPaint } from '@/lib/booharu/paint' // Booharu: a fill and a gradient, one paint.
@@ -271,6 +272,12 @@ export function TypeBar() {
   const selectionBounds = useKoharuStore((state) => state.selectionBounds)
   // A new text being typed has no layer yet for its paragraph to go to.
   const paragraph = targets.length > 0
+  // Booharu: Text effects goes with the bar, which shows as the line below says (S12-k).
+  useFxBar(
+    page?.id,
+    selectedIds,
+    !!selectionBounds && !!(targets.length || typing) && TOOLS.includes(tool),
+  )
   if (!selectionBounds || !(targets.length || typing) || !TOOLS.includes(tool)) return null
 
   // One row, as Photoshop's type options bar, at the user's choice: the face, its size, and its

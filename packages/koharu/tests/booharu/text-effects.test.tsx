@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import { openFx, useFx } from '@/lib/booharu/fx'
+import { closeFx, openFx, useFx } from '@/lib/booharu/fx'
 import { seedGradient } from '@/lib/booharu/paint'
 import { setWordRange, type WordRange } from '@/lib/booharu/words'
 import { pageKey, queryClient } from '@/lib/queries'
@@ -150,6 +150,63 @@ describe('Booharu Text effects in the type bar (S12-k)', () => {
 
     await waitFor(() => expect(useFx.getState().open).toBe(false))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Text effects' })).toBeNull())
+  })
+
+  it('closes as the bar goes, and never comes back with it, over the same text or another', async () => {
+    const { bar, user } = renderBar([styled('a', { fill: RED }), styled('c', { fill: RED })], {
+      selected: ['a'],
+    })
+    await user.click(bar.getByRole('button', { name: 'Text effects' }))
+    expect(await screen.findByRole('dialog', { name: 'Text effects' })).toBeInTheDocument()
+
+    // The brush hides the bar, and Text effects with it.
+    act(() => useKoharuStore.getState().setTool('draw'))
+    expect(screen.queryByTestId('type-bar')).toBeNull()
+    expect(useFx.getState().open).toBe(false)
+
+    act(() => useKoharuStore.getState().setTool('select'))
+    expect(screen.getByTestId('type-bar')).toBeInTheDocument()
+    act(() => useKoharuStore.getState().setTool('draw'))
+    act(() => useKoharuStore.getState().selectLayers([]))
+    act(() => useKoharuStore.getState().setTool('select'))
+    act(() => useKoharuStore.getState().selectLayers(['c']))
+
+    expect(screen.getByTestId('type-bar')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Text effects' })).toBeNull()
+    expect(useFx.getState().open).toBe(false)
+  })
+
+  it('opens once the bar shows the texts it was opened over, and never over others', async () => {
+    renderBar([styled('a', { fill: RED }), styled('c', { fill: RED })], { selected: ['a'] })
+    const bounds = useKoharuStore.getState().selectionBounds
+
+    // Opened before the canvas tells where the text lies, as FX… and an fx tag open it.
+    act(() => useKoharuStore.setState({ selectionBounds: null }))
+    act(() => openFx())
+    expect(screen.queryByTestId('type-bar')).toBeNull()
+    act(() => useKoharuStore.setState({ selectionBounds: bounds }))
+    expect(await screen.findByRole('dialog', { name: 'Text effects' })).toBeInTheDocument()
+
+    // Opened while the bar can't show, as over a text the canvas hides, then another selected.
+    act(() => closeFx())
+    act(() => useKoharuStore.setState({ selectionBounds: null }))
+    act(() => openFx())
+    act(() => useKoharuStore.setState({ selectedLayers: ['c'], selectionBounds: bounds }))
+
+    expect(screen.getByTestId('type-bar')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Text effects' })).toBeNull()
+    expect(useFx.getState().open).toBe(false)
+  })
+
+  it('closes, waiting, once the bar’s page hides the texts it was opened over', () => {
+    // An fx tag in Story opens it over a text on another page, which shows it hidden.
+    renderBar([{ ...styled('a', { fill: RED }), visible: false }], { selected: ['a'] })
+    act(() => useKoharuStore.setState({ selectionBounds: null }))
+
+    act(() => openFx())
+
+    expect(useFx.getState().open).toBe(false)
+    expect(useKoharuStore.getState().selectedLayers).toEqual(['a'])
   })
 })
 
