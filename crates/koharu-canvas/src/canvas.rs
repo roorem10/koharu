@@ -408,10 +408,8 @@ impl Canvas {
             return Ok(match typing.key(event)? {
                 Keyed::Taken(effects) => Some(effects),
                 Keyed::Commit => Some(self.finish_typing()),
-                Keyed::Cancel => {
-                    self.typing = None;
-                    Some(Vec::new())
-                }
+                // Booharu: Escape keeps what's typed, as Ctrl+Enter does.
+                Keyed::Cancel => Some(self.finish_typing()),
                 Keyed::Pass => None,
             });
         }

@@ -1567,26 +1567,36 @@ fn typed_text(content: Value) -> Vec<Value> {
     ]
 }
 
+// Booharu: Escape keeps what was typed, as Ctrl+Enter does (D6), where
+// Koharu's `escape_or_an_empty_commit_adds_no_text` dropped it; an empty
+// commit still adds no text.
 #[test]
-fn escape_or_an_empty_commit_adds_no_text() {
+fn escape_keeps_the_text_and_an_empty_commit_adds_none() {
     let Some(mut fixture) = unscaled(Vec::new()) else {
         return;
     };
     fixture.canvas.set_tool(Tool::Text);
     gesture(&mut fixture.canvas, (30.0, 40.0), (30.0, 40.0));
-    type_text(&mut fixture.canvas, "Gone");
+    type_text(&mut fixture.canvas, "Kept");
     let escaped = press_key(
         &mut fixture.canvas,
         NamedKey::Escape,
         Code::Escape,
         Modifiers::default(),
     );
-    assert!(escaped.is_empty());
+    assert_eq!(apply(&mut fixture, escaped), ["add_text"]);
     assert!(fixture.canvas.typing().is_none());
-    gesture(&mut fixture.canvas, (30.0, 40.0), (30.0, 40.0));
+    let [kept] = layers(&fixture)[..] else {
+        panic!("one layer");
+    };
+    assert_eq!(
+        layer(&fixture, kept)["content"],
+        json!([{"insert": "Kept"}])
+    );
+    gesture(&mut fixture.canvas, (300.0, 300.0), (300.0, 300.0));
     let effects = press_key(&mut fixture.canvas, NamedKey::Enter, Code::Enter, CONTROL);
     assert!(apply(&mut fixture, effects).is_empty());
-    assert!(layers(&fixture).is_empty());
+    assert_eq!(layers(&fixture), [kept]);
 }
 
 #[test]

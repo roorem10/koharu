@@ -1,7 +1,7 @@
 //! The O tool's box, as the canvas answers it, the default look of the text
-//! the T tool adds and of a translation typed into a block with none, and
-//! the clean-up such a translation shows again on a sound effect kept as
-//! art, on the canvas's harness.
+//! the T tool adds and of a translation typed into a block with none, the
+//! clean-up such a translation shows again on a sound effect kept as art,
+//! and Escape keeping what's typed, on the canvas's harness.
 
 use std::collections::BTreeMap;
 
@@ -592,4 +592,133 @@ fn pushing_settings_redraws_nothing() {
     // The same ones again, as each save pushes them.
     canvas.set_booharu(pushed(false, Some(WHITE)));
     assert!(canvas.draw().expect("a draw").is_none());
+}
+
+/// How typing is left: Escape, or Ctrl+Enter.
+#[derive(Clone, Copy)]
+enum Leave {
+    Escape,
+    Commit,
+}
+
+/// Leaves typing `how`: what typing answered.
+fn leave(canvas: &mut Canvas, how: Leave) -> Vec<Effect> {
+    match how {
+        Leave::Escape => press_key(canvas, NamedKey::Escape, Code::Escape, NONE),
+        Leave::Commit => press_key(canvas, NamedKey::Enter, Code::Enter, CONTROL),
+    }
+}
+
+fn steps(fixture: &Fixture) -> usize {
+    fixture.session.lock().history().steps.len()
+}
+
+#[test]
+fn escape_keeps_a_new_text_as_ctrl_enter_does() {
+    // The edits it applied, the project's steps, and the text added.
+    let kept = |how| -> Option<(Vec<String>, usize, Value)> {
+        let mut fixture = unscaled(Vec::new())?;
+        fixture.canvas.set_tool(Tool::Text);
+        gesture(&mut fixture.canvas, (30.0, 40.0), (30.0, 40.0));
+        type_text(&mut fixture.canvas, "Kept");
+        let effects = leave(&mut fixture.canvas, how);
+        let selected = selections(&effects);
+        let labels = apply(&mut fixture, effects);
+        assert!(fixture.canvas.typing().is_none());
+        let [added] = layers(&fixture)[..] else {
+            panic!("one layer");
+        };
+        assert_eq!(selected, [vec![added]]);
+        Some((
+            labels,
+            steps(&fixture),
+            layer(&fixture, added)["content"].clone(),
+        ))
+    };
+    let Some(escaped) = kept(Leave::Escape) else {
+        return;
+    };
+    assert_eq!(escaped.0, ["add_text"]);
+    assert_eq!(escaped.2, json!([{"insert": "Kept"}]));
+    assert_eq!(Some(escaped), kept(Leave::Commit));
+}
+
+#[test]
+fn escape_keeps_an_edit_to_a_text_as_ctrl_enter_does() {
+    let edited = |how| -> Option<(Vec<String>, usize, Value)> {
+        let mut fixture = unscaled(typed_text(json!("Hello")))?;
+        let text = layers(&fixture)[0];
+        fixture.canvas.set_tool(Tool::Text);
+        gesture(&mut fixture.canvas, (101.0, 220.0), (101.0, 220.0));
+        press_key(&mut fixture.canvas, NamedKey::End, Code::End, NONE);
+        type_text(&mut fixture.canvas, "!");
+        let effects = leave(&mut fixture.canvas, how);
+        let labels = apply(&mut fixture, effects);
+        assert!(fixture.canvas.typing().is_none());
+        // The text stays selected, so the type bar styles it whole next.
+        assert_eq!(fixture.canvas.selection(), [text]);
+        Some((
+            labels,
+            steps(&fixture),
+            layer(&fixture, text)["content"].clone(),
+        ))
+    };
+    let Some(escaped) = edited(Leave::Escape) else {
+        return;
+    };
+    assert_eq!(escaped.0, ["set_text"]);
+    assert_eq!(escaped.2, json!([{"insert": "Hello!"}]));
+    assert_eq!(Some(escaped), edited(Leave::Commit));
+}
+
+#[test]
+fn escape_keeps_a_first_translation_with_its_look_as_ctrl_enter_does() {
+    let typed = |how| -> Option<(Vec<String>, usize, Value)> {
+        let (mut fixture, talk, _) = untranslated()?;
+        fixture.canvas.set_booharu(pushed(false, None));
+        fixture.canvas.set_tool(Tool::Text);
+        let effects = gesture(&mut fixture.canvas, (100.0, 100.0), (100.0, 100.0));
+        assert_eq!(selections(&effects), [vec![talk]]);
+        type_text(&mut fixture.canvas, "Hi");
+        let effects = leave(&mut fixture.canvas, how);
+        let labels = apply(&mut fixture, effects);
+        Some((
+            labels,
+            steps(&fixture),
+            layer(&fixture, talk)["translation"].clone(),
+        ))
+    };
+    let Some(escaped) = typed(Leave::Escape) else {
+        return;
+    };
+    assert_eq!(escaped.0, ["set_text"]);
+    // The look a new translation gets: the default font and colours.
+    let look = chars(&escaped.2);
+    assert_eq!(look.family.as_deref(), Some(FONT));
+    assert_eq!(look.fill, Some(RED));
+    assert_eq!(Some(escaped), typed(Leave::Commit));
+}
+
+#[test]
+fn escape_during_a_composition_drops_only_the_composition() {
+    let Some(mut fixture) = unscaled(Vec::new()) else {
+        return;
+    };
+    fixture.canvas.set_tool(Tool::Text);
+    gesture(&mut fixture.canvas, (30.0, 40.0), (30.0, 40.0));
+    type_text(&mut fixture.canvas, "a");
+    fixture
+        .canvas
+        .compose("ni", Some((2, 2)))
+        .expect("a composition");
+    assert!(leave(&mut fixture.canvas, Leave::Escape).is_empty());
+    // Typing goes on, the composition dropped rather than typed.
+    assert!(fixture.canvas.typing().is_some());
+    type_text(&mut fixture.canvas, "b");
+    let effects = leave(&mut fixture.canvas, Leave::Escape);
+    assert_eq!(apply(&mut fixture, effects), ["add_text"]);
+    let [added] = layers(&fixture)[..] else {
+        panic!("one layer");
+    };
+    assert_eq!(layer(&fixture, added)["content"], json!([{"insert": "ab"}]));
 }

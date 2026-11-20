@@ -15,6 +15,7 @@ pub(crate) enum Keyed {
     /// Ctrl+Enter, or Enter on the number pad: keep what's typed and stop.
     Commit,
     /// Escape: drop what's typed and stop.
+    /// Booharu: the canvas keeps what's typed on Escape too, as on Commit.
     Cancel,
     /// Not typing's: the host's.
     Pass,
@@ -34,6 +35,12 @@ impl Typing {
         let vertical = self.base.direction == Direction::Vertical;
         let taken = Keyed::Taken(Vec::new());
         Ok(match &event.key {
+            // Booharu: Escape while the input method composes drops only the
+            // composition, as its own Escape does, and typing goes on.
+            Key::Named(NamedKey::Escape) if self.composition.is_some() => {
+                self.compose("", None)?;
+                taken
+            }
             Key::Named(NamedKey::Escape) => Keyed::Cancel,
             Key::Named(NamedKey::Enter) if word || event.code == Code::NumpadEnter => Keyed::Commit,
             Key::Named(NamedKey::Enter) => {
