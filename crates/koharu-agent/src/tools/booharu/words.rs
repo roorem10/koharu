@@ -1,14 +1,15 @@
 //! Styling words, as the agent does it: some characters of a block's
 //! translation or of a text layer made bold or italic, stressed as their
-//! lettering category's emphasis says, given values of their own, or
-//! cleared, as one undo step worked out by `booharu::words`, as the app's
-//! word toolbar and type bar style words chosen by hand. Koharu's `edit`
-//! can't: its schema leaves out `set_rich_text`, the op that marks single
-//! characters. The agent names the words by their wording, found as a
-//! translation run finds the words its model picks to stress, or by Unicode
-//! character offsets, which the tool turns into the UTF-8 byte offsets the
-//! scene takes. The edit leaves the hand-edit record as it is, so a word it
-//! styles is a hand edit, as one styled in the app is.
+//! lettering category's emphasis says, made a step bigger or smaller, given
+//! values of their own, or cleared, as one undo step worked out by
+//! `booharu::words`, as the app's word toolbar and type bar style words
+//! chosen by hand. Koharu's `edit` can't: its schema leaves out
+//! `set_rich_text`, the op that marks single characters. The agent names
+//! the words by their wording, found as a translation run finds the words
+//! its model picks to stress, or by Unicode character offsets, which the
+//! tool turns into the UTF-8 byte offsets the scene takes. The edit leaves
+//! the hand-edit record as it is, so a word it styles is a hand edit, as
+//! one styled in the app is.
 
 use std::{
     ops::{Range, RangeInclusive},
@@ -16,10 +17,11 @@ use std::{
 };
 
 use anyhow::{Context as _, ensure};
-use booharu::words::{self, WordChange};
+use booharu::words::{self, SizeStep, WordChange};
 use booharu_core::{
     emphasis::{self, EmphasisSettings},
     settings::LetteringSettings,
+    sizes,
 };
 use koharu_scene::{Change, CharStyle, LayerId, Rgba};
 use rig_core::tool::{Tool, ToolContext, ToolExecutionError};
@@ -34,9 +36,6 @@ const SIZE_PERCENT: RangeInclusive<f64> = 25.0..=400.0;
 
 /// The widest border a word takes, in pixels, as an emphasis look takes.
 const MAX_WIDTH: f64 = 100.0;
-
-/// The size the renderer draws a text with none at, in pixels.
-const SIZE: f64 = 24.0;
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -54,10 +53,15 @@ pub(super) struct StyleWordsArgs {
     /// characters. With `start`.
     end: Option<usize>,
     /// Stress the words in the look `booharu-emphasis` sets for the block's
-    /// lettering category, a text layer's the default one. Not with values
-    /// of the words' own or `clear`.
+    /// lettering category, a text layer's the default one. Not with `step`,
+    /// values of the words' own, or `clear`.
     #[serde(default)]
     emphasis: bool,
+    /// Each of the words a step bigger or smaller from its own size, else
+    /// the box's: 5% to the half pixel, at least half a pixel, from 0.5 to
+    /// 300 pixels, as the type bar's A+ and A− step them. Not with
+    /// `emphasis`, values of the words' own, or `clear`.
+    step: Option<SizeStep>,
     /// Bold, weight 700; false gives the words the box's own weight back,
     /// regular in a bold box.
     bold: Option<bool>,
@@ -83,7 +87,7 @@ pub(super) struct StyleWordsArgs {
     #[schemars(range(min = 0.0, max = 100.0))]
     outer_stroke_width: Option<f64>,
     /// Take every value of the words' own off, so they look as the rest of
-    /// the box. Not with `emphasis` or values of the words' own.
+    /// the box. Not with `emphasis`, `step`, or values of the words' own.
     #[serde(default)]
     clear: bool,
 }
@@ -194,7 +198,7 @@ impl StyleWordsArgs {
     fn change(&self, size: Option<f64>) -> WordChange {
         let size = self
             .size_percent
-            .map(|percent| (size.unwrap_or(SIZE) * percent).round() / 100.0);
+            .map(|percent| (size.unwrap_or(sizes::SIZE) * percent).round() / 100.0);
         WordChange {
             set: CharStyle {
                 family: self.family.clone(),
@@ -210,7 +214,7 @@ impl StyleWordsArgs {
             italic: self.italic,
             emphasis: self.emphasis,
             clear: self.clear,
-            step: None,
+            step: self.step,
         }
     }
 }
@@ -247,23 +251,29 @@ impl Tool for StyleWords {
          part of a word. Then give exactly one of: `emphasis` true, the stressed look \
          `booharu-emphasis` sets for the block's lettering category (booharu_get_text_styles \
          tells a block's category), or the default one for a text layer, bold at 115% of the \
-         box's size to start with; values of the words' own, which go together: `bold`, \
-         `italic`, `family`, `size_percent` (25 to 400, of the box's own size), `fill`, \
-         `outline` and `outline_width`, and a second border drawn outside the outline, and only \
-         with one, `outer_stroke` and `outer_stroke_width`, colours as [red, green, blue, \
-         alpha] from 0 to 1 and widths in pixels from 0 to 100; or `clear` true, which takes \
-         every value of the words' own off, a translation run's emphasis included, so they look \
-         as the rest of the box. `bold` false and `italic` false give the words the box's own \
-         weight or slant back, so in a bold or italic box they set regular or upright. A word's \
-         own values win over the box's: changing the box's look with `edit` leaves them, so \
-         clear the words first when they should follow it. Words given values of their own, an \
-         emphasis included, count as a hand edit of the block's look unless the only one is a \
-         size, as words styled in the app do, so booharu_apply_text_style leaves the block alone \
-         unless told to include hand-edited blocks, and booharu_set_lettering_category keeps its \
-         font. It refuses a locked layer, or one inside a locked layer, and a block without a \
-         translation. Answers the `words` styled, their `start` and `end` in characters, and what changed \
-         (`change`), null when they already looked so, which makes no undo step. Example: \
-         {\"layer\": \"<id>\", \"text\": \"NO\", \"emphasis\": true}."
+         box's size to start with; `step` `bigger` or `smaller`, each of the words a step \
+         bigger or smaller from its own size, else the box's, as the type bar's A+ and A− make \
+         them: 5% to the half pixel, at least half a pixel, from 0.5 to 300 pixels, so words of \
+         different sizes keep their order (for words a little bigger or smaller than they are \
+         now; `size_percent` sets a share of the box's size instead); values of the words' \
+         own, which go together: `bold`, `italic`, `family`, `size_percent` (25 to 400, of the \
+         box's own size), `fill`, `outline` and `outline_width`, and a second border drawn \
+         outside the outline, and only with one, `outer_stroke` and `outer_stroke_width`, \
+         colours as [red, green, blue, alpha] from 0 to 1 and widths in pixels from 0 to 100; \
+         or `clear` true, which takes every value of the words' own off, a translation run's \
+         emphasis included, so they look as the rest of the box. `bold` false and `italic` false \
+         give the words the box's own weight or slant back, so in a bold or italic box they set \
+         regular or upright. A word's own values win over the box's: changing the box's look \
+         with `edit` leaves them, so clear the words first when they should follow it. Words \
+         given values of their own, an emphasis included, count as a hand edit of the block's \
+         look unless the only one is a size, a step's among them, as words styled in the app \
+         do, so booharu_apply_text_style leaves the block alone unless told to include \
+         hand-edited blocks, and booharu_set_lettering_category keeps its font. It refuses a \
+         locked layer, or one inside a locked layer, and a block without a translation. Answers \
+         the `words` styled, their `start` and `end` in characters, and what changed \
+         (`change`), null when nothing did, as when they already looked so or a step found them \
+         at 300 or 0.5 pixels already, which makes no undo step. Example: {\"layer\": \"<id>\", \
+         \"text\": \"NO\", \"emphasis\": true}."
             .to_owned()
     }
 
@@ -515,6 +525,14 @@ mod tests {
         (styled.words.as_str(), styled.start, styled.end)
     }
 
+    /// Words of a size of their own, in pixels.
+    fn sized(size: f64) -> CharStyle {
+        CharStyle {
+            size: Some(size),
+            ..CharStyle::default()
+        }
+    }
+
     #[tokio::test]
     async fn words_are_found_by_their_wording_or_by_character_offsets() {
         let (_dir, tools, id) = opened();
@@ -623,6 +641,52 @@ mod tests {
         let styled = style(&tools, clear).await.expect("cleared again");
         assert!(styled.change.is_none());
         assert_eq!(steps(&tools).len(), before);
+    }
+
+    #[tokio::test]
+    async fn a_step_makes_each_word_bigger_or_smaller_from_its_own_size() {
+        let (_dir, tools, id) = opened();
+        let line = id("line");
+        let before = steps(&tools).len();
+        // By their wording, the first "NO" a step bigger than the box's 30
+        // pixels; by offsets, the last a step smaller.
+        let bigger = json!({"layer": line, "text": "NO", "step": "bigger"});
+        let styled = style(&tools, bigger).await.expect("a bigger word");
+        assert_eq!(found(&styled), ("NO", 2, 4));
+        assert!(styled.change.is_some());
+        let smaller = json!({"layer": line, "start": 11, "end": 13, "step": "smaller"});
+        let styled = style(&tools, smaller).await.expect("a smaller word");
+        assert_eq!(found(&styled), ("NO", 11, 13));
+        assert_eq!(
+            held(&tools, line),
+            RichText(vec![
+                plain("🙂 "),
+                span("NO", sized(31.5)),
+                plain("! KNOW "),
+                span("NO", sized(28.5)),
+                plain("."),
+            ])
+        );
+        // The whole line a step bigger: each word from its own size, so the
+        // words keep their order, and the smaller "NO", back at the box's
+        // size, holds none of its own.
+        let line_bigger = json!({"layer": line, "start": 0, "end": 14, "step": "bigger"});
+        let styled = style(&tools, line_bigger).await.expect("a bigger line");
+        assert_eq!(found(&styled), (LINE, 0, 14));
+        assert_eq!(
+            held(&tools, line),
+            RichText(vec![
+                span("🙂 ", sized(31.5)),
+                span("NO", sized(33.0)),
+                span("! KNOW ", sized(31.5)),
+                plain("NO"),
+                span(".", sized(31.5)),
+            ])
+        );
+        // One undo step each, under the words edit's label.
+        let labels = steps(&tools);
+        assert_eq!(labels.len(), before + 3);
+        assert_eq!(labels.last().map(String::as_str), Some(words::LABEL));
     }
 
     #[tokio::test]
@@ -751,6 +815,22 @@ mod tests {
                 choose,
             ),
             (
+                json!({"layer": line, "text": "NO", "step": "bigger", "emphasis": true}),
+                choose,
+            ),
+            (
+                json!({"layer": line, "text": "NO", "step": "smaller", "clear": true}),
+                choose,
+            ),
+            (
+                json!({"layer": line, "start": 2, "end": 4, "step": "bigger", "size_percent": 130}),
+                choose,
+            ),
+            (
+                json!({"layer": line, "text": "NO", "step": "smaller", "bold": false}),
+                choose,
+            ),
+            (
                 json!({"layer": id("locked"), "text": "NO", "bold": true}),
                 " is locked",
             ),
@@ -777,6 +857,9 @@ mod tests {
         assert!(!edited(&layer(&tools, line)).style);
         let larger = json!({"layer": line, "text": "KNOW", "size_percent": 150});
         style(&tools, larger).await.expect("a larger word");
+        assert!(!edited(&layer(&tools, line)).style);
+        let step = json!({"layer": line, "start": 11, "end": 13, "step": "smaller"});
+        style(&tools, step).await.expect("a smaller word");
         assert!(!edited(&layer(&tools, line)).style);
         let bold = json!({"layer": line, "text": "NO", "bold": true});
         style(&tools, bold).await.expect("a bold word");
@@ -811,6 +894,12 @@ mod tests {
         assert_eq!(crate::tools::refusal(&schema, &taken), None);
         let large = json!({"layer": id("line"), "text": "NO", "size_percent": 500});
         assert!(crate::tools::refusal(&schema, &large).is_some());
+        // A step is bigger or smaller, and nothing else.
+        let stepped = json!({"layer": id("line"), "text": "NO", "step": "bigger"});
+        assert_eq!(crate::tools::refusal(&schema, &stepped), None);
+        let huge = json!({"layer": id("line"), "text": "NO", "step": "huge"});
+        assert!(serde_json::from_value::<StyleWordsArgs>(huge.clone()).is_err());
+        assert!(crate::tools::refusal(&schema, &huge).is_some());
     }
 
     #[test]
