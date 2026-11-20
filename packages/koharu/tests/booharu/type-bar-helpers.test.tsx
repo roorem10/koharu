@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { setWordRange, type WordRange } from '@/lib/booharu/words'
 import { commands, type Layer, type Typed } from '@koharu/ipc/protocol'
+import { toast } from '@koharu/ui/components/toast'
 
 import { renderBar, text } from './typeBar'
 
@@ -27,6 +28,8 @@ const world: WordRange = { layer: 'text', start: 6, end: 11, text: 'Hello world'
 /** The tooltip whose own text is `label`. */
 const tooltip = (label: string) =>
   screen.findByText(label, { selector: '[data-slot=tooltip-content]' })
+
+const SELECTED = "Clear the selected words' styles"
 
 describe('Booharu A− and A+ in the type bar (S11-e)', () => {
   it('steps the characters typed, one call a click, after the size field, never the fit', async () => {
@@ -88,6 +91,101 @@ describe('Booharu A− and A+ in the type bar (S11-e)', () => {
 
     expect(bar.queryByRole('button', { name: 'Smaller' })).toBeNull()
     expect(bar.queryByRole('button', { name: 'Bigger' })).toBeNull()
+  })
+})
+
+describe('Booharu Clear in the type bar (S11-g)', () => {
+  it('takes the styles off the characters selected while typing, after the star', async () => {
+    const { bar, user, edits } = renderBar([hello('text', true)], { typing: typing('world') })
+
+    const clear = bar.getByRole('button', { name: SELECTED })
+    expect(bar.getByRole('button', { name: 'Emphasis' }).nextElementSibling).toBe(clear)
+    await user.hover(clear)
+    expect(await tooltip(SELECTED)).toBeInTheDocument()
+    await user.click(clear)
+
+    expect(commands.booharuUnmarkTyping).toHaveBeenCalledExactlyOnceWith('all')
+    expect(commands.booharuClearWordStyles).not.toHaveBeenCalled()
+    expect(edits).toEqual([])
+  })
+
+  it('is disabled at a caret while typing, a text with word styles too', () => {
+    const { bar } = renderBar([hello('text', true)], { typing: typing() })
+
+    expect(bar.getByRole('button', { name: SELECTED })).toBeDisabled()
+  })
+
+  it('takes the styles off the words chosen in Story', async () => {
+    const { bar, user } = renderBar([hello()])
+    act(() => setWordRange(world))
+
+    await user.click(bar.getByRole('button', { name: SELECTED }))
+
+    expect(commands.booharuStyleWords).toHaveBeenCalledExactlyOnceWith(
+      'text',
+      6,
+      11,
+      'Hello world',
+      {
+        clear: true,
+      },
+    )
+    expect(commands.booharuClearWordStyles).not.toHaveBeenCalled()
+  })
+
+  it('takes every word style off the selected boxes in one step', async () => {
+    const { bar, user, edits } = renderBar([hello('one', true), hello('two')])
+    const shown = vi.spyOn(toast, 'add')
+
+    const clear = bar.getByRole('button', { name: 'Clear all word styles in the 2 selected boxes' })
+    await user.hover(clear)
+    expect(await tooltip('Clear all word styles in the 2 selected boxes')).toBeInTheDocument()
+    await user.click(clear)
+
+    expect(commands.booharuClearWordStyles).toHaveBeenCalledExactlyOnceWith(['one', 'two'])
+    expect(edits).toEqual([])
+    expect(shown).not.toHaveBeenCalled()
+  })
+
+  it('names the one box, and counts the locked boxes it left as they are', async () => {
+    const { bar, user } = renderBar([hello('one', true)])
+    vi.mocked(commands.booharuClearWordStyles).mockResolvedValue({ cleared: 0, locked: 1 })
+    const shown = vi.spyOn(toast, 'add')
+
+    await user.click(bar.getByRole('button', { name: 'Clear all word styles in this box' }))
+
+    expect(commands.booharuClearWordStyles).toHaveBeenCalledExactlyOnceWith(['one'])
+    await vi.waitFor(() =>
+      expect(shown).toHaveBeenCalledExactlyOnceWith({
+        type: 'info',
+        title: '1 locked box was left as it is',
+      }),
+    )
+  })
+
+  it('counts several locked boxes', async () => {
+    const { bar, user } = renderBar([hello('one', true), hello('two', true), hello('three', true)])
+    vi.mocked(commands.booharuClearWordStyles).mockResolvedValue({ cleared: 1, locked: 2 })
+    const shown = vi.spyOn(toast, 'add')
+
+    await user.click(
+      bar.getByRole('button', { name: 'Clear all word styles in the 3 selected boxes' }),
+    )
+
+    await vi.waitFor(() =>
+      expect(shown).toHaveBeenCalledExactlyOnceWith({
+        type: 'info',
+        title: '2 locked boxes were left as they are',
+      }),
+    )
+  })
+
+  it('is disabled while no selected box has a word style', () => {
+    const { bar } = renderBar([hello('one'), hello('two')])
+
+    expect(
+      bar.getByRole('button', { name: 'Clear all word styles in the 2 selected boxes' }),
+    ).toBeDisabled()
   })
 })
 

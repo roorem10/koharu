@@ -14,6 +14,7 @@ import {
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ClearWordStyles } from '@/components/booharu/typebar/ClearWordStyles' // Booharu: S11-g.
 import { DoneButton } from '@/components/booharu/typebar/DoneButton' // Booharu: S11-c.
 import { LineSpacing } from '@/components/booharu/typebar/LineSpacing' // Booharu: S11-i.
 import { WordSizeSteps } from '@/components/booharu/typebar/WordSizeSteps' // Booharu: S11-e.
@@ -337,6 +338,8 @@ export function TypeBar() {
       </Tooltip>
       {/* Booharu: the star, which stresses words typed or chosen in Story, never a whole box. */}
       <EmphasisButton words={chosen} />
+      {/* Booharu: Clear, which takes the word styles off (S11-g). */}
+      <ClearWordStyles words={chosen} targets={targets} />
       <div className='w-[4.5rem]'>
         <FontSizeField
           disabled={false}
