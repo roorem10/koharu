@@ -108,8 +108,10 @@ pub struct Auto {
     pub style: Option<AutoStyle>,
     /// Whether Booharu hid the block's clean-up to keep the original art:
     /// a sound effect a run skips, or one given a subtitle (`sfx`). A
-    /// translation, typed or written by a stage, or a line given back,
-    /// drops it; a clean-up hidden with no mark was hidden by hand.
+    /// translation, typed or written by a stage, a line given back, or a
+    /// join that shows the joined block's clean-up or writes it a
+    /// translation drops it; a clean-up hidden with no mark was hidden by
+    /// hand.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub kept: bool,
     /// Whether the block is a half of a block split by hand: its box was

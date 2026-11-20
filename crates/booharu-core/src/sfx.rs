@@ -181,8 +181,10 @@ pub fn shown_again(layer: &Layer) -> Result<Vec<Op>> {
 
 /// The op taking the kept mark off `layer`'s hand-edit record: the record
 /// without it, or no record at all when nothing else is left in it; none for
-/// a layer whose record carries no mark.
-pub(crate) fn unmarked(layer: &Layer) -> Result<Option<Op>> {
+/// a layer whose record carries no mark. A translation typed into the block
+/// takes it off ([`styles::typed`](crate::styles::typed)), as does a join
+/// that shows the block's clean-up or writes it a translation.
+pub fn unmarked(layer: &Layer) -> Result<Option<Op>> {
     let record = Auto::of(layer);
     if !record.kept {
         return Ok(None);

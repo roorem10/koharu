@@ -18,7 +18,7 @@ use anyhow::{Context as _, Result, bail, ensure};
 use booharu_core::{
     attrs::{self, Attr, Auto, Flags, Lettering, QcOk, ReadNote, ReviewNote},
     settings::OcrBoxMode,
-    status,
+    sfx, status,
     styles::text_hash,
 };
 use image::{DynamicImage, Rgb, RgbImage};
@@ -253,7 +253,9 @@ pub fn find_split_balloons(project: &Project, page: Option<PageId>) -> Result<Ve
 /// one text block has nothing to join, and a hidden block, which isn't
 /// drawn, is no part of its balloon's text. The first keeps its hand-edit
 /// record, so a style set on it by hand stays a hand edit, and its joined
-/// wording, which no automatic step wrote, counts as changed by hand.
+/// wording, which no automatic step wrote, counts as changed by hand; the
+/// record loses the kept mark of a sound effect kept as art when the joined
+/// clean-up shows or the join writes a translation.
 pub fn join_balloon(session: &Session, block: LayerId) -> Result<Edit> {
     let project = session.project();
     let layer = project.layer(block)?;
@@ -675,6 +677,12 @@ fn join(
             layer: (*kept).into(),
             patch: json!({"cleanup": {"visible": shown}}),
         });
+    }
+    // A block kept as art no longer keeps it once its clean-up shows or it
+    // has a translation, so it loses the kept mark, which would read a
+    // clean-up the join showed as one shown by hand (`sfx::hand_shown`).
+    if shown || translated {
+        ops.extend(sfx::unmarked(project.layer(*kept)?)?);
     }
     let others: Vec<&Block> = rest.iter().map(|(_, block)| *block).collect();
     ops.extend(merged(session, first, &others)?);
@@ -2095,6 +2103,53 @@ mod tests {
                 .is_err_and(|error| error.to_string().contains("translate them first"))
         );
         assert_eq!(page.steps().len(), steps);
+        Ok(())
+    }
+
+    #[test]
+    fn a_join_showing_or_translating_a_line_kept_as_art_drops_its_mark() -> Result<()> {
+        use booharu_core::{lettering::LetteringCategory, settings::LetteringSettings};
+        // A line kept as art, with no clean-up of its own, read first beside
+        // a cleaned line that shows its clean-up, untranslated or translated.
+        for translation in [None, Some("Why?")] {
+            let (mut page, [first, second]) = two_cleaned("ドン", "どうして")?;
+            let mask = page.block(first)?.mask.id;
+            page.write(mask, pixel_rect(120, 20, 40, 100), &[0])?;
+            let kept = sfx::kept_original(page.session.project().layer(first)?);
+            assert!(!kept.is_empty());
+            page.session.apply(edit(kept))?;
+            if let Some(text) = translation {
+                translate(&mut page, second, text)?;
+            }
+
+            page.session.apply(join_balloon(&page.session, first)?)?;
+
+            // The join shows the clean-up over the other line's lettering,
+            // which no hand showed, and the line keeps the art no more.
+            let joined = page.block(first)?;
+            let layer = page.session.project().layer(first)?.clone();
+            assert!(joined.cleanup.visible);
+            assert_eq!(joined_translation(&page, first)?.as_deref(), translation);
+            assert!(!Auto::of(&layer).kept);
+            assert!(!sfx::hand_shown(&layer, &joined));
+            if translation.is_some() {
+                continue;
+            }
+            // So picking Sound Effect keeps it as art again, as for any
+            // line.
+            let (picked, _) = crate::lettering::set_category(
+                &page.session.project(),
+                &[first],
+                Some(LetteringCategory::Sfx),
+                crate::lettering::Chooser::User,
+                &LetteringSettings::default(),
+                None,
+            )?;
+            page.session.apply(picked.context("the pick's edit")?)?;
+            let layer = page.session.project().layer(first)?.clone();
+            assert!(!page.block(first)?.cleanup.visible);
+            assert!(Auto::of(&layer).kept);
+        }
         Ok(())
     }
 
