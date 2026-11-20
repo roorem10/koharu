@@ -591,12 +591,28 @@
       "ocrBoxModifiers": "Alt : lire uniquement. Maj : lire, traduire et nettoyer."
     },
     "typebar": {
+      "appliesTo": "S’applique à \"{{text}}\"",
+      "bigger": "Plus grand",
+      "clearAll": "Effacer tous les styles de mots de cette zone de texte",
+      "clearAllSelected_many": "Effacer tous les styles de mots des {{count}} zones de texte sélectionnées",
+      "clearAllSelected_one": "Effacer tous les styles de mots de {{count}} zone de texte sélectionnée",
+      "clearAllSelected_other": "Effacer tous les styles de mots des {{count}} zones de texte sélectionnées",
+      "clearSelected": "Effacer les styles des mots sélectionnés",
+      "clearedLocked_many": "{{count}} zones verrouillées sont restées telles quelles",
+      "clearedLocked_one": "{{count}} zone verrouillée est restée telle quelle",
+      "clearedLocked_other": "{{count}} zones verrouillées sont restées telles quelles",
+      "done": "Terminé",
+      "doneHint": "Conserver la saisie (Échap)",
       "lineSpacing": "Interligne",
       "lineSpacingReset": "Réinitialiser l’interligne",
       "mixed": "Valeurs mixtes",
       "mixedDirection": "Sens du texte : mixte ; cliquez pour passer toutes les zones sélectionnées à la verticale",
       "mixedToggle": "{{field}} : valeurs mixtes ; cliquez pour l’activer sur toute la sélection",
-      "wheelHint": "Cliquez dans un champ numérique et faites tourner la molette pour modifier sa valeur. Maintenez Maj enfoncée pour des pas plus grands."
+      "smaller": "Plus petit",
+      "wheelHint": "Cliquez dans un champ numérique et faites tourner la molette pour modifier sa valeur. Maintenez Maj enfoncée pour des pas plus grands.",
+      "wholeBox": "Toute la zone de texte",
+      "wholeBoxHint": "Mettre en forme toute la zone de texte à la place",
+      "wholeBoxOnly": "S’applique à toute la zone de texte"
     },
     "typesetting": {
       "apply": {
@@ -662,6 +678,7 @@
       "booharu_add_sfx_subtitle": "Ajouter un sous-titre d’effet sonore",
       "booharu_apply_text_style": "Appliquer le style de texte",
       "booharu_clear_qc_ok": "Retirer la marque OK",
+      "booharu_clear_word_styles": "Effacer les styles des mots",
       "booharu_dismiss_flag": "Ignorer le signalement",
       "booharu_flag_line": "Signaler la ligne à vérifier",
       "booharu_join_balloon": "Fusionner des textes",

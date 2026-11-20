@@ -551,12 +551,26 @@
       "ocrBoxModifiers": "Alt：OCRのみ。Shift：OCR・翻訳・クリーンアップ。"
     },
     "typebar": {
+      "appliesTo": "「{{text}}」に適用",
+      "bigger": "大きく",
+      "clearAll": "このボックスの単語スタイルをすべて解除",
+      "clearAllSelected_one": "選択した{{count}}個のボックスの単語スタイルをすべて解除",
+      "clearAllSelected_other": "選択した{{count}}個のボックスの単語スタイルをすべて解除",
+      "clearSelected": "選択した単語のスタイルを解除",
+      "clearedLocked_one": "ロック中の{{count}}個のボックスはそのままです",
+      "clearedLocked_other": "ロック中の{{count}}個のボックスはそのままです",
+      "done": "完了",
+      "doneHint": "入力を確定（Esc）",
       "lineSpacing": "行間",
       "lineSpacingReset": "行間をリセット",
       "mixed": "混在",
       "mixedDirection": "文字方向：混在しています。クリックすると選択したすべてのボックスが縦書きになります",
       "mixedToggle": "{{field}}：混在しています。クリックするとすべてで有効になります",
-      "wheelHint": "数値欄をクリックし、マウスホイールで値を変更できます。Shift キーを押しながら回すと大きく変わります。"
+      "smaller": "小さく",
+      "wheelHint": "数値欄をクリックし、マウスホイールで値を変更できます。Shift キーを押しながら回すと大きく変わります。",
+      "wholeBox": "ボックス全体",
+      "wholeBoxHint": "代わりにボックス全体のスタイルを設定",
+      "wholeBoxOnly": "ボックス全体に適用されます"
     },
     "typesetting": {
       "apply": {
@@ -614,6 +628,7 @@
       "booharu_add_sfx_subtitle": "効果音の字幕を追加",
       "booharu_apply_text_style": "書式を適用",
       "booharu_clear_qc_ok": "OKを取り消す",
+      "booharu_clear_word_styles": "単語のスタイルを解除",
       "booharu_dismiss_flag": "要確認フラグを解除",
       "booharu_flag_line": "要確認フラグを付ける",
       "booharu_join_balloon": "テキストを結合",

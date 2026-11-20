@@ -591,12 +591,28 @@
       "ocrBoxModifiers": "Alt: somente OCR. Shift: OCR, tradução e limpeza."
     },
     "typebar": {
+      "appliesTo": "Aplica-se a \"{{text}}\"",
+      "bigger": "Maior",
+      "clearAll": "Limpar todos os estilos de palavras desta caixa",
+      "clearAllSelected_many": "Limpar todos os estilos de palavras das {{count}} caixas selecionadas",
+      "clearAllSelected_one": "Limpar todos os estilos de palavras de {{count}} caixa selecionada",
+      "clearAllSelected_other": "Limpar todos os estilos de palavras das {{count}} caixas selecionadas",
+      "clearSelected": "Limpar os estilos das palavras selecionadas",
+      "clearedLocked_many": "{{count}} caixas bloqueadas ficaram como estavam",
+      "clearedLocked_one": "{{count}} caixa bloqueada ficou como estava",
+      "clearedLocked_other": "{{count}} caixas bloqueadas ficaram como estavam",
+      "done": "Concluído",
+      "doneHint": "Manter o que você digitou (Esc)",
       "lineSpacing": "Espaçamento entre linhas",
       "lineSpacingReset": "Redefinir espaçamento entre linhas",
       "mixed": "Misto",
       "mixedDirection": "Direção do texto: mista; clique para deixar todas as caixas selecionadas na vertical",
       "mixedToggle": "{{field}}: misto; clique para ativar em toda a seleção",
-      "wheelHint": "Clique em um campo numérico e use a roda do mouse para alterar o valor. Segure Shift para passos maiores."
+      "smaller": "Menor",
+      "wheelHint": "Clique em um campo numérico e use a roda do mouse para alterar o valor. Segure Shift para passos maiores.",
+      "wholeBox": "Caixa inteira",
+      "wholeBoxHint": "Aplicar o estilo à caixa inteira",
+      "wholeBoxOnly": "Aplica-se à caixa inteira"
     },
     "typesetting": {
       "apply": {
@@ -662,6 +678,7 @@
       "booharu_add_sfx_subtitle": "Adicionar legenda de efeito sonoro",
       "booharu_apply_text_style": "Aplicar estilo de texto",
       "booharu_clear_qc_ok": "Desfazer OK",
+      "booharu_clear_word_styles": "Limpar estilos de palavras",
       "booharu_dismiss_flag": "Dispensar alerta de revisão",
       "booharu_flag_line": "Adicionar alerta de revisão",
       "booharu_join_balloon": "Unir textos",

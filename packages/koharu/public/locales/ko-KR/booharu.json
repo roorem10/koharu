@@ -551,12 +551,26 @@
       "ocrBoxModifiers": "Alt: OCR만. Shift: OCR, 번역 및 정리."
     },
     "typebar": {
+      "appliesTo": "\"{{text}}\"에 적용",
+      "bigger": "크게",
+      "clearAll": "이 상자의 모든 단어 스타일 지우기",
+      "clearAllSelected_one": "선택한 상자 {{count}}개의 모든 단어 스타일 지우기",
+      "clearAllSelected_other": "선택한 상자 {{count}}개의 모든 단어 스타일 지우기",
+      "clearSelected": "선택한 단어의 스타일 지우기",
+      "clearedLocked_one": "잠긴 상자 {{count}}개는 그대로 두었습니다",
+      "clearedLocked_other": "잠긴 상자 {{count}}개는 그대로 두었습니다",
+      "done": "완료",
+      "doneHint": "입력한 내용 유지 (Esc)",
       "lineSpacing": "줄 간격",
       "lineSpacingReset": "줄 간격 초기화",
       "mixed": "혼합",
       "mixedDirection": "텍스트 방향: 혼합됨. 클릭하면 선택한 모든 상자가 세로쓰기가 됩니다",
       "mixedToggle": "{{field}}: 혼합됨. 클릭하면 모두에 적용됩니다",
-      "wheelHint": "숫자 입력란을 클릭한 뒤 마우스 휠을 돌려 값을 변경하세요. Shift 키를 누른 채 돌리면 더 크게 바뀝니다."
+      "smaller": "작게",
+      "wheelHint": "숫자 입력란을 클릭한 뒤 마우스 휠을 돌려 값을 변경하세요. Shift 키를 누른 채 돌리면 더 크게 바뀝니다.",
+      "wholeBox": "상자 전체",
+      "wholeBoxHint": "대신 상자 전체에 스타일 지정",
+      "wholeBoxOnly": "상자 전체에 적용됩니다"
     },
     "typesetting": {
       "apply": {
@@ -614,6 +628,7 @@
       "booharu_add_sfx_subtitle": "효과음 자막 추가",
       "booharu_apply_text_style": "글꼴 서식 적용",
       "booharu_clear_qc_ok": "OK 표시 취소",
+      "booharu_clear_word_styles": "단어 스타일 지우기",
       "booharu_dismiss_flag": "검토 플래그 무시",
       "booharu_flag_line": "검토 플래그 지정",
       "booharu_join_balloon": "텍스트 합치기",

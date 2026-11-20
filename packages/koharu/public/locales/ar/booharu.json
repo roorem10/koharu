@@ -705,12 +705,34 @@
       "ocrBoxModifiers": "Alt: قراءة فقط. Shift: قراءة وترجمة وتنظيف."
     },
     "typebar": {
+      "appliesTo": "يُطبّق على \"{{text}}\"",
+      "bigger": "أكبر",
+      "clearAll": "مسح كل أنماط الكلمات في هذا المربع",
+      "clearAllSelected_few": "مسح كل أنماط الكلمات في {{count}} مربعات محدّدة",
+      "clearAllSelected_many": "مسح كل أنماط الكلمات في {{count}} مربعًا محدّدًا",
+      "clearAllSelected_one": "مسح كل أنماط الكلمات في المربع المحدّد ({{count}})",
+      "clearAllSelected_other": "مسح كل أنماط الكلمات في {{count}} مربع محدّد",
+      "clearAllSelected_two": "مسح كل أنماط الكلمات في المربعين المحدّدين ({{count}})",
+      "clearAllSelected_zero": "مسح كل أنماط الكلمات في المربعات المحدّدة ({{count}})",
+      "clearSelected": "مسح أنماط الكلمات المحدّدة",
+      "clearedLocked_few": "بقيت {{count}} مربعات مقفلة كما هي",
+      "clearedLocked_many": "بقي {{count}} مربعًا مقفلًا كما هو",
+      "clearedLocked_one": "بقي مربع مقفل واحد كما هو ({{count}})",
+      "clearedLocked_other": "بقي {{count}} مربع مقفل كما هو",
+      "clearedLocked_two": "بقي مربعان مقفلان كما هما ({{count}})",
+      "clearedLocked_zero": "لا مربعات مقفلة ({{count}})",
+      "done": "تم",
+      "doneHint": "الاحتفاظ بما كتبته (Esc)",
       "lineSpacing": "تباعد الأسطر",
       "lineSpacingReset": "إعادة ضبط تباعد الأسطر",
       "mixed": "قيم مختلفة",
       "mixedDirection": "اتجاه النص: مختلف؛ انقر لجعل كل المربعات المحدّدة عمودية",
       "mixedToggle": "{{field}}: قيم مختلفة؛ انقر لتفعيله للكل",
-      "wheelHint": "انقر داخل حقل رقمي ومرّر عجلة الفأرة لتغيير قيمته. اضغط مع الاستمرار على Shift لخطوات أكبر."
+      "smaller": "أصغر",
+      "wheelHint": "انقر داخل حقل رقمي ومرّر عجلة الفأرة لتغيير قيمته. اضغط مع الاستمرار على Shift لخطوات أكبر.",
+      "wholeBox": "المربع كاملًا",
+      "wholeBoxHint": "تنسيق المربع كاملًا بدلًا من ذلك",
+      "wholeBoxOnly": "يُطبّق على المربع كاملًا"
     },
     "typesetting": {
       "apply": {
@@ -794,6 +816,7 @@
       "booharu_add_sfx_subtitle": "إضافة ترجمة مصاحبة للمؤثر الصوتي",
       "booharu_apply_text_style": "تطبيق نمط النص",
       "booharu_clear_qc_ok": "إلغاء علامة OK",
+      "booharu_clear_word_styles": "مسح أنماط الكلمات",
       "booharu_dismiss_flag": "تجاهل تنبيه المراجعة",
       "booharu_flag_line": "إضافة تنبيه للمراجعة",
       "booharu_join_balloon": "دمج النصوص",

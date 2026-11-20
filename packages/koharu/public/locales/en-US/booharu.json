@@ -551,12 +551,26 @@
       "ocrBoxModifiers": "Alt: read only. Shift: read, translate and clean."
     },
     "typebar": {
+      "appliesTo": "Applies to \"{{text}}\"",
+      "bigger": "Bigger",
+      "clearAll": "Clear all word styles in this box",
+      "clearAllSelected_one": "Clear all word styles in the {{count}} selected box",
+      "clearAllSelected_other": "Clear all word styles in the {{count}} selected boxes",
+      "clearSelected": "Clear the selected words' styles",
+      "clearedLocked_one": "{{count}} locked box was left as it is",
+      "clearedLocked_other": "{{count}} locked boxes were left as they are",
+      "done": "Done",
+      "doneHint": "Keep what you typed (Esc)",
       "lineSpacing": "Line spacing",
       "lineSpacingReset": "Reset line spacing",
       "mixed": "Mixed",
       "mixedDirection": "Text direction: mixed; click to make every selected box vertical",
       "mixedToggle": "{{field}}: mixed; click to turn it on for all",
-      "wheelHint": "Click into a number box and turn the mouse wheel to change it. Hold Shift for bigger steps."
+      "smaller": "Smaller",
+      "wheelHint": "Click into a number box and turn the mouse wheel to change it. Hold Shift for bigger steps.",
+      "wholeBox": "Whole box",
+      "wholeBoxHint": "Style the whole box instead",
+      "wholeBoxOnly": "Applies to the whole box"
     },
     "typesetting": {
       "apply": {
@@ -614,6 +628,7 @@
       "booharu_add_sfx_subtitle": "Add sound effect subtitle",
       "booharu_apply_text_style": "Apply text style",
       "booharu_clear_qc_ok": "Remove OK mark",
+      "booharu_clear_word_styles": "Clear word styles",
       "booharu_dismiss_flag": "Dismiss review flag",
       "booharu_flag_line": "Flag line for review",
       "booharu_join_balloon": "Join texts",

@@ -551,12 +551,26 @@
       "ocrBoxModifiers": "Alt：僅辨識。Shift：辨識、翻譯並清理。"
     },
     "typebar": {
+      "appliesTo": "套用至「{{text}}」",
+      "bigger": "放大",
+      "clearAll": "清除此文字框中的所有字詞樣式",
+      "clearAllSelected_one": "清除所選 {{count}} 個文字框中的所有字詞樣式",
+      "clearAllSelected_other": "清除所選 {{count}} 個文字框中的所有字詞樣式",
+      "clearSelected": "清除所選字詞的樣式",
+      "clearedLocked_one": "{{count}} 個已鎖定的文字框保持不變",
+      "clearedLocked_other": "{{count}} 個已鎖定的文字框保持不變",
+      "done": "完成",
+      "doneHint": "確認輸入的內容（Esc）",
       "lineSpacing": "行距",
       "lineSpacingReset": "重設行距",
       "mixed": "混合",
       "mixedDirection": "文字方向：狀態不一致；點選將所有所選文字框設為直排",
       "mixedToggle": "{{field}}：狀態不一致；點選以全部啟用",
-      "wheelHint": "點選數值輸入框後，捲動滑鼠滾輪即可變更數值。按住 Shift 可加大步距。"
+      "smaller": "縮小",
+      "wheelHint": "點選數值輸入框後，捲動滑鼠滾輪即可變更數值。按住 Shift 可加大步距。",
+      "wholeBox": "整個文字框",
+      "wholeBoxHint": "改為設定整個文字框的樣式",
+      "wholeBoxOnly": "作用於整個文字框"
     },
     "typesetting": {
       "apply": {
@@ -614,6 +628,7 @@
       "booharu_add_sfx_subtitle": "新增音效字幕",
       "booharu_apply_text_style": "套用文字樣式",
       "booharu_clear_qc_ok": "移除 OK 標記",
+      "booharu_clear_word_styles": "清除字詞樣式",
       "booharu_dismiss_flag": "忽略待複查標記",
       "booharu_flag_line": "標記為待複查",
       "booharu_join_balloon": "合併文字",

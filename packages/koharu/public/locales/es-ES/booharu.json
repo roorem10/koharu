@@ -591,12 +591,28 @@
       "ocrBoxModifiers": "Alt: solo leer. Mayús: leer, traducir y limpiar."
     },
     "typebar": {
+      "appliesTo": "Se aplica a \"{{text}}\"",
+      "bigger": "Más grande",
+      "clearAll": "Borrar todos los estilos de palabras de este cuadro",
+      "clearAllSelected_many": "Borrar todos los estilos de palabras de los {{count}} cuadros seleccionados",
+      "clearAllSelected_one": "Borrar todos los estilos de palabras de {{count}} cuadro seleccionado",
+      "clearAllSelected_other": "Borrar todos los estilos de palabras de los {{count}} cuadros seleccionados",
+      "clearSelected": "Borrar los estilos de las palabras seleccionadas",
+      "clearedLocked_many": "{{count}} cuadros bloqueados se quedaron como estaban",
+      "clearedLocked_one": "{{count}} cuadro bloqueado se quedó como estaba",
+      "clearedLocked_other": "{{count}} cuadros bloqueados se quedaron como estaban",
+      "done": "Listo",
+      "doneHint": "Conservar lo que has escrito (Esc)",
       "lineSpacing": "Interlineado",
       "lineSpacingReset": "Restablecer interlineado",
       "mixed": "Mixto",
       "mixedDirection": "Dirección del texto: mixta; haz clic para poner en vertical todos los cuadros seleccionados",
       "mixedToggle": "{{field}}: mixto; haz clic para activarlo en toda la selección",
-      "wheelHint": "Haz clic en un campo numérico y gira la rueda del ratón para cambiar su valor. Mantén pulsada Mayús para avanzar a pasos más grandes."
+      "smaller": "Más pequeño",
+      "wheelHint": "Haz clic en un campo numérico y gira la rueda del ratón para cambiar su valor. Mantén pulsada Mayús para avanzar a pasos más grandes.",
+      "wholeBox": "Todo el cuadro",
+      "wholeBoxHint": "Aplicar el estilo a todo el cuadro",
+      "wholeBoxOnly": "Se aplica a todo el cuadro"
     },
     "typesetting": {
       "apply": {
@@ -662,6 +678,7 @@
       "booharu_add_sfx_subtitle": "Añadir subtítulo de efecto de sonido",
       "booharu_apply_text_style": "Aplicar estilo de texto",
       "booharu_clear_qc_ok": "Desmarcar OK",
+      "booharu_clear_word_styles": "Borrar estilos de palabras",
       "booharu_dismiss_flag": "Descartar aviso de revisión",
       "booharu_flag_line": "Añadir aviso de revisión",
       "booharu_join_balloon": "Unir textos",
