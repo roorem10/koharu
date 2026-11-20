@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next'
 
 import { DoneButton } from '@/components/booharu/typebar/DoneButton' // Booharu: S11-c.
 import { LineSpacing } from '@/components/booharu/typebar/LineSpacing' // Booharu: S11-i.
+import { WordSizeSteps } from '@/components/booharu/typebar/WordSizeSteps' // Booharu: S11-e.
 import { BoldToggle } from '@/components/booharu/words/BoldToggle' // Booharu: B (D12).
 import { EmphasisButton } from '@/components/booharu/words/EmphasisButton' // Booharu: the star.
 import { ColorWell } from '@/components/controls/ColorWell'
@@ -353,6 +354,8 @@ export function TypeBar() {
           onAutoFit={() => fitted && update({ frame: { [fitted]: { fit: 'best' } } })}
         />
       </div>
+      {/* Booharu: A− and A+, for the characters typed or the words chosen in Story (S11-e). */}
+      <WordSizeSteps words={chosen} />
       <ColorWell
         label={t('inspector.textColor')}
         size='sm'
