@@ -74,8 +74,21 @@ impl Tool for GetSettings {
          as a share of the page's shorter side, above 0 and at most 0.1 (0.01 is 12 pixels on \
          a page 1,200 wide), under which a box's text is too small; \
          `booharu-start` has `fresh_start_note_seen`, whether the note on a \
-         first start saying where Booharu 0.0.4's series are was dismissed. The default font is the first of Koharu's Preferred fonts, not a \
-         Booharu setting. Needs a project open, as every tool here does."
+         first start saying where Booharu 0.0.4's series are was dismissed; and \
+         `booharu-emphasis` has how stressed words look: `ai`, whether a translation run asks \
+         its translation model which words of each line to stress, and stresses them, though \
+         never one of Koharu's own models trained only to translate, such as Index-Translate \
+         (off, a run stresses none, yet still takes off the marks an earlier run left on the \
+         translation it replaces); `default`, the look of a stressed word, a run's and \
+         booharu_style_words's `emphasis` alike: its `family`, `weight` from 1 to 1000 (400 \
+         regular, 700 bold), `italic`, `size_factor` from 0.25 to 4 times the text's size, the \
+         `fill`, `stroke` (the outline), and `outer_stroke` (a second border outside the \
+         outline, drawn only with one) colours, and `stroke_width` and `outer_stroke_width` \
+         from 0 to 100 pixels, each null to keep the text's own, bold at 1.15 times the size \
+         to start with; and `categories`, the lettering categories whose stressed words look \
+         different, by id, each entry's keys replacing the default's. The default font is the \
+         first of Koharu's Preferred fonts, not a Booharu setting. Needs a project open, as \
+         every tool here does."
             .to_owned()
     }
 
@@ -152,7 +165,15 @@ impl Tool for SetSettings {
          with `translate`. A change to `booharu-reading` applies to the next read and the next \
          line explained; a blank `model` is refused, so set it to null for the translation \
          model. A change to `booharu-qc` applies to booharu_get_qc_findings at once, and to \
-         the QC tab as the app checks every page again after any section's save. \
+         the QC tab as the app checks every page again after any section's save. A change to \
+         `booharu-emphasis` applies to runs started from then on and to booharu_style_words's \
+         `emphasis` at once; words already stressed keep their look. `default` and each of \
+         `categories` change only in the keys named, so `{\"categories\": {\"shout\": \
+         {\"fill\": [1, 0, 0, 1]}}}` keeps the rest of Shout's look; a key set to null in \
+         `default` keeps the text's own value, and in a category takes the default's. \
+         `default` keeps at least one key and a category entry sets at least one, so a change \
+         leaving either with none is refused; a category set to null, `{\"categories\": \
+         {\"shout\": null}}`, takes the default look again. \
          A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
          a project open, as every tool here does."
             .to_owned()
@@ -265,6 +286,26 @@ mod tests {
         })
     }
 
+    /// An emphasis look setting `values`, every other key null, as the
+    /// settings answer it.
+    fn emphasis(values: Value) -> Value {
+        let mut look = json!({
+            "family": null,
+            "weight": null,
+            "italic": null,
+            "size_factor": null,
+            "fill": null,
+            "stroke": null,
+            "stroke_width": null,
+            "outer_stroke": null,
+            "outer_stroke_width": null,
+        });
+        for (key, value) in values.as_object().into_iter().flatten() {
+            look[key] = value.clone();
+        }
+        look
+    }
+
     #[tokio::test]
     async fn the_settings_are_read_and_saved_through_the_app() {
         let settings = Arc::new(Settings::default());
@@ -302,6 +343,11 @@ mod tests {
                 "booharu-reading": {"model": null, "ask": true, "pages_per_request": 20},
                 "booharu-qc": {"min_size": 0.01},
                 "booharu-start": {"fresh_start_note_seen": false},
+                "booharu-emphasis": {
+                    "ai": true,
+                    "default": emphasis(json!({"weight": 700, "size_factor": 1.15})),
+                    "categories": {},
+                },
             })
         );
 
@@ -421,6 +467,53 @@ mod tests {
         let held = settings.0.lock().lettering.clone();
         assert_eq!(json!(held.sfx), json!("inside_bubbles"));
         assert_eq!(json!(held.subtitle), look);
+    }
+
+    #[tokio::test]
+    async fn the_emphasis_changes_one_key_at_a_time_and_a_category_can_go_back() {
+        let settings = Arc::new(Settings::default());
+        let (_dir, tools) = open(&settings);
+        let save = async |values: Value| {
+            let args = SetSettingsArgs {
+                section: "booharu-emphasis".to_owned(),
+                values: serde_json::from_value(values).expect("keys"),
+            };
+            let saved = SetSettings.call(&mut tools.tool_context(), args).await?;
+            Ok::<_, ToolExecutionError>(json!(saved)["saved"].clone())
+        };
+        let red = json!([1.0, 0.0, 0.0, 1.0]);
+        let shout = json!({"ai": false, "categories": {"shout": {"fill": red}}});
+        let saved = save(shout).await.expect("a red shout");
+        assert_eq!(saved["ai"], json!(false));
+        assert_eq!(saved["categories"]["shout"], emphasis(json!({"fill": red})));
+        // A category and the default change only in the keys named.
+        let heavier =
+            json!({"categories": {"shout": {"weight": 900}}, "default": {"size_factor": null}});
+        let saved = save(heavier).await.expect("a heavier shout");
+        assert_eq!(
+            saved["categories"]["shout"],
+            emphasis(json!({"fill": red, "weight": 900}))
+        );
+        assert_eq!(saved["default"], emphasis(json!({"weight": 700})));
+        // A default or a category left setting nothing, a value out of
+        // bounds, and a key the section hasn't, are refused.
+        for refused in [
+            json!({"default": {"weight": null}}),
+            json!({"categories": {"shout": {"fill": null, "weight": null}}}),
+            json!({"default": {"size_factor": 5}}),
+            json!({"default": {"outer_stroke_width": 101}}),
+            json!({"underline": true}),
+        ] {
+            assert!(save(refused.clone()).await.is_err(), "{refused}");
+        }
+        let held = settings.0.lock().emphasis.clone();
+        assert_eq!(held.default.weight, Some(700));
+        assert_eq!(held.categories.len(), 1);
+        // A category set to null takes the default look again.
+        let saved = save(json!({"categories": {"shout": null}}))
+            .await
+            .expect("no shout of its own");
+        assert_eq!(saved["categories"], json!({}));
     }
 
     #[tokio::test]
