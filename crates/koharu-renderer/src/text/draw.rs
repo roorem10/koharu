@@ -70,10 +70,11 @@ pub(crate) fn draw(
     Ok(())
 }
 
-// Booharu: bold and turn, out of `draw` for contour.rs to share.
+// Booharu: bold and turn, out of `draw` for contour.rs to share, and bold for
+// the bounds' room for faked bold and slant (booharu/lines.rs).
 /// How far `font`'s synthetic bold grows each side of its glyphs at `size`:
 /// a fiftieth of the size.
-pub(super) fn bold(font: &Font, size: f32) -> f64 {
+pub(crate) fn bold(font: &Font, size: f32) -> f64 {
     match font.synthesis.embolden() {
         true => f64::from(size) * 0.02,
         false => 0.0,

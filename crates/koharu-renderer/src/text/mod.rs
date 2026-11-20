@@ -26,6 +26,8 @@ mod shape;
 mod style;
 
 pub(crate) use self::{arrange::TextLayout, breaks::preload_dictionary, draw::draw};
+// Booharu: a face's faked bold, whose reach a layout's bounds make room for.
+pub(crate) use self::draw::bold;
 pub use self::{label::Label, lettering::Lettering};
 
 /// Laid-out text, as a run of one face at one size and paint.
@@ -42,6 +44,12 @@ pub struct TextRun {
     /// Booharu: the second border's colour and width, outward from the
     /// stroke.
     pub outer_stroke: Option<(Color, f32)>,
+    /// Booharu: its face's bold is faked, as fontique fakes it on a face
+    /// lighter than asked: Photoshop's Faux Bold.
+    pub faux_bold: bool,
+    /// Booharu: its face's slant is faked, as fontique fakes it on an
+    /// upright face asked for italic: Photoshop's Faux Italic.
+    pub faux_italic: bool,
 }
 
 /// What laying out a text resolved, for the inspector and PSD export.

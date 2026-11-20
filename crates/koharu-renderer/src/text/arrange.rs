@@ -124,6 +124,13 @@ pub(super) fn arrange(
             span.stroke.map(|(_, width)| (width + outer) * scale)
         })
         .fold(0.0, f32::max);
+    // Booharu: and faked bold and slant carry ink past the glyphs (D12).
+    let stroke = stroke
+        + crate::booharu::faux_reach(
+            runs.iter()
+                .zip(&text_runs)
+                .map(|(run, text)| (&run.font, text.size)),
+        );
     let contours = (styled.stroke_method == StrokeMethod::Contour)
         .then(|| contour::regions(&runs, &text_runs));
     let utf16 = |at: &usize| utf16(&styled.text, *at);
@@ -258,6 +265,16 @@ fn position(
     let mut pen = pen - lead;
     let start = pen;
     let block_center = line.top + line.pitch * 0.5;
+    // Booharu: a horizontal line's runs stand on one baseline (D23).
+    let shared = (!vertical).then(|| {
+        crate::booharu::shared_baseline(
+            line.top,
+            line.pitch,
+            pieces
+                .iter()
+                .map(|(run, _)| shaped.font(run).extent(styled.spans[run.span].size * scale)),
+        )
+    });
     let mut first = None;
     for (run, piece) in pieces {
         // A hyphen ending the line is no character of the text's.
@@ -271,6 +288,7 @@ fn position(
         let size = styled.spans[run.span].size * scale;
         let (ascent, descent) = shaped.font(run).extent(size);
         let baseline = line.top + (line.pitch - (ascent + descent)) * 0.5 + ascent;
+        let baseline = shared.unwrap_or(baseline); // Booharu: the line's own (D23).
         first.get_or_insert(if vertical { -block_center } else { baseline });
         let sideways = run.orientation == Orientation::Sideways;
         let mut push = |x: f32, y: f32, glyph: &Glyph| {
@@ -421,6 +439,9 @@ fn runs(shaped: &ShapedText, glyphs: &[Positioned], scale: f32) -> (Vec<GlyphRun
             outer_stroke: span
                 .outer_stroke
                 .map(|(color, width)| (color, width * scale)),
+            // Booharu: what fontique fakes on the run's face, for Photoshop (D12).
+            faux_bold: font.synthesis.embolden(),
+            faux_italic: font.synthesis.skew().is_some(),
         });
         glyph_runs.push(GlyphRun {
             font: font.clone(),

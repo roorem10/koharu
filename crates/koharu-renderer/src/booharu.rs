@@ -1,8 +1,10 @@
 //! Booharu's part of the renderer: the names font families go by in other
 //! languages, which Booharu's font picker shows muted after a family's name
 //! and searches, so typing 游ゴシック finds Yu Gothic, with Koharu's
-//! `FontFamily` as it is; and which of a family's faces sets a text asked
-//! for bold or italic, so they stay apart (`faces`).
+//! `FontFamily` as it is; which of a family's faces sets a text asked for
+//! bold or italic, so they stay apart (`faces`); and where the runs of a
+//! line of mixed sizes stand, and how far faked bold and slant reach past
+//! their glyphs (`lines`).
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -15,9 +17,13 @@ use fontique::{Collection, CollectionOptions, SourceCache};
 use parking_lot::Mutex;
 use skrifa::{FontRef, MetadataProvider, string::StringId};
 
-pub(crate) use self::faces::{Traits, better, repick};
+pub(crate) use self::{
+    faces::{Traits, better, repick},
+    lines::{faux_reach, shared_baseline},
+};
 
 mod faces;
+mod lines;
 
 /// Each family with names in other languages, by the name the font list
 /// shows, with those names: the installed families', and the bundled
@@ -149,6 +155,22 @@ pub(crate) fn static_sans() -> Option<crate::fonts::Font> {
         .into_iter()
         .filter_map(|family| library.family(family).ok())
         .find(|font| font.coords.is_empty())
+}
+
+/// `static_sans` with what fontique fakes on its Regular face for text asked
+/// for `style` and `weight`; `None`, saying why, without one.
+#[cfg(test)]
+pub(crate) fn faked(style: fontique::FontStyle, weight: f32) -> Option<crate::fonts::Font> {
+    const FAMILY: &str = "Booharu Faked Test";
+    let mut collection = test_family(FAMILY, &[(fontique::FontStyle::Normal, 400.0)])?;
+    let face = collection.family_by_name(FAMILY)?.fonts().first()?.clone();
+    let mut font = static_sans()?;
+    font.synthesis = face.synthesis(
+        fontique::FontWidth::NORMAL,
+        style,
+        fontique::FontWeight::new(weight),
+    );
+    Some(font)
 }
 
 /// A collection of only `family`, its `faces` each a slant and a weight given

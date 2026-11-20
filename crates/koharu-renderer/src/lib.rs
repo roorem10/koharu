@@ -2,7 +2,7 @@
 //! and the GPU passes that draw it.
 
 // Booharu: each font family's names in other languages, for its font picker,
-// and the face a bold or italic text takes.
+// the face a bold or italic text takes, and lines of mixed sizes.
 pub mod booharu;
 mod config;
 pub mod fonts;
