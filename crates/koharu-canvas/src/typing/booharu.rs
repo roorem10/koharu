@@ -108,3 +108,53 @@ impl Typing {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use koharu_scene::{CharStyle, Gradient, GradientKind, GradientStop, Rgba};
+
+    use super::super::style::shared;
+    use crate::CharKey;
+
+    /// A two-stop linear gradient from black to `to`.
+    fn gradient(to: Rgba) -> Gradient {
+        let stop = |offset, color| GradientStop { offset, color };
+        Gradient {
+            kind: GradientKind::Linear,
+            angle: 90.0,
+            stops: vec![stop(0.0, Rgba([0.0, 0.0, 0.0, 1.0])), stop(1.0, to)],
+        }
+    }
+
+    #[test]
+    fn a_gradient_or_letter_spacing_the_characters_dont_share_shows_mixed() {
+        let red = Rgba([1.0, 0.0, 0.0, 1.0]);
+        let style = |tracking| CharStyle {
+            size: Some(32.0),
+            fill_gradient: Some(gradient(red)),
+            tracking,
+            ..CharStyle::default()
+        };
+        // Shared, they show as they are.
+        let (chars, mixed) = shared([style(Some(200.0)), style(Some(200.0))].into_iter());
+        assert_eq!((chars, mixed), (style(Some(200.0)), Vec::new()));
+        // Letter spacing on some characters only is mixed, and left empty.
+        let (chars, mixed) = shared([style(Some(200.0)), style(None)].into_iter());
+        assert_eq!((chars, mixed), (style(None), vec![CharKey::Tracking]));
+        // So is another gradient, or none, beside a gradient.
+        let blue = CharStyle {
+            fill_gradient: Some(gradient(Rgba([0.0, 0.0, 1.0, 1.0]))),
+            ..style(None)
+        };
+        let plain = CharStyle {
+            fill_gradient: None,
+            ..style(None)
+        };
+        for other in [blue, plain] {
+            let (chars, mixed) = shared([style(None), other].into_iter());
+            assert_eq!(chars.fill_gradient, None);
+            assert_eq!(chars.size, Some(32.0));
+            assert_eq!(mixed, vec![CharKey::FillGradient]);
+        }
+    }
+}

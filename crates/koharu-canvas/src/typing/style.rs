@@ -20,6 +20,9 @@ pub enum CharKey {
     // Booharu: the second border's keys.
     OuterStroke,
     OuterStrokeWidth,
+    // Booharu: the gradient fill and letter spacing.
+    FillGradient,
+    Tracking,
 }
 
 /// The text being typed into, as the host shows it.
@@ -72,6 +75,12 @@ pub(super) fn shared(mut styles: impl Iterator<Item = CharStyle>) -> (CharStyle,
             CharKey::OuterStrokeWidth,
             chars.outer_stroke_width == style.outer_stroke_width,
         );
+        // Booharu: the gradient fill and letter spacing.
+        differs(
+            CharKey::FillGradient,
+            chars.fill_gradient == style.fill_gradient,
+        );
+        differs(CharKey::Tracking, chars.tracking == style.tracking);
     }
     for key in &mixed {
         match key {
@@ -85,6 +94,9 @@ pub(super) fn shared(mut styles: impl Iterator<Item = CharStyle>) -> (CharStyle,
             // Booharu: the second border.
             CharKey::OuterStroke => chars.outer_stroke = None,
             CharKey::OuterStrokeWidth => chars.outer_stroke_width = None,
+            // Booharu: the gradient fill and letter spacing.
+            CharKey::FillGradient => chars.fill_gradient = None,
+            CharKey::Tracking => chars.tracking = None,
         }
     }
     (chars, mixed)
