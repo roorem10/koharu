@@ -32,7 +32,7 @@ import {
 import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { LayerBoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the QC ? tag.
+import { LayerBoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the QC ? and fx tags.
 import { LayerKind } from '@/components/booharu/lettering/LayerKind' // Booharu: a block's lettering category.
 import { call, dispatch } from '@/lib/backend'
 import {
@@ -330,7 +330,8 @@ function LayerRow({
               </span>
             </span>
           </button>
-          {/* Booharu: the ? tag of a text the quality check has something open on, as on Story. */}
+          {/* Booharu: the ? tag of a text the quality check has something open on, as on Story,
+              and the fx tag of a text with a text effect (S12-j). */}
           <LayerBoxTag layer={layer} name={name} />
           {block &&
             (['cleanup', 'mask'] as const).map((part) => (

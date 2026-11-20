@@ -242,6 +242,13 @@
       "gradient": "Gradyan dolgu",
       "kind": "Gradyan türü",
       "linear": "Doğrusal",
+      "names": {
+        "border": "Kenarlık",
+        "gradient": "Gradyan dolgu",
+        "outline_method": "Anahat yöntemi",
+        "second_border": "2. kenarlık",
+        "skew": "Eğme"
+      },
       "radial": "Radyal",
       "screentoneLater": "Tram dolgusu (daha sonra)",
       "skew": "Eğme",
@@ -254,6 +261,8 @@
       "skewX": "Yatay (°)",
       "skewY": "Dikey (°)",
       "start": "Başlangıç rengi",
+      "tag": "{{name}} için metin efektleri",
+      "tagList": "Metin efektleri: {{list}}",
       "title": "Metin efektleri",
       "wavyLater": "Dalgalı / titrek metin (daha sonra)"
     },

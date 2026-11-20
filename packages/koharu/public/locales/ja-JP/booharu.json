@@ -242,6 +242,13 @@
       "gradient": "グラデーションの塗り",
       "kind": "グラデーションの種類",
       "linear": "線形",
+      "names": {
+        "border": "縁取り",
+        "gradient": "グラデーションの塗り",
+        "outline_method": "縁取り方式",
+        "second_border": "2重縁取り",
+        "skew": "傾斜"
+      },
       "radial": "放射状",
       "screentoneLater": "スクリーントーンの塗り（今後対応）",
       "skew": "傾斜",
@@ -254,6 +261,8 @@
       "skewX": "水平方向（°）",
       "skewY": "垂直方向（°）",
       "start": "開始色",
+      "tag": "{{name}}のテキスト効果",
+      "tagList": "テキスト効果：{{list}}",
       "title": "テキスト効果",
       "wavyLater": "波打ち・震え文字（今後対応）"
     },

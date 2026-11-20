@@ -3,15 +3,17 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
 
+import { showLayer } from '@/lib/booharu/boxDetails'
 import { BLACK, ownColor, seedGradient, spanStyles } from '@/lib/booharu/paint'
 import { chosenText, type WordRange } from '@/lib/booharu/words'
 import { letteringOf } from '@/lib/document'
-import { useKoharuStore } from '@/lib/store'
+import { projectKey, queryClient, type ProjectView } from '@/lib/queries'
+import { useKoharuStore, type CanvasTool } from '@/lib/store'
 import type { Gradient, Layer, LayerId, PageId, Text, Typed } from '@koharu/ipc/protocol'
 
-// Booharu's Text effects popover in the type bar (S12-k): whether it's open, which its fx button
-// and Text effects… in a box's menu open, closing when the selection empties or the page changes;
-// and what its gradient fill reads and writes over the bar's targets.
+// Booharu's Text effects popover in the type bar (S12-k): whether it's open, which its fx button,
+// FX… in a box's menu and a box's fx tag open, closing when the selection empties or the page
+// changes; and what its gradient fill reads and writes over the bar's targets.
 
 interface FxState {
   /** Whether the popover is open. */
@@ -31,6 +33,36 @@ export function openFx(): void {
 /** Closes Text effects. */
 export function closeFx(): void {
   useFx.setState({ open: false, page: null })
+}
+
+/** The tools the type bar shows for, as TypeBar lists them. */
+const BAR_TOOLS: readonly CanvasTool[] = ['select', 'direct_select', 'text']
+
+/** Opens Text effects over `layers` of `page`, as FX… in a box's menu (S12-l) and a box's fx tag
+ * (S12-j) do: selects them first unless the canvas shows them selected, through showLayer, which
+ * shows their page first when the canvas shows another; switches to the Select tool unless one of
+ * the type bar's tools is on; and opens the popover, which shows once the type bar does. A page or
+ * a layer selected meanwhile wins, and nothing opens. */
+export async function openFxOn(page: PageId, layers: LayerId[]): Promise<void> {
+  const selected = () => {
+    const { selectedLayers } = useKoharuStore.getState()
+    return layers.every((layer) => selectedLayers.includes(layer))
+  }
+  const [first, ...rest] = layers
+  if (!first) return
+  const shown = queryClient.getQueryData<ProjectView | null>(projectKey)?.page === page
+  if (!shown || !selected()) {
+    await showLayer(page, first).catch(() => undefined)
+    // The others join the first once it alone is selected, as showLayer leaves it.
+    const { selectedLayers, selectLayers } = useKoharuStore.getState()
+    if (rest.length && selectedLayers.length === 1 && selectedLayers[0] === first) {
+      selectLayers(layers)
+    }
+    if (!selected()) return
+  }
+  const { tool, setTool } = useKoharuStore.getState()
+  if (!BAR_TOOLS.includes(tool)) setTool('select')
+  openFx()
 }
 
 /** Whether Text effects shows on `page`, the page the type bar shows: open, and opened there. It

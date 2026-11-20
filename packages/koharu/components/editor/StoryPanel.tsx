@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 
 import { StoryBoxActions } from '@/components/booharu/boxes/BoxActionItems' // Booharu: box actions.
 import { GlossaryTextMenu } from '@/components/booharu/context/GlossaryTextMenu' // Booharu: Add to glossary.
-import { BoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the row's Box details tag.
+import { BoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the row's ? and fx tags.
 import { CategoryTag } from '@/components/booharu/lettering/CategoryTag' // Booharu: the row's lettering category.
 import { StoryWordToolbar } from '@/components/booharu/words/StoryWordToolbar' // Booharu: the word toolbar.
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
@@ -261,7 +261,7 @@ function StoryText({
     >
       <div className='flex flex-col items-center gap-1'>
         <ReadingNumber number={number} sfx={isBlockLayer(layer) && layer.role === 'sfx'} />
-        {/* Booharu: the ? tag, which opens Box details for the text. */}
+        {/* Booharu: the ? tag, which opens Box details for the text, and its fx tag (S12-j). */}
         <BoxTag page={page} layer={layer.id} name={name} />
         {isBlockLayer(layer) && (
           <Tooltip>

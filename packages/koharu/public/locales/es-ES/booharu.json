@@ -270,6 +270,13 @@
       "gradient": "Relleno degradado",
       "kind": "Tipo de degradado",
       "linear": "Lineal",
+      "names": {
+        "border": "Contorno",
+        "gradient": "Relleno degradado",
+        "outline_method": "Método del borde",
+        "second_border": "2.º contorno",
+        "skew": "Sesgado"
+      },
       "radial": "Radial",
       "screentoneLater": "Relleno de trama (más adelante)",
       "skew": "Sesgado",
@@ -284,6 +291,8 @@
       "skewX": "Horizontal (°)",
       "skewY": "Vertical (°)",
       "start": "Color inicial",
+      "tag": "Efectos de texto de {{name}}",
+      "tagList": "Efectos de texto: {{list}}",
       "title": "Efectos de texto",
       "wavyLater": "Texto ondulado / tembloroso (más adelante)"
     },

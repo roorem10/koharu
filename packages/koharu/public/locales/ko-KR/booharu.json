@@ -242,6 +242,13 @@
       "gradient": "그라디언트 채우기",
       "kind": "그라디언트 종류",
       "linear": "선형",
+      "names": {
+        "border": "테두리",
+        "gradient": "그라디언트 채우기",
+        "outline_method": "윤곽선 방식",
+        "second_border": "2차 테두리",
+        "skew": "기울이기"
+      },
       "radial": "방사형",
       "screentoneLater": "스크린톤 채우기 (추후 지원)",
       "skew": "기울이기",
@@ -254,6 +261,8 @@
       "skewX": "가로 (°)",
       "skewY": "세로 (°)",
       "start": "시작 색상",
+      "tag": "{{name}}의 텍스트 효과",
+      "tagList": "텍스트 효과: {{list}}",
       "title": "텍스트 효과",
       "wavyLater": "물결 / 떨리는 텍스트 (추후 지원)"
     },

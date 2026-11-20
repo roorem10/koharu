@@ -242,6 +242,13 @@
       "gradient": "渐变填充",
       "kind": "渐变类型",
       "linear": "线性",
+      "names": {
+        "border": "描边",
+        "gradient": "渐变填充",
+        "outline_method": "描边方式",
+        "second_border": "第二道描边",
+        "skew": "倾斜"
+      },
       "radial": "径向",
       "screentoneLater": "网点填充（以后开放）",
       "skew": "倾斜",
@@ -254,6 +261,8 @@
       "skewX": "水平方向（°）",
       "skewY": "垂直方向（°）",
       "start": "起始颜色",
+      "tag": "{{name}} 个文字效果",
+      "tagList": "文字效果：{{list}}",
       "title": "文字效果",
       "wavyLater": "波浪／抖动文字（以后开放）"
     },

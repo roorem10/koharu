@@ -242,6 +242,13 @@
       "gradient": "Gradient fill",
       "kind": "Gradient kind",
       "linear": "Linear",
+      "names": {
+        "border": "Border",
+        "gradient": "Gradient fill",
+        "outline_method": "Outline method",
+        "second_border": "2nd border",
+        "skew": "Skew"
+      },
       "radial": "Radial",
       "screentoneLater": "Screentone fill (later)",
       "skew": "Skew",
@@ -254,6 +261,8 @@
       "skewX": "Horizontal (°)",
       "skewY": "Vertical (°)",
       "start": "Start color",
+      "tag": "Text effects for {{name}}",
+      "tagList": "Text effects: {{list}}",
       "title": "Text effects",
       "wavyLater": "Wavy / shaky text (later)"
     },

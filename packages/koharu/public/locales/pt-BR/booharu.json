@@ -270,6 +270,13 @@
       "gradient": "Preenchimento em gradiente",
       "kind": "Tipo de gradiente",
       "linear": "Linear",
+      "names": {
+        "border": "Contorno",
+        "gradient": "Preenchimento em gradiente",
+        "outline_method": "Método do contorno",
+        "second_border": "2º contorno",
+        "skew": "Inclinação"
+      },
       "radial": "Radial",
       "screentoneLater": "Preenchimento com retícula (futuro)",
       "skew": "Inclinação",
@@ -284,6 +291,8 @@
       "skewX": "Horizontal (°)",
       "skewY": "Vertical (°)",
       "start": "Cor inicial",
+      "tag": "Efeitos de texto de {{name}}",
+      "tagList": "Efeitos de texto: {{list}}",
       "title": "Efeitos de texto",
       "wavyLater": "Texto ondulado / trêmulo (futuro)"
     },

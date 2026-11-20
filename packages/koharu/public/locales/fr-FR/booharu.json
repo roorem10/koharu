@@ -270,6 +270,13 @@
       "gradient": "Remplissage en dégradé",
       "kind": "Type de dégradé",
       "linear": "Linéaire",
+      "names": {
+        "border": "Contour",
+        "gradient": "Remplissage en dégradé",
+        "outline_method": "Méthode du contour",
+        "second_border": "2ᵉ contour",
+        "skew": "Inclinaison"
+      },
       "radial": "Radial",
       "screentoneLater": "Remplissage par trame (à venir)",
       "skew": "Inclinaison",
@@ -284,6 +291,8 @@
       "skewX": "Horizontal (°)",
       "skewY": "Vertical (°)",
       "start": "Couleur de départ",
+      "tag": "Effets de texte pour {{name}}",
+      "tagList": "Effets de texte : {{list}}",
       "title": "Effets de texte",
       "wavyLater": "Texte ondulé / tremblant (à venir)"
     },
