@@ -293,7 +293,8 @@ impl Tool for RedoBoxes {
          background and which you follow with wait. Every run, those of run and booharu_run \
          included, leaves out a block fixed by hand for its stage: a source corrected by hand \
          when reading, and when translating, a translation written or fixed by hand, by the user \
-         or by you, or a clean-up hidden by hand on a block with no translation. This tool takes \
+         or by you, or a clean-up hidden by hand on a block with no translation (or only the \
+         empty placeholder a style set on it before it was translated leaves). This tool takes \
          those too only with `include_hand_fixed`, which replaces the user's own work: call \
          booharu_count_redo first, and when it counts any `hand_fixed`, ask the user before \
          you set it. A locked block, or one in a locked layer, is always left alone, and a \

@@ -325,7 +325,8 @@ impl Tool for StyleWords {
          look unless the only one is a size, a step's among them, as words styled in the app \
          do, so booharu_apply_text_style leaves the block alone unless told to include \
          hand-edited blocks, and booharu_set_lettering_category keeps its font. It refuses a \
-         locked layer, or one inside a locked layer, and a block without a translation. Answers \
+         locked layer, or one inside a locked layer, and a block without a translation, or with \
+         only the empty placeholder a style set on it before it was translated leaves. Answers \
          the `words` styled, their `start` and `end` in characters, and what changed \
          (`change`), null when nothing did, as when they already looked so or a step found them \
          at 300 or 0.5 pixels already, which makes no undo step. Example: {\"layer\": \"<id>\", \

@@ -109,10 +109,12 @@ impl Tool for ApplyTextStyle {
          `normal_dialogue`); a category's font never touches the marks on single words. \
          Booharu leaves blocks changed by hand alone, their wording or their look, unless \
          `include_hand_edited` is true, and always leaves locked blocks alone; blocks without \
-         a translation have nothing to restyle. Answers how many blocks it `changed`, kept as \
-         `kept_hand_edited` (changed by hand, or locked), and found `untranslated`: tell the \
-         user how many were kept, and that including hand-edited blocks would restyle those \
-         changed by hand too, though never the locked ones. The look it gives counts as chosen \
+         a translation, or with only the empty placeholder a style set on them before they were \
+         translated leaves, have nothing to restyle, so that style stays as it was set. Answers \
+         how many blocks it `changed`, kept as `kept_hand_edited` (changed by hand, or locked), \
+         and found `untranslated`: tell the user how many were kept, and that including \
+         hand-edited blocks would restyle those changed by hand too, though never the locked \
+         ones. The look it gives counts as chosen \
          by hand, so later automatic steps, booharu_set_lettering_category's included, leave \
          those blocks alone, and restyling them again needs `include_hand_edited`. \
          booharu_count_text_style_targets answers the same numbers beforehand without changing \
@@ -168,8 +170,9 @@ impl Tool for CountTextStyleTargets {
         "How many blocks booharu_apply_text_style would change for the same scope, \
          `include_hand_edited`, `category`, and `shape` now, changing nothing: `changed`, the \
          translated blocks that would take the look; `kept_hand_edited`, those it would keep, \
-         changed by hand or locked; and `untranslated`, the blocks without a translation. A \
-         block whose translation has the look already counts in none."
+         changed by hand or locked; and `untranslated`, the blocks without a translation, or \
+         with only the empty placeholder a style set on them before they were translated \
+         leaves. A block whose translation has the look already counts in none."
             .to_owned()
     }
 
@@ -241,10 +244,11 @@ impl Tool for ResetLettering {
          one, whose outline otherwise changes only at its next translation. It replaces a look \
          changed by hand, the user's or booharu_apply_text_style's, and the look it gives counts \
          as automatic. Locked layers, and layers in locked layers, are left alone; a block without \
-         a translation has no lettering to reset. Answers how many layers it `changed`, left alone \
-         as `locked`, and found `untranslated`: tell the user about any it left alone. A layer \
-         with its default already counts in none, and with nothing to change, it makes no undo \
-         step."
+         a translation has no lettering to reset, and one with only the empty placeholder a style \
+         set on it before it was translated leaves has that style reset too and stays ready to \
+         translate. Answers how many layers it `changed`, left alone as `locked`, and found \
+         `untranslated`: tell the user about any it left alone. A layer with its default \
+         already counts in none, and with nothing to change, it makes no undo step."
             .to_owned()
     }
 

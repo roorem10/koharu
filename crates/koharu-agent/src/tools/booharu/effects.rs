@@ -90,6 +90,7 @@ impl Tool for SetSkew {
          move, a rotation or a resize too, and a block keeps it when translated again. \
          booharu_reset_lettering takes it off with the rest of a box's look. A locked layer, or \
          one inside a locked layer, is left as it is, and so is a block without a translation, \
+         or with only the empty placeholder a style set on it before it was translated leaves, \
          which has no lettering to skew; any other layer is left out, and a box named twice \
          counts once. Answers how many boxes it `changed`, left alone as `locked`, and found \
          `untranslated`: tell the user about any it left alone. A box showing that skew already \

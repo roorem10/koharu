@@ -33,18 +33,20 @@ impl Tool for GetProjectOverview {
 
     fn description(&self) -> String {
         "What working on the project needs, in one read: each page in order with its id, its \
-         size, how many blocks it has and how many of them have a translation, Booharu's \
-         attributes of each of its layers that has any, by layer id, and as `hand_edited` the \
-         parts of each block changed by hand, by layer id, only for blocks with any: `source`, \
-         its wording, `text`, its translation, `style`, its translation's look, words given \
-         values of their own among it but for their size and the words a translation run \
-         stressed, also when the agent chose it with booharu_apply_text_style or \
-         booharu_style_words, and `drawn`, a block drawn by hand rather \
-         than detected; the translator's model, target language, and instructions, with \
-         `connected`: whether the model's vendor has its API key or sign-in stored, as the \
-         Providers settings show it, never the key itself (Koharu's own models need neither, \
-         nor may a server named by its base URL); the typesetting defaults, such as the font \
-         families a text falls back on; the name of every font family a text can be set in; as \
+         size, how many blocks it has and how many of them have a translation with some text, \
+         Booharu's attributes of each of its layers that has any, by layer id, and as \
+         `hand_edited` the parts of each block changed by hand, by layer id, only for blocks \
+         with any: `source`, its wording, `text`, its translation, `style`, its translation's \
+         look, words given values of their own among it but for their size and the words a \
+         translation run stressed, also when the agent chose it with booharu_apply_text_style \
+         or booharu_style_words, and `drawn`, a block drawn by hand rather than detected (a \
+         style set on a block before it was translated is a `style` edit, never `text`: its \
+         empty placeholder is no translation, so the block stays untranslated); the \
+         translator's model, target language, and instructions, with `connected`: whether the \
+         model's vendor has its API key or sign-in stored, as the Providers settings show it, \
+         never the key itself (Koharu's own models need neither, nor may a server named by its \
+         base URL); the typesetting defaults, such as the font families a text falls back on; \
+         the name of every font family a text can be set in; as \
          `new_text` the look new text gets: the default `font`, the first of Koharu's Preferred \
          fonts, the default `fill` and `stroke` colours as [red, green, blue, alpha] from 0 to \
          1, null for Koharu's black and no outline, the outline's `stroke_width`, \
@@ -190,7 +192,8 @@ struct PageOverview {
     id: PageId,
     size: Size,
     blocks: usize,
-    /// The blocks whose translation has some text.
+    /// The blocks whose translation has some text, so never one with only
+    /// the empty placeholder a style set before translating leaves.
     translated: usize,
     /// Booharu's attributes of each layer that holds any, blocks and others.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -378,7 +381,9 @@ mod tests {
         // The c2pa attribute is another namespace's, and the bad skew reads
         // as none. No stage recorded detecting the blocks, nor reading or
         // translating the translated ones, so those parts count as made by
-        // hand.
+        // hand, but for the blank text: unplaced and written by no run, it's
+        // the placeholder a style set before translating leaves, no words
+        // typed.
         let everything = json!(["source", "text", "style", "drawn"]);
         assert_eq!(
             json!(overview),
@@ -394,7 +399,7 @@ mod tests {
                 "hand_edited": {
                     id("plain"): ["drawn"],
                     id("done"): everything,
-                    id("blank"): everything,
+                    id("blank"): ["source", "style", "drawn"],
                 },
             }])
         );
@@ -453,6 +458,63 @@ mod tests {
             json!(overview[0].hand_edited),
             json!({id("typed"): ["text", "style"], id("agent"): ["style"]})
         );
+    }
+
+    #[test]
+    fn a_block_styled_before_its_translated_counts_untranslated_with_its_style_set_by_hand() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let mut session = Session::create(dir.path().join("test.khr")).expect("a project");
+        let mut apply = |ops: Vec<Value>| {
+            session
+                .apply(Edit {
+                    label: "test".to_owned(),
+                    ops: ops
+                        .into_iter()
+                        .map(|op| serde_json::from_value(op).expect("an op"))
+                        .collect(),
+                })
+                .expect("an edit")
+        };
+        // Found and read by Koharu's stages, never translated.
+        let change = apply(vec![
+            json!({"op": "add_page", "id": "$page", "index": 0, "size": {"width": 100, "height": 200}}),
+            json!({"op": "add_layer", "id": "$styled", "page": "$page", "index": 0, "layer": {
+                "kind": "block",
+                "source": {"content": "やあ"},
+                "attributes": {"c2pa": {
+                    "detection": {"action": "c2pa.created"},
+                    "ocr": {"action": "c2pa.created"},
+                }},
+            }}),
+        ]);
+        let styled = change
+            .created
+            .iter()
+            .find_map(|created| match created {
+                Created::Layer {
+                    id,
+                    label: Some(label),
+                } if label == "styled" => Some(id.to_string()),
+                _ => None,
+            })
+            .expect("the block");
+        // A font and a fill picked in the type bar, merged into a translation
+        // the block doesn't have, start one from empty point text.
+        apply(vec![json!({
+            "op": "update_layer",
+            "layer": styled,
+            "patch": {"translation": {"style": {"chars": {
+                "family": "Comic Neue",
+                "fill": [0.0, 0.5, 0.0, 1.0],
+            }}}},
+        })]);
+
+        let overview = pages(&session.project()).expect("the pages");
+
+        // Its empty placeholder is no translation, nor one typed by hand,
+        // but the look picked for it is the user's.
+        assert_eq!((overview[0].blocks, overview[0].translated), (1, 0));
+        assert_eq!(json!(overview[0].hand_edited), json!({styled: ["style"]}));
     }
 
     #[test]
