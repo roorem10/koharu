@@ -545,6 +545,22 @@ export type CharStyle = {
   outer_stroke?: Rgba | null
   /**  Booharu: the second border's width, outward from the first border. */
   outer_stroke_width?: number | null
+  /**
+   *  Booharu: a gradient fill, drawn in place of `fill`. The two are one
+   *  paint: a gradient wins over a `fill` beside it, and a `fill` with no
+   *  gradient beside it wins over a gradient it would inherit, so a word
+   *  given a colour shows it in a gradient box, and a patch giving a text
+   *  with a gradient a flat colour sets this to null beside the `fill`.
+   *  Left out when unset, so a text without one stays readable by Koharu.
+   */
+  fill_gradient?: Gradient | null
+  /**
+   *  Booharu: letter spacing in thousandths of an em, as Photoshop's
+   *  tracking, from -500 to 2000: the space each character is followed by
+   *  grows by that much, or shrinks when it's negative. Left out when
+   *  unset, so a text without it stays readable by Koharu.
+   */
+  tracking?: number | null
 }
 
 /**
@@ -914,6 +930,39 @@ export type GlossaryUsage = {
   hand_edited: number
   /**  How many are locked, or in a locked layer, which no stage can write. */
   locked: number
+}
+
+/**
+ *  Booharu: a gradient fill: its stops spread along a line at `angle`, or
+ *  out from the centre, over the ink of the text it fills, or of the run of
+ *  characters whose mark it is.
+ */
+export type Gradient = {
+  kind: GradientKind
+  /**
+   *  The direction in degrees, as Photoshop's angle: 0 runs left to
+   *  right and 90 bottom to top. A radial gradient ignores it.
+   */
+  angle?: number
+  /**
+   *  2 to 8 stops in order: an offset is never below the one before it,
+   *  and two can share one, for a hard edge.
+   */
+  stops: GradientStop[]
+}
+
+/**  Booharu: how a gradient's stops spread. */
+export type GradientKind =
+  /**  Along a line through the centre, at the gradient's angle. */
+  | 'linear'
+  /**  Out from the centre to a circle through the corners. */
+  | 'radial'
+
+/**  Booharu: one colour of a gradient and where it falls along it. */
+export type GradientStop = {
+  /**  From 0 at the gradient's start to 1 at its end. */
+  offset: number
+  color: Rgba
 }
 
 /**  A folder of layers, drawn first to last. */
