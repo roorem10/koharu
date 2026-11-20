@@ -153,7 +153,7 @@ export function useWordSelection(layer: BlockLayer | TextLayer) {
       ) {
         event.preventDefault()
         // While the canvas types, it takes the keys from any control but a text field, so the
-        // toolbar's keys would type there, and its Escape would drop what was typed.
+        // toolbar's keys would type there, and its Escape would end the typing.
         if (useKoharuStore.getState().typing) return
         document
           .getElementById(wordToolbarId(layer.id))
