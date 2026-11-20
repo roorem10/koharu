@@ -76,8 +76,10 @@ release that follow.
 - **Booharu: a box styled before it's translated acts as one with none.** The
   type bar writes a style set on a block with no translation into an empty
   point text, only a placeholder. The canvas shows such a block by its
-  source's frame, and typing into it starts from its source in that style
-  and adds the first translation in the source's place, keeping the style.
+  source's frame, typing into it starts from its source in that style and
+  adds the first translation in the source's place, keeping the style, and a
+  resize, a reshape, a move or a turn changes its source, so the placeholder
+  stays one until something is typed.
 
 ## Sources
 

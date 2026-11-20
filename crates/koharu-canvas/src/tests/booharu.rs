@@ -4,8 +4,8 @@
 //! and, while typing, Escape keeping what's typed, marks taken off, size
 //! steps, the selected text the type bar quotes and the empty line a line
 //! break typed at the end starts, a right-click's box menu, and a box styled
-//! before it's translated, which the canvas types into and outlines as a
-//! block with none, on the canvas's harness.
+//! before it's translated, which the canvas types into, outlines, resizes,
+//! moves and turns as a block with none, on the canvas's harness.
 
 use std::collections::BTreeMap;
 
@@ -478,6 +478,11 @@ fn keep_as_art(fixture: &mut Fixture, block: LayerId) {
 
 /// The ops of the one edit among `effects`, which is labelled `set_text`.
 fn set_text(effects: &[Effect]) -> Vec<Op> {
+    edit_ops(effects, "set_text")
+}
+
+/// The ops of the one edit among `effects`, which is labelled `label`.
+fn edit_ops(effects: &[Effect], label: &str) -> Vec<Op> {
     let edits: Vec<&Edit> = effects
         .iter()
         .filter_map(|effect| match effect {
@@ -486,8 +491,8 @@ fn set_text(effects: &[Effect]) -> Vec<Op> {
         })
         .collect();
     match edits[..] {
-        [edit] if edit.label == "set_text" => edit.ops.clone(),
-        ref other => panic!("{other:?} isn't one set_text edit"),
+        [edit] if edit.label == label => edit.ops.clone(),
+        ref other => panic!("{other:?} isn't one {label} edit"),
     }
 }
 
@@ -1542,4 +1547,166 @@ fn a_box_styled_before_its_translated_keeps_its_sources_control() {
         within(bounds, Rect::new(50.0, 50.0, 150.0, 150.0)),
         "{bounds:?}"
     );
+}
+
+#[test]
+fn a_box_styled_before_its_translated_resizes_and_reshapes_its_source() {
+    let Some((mut fixture, talk, _)) = untranslated() else {
+        return;
+    };
+    style_before_translating(
+        &mut fixture,
+        talk,
+        json!({"style": {"chars": {"fill": GREEN}}}),
+    );
+    let styled = layer(&fixture, talk)["translation"].clone();
+    fixture.canvas.select(vec![talk]);
+    // Its right edge, from 150 to 170: its source's box widens, and its
+    // placeholder stays as it was, unplaced, so still a placeholder.
+    let effects = gesture(&mut fixture.canvas, (150.0, 100.0), (170.0, 100.0));
+    assert_eq!(apply(&mut fixture, effects), ["resize"]);
+    let resized = layer(&fixture, talk);
+    assert_eq!(
+        resized["source"]["frame"]["box"]["bounds"],
+        json!({"x": 50.0, "y": 50.0, "width": 120.0, "height": 100.0})
+    );
+    assert_eq!(resized["translation"], styled);
+    assert!(placeholder(&fixture, talk));
+
+    // Its corner, dragged with the direct selection tool, reshapes its
+    // source's frame alike.
+    fixture.canvas.set_tool(Tool::DirectSelect);
+    let effects = gesture(&mut fixture.canvas, (170.0, 150.0), (190.0, 170.0));
+    assert_eq!(apply(&mut fixture, effects), ["edit_frame"]);
+    let reshaped = layer(&fixture, talk);
+    let path = reshaped["source"]["frame"]["path"]["path"]
+        .as_str()
+        .expect("a path");
+    let anchors: Vec<Point> = BezPath::from_svg(path)
+        .expect("SVG")
+        .elements()
+        .iter()
+        .filter_map(|element| match *element {
+            kurbo::PathEl::MoveTo(point) | kurbo::PathEl::LineTo(point) => Some(point),
+            _ => None,
+        })
+        .collect();
+    assert!(anchors.contains(&Point::new(190.0, 170.0)), "{anchors:?}");
+    assert_eq!(reshaped["translation"], styled);
+    assert!(placeholder(&fixture, talk));
+}
+
+#[test]
+fn a_box_styled_before_its_translated_moves_and_turns_its_source() {
+    let Some((mut fixture, talk, _)) = untranslated() else {
+        return;
+    };
+    style_before_translating(
+        &mut fixture,
+        talk,
+        json!({"style": {"chars": {"fill": GREEN}}}),
+    );
+    let styled = layer(&fixture, talk)["translation"].clone();
+    // A drag on it moves its source, an update of the source's transform
+    // where Koharu would move the placeholder's.
+    let effects = gesture(&mut fixture.canvas, (100.0, 100.0), (130.0, 120.0));
+    assert_eq!(
+        json_of(&edit_ops(&effects, "move")),
+        json_of(&[Op::UpdateLayer {
+            layer: talk.into(),
+            patch: json!({"source": {"transform": [[1.0, 0.0, 30.0], [0.0, 1.0, 20.0]]}}),
+        }])
+    );
+    assert_eq!(apply(&mut fixture, effects), ["move"]);
+    assert_eq!(layer(&fixture, talk)["translation"], styled);
+    assert!(placeholder(&fixture, talk));
+
+    // Its rotate handle, 16 pixels above its top's middle, at (130, 54),
+    // turned a quarter about its centre, (130, 120), after the move.
+    let effects = gesture(&mut fixture.canvas, (130.0, 54.0), (196.0, 120.0));
+    assert_eq!(apply(&mut fixture, effects), ["rotate"]);
+    let turned = layer(&fixture, talk);
+    let transform = affine(&turned["source"]["transform"]);
+    assert!(close(
+        transform * Point::new(100.0, 100.0),
+        Point::new(130.0, 120.0)
+    ));
+    let across = transform * Point::new(101.0, 100.0) - transform * Point::new(100.0, 100.0);
+    assert!(close(across.to_point(), Point::new(0.0, 1.0)), "{across:?}");
+    assert_eq!(turned["translation"], styled);
+    assert!(placeholder(&fixture, talk));
+
+    // Typed into, still selected, its first translation goes where its
+    // source went.
+    fixture.canvas.set_tool(Tool::Text);
+    gesture(&mut fixture.canvas, (130.0, 120.0), (130.0, 120.0));
+    let typed = fixture.canvas.typing().expect("typing");
+    assert_eq!(typed.layer, Some(talk));
+    type_text(&mut fixture.canvas, "Hi");
+    let effects = leave(&mut fixture.canvas, Leave::Commit);
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    let typed = layer(&fixture, talk);
+    assert_eq!(
+        typed["translation"]["transform"],
+        typed["source"]["transform"]
+    );
+}
+
+#[test]
+fn a_translated_box_types_resizes_and_moves_its_translation_as_before() {
+    let Some((mut fixture, talk, boom)) = untranslated() else {
+        return;
+    };
+    // The dialogue's translation typed by hand and styled since, and the
+    // sound effect's written by a run, which records it.
+    let effects = commit_translation(&mut fixture, talk, (100.0, 100.0));
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    other_writer(
+        &mut fixture,
+        vec![
+            json!({"op": "update_layer", "layer": talk,
+                "patch": {"translation": {"style": {"chars": {"fill": GREEN}}}}}),
+            json!({"op": "update_layer", "layer": boom, "patch": {"translation": {"frame":
+                {"box": {"bounds": {"x": 250.0, "y": 50.0, "width": 100.0, "height": 100.0}}}}}}),
+            json!({"op": "set_text", "layer": boom, "text": "Bang"}),
+            json!({"op": "set_attribute", "layer": boom, "namespace": "c2pa",
+                "key": "translation", "value": {"action": "c2pa.created"}}),
+        ],
+    );
+    for (block, at) in [(talk, (100.0, 100.0)), (boom, (300.0, 100.0))] {
+        assert!(!placeholder(&fixture, block));
+        let before = layer(&fixture, block);
+        // Typing goes into its translation, whose commit writes its words
+        // alone.
+        fixture.canvas.set_tool(Tool::Text);
+        gesture(&mut fixture.canvas, at, at);
+        let typed = fixture.canvas.typing().expect("typing");
+        assert_eq!(typed.layer, Some(block));
+        type_text(&mut fixture.canvas, "!");
+        let effects = leave(&mut fixture.canvas, Leave::Commit);
+        let ops = set_text(&effects);
+        assert!(matches!(ops[..], [Op::SetRichText { .. }]), "{ops:?}");
+        assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+        // A resize writes its translation's frame, and a move is Koharu's
+        // transform, which the scene puts on its translation.
+        fixture.canvas.set_tool(Tool::Select);
+        fixture.canvas.select(vec![block]);
+        let edge = at.0 + 50.0;
+        let effects = gesture(&mut fixture.canvas, (edge, 100.0), (edge + 20.0, 100.0));
+        assert_eq!(apply(&mut fixture, effects), ["resize"]);
+        let effects = gesture(&mut fixture.canvas, at, (at.0 + 10.0, at.1 + 10.0));
+        let ops = edit_ops(&effects, "move");
+        assert!(matches!(ops[..], [Op::TransformLayer { .. }]), "{ops:?}");
+        assert_eq!(apply(&mut fixture, effects), ["move"]);
+        let after = layer(&fixture, block);
+        assert_eq!(after["source"], before["source"]);
+        assert_eq!(
+            after["translation"]["frame"]["box"]["bounds"]["width"],
+            json!(120.0)
+        );
+        assert!(close(
+            affine(&after["translation"]["transform"]) * Point::ZERO,
+            Point::new(10.0, 10.0)
+        ));
+    }
 }

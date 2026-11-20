@@ -55,7 +55,9 @@ impl Shape {
         if cx.snapshot.control(layer)?.locked {
             return None;
         }
-        let (lettering, text) = Lettering::of(&cx.snapshot.layer(layer)?.content)?;
+        // Booharu: a box styled before it's translated reshapes its source's
+        // frame.
+        let (lettering, text) = crate::booharu::lettering(cx.snapshot.layer(layer)?)?;
         let path = match &text.frame {
             TextFrame::Path { path, .. } => BezPath::from_svg(path.as_str()).ok()?,
             TextFrame::Box { bounds, fit, .. } if *fit != Fit::Grow => {

@@ -115,7 +115,11 @@ impl Transform {
                     .iter()
                     .filter_map(|control| {
                         let affine = self.turn(control);
-                        (affine != Affine::IDENTITY).then(|| transformed(control, affine))
+                        (affine != Affine::IDENTITY)
+                            .then(|| transformed(control, affine))
+                            // Booharu: a box styled before it's translated
+                            // moves and turns by its source.
+                            .map(|op| crate::booharu::moved(cx.snapshot, control, op))
                     })
                     .collect();
                 (
@@ -210,7 +214,8 @@ pub(crate) fn resized(snapshot: &Snapshot, control: &Control, local: Rect) -> Op
             transform: page.into(),
         });
     }
-    let (lettering, text) = Lettering::of(content)?;
+    // Booharu: a box styled before it's translated resizes its source's frame.
+    let (lettering, text) = crate::booharu::lettering(snapshot.layer(control.layer)?)?;
     Some(Op::UpdateLayer {
         layer,
         patch: lettering.patch(frame(text, local, stretch)?),

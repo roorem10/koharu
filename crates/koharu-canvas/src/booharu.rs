@@ -17,21 +17,26 @@
 //! placeholder ([`status::placeholder`]): the type bar writes a style set on
 //! a block with no translation into an empty point text. The canvas reads
 //! such a block as one with none ([`placeholder`]): it shows its source's
-//! control, and typing into it starts from its source with that style laid
-//! over ([`styled_source`]) and makes a first translation in its source's
-//! place that keeps the style.
+//! control, typing into it starts from its source with that style laid over
+//! ([`styled_source`]) and makes a first translation in its source's place
+//! that keeps the style, and a resize, a reshape, a move or a turn changes
+//! its source ([`lettering()`], [`moved()`]), so the placeholder stays one.
 
 use booharu_core::{lettering, settings::LetteringSettings, sfx, status, styles};
 use koharu_scene::{
-    Block, Content, Direction, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text,
+    Block, Content, Direction, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text, Transform,
 };
-use kurbo::{Point, Rect, Size};
+use kurbo::{Affine, Point, Rect, Size};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use ui_events::keyboard::Modifiers;
 
 use crate::{
+    control::Control,
     draw::overlay::Overlay,
     gesture::{self, Context, GestureLook, Press},
+    snapshot::Snapshot,
+    tools::transform::Lettering,
     view::Sample,
 };
 
@@ -169,6 +174,41 @@ pub(crate) fn styled_source(block: &Block) -> Text {
         }
     }
     text
+}
+
+/// Where `layer`'s drawn text lives for a resize or a reshape, as
+/// [`Lettering::of`] reads it, but a block whose translation is only a
+/// placeholder letters by its source, as one with none does: its source's
+/// frame changes, so the placeholder stays unplaced, and so stays one.
+pub(crate) fn lettering(layer: &Layer) -> Option<(Lettering, &Text)> {
+    match styled(layer) {
+        Some(block) => Some((Lettering::Source, &block.source)),
+        None => Lettering::of(&layer.content),
+    }
+}
+
+/// `op`, the move or turn of `control`'s layer, which `transform_layer`
+/// puts on a block's translation whenever it has one; for a block whose
+/// translation is only a placeholder, an update of its source's transform
+/// instead, as a block with none moves, composed as `transform_layer`
+/// composes it, the move after what the source had. So its control, its
+/// source's, goes where it was dragged, and the placeholder stays as it
+/// was. Any other op or layer, as it is.
+pub(crate) fn moved(snapshot: &Snapshot, control: &Control, op: Op) -> Op {
+    let source = snapshot
+        .layer(control.layer)
+        .and_then(styled)
+        .map(|block| &block.source);
+    match (op, source) {
+        (Op::TransformLayer { layer, transform }, Some(source)) => {
+            let moved = Affine::from(transform) * Affine::from(source.transform);
+            Op::UpdateLayer {
+                layer,
+                patch: json!({"source": {"transform": Transform::from(moved)}}),
+            }
+        }
+        (op, _) => op,
+    }
 }
 
 /// The layer `id` among `layers` and their children.
