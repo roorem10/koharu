@@ -171,7 +171,9 @@ function soundEffect(selection: BoxSelection): BlockLayer | null {
 }
 
 /** Whether Reset to lettering default gives `box` a look back: a translated block or a text layer,
- * neither locked; an untranslated block has no lettering. */
+ * neither locked; an untranslated block has no lettering. A block styled before it's translated
+ * counts as translated here, as the desktop's Reset takes off the style its placeholder holds
+ * (P-b). */
 function resettable({ layer, locked }: Box): boolean {
   return !locked && (isTextLayer(layer) || (isBlockLayer(layer) && layer.translation != null))
 }

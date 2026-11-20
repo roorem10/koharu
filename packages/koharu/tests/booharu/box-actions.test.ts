@@ -200,6 +200,13 @@ describe('Booharu box actions', () => {
     expect(action.enabled(resetting(['first']))).toBe(false)
     expect(action.enabled(resetting(['locked']))).toBe(false)
     expect(action.enabled(resetting(['first', 'locked']))).toBe(false)
+    // A block styled before it's translated: the desktop takes off the style its placeholder holds.
+    const styled = boxesPage()
+    const placeholder = { content: [], style: { chars: { size: 30 } }, frame: 'point' }
+    styled.layers[1] = block('free', 'Free', { translation: placeholder })
+    expect(action.enabled({ page: styled.id, boxes: selectedBoxes(styled.layers, ['free']) })).toBe(
+      true,
+    )
 
     // One such text is enough, and every selected one goes, the desktop counting those it leaves.
     reset.mockResolvedValue({ changed: 2, locked: 1, untranslated: 1 })
