@@ -1,16 +1,18 @@
 //! The words edit's commands: styling a run of a text's characters by hand,
-//! as the TypeBar and the Story toolbar do, and the marks the emphasis star
-//! gives text typed on the canvas, each worked out by `booharu::words`,
-//! which the agent's tool shares, its emphasis under the saved
-//! `[booharu-emphasis]` and `[booharu-lettering]` as they are when called.
-//! And the press on the canvas the page is told of, which lets the words
-//! chosen in the Story panel go.
+//! as the TypeBar and the Story toolbar do, every word style cleared off
+//! whole boxes, as the type bar's Clear does with no words chosen, and the
+//! marks the emphasis star gives text typed on the canvas, each worked out
+//! by `booharu::words`, which the agent's tools share, its emphasis under
+//! the saved `[booharu-emphasis]` and `[booharu-lettering]` as they are
+//! when called. And the press on the canvas the page is told of, which lets
+//! the words chosen in the Story panel go.
 
 use std::{ops::Range, sync::Arc};
 
-use booharu::words::{self, WordChange};
+use booharu::words::{self, ClearedWords, WordChange};
 use booharu_core::{emphasis::EmphasisSettings, settings::LetteringSettings};
 use koharu_scene::{CharStyle, Edit, LayerId, Project};
+use parking_lot::Mutex;
 use tauri::State;
 use tauri_runtime_cef::cef::{CefString, Frame, ImplFrame as _};
 
@@ -72,6 +74,31 @@ fn style(
         &emphasis,
         &lettering,
     )
+}
+
+/// Takes every word style off the texts of `layers`, each a block's
+/// translation or a text layer's, so their words look as their texts, as one
+/// undo step labelled `booharu_clear_word_styles`, none when none of them
+/// carries a word style. A box that is, or is inside, a locked layer is left
+/// as it is; a block without a translation, and any other layer, are left
+/// out. Answers how many texts it cleared, and how many with word styles it
+/// left as they are because they're locked.
+#[tauri::command]
+#[specta::specta]
+pub async fn booharu_clear_word_styles(
+    app: State<'_, Arc<App>>,
+    layers: Vec<LayerId>,
+) -> Result<ClearedWords> {
+    let answer = Arc::new(Mutex::new(ClearedWords::default()));
+    let counted = Arc::clone(&answer);
+    apply_if(&app, move |session| {
+        let mut cleared = words::clear_all(&session.project(), &layers)?;
+        let edit = cleared.edit.take();
+        *counted.lock() = cleared;
+        Ok(edit)
+    })
+    .await?;
+    Ok(std::mem::take(&mut *answer.lock()))
 }
 
 /// The marks the emphasis star gives the text typed into `layer`, a block

@@ -154,6 +154,10 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         crate::booharu::redo::booharu_redo_boxes,
         crate::booharu::words::booharu_style_words,
         crate::booharu::words::booharu_emphasis_patch,
+        crate::booharu::words::booharu_clear_word_styles,
+        crate::booharu::typing::booharu_finish_typing,
+        crate::booharu::typing::booharu_unmark_typing,
+        crate::booharu::typing::booharu_step_typing_size,
     ];
     move |invoke: Invoke<CefRuntime>| {
         let message = &invoke.message;
@@ -272,5 +276,9 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         crate::booharu::redo::booharu_redo_boxes,
         crate::booharu::words::booharu_style_words,
         crate::booharu::words::booharu_emphasis_patch,
+        crate::booharu::words::booharu_clear_word_styles,
+        crate::booharu::typing::booharu_finish_typing,
+        crate::booharu::typing::booharu_unmark_typing,
+        crate::booharu::typing::booharu_step_typing_size,
     ](types)
 }

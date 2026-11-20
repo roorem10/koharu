@@ -186,6 +186,32 @@ impl Screen {
         });
     }
 
+    /// Booharu: takes marks off what's being typed, as the type bar's Clear,
+    /// B off and I off ask: off the selected characters, or off the next
+    /// ones typed at a caret.
+    pub fn unmark_typing(&self, what: koharu_canvas::booharu::Unmark) {
+        self.change(move |main| {
+            if let Some(canvas) = &mut main.canvas
+                && let Err(error) = canvas.unmark_typing(what)
+            {
+                tracing::error!("the canvas failed to take marks off its typing: {error:#}");
+            }
+        });
+    }
+
+    /// Booharu: what's being typed a step bigger or smaller, as the type
+    /// bar's A+ and A− ask: the selected characters, or the next ones typed
+    /// at a caret.
+    pub fn step_typing_size(&self, bigger: bool) {
+        self.change(move |main| {
+            if let Some(canvas) = &mut main.canvas
+                && let Err(error) = canvas.step_typing_size(bigger)
+            {
+                tracing::error!("the canvas failed to step its typing's size: {error:#}");
+            }
+        });
+    }
+
     /// Types `text` into what's being typed, as a paste does.
     pub fn insert(&self, text: String) {
         self.change(move |main| {

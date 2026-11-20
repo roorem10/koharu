@@ -4,7 +4,8 @@
 //! the MCP server's start on Booharu's own port, Read chapter and Explain
 //! this line as jobs Stop and closing the project end (`jobs`), the agent's
 //! chat kept beside its project (`agent_history`), the quality check's
-//! findings, its watcher and its one-page check (`qc`), and the host
+//! findings, its watcher and its one-page check (`qc`), the type bar's
+//! commands for the text being typed on the canvas (`typing`), and the host
 //! Booharu's agent tools reach the app through, which tells the interface
 //! when they write a series or the chapter's notes, or save the
 //! Instructions, has the quality check look again after those writes and
@@ -30,6 +31,7 @@ pub(crate) mod settings;
 pub(crate) mod sfx;
 pub(crate) mod styles;
 pub(crate) mod translation;
+pub(crate) mod typing;
 pub(crate) mod words;
 
 use std::sync::Arc;
