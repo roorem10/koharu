@@ -16,6 +16,7 @@ pub(crate) mod agent_history;
 pub(crate) mod boxes;
 pub(crate) mod canvas;
 pub(crate) mod context;
+pub(crate) mod effects;
 pub(crate) mod events;
 pub(crate) mod explain;
 pub(crate) mod fonts;
