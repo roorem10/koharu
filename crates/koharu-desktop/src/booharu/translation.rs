@@ -1,7 +1,9 @@
-//! Typing a block's translation in the Story panel: a block without one gets
-//! it placed into its own frame first, in the same undo step, where the
-//! scene's `set_text` alone would leave it at the page's corner (#128), with
-//! the default look a new translation gets.
+//! Typing a block's translation in the Story panel: a block without one of
+//! its own, none or only the placeholder a style set before translating
+//! leaves, gets it placed into its own frame first, in the same undo step,
+//! where the scene's `set_text` alone would leave it at the page's corner
+//! (#128), with the default look a new translation gets where the
+//! placeholder set no value of its own.
 
 use std::sync::Arc;
 
