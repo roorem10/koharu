@@ -16,18 +16,21 @@
 //!   to stress, which appends the instruction to ask after those
 //!   (`emphasis`).
 //! - `emphasis_schema` and `emphasis_answers`, in a translation's turn that
-//!   asks, are the answer's shape and the words read back from it.
+//!   asks, are the answer's shape and the words read back from it, which
+//!   the stage gives each block by `picked` for the write.
 //! - `translated`, in the Translation stage's `written`, gives each new
 //!   translation the default look, its block's lettering category's font
-//!   among it while the run's Pick fonts automatically is on, and records
-//!   what the stage wrote, and `given_back` records a translation it
-//!   cleared, given back unchanged.
+//!   among it while the run's Pick fonts automatically is on, and the marks
+//!   of the words its model picked to stress, taking off those a run left on
+//!   the one it replaces, and records what the stage wrote; `given_back`
+//!   records a translation it cleared, given back unchanged.
 //! - `recognized`, in the Recognition stage, records the wording it read.
 //! - `seed`, right after the Translation stage's `keep`, starts a project's
 //!   translation conversation that holds nothing yet, as one does the first
 //!   time the project translates and again once its model, target, or
 //!   instructions changed, with the page before the one it translates as
-//!   the user left it.
+//!   the user left it, its answer in the shape a run that asks for the
+//!   words to stress has its model give.
 //! - `Failure`, from `stages::run`, is a stage task's failure as the run
 //!   reports it, with the class the run policy goes by, which the scheduler's
 //!   `booharu` module follows: another try, the page given up on, or the run
@@ -42,7 +45,12 @@
 pub(crate) mod emphasis;
 mod filters;
 
-use std::{collections::BTreeSet, future::Future, path::Path, time::Duration};
+use std::{
+    collections::{BTreeSet, HashMap},
+    future::Future,
+    path::Path,
+    time::Duration,
+};
 
 use booharu_core::{
     context::{self, Chapter, Extras, MAX_TERMS, SeriesStore},
@@ -66,7 +74,7 @@ use rig_agent::run::PromptError;
 use serde::Serialize;
 
 pub(crate) use self::{
-    emphasis::{emphasis_answers, emphasis_schema},
+    emphasis::{emphasis_answers, emphasis_schema, picked},
     filters::{Left, stays},
 };
 use crate::{
@@ -211,25 +219,28 @@ impl From<Stage> for RunStage {
 /// edit for `block`'s new translation `text`, both read before the edit, as
 /// placement reads the project: the run's default look, when it changes
 /// anything, with the block's category font while the run's Pick fonts
-/// automatically is on, the translation's word marks when the marks a run
-/// left on the one it replaces come off, then the hand-edit record, on
-/// every translation the stage writes. None when placement failed, which
-/// fails the stage.
+/// automatically is on, the translation's word marks, when the words the
+/// run's model picked to stress in it, `block`'s in `picked`, are marked in
+/// the run's emphasis, or the marks a run left on the one it replaces come
+/// off, then the hand-edit record, on every translation the stage writes.
+/// A pick the text doesn't hold is left out, logged. None when placement
+/// failed, which fails the stage.
 pub(crate) fn translated(
     project: &Project,
     block: LayerId,
     text: &str,
     placed: Option<&Op>,
     booharu: &Snapshot,
+    picked: &HashMap<LayerId, Vec<String>>,
 ) -> anyhow::Result<Vec<Op>> {
     let Some(placed) = placed else {
         return Ok(Vec::new());
     };
-    // No words picked yet: the model isn't asked for them until the turn
-    // reads its answer's picks.
+    // None picked for a block whose run didn't ask, or whose model picked
+    // none: its translation only takes off a run's marks.
     let marking = Marking {
         settings: booharu.emphasis.as_ref(),
-        words: &[],
+        words: picked.get(&block).map(Vec::as_slice).unwrap_or_default(),
     };
     styles::translated(
         project,
@@ -260,55 +271,90 @@ pub(crate) fn recognized(project: &Project, block: LayerId, text: &str) -> anyho
 /// holds, as the user left it, when the conversation holds nothing yet: the
 /// first time the project translates since it opened, and once `keep`
 /// started it again because the model, the target, or the instructions
-/// changed, the chapter's glossary and notes among them. The page goes in as
-/// one exchange, in the shapes a turn records its own: its texts numbered as
-/// a turn sends them, without the scan, and their translations as they are
-/// now, hand fixes included, as the answer; with no usage, so the context
-/// estimates it as it would any turn it fits; and as the conversation's last
-/// page, which the next turn's echo check compares its answer with. Nothing
-/// for the first page, a page before with no translated text, or a
-/// conversation under way, which so never gets a second.
-pub(crate) fn seed(conversation: &mut Conversation, session: &Mutex<Session>, page: PageId) {
+/// changed, the chapter's glossary and notes and the instruction to pick
+/// the words to stress among them. The page goes in as one exchange, in the
+/// shapes a turn of the run `booharu` is the snapshot of records its own:
+/// its texts numbered as a turn sends them, without the scan, and their
+/// translations as they are now, hand fixes included, as the answer, each
+/// an object of its translation and the words its run's marks still cover
+/// while the run asks its model for the words to stress; with no usage, so
+/// the context estimates it as it would any turn it fits; and as the
+/// conversation's last page, its plain translations, which the next turn's
+/// echo check compares its answer with. Nothing for the first page, a page
+/// before with no translated text, or a conversation under way, which so
+/// never gets a second.
+pub(crate) fn seed(
+    conversation: &mut Conversation,
+    session: &Mutex<Session>,
+    page: PageId,
+    booharu: &Snapshot,
+) {
     if conversation.last.is_some() || !conversation.context.messages().is_empty() {
         return;
     }
-    let Some((texts, translations)) = before(&session.lock().project(), page) else {
+    let Some(before) = before(&session.lock().project(), page) else {
         return;
     };
-    let keys = turn::keys(texts.len());
+    let keys = turn::keys(before.texts.len());
+    let answer = match booharu.asks_emphasis {
+        true => emphasis::numbered(&keys, &before.translations, &before.stressed),
+        false => turn::numbered(&keys, before.translations.iter().map(String::as_str)),
+    };
     let exchange = vec![
-        Message::user(turn::numbered(&keys, texts.iter().map(String::as_str))),
-        Message::assistant(turn::numbered(
+        Message::user(turn::numbered(
             &keys,
-            translations.iter().map(String::as_str),
+            before.texts.iter().map(String::as_str),
         )),
+        Message::assistant(answer),
     ];
     conversation.context.record([(exchange, Usage::default())]);
-    conversation.last = Some((texts, translations));
+    conversation.last = Some((before.texts, before.translations));
+}
+
+/// The page before the one a turn translates, as its conversation would
+/// have had it.
+struct Before {
+    /// Its blocks' sources, as a turn sends them.
+    texts: Vec<String>,
+    /// Their translations, trimmed as an answer is.
+    translations: Vec<String>,
+    /// The words of each that the marks its run gave it still cover.
+    stressed: Vec<Vec<String>>,
 }
 
 /// The page before `page` in `project`'s page order, as its translation
 /// conversation would have had it: each of its blocks with a source and a
 /// translation, in the order a turn lists a page's blocks, the source as a
-/// turn sends it and the translation as it is now, trimmed as an answer is;
-/// `None` for the first page, or one before it with no such block.
-fn before(project: &Project, page: PageId) -> Option<(Vec<String>, Vec<String>)> {
+/// turn sends it and the translation as it is now, trimmed as an answer is,
+/// with the words of it its run stressed ([`emphasis::stressed`]); `None`
+/// for the first page, or one before it with no such block.
+fn before(project: &Project, page: PageId) -> Option<Before> {
     let pages: Vec<PageId> = project.pages().map(|page| page.id).collect();
     let at = pages.iter().position(|&id| id == page)?;
     let before = *pages.get(at.checked_sub(1)?)?;
-    let (texts, translations): (Vec<String>, Vec<String>) = project
-        .blocks(before)
-        .ok()?
-        .into_iter()
-        .filter_map(|(_, block)| {
-            let text = block.source.content.text();
-            let translation = block.translation.as_ref()?.content.text();
-            let translation = translation.trim();
-            (!text.trim().is_empty() && !translation.is_empty())
-                .then(|| (text, translation.to_owned()))
-        })
-        .unzip();
-    (!texts.is_empty()).then_some((texts, translations))
+    let mut lines = Before {
+        texts: Vec::new(),
+        translations: Vec::new(),
+        stressed: Vec::new(),
+    };
+    for (id, block) in project.blocks(before).ok()? {
+        let text = block.source.content.text();
+        let Some(translation) = block.translation.as_ref() else {
+            continue;
+        };
+        let trimmed = translation.content.text().trim().to_owned();
+        if text.trim().is_empty() || trimmed.is_empty() {
+            continue;
+        }
+        let stressed = project
+            .layer(id)
+            .map(|layer| emphasis::stressed(layer, &translation.content))
+            .unwrap_or_default();
+        lines.texts.push(text);
+        lines.translations.push(trimmed);
+        lines.stressed.push(stressed);
+    }
+    (!lines.texts.is_empty()).then_some(lines)
 }
 
 /// A stage task's failure: the reason its run reports, as Koharu words it,
@@ -595,7 +641,7 @@ mod tests {
     use anyhow::{Context as _, Result};
     use booharu_core::{
         Edited,
-        attrs::Auto,
+        attrs::{Auto, AutoMark},
         context::{ChapterContext, GlossaryEntry},
         edited,
         lettering::{CategoryFont, LetteringCategory},
@@ -605,7 +651,7 @@ mod tests {
         styles::text_hash,
     };
     use icu_locale_core::langid;
-    use koharu_scene::{CharStyle, Content, Created, Edit, Layer, Rgba, Session, Text};
+    use koharu_scene::{CharStyle, Content, Created, Edit, Layer, Rgba, Session, Span, Text};
     use parking_lot::Mutex;
     use serde_json::{Value, json};
 
@@ -716,15 +762,31 @@ mod tests {
         /// a page's translations, under `booharu`, a run's snapshot: the ops
         /// of `written`, applied as its one edit.
         fn translate(&mut self, texts: &[(&str, &str)], booharu: &Snapshot) -> Result<()> {
-            let translated = texts
+            let texts: Vec<(&str, &str, &[&str])> = texts
                 .iter()
-                .map(|(label, text)| (self.id(label), langid!("ja"), (*text).to_owned()))
+                .map(|&(label, text)| (label, text, &[][..]))
                 .collect();
+            self.stress(&texts, booharu)
+        }
+
+        /// [`Page::translate`], the run's model picking the words of each
+        /// `(label, text, words)` to stress.
+        fn stress(&mut self, texts: &[(&str, &str, &[&str])], booharu: &Snapshot) -> Result<()> {
+            let translated: Vec<_> = texts
+                .iter()
+                .map(|(label, text, _)| (self.id(label), langid!("ja"), (*text).to_owned()))
+                .collect();
+            let picks = texts
+                .iter()
+                .map(|(_, _, words)| words.iter().map(|word| (*word).to_owned()).collect())
+                .collect();
+            let picked = super::picked(&translated, picks);
             let ops = written(
                 &self.session.project(),
                 translated,
                 &TranslatorConfig::default(),
                 booharu,
+                &picked,
             )?;
             self.edit(ops)
         }
@@ -1204,7 +1266,12 @@ mod tests {
             }],
         })?;
         let mut conversation = chapter.conversation()?;
-        seed(&mut conversation, &chapter.session, chapter.pages[1]);
+        seed(
+            &mut conversation,
+            &chapter.session,
+            chapter.pages[1],
+            &Snapshot::default(),
+        );
         // One exchange in the shapes a turn records: the page's texts
         // numbered as a turn sends them, then their translations as they are
         // now, the hand fix among them.
@@ -1234,18 +1301,33 @@ mod tests {
             &[("まだ", None)],
         ])?;
         let mut conversation = chapter.conversation()?;
-        seed(&mut conversation, &chapter.session, chapter.pages[1]);
+        seed(
+            &mut conversation,
+            &chapter.session,
+            chapter.pages[1],
+            &Snapshot::default(),
+        );
         let seeded = (history(&conversation), conversation.last.clone());
         assert_eq!(seeded.0.len(), 2);
         // The next page's turn keeps the conversation going: no seed.
-        seed(&mut conversation, &chapter.session, chapter.pages[2]);
+        seed(
+            &mut conversation,
+            &chapter.session,
+            chapter.pages[2],
+            &Snapshot::default(),
+        );
         assert_eq!((history(&conversation), conversation.last.clone()), seeded);
 
         // Nor does one a turn went into.
         let mut conversation = chapter.conversation()?;
         turn(&mut conversation, "ヒナです。", "It's Hina.");
         let kept = (history(&conversation), conversation.last.clone());
-        seed(&mut conversation, &chapter.session, chapter.pages[1]);
+        seed(
+            &mut conversation,
+            &chapter.session,
+            chapter.pages[1],
+            &Snapshot::default(),
+        );
         assert_eq!((history(&conversation), conversation.last.clone()), kept);
         Ok(())
     }
@@ -1259,7 +1341,12 @@ mod tests {
         ])?;
         for page in [chapter.pages[0], chapter.pages[2]] {
             let mut conversation = chapter.conversation()?;
-            seed(&mut conversation, &chapter.session, page);
+            seed(
+                &mut conversation,
+                &chapter.session,
+                page,
+                &Snapshot::default(),
+            );
             assert!(history(&conversation).is_empty());
             assert_eq!(conversation.last, None);
         }
@@ -1270,7 +1357,12 @@ mod tests {
     fn the_seed_is_history_the_context_fits_as_any_turn() -> Result<()> {
         let chapter = Chapter::new(&[&[("ヒナです。", Some("It's Hina."))], &[("ここに", None)]])?;
         let mut conversation = chapter.conversation()?;
-        seed(&mut conversation, &chapter.session, chapter.pages[1]);
+        seed(
+            &mut conversation,
+            &chapter.session,
+            chapter.pages[1],
+            &Snapshot::default(),
+        );
         // The page's own turn goes in after it, so the seed is the oldest
         // exchange of the history the context measures before each turn and
         // cuts from when it's full, as it would a page's turn.
@@ -1283,6 +1375,89 @@ mod tests {
                 Message::user("{\n  \"1\": \"ここに\"\n}"),
                 Message::assistant("{\"1\": \"Here.\"}"),
             ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_run_that_asks_for_emphasis_is_seeded_with_the_words_its_run_stressed() -> Result<()> {
+        let chapter = Chapter::new(&[
+            &[("ヒナです。", None), ("先生!", None), ("どうして", None)],
+            &[("ここに", None)],
+        ])?;
+        // The page before, translated by a run whose model picked words to
+        // stress in two of its lines.
+        let blocks = &chapter.blocks[0];
+        let translated: Vec<_> = [(0, "It's Hina."), (1, "Sensei!"), (2, "Why NO?")]
+            .into_iter()
+            .map(|(at, text)| (blocks[at], langid!("ja"), text.to_owned()))
+            .collect();
+        let picks = vec![vec!["Hina".to_owned()], Vec::new(), vec!["NO".to_owned()]];
+        let picked = super::picked(&translated, picks);
+        let ops = written(
+            &chapter.session.lock().project(),
+            translated,
+            &TranslatorConfig::default(),
+            &stressing(true),
+            &picked,
+        )?;
+        chapter.session.lock().apply(Edit {
+            label: "test".to_owned(),
+            ops,
+        })?;
+        // The last line was retyped by hand since: its run's marks no longer
+        // describe it.
+        chapter.session.lock().apply(Edit {
+            label: "test".to_owned(),
+            ops: vec![Op::SetText {
+                layer: blocks[2].into(),
+                text: "Why NOT?".to_owned(),
+            }],
+        })?;
+        let asks = Snapshot {
+            asks_emphasis: true,
+            ..stressing(true)
+        };
+        let mut conversation = chapter.conversation()?;
+        seed(&mut conversation, &chapter.session, chapter.pages[1], &asks);
+        assert_eq!(
+            history(&conversation),
+            [
+                Message::user(
+                    "{\n  \"1\": \"ヒナです。\",\n  \"2\": \"先生!\",\n  \"3\": \"どうして\"\n}"
+                ),
+                Message::assistant(
+                    "{\n  \"1\": {\"text\": \"It's Hina.\", \"emphasis\": [\"Hina\"]},\n  \
+                     \"2\": {\"text\": \"Sensei!\", \"emphasis\": []},\n  \
+                     \"3\": {\"text\": \"Why NOT?\", \"emphasis\": []}\n}"
+                ),
+            ]
+        );
+        // The last page holds the plain translations, as a turn keeps them.
+        let plain = ["It's Hina.", "Sensei!", "Why NOT?"]
+            .map(str::to_owned)
+            .to_vec();
+        assert_eq!(
+            conversation
+                .last
+                .as_ref()
+                .map(|(_, translations)| translations),
+            Some(&plain)
+        );
+
+        // A run that doesn't ask is seeded as Koharu's is.
+        let mut conversation = chapter.conversation()?;
+        seed(
+            &mut conversation,
+            &chapter.session,
+            chapter.pages[1],
+            &stressing(true),
+        );
+        assert_eq!(
+            history(&conversation)[1],
+            Message::assistant(
+                "{\n  \"1\": \"It's Hina.\",\n  \"2\": \"Sensei!\",\n  \"3\": \"Why NOT?\"\n}"
+            )
         );
         Ok(())
     }
@@ -1794,5 +1969,232 @@ mod tests {
             anyhow::Ok("answered")
         };
         assert_eq!(within(limit, false, slow).await.ok(), Some("answered"));
+    }
+
+    // S10-e: the words a run's model picks to stress, as the stage writes
+    // them.
+
+    /// `snapshot`'s with detection on and `[booharu-emphasis]` as it starts,
+    /// bold at 115%, its switch `ai`.
+    fn stressing(ai: bool) -> Snapshot {
+        Snapshot {
+            emphasis: Some(EmphasisSettings {
+                ai,
+                ..EmphasisSettings::default()
+            }),
+            ..snapshot(true, None, None, None)
+        }
+    }
+
+    fn span(insert: &str, attributes: CharStyle) -> Span {
+        Span {
+            insert: insert.to_owned(),
+            attributes,
+        }
+    }
+
+    impl Page {
+        /// The marks the default emphasis gives a word of `label`'s
+        /// translation, over its own values.
+        fn stressed(&self, label: &str) -> Result<CharStyle> {
+            let chars = self.chars(label)?;
+            let style = EmphasisSettings::default().style_for(None);
+            Ok(booharu_core::emphasis::patch(&style, &chars))
+        }
+
+        /// `label`'s translation's spans.
+        fn spans(&self, label: &str) -> Result<Vec<Span>> {
+            Ok(self.translation(label)?.context("a translation")?.content.0)
+        }
+
+        fn marks(&self, label: &str) -> Result<Vec<AutoMark>> {
+            Ok(Auto::of(&self.layer(label)?).marks)
+        }
+
+        /// Gives `label`'s translation `spans`, by hand.
+        fn restyle(&mut self, label: &str, spans: Vec<Span>) -> Result<()> {
+            let layer = self.id(label).into();
+            self.edit(vec![Op::SetRichText { layer, spans }])
+        }
+    }
+
+    #[test]
+    fn a_runs_picks_are_marked_once_however_often_it_translates_again() -> Result<()> {
+        let mut page = Page::new(&[("a", "text")])?;
+        let on = stressing(true);
+        page.stress(&[("a", "No way!", &["No"])], &on)?;
+        let bold = page.stressed("a")?;
+        assert_eq!((bold.weight, bold.size.is_some()), (Some(700), true));
+        let plain = CharStyle::default();
+        let first = vec![span("No", bold.clone()), span(" way!", plain.clone())];
+        assert_eq!(page.spans("a")?, first);
+        let mark = AutoMark {
+            start: 0,
+            end: 2,
+            style: bold.clone(),
+        };
+        assert_eq!(page.marks("a")?, std::slice::from_ref(&mark));
+        // The same answer again: the run's own mark comes off before the
+        // word is marked, so it's never stressed twice.
+        page.stress(&[("a", "No way!", &["No"])], &on)?;
+        assert_eq!(page.spans("a")?, first);
+        assert_eq!(page.marks("a")?, [mark]);
+        // Another pick moves it.
+        page.stress(&[("a", "No way!", &["way"])], &on)?;
+        assert_eq!(
+            page.spans("a")?,
+            [
+                span("No ", plain.clone()),
+                span("way", bold.clone()),
+                span("!", plain)
+            ]
+        );
+        assert_eq!(page.marks("a")?.len(), 1);
+        assert_eq!(edited(&page.layer("a")?), Edited::default());
+        Ok(())
+    }
+
+    #[test]
+    fn a_word_marked_by_hand_keeps_its_mark_when_the_run_translates_again() -> Result<()> {
+        let mut page = Page::new(&[("a", "text")])?;
+        let on = stressing(true);
+        let text = "No way, Sensei!";
+        page.stress(&[("a", text, &["No"])], &on)?;
+        let bold = page.stressed("a")?;
+        let plain = CharStyle::default();
+        let italic = CharStyle {
+            italic: Some(true),
+            ..CharStyle::default()
+        };
+        // The user sets Sensei in italic.
+        page.restyle(
+            "a",
+            vec![
+                span("No", bold.clone()),
+                span(" way, ", plain.clone()),
+                span("Sensei", italic.clone()),
+                span("!", plain.clone()),
+            ],
+        )?;
+        assert!(edited(&page.layer("a")?).style);
+        // Translated again, the model picking Sensei and way: Sensei keeps
+        // the user's mark, way is stressed, and No's run mark comes off.
+        page.stress(&[("a", text, &["Sensei", "way"])], &on)?;
+        assert_eq!(
+            page.spans("a")?,
+            [
+                span("No ", plain.clone()),
+                span("way", bold.clone()),
+                span(", ", plain.clone()),
+                span("Sensei", italic),
+                span("!", plain),
+            ]
+        );
+        assert_eq!(
+            page.marks("a")?,
+            [AutoMark {
+                start: 3,
+                end: 6,
+                style: bold,
+            }]
+        );
+        assert!(edited(&page.layer("a")?).style, "still the user's");
+        Ok(())
+    }
+
+    #[test]
+    fn picks_the_text_doesnt_hold_are_left_out_and_logged_and_the_page_is_written() -> Result<()> {
+        let mut page = Page::new(&[("a", "text"), ("b", "text")])?;
+        let on = stressing(true);
+        let (written, log) = emphasis::logged(|| {
+            page.stress(
+                &[
+                    ("a", "No way!", &["Hello", "way"]),
+                    ("b", "Why?", &["Hello"]),
+                ],
+                &on,
+            )
+        });
+        written?;
+        assert!(
+            log.contains("emphasis picks matching no word were left out"),
+            "{log}"
+        );
+        let plain = CharStyle::default();
+        assert_eq!(
+            page.spans("a")?,
+            [
+                span("No ", plain.clone()),
+                span("way", page.stressed("a")?),
+                span("!", plain)
+            ]
+        );
+        assert_eq!(page.spans("b")?, [span("Why?", CharStyle::default())]);
+        assert!(page.marks("b")?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn with_the_switch_off_or_a_translation_model_a_run_takes_its_old_marks_off_and_adds_none()
+    -> Result<()> {
+        let mut page = Page::new(&[("a", "text")])?;
+        let plain = [span("No way!", CharStyle::default())];
+        // Off: the model's picks, had it given any, mark nothing.
+        page.stress(&[("a", "No way!", &["No"])], &stressing(true))?;
+        page.stress(&[("a", "No way!", &["way"])], &stressing(false))?;
+        assert_eq!(page.spans("a")?, plain);
+        assert!(page.marks("a")?.is_empty());
+        assert_eq!(edited(&page.layer("a")?), Edited::default());
+
+        // A run on Index-Translate isn't asked, so it has no picks.
+        page.stress(&[("a", "No way!", &["No"])], &stressing(true))?;
+        let (translation_only, translator) = emphasis::asked(
+            Snapshot::default(),
+            TranslatorConfig::default(),
+            &[Stage::Translate].into(),
+            || Ok(EmphasisSettings::default()),
+        )?;
+        assert_eq!(
+            (translation_only.asks_emphasis, translator),
+            (false, TranslatorConfig::default())
+        );
+        page.translate(&[("a", "No way!")], &translation_only)?;
+        assert_eq!(page.spans("a")?, plain);
+        assert!(page.marks("a")?.is_empty());
+        assert_eq!(edited(&page.layer("a")?), Edited::default());
+        Ok(())
+    }
+
+    #[test]
+    fn a_runs_marks_are_no_hand_edit_for_apply_a_category_or_detect_again_but_a_change_is()
+    -> Result<()> {
+        let mut page = Page::new(&[("a", "text")])?;
+        page.stress(&[("a", "No way!", &["No"])], &stressing(true))?;
+        assert_eq!(page.marks("a")?.len(), 1);
+        let a = page.layer("a")?;
+        // No hand edit: Apply restyles the block (crates/booharu's styles
+        // skips one `hand_edited`), a model's category letters it (its
+        // lettering keeps the font of one whose `style` was edited), and
+        // Detect again doesn't keep it for its marks.
+        assert_eq!(edited(&a), Edited::default());
+        let project = page.session.project();
+        let on = project.parent(a.id)?.0;
+        assert!(!stays(on, &a));
+
+        // The stressed word made heavier by hand is a style edit, which
+        // each of them keeps.
+        let heavier = CharStyle {
+            weight: Some(900),
+            ..page.stressed("a")?
+        };
+        page.restyle(
+            "a",
+            vec![span("No", heavier), span(" way!", CharStyle::default())],
+        )?;
+        let a = page.layer("a")?;
+        assert!(edited(&a).style);
+        let project = page.session.project();
+        assert!(stays(project.parent(a.id)?.0, &a));
+        Ok(())
     }
 }

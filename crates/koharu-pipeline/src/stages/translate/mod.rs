@@ -139,7 +139,8 @@ pub(crate) async fn translate(
     };
     let conversation = &mut *conversation;
     conversation.keep(&translator);
-    crate::booharu::seed(conversation, &member.session, member.page); // Booharu: the page before.
+    // Booharu: the page before, its answer in the shape the run asks for.
+    crate::booharu::seed(conversation, &member.session, member.page, &config.booharu);
     let model = match key(Stage::Translate, config) {
         // A local model loads on the GPU thread, which only hands it over:
         // its engine runs on a thread of its own, so the turn waits off the
@@ -181,7 +182,11 @@ pub(crate) async fn translate(
         .zip(translations)
         .map(|((block, source), text)| (block, source, text))
         .collect();
-    let writing = left.writing(member); // Booharu: the run's filters, for the write.
+    // Booharu: the run's filters, for the write, with each block's words to
+    // stress.
+    let writing = left
+        .writing(member)
+        .stressing(crate::booharu::picked(&translated, picks.into_inner()));
     member
         .apply(Stage::Translate, move |project| {
             // Booharu: through the filters again, as `written` with the run's
@@ -240,12 +245,14 @@ fn sight(scan: &image::DynamicImage) -> Result<String> {
 /// The ops writing each block's translation, placed, into the project as it
 /// is now.
 // Booharu: crate-wide, for the tests of Booharu's hooks in it, and given the
-// run's Booharu settings, for those hooks.
+// run's Booharu settings and the words its model picked to stress in each
+// block, for those hooks.
 pub(crate) fn written(
     project: &Project,
     translated: Vec<(LayerId, LanguageIdentifier, String)>,
     config: &TranslatorConfig,
     booharu: &booharu_core::settings::Snapshot,
+    picked: &std::collections::HashMap<LayerId, Vec<String>>,
 ) -> Result<Vec<Op>> {
     let target = &config.target;
     // Each block's placement reads the project as it is before any of them,
@@ -275,9 +282,17 @@ pub(crate) fn written(
             ops.push(crate::booharu::given_back(project, block)?);
             continue;
         };
-        // Booharu: the default look and the hand-edit record, read as
-        // placement reads the project and written after its op.
-        let look = crate::booharu::translated(project, block, &text, placed.as_ref().ok(), booharu);
+        // Booharu: the default look, the marks of the words picked to stress,
+        // and the hand-edit record, read as placement reads the project and
+        // written after its op.
+        let look = crate::booharu::translated(
+            project,
+            block,
+            &text,
+            placed.as_ref().ok(),
+            booharu,
+            picked,
+        );
         ops.push(Op::SetText {
             layer: block.into(),
             text,

@@ -9,11 +9,18 @@
 //!   the answer's shape, each text an object of its translation and the
 //!   words to stress, and the words read back from it into the turn's slot,
 //!   its texts going on as Koharu's plain answer gives them.
+//! - [`picked`], once the turn passed, gives each block its words, which the
+//!   write hands to `translated`, which marks them.
+//! - [`stressed`] and [`numbered`], in `seed`, give the page before's answer
+//!   that shape for a run that asks, each block's words those the marks its
+//!   run gave it still cover.
 
 use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Context as _;
-use booharu_core::{emphasis::EmphasisSettings, settings::Snapshot};
+use booharu_core::{attrs::Auto, emphasis::EmphasisSettings, settings::Snapshot};
+use icu_locale_core::LanguageIdentifier;
+use koharu_scene::{Layer, LayerId, RichText};
 use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
 
@@ -177,6 +184,62 @@ fn words(key: &str, emphasis: Option<Value>) -> Vec<String> {
             }
         })
         .collect()
+}
+
+/// The words the model picked to stress in each of `translated`'s answers,
+/// `picks` holding them in the same order, by block, for the write: none
+/// for a run that didn't ask, whose slot stays empty.
+pub(crate) fn picked(
+    translated: &[(LayerId, LanguageIdentifier, String)],
+    picks: Vec<Vec<String>>,
+) -> HashMap<LayerId, Vec<String>> {
+    translated
+        .iter()
+        .map(|(block, ..)| *block)
+        .zip(picks)
+        .filter(|(_, words)| !words.is_empty())
+        .collect()
+}
+
+/// The words of `translation`, `layer`'s, that the marks its run gave it
+/// cover, while its hand-edit record trusts them ([`Auto::trusted_marks`]),
+/// in order: the words the run's model picked to stress there, as it
+/// marked them.
+pub(super) fn stressed(layer: &Layer, translation: &RichText) -> Vec<String> {
+    let text = translation.text();
+    let record = Auto::of(layer);
+    record
+        .trusted_marks(translation)
+        .iter()
+        .filter_map(|mark| text.get(mark.start..mark.end))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// A page's answer in the shape a turn that asks for the words to stress
+/// has its model write one, laid out as Koharu's `turn::numbered` lays out
+/// a page: an object of `keys` to each of `translations` and the words of
+/// it in `stressed`, a text a line, in order, the translation first, as the
+/// schema lists it.
+pub(super) fn numbered(
+    keys: &[String],
+    translations: &[String],
+    stressed: &[Vec<String>],
+) -> String {
+    let lines = keys
+        .iter()
+        .zip(translations)
+        .zip(stressed)
+        .map(|((key, text), words)| {
+            format!(
+                "  {}: {{\"text\": {}, \"emphasis\": {}}}",
+                json!(key),
+                json!(text),
+                json!(words)
+            )
+        })
+        .collect::<Vec<_>>();
+    format!("{{\n{}\n}}", lines.join(",\n"))
 }
 
 /// What `f` logs at the debug level and above, as it returns, with what it
@@ -475,5 +538,57 @@ mod tests {
         // Without a slot, the answer is Koharu's, as it is.
         let answer = json!({"1": {"text": "No", "emphasis": ["No"]}}).to_string();
         assert_eq!(emphasis_answers(answer.clone(), &keys, None), answer);
+    }
+
+    #[test]
+    fn each_block_takes_the_words_of_its_own_answer() {
+        let ids: Vec<LayerId> = (1..=3)
+            .map(|n| {
+                format!("01a1ee94-9e1f-7088-bee4-f54661aa2bd{n}")
+                    .parse()
+                    .expect("an id")
+            })
+            .collect();
+        let translated: Vec<(LayerId, LanguageIdentifier, String)> = ids
+            .iter()
+            .map(|&id| (id, icu_locale_core::langid!("ja"), "text".to_owned()))
+            .collect();
+        let picks = vec![vec!["No".to_owned()], Vec::new(), vec!["Bam".to_owned()]];
+        assert_eq!(
+            picked(&translated, picks),
+            HashMap::from([
+                (ids[0], vec!["No".to_owned()]),
+                (ids[2], vec!["Bam".to_owned()]),
+            ])
+        );
+        // A run that didn't ask has none.
+        assert!(picked(&translated, Vec::new()).is_empty());
+    }
+
+    #[test]
+    fn the_page_befores_answer_is_laid_out_as_a_turn_lays_out_a_page() {
+        let keys = keys(2);
+        assert_eq!(
+            numbered(
+                &keys,
+                &["No \"way\"!".to_owned(), "Sensei!".to_owned()],
+                &[vec!["No".to_owned(), "way".to_owned()], Vec::new()],
+            ),
+            "{\n  \"1\": {\"text\": \"No \\\"way\\\"!\", \"emphasis\": [\"No\",\"way\"]},\n  \
+             \"2\": {\"text\": \"Sensei!\", \"emphasis\": []}\n}"
+        );
+        // It reads back as an answer in the shape.
+        let picks = Mutex::new(Vec::new());
+        let answer = numbered(
+            &keys,
+            &["Hi".to_owned(), "Yo".to_owned()],
+            &[vec!["Hi".to_owned()], Vec::new()],
+        );
+        let plain = emphasis_answers(answer, &keys, Some(&picks));
+        assert_eq!(
+            serde_json::from_str::<Value>(&plain).ok(),
+            Some(json!({"1": "Hi", "2": "Yo"}))
+        );
+        assert_eq!(*picks.lock(), [vec!["Hi".to_owned()], Vec::new()]);
     }
 }

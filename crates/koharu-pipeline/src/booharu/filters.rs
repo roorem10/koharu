@@ -9,11 +9,12 @@
 //! - [`Writing`], in each stage's write, checks again against the project as
 //!   the write finds it, so a block locked or fixed by hand while the model
 //!   ran stays as it is, counted, rather than failing the page's edit or
-//!   being written over: the Translation stage's answers (T3, T4), with a
-//!   subtitle run's subtitles and the kept art of the effects it skips; the
-//!   Recognition stage's readings (R2); the Inpainting stage's clean-ups,
-//!   with the kept art of the effects a translation skips (I1, I2); and
-//!   Detect again's additions (D2).
+//!   being written over: the Translation stage's answers (T3, T4), with the
+//!   words its model picked to stress in each, a subtitle run's subtitles,
+//!   and the kept art of the effects it skips; the Recognition stage's
+//!   readings (R2); the Inpainting stage's clean-ups, with the kept art of
+//!   the effects a translation skips (I1, I2); and Detect again's additions
+//!   (D2).
 //! - [`stays`], in Detect again's removals (D1), keeps what the user made (a
 //!   split's halves among it), fixed (a clean-up hidden by hand, or shown
 //!   again by hand on an effect kept as art, among it), labelled, noted,
@@ -212,6 +213,7 @@ impl Left {
         Writing {
             left: self.clone(),
             member: member.clone(),
+            picked: HashMap::new(),
         }
     }
 }
@@ -221,9 +223,20 @@ impl Left {
 pub(crate) struct Writing {
     left: Left,
     member: Member,
+    /// The words the run's model picked to stress in each block's answer,
+    /// by block: none but in a translation that asked for them.
+    picked: HashMap<LayerId, Vec<String>>,
 }
 
 impl Writing {
+    /// The write of a translation whose model picked `picked`, the words to
+    /// stress in each block's answer, by block ([`super::picked`]), which
+    /// [`Self::written`] hands on with the answers it writes; a block it
+    /// leaves out, and a subtitle, take none.
+    pub(crate) fn stressing(self, picked: HashMap<LayerId, Vec<String>>) -> Self {
+        Self { picked, ..self }
+    }
+
     fn named(&self) -> bool {
         self.left.tally(&self.member, |tally| tally.named)
     }
@@ -246,7 +259,8 @@ impl Writing {
     /// blocks it sent, in reading order, by `translator`, into `project` as
     /// it is now (T3, T4): an answer for a block the stage leaves out now is
     /// dropped, counted; in a subtitle run, each named sound effect's answer
-    /// becomes its subtitle (`subtitle`); the rest go through `written`,
+    /// becomes its subtitle (`subtitle`), its words to stress unmarked; the
+    /// rest go through `written`, with the words to stress picked in them,
     /// followed by the kept art of the sound effects the stage skips.
     pub(crate) fn written(
         &self,
@@ -256,7 +270,7 @@ impl Writing {
     ) -> anyhow::Result<Vec<Op>> {
         let booharu = &self.left.0.booharu;
         let Ok(page) = project.page(self.member.page) else {
-            return written(project, translated, translator, booharu);
+            return written(project, translated, translator, booharu, &self.picked);
         };
         let named = self.named();
         let subtitling = named && booharu.subtitle_run;
@@ -277,7 +291,7 @@ impl Writing {
                 None => answers.push((block, source, text)),
             }
         }
-        let mut ops = written(project, answers, translator, booharu)?;
+        let mut ops = written(project, answers, translator, booharu, &self.picked)?;
         ops.extend(self.kept(project));
         ops.extend(numbered(subtitles)?);
         Ok(ops)
@@ -544,12 +558,13 @@ mod tests {
     use anyhow::{Context as _, Result};
     use booharu_core::{
         attrs::{self, Auto, ReviewNote, SfxSubtitle},
+        emphasis::EmphasisSettings,
         settings::{LetteringSettings, SfxMode},
         styles::{given_back, recognized, recorded},
     };
     use icu_locale_core::langid;
     use image::{ImageFormat, Rgb, RgbImage};
-    use koharu_scene::{Block, Created, Edit, Hash, Session};
+    use koharu_scene::{Block, Created, Edit, Hash, RichText, Session, Span};
     use parking_lot::RwLock;
     use petgraph::stable_graph::NodeIndex;
     use serde_json::{Value, json};
@@ -1465,6 +1480,82 @@ mod tests {
             skipped(&events.told()),
             [(Stage::Translate, 1, 0, 0, false)]
         );
+        Ok(())
+    }
+
+    // S10-e: the words a translation's model picked to stress, as the write
+    // hands them on.
+
+    #[test]
+    fn the_write_marks_an_answers_picks_but_none_in_a_subtitle_or_a_block_left_out() -> Result<()> {
+        // A subtitle run of an effect and two lines, its model picking a
+        // word in each answer, the last line locked while the model ran;
+        // written with its picks when `stressing`.
+        let written = |stressing: bool| -> Result<Fixture> {
+            let fixture = Fixture::new(
+                false,
+                vec![
+                    add("effect", None, 0, block("sfx", (20.0, 20.0))),
+                    add("talk", None, 1, block("text", (80.0, 20.0))),
+                    add("locked", None, 2, block("text", (140.0, 20.0))),
+                ],
+            )?;
+            let booharu = Snapshot {
+                emphasis: Some(EmphasisSettings::default()),
+                ..snapshot(SfxMode::Skip, false, true)
+            };
+            let left = Left::of(Stage::Translate, booharu, Events::new());
+            let member = fixture.member(Some(&["effect", "talk", "locked"]));
+            fixture.lock("locked")?;
+            let said = answers(
+                &fixture,
+                &[("effect", "BAM"), ("talk", "No way!"), ("locked", "Why?")],
+            );
+            let picked = HashMap::from([
+                (fixture.id("effect"), vec!["BAM".to_owned()]),
+                (fixture.id("talk"), vec!["No".to_owned()]),
+                (fixture.id("locked"), vec!["Why".to_owned()]),
+            ]);
+            let writing = match stressing {
+                true => left.writing(&member).stressing(picked),
+                false => left.writing(&member),
+            };
+            let ops = writing.written(&fixture.project(), said, &TranslatorConfig::default())?;
+            fixture.edit(ops)?;
+            Ok(fixture)
+        };
+        let spans = |fixture: &Fixture| -> Result<Vec<Span>> {
+            let translation = fixture.block("talk")?.translation;
+            Ok(translation.context("talk's translation")?.content.0)
+        };
+        let subtitle = |fixture: &Fixture| -> Result<RichText> {
+            let page = fixture.page()?;
+            let id = sfx::subtitle_of(&page, fixture.id("effect")).context("a subtitle")?;
+            match &fixture.project().layer(id)?.content {
+                Content::Text(subtitle) => Ok(subtitle.content.clone()),
+                _ => anyhow::bail!("the subtitle isn't text"),
+            }
+        };
+
+        let stressed = written(true)?;
+        let talk = spans(&stressed)?;
+        let words: Vec<_> = talk.iter().map(|span| span.insert.as_str()).collect();
+        assert_eq!(words, ["No", " way!"]);
+        assert_eq!(talk[0].attributes.weight, Some(700));
+        assert_eq!(Auto::of(&stressed.layer("talk")?).marks.len(), 1);
+        // The subtitle is written as it is with no picks, and the block
+        // locked meanwhile gets nothing.
+        let plain = written(false)?;
+        assert_eq!(subtitle(&stressed)?, subtitle(&plain)?);
+        assert_eq!(subtitle(&stressed)?.text(), "BAM");
+        assert_eq!(stressed.translation("effect")?, None);
+        assert_eq!(stressed.translation("locked")?, None);
+        assert!(Auto::of(&stressed.layer("locked")?).marks.is_empty());
+
+        // Written with none, the line is marked nowhere.
+        let talk = spans(&plain)?;
+        assert_eq!(talk.len(), 1, "{talk:?}");
+        assert!(Auto::of(&plain.layer("talk")?).marks.is_empty());
         Ok(())
     }
 
