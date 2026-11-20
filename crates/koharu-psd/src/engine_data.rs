@@ -18,6 +18,11 @@ pub(crate) struct Run {
     pub font: usize,
     pub size: f64,
     pub fill: [f32; 4],
+    /// Booharu: its face's bold is faked, which Photoshop fakes as Faux Bold.
+    pub faux_bold: bool,
+    /// Booharu: its face's slant is faked, which Photoshop fakes as Faux
+    /// Italic.
+    pub faux_italic: bool,
 }
 
 pub(crate) struct Type<'a> {
@@ -259,8 +264,9 @@ fn style(run: &Run) -> Value {
     Dict(vec![
         ("Font", Int(run.font as i32)),
         ("FontSize", Float(run.size)),
-        ("FauxBold", Bool(false)),
-        ("FauxItalic", Bool(false)),
+        // Booharu: the bold and slant the renderer fakes, for Photoshop to fake (D12).
+        ("FauxBold", Bool(run.faux_bold)),
+        ("FauxItalic", Bool(run.faux_italic)),
         ("AutoLeading", Bool(true)),
         ("AutoKerning", Bool(true)),
         ("Kerning", Int(0)),
@@ -432,5 +438,39 @@ fn write(out: &mut Vec<u8>, value: &Value, indent: usize, in_property: bool) {
             out.extend(std::iter::repeat_n(b'\t', indent));
             out.extend_from_slice(b">>");
         }
+    }
+}
+
+// Booharu: a run's faked bold and slant, as Photoshop reads them.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_run_s_faked_bold_and_slant_reach_photoshop() {
+        let runs = [Run {
+            length: 5,
+            font: 1,
+            size: 24.0,
+            fill: [0.0, 0.0, 0.0, 1.0],
+            faux_bold: true,
+            faux_italic: false,
+        }];
+        let fonts = ["AdobeInvisFont".to_owned(), "DejaVuSans".to_owned()];
+        let encoded = encode(&Type {
+            text: "Words\r",
+            runs: &runs,
+            fonts: &fonts,
+            align: Align::Start,
+            rtl: false,
+            leading: 1.2,
+            vertical: false,
+            shape: Shape::Point,
+        });
+        let has = |key: &[u8]| encoded.windows(key.len()).any(|window| window == key);
+        assert!(has(b"/FauxBold true"));
+        assert!(has(b"/FauxItalic false"));
+        assert!(!has(b"/FauxBold false"));
+        assert!(!has(b"/FauxItalic true"));
     }
 }

@@ -287,6 +287,9 @@ pub(crate) fn type_layer(layer: &Text, text: &ResolvedText, index: i32) -> Vec<T
             font,
             size: f64::from(run.size),
             fill: run.fill.components,
+            // Booharu: Faux Bold and Faux Italic where the renderer fakes them (D12).
+            faux_bold: run.faux_bold,
+            faux_italic: run.faux_italic,
         });
     }
     let engine_data = engine_data::encode(&engine_data::Type {
