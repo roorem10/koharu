@@ -2,8 +2,8 @@
 //! the T tool adds and of a translation typed into a block with none, the
 //! clean-up such a translation shows again on a sound effect kept as art,
 //! and, while typing, Escape keeping what's typed, marks taken off, size
-//! steps and the selected text the type bar quotes, on the canvas's
-//! harness.
+//! steps, the selected text the type bar quotes and the empty line a line
+//! break typed at the end starts, on the canvas's harness.
 
 use std::collections::BTreeMap;
 
@@ -1038,4 +1038,53 @@ fn a_long_selection_is_cut_at_eighty_grapheme_clusters() {
         Some(Some(format!("{}…", thumbs.repeat(80))))
     );
     assert_eq!(quote(thumbs.repeat(80)), Some(Some(thumbs.repeat(80))));
+}
+
+/// Where the caret shows while typing, in the window's pixels, which are
+/// the page's on an unscaled fixture.
+fn caret(canvas: &Canvas) -> Rect {
+    canvas.caret_area().expect("typing shows a caret")
+}
+
+#[test]
+fn a_line_break_typed_at_the_end_puts_the_caret_on_a_new_empty_line() {
+    let Some(mut fixture) = unscaled(Vec::new()) else {
+        return;
+    };
+    fixture.canvas.set_tool(Tool::Text);
+    gesture(&mut fixture.canvas, (30.0, 40.0), (30.0, 40.0));
+    type_text(&mut fixture.canvas, "ab");
+    press_key(&mut fixture.canvas, NamedKey::Home, Code::Home, NONE);
+    let start = caret(&fixture.canvas);
+    press_key(&mut fixture.canvas, NamedKey::End, Code::End, NONE);
+    let end = caret(&fixture.canvas);
+    press_key(&mut fixture.canvas, NamedKey::Enter, Code::Enter, NONE);
+    // The caret starts the empty line under the first, as Photoshop shows
+    // it (GitHub #89), rather than staying at the end of the first.
+    let below = caret(&fixture.canvas);
+    assert!(
+        (below.x0 - start.x0).abs() < 1e-3,
+        "{below:?} from {start:?}"
+    );
+    assert!(below.y0 > end.y1 - 1e-3, "{below:?} under {end:?}");
+    // Up goes to the first line's start, and a press on the empty line
+    // puts the caret back on it, still typing, so what's typed next goes
+    // there.
+    press_key(&mut fixture.canvas, NamedKey::ArrowUp, Code::ArrowUp, NONE);
+    let up = caret(&fixture.canvas);
+    assert!((up.x0 - start.x0).abs() < 1e-3, "{up:?} from {start:?}");
+    assert!(up.y1 < below.y0 + 1e-3, "{up:?} over {below:?}");
+    let on = below.center();
+    gesture(&mut fixture.canvas, (on.x, on.y), (on.x, on.y));
+    assert_eq!(caret(&fixture.canvas), below);
+    type_text(&mut fixture.canvas, "c");
+    let effects = leave(&mut fixture.canvas, Leave::Commit);
+    assert_eq!(apply(&mut fixture, effects), ["add_text"]);
+    let [added] = layers(&fixture)[..] else {
+        panic!("one layer");
+    };
+    assert_eq!(
+        layer(&fixture, added)["content"],
+        json!([{"insert": "ab\nc"}])
+    );
 }
