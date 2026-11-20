@@ -860,8 +860,8 @@ mod tests {
                 .iter()
                 .map(|mark| mark.start..mark.end)
                 .collect();
-            assert_eq!(trusted, [at.clone()], "{text:?}");
-            assert_eq!(&text[at], "NO", "{text:?}");
+            assert_eq!(&text[at.clone()], "NO", "{text:?}");
+            assert_eq!(trusted, [at], "{text:?}");
         }
         // A mark is checked against the text as it was written, so one
         // reaching into whitespace typed after it is none.
