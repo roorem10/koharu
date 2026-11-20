@@ -229,7 +229,7 @@ mod tests {
     }
 
     // Booharu: a gradient fill paints in place of the flat one, across the
-    // text where the drawing puts it.
+    // text where the drawing puts it, while its border stays flat.
     #[test]
     fn a_gradient_fill_runs_across_the_text_where_it_is_drawn() -> Result<()> {
         let mut library = Library::new();
@@ -243,6 +243,8 @@ mod tests {
             style: TextStyle {
                 chars: CharStyle {
                     size: Some(48.0),
+                    stroke: Some(Rgba([0.0, 1.0, 0.0, 1.0])),
+                    stroke_width: Some(3.0),
                     fill_gradient: Some(koharu_scene::Gradient {
                         kind: koharu_scene::GradientKind::Linear,
                         angle: 0.0,
@@ -253,6 +255,8 @@ mod tests {
                     }),
                     ..CharStyle::default()
                 },
+                // Its border drawn in a pass before the fill's.
+                stroke_method: Some(koharu_scene::StrokeMethod::Expansion),
                 ..TextStyle::default()
             },
             ..Text::default()
@@ -286,6 +290,9 @@ mod tests {
         assert!(starts.all(|(_, pixel)| pixel[0] > pixel[2] + 128));
         let mut ends = ink.iter().filter(|(x, _)| *x + 4 > right);
         assert!(ends.all(|(_, pixel)| pixel[2] > pixel[0] + 128));
+        // The border around them stays green.
+        let green = |pixel: &&image::Rgba<u8>| pixel.0[1] > 200 && pixel.0[0].max(pixel.0[2]) < 60;
+        assert!(image.pixels().filter(green).count() > 100);
         Ok(())
     }
 }
