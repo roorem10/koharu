@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, vi } from 'vitest'
 
+import { useWordRange } from '@/lib/booharu/words' // Booharu: the words chosen in Story.
 import { queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 
@@ -93,6 +94,7 @@ beforeEach(() => {
     settingsOpen: false,
     historyOpen: false,
   })
+  useWordRange.setState({ range: null }) // Booharu: no words chosen in Story.
 })
 
 afterEach(() => {
