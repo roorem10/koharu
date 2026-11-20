@@ -14,6 +14,7 @@ import {
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { AppliesTo, WholeBoxOnly } from '@/components/booharu/typebar/AppliesTo' // Booharu: S11-f.
 import { ClearWordStyles } from '@/components/booharu/typebar/ClearWordStyles' // Booharu: S11-g.
 import { DoneButton } from '@/components/booharu/typebar/DoneButton' // Booharu: S11-c.
 import { LineSpacing } from '@/components/booharu/typebar/LineSpacing' // Booharu: S11-i.
@@ -279,6 +280,8 @@ export function TypeBar() {
       className='flex-wrap'
       onPointerDown={keepWords} // Booharu: a press here, or in its popups, keeps words chosen in Story.
     >
+      {/* Booharu: what the character settings apply to, with Whole box (S11-f). */}
+      <AppliesTo words={chosen} />
       <div className='w-28'>
         <FontPicker
           value={family}
@@ -410,15 +413,18 @@ export function TypeBar() {
             <TooltipContent>
               {label}
               {alignMixed && <span className='ml-2 opacity-60'>{t('booharu.typebar.mixed')}</span>}
+              {/* Booharu: the whole box's, while typing or with words chosen in Story (S11-f). */}
+              <WholeBoxOnly words={chosen} />
             </TooltipContent>
           </Tooltip>
         ))}
       </div>
-      {/* Booharu: line spacing, which only the paragraph has (S11-i). */}
+      {/* Booharu: line spacing, which only the paragraph has (S11-i), the whole box's (S11-f). */}
       <LineSpacing
         value={style.line_height ?? null}
         mixed={share.line_height.mixed && drafted?.line_height === undefined}
         disabled={!paragraph}
+        words={chosen}
         onChange={(lineHeight) => apply({ line_height: lineHeight })}
       />
       <Tooltip>
@@ -461,6 +467,8 @@ export function TypeBar() {
               <span className='ml-2 opacity-60'>{t(`inspector.${direction}`)}</span>
             </>
           )}
+          {/* Booharu: the whole box's, while typing or with words chosen in Story (S11-f). */}
+          <WholeBoxOnly words={chosen} />
         </TooltipContent>
       </Tooltip>
       <Popover>
@@ -644,6 +652,8 @@ export function TypeBar() {
           </div>
           <span className='text-[10px] font-medium text-muted-foreground'>
             {t('booharu.borders.outlineMethod')}
+            {/* Booharu: the whole box's, while typing or with words chosen in Story (S11-f). */}
+            <WholeBoxOnly words={chosen} />
           </span>
           <Select
             value={strokeMethodMixed ? null : strokeMethod} // Booharu: "Mixed" (S11-h).

@@ -4,7 +4,9 @@ import { LineHeight, RotateCcw } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { WholeBoxOnly } from '@/components/booharu/typebar/AppliesTo'
 import { DEFAULT_LINE_HEIGHT } from '@/lib/booharu/mixed'
+import type { WordRange } from '@/lib/booharu/words'
 import { NumberField, NumberFieldGroup, NumberFieldInput } from '@koharu/ui/components/number-field'
 import { Popover, PopoverContent, PopoverTrigger } from '@koharu/ui/components/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/tooltip'
@@ -17,11 +19,13 @@ const MAX = 3
  * targets' shared spacing, Koharu's 1.2 where none sets one, or nothing, "Mixed", where they
  * differ. A typed value goes on Enter or as the box loses the focus, a step of the arrow keys or
  * of a turn of the mouse wheel at once, each one change of the line spacing alone; Reset takes it
- * off, back to Koharu's 1.2. A new text being typed has no paragraph yet, so it's disabled. */
+ * off, back to Koharu's 1.2. A new text being typed has no paragraph yet, so it's disabled. While
+ * the canvas types, or with words chosen in Story, its tooltip says it's the whole box's (S11-f). */
 export function LineSpacing({
   value,
   mixed,
   disabled,
+  words = null,
   onChange,
 }: {
   /** The targets' shared spacing, `null` where none sets one. */
@@ -29,6 +33,8 @@ export function LineSpacing({
   /** Whether the targets' spacings differ. */
   mixed: boolean
   disabled: boolean
+  /** The words chosen in the Story panel that the bar's character settings apply to. */
+  words?: WordRange | null
   /** Sets every target's spacing to `lineHeight`, or takes it off with `null`. */
   onChange: (lineHeight: number | null) => void
 }) {
@@ -59,7 +65,10 @@ export function LineSpacing({
         >
           <LineHeight aria-hidden='true' className='size-3.5' />
         </TooltipTrigger>
-        <TooltipContent>{t('booharu.typebar.lineSpacing')}</TooltipContent>
+        <TooltipContent>
+          {t('booharu.typebar.lineSpacing')}
+          <WholeBoxOnly words={words} />
+        </TooltipContent>
       </Tooltip>
       <PopoverContent side='bottom' align='center' className='w-56 gap-1.5 rounded-xl p-2'>
         <span className='text-[10px] font-medium text-muted-foreground'>

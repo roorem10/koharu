@@ -1,7 +1,7 @@
 import { act, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { setWordRange, type WordRange } from '@/lib/booharu/words'
+import { setWordRange, useWordRange, type WordRange } from '@/lib/booharu/words'
 import { commands, type Layer, type Typed } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
@@ -30,6 +30,95 @@ const tooltip = (label: string) =>
   screen.findByText(label, { selector: '[data-slot=tooltip-content]' })
 
 const SELECTED = "Clear the selected words' styles"
+
+describe('Booharu Applies to in the type bar (S11-f)', () => {
+  it('quotes the characters selected while typing, first, and Whole box keeps what was typed', async () => {
+    const { bar, user, edits } = renderBar([hello()], { typing: typing('Hello wo') })
+
+    expect(screen.getByTestId('type-bar').firstElementChild).toHaveTextContent(
+      /^Applies to "Hello wo"Whole box$/,
+    )
+    // The bar cuts the quote to its room, so a tooltip has it whole.
+    await user.hover(bar.getByText('Applies to "Hello wo"'))
+    expect(await tooltip('Applies to "Hello wo"')).toBeInTheDocument()
+
+    const wholeBox = bar.getByRole('button', { name: 'Whole box' })
+    await user.hover(wholeBox)
+    expect(await tooltip('Style the whole box instead')).toBeInTheDocument()
+    await user.click(wholeBox)
+
+    expect(commands.booharuFinishTyping).toHaveBeenCalledOnce()
+    expect(commands.styleTyping).not.toHaveBeenCalled()
+    expect(edits).toEqual([])
+  })
+
+  it('quotes the words chosen in Story, and Whole box lets them go', async () => {
+    const { bar, user } = renderBar([hello()])
+    act(() => setWordRange(world))
+
+    expect(bar.getByText('Applies to "world"')).toBeInTheDocument()
+    await user.click(bar.getByRole('button', { name: 'Whole box' }))
+
+    expect(useWordRange.getState().range).toBeNull()
+    expect(bar.queryByText(/^Applies to/)).toBeNull()
+    expect(commands.booharuFinishTyping).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['at a caret while typing', typing()],
+    ['at a caret the canvas quotes as none', typing(null)],
+    ['with nothing chosen', null],
+  ])('shows nothing %s', (_, typed) => {
+    const { bar } = renderBar([hello()], { typing: typed })
+
+    expect(bar.queryByText(/^Applies to/)).toBeNull()
+    expect(bar.queryByRole('button', { name: 'Whole box' })).toBeNull()
+  })
+
+  it("says the paragraph settings are the whole box's while typing, greying none", async () => {
+    const { bar, user } = renderBar([hello()], { typing: typing() })
+
+    const center = bar.getByRole('button', { name: 'Align center' })
+    expect(center).toBeEnabled()
+    await user.hover(center)
+    expect(await tooltip('Align center')).toHaveTextContent(
+      /^Align centerApplies to the whole box$/,
+    )
+
+    const vertical = bar.getByRole('button', { name: 'Vertical' })
+    expect(vertical).toBeEnabled()
+    await user.hover(vertical)
+    expect(await tooltip('Text direction')).toHaveTextContent(
+      /^Text directionHorizontalApplies to the whole box$/,
+    )
+
+    const spacing = bar.getByRole('button', { name: 'Line spacing' })
+    expect(spacing).toBeEnabled()
+    await user.hover(spacing)
+    expect(await tooltip('Line spacing')).toHaveTextContent(
+      /^Line spacingApplies to the whole box$/,
+    )
+
+    await user.click(bar.getByRole('button', { name: 'Border' }))
+    expect(await screen.findByText('Outline method')).toHaveTextContent(
+      /^Outline methodApplies to the whole box$/,
+    )
+    expect(screen.getByRole('combobox', { name: 'Outline method' })).toBeEnabled()
+  })
+
+  it('says so with words chosen in Story too, and nothing of the kind on a whole box', async () => {
+    const { bar, user } = renderBar([hello()])
+
+    await user.hover(bar.getByRole('button', { name: 'Vertical' }))
+    expect(await tooltip('Text direction')).toHaveTextContent(/^Text directionHorizontal$/)
+
+    act(() => setWordRange(world))
+    await user.hover(bar.getByRole('button', { name: 'Align center' }))
+    expect(await tooltip('Align center')).toHaveTextContent(
+      /^Align centerApplies to the whole box$/,
+    )
+  })
+})
 
 describe('Booharu A− and A+ in the type bar (S11-e)', () => {
   it('steps the characters typed, one call a click, after the size field, never the fit', async () => {
