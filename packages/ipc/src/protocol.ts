@@ -244,6 +244,18 @@ export type BlockShape = {
 }
 
 /**
+ *  A right-click on a box on the canvas: `layer`, a text or a block of
+ *  `page`, which the selection holds by then, and where the pointer
+ *  pressed, `x` and `y` in the window's CSS pixels.
+ */
+export type BooharuBoxMenu = {
+  page: PageId
+  layer: LayerId
+  x: number
+  y: number
+}
+
+/**
  *  A job as the interface follows it: the `booharu_job` event's payload,
  *  told as a read starts, after each of its chunks, and as it ends, always
  *  ending with a state other than running, and what `booharu_get_jobs`
@@ -524,6 +536,8 @@ export type CharKey =
   | 'stroke_width'
   | 'outer_stroke'
   | 'outer_stroke_width'
+  | 'fill_gradient'
+  | 'tracking'
 
 /**
  *  Character values; each is also a mark key on a span, and a mark wins for
@@ -2061,6 +2075,28 @@ export type Size = {
  */
 export type SizeStep = 'bigger' | 'smaller'
 
+/**  The skew a text shows, in degrees along each axis (`skew::shown`). */
+export type SkewAngles = {
+  x: number
+  y: number
+}
+
+/**
+ *  How many layers a skew changed, left alone as locked, and found
+ *  untranslated. A layer showing the skew already counts in none.
+ */
+export type SkewCounts = {
+  /**  Text layers and translated blocks skewed. */
+  changed: number
+  /**
+   *  Layers left as they are because they, or a layer holding them, are
+   *  locked.
+   */
+  locked: number
+  /**  Blocks without a translation, which have no lettering to skew. */
+  untranslated: number
+}
+
 /**
  *  Why a read skipped, writing nothing: its job tells it, so the interface
  *  words it in the user's language. It reads in English as the job's
@@ -2242,6 +2278,30 @@ export type Text = {
   /**  A BCP 47 tag; `und` when undetermined. */
   language?: string
   transform?: Transform
+}
+
+/**  A text effect, as the fx tag names it. */
+export type TextEffect =
+  /**  A border unlike the default's, or none where the default has one. */
+  | 'border'
+  /**  A second border the default doesn't give. */
+  | 'second_border'
+  /**  Borders drawn letter by letter (`StrokeMethod::Expansion`). */
+  | 'outline_method'
+  /**  A gradient fill, on the box or on any of its words. */
+  | 'gradient'
+  /**  A skew of at least `skew::LEAST` degrees along either axis. */
+  | 'skew'
+
+/**
+ *  A text layer's or a translated block's effects: `effects` in the
+ *  order [`TextEffect`] lists them, and the skew it shows, when it shows
+ *  one, for the FX window's sliders.
+ */
+export type TextEffects = {
+  layer: LayerId
+  effects: TextEffect[]
+  skew: SkewAngles | null
 }
 
 /**  A text's character and paragraph values. */
@@ -2699,6 +2759,12 @@ export const commands = {
   /** The text being typed a step bigger, or smaller, 5% to the half pixel, as the type bar's A+ and A− ask: each selected character from its own size, else the text's, or at a caret the next ones typed. Nothing when not typing. */
   booharuStepTypingSize: (bigger: boolean) =>
     invoke<null>('booharu_step_typing_size', { bigger }, { headers: headers() }),
+  /** The text effects of each text layer and translated block of `page` that carries any beyond its lettering default, in reading order: a border, a second border, the outline method, a gradient fill or a skew, with the skew each shows. A box with none is left out. Changes nothing. */
+  booharuTextEffects: (page: PageId) =>
+    invoke<TextEffects[]>('booharu_text_effects', { page }, { headers: headers() }),
+  /** Skews the texts of `layers`, each a translated block's or a text layer's, `x` degrees along its width and `y` along its height, from -60 to 60, in place of the skew it shows, as one undo step labelled `booharu_set_skew`, about its box's centre (a point text's anchor), so its position, rotation and frame stay: an axis left out keeps each box's own skew along it, and 0 along both takes the skew off. A box that is, or is inside, a locked layer is left as it is, a block without a translation too, and any other layer is left out. Answers how many boxes it changed, and how many it left as they are because they're locked or untranslated; with nothing to change, it makes no undo step. An angle out of range refuses the call. */
+  booharuSetSkew: (layers: LayerId[], x: number | null, y: number | null) =>
+    invoke<SkewCounts>('booharu_set_skew', { layers, x, y }, { headers: headers() }),
 }
 
 export const events = {
@@ -2742,4 +2808,6 @@ export const events = {
     listen<null>('booharu_agent_history_changed', (event) => handler(event.payload)),
   booharuQc: (handler: (payload: BooharuQc) => void): Promise<UnlistenFn> =>
     listen<BooharuQc>('booharu_qc', (event) => handler(event.payload)),
+  booharuBoxMenu: (handler: (payload: BooharuBoxMenu) => void): Promise<UnlistenFn> =>
+    listen<BooharuBoxMenu>('booharu_box_menu', (event) => handler(event.payload)),
 }
