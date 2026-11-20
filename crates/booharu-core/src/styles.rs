@@ -509,8 +509,10 @@ pub struct Edited {
     pub text: bool,
     /// A style value of its translation isn't the one recorded, a span of
     /// it is marked with one, but for the marks a run's emphasis gave it and
-    /// that still hold ([`Auto::trusted_marks`]), or the agent chose its
-    /// style on purpose; with nothing recorded, no stage wrote the
+    /// that still hold ([`Auto::trusted_marks`]), and their values on
+    /// whitespace typed beside a mark that starts or ends the line, which
+    /// Koharu gives the mark's values ([`emphasis::stripped`]), or the agent
+    /// chose its style on purpose; with nothing recorded, no stage wrote the
     /// translation.
     pub style: bool,
     /// It was drawn by hand: no detection made it, as the O tool's boxes.
@@ -556,7 +558,9 @@ pub fn edited(layer: &Layer) -> Edited {
                 None => !recorded("translation"),
             };
             // A span's marks are a hand edit but for the values a run's
-            // emphasis set there and that still hold; size never counts.
+            // emphasis set there and that still hold, and those whitespace
+            // typed beside a mark at either end of the line took from it;
+            // size never counts.
             let marked = emphasis::stripped(&translation.content, &record)
                 .0
                 .iter()
