@@ -58,6 +58,10 @@ pub(crate) fn draw(
             let font = &glyphs.font;
             let bold = bold(font, run.size);
             drawing.scene.set_paint(Color::from(paint));
+            // Booharu: a gradient fill paints in place of the flat one.
+            if let (Pass::Fill, Some(gradient)) = (pass, &glyphs.fill) {
+                drawing.scene.set_paint(gradient.clone());
+            }
             drawing.glyphs(
                 font,
                 run.size,
@@ -70,8 +74,9 @@ pub(crate) fn draw(
     Ok(())
 }
 
-// Booharu: bold and turn, out of `draw` for contour.rs to share, and bold for
-// the bounds' room for faked bold and slant (booharu/lines.rs).
+// Booharu: bold and turn, out of `draw` for contour.rs to share, bold for the
+// bounds' room for faked bold and slant (booharu/lines.rs), and both for the
+// ink a gradient fill spreads over (booharu/paint.rs).
 /// How far `font`'s synthetic bold grows each side of its glyphs at `size`:
 /// a fiftieth of the size.
 pub(crate) fn bold(font: &Font, size: f32) -> f64 {
@@ -85,7 +90,7 @@ pub(crate) fn bold(font: &Font, size: f32) -> f64 {
 /// glifo flips an outline before this transform (`glyph_transform * FLIP_Y`
 /// in glifo 0.5's `glyph.rs`). A quarter turn clockwise on the page for
 /// `sideways` text, which maps (x, y) to (-y, x), after a synthetic slant.
-pub(super) fn turn(font: &Font, sideways: bool) -> Option<Affine> {
+pub(crate) fn turn(font: &Font, sideways: bool) -> Option<Affine> {
     let skew = font
         .synthesis
         .skew()
@@ -220,6 +225,67 @@ mod tests {
             "{along_top} of {}",
             right - left
         );
+        Ok(())
+    }
+
+    // Booharu: a gradient fill paints in place of the flat one, across the
+    // text where the drawing puts it.
+    #[test]
+    fn a_gradient_fill_runs_across_the_text_where_it_is_drawn() -> Result<()> {
+        let mut library = Library::new();
+        let font = ["Arial", "DejaVu Sans", "Helvetica"]
+            .into_iter()
+            .find_map(|family| library.family(family).ok())
+            .expect("an installed sans-serif");
+        let stop = |offset, color| koharu_scene::GradientStop { offset, color };
+        let text = Text {
+            content: "IIIIII".into(),
+            style: TextStyle {
+                chars: CharStyle {
+                    size: Some(48.0),
+                    fill_gradient: Some(koharu_scene::Gradient {
+                        kind: koharu_scene::GradientKind::Linear,
+                        angle: 0.0,
+                        stops: vec![
+                            stop(0.0, Rgba([1.0, 0.0, 0.0, 1.0])),
+                            stop(1.0, Rgba([0.0, 0.0, 1.0, 1.0])),
+                        ],
+                    }),
+                    ..CharStyle::default()
+                },
+                ..TextStyle::default()
+            },
+            ..Text::default()
+        };
+        let layout = crate::text::layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout");
+        let Ok(gpu) = Gpu::get() else {
+            eprintln!("skipped drawing without a GPU");
+            return Ok(());
+        };
+        // Drawn well in from the drawing's left edge.
+        let margin = 100.0;
+        let size = layout.bounds.size();
+        let mut drawing = gpu.drawing(
+            (size.width + margin).ceil() as u16,
+            size.height.ceil() as u16,
+        );
+        let origin = (margin - layout.bounds.x0, -layout.bounds.y0);
+        draw(&mut drawing, &layout, Affine::translate(origin), true)?;
+        let image = drawing.read()?;
+        // The letters' pixels, which show no green, red at the left end and
+        // blue at the right.
+        let ink: Vec<(u32, [u8; 4])> = image
+            .enumerate_pixels()
+            .filter(|(_, _, pixel)| pixel.0[1] < 64 && pixel.0[3] > 200)
+            .map(|(x, _, pixel)| (x, pixel.0))
+            .collect();
+        let left = ink.iter().map(|at| at.0).min().expect("ink");
+        let right = ink.iter().map(|at| at.0).max().expect("ink");
+        assert!(f64::from(left) >= margin - 1.0, "{left}");
+        let mut starts = ink.iter().filter(|(x, _)| *x < left + 4);
+        assert!(starts.all(|(_, pixel)| pixel[0] > pixel[2] + 128));
+        let mut ends = ink.iter().filter(|(x, _)| *x + 4 > right);
+        assert!(ends.all(|(_, pixel)| pixel[2] > pixel[0] + 128));
         Ok(())
     }
 }

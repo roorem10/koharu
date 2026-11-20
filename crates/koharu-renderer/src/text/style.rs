@@ -37,7 +37,8 @@ pub(super) struct Span {
     pub fill: Color,
     /// The colour and width of a stroke.
     pub stroke: Option<(Color, f32)>,
-    /// Booharu: its own values, such as a second border and letter spacing.
+    /// Booharu: its own values, such as a second border, a gradient fill and
+    /// letter spacing.
     pub booharu: crate::booharu::SpanStyle,
 }
 
@@ -61,16 +62,22 @@ impl Styled {
                 range: start..plain.len(),
                 fonts: fonts(&style, &span.insert)?,
                 size: style.size.unwrap_or(24.0) as f32,
-                fill: style.fill.map_or(Color::BLACK, Color::from),
+                // Booharu: or a gradient fill's first stop.
+                fill: crate::booharu::flat_fill(&style).map_or(Color::BLACK, Color::from),
                 stroke: match (style.stroke, style.stroke_width) {
                     (Some(color), Some(width)) if width > 0.0 => {
                         Some((Color::from(color), width as f32))
                     }
                     _ => None,
                 },
-                // Booharu: its own values, such as a second border and letter
-                // spacing.
-                booharu: crate::booharu::SpanStyle::new(&style),
+                // Booharu: its own values, such as a second border, a gradient
+                // fill and letter spacing.
+                booharu: crate::booharu::SpanStyle::new(
+                    &style,
+                    &span.attributes,
+                    spans.len(),
+                    spans.last().map(|span: &Span| &span.booharu),
+                ),
             });
         }
         Ok(Self {

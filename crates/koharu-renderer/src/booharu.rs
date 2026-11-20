@@ -4,9 +4,11 @@
 //! `FontFamily` as it is; which of a family's faces sets a text asked for
 //! bold or italic, so they stay apart (`faces`); where the runs of a line of
 //! mixed sizes stand, and how far faked bold and slant reach past their
-//! glyphs (`lines`); and a span's own values, which a span of Koharu's text
-//! carries in one field (`SpanStyle`): its second border, and its letter
-//! spacing, which follows each cluster (`track`).
+//! glyphs (`lines`); a span's own values, which a span of Koharu's text
+//! carries in one field (`SpanStyle`): its second border, its gradient fill
+//! with what the gradient spreads over (`Unit`), and its letter spacing,
+//! which follows each cluster (`track`); and where gradient fills spread
+//! and how they paint (`paint`).
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -16,17 +18,19 @@ use std::{
 
 use anyhow::Result;
 use fontique::{Collection, CollectionOptions, SourceCache};
-use koharu_scene::{CharStyle, Color};
+use koharu_scene::{CharStyle, Color, Gradient, Rgba};
 use parking_lot::Mutex;
 use skrifa::{FontRef, MetadataProvider, string::StringId};
 
 pub(crate) use self::{
     faces::{Traits, better, repick},
     lines::{faux_reach, shared_baseline},
+    paint::{opaque, paint},
 };
 
 mod faces;
 mod lines;
+mod paint;
 
 /// A span's Booharu values, which a span of Koharu's text carries in one
 /// field.
@@ -35,13 +39,50 @@ pub(crate) struct SpanStyle {
     /// The colour and width of a second border around the stroke, which
     /// only a stroke has.
     pub outer_stroke: Option<(Color, f32)>,
+    /// A gradient fill, drawn in place of the span's flat fill, with what it
+    /// spreads over.
+    pub gradient: Option<(Gradient, Unit)>,
     /// Letter spacing in thousandths of an em.
     pub tracking: f32,
 }
 
+/// What a gradient fill spreads over: the ink of the whole text, for a
+/// gradient the text's style gives; or for a span's own gradient, the ink
+/// of the run of consecutive spans given the same one, across their lines
+/// and sizes, named by the run's first span.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Unit {
+    Text,
+    Own(usize),
+}
+
 impl SpanStyle {
-    /// The values of a span styled `style`: its own values over the text's.
-    pub(crate) fn new(style: &CharStyle) -> Self {
+    /// The values of the span at `index` of a text, styled `style`, its
+    /// `own` values over the text's; `before` is the span before it.
+    pub(crate) fn new(
+        style: &CharStyle,
+        own: &CharStyle,
+        index: usize,
+        before: Option<&Self>,
+    ) -> Self {
+        let gradient = style
+            .fill_gradient
+            .clone()
+            .filter(|gradient| !gradient.stops.is_empty());
+        let gradient = gradient.map(|gradient| {
+            let unit = match (
+                &own.fill_gradient,
+                before.and_then(|before| before.gradient.as_ref()),
+            ) {
+                (None, _) => Unit::Text,
+                // The same gradient as the span before's own carries its run on.
+                (Some(_), Some((previous, Unit::Own(first)))) if *previous == gradient => {
+                    Unit::Own(*first)
+                }
+                (Some(_), _) => Unit::Own(index),
+            };
+            (gradient, unit)
+        });
         Self {
             outer_stroke: match (style.stroke, style.stroke_width, style.outer_stroke) {
                 (Some(_), Some(inner), Some(color)) if inner > 0.0 => style
@@ -50,6 +91,7 @@ impl SpanStyle {
                     .map(|width| (Color::from(color), width as f32)),
                 _ => None,
             },
+            gradient,
             tracking: style
                 .tracking
                 .filter(|tracking| tracking.is_finite())
@@ -60,6 +102,15 @@ impl SpanStyle {
     /// The letter spacing after each cluster of the span set at `size`.
     pub(crate) fn gap(&self, size: f32) -> f32 {
         size * self.tracking / 1000.0
+    }
+}
+
+/// The flat colour a span styled `style` fills with: its gradient fill's
+/// first stop's, which shows wherever a gradient can't, or its fill.
+pub(crate) fn flat_fill(style: &CharStyle) -> Option<Rgba> {
+    match &style.fill_gradient {
+        Some(gradient) => gradient.stops.first().map(|stop| stop.color).or(style.fill),
+        None => style.fill,
     }
 }
 
@@ -374,6 +425,47 @@ mod tests {
                 vec!["ノート".to_owned(), "諾托".to_owned()]
             )]
         );
+    }
+
+    #[test]
+    fn a_span_s_own_gradient_spreads_over_its_run_and_the_text_s_over_the_text() {
+        let gradient = |red: f32| Gradient {
+            kind: koharu_scene::GradientKind::Linear,
+            angle: 0.0,
+            stops: [Rgba([red, 0.0, 0.0, 1.0]), Rgba([0.0, 0.0, 1.0, 1.0])]
+                .into_iter()
+                .zip([0.0, 1.0])
+                .map(|(color, offset)| koharu_scene::GradientStop { offset, color })
+                .collect(),
+        };
+        let filled = |red: f32| CharStyle {
+            fill_gradient: Some(gradient(red)),
+            ..CharStyle::default()
+        };
+        let flat = CharStyle {
+            fill: Some(Rgba([0.0, 0.5, 0.0, 1.0])),
+            ..CharStyle::default()
+        };
+        // Each span's own values over the text's gradient, and what its
+        // gradient spreads over: the text's own, given again, is the span's;
+        // the same one carries a run on, and another one, or one after a
+        // span without it, starts one.
+        let spans = [
+            (CharStyle::default(), Some(Unit::Text)),
+            (filled(1.0), Some(Unit::Own(1))),
+            (filled(1.0), Some(Unit::Own(1))),
+            (filled(0.5), Some(Unit::Own(3))),
+            (flat, None),
+            (filled(0.5), Some(Unit::Own(5))),
+        ];
+        let text = filled(1.0);
+        let mut before: Option<SpanStyle> = None;
+        for (index, (own, unit)) in spans.into_iter().enumerate() {
+            let style = SpanStyle::new(&own.or(&text), &own, index, before.as_ref());
+            let spread = style.gradient.as_ref().map(|(_, unit)| *unit);
+            assert_eq!(spread, unit, "span {index}");
+            before = Some(style);
+        }
     }
 
     /// `text` laid out in `font` with its style's letter spacing `tracking`.

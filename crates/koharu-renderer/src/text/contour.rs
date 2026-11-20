@@ -51,7 +51,8 @@ pub(super) fn regions(runs: &[GlyphRun], resolved: &[TextRun]) -> Vec<(Color, Be
     // show through.
     let mut clear = BezPath::new();
     for (glyphs, run) in runs.iter().zip(resolved) {
-        if run.fill.components[3] < 1.0 {
+        // Booharu: a gradient fill is translucent where any stop is.
+        if !crate::booharu::opaque(run) {
             outlines(glyphs, run.size, &mut clear);
         }
         let Some(stroke) = run.stroke else {
@@ -73,7 +74,7 @@ pub(super) fn regions(runs: &[GlyphRun], resolved: &[TextRun]) -> Vec<(Color, Be
             }
         };
         let group = &mut groups[at];
-        group.opaque &= run.fill.components[3] >= 1.0;
+        group.opaque &= crate::booharu::opaque(run); // Booharu: every stop too.
         outlines(glyphs, run.size, &mut group.letters);
     }
     let clear = merged(&clear);

@@ -48,6 +48,9 @@ pub(crate) struct GlyphRun {
     /// Its glyphs are turned a quarter clockwise around their origins, as
     /// vertical text sets Latin.
     pub sideways: bool,
+    /// Booharu: the gradient its fill paints, spread over the ink it fills,
+    /// in the text's own coordinates.
+    pub fill: Option<vello_gpu::peniko::Gradient>,
 }
 
 /// A glyph as positioned: what groups it into a run, its run's span, font,
@@ -115,6 +118,12 @@ pub(super) fn arrange(
     }
 
     let (runs, text_runs) = runs(shaped, &glyphs, scale);
+    // Booharu: gradient fills, spread over the ink of the text or of words.
+    let gradients = glyphs.chunk_by(|a, b| a.0 == b.0).map(|run| {
+        let (span, ..) = run[0].0;
+        styled.spans[span].booharu.gradient.as_ref()
+    });
+    let runs = crate::booharu::paint(runs, &text_runs, gradients);
     // Booharu: text borders. A second border reaches past the first.
     let stroke = styled
         .spans
@@ -434,6 +443,12 @@ fn runs(shaped: &ShapedText, glyphs: &[Positioned], scale: f32) -> (Vec<GlyphRun
             post_script_name: font.post_script_name.clone(),
             size: span.size * scale,
             fill: span.fill,
+            // Booharu: a gradient fill.
+            fill_gradient: span
+                .booharu
+                .gradient
+                .as_ref()
+                .map(|(gradient, _)| gradient.clone()),
             stroke: span.stroke.map(|(color, width)| (color, width * scale)),
             // Booharu: the second border.
             outer_stroke: span
@@ -448,6 +463,7 @@ fn runs(shaped: &ShapedText, glyphs: &[Positioned], scale: f32) -> (Vec<GlyphRun
             font: font.clone(),
             glyphs: run.iter().map(|glyph| glyph.1).collect(),
             sideways,
+            fill: None, // Booharu: a gradient fill, which `arrange` spreads.
         });
     }
     (glyph_runs, text_runs)

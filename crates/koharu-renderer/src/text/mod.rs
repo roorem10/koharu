@@ -26,8 +26,12 @@ mod shape;
 mod style;
 
 pub(crate) use self::{arrange::TextLayout, breaks::preload_dictionary, draw::draw};
-// Booharu: a face's faked bold, whose reach a layout's bounds make room for.
-pub(crate) use self::draw::bold;
+// Booharu: a face's faked bold, whose reach a layout's bounds make room for,
+// and the glyph runs, with their turn, whose ink a gradient fill spreads over.
+pub(crate) use self::{
+    arrange::GlyphRun,
+    draw::{bold, turn},
+};
 pub use self::{label::Label, lettering::Lettering};
 
 /// Laid-out text, as a run of one face at one size and paint.
@@ -39,6 +43,9 @@ pub struct TextRun {
     /// The size it was drawn at.
     pub size: f32,
     pub fill: Color,
+    /// Booharu: a gradient fill, drawn in place of `fill`, which is then its
+    /// first stop's colour.
+    pub fill_gradient: Option<koharu_scene::Gradient>,
     /// The stroke colour and width.
     pub stroke: Option<(Color, f32)>,
     /// Booharu: the second border's colour and width, outward from the
