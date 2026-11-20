@@ -493,6 +493,13 @@ pub fn key(app: &Arc<App>, event: &KeyEvent) {
     }
 }
 
+/// Booharu: gives the canvas the keyboard back, which a box's menu took for
+/// its keys (see `canvas`), as the menu closes with nothing pressed on the
+/// page, so the next keys reach the canvas first, as after the right-click.
+pub(super) fn booharu_canvas_keys(main: &mut Main) {
+    main.input.keyboard = Side::Canvas;
+}
+
 /// Has the app carry out what the canvas answered, once the window is free
 /// again, and draws again, showing the page as its edits left it.
 pub(super) fn carry(app: &Arc<App>, effects: Vec<Effect>) {

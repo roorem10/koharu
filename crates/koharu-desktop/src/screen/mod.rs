@@ -294,6 +294,12 @@ impl Screen {
         });
     }
 
+    /// Booharu: gives the canvas the keyboard back, which a box's menu took
+    /// for its keys, as the menu closes with nothing pressed on the page.
+    pub fn booharu_canvas_keys(&self) {
+        self.change(input::booharu_canvas_keys);
+    }
+
     /// The canvas's area, for a fill: its page, its bounds, and its coverage.
     pub fn area(&self) -> oneshot::Receiver<Option<(PageId, koharu_scene::Rect, Vec<u8>)>> {
         let (sender, receiver) = oneshot::channel();

@@ -101,6 +101,8 @@ describe('Booharu box menu (S12-l)', () => {
     await waitFor(() => expect(run).toHaveBeenCalledWith({ blocks: ['second'] }, ['inpaint']))
     await closed()
     expect(useKoharuStore.getState().selectedLayers).toEqual(['second'])
+    // The item pressed on the page, the keys stay with it.
+    expect(commands.booharuCanvasKeys).not.toHaveBeenCalled()
   })
 
   it('opens Text effects on the selection with FX…, switching to the Select tool', async () => {
@@ -117,7 +119,7 @@ describe('Booharu box menu (S12-l)', () => {
     await closed()
   })
 
-  it('keeps its keys from the canvas: Delete deletes nothing, and Escape closes it and keeps the selection', async () => {
+  it('keeps its keys from the canvas: Delete deletes nothing, and Escape closes it, keeps the selection and gives the canvas its keys back', async () => {
     open()
     mountOverCanvas()
     const menu = await rightClick('second')
@@ -129,11 +131,14 @@ describe('Booharu box menu (S12-l)', () => {
     expect(commands.edit).not.toHaveBeenCalled()
     expect(useKoharuStore.getState().tool).toBe('select')
     expect(screen.getByRole('menu', { name: 'Box actions' })).toBe(menu)
+    expect(commands.booharuCanvasKeys).not.toHaveBeenCalled()
 
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
 
     await closed()
     expect(useKoharuStore.getState().selectedLayers).toEqual(['second'])
+    // The desktop gives the canvas the keys again, so Delete takes the anchors Direct Select picked.
+    expect(commands.booharuCanvasKeys).toHaveBeenCalledTimes(1)
     // Closed, it leaves the keys to the canvas again: Delete deletes the selected box.
     fireEvent.keyDown(document.body, { key: 'Delete' })
     await waitFor(() =>
@@ -145,11 +150,21 @@ describe('Booharu box menu (S12-l)', () => {
   })
 
   const page = boxesPage()
-  const closers: [string, () => void][] = [
-    ['a press on the canvas', () => window.dispatchEvent(new Event(CANVAS_PRESS))],
-    ['the camera moving', () => useKoharuStore.setState({ camera: { zoom: 1.5, x: 0, y: 0 } })],
-    ['the window losing the focus', () => window.dispatchEvent(new Event('blur'))],
-    ['another page showing', () => queryClient.setQueryData(pageKey, { ...page, id: 'other' })],
+  // Each closer, and whether closing gives the canvas back the keys the menu took: all but a press
+  // on the canvas, which gave it them already.
+  const closers: [string, () => void, boolean][] = [
+    ['a press on the canvas', () => window.dispatchEvent(new Event(CANVAS_PRESS)), false],
+    [
+      'the camera moving',
+      () => useKoharuStore.setState({ camera: { zoom: 1.5, x: 0, y: 0 } }),
+      true,
+    ],
+    ['the window losing the focus', () => window.dispatchEvent(new Event('blur')), true],
+    [
+      'another page showing',
+      () => queryClient.setQueryData(pageKey, { ...page, id: 'other' }),
+      true,
+    ],
     [
       'its box leaving the page',
       () =>
@@ -157,6 +172,7 @@ describe('Booharu box menu (S12-l)', () => {
           ...page,
           layers: page.layers.filter(({ id }) => id !== 'free'),
         }),
+      true,
     ],
     [
       'another project opening',
@@ -165,10 +181,11 @@ describe('Booharu box menu (S12-l)', () => {
           projectKey,
           (project) => project && { ...project, name: 'Other' },
         ),
+      true,
     ],
   ]
 
-  it.each(closers)('closes on %s', async (_, close) => {
+  it.each(closers)('closes on %s', async (_, close, keys) => {
     open()
     mount()
     await rightClick('free')
@@ -176,6 +193,7 @@ describe('Booharu box menu (S12-l)', () => {
     act(close)
 
     await closed()
+    expect(commands.booharuCanvasKeys).toHaveBeenCalledTimes(keys ? 1 : 0)
   })
 
   it('closes on a press outside it', async () => {
@@ -191,6 +209,8 @@ describe('Booharu box menu (S12-l)', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Outside' }))
 
     await closed()
+    // The press landed on the page, which keeps the keys.
+    expect(commands.booharuCanvasKeys).not.toHaveBeenCalled()
   })
 
   it('stays open while its box stays on the page the canvas shows', async () => {
@@ -251,5 +271,7 @@ describe('Booharu box menu (S12-l)', () => {
     tell('booharuBoxMenu', { page: 'other', layer: 'free', x: 120, y: 80 })
 
     await closed()
+    // The right-click took the keys for a menu that never shows, so the canvas gets them back.
+    expect(commands.booharuCanvasKeys).toHaveBeenCalledTimes(1)
   })
 })

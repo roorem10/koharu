@@ -15,6 +15,7 @@ use koharu_canvas::{
 };
 use koharu_renderer::RendererConfig;
 use koharu_scene::Fit;
+use tauri::State;
 
 use super::events::{BOX_MENU, BooharuBoxMenu};
 use crate::{app::App, screen::Screen};
@@ -48,6 +49,19 @@ pub(crate) fn opens_menu(effects: &[CanvasEffect]) -> bool {
     effects
         .iter()
         .any(|effect| matches!(effect, CanvasEffect::Booharu(Effect::Menu { .. })))
+}
+
+/// Gives the canvas the keyboard back, which a box's menu took for its keys
+/// (`opens_menu`), as the interface asks when the menu closes with nothing
+/// pressed on the page: on Escape, or as the camera moves, the window loses
+/// the focus, or its page, project or box goes. The next keys reach the
+/// canvas first again, as after the right-click's press, so Delete takes the
+/// anchors the Direct Select tool picked. Window input alone, changing
+/// nothing in the project.
+#[tauri::command]
+#[specta::specta]
+pub fn booharu_canvas_keys(app: State<'_, Arc<App>>) {
+    app.screen.booharu_canvas_keys();
 }
 
 /// Pushes the settings as the file holds them now to `screen`'s window.

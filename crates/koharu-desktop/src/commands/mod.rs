@@ -160,6 +160,7 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         crate::booharu::typing::booharu_step_typing_size,
         crate::booharu::effects::booharu_text_effects,
         crate::booharu::effects::booharu_set_skew,
+        crate::booharu::canvas::booharu_canvas_keys,
     ];
     move |invoke: Invoke<CefRuntime>| {
         let message = &invoke.message;
@@ -284,5 +285,6 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         crate::booharu::typing::booharu_step_typing_size,
         crate::booharu::effects::booharu_text_effects,
         crate::booharu::effects::booharu_set_skew,
+        crate::booharu::canvas::booharu_canvas_keys,
     ](types)
 }

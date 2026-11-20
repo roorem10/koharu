@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { SelectionBoxActions } from '@/components/booharu/boxes/BoxActionItems'
 import {
   closeBoxMenu,
+  dismissBoxMenu,
   useBoxMenu,
   useBoxMenuDismissal,
   useBoxMenuEvents,
@@ -27,7 +28,8 @@ import { cn } from '@koharu/ui/lib/utils'
  * Escape, which keeps the selection, a press outside it, on the canvas too, an item run, the page
  * or the project changing, the camera moving, the window losing the focus, or its box leaving the
  * page. Its keys stay its own, as a dialog's do, so Delete deletes nothing
- * (lib/booharu/keys.ts). */
+ * (lib/booharu/keys.ts), and go back to the canvas as it closes with nothing pressed on the page
+ * (dismissBoxMenu). */
 export function BoxMenu() {
   useBoxMenuEvents()
   const shown = useBoxMenu((state) => state.shown)
@@ -38,12 +40,12 @@ export function BoxMenu() {
   const there = shown !== null && page?.id === shown.page
   const gone = there && findLayer(page.layers, shown.layer) === undefined
   useEffect(() => {
-    if (shown && (!there || gone)) closeBoxMenu()
+    if (shown && (!there || gone)) dismissBoxMenu()
   }, [shown, there, gone])
 
   const last = useRef(project)
   useEffect(() => {
-    if (last.current !== project) closeBoxMenu()
+    if (last.current !== project) dismissBoxMenu()
     last.current = project
   }, [project])
 
@@ -76,8 +78,12 @@ function ShownMenu({ menu, page }: { menu: ShownBoxMenu; page: Page }) {
     <DropdownMenu
       open
       modal={false}
-      onOpenChange={(open) => {
-        if (!open) closeBoxMenu()
+      onOpenChange={(open, { reason }) => {
+        if (open) return
+        // Escape gives the canvas back the keys the menu took; a press on the page, an item run or
+        // the focus moving on leave them on the page.
+        if (reason === 'escape-key') dismissBoxMenu()
+        else closeBoxMenu()
       }}
     >
       <DropdownMenuContent

@@ -3,9 +3,10 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
 
+import { dispatch } from '@/lib/backend'
 import { CANVAS_PRESS } from '@/lib/booharu/wordSelection'
 import { useKoharuStore } from '@/lib/store'
-import { events, type BooharuBoxMenu } from '@koharu/ipc/protocol'
+import { commands, events, type BooharuBoxMenu } from '@koharu/ipc/protocol'
 
 // Booharu's box menu (S12-l): a right-click on a box on the canvas opens the box actions for the
 // selection where the pointer pressed, as Booharu 0.0.4's canvas menu did. The desktop tells of the
@@ -40,6 +41,18 @@ export function closeBoxMenu(): void {
   if (useBoxMenu.getState().shown) useBoxMenu.setState({ shown: null })
 }
 
+/** Closes the box menu with nothing pressed on the page, giving the canvas back the keys the menu
+ * took from it (`booharu_canvas_keys`), as the right-click's press gave them it, so Delete then
+ * takes the anchors the Direct Select tool picked: on Escape, the camera moving, the window losing
+ * the focus, or its page, project or box going. A press on the canvas gives it the keys itself, and
+ * a press on the page, an item run or the focus moving on leave them on the page, so those close it
+ * with closeBoxMenu. */
+export function dismissBoxMenu(): void {
+  if (!useBoxMenu.getState().shown) return
+  useBoxMenu.setState({ shown: null })
+  dispatch(commands.booharuCanvasKeys)
+}
+
 /** Opens the box menu at each right-click on a box the desktop tells of while the editor shows,
  * and closes it as the editor goes. */
 export function useBoxMenuEvents(): void {
@@ -58,18 +71,19 @@ export function useBoxMenuEvents(): void {
 
 /** While the box menu is `open`, closes it on what moves the canvas from under it, or leaves it
  * behind: a press on the canvas, which the page never sees, the desktop telling the page of it with
- * `CANVAS_PRESS`; a move of the camera, a zoom or a scroll; and the window losing the focus. */
+ * `CANVAS_PRESS` once it has given the canvas the keys; a move of the camera, a zoom or a scroll;
+ * and the window losing the focus, which give the canvas its keys back. */
 export function useBoxMenuDismissal(open: boolean): void {
   useEffect(() => {
     if (!open) return
     window.addEventListener(CANVAS_PRESS, closeBoxMenu)
-    window.addEventListener('blur', closeBoxMenu)
+    window.addEventListener('blur', dismissBoxMenu)
     const stop = useKoharuStore.subscribe((state, previous) => {
-      if (state.camera !== previous.camera) closeBoxMenu()
+      if (state.camera !== previous.camera) dismissBoxMenu()
     })
     return () => {
       window.removeEventListener(CANVAS_PRESS, closeBoxMenu)
-      window.removeEventListener('blur', closeBoxMenu)
+      window.removeEventListener('blur', dismissBoxMenu)
       stop()
     }
   }, [open])

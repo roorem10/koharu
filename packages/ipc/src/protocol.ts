@@ -2765,6 +2765,8 @@ export const commands = {
   /** Skews the texts of `layers`, each a translated block's or a text layer's, `x` degrees along its width and `y` along its height, from -60 to 60, in place of the skew it shows, as one undo step labelled `booharu_set_skew`, about its box's centre (a point text's anchor), so its position, rotation and frame stay: an axis left out keeps each box's own skew along it, and 0 along both takes the skew off. A box that is, or is inside, a locked layer is left as it is, a block without a translation too, and any other layer is left out. Answers how many boxes it changed, and how many it left as they are because they're locked or untranslated; with nothing to change, it makes no undo step. An angle out of range refuses the call. */
   booharuSetSkew: (layers: LayerId[], x: number | null, y: number | null) =>
     invoke<SkewCounts>('booharu_set_skew', { layers, x, y }, { headers: headers() }),
+  /** Gives the canvas the keyboard back, which a box's menu took for its keys (`opens_menu`), as the interface asks when the menu closes with nothing pressed on the page: on Escape, or as the camera moves, the window loses the focus, or its page, project or box goes. The next keys reach the canvas first again, as after the right-click's press, so Delete takes the anchors the Direct Select tool picked. Window input alone, changing nothing in the project. */
+  booharuCanvasKeys: () => invoke<null>('booharu_canvas_keys', {}, { headers: headers() }),
 }
 
 export const events = {
