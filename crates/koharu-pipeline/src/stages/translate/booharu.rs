@@ -1,7 +1,8 @@
 //! Booharu's tests of the Translation stage when its run asks the model
-//! which words to stress (S10-e), mounted by a marked line in `mod.rs`, as
-//! they drive the stage's own turn, private to it, and the stage itself,
-//! with rig's scripted model in place of a real one.
+//! which words to stress (S10-e), and when it translates a block skewed by
+//! hand again (S12-h), mounted by a marked line in `mod.rs`, as they drive
+//! the stage's own turn, private to it, and the stage itself, with rig's
+//! scripted model in place of a real one.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -10,8 +11,14 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use booharu_core::{attrs::Auto, emphasis::EmphasisSettings, settings::Snapshot};
-use koharu_scene::{Content, Created, Edit, LayerId, Op, PageId, RichText, Session};
+use booharu_core::{
+    attrs::{self, Auto, Skew},
+    emphasis::EmphasisSettings,
+    settings::Snapshot,
+    skew,
+};
+use koharu_scene::{Content, Created, Edit, LayerId, Op, PageId, RichText, Session, Text};
+use kurbo::{Affine, Point};
 use parking_lot::{Mutex, RwLock};
 use rig_core::{
     catalog::ModelSpec,
@@ -406,6 +413,18 @@ impl Chapter {
             .collect();
         Ok((translation.content.clone(), marked))
     }
+
+    /// The translation of the block on the page at `index`, as it's drawn,
+    /// and the record of the skew the FX window set on it.
+    fn shown(&self, index: usize) -> Result<(Text, Option<Skew>)> {
+        let project = self.session.lock().project();
+        let layer = project.layer(self.blocks[index])?;
+        let Content::Block(block) = &layer.content else {
+            anyhow::bail!("not a block");
+        };
+        let translation = block.translation.clone().context("a translation")?;
+        Ok((translation, attrs::get::<Skew>(layer)))
+    }
 }
 
 /// A run's snapshot with `[booharu-emphasis]` as it starts, asking its model
@@ -501,5 +520,61 @@ async fn a_translating_run_that_doesnt_ask_takes_its_old_marks_off_and_seeds_koh
     let history: Vec<&Message> = requests[1].chat_history.iter().map(|m| &**m).collect();
     let seeded = Message::assistant("{\n  \"1\": \"No way!\"\n}");
     assert!(history.contains(&&seeded), "{history:#?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_block_skewed_by_hand_keeps_its_skew_when_translated_again() -> Result<()> {
+    let chapter = Chapter::new(["まさか!", "どうして"])?;
+    let reference = "mock/s12h-skewed";
+    let model = model(&[r#"{"1": "No way!"}"#, r#"{"1": "No way at all!"}"#]);
+    let _hosted = Hosted::new(reference, model.clone().erase());
+    let first = Target::Pages(vec![chapter.pages[0]]);
+    chapter
+        .translate(first.clone(), reference, Snapshot::default())
+        .await?;
+    // Skewed in the FX window, as `booharu_set_skew` skews it: about its
+    // box's centre, with the skew's record.
+    let (shown, record) = chapter.shown(0)?;
+    let pivot = skew::pivot(&shown.frame);
+    assert_eq!(pivot, Point::new(30.0, 40.0));
+    let transform = skew::reskewed(shown.transform, record.as_ref(), (12.0, -3.0), pivot);
+    let block = chapter.blocks[0];
+    let skewed = Skew {
+        x: 12.0,
+        y: -3.0,
+        pivot: [pivot.x, pivot.y],
+    };
+    chapter.session.lock().apply(Edit {
+        label: "booharu_set_skew".to_owned(),
+        ops: vec![
+            Op::UpdateLayer {
+                layer: block.into(),
+                patch: json!({"translation": {"transform": transform}}),
+            },
+            attrs::set(block, &skewed)?,
+        ],
+    })?;
+    // Translated again: the new text in placement's fresh transform with
+    // the skew composed in about the box's centre, and the record kept.
+    chapter
+        .translate(first, reference, Snapshot::default())
+        .await?;
+    let (written, record) = chapter.shown(0)?;
+    assert_eq!(written.content.text(), "No way at all!");
+    assert_eq!(record, Some(skewed));
+    assert_eq!(skew::shown(&written, record.as_ref()), (12.0, -3.0));
+    let about = Affine::translate(pivot.to_vec2())
+        * skew::matrix(12.0, -3.0)
+        * Affine::translate(-pivot.to_vec2());
+    let drawn = Affine::from(written.transform);
+    assert!(
+        drawn
+            .as_coeffs()
+            .iter()
+            .zip(about.as_coeffs())
+            .all(|(a, b)| (a - b).abs() <= 1e-9),
+        "{drawn:?}"
+    );
     Ok(())
 }
