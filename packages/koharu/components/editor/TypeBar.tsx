@@ -14,6 +14,7 @@ import {
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { DoneButton } from '@/components/booharu/typebar/DoneButton' // Booharu: S11-c.
 import { LineSpacing } from '@/components/booharu/typebar/LineSpacing' // Booharu: S11-i.
 import { BoldToggle } from '@/components/booharu/words/BoldToggle' // Booharu: B (D12).
 import { EmphasisButton } from '@/components/booharu/words/EmphasisButton' // Booharu: the star.
@@ -668,6 +669,8 @@ export function TypeBar() {
           </Select>
         </PopoverContent>
       </Popover>
+      {/* Booharu: Done, last, while the canvas types (S11-c). */}
+      <DoneButton />
     </ContextBar>
   )
 }
