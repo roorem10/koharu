@@ -32,7 +32,7 @@ import type { Text } from '@koharu/ipc/protocol'
 // the type bar imports, as it reads the type bar's sharedChars.
 
 /** The event the desktop sends the page when its canvas takes a press, which the page never sees,
- * as the window gives the canvas its presses (koharu-desktop's `booharu::canvas::pressed`). */
+ * as the window gives the canvas its presses (koharu-desktop's `booharu::words::pressed`). */
 export const CANVAS_PRESS = 'booharu:canvas-press'
 
 /** The id of the word toolbar of `layer`'s Story field, which Alt+F10 there moves the focus to. */
