@@ -334,3 +334,32 @@ describe('Booharu emphasis star in the TypeBar', () => {
     expect(edits).toEqual([])
   })
 })
+
+describe('Booharu TypeBar and words chosen in Story', () => {
+  it('styles the whole text when its words were chosen before it changed', async () => {
+    const user = userEvent.setup()
+    const { edits, bar } = renderBar(pageWith({ family: 'Comic' }, [{ insert: 'Hello world' }]))
+    setWordRange({ layer: 'text', start: 6, end: 11, text: 'Hello there' })
+
+    await user.click(bar.getByRole('button', { name: 'Bold' }))
+
+    expect(commands.booharuStyleWords).not.toHaveBeenCalled()
+    expect(edits).toEqual([restyled({ weight: 700 })])
+  })
+
+  it('styles the characters typed, not the words chosen, while the canvas types', async () => {
+    const user = userEvent.setup()
+    const { edits, bar } = renderBar(pageWith({ family: 'Comic' }, [{ insert: 'Hello world' }]), {
+      layer: 'text',
+      chars: { family: 'Comic' },
+      mixed: [],
+    })
+    setWordRange({ layer: 'text', start: 6, end: 11, text: 'Hello world' })
+
+    await user.click(bar.getByRole('button', { name: 'Italic' }))
+
+    expect(commands.styleTyping).toHaveBeenCalledExactlyOnceWith({ italic: true })
+    expect(commands.booharuStyleWords).not.toHaveBeenCalled()
+    expect(edits).toEqual([])
+  })
+})

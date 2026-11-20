@@ -21,7 +21,15 @@ import { FontPicker } from '@/components/controls/FontPicker'
 import { ContextBar } from '@/components/editor/ContextBar'
 import { call, dispatch } from '@/lib/backend'
 import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: favourites and local names.
-import { isItalic, weightChoices } from '@/lib/booharu/words' // Booharu: I and the weights (D12).
+import {
+  chosenText,
+  isItalic,
+  italicWords,
+  keepWords,
+  styleWords,
+  useChosenWords,
+  weightChoices,
+} from '@/lib/booharu/words' // Booharu: I, the weights (D12) and words chosen in Story.
 import {
   expandLayerSelection,
   isBlockLayer,
@@ -44,6 +52,7 @@ import {
   type Text,
   type TextStyle,
   type Value,
+  type WordChange, // Booharu: words chosen in Story.
 } from '@koharu/ipc/protocol'
 import {
   DropdownMenu,
@@ -107,6 +116,7 @@ export function TypeBar() {
   const current = targets[0]
   const lettering: Text | null = current ? letteringOf(current) : null
   const typing = useKoharuStore((state) => state.typing)
+  const chosen = useChosenWords(targets, typing) // Booharu: words chosen in Story in the one text shown.
   const [draft, setDraft] = useState<{ layer: LayerId; style: TextStyle } | null>(null)
   const sequence = useRef(0)
 
@@ -115,8 +125,15 @@ export function TypeBar() {
   // While typing, what the canvas says its selected characters share; otherwise what every
   // character of the selected texts shares.
   const shared = useMemo(
-    () => typing ?? sharedChars(targets.flatMap((layer) => letteringOf(layer) ?? [])),
-    [typing, targets],
+    () =>
+      typing ??
+      sharedChars(
+        // Booharu: or with words chosen in Story, what their characters share.
+        chosen && lettering
+          ? [chosenText(lettering, chosen)]
+          : targets.flatMap((layer) => letteringOf(layer) ?? []),
+      ),
+    [typing, targets, chosen, lettering],
   )
   const drafted = current && draft?.layer === current.id ? draft.style : null
   const style: TextStyle = {
@@ -148,8 +165,9 @@ export function TypeBar() {
 
   /** A character setting: while typing, the canvas styles the selected characters, or holds it
    * for the next ones typed at a caret; otherwise every character of each target takes it. */
-  const applyChars = (patch: CharStyle) => {
-    if (!typing) return apply({ chars: patch })
+  const applyChars = (patch: CharStyle, words?: WordChange) => {
+    // Booharu: or the words chosen in Story take it, or what `words` asks, through the words edit.
+    if (!typing && !chosen) return apply({ chars: patch })
     // A mark can't unset a value, so no border on some characters is a border no wide.
     // Booharu: the same for the second border, so `marked` is a let.
     let marked: CharStyle =
@@ -157,6 +175,7 @@ export function TypeBar() {
     if (marked.outer_stroke === null) {
       marked = { ...marked, outer_stroke: undefined, outer_stroke_width: 0 }
     }
+    if (chosen) return void styleWords(chosen, words ?? { set: marked }) // Booharu: words chosen in Story.
     void call(commands.styleTyping, marked).catch(() => undefined)
   }
 
@@ -224,6 +243,7 @@ export function TypeBar() {
       aria-label={t('inspector.type')}
       data-testid='type-bar'
       className='flex-wrap'
+      onPointerDown={keepWords} // Booharu: a press here, or in its popups, keeps words chosen in Story.
     >
       <div className='w-28'>
         <FontPicker
@@ -263,8 +283,10 @@ export function TypeBar() {
               className={toggle}
               pressed={italic}
               // Booharu: never disabled, and only italic, as the renderer slants a family with no
-              // italic face (D12).
-              onPressedChange={(nextItalic) => applyChars({ italic: nextItalic })}
+              // italic face (D12); for words chosen in Story, as the word toolbar's I.
+              onPressedChange={(nextItalic) =>
+                applyChars({ italic: nextItalic }, italicWords(italic))
+              }
             />
           }
         >
@@ -273,7 +295,7 @@ export function TypeBar() {
         <TooltipContent>{t('inspector.fontStyles.italic')}</TooltipContent>
       </Tooltip>
       {/* Booharu: the star, which stresses words typed or chosen in Story, never a whole box. */}
-      <EmphasisButton layer={current?.id} />
+      <EmphasisButton words={chosen} />
       <div className='w-[4.5rem]'>
         <FontSizeField
           disabled={false}
@@ -465,12 +487,15 @@ export function TypeBar() {
                 mixed.has('outer_stroke') ? '' : outerEnabled && outer ? rgbaToHex(outer) : null
               }
               onChange={(color) => {
-                // Both keys go, so the text is as Koharu writes it again. While typing, a mark
-                // can't unset them, so characters with no second border are left unmarked.
+                // Both keys go, so the text is as Koharu writes it again. While typing, or for
+                // words chosen in Story, a mark can't unset them, so characters with no second
+                // border are left unmarked.
                 if (color === null) {
                   const some =
                     outerEnabled || mixed.has('outer_stroke') || mixed.has('outer_stroke_width')
-                  if (some || !typing) applyChars({ outer_stroke: null, outer_stroke_width: null })
+                  if (some || (!typing && !chosen)) {
+                    applyChars({ outer_stroke: null, outer_stroke_width: null })
+                  }
                   return
                 }
                 // Widths that differ stay each character's own.

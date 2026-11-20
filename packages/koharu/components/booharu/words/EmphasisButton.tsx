@@ -4,24 +4,21 @@ import { Star } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { call } from '@/lib/backend'
-import { styleWords, useWordRange } from '@/lib/booharu/words'
+import { styleWords, type WordRange } from '@/lib/booharu/words'
 import { useKoharuStore } from '@/lib/store'
-import { commands, type LayerId } from '@koharu/ipc/protocol'
+import { commands } from '@koharu/ipc/protocol'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/tooltip'
 
 /** The emphasis star, after the type bar's I (D14): it stresses words as Settings > Typesetting >
  * Emphasis has them look in their text's lettering category. While the canvas types into a text,
- * the selected characters take the emphasis, or at a caret the next ones typed; with words chosen
- * in the Story panel in `layer`, the text the bar shows, those words do, through the words edit.
- * Otherwise it's disabled, so it never restyles a whole box; so it is for a new text, which has no
- * layer, and so no category, until it's committed. As in 0.0.4 it has no off: Clear takes the
- * words' own style off. */
-export function EmphasisButton({ layer }: { layer: LayerId | undefined }) {
+ * the selected characters take the emphasis, or at a caret the next ones typed; with `words`, the
+ * words chosen in the Story panel in the text the bar shows, those words do, through the words
+ * edit. Otherwise it's disabled, so it never restyles a whole box; so it is for a new text, which
+ * has no layer, and so no category, until it's committed. As in 0.0.4 it has no off: Clear takes
+ * the words' own style off. */
+export function EmphasisButton({ words }: { words: WordRange | null }) {
   const { t } = useTranslation()
-  const typing = useKoharuStore((state) => state.typing !== null)
   const typed = useKoharuStore((state) => state.typing?.layer ?? null)
-  const range = useWordRange((state) => state.range)
-  const words = !typing && range && range.layer === layer ? range : null
 
   const press = async () => {
     if (typed !== null) {

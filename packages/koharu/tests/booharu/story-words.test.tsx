@@ -319,3 +319,68 @@ describe('Booharu words chosen in Story', () => {
     expect(toolbar()!.style.transform).toBe('')
   })
 })
+
+describe('Booharu type bar on words chosen in Story', () => {
+  it("shows the words' values and styles only them, presses on it keeping them", async () => {
+    const user = userEvent.setup()
+    const border = { stroke: [1, 1, 1, 1] as [number, number, number, number], stroke_width: 2 }
+    const { edits } = story(
+      pageOf(
+        textLayer('text', [
+          { insert: 'Hello ' },
+          { insert: 'world', attributes: { weight: 700, italic: true, ...border } },
+        ]),
+      ),
+      true,
+    )
+    const field = await screen.findByPlaceholderText('Text')
+    choose(field, 6, 11)
+    const bar = within(await screen.findByTestId('type-bar'))
+
+    expect(bar.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'true')
+    expect(bar.getByRole('button', { name: 'Italic' })).toHaveAttribute('aria-pressed', 'true')
+    expect(bar.getByRole('combobox', { name: 'Font weight' })).toHaveTextContent('700')
+
+    // B and I as the word toolbar's, the others' values set on the words, and no border a border
+    // no wide, as a mark can't unset one.
+    await user.click(bar.getByRole('button', { name: 'Bold' }))
+    await user.click(bar.getByRole('button', { name: 'Italic' }))
+    await user.click(bar.getByRole('combobox', { name: 'Font weight' }))
+    await user.click(await screen.findByRole('option', { name: '400' }))
+    await user.click(bar.getByRole('button', { name: 'Border' }))
+    await user.click(await screen.findByRole('button', { name: 'Border color' }))
+    await user.click(await screen.findByRole('button', { name: 'Transparent' }))
+
+    const words = ['text', 6, 11, 'Hello world'] as const
+    await waitFor(() =>
+      expect(styled()).toEqual([
+        [...words, { bold: false }],
+        [...words, { italic: false }],
+        [...words, { set: { weight: 400 } }],
+        [...words, { set: { stroke_width: 0 } }],
+      ]),
+    )
+    expect(edits).toEqual([])
+    expect(range()).not.toBeNull()
+
+    // A press outside lets the words go, and the bar shows the whole text again.
+    await press(screen.getByTestId('canvas'))
+    expect(range()).toBeNull()
+    expect(bar.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('leaves the second border of words that have none, as typing does', async () => {
+    const user = userEvent.setup()
+    const border = { stroke: [1, 1, 1, 1] as [number, number, number, number], stroke_width: 2 }
+    story(pageOf(textLayer('text', [{ insert: 'Hello world', attributes: border }])), true)
+    choose(await screen.findByPlaceholderText('Text'), 0, 5)
+    const bar = within(await screen.findByTestId('type-bar'))
+
+    await user.click(bar.getByRole('button', { name: 'Border' }))
+    await user.click(await screen.findByRole('button', { name: 'Second border color' }))
+    await user.click(await screen.findByRole('button', { name: 'Transparent' }))
+
+    expect(styled()).toEqual([])
+    expect(range()).not.toBeNull()
+  })
+})
