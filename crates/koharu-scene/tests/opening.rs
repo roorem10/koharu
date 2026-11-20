@@ -221,6 +221,52 @@ fn a_project_whose_values_dont_read_fails_to_open() {
     }
 }
 
+// Booharu: a stored gradient or letter spacing out of bounds fails to open,
+// as any value that doesn't read does, and the file stays as it was.
+#[test]
+fn booharu_a_stored_bad_gradient_or_letter_spacing_fails_to_open() {
+    let (dir, mut session, page) = session();
+    let path = dir.path().join("test.khr");
+    add(
+        &mut session,
+        page,
+        None,
+        json!({"kind": "text", "content": "Hi", "style": {"chars": {
+            "tracking": 100.0,
+            "fill_gradient": {"kind": "linear", "angle": 90.0, "stops": [
+                {"offset": 0.0, "color": [1.0, 0.0, 0.0, 1.0]},
+                {"offset": 1.0, "color": [0.0, 0.0, 1.0, 1.0]},
+            ]},
+        }}}),
+    );
+    drop(session);
+    drop(Session::open(&path).expect("a text with both opens"));
+    let set = |key: &str, value: &str| {
+        format!("UPDATE pages SET page = json_set(page, '$.layers[0].style.chars.{key}', {value});")
+    };
+    for change in [
+        set("tracking", "2001"),
+        set("tracking", "-501"),
+        set("fill_gradient.stops[0].offset", "1.5"),
+        set("fill_gradient.stops[0].offset", "0.7") + &set("fill_gradient.stops[1].offset", "0.2"),
+        "UPDATE pages SET page = json_remove(page, '$.layers[0].style.chars.fill_gradient.stops[1]');"
+            .to_owned(),
+        set("fill_gradient.kind", "'conic'"),
+        set("fill_gradient.spread", "'repeat'"),
+    ] {
+        let copy = dir.path().join("broken.khr");
+        fs_err::copy(&path, &copy).expect("a copy");
+        let conn = rusqlite::Connection::open(&copy).expect("the file opens");
+        conn.execute_batch(&change).expect("the change applies");
+        drop(conn);
+        let before = fs_err::read(&copy).expect("its bytes");
+        let error = Session::open(&copy).err().expect("refused");
+        assert!(matches!(error, Error::Corrupt(_)), "{change}: {error:?}");
+        assert_eq!(fs_err::read(&copy).expect("its bytes"), before, "{change}");
+        fs_err::remove_file(&copy).expect("removed");
+    }
+}
+
 #[test]
 fn files_go_at_reopening_when_nothing_names_them() {
     let (dir, mut session, page) = session();

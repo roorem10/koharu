@@ -180,6 +180,8 @@ pub fn patch(style: &EmphasisStyle, base: &CharStyle) -> CharStyle {
         stroke_width: new(&style.stroke_width, &base.stroke_width),
         outer_stroke: new(&style.outer_stroke, &base.outer_stroke),
         outer_stroke_width: new(&style.outer_stroke_width, &base.outer_stroke_width),
+        fill_gradient: None,
+        tracking: None,
     }
 }
 
@@ -362,6 +364,8 @@ fn without(marks: &CharStyle, set: &CharStyle) -> CharStyle {
         stroke_width: kept(&marks.stroke_width, &set.stroke_width),
         outer_stroke: kept(&marks.outer_stroke, &set.outer_stroke),
         outer_stroke_width: kept(&marks.outer_stroke_width, &set.outer_stroke_width),
+        fill_gradient: kept(&marks.fill_gradient, &set.fill_gradient),
+        tracking: kept(&marks.tracking, &set.tracking),
     }
 }
 

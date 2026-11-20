@@ -252,3 +252,77 @@ fn booharu_border_keys_are_left_out_until_set() {
         style.chars.outer_stroke
     );
 }
+
+// Booharu: a gradient and letter spacing stay out of the file until set, and
+// a text with both reopens as it was written.
+#[test]
+fn booharu_gradient_and_letter_spacing_are_left_out_until_set() {
+    use koharu_scene::{Gradient, GradientKind, GradientStop, Rgba};
+
+    let plain = serde_json::to_value(CharStyle::default()).expect("a style");
+    assert!(plain.get("fill_gradient").is_none());
+    assert!(plain.get("tracking").is_none());
+
+    let gradient = json!({"kind": "radial", "angle": 30.0, "stops": [
+        {"offset": 0.0, "color": [1.0, 0.0, 0.0, 1.0]},
+        {"offset": 0.5, "color": [0.0, 0.0, 1.0, 0.5]},
+        {"offset": 0.5, "color": [0.0, 1.0, 0.0, 1.0]},
+    ]});
+    let (_dir, path) = path();
+    let mut session = Session::create(&path).expect("a project");
+    let page = page(&mut session);
+    let layer = add(
+        &mut session,
+        page,
+        None,
+        json!({"kind": "text",
+            "content": [
+                {"insert": "Hi ", "attributes": {"tracking": 50.0}},
+                {"insert": "there", "attributes": {"fill_gradient": gradient}},
+            ],
+            "style": {"chars": {"fill_gradient": gradient, "tracking": -120.0}},
+        }),
+    );
+    let written = text(&session, layer);
+    let expected = Gradient {
+        kind: GradientKind::Radial,
+        angle: 30.0,
+        stops: vec![
+            GradientStop {
+                offset: 0.0,
+                color: Rgba([1.0, 0.0, 0.0, 1.0]),
+            },
+            GradientStop {
+                offset: 0.5,
+                color: Rgba([0.0, 0.0, 1.0, 0.5]),
+            },
+            GradientStop {
+                offset: 0.5,
+                color: Rgba([0.0, 1.0, 0.0, 1.0]),
+            },
+        ],
+    };
+    assert_eq!(written.style.chars.fill_gradient, Some(expected.clone()));
+    assert_eq!(written.style.chars.tracking, Some(-120.0));
+    assert_eq!(written.content.0[0].attributes.tracking, Some(50.0));
+    assert_eq!(
+        written.content.0[1].attributes.fill_gradient,
+        Some(expected)
+    );
+    let stored = serde_json::to_value(&written.style.chars).expect("a style");
+    assert_eq!(stored["fill_gradient"]["kind"], json!("radial"));
+    assert_eq!(stored["tracking"], json!(-120.0));
+
+    let before = session.project();
+    drop(session);
+    let session = Session::open(&path).expect("it opens");
+    assert_eq!(session.project(), before);
+
+    // An angle left out reads as 0, as Photoshop's left to right.
+    let gradient: Gradient = serde_json::from_value(json!({"kind": "linear", "stops": [
+        {"offset": 0, "color": [0, 0, 0, 1]},
+        {"offset": 1, "color": [1, 1, 1, 1]},
+    ]}))
+    .expect("a gradient");
+    assert_eq!(gradient.angle, 0.0);
+}

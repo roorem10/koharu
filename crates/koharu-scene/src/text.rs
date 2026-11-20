@@ -39,6 +39,22 @@ pub struct CharStyle {
     /// Booharu: the second border's width, outward from the first border.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outer_stroke_width: Option<f64>,
+    /// Booharu: a gradient fill, drawn in place of `fill`. Left out when
+    /// unset, so a text without one stays readable by Koharu.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill_gradient: Option<Gradient>,
+    /// Booharu: letter spacing in thousandths of an em, as Photoshop's
+    /// tracking, from -500 to 2000: the space each character is followed by
+    /// grows by that much, or shrinks when it's negative. Left out when
+    /// unset, so a text without it stays readable by Koharu.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "tracking"
+    )]
+    #[specta(type = Option<f64>)]
+    #[schemars(range(min = -500.0, max = 2000.0))]
+    pub tracking: Option<f64>,
 }
 
 impl CharStyle {
@@ -56,7 +72,25 @@ impl CharStyle {
             // Booharu: the second border.
             outer_stroke: self.outer_stroke.or(base.outer_stroke),
             outer_stroke_width: self.outer_stroke_width.or(base.outer_stroke_width),
+            // Booharu: the gradient fill and letter spacing.
+            fill_gradient: self
+                .fill_gradient
+                .clone()
+                .or_else(|| base.fill_gradient.clone()),
+            tracking: self.tracking.or(base.tracking),
         }
+    }
+}
+
+/// Booharu: a letter spacing, which as a tracking of Photoshop's runs from
+/// -500 to 2000 thousandths of an em.
+fn tracking<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<f64>, D::Error> {
+    let tracking = Option::<f64>::deserialize(deserializer)?;
+    match tracking {
+        Some(value) if !(-500.0..=2000.0).contains(&value) => Err(serde::de::Error::custom(
+            format!("a letter spacing of {value} isn't from -500 to 2000"),
+        )),
+        _ => Ok(tracking),
     }
 }
 
@@ -90,6 +124,94 @@ pub enum StrokeMethod {
     Contour,
     /// Each letter grown on its own, as Koharu draws borders.
     Expansion,
+}
+
+/// Booharu: a gradient fill: its stops spread along a line at `angle`, or
+/// out from the centre, over the ink of the text it fills, or of the run of
+/// characters whose mark it is.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Gradient {
+    pub kind: GradientKind,
+    /// The direction in degrees, as Photoshop's angle: 0 runs left to
+    /// right and 90 bottom to top. A radial gradient ignores it.
+    #[serde(default, deserialize_with = "angle")]
+    #[specta(type = f64)]
+    pub angle: f64,
+    /// 2 to 8 stops in order: an offset is never below the one before it,
+    /// and two can share one, for a hard edge.
+    #[serde(deserialize_with = "stops")]
+    #[specta(type = Vec<GradientStop>)]
+    #[schemars(length(min = 2, max = 8))]
+    pub stops: Vec<GradientStop>,
+}
+
+/// Booharu: how a gradient's stops spread.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Type, JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum GradientKind {
+    /// Along a line through the centre, at the gradient's angle.
+    Linear,
+    /// Out from the centre to a circle through the corners.
+    Radial,
+}
+
+/// Booharu: one colour of a gradient and where it falls along it.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Type, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GradientStop {
+    /// From 0 at the gradient's start to 1 at its end.
+    #[serde(deserialize_with = "offset")]
+    #[specta(type = f64)]
+    #[schemars(range(min = 0.0, max = 1.0))]
+    pub offset: f64,
+    pub color: Rgba,
+}
+
+/// Booharu: a gradient's angle, any finite number of degrees.
+fn angle<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<f64, D::Error> {
+    let angle = f64::deserialize(deserializer)?;
+    if angle.is_finite() {
+        Ok(angle)
+    } else {
+        Err(serde::de::Error::custom(format!(
+            "a gradient's angle of {angle} isn't finite"
+        )))
+    }
+}
+
+/// Booharu: a gradient's stops, 2 to 8 of them, none at an offset below the
+/// one before it.
+fn stops<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<GradientStop>, D::Error> {
+    let stops = Vec::<GradientStop>::deserialize(deserializer)?;
+    if !(2..=8).contains(&stops.len()) {
+        return Err(serde::de::Error::custom(format!(
+            "a gradient has {} stops, not 2 to 8",
+            stops.len()
+        )));
+    }
+    match stops
+        .windows(2)
+        .find(|pair| pair[1].offset < pair[0].offset)
+    {
+        Some(pair) => Err(serde::de::Error::custom(format!(
+            "a gradient's stop at {} follows one at {}",
+            pair[1].offset, pair[0].offset
+        ))),
+        None => Ok(stops),
+    }
+}
+
+/// Booharu: a gradient stop's offset, from 0 to 1.
+fn offset<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<f64, D::Error> {
+    let offset = f64::deserialize(deserializer)?;
+    if (0.0..=1.0).contains(&offset) {
+        Ok(offset)
+    } else {
+        Err(serde::de::Error::custom(format!(
+            "a gradient stop's offset of {offset} isn't from 0 to 1"
+        )))
+    }
 }
 
 /// Text as spans in order, each with its marks, so no mark can fall outside the

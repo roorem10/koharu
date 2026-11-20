@@ -27,7 +27,10 @@ pub use layer::{Attributes, Layer, NewLayer, PixelFormat};
 pub use project::{Background, Page, Project};
 pub use query::{Answer, PageSummary, ProjectAnswer, Query};
 pub use session::{EXTENSION, Session};
-// Booharu: StrokeMethod, the border method.
-pub use text::{CharStyle, RichText, Span, StrokeMethod, Text, TextStyle};
+// Booharu: StrokeMethod, the border method, and Gradient, GradientKind and
+// GradientStop, the gradient fill.
+pub use text::{
+    CharStyle, Gradient, GradientKind, GradientStop, RichText, Span, StrokeMethod, Text, TextStyle,
+};
 pub use tiles::{Tile, Tiles};
 pub use values::*;
