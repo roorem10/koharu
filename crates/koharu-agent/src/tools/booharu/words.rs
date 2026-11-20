@@ -210,6 +210,7 @@ impl StyleWordsArgs {
             italic: self.italic,
             emphasis: self.emphasis,
             clear: self.clear,
+            step: None,
         }
     }
 }
@@ -722,7 +723,7 @@ mod tests {
         }
         // And so are words the text doesn't hold, a change asking for
         // none or more than one thing, and a layer that takes none.
-        let choose = "Choose clear, emphasis, or explicit style fields.";
+        let choose = "Choose clear, emphasis, step, or explicit style fields.";
         for (args, reason) in [
             (
                 json!({"layer": line, "text": "missing", "bold": true}),

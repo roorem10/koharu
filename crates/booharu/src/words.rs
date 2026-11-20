@@ -1,8 +1,9 @@
 //! Styling words by hand: a run of a text's characters made bold or italic,
-//! stressed as its lettering category's emphasis says, given values of its
-//! own, or cleared, as one undo step labelled [`LABEL`], which the desktop's
-//! command and the agent's tool share ([`style_words`]), and the marks the
-//! emphasis star gives text typed on the canvas ([`emphasis_patch`]).
+//! stressed as its lettering category's emphasis says, a step bigger or
+//! smaller, given values of its own, or cleared, as one undo step labelled
+//! [`LABEL`], which the desktop's command and the agent's tool share
+//! ([`style_words`]), and the marks the emphasis star gives text typed on
+//! the canvas ([`emphasis_patch`]).
 //!
 //! The words are UTF-8 byte offsets into the text of a block's translation
 //! or of a text layer. The edit writes the text's spans whole, as Koharu's
@@ -18,8 +19,10 @@ use booharu_core::{
     lettering::{self, LetteringCategory},
     resolver,
     settings::LetteringSettings,
+    sizes,
 };
 use koharu_scene::{CharStyle, Content, Edit, LayerId, Op, Project, Text};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::boxes::unlocked;
@@ -35,7 +38,7 @@ const REGULAR: u16 = 400;
 const BOLD_FROM: u16 = 600;
 
 /// What a words edit does to its words: exactly one of `clear`, `emphasis`,
-/// or the explicit values, `set`, `bold` and `italic`, which may go
+/// `step`, or the explicit values, `set`, `bold` and `italic`, which may go
 /// together.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(default, deny_unknown_fields)]
@@ -54,6 +57,20 @@ pub struct WordChange {
     pub emphasis: bool,
     /// Every value of the words' own taken off, so they look as the text.
     pub clear: bool,
+    /// Each of the words a step bigger or smaller from its own size, else
+    /// the text's, 24 pixels without one, as the type bar's A+ and A− step
+    /// them ([`sizes::resized`]), so words of different sizes keep their
+    /// order.
+    pub step: Option<SizeStep>,
+}
+
+/// A step a words edit makes its words bigger or smaller by: 5%, to the
+/// half pixel ([`sizes::stepped`]).
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, specta::Type, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SizeStep {
+    Bigger,
+    Smaller,
 }
 
 /// What a [`WordChange`] asks for.
@@ -61,6 +78,8 @@ pub struct WordChange {
 enum Mode {
     Clear,
     Emphasis,
+    /// A step, bigger when true.
+    Step(bool),
     Explicit,
 }
 
@@ -68,11 +87,12 @@ impl WordChange {
     fn mode(&self) -> Result<Mode> {
         let explicit =
             self.set != CharStyle::default() || self.bold.is_some() || self.italic.is_some();
-        let mode = match (self.clear, self.emphasis, explicit) {
-            (true, false, false) => Mode::Clear,
-            (false, true, false) => Mode::Emphasis,
-            (false, false, true) => Mode::Explicit,
-            _ => bail!("Choose clear, emphasis, or explicit style fields."),
+        let mode = match (self.clear, self.emphasis, self.step, explicit) {
+            (true, false, None, false) => Mode::Clear,
+            (false, true, None, false) => Mode::Emphasis,
+            (false, false, Some(step), false) => Mode::Step(step == SizeStep::Bigger),
+            (false, false, None, true) => Mode::Explicit,
+            _ => bail!("Choose clear, emphasis, step, or explicit style fields."),
         };
         ensure!(
             self.set.weight.is_none() || self.bold.is_none(),
@@ -94,8 +114,8 @@ impl WordChange {
 /// With `expected`, the plain text the range was taken from, a text that has
 /// changed since is refused.
 ///
-/// Refused: a change asking for none or more than one of clear, emphasis
-/// and explicit values, or for a weight and bold or italic twice; a layer
+/// Refused: a change asking for none or more than one of clear, emphasis,
+/// a step and explicit values, or for a weight and bold or italic twice; a layer
 /// that's neither a block nor a text layer; one that is, or is inside, a
 /// locked layer ([`crate::boxes::Refusal::Locked`]); a block without a
 /// translation; and an empty range, or one past the text or off a
@@ -137,8 +157,9 @@ pub fn style_words(
             let category = category(project, layer, lettering)?;
             emphasis::patch(&emphasis.style_for(category), own)
         }
-        Mode::Clear | Mode::Explicit => CharStyle::default(),
+        Mode::Clear | Mode::Step(_) | Mode::Explicit => CharStyle::default(),
     };
+    let base = own.size.unwrap_or(sizes::SIZE);
     let bold = change.bold.map(|bold| match bold {
         true => Some(BOLD),
         false if own.weight.is_some_and(|weight| weight >= BOLD_FROM) => Some(REGULAR),
@@ -152,6 +173,7 @@ pub fn style_words(
     let restyle = |marks: &CharStyle| match mode {
         Mode::Clear => CharStyle::default(),
         Mode::Emphasis => stressed.or(marks),
+        Mode::Step(bigger) => sizes::stepped_marks(marks, base, bigger),
         Mode::Explicit => {
             let mut marks = change.set.or(marks);
             if let Some(weight) = bold {
@@ -714,16 +736,37 @@ mod tests {
     #[test]
     fn a_change_asks_for_one_thing_on_a_text_that_takes_it() -> Result<()> {
         let fixture = Fixture::new()?;
-        let choose = "Choose clear, emphasis, or explicit style fields.";
+        let choose = "Choose clear, emphasis, step, or explicit style fields.";
         let red = CharStyle {
             fill: Some(RED),
             ..CharStyle::default()
         };
+        let bigger = Some(SizeStep::Bigger);
         for change in [
             WordChange::default(),
             WordChange {
                 clear: true,
                 emphasis: true,
+                ..WordChange::default()
+            },
+            WordChange {
+                step: bigger,
+                clear: true,
+                ..WordChange::default()
+            },
+            WordChange {
+                step: bigger,
+                emphasis: true,
+                ..WordChange::default()
+            },
+            WordChange {
+                step: bigger,
+                bold: Some(true),
+                ..WordChange::default()
+            },
+            WordChange {
+                step: Some(SizeStep::Smaller),
+                set: red.clone(),
                 ..WordChange::default()
             },
             WordChange {
@@ -772,6 +815,79 @@ mod tests {
             ),
             "{locked}"
         );
+        Ok(())
+    }
+
+    fn step(bigger: bool) -> WordChange {
+        WordChange {
+            step: Some(match bigger {
+                true => SizeStep::Bigger,
+                false => SizeStep::Smaller,
+            }),
+            ..WordChange::default()
+        }
+    }
+
+    fn sized(size: f64) -> CharStyle {
+        CharStyle {
+            size: Some(size),
+            ..CharStyle::default()
+        }
+    }
+
+    #[test]
+    fn a_step_steps_each_word_from_its_own_size() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        // "Why" at 40 in a text of 30.
+        fixture.styled(
+            "plain",
+            0..3,
+            &WordChange {
+                set: sized(40.0),
+                ..WordChange::default()
+            },
+        )?;
+        let before = fixture.words("plain")?;
+        assert_eq!(
+            fixture.styled("plain", 0..TEXT.len(), &step(true))?,
+            RichText(vec![
+                span("Why", sized(42.0)),
+                span(" 魔王 NO?", sized(31.5))
+            ])
+        );
+        // A step back gives the words their sizes again, the text's own
+        // as no mark.
+        assert_eq!(
+            fixture.styled("plain", 0..TEXT.len(), &step(false))?,
+            before
+        );
+        // Only the range steps, its other marks kept: a bold "NO" in a text
+        // layer of 20.
+        fixture.styled("typed", 11..13, &bold(true))?;
+        assert_eq!(
+            fixture.styled("typed", 11..13, &step(false))?,
+            no_marked(CharStyle {
+                weight: Some(700),
+                size: Some(19.0),
+                ..CharStyle::default()
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_step_past_the_largest_size_changes_nothing() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        fixture.styled(
+            "plain",
+            11..13,
+            &WordChange {
+                set: sized(300.0),
+                ..WordChange::default()
+            },
+        )?;
+        assert!(fixture.style("plain", 11..13, &step(true))?.is_none());
+        assert!(fixture.style("plain", 11..13, &step(false))?.is_some());
         Ok(())
     }
 
