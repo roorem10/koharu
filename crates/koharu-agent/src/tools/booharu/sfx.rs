@@ -42,8 +42,8 @@ impl Tool for AddSfxSubtitle {
          means, set beside the effect (to its left when its text runs down the page, else below \
          it, or on the other side where that would leave the page), right after it in reading \
          order, in the subtitle look of `subtitle` in `booharu-lettering`, while the effect \
-         keeps its original art: its own translation goes and its clean-up is hidden, so the \
-         art shows. Use it for a sound effect worth explaining that should stay drawn, as the \
+         keeps its original art: its own translation goes, though a style set on it before it \
+         was translated stays, and its clean-up is hidden, so the art shows. Use it for a sound effect worth explaining that should stay drawn, as the \
          SFX mode (`sfx` in `booharu-lettering`) keeps sound effects by default. `block` is the \
          effect: a block whose lettering category is `sfx`, as booharu_get_text_styles tells \
          it, neither locked nor in a locked layer, whose source has a box to put the subtitle \

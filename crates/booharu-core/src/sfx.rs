@@ -271,9 +271,12 @@ pub fn subtitle_rect(source: Rect, vertical: bool, size: f64, page: (f64, f64)) 
 /// fit, horizontal and aligned to the start, its size `style.size` of the
 /// page's shorter side and its outline a ninth of that, with
 /// `booharu.sfx_subtitle` naming the block; then the block's translation
-/// removed and its clean-up hidden, with the kept mark, so the effect stays
-/// the original art. Fails for a layer that isn't a block on `page`, or a
-/// block whose source has no frame to put the subtitle beside.
+/// removed, but for only the placeholder a style set before translating
+/// leaves ([`status::placeholder`]), which stays with its style as
+/// [`kept_original`] keeps it, and its clean-up hidden, with the kept mark,
+/// so the effect stays the original art. Fails for a layer that isn't a
+/// block on `page`, or a block whose source has no frame to put the
+/// subtitle beside.
 pub fn subtitle_ops(
     page: &Page,
     block: LayerId,
@@ -338,11 +341,16 @@ pub fn subtitle_ops(
         kept: true,
         ..Auto::of(layer)
     };
+    // A style set on the effect before it's translated is the user's (D1).
+    let patch = match status::placeholder(layer, found) {
+        true => json!({"cleanup": {"visible": false}}),
+        false => json!({"translation": null, "cleanup": {"visible": false}}),
+    };
     Ok(vec![
         serde_json::from_value(add)?,
         Op::UpdateLayer {
             layer: block.into(),
-            patch: json!({"translation": null, "cleanup": {"visible": false}}),
+            patch,
         },
         attrs::set(block, &marked)?,
     ])
@@ -909,6 +917,35 @@ mod tests {
         assert!(hand_kept(&layer, &block));
         assert!(kept_original(&layer).is_empty());
         assert!(shown_again(&layer).expect("the ops").is_empty());
+    }
+
+    #[test]
+    fn an_effect_styled_before_its_translated_keeps_its_style_under_a_subtitle() {
+        let mut fixture = Fixture::new("sfx");
+        let id = fixture.held;
+        fixture.apply(vec![type_bar_style(id)]);
+        let english: LanguageIdentifier = "en".parse().expect("a tag");
+        let ops = subtitle_ops(
+            &fixture.page(),
+            id,
+            "Boom",
+            &english,
+            &SubtitleStyle::default(),
+            None,
+        )
+        .expect("the ops");
+        fixture.apply(ops);
+
+        // Kept as art under its subtitle, the style set on it staying.
+        let (layer, block) = (fixture.layer(id), fixture.block(id));
+        assert!(subtitled(&fixture.page(), id));
+        assert!(!block.cleanup.visible && Auto::of(&layer).kept);
+        assert!(status::placeholder(&layer, &block));
+        let family = block
+            .translation
+            .as_ref()
+            .and_then(|translation| translation.style.chars.family.as_deref());
+        assert_eq!(family, Some(FAMILY));
     }
 
     #[test]

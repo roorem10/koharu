@@ -9,8 +9,9 @@
 //! ([`subtitle_run`]). The edit comes from
 //! `booharu_core::sfx::subtitle_ops`: the text layer right after the effect
 //! in reading order, in the subtitle look of `[booharu-lettering]
-//! subtitle`, and the effect's translation taken away with its clean-up
-//! hidden and the kept mark, all as one undo step.
+//! subtitle`, and the effect's translation taken away, but for a style set
+//! on it before it was translated, which stays, with its clean-up hidden
+//! and the kept mark, all as one undo step.
 
 use std::collections::BTreeSet;
 
