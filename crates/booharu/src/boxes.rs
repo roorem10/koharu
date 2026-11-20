@@ -2207,6 +2207,12 @@ mod tests {
     /// hooks: found and read, its wording recorded, then translated as
     /// `text`, with the default look and the record of what it wrote.
     fn run_on(page: &mut Fixture, block: LayerId, text: &str) -> Result<()> {
+        run_stressing(page, block, text, &[])
+    }
+
+    /// [`run_on`], its model picking `words` to stress, which the
+    /// Translation stage marks in the default emphasis.
+    fn run_stressing(page: &mut Fixture, block: LayerId, text: &str, words: &[&str]) -> Result<()> {
         let project = page.session.project();
         let wording = page.block(block)?.source.content.text();
         page.session.apply(edit(vec![
@@ -2214,12 +2220,29 @@ mod tests {
             made(block, "ocr", "c2pa.created"),
             booharu_core::styles::recognized(project.layer(block)?, &wording)?,
         ]))?;
-        stage_translates(page, block, text)
+        stage_stresses(page, block, text, words)
     }
 
     /// Translates `block` as `text` as Koharu's Translation stage does, with
     /// Booharu's hook: the default look and the record of what it wrote.
     fn stage_translates(page: &mut Fixture, block: LayerId, text: &str) -> Result<()> {
+        stage_stresses(page, block, text, &[])
+    }
+
+    /// [`stage_translates`], its model picking `words` to stress, which the
+    /// hook marks in the default emphasis.
+    fn stage_stresses(
+        page: &mut Fixture,
+        block: LayerId,
+        text: &str,
+        words: &[&str],
+    ) -> Result<()> {
+        let emphasis = booharu_core::emphasis::EmphasisSettings::default();
+        let words: Vec<String> = words.iter().map(|word| (*word).to_owned()).collect();
+        let marking = booharu_core::emphasis::Marking {
+            settings: Some(&emphasis),
+            words: &words,
+        };
         let english: koharu_scene::LanguageIdentifier = "en".parse()?;
         let project = page.session.project();
         let placed = koharu_pipeline::placement(&project, block, &english)?;
@@ -2237,7 +2260,7 @@ mod tests {
             &placed,
             &booharu_core::settings::LetteringSettings::default(),
             None,
-            &booharu_core::emphasis::Marking::default(),
+            &marking,
         )?);
         ops.push(Op::UpdateLayer {
             layer: block.into(),
@@ -2889,6 +2912,70 @@ mod tests {
             assert_eq!(family(half)?.as_deref(), Some("CCWildWords"));
         }
         assert_ne!(family(drawn)?.as_deref(), Some("CCWildWords"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_split_drops_the_word_marks_its_run_stressed() -> Result<()> {
+        let mut page = Fixture::new(400, 400, &[rect(0.0, 0.0, 400.0, 400.0)])?;
+        let bounds = page_bounds(100.0, 20.0, 40.0, 100.0);
+        let block = page.add(None, text_block(bounds, Direction::Vertical, "あいう"))?;
+        run_stressing(&mut page, block, "Who are you?", &["you"])?;
+        let marks = Auto::of(page.session.project().layer(block)?).marks;
+        assert_eq!(marks.len(), 1);
+        assert_eq!((marks[0].start, marks[0].end), (8, 11));
+
+        let change = page.session.apply(split_block(&page.session, block)?)?;
+        for id in split_halves(block, &change)? {
+            // Neither half holds the words the marks were made on.
+            assert!(page.block(id)?.translation.is_none());
+            assert!(Auto::of(page.session.project().layer(id)?).marks.is_empty());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn detect_again_keeps_a_block_for_a_word_marked_by_hand_not_by_its_run() -> Result<()> {
+        use booharu_core::{emphasis::EmphasisSettings, protect, settings::LetteringSettings};
+        let mut page = Fixture::new(400, 400, &[rect(0.0, 0.0, 400.0, 400.0)])?;
+        let bounds = page_bounds(100.0, 20.0, 40.0, 100.0);
+        let block = page.add(None, text_block(bounds, Direction::Vertical, "あいう"))?;
+        // Detected, read, and translated by the stages, its model stressing
+        // a word, which is no hand edit.
+        run_stressing(&mut page, block, "Who are you?", &["you"])?;
+        let keeps = |page: &Fixture| -> Result<bool> {
+            let project = page.session.project();
+            Ok(protect::keeps(
+                project.page(page.page)?,
+                project.layer(block)?,
+            ))
+        };
+        let layer = page.session.project().layer(block)?.clone();
+        assert!(!Auto::of(&layer).marks.is_empty());
+        assert_eq!(
+            booharu_core::edited(&layer),
+            booharu_core::Edited::default()
+        );
+        assert!(!keeps(&page)?);
+
+        // A word made bold by hand is one, which Detect again keeps.
+        let bold = crate::words::WordChange {
+            bold: Some(true),
+            ..crate::words::WordChange::default()
+        };
+        let edit = crate::words::style_words(
+            &page.session.project(),
+            block,
+            0..3,
+            Some("Who are you?"),
+            &bold,
+            &EmphasisSettings::default(),
+            &LetteringSettings::default(),
+        )?
+        .context("a change")?;
+        page.session.apply(edit)?;
+        assert!(booharu_core::edited(page.session.project().layer(block)?).style);
+        assert!(keeps(&page)?);
         Ok(())
     }
 

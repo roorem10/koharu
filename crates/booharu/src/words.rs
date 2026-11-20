@@ -1,0 +1,767 @@
+//! Styling words by hand: a run of a text's characters made bold or italic,
+//! stressed as its lettering category's emphasis says, given values of its
+//! own, or cleared, as one undo step labelled [`LABEL`], which the desktop's
+//! command and the agent's tool share ([`style_words`]), and the marks the
+//! emphasis star gives text typed on the canvas ([`emphasis_patch`]).
+//!
+//! The words are UTF-8 byte offsets into the text of a block's translation
+//! or of a text layer. The edit writes the text's spans whole, as Koharu's
+//! rich editor does, and leaves the hand-edit record as it is: a mark set by
+//! hand is a hand edit, and so is a change to one a run's emphasis set
+//! (`booharu_core::edited`).
+
+use std::{cell::Cell, ops::Range};
+
+use anyhow::{Result, bail, ensure};
+use booharu_core::{
+    emphasis::{self, EmphasisSettings},
+    lettering::{self, LetteringCategory},
+    resolver,
+    settings::LetteringSettings,
+};
+use koharu_scene::{CharStyle, Content, Edit, LayerId, Op, Project, Text};
+use serde::{Deserialize, Serialize};
+
+use crate::boxes::unlocked;
+
+/// The undo step's label, which the History panel translates.
+pub const LABEL: &str = "booharu_style_words";
+
+/// The weight bold sets.
+const BOLD: u16 = 700;
+/// The weight bold off sets in a bold text.
+const REGULAR: u16 = 400;
+/// The lightest weight a text counts as bold at.
+const BOLD_FROM: u16 = 600;
+
+/// What a words edit does to its words: exactly one of `clear`, `emphasis`,
+/// or the explicit values, `set`, `bold` and `italic`, which may go
+/// together.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default, deny_unknown_fields)]
+pub struct WordChange {
+    /// The values the words get, each one set written over theirs.
+    pub set: CharStyle,
+    /// Bold, weight 700; false takes the words' weight off, or sets regular,
+    /// 400, where the text itself is bold (600 or more). Not with a weight
+    /// in `set`.
+    pub bold: Option<bool>,
+    /// Italic; false takes the words' italic off, or sets upright where the
+    /// text itself is italic. Not with an italic in `set`.
+    pub italic: Option<bool>,
+    /// Stressed as `[booharu-emphasis]` says for the layer's lettering
+    /// category, a text layer's as the default emphasis.
+    pub emphasis: bool,
+    /// Every value of the words' own taken off, so they look as the text.
+    pub clear: bool,
+}
+
+/// What a [`WordChange`] asks for.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Mode {
+    Clear,
+    Emphasis,
+    Explicit,
+}
+
+impl WordChange {
+    fn mode(&self) -> Result<Mode> {
+        let explicit =
+            self.set != CharStyle::default() || self.bold.is_some() || self.italic.is_some();
+        let mode = match (self.clear, self.emphasis, explicit) {
+            (true, false, false) => Mode::Clear,
+            (false, true, false) => Mode::Emphasis,
+            (false, false, true) => Mode::Explicit,
+            _ => bail!("Choose clear, emphasis, or explicit style fields."),
+        };
+        ensure!(
+            self.set.weight.is_none() || self.bold.is_none(),
+            "Choose bold or a weight, not both."
+        );
+        ensure!(
+            self.set.italic.is_none() || self.italic.is_none(),
+            "Choose italic once: in set or as italic."
+        );
+        Ok(mode)
+    }
+}
+
+/// The edit styling the characters `range`, UTF-8 byte offsets, of the text
+/// of `layer` in `project`, a block's translation or a text layer's, as
+/// `change` says, the emphasis by `emphasis` and the block's category by
+/// `lettering`, as one undo step labelled [`LABEL`] holding one
+/// `SetRichText`; none when nothing changes. With `expected`, the plain text
+/// the range was taken from, a text that has changed since is refused.
+///
+/// Refused: a change asking for none or more than one of clear, emphasis
+/// and explicit values, or for a weight and bold or italic twice; a layer
+/// that's neither a block nor a text layer; one that is, or is inside, a
+/// locked layer ([`crate::boxes::Refusal::Locked`]); a block without a
+/// translation; and an empty range, or one past the text or off a
+/// character boundary.
+pub fn style_words(
+    project: &Project,
+    layer: LayerId,
+    range: Range<usize>,
+    expected: Option<&str>,
+    change: &WordChange,
+    emphasis: &EmphasisSettings,
+    lettering: &LetteringSettings,
+) -> Result<Option<Edit>> {
+    let mode = change.mode()?;
+    let (text, category) = words(project, layer, lettering)?;
+    let Some(text) = text else {
+        bail!("block {layer} has no translation, so it has no words to style");
+    };
+    let plain = text.content.text();
+    if let Some(expected) = expected {
+        ensure!(
+            expected == plain,
+            "The text changed. Select the words again."
+        );
+    }
+    ensure!(
+        range.start < range.end,
+        "Select the words to style: the range {}..{} holds none",
+        range.start,
+        range.end
+    );
+    ensure!(
+        plain.is_char_boundary(range.start) && plain.is_char_boundary(range.end),
+        "The range {}..{} isn't whole characters of the text, which is {} bytes long",
+        range.start,
+        range.end,
+        plain.len()
+    );
+    let own = &text.style.chars;
+    let stressed = emphasis::patch(&emphasis.style_for(category), own);
+    let bold = change.bold.map(|bold| match bold {
+        true => Some(BOLD),
+        false if own.weight.is_some_and(|weight| weight >= BOLD_FROM) => Some(REGULAR),
+        false => None,
+    });
+    let italic = change.italic.map(|italic| match italic {
+        true => Some(true),
+        false if own.italic == Some(true) => Some(false),
+        false => None,
+    });
+    let restyle = |marks: &CharStyle| match mode {
+        Mode::Clear => CharStyle::default(),
+        Mode::Emphasis => stressed.or(marks),
+        Mode::Explicit => {
+            let mut marks = change.set.or(marks);
+            if let Some(weight) = bold {
+                marks.weight = weight;
+            }
+            if let Some(italic) = italic {
+                marks.italic = italic;
+            }
+            marks
+        }
+    };
+    let changed = Cell::new(false);
+    let restyled = emphasis::restyled(&text.content, range, |marks| {
+        let new = restyle(marks);
+        changed.set(changed.get() || new != *marks);
+        new
+    });
+    let Some(restyled) = restyled else {
+        bail!("the words can't be cut from the text");
+    };
+    Ok(changed.get().then(|| Edit {
+        label: LABEL.to_owned(),
+        ops: vec![Op::SetRichText {
+            layer: layer.into(),
+            spans: restyled.0,
+        }],
+    }))
+}
+
+/// The marks the emphasis star gives text typed into `layer` in `project`,
+/// a block or a text layer: the emphasis `emphasis` gives its lettering
+/// category, as `lettering` reads it, a text layer's the default, over its
+/// text's own character values, or for a block not yet translated the ones
+/// Koharu's placement would give its translation. Refused as
+/// [`style_words`] refuses the layer.
+pub fn emphasis_patch(
+    project: &Project,
+    layer: LayerId,
+    emphasis: &EmphasisSettings,
+    lettering: &LetteringSettings,
+) -> Result<CharStyle> {
+    let (text, category) = words(project, layer, lettering)?;
+    let own = match text {
+        Some(text) => text.style.chars.clone(),
+        None => {
+            let (page, _) = project.parent(layer)?;
+            match &project.layer(layer)?.content {
+                Content::Block(block) => resolver::koharu_chars(page, block, None),
+                _ => CharStyle::default(),
+            }
+        }
+    };
+    Ok(emphasis::patch(&emphasis.style_for(category), &own))
+}
+
+/// The text of `layer` in `project` whose words are styled, none for a
+/// block without a translation, and its lettering category, as `lettering`
+/// reads it, none for a text layer. Refuses any other layer, and a locked
+/// one.
+fn words<'p>(
+    project: &'p Project,
+    layer: LayerId,
+    lettering: &LetteringSettings,
+) -> Result<(Option<&'p Text>, Option<LetteringCategory>)> {
+    let found = project.layer(layer)?;
+    let words = match &found.content {
+        Content::Block(block) => {
+            let (page, _) = project.parent(layer)?;
+            let category =
+                lettering::effective(page, layer, lettering).map(|effective| effective.category);
+            (block.translation.as_ref(), category)
+        }
+        Content::Text(text) => (Some(&**text), None),
+        _ => bail!("layer {layer} is neither a block nor a text, so it has no words to style"),
+    };
+    unlocked(project, layer)?;
+    Ok(words)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use anyhow::Context as _;
+    use booharu_core::{
+        attrs::{self, Lettering, LetteringSource},
+        emphasis::EmphasisStyle,
+    };
+    use koharu_scene::{Created, Rgba, RichText, Session, Span};
+    use serde_json::{Value, json};
+    use tempfile::TempDir;
+
+    use super::*;
+    use crate::boxes::Refusal;
+
+    const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
+    const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
+    const BLACK: Rgba = Rgba([0.0, 0.0, 0.0, 1.0]);
+
+    /// The translation the blocks hold: 魔 and 王 are three bytes each, so
+    /// "魔王" is 4..10 and "NO" 11..13.
+    const TEXT: &str = "Why 魔王 NO?";
+
+    /// A page holding the translated blocks `plain`, lettered at size 30,
+    /// `heavy`, bold italic, and `shout`, labelled a shout by hand, the
+    /// untranslated block `bare`, the text layer `typed`, the raster
+    /// `paint`, and the block `held` in the locked group `locked`.
+    struct Fixture {
+        _dir: TempDir,
+        session: Session,
+        layers: BTreeMap<String, LayerId>,
+    }
+
+    impl Fixture {
+        fn new() -> Result<Self> {
+            let dir = tempfile::tempdir()?;
+            let mut session = Session::create(dir.path().join("test.khr"))?;
+            let block = |x: f64, chars: Value| {
+                json!({"kind": "block", "source": {
+                    "frame": {"box": {"bounds": {"x": x, "y": 20.0, "width": 40.0, "height": 120.0}}},
+                    "content": "どうして",
+                    "style": {"chars": {"size": 30.0, "fill": BLUE}},
+                }, "translation": {
+                    "frame": {"box": {"bounds": {"x": x, "y": 20.0, "width": 40.0, "height": 120.0}}},
+                    "content": TEXT,
+                    "style": {"chars": chars},
+                }, "attributes": {"c2pa": {"detection": {"action": "c2pa.created"}}}})
+            };
+            let bare = json!({"kind": "block", "source": {
+                "frame": {"box": {"bounds": {"x": 210.0, "y": 20.0, "width": 40.0, "height": 120.0}}},
+                "content": "どうして",
+                "style": {"chars": {"size": 32.0, "fill": BLUE}},
+            }});
+            let ops = [
+                json!({"op": "add_page", "id": "$p", "index": 0, "size": {"width": 400, "height": 400}}),
+                json!({"op": "add_layer", "id": "$plain", "page": "$p", "index": 0,
+                    "layer": block(10.0, json!({"size": 30.0, "fill": BLUE}))}),
+                json!({"op": "add_layer", "id": "$heavy", "page": "$p", "index": 1,
+                    "layer": block(60.0, json!({"size": 30.0, "weight": 700, "italic": true}))}),
+                json!({"op": "add_layer", "id": "$shout", "page": "$p", "index": 2,
+                    "layer": block(110.0, json!({"size": 30.0}))}),
+                json!({"op": "add_layer", "id": "$bare", "page": "$p", "index": 3, "layer": bare}),
+                json!({"op": "add_layer", "id": "$typed", "page": "$p", "index": 4,
+                    "layer": {"kind": "text", "content": TEXT, "style": {"chars": {"size": 20.0}}}}),
+                json!({"op": "add_layer", "id": "$paint", "page": "$p", "index": 5,
+                    "layer": {"kind": "raster"}}),
+                json!({"op": "add_layer", "id": "$locked", "page": "$p", "index": 6,
+                    "layer": {"kind": "group"}}),
+                json!({"op": "add_layer", "id": "$held", "page": "$p", "parent": "$locked",
+                    "index": 0, "layer": block(160.0, json!({"size": 30.0}))}),
+            ];
+            let change = session.apply(Edit {
+                label: "test".to_owned(),
+                ops: ops
+                    .into_iter()
+                    .map(serde_json::from_value)
+                    .collect::<Result<_, _>>()?,
+            })?;
+            let layers: BTreeMap<String, LayerId> = change
+                .created
+                .into_iter()
+                .filter_map(|created| match created {
+                    Created::Layer {
+                        id,
+                        label: Some(label),
+                    } => Some((label, id)),
+                    _ => None,
+                })
+                .collect();
+            let label = Lettering {
+                category: LetteringCategory::Shout,
+                source: LetteringSource::User,
+                confidence: None,
+                role: None,
+            };
+            session.apply(Edit {
+                label: "test".to_owned(),
+                ops: vec![
+                    attrs::set(layers["shout"], &label)?,
+                    Op::UpdateLayer {
+                        layer: layers["locked"].into(),
+                        patch: json!({"locked": true}),
+                    },
+                ],
+            })?;
+            Ok(Self {
+                _dir: dir,
+                session,
+                layers,
+            })
+        }
+
+        fn id(&self, name: &str) -> LayerId {
+            self.layers[name]
+        }
+
+        /// The edit styling `range` of `name`'s words as `change` says, with
+        /// the settings [`emphasis`] gives and no category fonts.
+        fn style(
+            &self,
+            name: &str,
+            range: Range<usize>,
+            change: &WordChange,
+        ) -> Result<Option<Edit>> {
+            style_words(
+                &self.session.project(),
+                self.id(name),
+                range,
+                None,
+                change,
+                &emphasis(),
+                &LetteringSettings::default(),
+            )
+        }
+
+        /// Styles `range` of `name`'s words as `change` says, as one undo
+        /// step holding one `SetRichText`, and answers the words.
+        fn styled(
+            &mut self,
+            name: &str,
+            range: Range<usize>,
+            change: &WordChange,
+        ) -> Result<RichText> {
+            let edit = self.style(name, range, change)?.context("a change")?;
+            assert_eq!(edit.label, LABEL);
+            assert!(
+                matches!(edit.ops.as_slice(), [Op::SetRichText { .. }]),
+                "{:?}",
+                edit.ops
+            );
+            let steps = self.session.history().steps.len();
+            self.session.apply(edit)?;
+            assert_eq!(self.session.history().steps.len(), steps + 1);
+            self.words(name)
+        }
+
+        fn words(&self, name: &str) -> Result<RichText> {
+            let project = self.session.project();
+            Ok(match &project.layer(self.id(name))?.content {
+                Content::Block(block) => block
+                    .translation
+                    .as_ref()
+                    .context("a translation")?
+                    .content
+                    .clone(),
+                Content::Text(text) => text.content.clone(),
+                _ => bail!("{name} has no words"),
+            })
+        }
+    }
+
+    /// The default emphasis, with a shout's stressed words red.
+    fn emphasis() -> EmphasisSettings {
+        let mut settings = EmphasisSettings::default();
+        settings.categories.insert(
+            LetteringCategory::Shout,
+            EmphasisStyle {
+                fill: Some(RED),
+                ..EmphasisStyle::default()
+            },
+        );
+        settings
+    }
+
+    fn span(insert: &str, attributes: CharStyle) -> Span {
+        Span {
+            insert: insert.to_owned(),
+            attributes,
+        }
+    }
+
+    fn bold(on: bool) -> WordChange {
+        WordChange {
+            bold: Some(on),
+            ..WordChange::default()
+        }
+    }
+
+    fn italic(on: bool) -> WordChange {
+        WordChange {
+            italic: Some(on),
+            ..WordChange::default()
+        }
+    }
+
+    /// `TEXT` with "NO" marked `marks`.
+    fn no_marked(marks: CharStyle) -> RichText {
+        RichText(vec![
+            span("Why 魔王 ", CharStyle::default()),
+            span("NO", marks),
+            span("?", CharStyle::default()),
+        ])
+    }
+
+    fn weight(weight: u16) -> CharStyle {
+        CharStyle {
+            weight: Some(weight),
+            ..CharStyle::default()
+        }
+    }
+
+    #[test]
+    fn a_range_off_a_character_or_past_the_text_is_refused() -> Result<()> {
+        let fixture = Fixture::new()?;
+        let backwards = Range { start: 10, end: 4 };
+        for range in [5..10, 4..8, 11..15, 20..22, 4..4, backwards] {
+            let refused = fixture.style("plain", range.clone(), &bold(true));
+            assert!(refused.is_err(), "{range:?}");
+        }
+        // The whole text, and one character of three bytes, are taken.
+        assert!(
+            fixture
+                .style("plain", 0..TEXT.len(), &bold(true))?
+                .is_some()
+        );
+        assert!(fixture.style("plain", 4..7, &bold(true))?.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn bold_and_italic_off_take_the_mark_off_or_set_the_regular() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        // In a regular text, bold marks the words and bold off takes the
+        // mark off again.
+        assert_eq!(
+            fixture.styled("plain", 11..13, &bold(true))?,
+            no_marked(weight(700))
+        );
+        assert_eq!(
+            fixture.styled("plain", 11..13, &bold(false))?,
+            RichText::from(TEXT)
+        );
+        assert!(fixture.style("plain", 11..13, &bold(false))?.is_none());
+        assert_eq!(
+            fixture.styled("plain", 11..13, &italic(true))?,
+            no_marked(CharStyle {
+                italic: Some(true),
+                ..CharStyle::default()
+            })
+        );
+        assert_eq!(
+            fixture.styled("plain", 11..13, &italic(false))?,
+            RichText::from(TEXT)
+        );
+
+        // In a bold italic text, off sets regular and upright.
+        assert_eq!(
+            fixture.styled("heavy", 11..13, &bold(false))?,
+            no_marked(weight(400))
+        );
+        assert_eq!(
+            fixture.styled("heavy", 11..13, &italic(false))?,
+            no_marked(CharStyle {
+                weight: Some(400),
+                italic: Some(false),
+                ..CharStyle::default()
+            })
+        );
+        // And on again, its own values as marks.
+        assert_eq!(
+            fixture.styled("heavy", 11..13, &bold(true))?,
+            no_marked(CharStyle {
+                weight: Some(700),
+                italic: Some(false),
+                ..CharStyle::default()
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn clear_takes_off_only_the_marks_in_the_range() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let red = WordChange {
+            set: CharStyle {
+                fill: Some(RED),
+                size: Some(40.0),
+                ..CharStyle::default()
+            },
+            ..WordChange::default()
+        };
+        fixture.styled("plain", 0..3, &red)?;
+        fixture.styled("plain", 11..13, &bold(true))?;
+        let clear = WordChange {
+            clear: true,
+            ..WordChange::default()
+        };
+        // From the middle of "NO" to the end: "N" keeps its mark.
+        assert_eq!(
+            fixture.styled("plain", 12..14, &clear)?,
+            RichText(vec![
+                span("Why", red.set.clone()),
+                span(" 魔王 ", CharStyle::default()),
+                span("N", weight(700)),
+                span("O?", CharStyle::default()),
+            ])
+        );
+        assert!(fixture.style("plain", 12..14, &clear)?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn emphasis_follows_the_layers_category_or_the_default() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let stress = WordChange {
+            emphasis: true,
+            ..WordChange::default()
+        };
+        // A shout's: bold, at 115% of its size, and red.
+        let shout = CharStyle {
+            weight: Some(700),
+            size: Some(34.5),
+            fill: Some(RED),
+            ..CharStyle::default()
+        };
+        assert_eq!(fixture.styled("shout", 11..13, &stress)?, no_marked(shout));
+        // A block whose category has no emphasis of its own takes the
+        // default, which keeps the text's fill.
+        let default = CharStyle {
+            weight: Some(700),
+            size: Some(34.5),
+            ..CharStyle::default()
+        };
+        assert_eq!(
+            fixture.styled("plain", 11..13, &stress)?,
+            no_marked(default)
+        );
+        // A text layer has no category: the default, over its own size.
+        assert_eq!(
+            fixture.styled("typed", 11..13, &stress)?,
+            no_marked(CharStyle {
+                weight: Some(700),
+                size: Some(23.0),
+                ..CharStyle::default()
+            })
+        );
+        // A bold italic text's stress needs no weight.
+        assert_eq!(
+            fixture.styled("heavy", 11..13, &stress)?,
+            no_marked(CharStyle {
+                size: Some(34.5),
+                ..CharStyle::default()
+            })
+        );
+        // Stressed again, nothing changes.
+        assert!(fixture.style("heavy", 11..13, &stress)?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn the_second_border_is_set_and_cleared_on_a_word() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let border = WordChange {
+            set: CharStyle {
+                stroke: Some(RED),
+                stroke_width: Some(2.0),
+                outer_stroke: Some(BLACK),
+                outer_stroke_width: Some(4.0),
+                ..CharStyle::default()
+            },
+            ..WordChange::default()
+        };
+        assert_eq!(
+            fixture.styled("plain", 4..10, &border)?,
+            RichText(vec![
+                span("Why ", CharStyle::default()),
+                span("魔王", border.set.clone()),
+                span(" NO?", CharStyle::default()),
+            ])
+        );
+        // Set again, nothing changes; cleared, it goes.
+        assert!(fixture.style("plain", 4..10, &border)?.is_none());
+        let clear = WordChange {
+            clear: true,
+            ..WordChange::default()
+        };
+        assert_eq!(
+            fixture.styled("plain", 4..10, &clear)?,
+            RichText::from(TEXT)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_text_changed_since_the_words_were_chosen_is_refused() -> Result<()> {
+        let fixture = Fixture::new()?;
+        let project = fixture.session.project();
+        let style = |expected: &str| {
+            style_words(
+                &project,
+                fixture.id("plain"),
+                11..13,
+                Some(expected),
+                &bold(true),
+                &emphasis(),
+                &LetteringSettings::default(),
+            )
+        };
+        let changed = style("Why 魔王 NO!").expect_err("a changed text");
+        assert_eq!(
+            changed.to_string(),
+            "The text changed. Select the words again."
+        );
+        assert!(style(TEXT)?.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn a_change_asks_for_one_thing_on_a_text_that_takes_it() -> Result<()> {
+        let fixture = Fixture::new()?;
+        let choose = "Choose clear, emphasis, or explicit style fields.";
+        let red = CharStyle {
+            fill: Some(RED),
+            ..CharStyle::default()
+        };
+        for change in [
+            WordChange::default(),
+            WordChange {
+                clear: true,
+                emphasis: true,
+                ..WordChange::default()
+            },
+            WordChange {
+                emphasis: true,
+                bold: Some(true),
+                ..WordChange::default()
+            },
+            WordChange {
+                clear: true,
+                set: red.clone(),
+                ..WordChange::default()
+            },
+        ] {
+            let refused = fixture
+                .style("plain", 11..13, &change)
+                .expect_err("refused");
+            assert_eq!(refused.to_string(), choose, "{change:?}");
+        }
+        let twice = WordChange {
+            set: weight(900),
+            bold: Some(true),
+            ..WordChange::default()
+        };
+        assert!(fixture.style("plain", 11..13, &twice).is_err());
+        // Explicit values go together.
+        let together = WordChange {
+            set: red,
+            bold: Some(true),
+            italic: Some(true),
+            ..WordChange::default()
+        };
+        assert!(fixture.style("plain", 11..13, &together)?.is_some());
+
+        // Neither a block nor a text, a block with no translation, and a
+        // locked one, each refused.
+        assert!(fixture.style("paint", 0..1, &bold(true)).is_err());
+        assert!(fixture.style("locked", 0..1, &bold(true)).is_err());
+        assert!(fixture.style("bare", 0..1, &bold(true)).is_err());
+        let locked = fixture
+            .style("held", 11..13, &bold(true))
+            .expect_err("a locked group");
+        assert!(
+            matches!(
+                locked.downcast_ref::<Refusal>(),
+                Some(Refusal::Locked { layer, .. }) if *layer == fixture.id("locked")
+            ),
+            "{locked}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_star_gives_the_emphasis_over_the_texts_own_values() -> Result<()> {
+        let fixture = Fixture::new()?;
+        let project = fixture.session.project();
+        let star = |name: &str| {
+            emphasis_patch(
+                &project,
+                fixture.id(name),
+                &emphasis(),
+                &LetteringSettings::default(),
+            )
+        };
+        assert_eq!(
+            star("shout")?,
+            CharStyle {
+                weight: Some(700),
+                size: Some(34.5),
+                fill: Some(RED),
+                ..CharStyle::default()
+            }
+        );
+        assert_eq!(
+            star("typed")?,
+            CharStyle {
+                weight: Some(700),
+                size: Some(23.0),
+                ..CharStyle::default()
+            }
+        );
+        // A block not yet translated: over what Koharu's placement would
+        // give its translation, at the page's lettering size, the lower
+        // median of its sources' sizes, 30.
+        assert_eq!(
+            star("bare")?,
+            CharStyle {
+                weight: Some(700),
+                size: Some(34.5),
+                ..CharStyle::default()
+            }
+        );
+        for refused in ["paint", "held"] {
+            assert!(star(refused).is_err(), "{refused}");
+        }
+        Ok(())
+    }
+}

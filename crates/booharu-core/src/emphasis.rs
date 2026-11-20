@@ -268,6 +268,10 @@ pub fn restyled(
         let from = range.start.clamp(start, end) - start;
         let to = range.end.clamp(start, end) - start;
         for (piece, inside) in [(0..from, false), (from..to, true), (to..end - start, false)] {
+            // `change` sees only characters in the range.
+            if piece.is_empty() {
+                continue;
+            }
             let insert = span.insert.get(piece)?;
             let attributes = match inside {
                 true => change(&span.attributes),
@@ -727,6 +731,16 @@ mod tests {
             assert_eq!(restyled(&content, range.clone(), unbold), None, "{range:?}");
         }
         assert_eq!(restyled(&content, 2..2, unbold), Some(content.clone()));
+        // The change sees the marks of the characters in the range only.
+        let seen = std::cell::RefCell::new(Vec::new());
+        let seeing = |marks: &CharStyle| {
+            seen.borrow_mut().push(marks.clone());
+            marks.clone()
+        };
+        assert_eq!(restyled(&content, 0..4, seeing), Some(content.clone()));
+        assert_eq!(seen.take(), [CharStyle::default()]);
+        assert_eq!(restyled(&content, 2..2, seeing), Some(content.clone()));
+        assert!(seen.take().is_empty());
     }
 
     /// A span of `insert` with the marks `attributes`.

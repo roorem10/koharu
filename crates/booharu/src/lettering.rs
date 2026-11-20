@@ -404,7 +404,11 @@ pub fn fonts(settings: &LetteringSettings, font: Option<&str>) -> Vec<ResolvedFo
 mod tests {
     use std::collections::BTreeMap;
 
-    use booharu_core::{settings::SfxMode, shape::BubbleShape};
+    use booharu_core::{
+        emphasis::{EmphasisSettings, Marking},
+        settings::SfxMode,
+        shape::BubbleShape,
+    };
     use koharu_scene::{CharStyle, Created, LanguageIdentifier, Session, Span, Text};
     use serde_json::Value;
     use tempfile::TempDir;
@@ -554,6 +558,18 @@ mod tests {
         /// Translates `names` as Koharu's Translation stage does, with
         /// Booharu's hook and the switch off.
         fn translate(&mut self, names: &[&str]) -> Result<()> {
+            self.translate_stressing(names, &[])
+        }
+
+        /// [`Fixture::translate`], the model picking `words` to stress,
+        /// which the hook marks in the default emphasis.
+        fn translate_stressing(&mut self, names: &[&str], words: &[&str]) -> Result<()> {
+            let emphasis = EmphasisSettings::default();
+            let words: Vec<String> = words.iter().map(|word| (*word).to_owned()).collect();
+            let marking = Marking {
+                settings: Some(&emphasis),
+                words: &words,
+            };
             let project = self.session.project();
             let english: LanguageIdentifier = "en".parse()?;
             let mut ops = Vec::new();
@@ -572,7 +588,7 @@ mod tests {
                     &placed,
                     &LetteringSettings::default(),
                     Some(FONT),
-                    &booharu_core::emphasis::Marking::default(),
+                    &marking,
                 )?);
                 ops.push(Op::SetAttribute {
                     layer: block.into(),
@@ -797,6 +813,67 @@ mod tests {
             Chooser::User,
             &settings,
         )?;
+        assert_eq!(fixture.font("b")?, font("Badaboom BB", Some(700)));
+        Ok(())
+    }
+
+    #[test]
+    fn a_models_choice_letters_a_block_whose_only_word_marks_are_its_runs() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = lettered();
+        let model = Chooser::Model {
+            confidence: Some(0.9),
+        };
+        // b translated again, its model stressing a word, which is no hand
+        // edit.
+        fixture.translate_stressing(&["b"], &["Why"])?;
+        let marked = fixture.translation("b")?.content;
+        assert!(
+            marked
+                .0
+                .iter()
+                .any(|span| span.attributes != CharStyle::default())
+        );
+        assert!(!edited(&fixture.layer("b")?).style);
+
+        let counts = fixture.set(&["b"], Some(LetteringCategory::Shout), model, &settings)?;
+        assert_eq!(
+            counts,
+            CategoryCounts {
+                changed: 1,
+                ..CategoryCounts::default()
+            }
+        );
+        assert_eq!(fixture.font("b")?, font("Badaboom BB", Some(700)));
+        // The marks stay, still the run's.
+        assert_eq!(fixture.translation("b")?.content, marked);
+        assert_eq!(Auto::of(&fixture.layer("b")?).marks.len(), 1);
+        assert!(!edited(&fixture.layer("b")?).style);
+
+        // A word marked by hand is a hand edit, whose font a model's choice
+        // keeps.
+        let italic = crate::words::WordChange {
+            italic: Some(true),
+            ..crate::words::WordChange::default()
+        };
+        let edit = crate::words::style_words(
+            &fixture.session.project(),
+            fixture.id("b"),
+            3..4,
+            None,
+            &italic,
+            &EmphasisSettings::default(),
+            &settings,
+        )?
+        .context("a change")?;
+        fixture.session.apply(edit)?;
+        let counts = fixture.set(
+            &["b"],
+            Some(LetteringCategory::NormalDialogue),
+            model,
+            &settings,
+        )?;
+        assert_eq!((counts.changed, counts.kept_hand_edited), (1, 1));
         assert_eq!(fixture.font("b")?, font("Badaboom BB", Some(700)));
         Ok(())
     }
