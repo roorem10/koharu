@@ -559,6 +559,21 @@ export type Character = {
   notes?: string
 }
 
+/**
+ *  What `clear_all` does to the boxes named: its edit, none when nothing
+ *  changes, with how many texts it clears and how many it leaves alone as
+ *  locked, which the desktop answers without the edit, which it applies.
+ */
+export type ClearedWords = {
+  /**  Texts whose word styles it takes off. */
+  cleared: number
+  /**
+   *  Texts with word styles that it leaves as they are because they, or
+   *  a layer holding them, are locked.
+   */
+  locked: number
+}
+
 /**  The app's theme colours the canvas draws with. */
 export type Colors = {
   /**  Around the page. */
@@ -1992,6 +2007,12 @@ export type Size = {
 }
 
 /**
+ *  A step a words edit makes its words bigger or smaller by: 5%, to the
+ *  half pixel, as `booharu_core::sizes` steps a size.
+ */
+export type SizeStep = 'bigger' | 'smaller'
+
+/**
  *  Why a read skipped, writing nothing: its job tells it, so the interface
  *  words it in the user's language. It reads in English as the job's
  *  message, and a read by hand's error.
@@ -2269,7 +2290,28 @@ export type Typed = {
    *  empty.
    */
   mixed: CharKey[]
+  /**
+   *  Booharu: the selected characters as the type bar quotes them, each
+   *  line break a space, cut to 80 grapheme clusters; none at a caret.
+   *  Left out when none.
+   */
+  selected?: string | null
 }
+
+/**
+ *  What the type bar takes off the characters being typed, for real, as
+ *  the words edit takes marks off Story's words, so they agree.
+ */
+export type Unmark =
+  /**  Clear: every mark, so the characters look as the text. */
+  | 'all'
+  /**
+   *  B off: the weight mark, or regular, 400, where the text itself is
+   *  bold (600 or more).
+   */
+  | 'bold'
+  /**  I off: the italic mark, or upright where the text itself is italic. */
+  | 'italic'
 
 export type Value = null | boolean | number | string | Value[] | { [key in string]: Value }
 
@@ -2287,7 +2329,7 @@ export type Vendor = {
 
 /**
  *  What a words edit does to its words: exactly one of `clear`, `emphasis`,
- *  or the explicit values, `set`, `bold` and `italic`, which may go
+ *  `step`, or the explicit values, `set`, `bold` and `italic`, which may go
  *  together.
  */
 export type WordChange = {
@@ -2311,6 +2353,12 @@ export type WordChange = {
   emphasis?: boolean
   /**  Every value of the words' own taken off, so they look as the text. */
   clear?: boolean
+  /**
+   *  Each of the words a step bigger or smaller from its own size, else
+   *  the text's, 24 pixels without one, as the type bar's A+ and A− step
+   *  them, so words of different sizes keep their order.
+   */
+  step?: SizeStep | null
 }
 
 export const commands = {
@@ -2591,6 +2639,17 @@ export const commands = {
   /** The marks the emphasis star gives the text typed into `layer`, a block or a text layer: its lettering category's emphasis, a text layer's the default, over its text's own values, so only what changes is set. Refused for a layer that's neither, and for a locked one. */
   booharuEmphasisPatch: (layer: LayerId) =>
     invoke<CharStyle>('booharu_emphasis_patch', { layer }, { headers: headers() }),
+  /** Takes every word style off the texts of `layers`, each a block's translation or a text layer's, so their words look as their texts, as one undo step labelled `booharu_clear_word_styles`, none when none of them carries a word style. A box that is, or is inside, a locked layer is left as it is; a block without a translation, and any other layer, are left out. Answers how many texts it cleared, and how many with word styles it left as they are because they're locked. */
+  booharuClearWordStyles: (layers: LayerId[]) =>
+    invoke<ClearedWords>('booharu_clear_word_styles', { layers }, { headers: headers() }),
+  /** Commits the text being typed, as Ctrl+Enter does, as one undo step, none when nothing changed: the type bar's Done. Nothing when not typing. */
+  booharuFinishTyping: () => invoke<null>('booharu_finish_typing', {}, { headers: headers() }),
+  /** Takes marks off the text being typed, as the type bar's Clear, B off and I off ask: off the selected characters, or off the next ones typed at a caret. `all` takes every mark; `bold` the weight, or sets regular where the text itself is bold; `italic` the italic, or sets upright where the text itself is italic. Nothing when not typing. */
+  booharuUnmarkTyping: (what: Unmark) =>
+    invoke<null>('booharu_unmark_typing', { what }, { headers: headers() }),
+  /** The text being typed a step bigger, or smaller, 5% to the half pixel, as the type bar's A+ and A− ask: each selected character from its own size, else the text's, or at a caret the next ones typed. Nothing when not typing. */
+  booharuStepTypingSize: (bigger: boolean) =>
+    invoke<null>('booharu_step_typing_size', { bigger }, { headers: headers() }),
 }
 
 export const events = {

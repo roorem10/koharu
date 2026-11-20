@@ -64,13 +64,12 @@ pub struct WordChange {
     pub clear: bool,
     /// Each of the words a step bigger or smaller from its own size, else
     /// the text's, 24 pixels without one, as the type bar's A+ and A− step
-    /// them ([`sizes::resized`]), so words of different sizes keep their
-    /// order.
+    /// them, so words of different sizes keep their order.
     pub step: Option<SizeStep>,
 }
 
 /// A step a words edit makes its words bigger or smaller by: 5%, to the
-/// half pixel ([`sizes::stepped`]).
+/// half pixel, as `booharu_core::sizes` steps a size.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, specta::Type, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SizeStep {
@@ -208,7 +207,7 @@ pub fn style_words(
     }))
 }
 
-/// What [`clear_all`] does to the boxes named: its edit, none when nothing
+/// What `clear_all` does to the boxes named: its edit, none when nothing
 /// changes, with how many texts it clears and how many it leaves alone as
 /// locked, which the desktop answers without the edit, which it applies.
 #[derive(Clone, Debug, Default, Serialize, specta::Type)]
