@@ -183,29 +183,24 @@ pub(super) fn grown(runs: &[GlyphRun], resolved: &[TextRun]) -> Vec<Grown> {
             // What `draw` grows each pass by, reckoned as it does.
             let bold = draw::bold(&glyphs.font, run.size);
             let stroke = bold + f64::from(width);
-            let outer = run
-                .outer_stroke
-                .map(|(_, outer)| (bold + f64::from(width + outer), f64::from(outer)));
-            if stroke <= 0.0 && outer.is_none_or(|(outer, _)| outer <= 0.0) {
+            if stroke <= 0.0 {
                 return Grown::default();
             }
+            // How much further the second border reaches, which a run has
+            // only beside a border of its own (`SpanStyle::new`).
+            let more = run.outer_stroke.map(|(_, outer)| f64::from(outer));
             let turn = draw::turn(&glyphs.font, glyphs.sideways).unwrap_or(Affine::IDENTITY);
             let mut alike: HashMap<u32, [Option<BezPath>; 2]> = HashMap::new();
             let mut regions = [BezPath::new(), BezPath::new()];
             outlines(glyphs, run.size, Outlines::Stroked, |glyph, outline| {
                 let grown = alike.entry(glyph.id).or_insert_with(|| {
-                    let letter = merged(&outline);
-                    let first = (stroke > 0.0).then(|| grow(&letter, stroke));
-                    // The second border grows on from the first where there's
-                    // one, the same shape as the letter grown by both at once,
-                    // at less cost.
-                    let second = outer.and_then(|(reach, more)| match &first {
-                        Some(first) if more > 0.0 => Some(grow(first, more)),
-                        _ => (reach > 0.0).then(|| grow(&letter, reach)),
-                    });
+                    let first = grow(&merged(&outline), stroke);
+                    // The second border grows on from the first, the same
+                    // shape as the letter grown by both at once, at less cost.
+                    let second = more.map(|more| grow(&first, more));
                     // Turned once grown, as glifo strokes a glyph before its
                     // glyph transform (see `Outlines::Stroked`).
-                    [second, first].map(|grown| {
+                    [second, Some(first)].map(|grown| {
                         let mut grown = path(&grown?);
                         grown.apply_affine(turn);
                         Some(grown)
@@ -919,10 +914,12 @@ mod tests {
         Ok(())
     }
 
-    /// `layout`'s borders as Koharu 0.89.0 draws them, in black, on a
-    /// drawing as `drawn`'s: each run's glyphs filled, then stroked twice as
-    /// wide as the border grows them, with round joins, through
-    /// `Drawing::glyphs`; `None` without a GPU.
+    /// `layout`'s outermost borders as Koharu 0.89.0 draws them, in black, on
+    /// a drawing as `drawn`'s: each run's glyphs filled, then stroked twice as
+    /// wide as the pass grows them, with round joins, through
+    /// `Drawing::glyphs`, by its second border's pass (`Pass::Outer`), which
+    /// grows them by both borders' widths, where it has one, or else by its
+    /// border's (`Pass::Stroke`); `None` without a GPU.
     fn koharus(layout: &crate::text::TextLayout) -> Result<Option<image::RgbaImage>> {
         let Ok(gpu) = crate::Gpu::get() else {
             eprintln!("skipped drawing without a GPU");
@@ -938,7 +935,8 @@ mod tests {
             let Some((_, width)) = run.stroke else {
                 continue;
             };
-            let grow = draw::bold(&glyphs.font, run.size) + f64::from(width);
+            let outer = run.outer_stroke.map_or(0.0, |(_, outer)| outer);
+            let grow = draw::bold(&glyphs.font, run.size) + f64::from(width + outer);
             let stroke = Stroke::new(2.0 * grow).with_join(Join::Round);
             let turn = draw::turn(&glyphs.font, glyphs.sideways);
             drawing.glyphs(&glyphs.font, run.size, turn, Some(stroke), &glyphs.glyphs)?;
@@ -989,11 +987,22 @@ mod tests {
         cases.push(("sideways", plain, Direction::Vertical));
         let clear = Rgba([1.0, 1.0, 1.0, 0.0]);
         let black = Rgba([0.0, 0.0, 0.0, 1.0]);
+        // The border alone, under a clear fill; then the second border, under
+        // a clear border, which Koharu's second pass strokes as wide as both.
+        // Some widths between, as 8 px past 2 px under the synthetic bold,
+        // fold where two letters' strokes meet and leave pinholes there,
+        // which the region fills.
+        let borders = [
+            ((black, 2.0), None),
+            ((black, 4.0), None),
+            ((black, 8.0), None),
+            ((clear, 2.0), Some((black, 4.0))),
+            ((clear, 4.0), Some((black, 8.0))),
+        ];
         for (name, font, direction) in &cases {
             for content in ["Hello World", "WAVE MAW"] {
-                for width in [2.0, 4.0, 8.0] {
-                    // The border alone, under a clear fill.
-                    let layout = bordered(content, font, *direction, clear, (black, width), None)?;
+                for (border, second) in borders {
+                    let layout = bordered(content, font, *direction, clear, border, second)?;
                     let run = &layout.runs[0];
                     match *name {
                         "bold" => assert!(draw::bold(&run.font, 48.0) > 0.0),
@@ -1011,7 +1020,7 @@ mod tests {
                     // its chords inside the curve, where the region keeps
                     // within a fiftieth. Measured on llvmpipe in DejaVu Sans:
                     // the largest difference 105 of 255, at a round join; the
-                    // edges 0.073 of a pixel apart on average at most, the
+                    // edges 0.074 of a pixel apart on average at most, the
                     // region's outside; and no pixel off Koharu's antialiased
                     // edge differing by more than 8, an edge which takes in
                     // the faint seam (alpha 236) its stroke leaves where
@@ -1020,7 +1029,12 @@ mod tests {
                     // edges lie within 0.15 of a pixel on average, where
                     // growth off by a pixel, or mitred joins, differ by whole
                     // pixels.
-                    let case = format!("{name} {content:?} at {width} px");
+                    let case = match second {
+                        None => format!("{name} {content:?} at {} px", border.1),
+                        Some((_, outer)) => {
+                            format!("{name} {content:?} at {outer} px past {} px", border.1)
+                        }
+                    };
                     assert_eq!(off_edge, 0, "{case}: {off_edge} pixels off the edge");
                     assert!(largest <= 144, "{case}: {largest} of 255 apart");
                     assert!(apart <= 0.15, "{case}: {apart:.3} px apart");
