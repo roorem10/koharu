@@ -91,6 +91,24 @@ pub(crate) mod testing {
     pub(crate) fn unreadable<T: koharu_config::Section>() -> koharu_config::Result<T> {
         koharu_config::booharu_read_section(&format!("[{}", T::NAME))
     }
+
+    /// Runs `edit` on the section `T` as a save does, in a settings file
+    /// holding `table` as `T`'s table: how that went, the section as the
+    /// file reads it then, and the file.
+    pub(crate) fn saved<T: koharu_config::Section>(
+        table: &str,
+        edit: impl FnOnce(&mut T),
+    ) -> (koharu_config::Result<()>, T, String) {
+        let directory = tempfile::tempdir().expect("a folder");
+        let path = directory.path().join("config.toml");
+        let table: toml::Table = table.parse().expect("a table");
+        let file = toml::Table::from_iter([(T::NAME.to_owned(), toml::Value::Table(table))]);
+        std::fs::write(&path, toml::to_string(&file).expect("a settings file")).expect("saved");
+        let outcome = koharu_config::booharu_update_file(&path, edit);
+        let text = std::fs::read_to_string(&path).expect("the file");
+        let read = koharu_config::booharu_read_section(&text).expect("the section");
+        (outcome, read, text)
+    }
 }
 
 #[cfg(test)]

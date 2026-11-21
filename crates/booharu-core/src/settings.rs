@@ -585,9 +585,10 @@ impl BooharuPreferences {
 
     /// Saves every section, writing only what differs from its defaults, and
     /// answers them as the file holds them now. A stored value that doesn't
-    /// read, which reads as its default, stays in the file until a save sets
-    /// that key to another value, as koharu-config writes only the keys that
-    /// change.
+    /// read, which reads as its default, stays in the file until a save
+    /// changes it, as koharu-config writes only the keys that change; a
+    /// change to a list, or to a map or table that reads as its default for
+    /// one, writes it whole, as it read, with the change.
     pub fn save(self) -> anyhow::Result<Self> {
         // Every section is read and every given value checked before any is
         // written, so a bad value given, or a file that can't be read, writes
@@ -650,8 +651,8 @@ impl BooharuPreferences {
     /// such as a font's star, stays. Answers every section as the file holds
     /// them then. An unknown section or key, a bad value given, or a file
     /// that can't be read writes nothing; a stored value that doesn't read
-    /// reads as its default, and stays in the file unless `values` sets it to
-    /// another value.
+    /// reads as its default, and stays in the file unless `values` changes
+    /// it, as [`save`](Self::save) writes it.
     pub fn save_section(name: &str, values: Map<String, Value>) -> anyhow::Result<Self> {
         let save = saver(name).ok_or_else(|| unknown(name))?;
         // The file is read first, as `save` reads it, so one that can't be

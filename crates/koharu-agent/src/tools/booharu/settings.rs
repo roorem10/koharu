@@ -147,7 +147,9 @@ impl Tool for SetSettings {
         "Change keys of one of Booharu's settings sections, named as booharu_get_settings names \
          them, and save that section alone; an unknown section or key, a key inside one of its \
          tables included, or an invalid value, saves nothing. Answers the section as saved, \
-         with a note when the change applies only once Booharu restarts. `categories` changes \
+         with a note when the change applies only once Booharu restarts. A stored value that \
+         doesn't read counts as its default, so a change to a list or map holding one saves it \
+         as booharu_get_settings shows it, with the change. `categories` changes \
          only the categories it names, each only in the keys it names, so `{\"categories\": \
          {\"shout\": {\"bold\": true}}}` keeps Shout's family and every other category's \
          font, and a category set to null, `{\"categories\": {\"shout\": null}}`, loses its \

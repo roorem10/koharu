@@ -526,7 +526,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::testing::{stored, unreadable};
+    use crate::testing::{saved, stored, unreadable};
 
     const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
 
@@ -637,6 +637,60 @@ mod tests {
         let removed: EmphasisSettings =
             serde_json::from_value(json!({"categories": {"shout": null}})).expect("no entry");
         assert!(removed.categories.is_empty());
+    }
+
+    #[test]
+    fn a_change_over_a_bad_stored_style_writes_it_whole() {
+        // A category whose weight doesn't read gives the categories their
+        // default, none; a change to them saves them as read with it.
+        let whisper = EmphasisStyle {
+            italic: Some(true),
+            ..EmphasisStyle::default()
+        };
+        let (outcome, read, text) = saved::<EmphasisSettings>(
+            "[categories.shout]\nsize_factor = 2\n[categories.whisper]\nweight = 5000",
+            |emphasis| {
+                assert!(emphasis.categories.is_empty());
+                emphasis
+                    .categories
+                    .insert(LetteringCategory::Whisper, whisper.clone());
+            },
+        );
+        outcome.expect("saved");
+        assert_eq!(
+            read.categories,
+            BTreeMap::from([(LetteringCategory::Whisper, whisper)])
+        );
+        assert!(!text.contains("5000"), "{text}");
+        // A default whose only value doesn't read is the default look; a
+        // change to it saves that look with the change, a weight of its own
+        // or italic beside bold at 115%.
+        let stored = "[default]\nweight = 5000";
+        for (change, wanted) in [
+            (
+                EmphasisStyle {
+                    weight: Some(600),
+                    ..EmphasisStyle::default()
+                },
+                (Some(600), None),
+            ),
+            (
+                EmphasisStyle {
+                    italic: Some(true),
+                    ..EmphasisStyle::default()
+                },
+                (Some(BOLD), Some(true)),
+            ),
+        ] {
+            let (outcome, read, text) = saved::<EmphasisSettings>(stored, |emphasis| {
+                assert_eq!(emphasis.default, EmphasisSettings::default().default);
+                emphasis.default = change.or(&emphasis.default);
+            });
+            outcome.expect("saved");
+            assert_eq!((read.default.weight, read.default.italic), wanted);
+            assert_eq!(read.default.size_factor, Some(1.15));
+            assert!(!text.contains("5000"), "{text}");
+        }
     }
 
     #[test]

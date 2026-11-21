@@ -1,5 +1,6 @@
 //! Koharu's settings and secrets.
 
+mod booharu; // Booharu: how a save writes a key of Booharu's that doesn't read.
 mod error;
 pub mod secrets;
 
@@ -59,6 +60,13 @@ pub fn booharu_read_section<T: Section>(text: &str) -> Result<T> {
     section(Path::new("config.toml"), text)
 }
 
+/// Booharu: runs `edit` on the section in the settings file at `path` and
+/// writes what it changed, the way [`update`] saves `config.toml`, for
+/// Booharu's tests of what a save writes over a stored value.
+pub fn booharu_update_file<T: Section>(path: &Path, edit: impl FnOnce(&mut T)) -> Result<()> {
+    write(path, edit)
+}
+
 fn read<T: Section>(path: &Path) -> Result<T> {
     section(path, &read_text(path)?.unwrap_or_default())
 }
@@ -85,6 +93,8 @@ fn write<T: Section>(path: &Path, edit: impl FnOnce(&mut T)) -> Result<()> {
     if let Some(table) = item.as_table_like_mut() {
         edit_table(table, &before, &after, Some(&defaults));
     }
+    // Booharu: a key of Booharu's that still doesn't read back is written whole.
+    booharu::whole::<T>(path, &mut document, &after, &defaults)?;
     let text = document.to_string();
     if table(&section::<T>(path, &text)?) != after {
         return Err(invalid(

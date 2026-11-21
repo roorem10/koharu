@@ -560,7 +560,7 @@ mod tests {
     use super::*;
     use crate::{
         settings::BooharuPreferences,
-        testing::{stored, unreadable},
+        testing::{saved, stored, unreadable},
     };
 
     fn label(
@@ -760,6 +760,54 @@ mod tests {
             Some(1.0)
         );
         assert_eq!(edges.categories.len(), 1);
+    }
+
+    #[test]
+    fn a_change_to_categories_holding_a_bad_one_writes_them_whole() {
+        // Shout's font is good and Whisper's blank family isn't, so they
+        // read as none.
+        let stored = "[categories.shout]\nfamily = \"Anime Ace\"\nbold = true\n\
+                      [categories.whisper]\nfamily = \"\"";
+        let thoughts = CategoryFont {
+            italic: true,
+            ..CategoryFont::default()
+        };
+        // A change to them saves them as read with it, over the file's.
+        let (outcome, read, text) = saved::<LetteringSettings>(stored, |lettering| {
+            assert!(lettering.categories.is_empty());
+            lettering
+                .categories
+                .insert(LetteringCategory::Thoughts, thoughts.clone());
+        });
+        outcome.expect("saved");
+        assert_eq!(
+            read.categories,
+            BTreeMap::from([(LetteringCategory::Thoughts, thoughts)])
+        );
+        assert!(!text.contains("Anime Ace"), "{text}");
+        // Shout's font picked again is saved alone.
+        let shout = CategoryFont {
+            family: Some("Anime Ace".into()),
+            bold: true,
+            italic: false,
+        };
+        let (outcome, read, _) = saved::<LetteringSettings>(stored, |lettering| {
+            lettering
+                .categories
+                .insert(LetteringCategory::Shout, shout.clone());
+        });
+        outcome.expect("saved");
+        assert_eq!(
+            read.categories,
+            BTreeMap::from([(LetteringCategory::Shout, shout)])
+        );
+        // A change elsewhere leaves them in the file as they were.
+        let (outcome, read, text) = saved::<LetteringSettings>(stored, |lettering| {
+            lettering.auto = true;
+        });
+        outcome.expect("saved");
+        assert!(read.auto && read.categories.is_empty());
+        assert!(text.contains("Anime Ace"), "{text}");
     }
 
     fn values(values: Value) -> serde_json::Map<String, Value> {

@@ -29,6 +29,13 @@ A write reads back what it's about to save and saves only if reading would
 return exactly what the edit left, so the file can't hold a value that reads
 differently.
 
+<!-- Booharu: a key of its own that doesn't read is written whole. -->
+In Booharu's own tables, `[booharu-<area>]`, a key that still wouldn't read
+back once the write has edited it key by key, as a map holding an entry that
+doesn't read, which reads as its default, is written whole instead: as it
+read, with the change, over what the file held. Koharu's own tables still
+refuse such a save.
+
 ## 2. Secrets
 
 | Part | Model | Cite |
