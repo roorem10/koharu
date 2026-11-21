@@ -154,14 +154,16 @@ fn gradient_fill(gradient: &Gradient, extent: Rect, transform: Affine) -> Descri
 /// along the normal the transform's inverse transpose gives, its length
 /// the extent's along its angle, divided by how much that normal stretches.
 /// A radial one reaches the extent's corners, as long on the page as the
-/// transform scales areas, measured along the box's longer side.
+/// transform scales areas, measured along the box's longer side. A
+/// transform that flattens the text, which then shows nothing, keeps the
+/// gradient's own angle, brought into that range, at scale 100.
 pub(crate) fn fit(gradient: &Gradient, extent: Rect, transform: Affine) -> (f64, f64) {
     let (width, height) = (extent.width(), extent.height());
     let frame = transform.transform_rect_bbox(extent);
     let [a, b, c, d, ..] = transform.as_coeffs();
     let determinant = a * d - b * c;
     if !determinant.is_finite() || determinant.abs() < 1e-12 {
-        return (gradient.angle, 100.0);
+        return (normalized(gradient.angle), 100.0);
     }
     let (angle, length, chord) = match gradient.kind {
         GradientKind::Linear => {
@@ -170,10 +172,7 @@ pub(crate) fn fit(gradient: &Gradient, extent: Rect, transform: Affine) -> (f64,
             let reach = width * along.x.abs() + height * along.y.abs();
             let normal =
                 Vec2::new(d * along.x - b * along.y, a * along.y - c * along.x) / determinant;
-            let mut angle = (-normal.y).atan2(normal.x).to_degrees();
-            if angle <= -180.0 {
-                angle += 360.0;
-            }
+            let angle = normalized((-normal.y).atan2(normal.x).to_degrees());
             let turn = angle.to_radians();
             let chord = [(frame.width(), turn.cos()), (frame.height(), turn.sin())]
                 .into_iter()
@@ -200,6 +199,14 @@ pub(crate) fn fit(gradient: &Gradient, extent: Rect, transform: Affine) -> (f64,
             scale.clamp(10.0, 150.0)
         },
     )
+}
+
+/// The direction `angle` gives, in degrees, as an angle in (-180, 180],
+/// where Photoshop's angles lie.
+fn normalized(angle: f64) -> f64 {
+    // From 0 to 360, which round-off reaches for an angle just under 0.
+    let angle = angle.rem_euclid(360.0);
+    if angle > 180.0 { angle - 360.0 } else { angle }
 }
 
 #[cfg(test)]
@@ -536,5 +543,51 @@ mod tests {
             Affine::scale(3.0),
         );
         assert!(close(radial, (0.0, 116.62)), "{radial:?}");
+    }
+
+    #[test]
+    fn an_overlay_s_angle_stays_in_photoshop_s_range_on_a_flattened_text() {
+        // The scene keeps a gradient's angle as given, so on a text its
+        // transform flattens to a line or a point, which shows nothing, the
+        // overlay keeps that angle, brought into (-180, 180], at 100.
+        let flattened = [
+            Affine::new([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+            Affine::scale(1e-7),
+        ];
+        let angles = [
+            (270.0, -90.0),
+            (-180.0, 180.0),
+            (540.0, 180.0),
+            (-90.0, -90.0),
+            (30.0, 30.0),
+        ];
+        for transform in flattened {
+            for kind in [GradientKind::Linear, GradientKind::Radial] {
+                for (angle, want) in angles {
+                    let got = fitted(kind, angle, (200.0, 120.0), transform);
+                    assert!(
+                        near(got.0, want) && got.1 == 100.0,
+                        "{kind:?} at {angle} under {transform:?}: {got:?}"
+                    );
+                }
+            }
+        }
+        // As a text set as it is runs it, and so the file holds it.
+        let upright = fitted(
+            GradientKind::Linear,
+            270.0,
+            (200.0, 120.0),
+            Affine::IDENTITY,
+        );
+        assert!(near(upright.0, -90.0), "{upright:?}");
+        let text = words(|run| {
+            run.fill_gradient = Some(gradient(GradientKind::Linear, 270.0));
+            run.fill_extent = Some(INK);
+        });
+        let block = effects(&layer(flattened[0]), &text).expect("effects");
+        let effects = read(&block);
+        let fill = object(&effects, "GrFl");
+        assert!(near(number(fill, "Angl"), -90.0), "{fill:?}");
+        assert_eq!(number(fill, "Scl "), 100.0);
     }
 }
