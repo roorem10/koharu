@@ -68,6 +68,11 @@ do: with the scene's own queries and edits, its undo and redo, and its history.
   CBR archive, and of each page of a PDF, in name order.
 - **Export** writes every page as PNG or PSD files in a folder, or as a CBZ of
   PNGs.
+- **Booharu** writes a report beside a page's PSD, `001.psd.report.json`, when <!-- Booharu: the report beside a PSD. -->
+  its export drew texts into pixels, as their words carry effects of their
+  own: a JSON array of `koharu_psd::Notice`, each text's layer, name and page,
+  why, and where its words stay editable. A page with none gets no report, and
+  one an earlier export left there is removed.
 
 ## 4. Around the project
 
