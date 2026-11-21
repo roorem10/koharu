@@ -301,6 +301,8 @@ impl Export<'_> {
 
     /// A block's parts, bottom to top: its clean-up, masked by its mask; its
     /// source as a hidden type layer; and its translation as a type layer.
+    /// Booharu: or, when its words carry effects of their own, as a pixel
+    /// layer over a hidden type layer to edit (S13-g).
     fn block(&mut self, id: LayerId, block: &Block) -> Result<()> {
         let cleanup = &block.cleanup;
         let cleaned = drawn(self.frame.layer(cleanup.id), || {

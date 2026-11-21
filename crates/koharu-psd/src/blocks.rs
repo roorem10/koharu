@@ -214,10 +214,14 @@ const LF: u16 = b'\n' as u16;
 /// run: a type layer (`TySh`) holding its transform, a text descriptor with
 /// the EngineData, and a warp descriptor; and, when every run shares one
 /// stroke, an Outside stroke effect (`lfx2` with `FrFX`), how Photoshop
-/// strokes type outside its glyphs as the renderer does. Strokes that differ
-/// by span stay in the pixels only.
+/// strokes type outside its glyphs as the renderer does.
 /// Booharu: `booharu::effects` writes the effects: the stroke effect as it
 /// was, or with a second border and a gradient fill, all the runs share.
+/// Strokes that differ by span no longer stay in the pixels only, as
+/// Koharu's did, and nor do second borders or gradients: the export draws
+/// such a text into a pixel layer, and this writes the hidden type layer
+/// under it, of its runs in plain styles, so with no effects
+/// (`booharu::pixels`, S13-g).
 pub(crate) fn type_layer(layer: &Text, text: &ResolvedText, index: i32) -> Vec<TaggedBlock> {
     let vertical = layer.direction == Direction::Vertical;
     let frame = text.frame;

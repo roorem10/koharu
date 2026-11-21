@@ -27,7 +27,7 @@ its source, and its translation each stay a layer.
 | block | a folder holding its clean-up as a pixel layer, whose layer mask is the block's mask while that's shown, its source as a hidden type layer, and its translation as a type layer |
 | image, raster | a pixel layer, cropped to what it draws |
 | shape | a shape layer: its path as a vector mask, its fill, and its stroke |
-| text | a type layer, with its stroke as a layer effect |
+| text | a type layer, with its stroke as a layer effect<!-- Booharu: more effects, letter spacing, and words with effects of their own. -->; Booharu adds its second border as a second stroke effect, in the effects that hold more than one of a kind (`lmfx`), its gradient fill as a Gradient Overlay, and its letter spacing as tracking. A text whose words carry borders or gradients of their own is drawn into a pixel layer over a hidden type layer to edit (Booharu) |
 | mask | no layer of its own: it's its parent's mask |
 
 - **Every layer** keeps its name, visibility, opacity, and blend mode, and a
@@ -36,6 +36,18 @@ its source, and its translation each stay a layer.
 - **Pixels are a layer's own**, without its opacity, blend mode, or masks,
   which the file records as properties. Under a stroke effect they're the
   glyphs alone, as Photoshop draws the effect around them.
+  <!-- Booharu: a type layer's pixels, and words with effects of their own. -->
+  Booharu: so are a type layer's, with effects or none, as Photoshop draws
+  them again from its text once it's edited. One layer's effects are the
+  whole layer's, a border, a second border, and a gradient for all its
+  words, so a text whose words differ in them is drawn, borders and
+  gradients and all, into a pixel layer with no type data or effects,
+  directly over a hidden type layer of its words in plain styles to edit:
+  each word keeps its face, size, faked bold and slant, letter spacing, and
+  flat colour, a gradient's first stop, without its borders and gradient.
+  Koharu kept such a text one type layer, its strokes in its pixels only.
+  The export tells which texts it drew into pixels, which the app writes
+  beside the page's PSD as `{number}.psd.report.json`.
 - **Masks.** A PSD layer has one layer mask [PSD spec], so a layer's shown masks
   merge into one, cropped to what it covers.
 - **Names.** A type layer is named by its text, as Photoshop names one. The
