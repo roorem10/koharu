@@ -23,6 +23,9 @@ pub(crate) struct Run {
     /// Booharu: its face's slant is faked, which Photoshop fakes as Faux
     /// Italic.
     pub faux_italic: bool,
+    /// Booharu: its letter spacing in thousandths of an em, Photoshop's
+    /// tracking.
+    pub tracking: i32,
 }
 
 pub(crate) struct Type<'a> {
@@ -261,7 +264,8 @@ fn paragraph(spec: &Type) -> Value {
 }
 
 fn style(run: &Run) -> Value {
-    Dict(vec![
+    // Booharu: a list, which letter spacing joins below (S13-k).
+    let mut style = vec![
         ("Font", Int(run.font as i32)),
         ("FontSize", Float(run.size)),
         // Booharu: the bold and slant the renderer fakes, for Photoshop to fake (D12).
@@ -271,7 +275,14 @@ fn style(run: &Run) -> Value {
         ("AutoKerning", Bool(true)),
         ("Kerning", Int(0)),
         ("FillColor", color(run.fill)),
-    ])
+    ];
+    // Booharu: letter spacing where there is some, before AutoKerning, where
+    // ag-psd writes Tracking (S13-k).
+    if run.tracking != 0 {
+        let at = style.iter().position(|(key, _)| *key == "AutoKerning");
+        style.insert(at.unwrap_or(style.len()), ("Tracking", Int(run.tracking)));
+    }
+    Dict(style)
 }
 
 fn resources(fonts: &[String]) -> Value {
@@ -441,7 +452,8 @@ fn write(out: &mut Vec<u8>, value: &Value, indent: usize, in_property: bool) {
     }
 }
 
-// Booharu: a run's faked bold and slant, as Photoshop reads them.
+// Booharu: a run's faked bold and slant, and its letter spacing, as
+// Photoshop reads them.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -455,6 +467,7 @@ mod tests {
             fill: [0.0, 0.0, 0.0, 1.0],
             faux_bold: true,
             faux_italic: false,
+            tracking: 0, // Booharu: no letter spacing.
         }];
         let fonts = ["AdobeInvisFont".to_owned(), "DejaVuSans".to_owned()];
         let encoded = encode(&Type {
@@ -472,5 +485,42 @@ mod tests {
         assert!(has(b"/FauxItalic false"));
         assert!(!has(b"/FauxBold false"));
         assert!(!has(b"/FauxItalic true"));
+    }
+
+    #[test]
+    fn a_run_s_letter_spacing_reaches_photoshop_where_there_is_some() {
+        let run = |length, tracking| Run {
+            length,
+            font: 1,
+            size: 24.0,
+            fill: [0.0, 0.0, 0.0, 1.0],
+            faux_bold: false,
+            faux_italic: false,
+            tracking,
+        };
+        let runs = [run(7, 120), run(6, 0)];
+        let fonts = ["AdobeInvisFont".to_owned(), "DejaVuSans".to_owned()];
+        let encoded = encode(&Type {
+            text: "Spaced plain\r",
+            runs: &runs,
+            fonts: &fonts,
+            align: Align::Start,
+            rtl: false,
+            leading: 1.2,
+            vertical: false,
+            shape: Shape::Point,
+        });
+        let count = |key: &[u8]| {
+            encoded
+                .windows(key.len())
+                .filter(|window| *window == key)
+                .count()
+        };
+        assert_eq!(count(b"/Tracking"), 1);
+        assert_eq!(count(b"/Tracking 120\n"), 1);
+        // After AutoLeading and before AutoKerning, as ag-psd writes it.
+        let at = |key: &[u8]| encoded.windows(key.len()).position(|window| window == key);
+        assert!(at(b"/AutoLeading") < at(b"/Tracking"));
+        assert!(at(b"/Tracking") < at(b"/AutoKerning"));
     }
 }
