@@ -70,9 +70,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          # Booharu 0.0.5 is built on Koharu 0.85 and later, which share almost no
+          # Booharu 0.0.5 is built on Koharu 0.89.0, which shares almost no
           # compiled dependencies with 0.0.4's, so it keeps a cache of its own.
-          # The key keeps its 0.85 name so the warm cache still serves.
+          # The key keeps the name it had on Koharu 0.85 so the warm cache still
+          # serves.
           shared-key: booharu-windows-koharu-085
           # Keep compiled dependencies even when a later packaging step fails.
           cache-on-failure: true
