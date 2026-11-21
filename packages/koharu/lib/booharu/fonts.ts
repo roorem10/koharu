@@ -1,26 +1,17 @@
 'use client'
 
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import type { RefObject } from 'react'
-import { create } from 'zustand'
+import { useMemo } from 'react'
 
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import { queueBooharuWrite } from '@/lib/booharu/preferences'
 import { queryClient } from '@/lib/queries'
 import { commands, type FontFamily } from '@koharu/ipc/protocol'
 
 /** What Booharu adds to Koharu's font picker, each optional, so a picker given none is Koharu's;
- * useBooharuFontPicker gives all but the leading row, which a mount gives its own. */
+ * useBooharuFontPicker gives the local names, and a mount its own leading row. Every picker shows
+ * the favourites, Booharu's (useBooharuFavoriteFonts). */
 export type BooharuFontProps = {
-  /** The favourite families, by name: those among the matches are pinned under Favorites, above
-   * All fonts. */
-  favorites?: readonly string[]
-  /** Stars `family`, or with `favorite` false unstars it: each family's row gets a star for it. */
-  onToggleFavorite?: (family: string, favorite: boolean) => void
-  /** Whether only the favourites show. */
-  favoritesOnly?: boolean
-  /** Turns Favorites only on or off: the search line gets a switch for it. */
-  onFavoritesOnlyChange?: (favoritesOnly: boolean) => void
   /** The names each family goes by in other languages, by the name it's listed by, such as
    * 游ゴシック for Yu Gothic: a search finds the family by any of them, and its row shows the
    * first, muted, after its name. */
@@ -28,69 +19,61 @@ export type BooharuFontProps = {
   /** The label of a row before the families that stands for no family of the picker's own, such
    * as a lettering category's "Same as Normal Dialogue": the arrows and Enter reach it as they
    * reach a family, picking it gives onChange an empty name, and it shows as chosen, and on the
-   * picker's button, while the value is empty. It shows while nothing is searched, so Enter picks
-   * a search's first match. */
+   * picker's button, while the value is empty. A search leaves it out, as it names no family. */
   noneLabel?: string
 }
 
-/** What Koharu's font list takes of Booharu's: its props, the search line, which a star gives the
- * focus back to, and whether anything is searched. */
-export type BooharuListProps = BooharuFontProps & {
-  search: RefObject<HTMLInputElement | null>
-  searched: boolean
+/** An item of Koharu's font list, as Booharu adds to the families: a favourite's copy pinned above
+ * them (`pinned`), or the leading row (`none`, its label), which stands for no family and is named
+ * '' so Koharu's filter never finds it. */
+export type FontItem = FontFamily & { pinned?: true; none?: string }
+
+/** Koharu's font list's items for the families it lists, `listed`: given `noneLabel`, the leading
+ * row first, then a copy of each family among them that `favorites`, normalized names, holds,
+ * pinned under Favorites, then every family under All fonts. Koharu's filter finds a pinned copy as
+ * it finds its family. */
+export function fontItems(
+  listed: readonly FontFamily[],
+  favorites: readonly string[],
+  noneLabel?: string,
+): FontItem[] {
+  const starred = new Set(favorites)
+  const pinned = listed
+    .filter((family) => starred.has(fontKey(family.name)))
+    .map((family): FontItem => ({ ...family, pinned: true }))
+  const leading: FontItem[] =
+    noneLabel === undefined ? [] : [{ name: '', faces: [], none: noneLabel }]
+  return [...leading, ...pinned, ...listed]
 }
 
-/** A row of the font list: a family, starred when it's a favourite, with the first of its names in
- * other languages, a section's heading, which the arrows skip, or the leading row, labelled
- * `none`, which stands for no family. */
-export type FontRow =
-  | { key: string; family: FontFamily; starred: boolean; localName?: string }
-  | { key: string; heading: 'favorites' | 'allFonts' }
-  | { key: string; none: string }
-
-/** What a pinned family's key has before its key under All fonts. */
-const PINNED = 'favorite:'
-/** The leading row's key, which no family's, a name trimmed and in lower case, can be. */
-const NONE = ' none'
-
-/** The font list's rows for `results`, the families matching the search, in name order: the
- * favourites among them pinned under Favorites, then every match under All fonts, or with
- * `favoritesOnly` the favourites alone; with no favourite among them, the matches alone, as Koharu
- * lists them. A pinned family's key is its own under All fonts with `favorite:` before it. Given
- * `none`, the leading row's label, which the picker gives while nothing is searched, that row comes
- * first. */
-export function fontRows(
-  results: FontFamily[],
-  favorites: readonly string[] = [],
-  favoritesOnly = false,
-  localNames: BooharuFontProps['localNames'] = {},
-  none?: string,
-): FontRow[] {
-  const starred = new Set(favorites.map(fontKey))
-  const all = results.map((family) => {
-    const key = fontKey(family.name)
-    return { key, family, starred: starred.has(key), localName: localNames[family.name]?.[0] }
-  })
-  const pinned: FontRow[] = all
-    .filter((row) => row.starred)
-    .map((row) => ({ ...row, key: `${PINNED}${row.key}` }))
-  const favoriteRows: FontRow[] = pinned.length
-    ? [{ key: 'heading:favorites', heading: 'favorites' }, ...pinned]
-    : []
-  const leading: FontRow[] = none === undefined ? [] : [{ key: NONE, none }]
-  if (favoritesOnly) return [...leading, ...favoriteRows]
-  if (!pinned.length) return [...leading, ...all]
-  return [...leading, ...favoriteRows, { key: 'heading:allFonts', heading: 'allFonts' }, ...all]
+/** The leading row among `items` while the picker's `value` is empty, which it then stands for. */
+export function leadingItem(items: readonly FontItem[], value: string): FontItem | undefined {
+  return !value && items[0]?.none !== undefined ? items[0] : undefined
 }
 
-/** The index among `rows` of the row keyed `active`, or, when that's a pinned family's row and it
- * has gone, as when the family is unstarred, of the family's row under All fonts; -1 when neither
- * is there. */
-export function activeRow(rows: FontRow[], active: string | null): number {
-  const found = rows.findIndex((row) => row.key === active)
-  if (found >= 0 || !active?.startsWith(PINNED)) return found
-  const own = active.slice(PINNED.length)
-  return rows.findIndex((row) => row.key === own)
+/** The headings over the font list's matches, `items`, by the index of the match each is over:
+ * Favorites over the first pinned favourite and All fonts over the first family after them; none
+ * while no favourite is among them, as the list is then Koharu's. */
+export function fontHeadings(items: readonly FontItem[]): Map<number, 'favorites' | 'allFonts'> {
+  const headings = new Map<number, 'favorites' | 'allFonts'>()
+  const first = items.findIndex((item) => item.pinned)
+  if (first < 0) return headings
+  headings.set(first, 'favorites')
+  const all = items.findIndex((item, index) => index > first && !item.pinned)
+  if (all >= 0) headings.set(all, 'allFonts')
+  return headings
+}
+
+/** The key of the font list's row for `item`, which Koharu keys `key`, by its family's name: a
+ * pinned favourite's and the leading row's start with a space, which no family's key can. */
+export function fontItemKey(item: FontItem | undefined, key: string): string {
+  if (item?.pinned) return ` pinned ${key}`
+  return item?.none === undefined ? key : ' none'
+}
+
+/** How many families `items` holds, the pinned favourites' copies and the leading row left out. */
+export function familyCount(items: readonly FontItem[]): number {
+  return items.filter((item) => !item.pinned && item.none === undefined).length
 }
 
 /** A family's name as the font picker compares names, as Koharu's FontPicker normalizes them. */
@@ -98,31 +81,31 @@ function fontKey(family: string): string {
   return family.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
-/** `[booharu-fonts]`'s favourites as the desktop answers them, which every font picker shares:
- * read again each time a view with pickers opens, as the agent's settings tool may have changed
- * them since. */
+/** `[booharu-fonts]`'s favourites as the desktop answers them, which every font picker shares. A
+ * failed read shows as every failed read does. */
 const favoritesQuery = queryOptions({
   queryKey: ['booharu', 'font-favorites'] as const,
-  queryFn: () => call(commands.booharuGetFontFavorites),
-  refetchOnMount: 'always',
+  queryFn: () => commands.booharuGetFontFavorites(),
 })
 
 /** How many stars are on their way to the desktop. */
 let starring = 0
 
-/** Stars `family`, or with `favorite` false unstars it, in every picker at once and then in the
- * settings file, through the desktop, which answers the favourites as it saved them. A failure
+/** Stars `family`, or unstars it when the favourites hold it, in every picker at once and then in
+ * the settings file, through the desktop, which answers the favourites as it saved them. A failure
  * shows as every failed command's does, and the star goes back. */
-async function toggleFontFavorite(family: string, favorite: boolean): Promise<void> {
+async function toggleFontFavorite(family: string): Promise<void> {
   // The star goes over the favourites the file holds, and a read still on its way, which wouldn't
   // have it, is dropped; a read that fails has shown its error.
   const saved = await queryClient.ensureQueryData(favoritesQuery).catch(() => undefined)
   if (saved === undefined) return
   await queryClient.cancelQueries({ queryKey: favoritesQuery.queryKey })
-  // The file keeps a favourite by the name it was starred under, which unstarring it must give.
-  const name = favorite
-    ? family
-    : ((saved ?? []).find((star) => fontKey(star) === fontKey(family)) ?? family)
+  // The favourites as they show, a star still on its way among them; the file keeps a favourite by
+  // the name it was starred under, which unstarring it must give.
+  const shown = queryClient.getQueryData(favoritesQuery.queryKey) ?? saved ?? []
+  const kept = shown.find((star) => fontKey(star) === fontKey(family))
+  const favorite = kept === undefined
+  const name = kept ?? family
   const starred = (stars: string[] | null | undefined, on: boolean) => [
     ...(stars ?? []).filter((star) => star !== name),
     ...(on ? [name] : []),
@@ -143,6 +126,25 @@ async function toggleFontFavorite(family: string, favorite: boolean): Promise<vo
   }
 }
 
+const noFavorites: string[] = []
+
+/** The favourites Koharu's font picker shows and stars, Booharu's, kept in `[booharu-fonts]`, which
+ * the agent reads and stars too, in place of the ones Koharu keeps in the browser profile:
+ * `favorites` by their names as Koharu's picker compares them, and `toggle`, which stars a family
+ * by the name it's listed by, or unstars it. */
+export function useBooharuFavoriteFonts(): {
+  favorites: string[]
+  toggle: (family: string) => void
+} {
+  const saved = useQuery(favoritesQuery).data
+  const favorites = useMemo(() => (saved ? saved.map(fontKey) : noFavorites), [saved])
+  return { favorites, toggle: starFamily }
+}
+
+function starFamily(family: string): void {
+  void toggleFontFavorite(family)
+}
+
 /** The names font families go by in other languages, as the desktop answers them: read again each
  * time a view with pickers opens, as a bundled family downloaded since has names the last read
  * lacked. The pickers work without them until they come, and with the last read's while the next
@@ -152,30 +154,16 @@ const localNamesQuery = queryOptions({
   queryFn: () => commands.booharuGetFontLocalNames(),
   gcTime: Number.POSITIVE_INFINITY,
   refetchOnMount: 'always',
+  meta: { booharuQuiet: true },
 })
 
-/** Whether the font pickers show only the favourites: one choice for every picker, kept for the
- * session only. */
-const useFavoritesOnly = create<{ favoritesOnly: boolean }>()(() => ({ favoritesOnly: false }))
-
-export function setFavoritesOnly(favoritesOnly: boolean): void {
-  useFavoritesOnly.setState({ favoritesOnly })
-}
-
-const noFavorites: readonly string[] = []
-
-/** Booharu's props for Koharu's font picker, which a mount spreads into it: the favourites, shared
- * by every picker, with their stars, the Favorites only switch, and the families' names in other
- * languages. */
+/** Booharu's props for Koharu's font picker, which a mount spreads into it: the families' names in
+ * other languages. It reads the favourites again too, which every picker shows, as the agent's
+ * settings tool may have changed them since the view last opened. */
 export function useBooharuFontPicker(): BooharuFontProps {
-  const favorites = useQuery(favoritesQuery).data
+  useQuery({ ...favoritesQuery, refetchOnMount: 'always' })
   const localNames = useQuery(localNamesQuery).data
-  const favoritesOnly = useFavoritesOnly((state) => state.favoritesOnly)
   return {
-    favorites: favorites ?? noFavorites,
-    onToggleFavorite: toggleFontFavorite,
-    favoritesOnly,
-    onFavoritesOnlyChange: setFavoritesOnly,
     localNames: localNames ?? undefined, // A desktop answering null, as a stub may, has none.
   }
 }

@@ -1,11 +1,13 @@
 'use client'
 
 import { Pipette, SquareSlash } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { HexColorInput, HexColorPicker } from 'react-colorful'
 import { useTranslation } from 'react-i18next'
 
 import { useColorSampling } from '@/components/controls/ColorSampling'
+import { toHex, toRgba } from '@/lib/color'
+import { rememberColor, useColorHistory } from '@/lib/colorHistory'
 import { Button } from '@koharu/ui/components/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@koharu/ui/components/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/tooltip'
@@ -36,11 +38,14 @@ export function ColorWell(props: ColorWellProps) {
   // Booharu: a picker drag can move the colour without its end event firing, for example when it
   // ends in the black corner (koharu#866). The dragged colour waits here, apart from `value`, so
   // closing the picker applies it and Escape discards it. Every other way of settling the colour
-  // (a finished drag, a typed hex code, Transparent, the eyedropper or a new value from outside)
-  // clears it, so it never overrides a later choice.
+  // (a finished drag, a typed hex code, a recent colour, Transparent, the eyedropper or a new value
+  // from outside) clears it, so it never overrides a later choice.
   const [pending, setPending] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [typed, setTyped] = useState<{ text: string; color: string } | null>(null)
+  const opened = useRef(draft)
   const sampling = useColorSampling()
+  const recent = useColorHistory((state) => state.colors)
   const accessibleLabel = label ?? t('colorPicker.brushColor')
 
   useEffect(() => {
@@ -54,12 +59,13 @@ export function ColorWell(props: ColorWellProps) {
   }, [value])
 
   const set = (color: string) => {
-    const normalized = normalize(color)
+    const normalized = toHex(toRgba(color))
     setDraft(normalized)
     setPending(null) // Booharu: a committed colour settles any unfinished drag.
     setTransparent(false)
     if (props.allowTransparent) props.onChange(normalized)
     else props.onChange(normalized)
+    return normalized
   }
 
   const clear = () => {
@@ -69,21 +75,30 @@ export function ColorWell(props: ColorWellProps) {
     props.onChange(null)
   }
 
+  // A colour joins the history when the popover closes on it, so the drags and the keystrokes of a
+  // hex code that led there don't fill it; canvas picks join it in `ColorSamplingProvider`.
+  const openChange = (next: boolean) => {
+    if (next) opened.current = draft
+    else if (!transparent && draft !== opened.current) rememberColor(draft)
+    setOpen(next)
+  }
+
   return (
     <Popover
       open={open}
-      // Booharu: closing the picker applies a drag whose end event never came, and Escape
-      // discards it and shows the committed colour again.
+      // Booharu: closing the picker applies a drag whose end event never came and remembers it, as
+      // Koharu remembers the colour a well closes on; Escape discards it, shows the committed colour
+      // again and remembers nothing. With no drag waiting, Koharu's own handler runs.
       onOpenChange={(next, details) => {
-        if (!next && pending !== null) {
-          if (details.reason === 'escape-key') {
-            setPending(null)
-            if (value !== null) setDraft(value)
-          } else {
-            set(pending)
-          }
+        if (next || pending === null) return openChange(next)
+        setPending(null)
+        if (details.reason === 'escape-key') {
+          if (value !== null) setDraft(value)
+        } else {
+          const applied = set(pending)
+          if (applied !== opened.current) rememberColor(applied)
         }
-        setOpen(next)
+        setOpen(false)
       }}
     >
       <Tooltip>
@@ -124,12 +139,12 @@ export function ColorWell(props: ColorWellProps) {
           {accessibleLabel}
         </TooltipContent>
       </Tooltip>
-      <PopoverContent side='right' align='start' className='w-60 rounded-xl p-3'>
+      <PopoverContent side='right' align='start' className='w-60 p-3'>
         <div>
           <HexColorPicker
             color={draft}
             onChange={(color) => {
-              const normalized = normalize(color)
+              const normalized = toHex(toRgba(color))
               setDraft(normalized)
               setPending(normalized) // Booharu: kept until the drag ends or the picker closes.
             }}
@@ -137,12 +152,15 @@ export function ColorWell(props: ColorWellProps) {
           />
         </div>
         <div className='mt-3 flex gap-2'>
+          {/* The field resets its text whenever `color` changes, so it keeps the text typed while
+              that names the colour applied: the expanded colour would turn a typed `ff0` into
+              `FFFF00` and cut off the code's remaining digits. */}
           <HexColorInput
             prefixed
-            color={draft}
+            color={typed?.color === draft ? typed.text : draft}
             aria-label={t('colorPicker.hexCode')}
             className='h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 font-mono text-[11px] uppercase outline-none focus:border-ring'
-            onChange={set}
+            onChange={(text) => setTyped({ text, color: set(text) })}
           />
           {sampling && (
             <Button
@@ -162,6 +180,20 @@ export function ColorWell(props: ColorWellProps) {
             </Button>
           )}
         </div>
+        {recent.length > 0 && (
+          <div role='group' aria-label={t('colorPicker.recent')} className='mt-3 flex gap-1'>
+            {recent.map((color) => (
+              <button
+                key={color}
+                type='button'
+                aria-label={t('colorPicker.recentColor', { color })}
+                className='size-5 rounded-[3px] ring-1 ring-black/15 outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                style={{ backgroundColor: color }}
+                onClick={() => set(color)}
+              />
+            ))}
+          </div>
+        )}
         {allowTransparent && (
           <Button
             type='button'
@@ -177,11 +209,4 @@ export function ColorWell(props: ColorWellProps) {
       </PopoverContent>
     </Popover>
   )
-}
-
-function normalize(value: string): string {
-  const digits = value.startsWith('#') ? value.slice(1) : value
-  const expanded =
-    digits.length === 3 ? [...digits].map((digit) => digit.repeat(2)).join('') : digits
-  return `#${expanded}`.toUpperCase()
 }

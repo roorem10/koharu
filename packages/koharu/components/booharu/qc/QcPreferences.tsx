@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PreferenceRow, PreferenceSection } from '@/components/preferences/PreferenceFields'
-import { saveBooharuSection, useBooharuPreferences } from '@/lib/booharu/preferences'
+import { writeBooharuSection, useBooharuPreferences } from '@/lib/booharu/preferences'
 import { MIN_SIZE_PERCENT, minSizePercent, minSizeShare } from '@/lib/booharu/qc'
 import {
   NumberField,
@@ -28,7 +28,7 @@ export function QcPreferences() {
   const [editing, setEditing] = useState<number | null | undefined>(undefined)
   const save = useMutation({
     mutationFn: (min_size: number) =>
-      saveBooharuSection('booharu-qc', (section) => ({ ...section, min_size })),
+      writeBooharuSection('booharu-qc', (section) => ({ ...section, min_size })),
   })
   const saved = preferences.data ? minSizePercent(preferences.data['booharu-qc']) : null
   // The value being saved shows at once, then what the file holds once the save ends.

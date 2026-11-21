@@ -1,5 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import type { UserEvent } from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { vi } from 'vitest'
 
@@ -35,9 +36,10 @@ function BooharuFontPicker(props: PickerProps) {
 
 /** Koharu's font picker, named Font, choosing among the comic fonts unless `props` say otherwise,
  * as Koharu mounts it or, with `booharu`, as Booharu does; every family's preview is a blank
- * image. */
+ * image. Every picker shows Booharu's favourites: none, unless favoritesDesktop answers some. */
 export function renderPicker(props: Partial<PickerProps> = {}, { booharu = false } = {}) {
   vi.spyOn(commands, 'getFontPreview').mockResolvedValue(new ArrayBuffer(0))
+  if (!vi.isMockFunction(commands.booharuGetFontFavorites)) favoritesDesktop()
   const onChange = vi.fn()
   const Picker = booharu ? BooharuFontPicker : FontPicker
   render(
@@ -63,6 +65,17 @@ export function favoritesDesktop(saved: string[] = []) {
       return [...file.favorites].sort()
     })
   return { file, set }
+}
+
+/** The picker's button, named Font, which opens its list. */
+export function trigger(name = 'Font'): HTMLElement {
+  return screen.getByRole('combobox', { name })
+}
+
+/** Opens the picker named `name` with the pointer, as `user`, once its list shows. */
+export async function openPicker(user: UserEvent, name = 'Font'): Promise<void> {
+  await user.click(trigger(name))
+  await screen.findByRole('listbox')
 }
 
 /** The search line, a combobox over the fonts. */

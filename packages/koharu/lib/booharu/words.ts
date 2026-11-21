@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import { letteringOf, plainText } from '@/lib/document'
 import i18n from '@/lib/i18n'
 import {

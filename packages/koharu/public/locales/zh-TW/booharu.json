@@ -16,6 +16,7 @@
     "borders": {
       "decreaseSecondBorderWidth": "減少第二描邊寬度",
       "increaseSecondBorderWidth": "增加第二描邊寬度",
+      "more": "更多描邊選項",
       "outlineContour": "輪廓描邊",
       "outlineExpansion": "擴張",
       "outlineMethod": "描邊方式",
@@ -308,13 +309,8 @@
       "weight": "字重"
     },
     "fonts": {
-      "addFavorite": "將{{family}}加入我的最愛",
       "allFonts": "所有字型",
-      "favorites": "我的最愛",
-      "favoritesOnly": "僅顯示收藏",
-      "noFavorites": "為字型加上星號即可顯示於此",
-      "noFavoritesHere": "這裡沒有可用的收藏字型。關閉「僅顯示收藏」即可查看所有字型。",
-      "removeFavorite": "將{{family}}從我的最愛移除"
+      "favorites": "我的最愛"
     },
     "lettering": {
       "auto": "自動選擇字型",
@@ -395,6 +391,7 @@
     "menu": {
       "booharuGithub": "GitHub 上的 Booharu",
       "koharuDiscord": "Koharu 的 Discord",
+      "koharuDonate": "贊助 Koharu",
       "koharuGithub": "GitHub 上的 Koharu"
     },
     "notice": {

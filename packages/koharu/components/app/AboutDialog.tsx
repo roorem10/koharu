@@ -1,8 +1,8 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { getVersion } from '@tauri-apps/api/app'
 import Image from 'next/image'
-import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -26,21 +26,12 @@ export function AboutDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation()
-  const [version, setVersion] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!open || version) return
-    let active = true
-    void getVersion()
-      .then((current) => {
-        if (active) setVersion(current)
-      })
-      // Booharu: a failed read leaves it unknown, and the Based on line names Koharu alone.
-      .catch(() => undefined)
-    return () => {
-      active = false
-    }
-  }, [open, version])
+  // `null` when the version can't be read, which About says without a toast.
+  const version = useQuery({
+    queryKey: ['version'],
+    queryFn: () => getVersion().catch(() => null),
+    enabled: open,
+  }).data
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -58,7 +49,8 @@ export function AboutDialog({
 
         {/* Booharu: the fork's author and version, and the Koharu release it's based on. */}
         <div className='grid gap-2 border-t border-border/70 pt-3 text-[11px]'>
-          {/* The version Tauri reports is the Koharu release Booharu is built on. */}
+          {/* The version Tauri reports is the Koharu release Booharu is built on; while it's
+              unknown, or when it can't be read, the line names Koharu alone. */}
           <p className='text-muted-foreground'>
             {t('booharu.about.basedOn', { name: version ? `Koharu ${version}` : 'Koharu' })}
           </p>

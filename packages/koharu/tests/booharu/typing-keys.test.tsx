@@ -16,6 +16,11 @@ function press(init: KeyboardEventInit & { keyCode?: number }, target: Element =
   return event
 }
 
+/** A turn of the event loop, by which a command a key sent, as a mutation, has gone. */
+function settled(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 const ctrlB = { key: 'b', code: 'KeyB', ctrlKey: true }
 const ctrlI = { key: 'i', code: 'KeyI', ctrlKey: true }
 
@@ -43,40 +48,41 @@ describe('Booharu Ctrl+B and Ctrl+I while typing', () => {
     expect(reservedKeys.has('ctrl+i')).toBe(true)
   })
 
-  it('makes the characters typed bold with Ctrl or Cmd, and takes the bold off them (S11-d)', () => {
+  // The commands go as mutations, a turn after the key.
+  it('makes the characters typed bold with Ctrl or Cmd, and takes the bold off them (S11-d)', async () => {
     renderHook(() => useTypingShortcuts())
     useKoharuStore.setState({ typing: typing({ weight: 400 }) })
 
     expect(press(ctrlB).defaultPrevented).toBe(true)
-    expect(styled).toHaveBeenLastCalledWith({ weight: 700 })
+    await vi.waitFor(() => expect(styled).toHaveBeenLastCalledWith({ weight: 700 }))
 
     // Off takes the weight mark off for real, so the text's own weight shows again.
     useKoharuStore.setState({ typing: typing({ weight: 700 }) })
     expect(press({ key: 'b', code: 'KeyB', metaKey: true }).defaultPrevented).toBe(true)
-    expect(unmarked).toHaveBeenCalledExactlyOnceWith('bold')
+    await vi.waitFor(() => expect(unmarked).toHaveBeenCalledExactlyOnceWith('bold'))
 
     // Mixed weights go bold, every one.
     useKoharuStore.setState({ typing: typing({}, ['weight']) })
     press(ctrlB)
+    await vi.waitFor(() => expect(styled).toHaveBeenCalledTimes(2))
     expect(styled).toHaveBeenLastCalledWith({ weight: 700 })
-    expect(styled).toHaveBeenCalledTimes(2)
     expect(unmarked).toHaveBeenCalledOnce()
   })
 
-  it('makes the characters typed italic unless every one is, and takes the italic off them', () => {
+  it('makes the characters typed italic unless every one is, and takes the italic off them', async () => {
     renderHook(() => useTypingShortcuts())
     useKoharuStore.setState({ typing: typing({ italic: false }) })
     expect(press(ctrlI).defaultPrevented).toBe(true)
-    expect(styled).toHaveBeenLastCalledWith({ italic: true })
+    await vi.waitFor(() => expect(styled).toHaveBeenLastCalledWith({ italic: true }))
 
     useKoharuStore.setState({ typing: typing({ italic: true }) })
     expect(press(ctrlI).defaultPrevented).toBe(true)
-    expect(unmarked).toHaveBeenCalledExactlyOnceWith('italic')
+    await vi.waitFor(() => expect(unmarked).toHaveBeenCalledExactlyOnceWith('italic'))
 
     useKoharuStore.setState({ typing: typing({}, ['italic']) })
     press(ctrlI)
+    await vi.waitFor(() => expect(styled).toHaveBeenCalledTimes(2))
     expect(styled).toHaveBeenLastCalledWith({ italic: true })
-    expect(styled).toHaveBeenCalledTimes(2)
     expect(unmarked).toHaveBeenCalledOnce()
   })
 
@@ -93,7 +99,7 @@ describe('Booharu Ctrl+B and Ctrl+I while typing', () => {
     expect(typingShortcut(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }))).toBeNull()
   })
 
-  it('leaves the keys alone in a text field, while composing, without typing, or with Shift or Alt', () => {
+  it('leaves the keys alone in a text field, while composing, without typing, or with Shift or Alt', async () => {
     renderHook(() => useTypingShortcuts())
     useKoharuStore.setState({ typing: typing({ weight: 400 }) })
     const textarea = document.createElement('textarea')
@@ -113,21 +119,24 @@ describe('Booharu Ctrl+B and Ctrl+I while typing', () => {
     left.push(press(ctrlB), press(ctrlI))
 
     expect(left.map((event) => event.defaultPrevented)).toEqual(left.map(() => false))
+    await settled()
     expect(styled).not.toHaveBeenCalled()
     expect(unmarked).not.toHaveBeenCalled()
   })
 
-  it('leaves a key another handler took, and stops listening once unmounted', () => {
+  it('leaves a key another handler took, and stops listening once unmounted', async () => {
     const shortcuts = renderHook(() => useTypingShortcuts())
     useKoharuStore.setState({ typing: typing({ weight: 700 }) })
     const taken = (event: KeyboardEvent) => event.preventDefault()
     document.body.addEventListener('keydown', taken)
     press(ctrlB)
     document.body.removeEventListener('keydown', taken)
+    await settled()
     expect(unmarked).not.toHaveBeenCalled()
 
     shortcuts.unmount()
     expect(press(ctrlB).defaultPrevented).toBe(false)
+    await settled()
     expect(styled).not.toHaveBeenCalled()
     expect(unmarked).not.toHaveBeenCalled()
   })

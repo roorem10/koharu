@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CanvasWorkspace } from '@/components/editor/CanvasWorkspace'
 import { controlKeepsKey, keyActions, reservedKeys } from '@/lib/booharu/keys'
 import { queryClient } from '@/lib/queries'
-import { toolKeys, useKoharuStore } from '@/lib/store'
+import { toolKeys } from '@/lib/shortcuts'
+import { useKoharuStore } from '@/lib/store'
 import { commands } from '@koharu/ipc/protocol'
 
 /** Keys a focused control keeps: Space, the arrows, Enter, Delete, Escape, and the canvas's own
@@ -29,11 +30,47 @@ const controlKeys: KeyboardEventInit[] = [
   { key: 'v', altKey: true },
 ]
 
+/** Keys the canvas takes from the page, as a browser names them, its `code` included, which
+ * Koharu's hotkeys match by: a tool's letter, with Shift too, Delete, Escape, the arrows, and its
+ * Ctrl chords. */
+const canvasKeys: KeyboardEventInit[] = [
+  { key: 'v', code: 'KeyV' },
+  { key: 'b', code: 'KeyB' },
+  { key: 'o', code: 'KeyO' },
+  { key: 'B', code: 'KeyB', shiftKey: true },
+  { key: 'Delete', code: 'Delete' },
+  { key: 'Backspace', code: 'Backspace' },
+  { key: 'Escape', code: 'Escape' },
+  { key: 'ArrowRight', code: 'ArrowRight' },
+  { key: 'ArrowDown', code: 'ArrowDown', shiftKey: true },
+  { key: 'z', code: 'KeyZ', ctrlKey: true },
+  { key: 'Z', code: 'KeyZ', ctrlKey: true, shiftKey: true },
+  { key: 'a', code: 'KeyA', ctrlKey: true },
+  { key: 'd', code: 'KeyD', ctrlKey: true },
+  { key: '0', code: 'Digit0', ctrlKey: true },
+]
+
 /** `init` pressed on `target`; the event keeps its target once dispatched. */
 function press(target: Element, init: KeyboardEventInit): KeyboardEvent {
   const event = new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true })
   target.dispatchEvent(event)
   return event
+}
+
+/** A popup of `role` holding a button, on the page. */
+function popup(role: string): { popup: HTMLElement; button: HTMLButtonElement } {
+  const element = document.createElement('div')
+  element.setAttribute('role', role)
+  const button = document.createElement('button')
+  element.append(button)
+  document.body.append(element)
+  return { popup: element, button }
+}
+
+/** Lets the commands the workspace sent reach their spies: Koharu's `send()` runs each as a
+ * mutation, which calls its command a few promises later. */
+function settle(): Promise<void> {
+  return act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)))
 }
 
 function input(type: string): HTMLInputElement {
@@ -68,13 +105,15 @@ describe('Booharu key registry', () => {
     expect(new Set(keys).size).toBe(keys.length)
   })
 
-  it("reserves Koharu's fixed keys and every one of its tools' letters", () => {
+  it("reserves Koharu's fixed keys, the arrows and every one of its tools' letters", () => {
     const fixed = ['ctrl+z', 'ctrl+shift+z', 'ctrl+a', 'ctrl+d', 'ctrl+0']
-    for (const key of [...fixed, 'delete', 'backspace', 'escape', 'space', 'a', 'm', 'l']) {
+    const arrows = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown']
+    const nudges = [...arrows, ...arrows.map((key) => `shift+${key}`)]
+    for (const key of [...fixed, 'delete', 'backspace', 'escape', 'space', ...nudges, 'a', 'm']) {
       expect(reservedKeys.has(key), key).toBe(true)
     }
-    // Koharu's handler selects a tool by its letter with or without Shift, whatever tools a Koharu
-    // release adds; only Booharu's own tool keys are left to Booharu.
+    // Koharu's tool hotkey selects a tool by its letter, and with Shift too as Booharu binds it,
+    // whatever tools a Koharu release adds; only Booharu's own tool keys are left to Booharu.
     for (const [tool, key] of Object.entries(toolKeys)) {
       const koharu = tool !== 'ocr_box'
       expect(reservedKeys.has(key), tool).toBe(koharu)
@@ -132,6 +171,22 @@ describe('Booharu tool keys in a focused control', () => {
     }
   })
 
+  it('leaves every key to an open list, so a letter finds its option', () => {
+    // A list such as a select's, whose options take the focus while it's open.
+    const list = document.createElement('div')
+    list.setAttribute('role', 'listbox')
+    const option = document.createElement('div')
+    option.setAttribute('role', 'option')
+    list.append(option)
+    document.body.append(list)
+    for (const target of [list, option]) {
+      for (const init of [{ key: 'v' }, { key: 'o' }, ...controlKeys]) {
+        const role = target.getAttribute('role')
+        expect(controlKeepsKey(press(target, init)), `${role} ${JSON.stringify(init)}`).toBe(true)
+      }
+    }
+  })
+
   it('leaves every key to an open menu, so Escape keeps the selection and Delete removes nothing', () => {
     // A menu such as the box menu a right-click on the canvas opens, which takes the focus.
     const menu = document.createElement('div')
@@ -160,7 +215,7 @@ describe('Booharu tool keys in a focused control', () => {
 
 describe('Booharu tool keys on the canvas', () => {
   /** The workspace, with one layer selected; `sent` lists the commands it sends from then on. */
-  function renderWorkspace() {
+  async function renderWorkspace() {
     const sent: string[] = []
     const table = commands as unknown as Record<string, () => Promise<unknown>>
     for (const name of Object.keys(table)) {
@@ -177,12 +232,14 @@ describe('Booharu tool keys on the canvas', () => {
       </QueryClientProvider>,
     )
     act(() => useKoharuStore.setState({ selectedLayers: ['layer'] }))
+    // What it sends as it mounts arrives a few promises later.
+    await settle()
     sent.length = 0
     return { view, sent }
   }
 
-  it('switches tools from the zoom slider and leaves the slider its own keys', () => {
-    const { view, sent } = renderWorkspace()
+  it('switches tools from the zoom slider and leaves the slider its own keys', async () => {
+    const { view, sent } = await renderWorkspace()
     const slider = view.container.querySelector<HTMLInputElement>('footer input[type="range"]')
     expect(slider).not.toBeNull()
     act(() => slider!.focus())
@@ -192,8 +249,9 @@ describe('Booharu tool keys on the canvas', () => {
       expect(fireEvent.keyDown(slider!, init), JSON.stringify(init)).toBe(true)
     }
     for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
-      fireEvent.keyDown(slider!, { key })
+      fireEvent.keyDown(slider!, { key, code: key })
     }
+    await settle()
     const state = useKoharuStore.getState()
     expect(state.tool).toBe('select')
     expect(state.selectedLayers).toEqual(['layer'])
@@ -206,8 +264,8 @@ describe('Booharu tool keys on the canvas', () => {
     expect(useKoharuStore.getState().tool).toBe('select')
   })
 
-  it('selects the O tool with O, from the page and from a focused slider', () => {
-    const { view } = renderWorkspace()
+  it('selects the O tool with O, from the page and from a focused slider', async () => {
+    const { view } = await renderWorkspace()
     fireEvent.keyDown(document.body, { key: 'o' })
     expect(useKoharuStore.getState().tool).toBe('ocr_box')
     fireEvent.keyDown(document.body, { key: 'v' })
@@ -222,18 +280,79 @@ describe('Booharu tool keys on the canvas', () => {
     expect(useKoharuStore.getState().tool).toBe('ocr_box')
   })
 
-  it('leaves every key to a text field, a select and editable text', () => {
-    const { sent } = renderWorkspace()
+  it('leaves every key to a text field, a select and editable text', async () => {
+    const { sent } = await renderWorkspace()
     for (const control of textEntries()) {
       document.body.append(control)
-      for (const init of [{ key: 'b' }, ...controlKeys]) {
+      for (const init of [{ key: 'b' }, ...controlKeys, ...canvasKeys]) {
         fireEvent.keyDown(control, init)
       }
       control.remove()
     }
+    await settle()
     const state = useKoharuStore.getState()
     expect(state.tool).toBe('select')
     expect(state.selectedLayers).toEqual(['layer'])
     expect(sent).toEqual([])
+  })
+
+  it('selects a tool with Shift and its letter too', async () => {
+    await renderWorkspace()
+    fireEvent.keyDown(document.body, { key: 'B', code: 'KeyB', shiftKey: true })
+    expect(useKoharuStore.getState().tool).toBe('draw')
+    fireEvent.keyDown(document.body, { key: 'O', code: 'KeyO', shiftKey: true })
+    expect(useKoharuStore.getState().tool).toBe('ocr_box')
+    fireEvent.keyDown(document.body, { key: 'V', code: 'KeyV', shiftKey: true })
+    expect(useKoharuStore.getState().tool).toBe('select')
+  })
+
+  it("takes Koharu's keys from the page: undo, the arrows' nudge, Delete and Escape", async () => {
+    const { sent } = await renderWorkspace()
+    fireEvent.keyDown(document.body, { key: 'z', code: 'KeyZ', ctrlKey: true })
+    expect(fireEvent.keyDown(document.body, { key: 'ArrowRight', code: 'ArrowRight' })).toBe(false)
+    fireEvent.keyDown(document.body, { key: 'ArrowUp', code: 'ArrowUp', shiftKey: true })
+    fireEvent.keyDown(document.body, { key: 'Delete', code: 'Delete' })
+    await settle()
+    expect(sent).toEqual(['undo', 'nudge', 'nudge', 'edit'])
+    expect(commands.nudge).toHaveBeenNthCalledWith(1, 1, 0)
+    expect(commands.nudge).toHaveBeenNthCalledWith(2, 0, -10)
+    fireEvent.keyDown(document.body, { key: 'Escape', code: 'Escape' })
+    expect(useKoharuStore.getState().selectedLayers).toEqual([])
+  })
+
+  it('leaves every key in a dialog, a menu or an open list to it', async () => {
+    const { sent } = await renderWorkspace()
+    for (const role of ['dialog', 'alertdialog', 'menu', 'listbox']) {
+      const { popup: element, button } = popup(role)
+      for (const init of canvasKeys) {
+        // Not prevented either: the dialog's button, the menu's item or the list's option has it.
+        expect(fireEvent.keyDown(button, init), `${role} ${JSON.stringify(init)}`).toBe(true)
+      }
+      element.remove()
+    }
+    await settle()
+    const state = useKoharuStore.getState()
+    expect(state.tool).toBe('select')
+    expect(state.selectedLayers).toEqual(['layer'])
+    expect(sent).toEqual([])
+  })
+
+  it("leaves Space to a dialog's button, which it presses, and holds no Hand tool", async () => {
+    await renderWorkspace()
+    const { button } = popup('dialog')
+    expect(fireEvent.keyDown(button, { key: ' ', code: 'Space' })).toBe(true)
+    expect(useKoharuStore.getState().tool).toBe('select')
+    // The key let go isn't prevented either, which would stop the button's click.
+    expect(fireEvent.keyUp(button, { key: ' ', code: 'Space' })).toBe(true)
+    expect(useKoharuStore.getState().tool).toBe('select')
+  })
+
+  it('ends a Space hold begun on the page when Space is let go in a dialog', async () => {
+    await renderWorkspace()
+    const { button } = popup('dialog')
+    fireEvent.keyDown(document.body, { key: ' ', code: 'Space' })
+    expect(useKoharuStore.getState().tool).toBe('pan')
+    fireEvent.keyUp(button, { key: ' ', code: 'Space' })
+    expect(useKoharuStore.getState().tool).toBe('select')
   })
 })

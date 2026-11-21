@@ -1,47 +1,35 @@
 'use client'
 
-import { Check } from 'lucide-react'
+import type { FontItem } from '@/lib/booharu/fonts'
+import { ComboboxItem } from '@koharu/ui/components/combobox'
 
-/** The leading row of Koharu's font list, `top` pixels down it, given a mount's `noneLabel`: an
- * option labelled `label` that stands for no family, checked when `chosen`, the value being empty,
- * and marked when `active`, the arrows being on it. Moving the pointer over it, or the focus to it,
- * marks it, as moving either to a family's row does, and picking it calls `onSelect`. */
+/** The leading row of Koharu's font list, `top` pixels down it, given a mount's `noneLabel`: the
+ * list's item `item`, at `index` of its `count`, labelled with it, which stands for no family. The
+ * arrows and Enter reach it as they reach a family, picking it gives an empty name, and it shows
+ * as chosen while the value is empty. */
 export function NoneOption({
-  id,
-  label,
+  index,
+  item,
+  count,
   top,
-  chosen,
-  active,
-  onActive,
-  onSelect,
 }: {
-  id: string
-  label: string
+  index: number
+  item: FontItem
+  count: number
   top: number
-  chosen: boolean
-  active: boolean
-  onActive: () => void
-  onSelect: () => void
 }) {
   return (
-    <button
-      type='button'
-      role='option'
-      aria-label={label} // Named as a family's option is.
-      id={id}
-      aria-selected={chosen}
-      data-active={active}
-      className='absolute inset-x-0 top-0 flex h-9.5 w-full items-center gap-2 px-2 text-left text-[11px] focus-visible:outline-none data-[active=true]:bg-accent data-[active=true]:text-accent-foreground'
+    <ComboboxItem
+      index={index}
+      value={item}
+      aria-label={item.none} // Named as a family's row is.
+      aria-setsize={count}
+      aria-posinset={index + 1}
+      // As a family's row looks, chosen or not, its label where a family's name starts.
+      className='absolute inset-x-0 top-0 h-9.5 rounded-none pr-5.5 pl-5.5 data-[selected]:bg-accent data-[selected]:text-accent-foreground [&>span]:hidden!'
       style={{ transform: `translateY(${top}px)` }}
-      // Only the pointer's own moves mark it, as for a family's row.
-      onPointerMove={(event) => {
-        if (event.movementX || event.movementY) onActive()
-      }}
-      onFocus={onActive}
-      onClick={onSelect}
     >
-      <span className='min-w-0 flex-1 truncate'>{label}</span>
-      {chosen && <Check className='size-3.5 shrink-0' />}
-    </button>
+      <div className='min-w-0 flex-1 truncate'>{item.none}</div>
+    </ComboboxItem>
   )
 }

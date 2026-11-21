@@ -1,8 +1,8 @@
 'use client'
 
 import { paintUnit } from '@/lib/booharu/paint'
+import { toRgba } from '@/lib/color'
 import { isBlockLayer, isTextLayer, letteringOf } from '@/lib/document'
-import { hexToRgba } from '@/lib/store'
 import {
   commands,
   type Align,
@@ -93,9 +93,9 @@ export type BorderKey = 'stroke' | 'stroke_width' | 'outer_stroke' | 'outer_stro
 /** What a text with no border colour or width of its own takes when the border's other value is
  * set, as the type bar gives it: a white first border 1.5 wide, and a black second one 3 wide. */
 const BORDER_DEFAULTS: CharStyle = {
-  stroke: hexToRgba('#FFFFFF'),
+  stroke: toRgba('#FFFFFF'),
   stroke_width: 1.5,
-  outer_stroke: hexToRgba('#000000'),
+  outer_stroke: toRgba('#000000'),
   outer_stroke_width: 3,
 }
 

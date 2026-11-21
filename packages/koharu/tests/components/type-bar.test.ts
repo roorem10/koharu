@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { sharedChars, swappedColors } from '@/components/editor/TypeBar'
+import { swappedColors } from '@/components/booharu/typebar/BorderExtras'
+import { sharedChars } from '@/components/editor/TypeBar'
 import type { CharStyle } from '@koharu/ipc/protocol'
 
 describe('Booharu swap of text and border colours', () => {

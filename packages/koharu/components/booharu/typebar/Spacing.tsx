@@ -80,7 +80,7 @@ export function Spacing({
         </TooltipTrigger>
         <TooltipContent>{t('booharu.typebar.spacing')}</TooltipContent>
       </Tooltip>
-      <PopoverContent side='bottom' align='center' className='w-56 gap-2 rounded-xl p-2'>
+      <PopoverContent side='bottom' align='center' className='w-56 gap-2 p-2'>
         <SpacingField
           name='line-spacing'
           label={t('booharu.typebar.lineSpacing')}
@@ -112,8 +112,8 @@ export function Spacing({
 }
 
 /** A spacing's number box under its label, with its Reset: `value` shown, nothing where it's
- * `null`, with "Mixed" when `mixed`. A value goes once: Enter sends it, and the box's commit as it
- * loses the focus doesn't send it again, nor a value the box shows. */
+ * `null`, with "Mixed" when `mixed`. A value goes once: Enter leaves the box, as Koharu's number
+ * boxes do, and the box sends it as it loses the focus, but not again, nor a value the box shows. */
 function SpacingField({
   name,
   label,
@@ -186,9 +186,6 @@ function SpacingField({
             <NumberFieldInput
               aria-label={label}
               placeholder={mixed ? t('booharu.typebar.mixed') : undefined}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') commit(draft)
-              }}
             />
           </NumberFieldGroup>
         </NumberField>

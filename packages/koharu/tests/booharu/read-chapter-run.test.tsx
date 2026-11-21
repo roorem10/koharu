@@ -221,7 +221,7 @@ describe('Booharu Runs settings with Read chapter', () => {
         <SettingsPage />
       </QueryClientProvider>,
     )
-    await user.click(screen.getByRole('button', { name: 'Runs' }))
+    await user.click(screen.getByRole('tab', { name: 'Runs' }))
     const detect = within(await screen.findByRole('group', { name: 'Detect + OCR' }))
     const translate = within(screen.getByRole('group', { name: 'Translate + clean up' }))
 

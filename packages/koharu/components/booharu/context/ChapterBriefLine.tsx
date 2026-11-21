@@ -5,8 +5,8 @@ import { useTranslation } from 'react-i18next'
 
 import { joinPages, readTime } from '@/lib/booharu/brief'
 import { setChapterBrief, type FullChapter } from '@/lib/booharu/context'
-import { useKoharuStore } from '@/lib/store'
-import { modelName } from '@/lib/translation'
+import { modelName } from '@/lib/models'
+import { useModels } from '@/lib/queries'
 import { Badge } from '@koharu/ui/components/badge'
 import { Button } from '@koharu/ui/components/button'
 import {
@@ -27,7 +27,7 @@ type Brief = NonNullable<FullChapter['context']['brief']>
  * not read. */
 export function ChapterBriefLine({ brief }: { brief: Brief | null }) {
   const { t, i18n } = useTranslation()
-  const models = useKoharuStore((state) => state.models)
+  const models = useModels().data ?? []
   const [open, setOpen] = useState(false)
   const heading = useId()
   const status = brief?.read_at

@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { boxActions, selectedBoxes, type BoxSelection } from '@/lib/booharu/boxActions'
+import {
+  boxActions,
+  selectedBoxes,
+  storyMenuReturnsFocus,
+  type BoxSelection,
+} from '@/lib/booharu/boxActions'
 import { useBoxDetails } from '@/lib/booharu/boxDetails'
 import { useKoharuStore } from '@/lib/store'
 import type { BlockLettering, LetteringCategory, Page } from '@koharu/ipc/protocol'
@@ -318,5 +323,34 @@ describe('Booharu box actions', () => {
       expect.objectContaining({ type: 'error', description: refused }),
     )
     expect(useBoxDetails.getState().shown).toBeNull()
+  })
+
+  it("gives a Story row's … button the focus back only while the row's text stays selected", () => {
+    const ids = ['bang', 'bang-mask', 'bang-cleanup']
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    const item = document.createElement('div')
+    item.tabIndex = -1
+    menu.append(item)
+    const field = document.createElement('textarea')
+    document.body.append(menu, field)
+    try {
+      // The row's text, or one of its parts, still selected: back, from the menu or from nowhere.
+      useKoharuStore.setState({ selectedLayers: ['bang-cleanup'] })
+      item.focus()
+      expect(storyMenuReturnsFocus(ids)).toBe(true)
+      item.blur()
+      expect(storyMenuReturnsFocus(ids)).toBe(true)
+      // Add subtitle left its subtitle selected: the focus stays off the row, which would take it.
+      useKoharuStore.setState({ selectedLayers: ['bang-subtitle'] })
+      expect(storyMenuReturnsFocus(ids)).toBe(false)
+      // The focus went on to another control, such as a dialog's field: it stays there.
+      useKoharuStore.setState({ selectedLayers: ['bang'] })
+      field.focus()
+      expect(storyMenuReturnsFocus(ids)).toBe(false)
+    } finally {
+      menu.remove()
+      field.remove()
+    }
   })
 })

@@ -11,7 +11,7 @@
 //! as beside the dot of an i or a colon once the border is wider than about a
 //! fifth of the text size, the stroke's inner side folds back past the
 //! contour, and filled by the non-zero rule the folds cancel it, leaving holes
-//! in the border beside the dot, as Koharu 0.89.0 draws it too. So Expansion's
+//! in the border beside the dot, as Koharu 0.90.0 draws it too. So Expansion's
 //! border passes fill the region the glyphs and their stroke cover where the
 //! stroke doesn't fold: each run's glyphs, as glifo strokes them, grown by the
 //! pass's growth with round joins ([`grown`]), made once as the text is laid
@@ -914,7 +914,7 @@ mod tests {
         Ok(())
     }
 
-    /// `layout`'s outermost borders as Koharu 0.89.0 draws them, in black, on
+    /// `layout`'s outermost borders as Koharu 0.90.0 draws them, in black, on
     /// a drawing as `drawn`'s: each run's glyphs filled, then stroked twice as
     /// wide as the pass grows them, with round joins, through
     /// `Drawing::glyphs`, by its second border's pass (`Pass::Outer`), which

@@ -123,7 +123,7 @@ export function openProject(page: Page, shown: string | null = page.id): void {
   const project: ProjectView = {
     name: 'Demo',
     page: shown,
-    pages: [{ id: page.id, size: page.size, background: null }],
+    pages: [{ id: page.id, size: page.size, background: null, texts: 0, translated: 0 }],
     history: { steps: [], current: 0 },
     revisions: {},
   }

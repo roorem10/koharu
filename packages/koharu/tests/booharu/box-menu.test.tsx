@@ -125,22 +125,27 @@ describe('Booharu box menu (S12-l)', () => {
     const menu = await rightClick('second')
     await waitFor(() => expect(menu.contains(document.activeElement)).toBe(true))
 
-    for (const key of ['Delete', 'Backspace', 'b'])
-      fireEvent.keyDown(document.activeElement!, { key })
+    // Each key as a browser names it, its code included, which Koharu's Delete hotkey matches by.
+    for (const [key, code] of [
+      ['Delete', 'Delete'],
+      ['Backspace', 'Backspace'],
+      ['b', 'KeyB'],
+    ])
+      fireEvent.keyDown(document.activeElement!, { key, code })
 
     expect(commands.edit).not.toHaveBeenCalled()
     expect(useKoharuStore.getState().tool).toBe('select')
     expect(screen.getByRole('menu', { name: 'Box actions' })).toBe(menu)
     expect(commands.booharuCanvasKeys).not.toHaveBeenCalled()
 
-    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape', code: 'Escape' })
 
     await closed()
     expect(useKoharuStore.getState().selectedLayers).toEqual(['second'])
     // The desktop gives the canvas the keys again, so Delete takes the anchors Direct Select picked.
     expect(commands.booharuCanvasKeys).toHaveBeenCalledTimes(1)
     // Closed, it leaves the keys to the canvas again: Delete deletes the selected box.
-    fireEvent.keyDown(document.body, { key: 'Delete' })
+    fireEvent.keyDown(document.body, { key: 'Delete', code: 'Delete' })
     await waitFor(() =>
       expect(commands.edit).toHaveBeenCalledWith({
         label: 'delete_layers',

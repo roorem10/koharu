@@ -22,6 +22,7 @@
     "borders": {
       "decreaseSecondBorderWidth": "تقليل عرض الحدود الثانية",
       "increaseSecondBorderWidth": "زيادة عرض الحدود الثانية",
+      "more": "المزيد من خيارات الحدود",
       "outlineContour": "حدود المسار",
       "outlineExpansion": "توسيع",
       "outlineMethod": "طريقة الحدود",
@@ -422,13 +423,8 @@
       "weight": "وزن الخط"
     },
     "fonts": {
-      "addFavorite": "إضافة {{family}} إلى المفضلة",
       "allFonts": "كل الخطوط",
-      "favorites": "المفضلة",
-      "favoritesOnly": "المفضلة فقط",
-      "noFavorites": "أضف نجمة إلى الخطوط لإظهارها هنا",
-      "noFavoritesHere": "لا يتوفر هنا أي من خطوطك المفضلة. أوقف «المفضلة فقط» لعرض كل الخطوط.",
-      "removeFavorite": "إزالة {{family}} من المفضلة"
+      "favorites": "المفضلة"
     },
     "lettering": {
       "auto": "اختيار الخطوط تلقائيًا",
@@ -517,6 +513,7 @@
     "menu": {
       "booharuGithub": "Booharu على GitHub",
       "koharuDiscord": "Discord الخاص بـ Koharu",
+      "koharuDonate": "تبرّع لـ Koharu",
       "koharuGithub": "Koharu على GitHub"
     },
     "notice": {

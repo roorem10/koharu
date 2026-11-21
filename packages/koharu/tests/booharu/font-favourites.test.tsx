@@ -1,11 +1,10 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { TypeBar } from '@/components/editor/TypeBar'
 import { TypesettingPreferences } from '@/components/preferences/TypesettingPreferences'
-import { setFavoritesOnly } from '@/lib/booharu/fonts'
 import { saveBooharuSection } from '@/lib/booharu/preferences'
 import { fontsKey, pageKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
@@ -15,26 +14,25 @@ import { toast } from '@koharu/ui/components/toast'
 import {
   comicFonts,
   favoritesDesktop,
-  fontFamilies,
   highlighted,
   listed,
+  openPicker,
   renderPicker,
   search,
 } from './fonts'
 import { settingsDesktop } from './settings'
 
+// Koharu's picker stars a family with the star on its row and lists the favourites alone with Show
+// favorite fonts; Booharu keeps the stars in the settings file, where the agent reads and stars them
+// too, and pins the favourites above every family under their headings.
 describe('Booharu font favourites', () => {
-  // Favorites only lasts the session, so a test that turns it on leaves it on for the next.
-  beforeEach(() => setFavoritesOnly(false))
-
-  it('pins the favourites above all fonts, and the arrows skip the headings', async () => {
+  it('pins the favourites above all fonts, each section under its heading', async () => {
     favoritesDesktop(['Wild Words'])
     const user = userEvent.setup()
     const { onChange } = renderPicker({ value: 'Komika Text' }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
-
+    await openPicker(user)
     await screen.findByText('Favorites')
-    expect(screen.getByText('All fonts')).toBeInTheDocument()
+
     expect(listed()).toEqual([
       'Wild Words',
       'Anime Ace',
@@ -42,60 +40,29 @@ describe('Booharu font favourites', () => {
       'Komika Text',
       'Wild Words',
     ])
-    expect(screen.getByRole('status')).toHaveTextContent('4 fonts')
-    expect(search()).toHaveAttribute('aria-controls', screen.getByRole('listbox').id)
+    expect(screen.getByText('4 fonts')).toBeInTheDocument()
+    // Each heading over the first row of its section, which sits below it.
+    const [pinned, own] = screen.getAllByRole('option', { name: 'Wild Words' })
+    expect(screen.getByText('Favorites')).toHaveStyle({ transform: 'translateY(0px)' })
+    expect(pinned).toHaveStyle({ transform: 'translateY(24px)' })
+    expect(screen.getByText('All fonts')).toHaveStyle({ transform: 'translateY(62px)' })
+    expect(screen.getByRole('option', { name: 'Anime Ace' })).toHaveStyle({
+      transform: 'translateY(86px)',
+    })
+    // Starred in both places.
+    expect(within(pinned!).getByRole('button', { pressed: true })).toHaveAccessibleName(
+      'Remove Wild Words from favorites',
+    )
+    expect(within(own!).getByRole('button', { pressed: true })).toHaveAccessibleName(
+      'Remove Wild Words from favorites',
+    )
 
-    // From the font in use, under All fonts, around past both headings.
+    // From the font in use the arrows reach the pinned copy, which Enter picks.
     expect(highlighted()).toHaveAccessibleName('Komika Text')
-    await user.keyboard('{ArrowDown}{ArrowDown}')
-    expect(highlighted()).toBe(screen.getAllByRole('option', { name: 'Wild Words' })[0])
-    await user.keyboard('{ArrowDown}')
-    expect(highlighted()).toHaveAccessibleName('Anime Ace')
-    await user.keyboard('{ArrowUp}')
-    expect(highlighted()).toBe(screen.getAllByRole('option', { name: 'Wild Words' })[0])
+    await user.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}')
+    expect(highlighted()).toBe(pinned)
     await user.keyboard('{Enter}')
     expect(onChange).toHaveBeenCalledExactlyOnceWith('Wild Words')
-  })
-
-  it('keeps the arrows on a favourite whose pinned row goes as it is unstarred', async () => {
-    favoritesDesktop(['Komika Text', 'Wild Words'])
-    const user = userEvent.setup()
-    const { onChange } = renderPicker({ value: 'Anime Ace' }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
-    await screen.findByText('Favorites')
-
-    // Up from the font in use, to Wild Words pinned under Favorites.
-    await user.keyboard('{ArrowUp}')
-    expect(highlighted()).toBe(screen.getAllByRole('option', { name: 'Wild Words' })[0])
-    await user.click(
-      screen.getAllByRole('button', { name: 'Remove Wild Words from favorites' })[0]!,
-    )
-
-    await waitFor(() =>
-      expect(screen.getAllByRole('option', { name: 'Wild Words' })).toHaveLength(1),
-    )
-    expect(highlighted()).toHaveAccessibleName('Wild Words')
-    await user.keyboard('{Enter}')
-    expect(onChange).toHaveBeenCalledExactlyOnceWith('Wild Words')
-  })
-
-  it('puts each star right after its font, and a star the focus moves to marks its font', async () => {
-    favoritesDesktop()
-    const user = userEvent.setup()
-    renderPicker({ value: 'Komika Text' }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
-
-    act(() => screen.getByRole('option', { name: 'Anime Ace' }).focus())
-    await user.tab()
-    expect(screen.getByRole('button', { name: 'Add Anime Ace to favorites' })).toHaveFocus()
-    await user.tab()
-    expect(screen.getByRole('option', { name: 'CCMeanwhile' })).toHaveFocus()
-    expect(highlighted()).toHaveAccessibleName('CCMeanwhile')
-
-    // Back to the star of the font before, which the arrows then are on.
-    await user.tab({ shift: true })
-    expect(screen.getByRole('button', { name: 'Add Anime Ace to favorites' })).toHaveFocus()
-    expect(highlighted()).toHaveAccessibleName('Anime Ace')
   })
 
   it('stars a font through the desktop at once, and takes the star back when that fails', async () => {
@@ -103,7 +70,7 @@ describe('Booharu font favourites', () => {
     const shown = vi.spyOn(toast, 'add')
     const user = userEvent.setup()
     const { onChange } = renderPicker({ value: 'Komika Text' }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
 
     await user.click(screen.getByRole('button', { name: 'Add Wild Words to favorites' }))
     expect(set).toHaveBeenCalledExactlyOnceWith('Wild Words', true)
@@ -142,7 +109,7 @@ describe('Booharu font favourites', () => {
     const { set, file } = favoritesDesktop(['wild  words'])
     const user = userEvent.setup()
     renderPicker({}, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
 
     const stars = await screen.findAllByRole('button', { name: 'Remove Wild Words from favorites' })
     await user.click(stars[0]!)
@@ -151,62 +118,56 @@ describe('Booharu font favourites', () => {
     expect(file.favorites).toEqual([])
   })
 
-  it('shows only the favourites, or how to star some while there are none', async () => {
+  // Show favorite fonts stays on for the next test, so this one turns it off again at its end.
+  it("lists Booharu's favourites alone with Koharu's Show favorite fonts, keeping none in the browser", async () => {
     favoritesDesktop()
     const user = userEvent.setup()
     renderPicker({}, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
 
-    const only = screen.getByRole('button', { name: 'Favorites only' })
+    const only = screen.getByRole('button', { name: 'Show favorite fonts' })
     expect(only).toHaveAttribute('aria-pressed', 'false')
     await user.click(only)
     expect(only).toHaveAttribute('aria-pressed', 'true')
     expect(listed()).toEqual([])
-    expect(screen.getByText('Star fonts to add them here')).toBeInTheDocument()
+    expect(screen.getByText('No favorite fonts yet')).toBeInTheDocument()
     expect(search()).toHaveFocus()
 
     await user.click(only)
     await user.click(screen.getByRole('button', { name: 'Add Komika Text to favorites' }))
     await user.click(only)
     await waitFor(() => expect(listed()).toEqual(['Komika Text']))
-    expect(screen.getByText('Favorites')).toBeInTheDocument()
+    // Koharu's list of them, with no headings.
+    expect(screen.queryByText('Favorites')).not.toBeInTheDocument()
     expect(screen.queryByText('All fonts')).not.toBeInTheDocument()
-    expect(within(screen.getAllByRole('status')[0]!).getByText('1 font')).toBeInTheDocument()
-
-    // A search finds none of them.
+    expect(screen.getByText('1 font')).toBeInTheDocument()
     await user.type(search(), 'Anime')
     expect(screen.getByText('No fonts match this search')).toBeInTheDocument()
 
     // Reopened, the picker still shows only the favourites.
     await user.keyboard('{Escape}')
-    await user.click(screen.getByRole('button', { name: 'Font' }))
-    expect(screen.getByRole('button', { name: 'Favorites only' })).toHaveAttribute(
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+    await openPicker(user)
+    expect(screen.getByRole('button', { name: 'Show favorite fonts' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
     expect(listed()).toEqual(['Komika Text'])
+
+    // The star went to the settings file, and none to Koharu's store in the browser profile.
+    const kept = JSON.parse(localStorage.getItem('favorite-fonts') ?? '{}') as {
+      state?: { favorites?: string[] }
+    }
+    expect(kept.state?.favorites).toEqual([])
+
+    await user.click(screen.getByRole('button', { name: 'Show favorite fonts' }))
+    expect(screen.getByRole('button', { name: 'Show favorite fonts' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
   })
 
-  it('says when Favorites only hides every font a picker offers, not that a search found none', async () => {
-    favoritesDesktop(['Anime Ace'])
-    setFavoritesOnly(true)
-    const user = userEvent.setup()
-    // A picker without the favourite, as Add font family leaves out the families already listed.
-    renderPicker({ families: fontFamilies('Komika Text', 'Wild Words') }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
-
-    expect(
-      await screen.findByText(
-        'None of your favorites are available here. Turn off Favorites only to see all fonts.',
-      ),
-    ).toBeInTheDocument()
-    expect(screen.queryByText('No fonts match this search')).not.toBeInTheDocument()
-
-    await user.type(search(), 'Wild')
-    expect(screen.getByText('No fonts match this search')).toBeInTheDocument()
-  })
-
-  it("shares the favourites between Preferred fonts' pickers and the TypeBar's", async () => {
+  it("shares the favourites between Typesetting's pickers and the TypeBar's", async () => {
     settingsDesktop()
     favoritesDesktop()
     vi.spyOn(commands, 'listFonts').mockResolvedValue(comicFonts)
@@ -217,14 +178,20 @@ describe('Booharu font favourites', () => {
         <TypesettingPreferences value={{ font_families: ['Anime Ace'] }} onChange={() => {}} />
       </QueryClientProvider>,
     )
-    await user.click(await screen.findByRole('button', { name: 'Add font family' }))
+    await screen.findByRole('combobox', { name: 'Add a fallback' })
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Add a fallback' })).toBeEnabled(),
+    )
+    await openPicker(user, 'Add a fallback')
     await user.click(await screen.findByRole('button', { name: 'Add Komika Text to favorites' }))
     await screen.findByText('Favorites')
     await user.keyboard('{Escape}')
-    await user.click(screen.getByRole('button', { name: 'Default font family 1' }))
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+    await openPicker(user, 'Primary')
     expect(await screen.findByText('Favorites')).toBeInTheDocument()
     expect(listed()[0]).toBe('Komika Text')
     await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
 
     const page: Page = {
       id: 'page',
@@ -285,7 +252,7 @@ describe('Booharu font favourites', () => {
     })
     const user = userEvent.setup()
     renderPicker({}, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
 
     const saved = saveBooharuSection('booharu-lettering', (section) => ({
       ...section,

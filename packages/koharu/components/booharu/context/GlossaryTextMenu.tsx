@@ -73,7 +73,6 @@ export function GlossaryTextMenu({
         </ContextMenuTrigger>
         <ContextMenuContent className='min-w-32'>
           <ContextMenuItem
-            className='text-[12px]'
             onClick={() => {
               const { field, selected } = clicked.current
               setAdding(
@@ -88,7 +87,6 @@ export function GlossaryTextMenu({
           </ContextMenuItem>
           {line && (
             <ContextMenuItem
-              className='text-[12px]'
               disabled={!source.trim()}
               onClick={() => void openExplanation(line.page, line.block)}
             >

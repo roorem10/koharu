@@ -1,7 +1,7 @@
 'use client'
 
-import { dispatch } from '@/lib/backend'
 import { plainText, type BlockLayer } from '@/lib/document'
+import { send } from '@/lib/queries'
 import { setText } from '@/lib/scene'
 import { commands, type Change, type LayerId, type Text } from '@koharu/ipc/protocol'
 
@@ -36,5 +36,5 @@ export function setTranslation(block: LayerId, text: string): Promise<Change> {
  * this both commit through it. A failure shows its error, as every failed command's does. */
 export function commitTranslation(block: BlockLayer, text: string): void {
   const first = !block.translation || isPlaceholder(block.translation)
-  dispatch(first ? setTranslation : setText, block.id, text)
+  send(first ? setTranslation : setText, block.id, text)
 }

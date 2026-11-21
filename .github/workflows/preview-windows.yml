@@ -70,7 +70,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          # Booharu 0.0.5 is built on Koharu 0.89.0, which shares almost no
+          # Booharu 0.0.5 is built on Koharu 0.90.0, which shares almost no
           # compiled dependencies with 0.0.4's, so it keeps a cache of its own.
           # The key keeps the name it had on Koharu 0.85 so the warm cache still
           # serves.

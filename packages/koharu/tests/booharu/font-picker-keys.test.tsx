@@ -1,62 +1,85 @@
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { favoritesDesktop, fontFamilies, highlighted, listed, renderPicker, search } from './fonts'
+import {
+  favoritesDesktop,
+  fontFamilies,
+  highlighted,
+  listed,
+  openPicker,
+  renderPicker,
+  search,
+} from './fonts'
 
-describe('Booharu font picker keys', () => {
-  it('moves through the fonts with Up and Down, wrapping around, and picks one with Enter', async () => {
+const SAME = 'Same as Normal Dialogue'
+
+// Koharu's picker moves through its list with the arrows and picks with Enter itself; these test the
+// rows Booharu adds to it, the leading row and the pinned favourites, and their headings.
+describe("Booharu's rows in Koharu's font picker, by keyboard", () => {
+  it('reaches the leading row and the pinned favourites with the arrows, and Enter picks them', async () => {
+    favoritesDesktop(['Wild Words'])
     const user = userEvent.setup()
-    const { onChange } = renderPicker({ value: 'Komika Text' })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    const { onChange } = renderPicker({ value: 'Komika Text', noneLabel: SAME })
+    await openPicker(user)
+    await screen.findByText('Favorites')
 
-    // The arrows start from the font in use, the one option they mark.
-    expect(search()).toHaveFocus()
+    expect(listed()).toEqual([
+      SAME,
+      'Wild Words',
+      'Anime Ace',
+      'CCMeanwhile',
+      'Komika Text',
+      'Wild Words',
+    ])
+    // The families, the leading row and the pinned copies not among them.
+    expect(screen.getByText('4 fonts')).toBeInTheDocument()
+
+    // From the font in use, under All fonts, round to the leading row and the pinned favourite.
     expect(highlighted()).toHaveAccessibleName('Komika Text')
-    expect(highlighted()).toHaveAttribute('data-active', 'true')
-    expect(
-      screen.getAllByRole('option').filter((option) => option.dataset.active === 'true'),
-    ).toHaveLength(1)
-
     await user.keyboard('{ArrowDown}')
-    expect(highlighted()).toHaveAccessibleName('Wild Words')
+    expect(highlighted()).toBe(screen.getAllByRole('option', { name: 'Wild Words' })[1])
+    await user.keyboard('{ArrowDown}{ArrowDown}')
+    expect(highlighted()).toBe(screen.getByRole('option', { name: SAME }))
     await user.keyboard('{ArrowDown}')
-    expect(highlighted()).toHaveAccessibleName('Anime Ace')
-    await user.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}')
-    expect(highlighted()).toHaveAccessibleName('CCMeanwhile')
+    expect(highlighted()).toBe(screen.getAllByRole('option', { name: 'Wild Words' })[0])
     expect(onChange).not.toHaveBeenCalled()
 
     await user.keyboard('{Enter}')
-    expect(onChange).toHaveBeenCalledExactlyOnceWith('CCMeanwhile')
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
-  })
-
-  it('starts again from the first match of a search, and sums up the matches and the font it is on', async () => {
-    const user = userEvent.setup()
-    const { onChange } = renderPicker({ value: 'Komika Text' })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
-
-    await user.type(search(), 'w')
-    expect(highlighted()).toHaveAccessibleName('CCMeanwhile')
-    const summary = screen.getByRole('status')
-    expect(summary).toHaveTextContent('2 fonts')
-    // The font it is on, its name set in its own face.
-    expect(await within(summary).findByRole('img', { name: 'CCMeanwhile' })).toBeInTheDocument()
-
-    await user.keyboard('{ArrowDown}')
-    expect(await within(summary).findByRole('img', { name: 'Wild Words' })).toBeInTheDocument()
-    await user.keyboard('{Enter}')
     expect(onChange).toHaveBeenCalledExactlyOnceWith('Wild Words')
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
   })
 
-  it('leaves Enter and the arrows to an IME while it composes', async () => {
+  it("keeps Koharu's search by PostScript name and pick by pointer, the favourite found twice", async () => {
+    favoritesDesktop(['Wild Words'])
+    const user = userEvent.setup()
+    const { onChange } = renderPicker({ value: 'Komika Text', noneLabel: SAME })
+    await openPicker(user)
+    await screen.findByText('Favorites')
+
+    await user.type(search(), 'WildWords')
+    expect(listed()).toEqual(['Wild Words', 'Wild Words'])
+    expect(screen.getByText('1 font')).toBeInTheDocument()
+    await user.clear(search())
+    await user.type(search(), 'missing family')
+    expect(screen.getByText('No fonts match this search')).toBeInTheDocument()
+
+    await user.clear(search())
+    await user.click(screen.getByRole('option', { name: 'Anime Ace' }))
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('Anime Ace')
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+  })
+
+  it('leaves Enter and the arrows to an IME while it composes, as Base UI does', async () => {
     const user = userEvent.setup()
     const { onChange } = renderPicker({ value: 'Komika Text' })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
 
-    fireEvent.keyDown(search(), { key: 'ArrowDown', isComposing: true })
+    // A key pressed while an IME composes comes with key code 229.
     expect(highlighted()).toHaveAccessibleName('Komika Text')
-    fireEvent.keyDown(search(), { key: 'Enter', isComposing: true })
+    fireEvent.keyDown(search(), { key: 'ArrowDown', keyCode: 229 })
+    expect(highlighted()).toHaveAccessibleName('Komika Text')
+    fireEvent.keyDown(search(), { key: 'Enter', keyCode: 229 })
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.getByRole('listbox')).toBeInTheDocument()
 
@@ -91,59 +114,27 @@ describe('Booharu font picker keys', () => {
       }
     })
 
-    it('scrolls to the font the arrows move to', async () => {
-      layOut(40 * 38)
-      const user = userEvent.setup()
-      renderPicker({ families: fontFamilies(...names) })
-      await user.click(screen.getByRole('button', { name: 'Font' }))
-      expect(highlighted()).toHaveAccessibleName('Font 1')
-
-      await user.keyboard('{ArrowUp}')
-      expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: 40 * 38 - 248 }))
-      expect(highlighted()).toHaveAccessibleName('Font 40')
-    })
-
-    it('shows the heading above the first font when the arrows come around to it', async () => {
-      layOut(24 + 38 + 24 + 40 * 38)
+    it('shows the heading above the first favourite when the arrows come round to it', async () => {
+      const height = 24 + 38 + 24 + 40 * 38
+      layOut(height)
       favoritesDesktop(['Font 2'])
       const user = userEvent.setup()
-      renderPicker({ families: fontFamilies(...names) }, { booharu: true })
-      await user.click(screen.getByRole('button', { name: 'Font' }))
+      renderPicker({ families: fontFamilies(...names) })
+      await openPicker(user)
       await screen.findByText('Favorites')
+
+      // The last family, at the bottom, both headings above it.
       await user.keyboard('{ArrowUp}')
       expect(highlighted()).toHaveAccessibleName('Font 40')
+      expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: height - 248 }))
 
+      // Round through the search line to the pinned favourite, its heading in view above it.
+      await user.keyboard('{ArrowDown}')
+      expect(highlighted()).toBeNull()
       await user.keyboard('{ArrowDown}')
       expect(highlighted()).toBe(screen.getAllByRole('option', { name: 'Font 2' })[0])
       expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: 0 }))
+      expect(await screen.findByText('Favorites')).toBeInTheDocument()
     })
-  })
-
-  it("still picks with the pointer and searches PostScript names, as Koharu's does", async () => {
-    const user = userEvent.setup()
-    const { onChange } = renderPicker({ value: 'Komika Text' })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
-
-    expect(screen.getByRole('option', { name: 'Komika Text' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
-    expect(screen.getByRole('status')).toHaveTextContent('4 fonts')
-    // Without Booharu's props, none of its favourites.
-    expect(listed()).toEqual(['Anime Ace', 'CCMeanwhile', 'Komika Text', 'Wild Words'])
-    expect(screen.queryByRole('button', { name: 'Favorites only' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /favorites$/ })).not.toBeInTheDocument()
-
-    await user.type(search(), 'WildWords')
-    expect(listed()).toEqual(['Wild Words'])
-    await user.clear(search())
-    await user.type(search(), 'missing family')
-    expect(screen.getByText('No fonts match this search')).toBeInTheDocument()
-    expect(highlighted()).toBeNull()
-
-    await user.clear(search())
-    await user.click(screen.getByRole('option', { name: 'Anime Ace' }))
-    expect(onChange).toHaveBeenCalledExactlyOnceWith('Anime Ace')
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 })

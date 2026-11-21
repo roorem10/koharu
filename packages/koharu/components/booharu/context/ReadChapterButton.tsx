@@ -1,21 +1,21 @@
 'use client'
 
-import type { TFunction } from 'i18next'
+import type { ParseKeys, TFunction } from 'i18next'
 import { BookOpenText, LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ReadingModelPicker } from '@/components/booharu/context/ReadingModelPicker'
 import { SeriesPicker } from '@/components/booharu/context/SeriesPicker'
-import { call } from '@/lib/backend'
 import { useReadingChapter } from '@/lib/booharu/booharuJobs'
+import { call } from '@/lib/booharu/call'
 import { linkSeries, readChapter } from '@/lib/booharu/context'
 import { booharuPreferencesQuery } from '@/lib/booharu/preferences'
 import { completeReading, isLocal, openProject, saveReading } from '@/lib/booharu/reading'
-import { queryClient, useProject } from '@/lib/queries'
+import { modelName } from '@/lib/models'
+import { modelsKey, queryClient, useModels, useProject } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { modelName } from '@/lib/translation'
-import { commands, type CantRead, type ReadSummary } from '@koharu/ipc/protocol'
+import { commands, type CantRead, type Model, type ReadSummary } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
 import { Checkbox } from '@koharu/ui/components/checkbox'
 import {
@@ -44,14 +44,14 @@ type Step =
 const separately = (why: CantRead) =>
   why === 'no_vision' ? 'booharu.context.noVisionConfirm' : 'booharu.context.onlyTranslatesConfirm'
 
-/** Says what a read did: the pages it read with its model, then each thing it found, wrote, kept or
- * skipped; or that it stopped, having saved nothing. */
+/** Says what a read did: the pages it read with its model, named as the models last listed name
+ * it, then each thing it found, wrote, kept or skipped; or that it stopped, having saved nothing. */
 function showRead(summary: ReadSummary, t: TFunction): void {
   if (summary.stopped) {
     toast.add({ type: 'info', title: t('booharu.context.readStopped') })
     return
   }
-  const counted = (key: string, count: number) => (count > 0 ? t(key, { count }) : null)
+  const counted = (key: ParseKeys, count: number) => (count > 0 ? t(key, { count }) : null)
   const notes = [
     counted('booharu.context.readCharacters', summary.characters),
     counted('booharu.context.readSuggestions', summary.suggestions_added),
@@ -68,7 +68,7 @@ function showRead(summary: ReadSummary, t: TFunction): void {
     type: 'success',
     title: t('booharu.context.readDone', {
       count: summary.pages,
-      model: modelName(useKoharuStore.getState().models, summary.model),
+      model: modelName(queryClient.getQueryData<Model[]>(modelsKey) ?? [], summary.model),
     }),
     description: notes.join(' ') || undefined,
   })
@@ -89,7 +89,7 @@ function showRead(summary: ReadSummary, t: TFunction): void {
 export function ReadChapterButton({ linked }: { linked: boolean }) {
   const { t } = useTranslation()
   const project = useProject().data?.name ?? null
-  const models = useKoharuStore((state) => state.models)
+  const models = useModels().data ?? []
   const running = useKoharuStore((state) =>
     Object.values(state.jobs).some((job) => job.state === 'running'),
   )

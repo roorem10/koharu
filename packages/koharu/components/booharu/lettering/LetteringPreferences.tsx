@@ -31,8 +31,8 @@ import {
   subtitleShare,
   useSubtitleLook,
 } from '@/lib/booharu/sfx'
+import { toHex, toRgba } from '@/lib/color'
 import { useFonts } from '@/lib/queries'
-import { hexToRgba, rgbaToHex } from '@/lib/store'
 import type { CategoryFont, LetteringCategory } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
 import {
@@ -254,8 +254,8 @@ function SubtitlePreferences() {
   const loaded = look !== undefined
   const shown = look ?? builtInSubtitle
   const size = look ? subtitlePercent(look.size) : null
-  const fill = rgbaToHex(shown.fill)
-  const stroke = rgbaToHex(shown.stroke)
+  const fill = toHex(shown.fill)
+  const stroke = toHex(shown.stroke)
 
   return (
     <PreferenceSection
@@ -318,7 +318,7 @@ function SubtitlePreferences() {
             size='sm'
             disabled={!loaded}
             value={fill}
-            onChange={(color) => color !== fill && change({ fill: hexToRgba(color) })}
+            onChange={(color) => color !== fill && change({ fill: toRgba(color) })}
           />
           <span className='min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground'>
             {fill}
@@ -335,7 +335,7 @@ function SubtitlePreferences() {
             size='sm'
             disabled={!loaded}
             value={stroke}
-            onChange={(color) => color !== stroke && change({ stroke: hexToRgba(color) })}
+            onChange={(color) => color !== stroke && change({ stroke: toRgba(color) })}
           />
           <span className='min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground'>
             {stroke}

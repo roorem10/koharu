@@ -76,6 +76,7 @@ export async function explainLine(layer: LayerId): Promise<void> {
 const readingModelQuery = queryOptions({
   queryKey: ['booharu', 'reading-model'] as const,
   queryFn: () => commands.booharuGetReadingModel(),
+  meta: { booharuQuiet: true },
 })
 
 /** The model Explain this line would use now, by its reference; none when none is set, which

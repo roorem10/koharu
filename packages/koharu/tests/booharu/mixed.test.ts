@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { borderCompanion, paragraphShare, setEach } from '@/lib/booharu/mixed'
+import { toRgba } from '@/lib/color'
 import { setStyle } from '@/lib/scene'
-import { hexToRgba } from '@/lib/store'
 import {
   commands,
   type CharStyle,
@@ -142,7 +142,7 @@ describe('Booharu style edit of each target’s own (S11-h)', () => {
   it('gives each target its own patch, and none to a target given none', async () => {
     const edits = await editsOf(() =>
       setEach(targets, (layer) =>
-        layer.id === 'plain' ? null : { chars: { stroke: hexToRgba('#FF0000') } },
+        layer.id === 'plain' ? null : { chars: { stroke: toRgba('#FF0000') } },
       ),
     )
 

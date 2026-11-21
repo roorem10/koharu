@@ -19,6 +19,7 @@
     "borders": {
       "decreaseSecondBorderWidth": "Reducir ancho del segundo contorno",
       "increaseSecondBorderWidth": "Aumentar ancho del segundo contorno",
+      "more": "Más opciones de contorno",
       "outlineContour": "Trazo de contorno",
       "outlineExpansion": "Expansión",
       "outlineMethod": "Método del borde",
@@ -338,13 +339,8 @@
       "weight": "Grosor de fuente"
     },
     "fonts": {
-      "addFavorite": "Añadir {{family}} a favoritos",
       "allFonts": "Todas las fuentes",
-      "favorites": "Favoritos",
-      "favoritesOnly": "Solo favoritos",
-      "noFavorites": "Marca fuentes con una estrella para añadirlas aquí",
-      "noFavoritesHere": "Ninguna de tus fuentes favoritas está disponible aquí. Desactiva “Solo favoritos” para ver todas las fuentes.",
-      "removeFavorite": "Quitar {{family}} de favoritos"
+      "favorites": "Favoritos"
     },
     "lettering": {
       "auto": "Elegir fuentes automáticamente",
@@ -427,6 +423,7 @@
     "menu": {
       "booharuGithub": "Booharu en GitHub",
       "koharuDiscord": "Discord de Koharu",
+      "koharuDonate": "Donar a Koharu",
       "koharuGithub": "Koharu en GitHub"
     },
     "notice": {

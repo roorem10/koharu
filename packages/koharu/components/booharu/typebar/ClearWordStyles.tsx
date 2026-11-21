@@ -4,7 +4,7 @@ import { RemoveFormatting } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import { markedTargets } from '@/lib/booharu/typebar'
 import { styleWords, unmarkTyping, type WordRange } from '@/lib/booharu/words'
 import { useKoharuStore } from '@/lib/store'

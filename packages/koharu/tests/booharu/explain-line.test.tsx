@@ -12,7 +12,7 @@ import { boxActions, runBoxAction, selectedBoxes } from '@/lib/booharu/boxAction
 import { closeBoxDetails, openBoxDetails, useBoxDetails } from '@/lib/booharu/boxDetails'
 import { useExplanations } from '@/lib/booharu/explain'
 import { resources, supportedLanguages } from '@/lib/i18n'
-import { queryClient } from '@/lib/queries'
+import { modelsKey, preferencesKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type ExplainAnswer, type Page, type ReadingModel } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
@@ -66,7 +66,7 @@ function readingModel(explain: string | null): ReadingModel {
  * `answer`; the boxes page open with the free block translated. */
 function setUp(explain: string | null = gpt.reference) {
   const spies = desktop()
-  useKoharuStore.setState({ models })
+  queryClient.setQueryData(modelsKey, models)
   const reading = vi
     .spyOn(commands, 'booharuGetReadingModel')
     .mockResolvedValue(readingModel(explain))
@@ -324,7 +324,8 @@ describe('Booharu Explain this line', () => {
   it("takes the line to the agent's composer once, and shows the Agent tab", async () => {
     setUp()
     explained(answer)
-    useKoharuStore.setState({ preferences: koharuPreferences(gpt.reference), panel: 'story' })
+    queryClient.setQueryData(preferencesKey, koharuPreferences(gpt.reference))
+    useKoharuStore.setState({ panel: 'story' })
     const user = userEvent.setup()
     const view = mount(
       <>

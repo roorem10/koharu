@@ -1,10 +1,10 @@
 'use client'
 
 import { InferenceControl } from '@/components/editor/InferenceControl'
-import { call } from '@/lib/backend'
 import { useReadingChapter } from '@/lib/booharu/booharuJobs' // Booharu: a read going.
+import { call } from '@/lib/booharu/call' // Booharu: Koharu's run, which runOrCarryOn awaits.
 import { runOrCarryOn } from '@/lib/booharu/runs' // Booharu: Run carries on with what's left.
-import { usePage } from '@/lib/queries'
+import { usePage } from '@/lib/queries' // Booharu: Run goes through runOrCarryOn, not send().
 import { pipelineStages, useKoharuStore, type PipelineScope } from '@/lib/store'
 import { commands, type Stage, type Target } from '@koharu/ipc/protocol'
 

@@ -11,6 +11,7 @@ import {
   fontFamilies,
   highlighted,
   listed,
+  openPicker,
   renderPicker,
   search,
 } from './fonts'
@@ -28,7 +29,7 @@ describe('Booharu local font names', () => {
     vi.spyOn(commands, 'booharuGetFontLocalNames').mockResolvedValue(localNames)
     const user = userEvent.setup()
     const { onChange } = renderPicker({ families }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
 
     const yuGothic = screen.getByRole('option', { name: 'Yu Gothic' })
     const local = await within(yuGothic).findByText('游ゴシック')
@@ -43,6 +44,7 @@ describe('Booharu local font names', () => {
     await user.clear(search())
     await user.type(search(), '游ゴシック')
     expect(listed()).toEqual(['Yu Gothic'])
+    await user.keyboard('{ArrowDown}')
     expect(highlighted()).toHaveAccessibleName('Yu Gothic')
     await user.keyboard('{Enter}')
     expect(onChange).toHaveBeenCalledExactlyOnceWith('Yu Gothic')
@@ -56,7 +58,7 @@ describe('Booharu local font names', () => {
     )
     const user = userEvent.setup()
     const { onChange } = renderPicker({ families }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
 
     expect(listed()).toHaveLength(6)
     await user.type(search(), 'Yu')
@@ -68,7 +70,7 @@ describe('Booharu local font names', () => {
     answer(localNames)
     await waitFor(() => expect(listed()).toEqual(['Yu Gothic']))
     expect(screen.getByText('游ゴシック')).toHaveClass('opacity-70')
-    await user.keyboard('{Enter}')
+    await user.keyboard('{ArrowDown}{Enter}')
     expect(onChange).toHaveBeenCalledExactlyOnceWith('Yu Gothic')
   })
 
@@ -80,13 +82,13 @@ describe('Booharu local font names', () => {
       .mockResolvedValueOnce(localNames)
     const user = userEvent.setup()
     renderPicker({ families }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
     expect(await screen.findByText('宋体')).toBeInTheDocument()
     expect(screen.queryByText('游ゴシック')).not.toBeInTheDocument()
 
     cleanup()
     renderPicker({ families }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
     expect(await screen.findByText('游ゴシック')).toBeInTheDocument()
     await user.type(search(), '游ゴシック')
     expect(listed()).toEqual(['Yu Gothic'])
@@ -102,17 +104,17 @@ describe('Booharu local font names', () => {
     const shown = vi.spyOn(toast, 'add')
     const user = userEvent.setup()
     const { onChange } = renderPicker({ families }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
 
     await waitFor(() => expect(read).toHaveBeenCalledOnce())
     await user.type(search(), 'Komika')
-    await user.keyboard('{Enter}')
+    await user.keyboard('{ArrowDown}{Enter}')
     expect(onChange).toHaveBeenCalledExactlyOnceWith('Komika Text')
     expect(shown).not.toHaveBeenCalled()
 
     cleanup()
     renderPicker({ families }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
     expect(await screen.findByText('游ゴシック')).toBeInTheDocument()
     expect(read).toHaveBeenCalledTimes(2)
   })

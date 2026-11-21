@@ -1,13 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ColorWell } from '@/components/controls/ColorWell'
+import { useColorHistory } from '@/lib/colorHistory'
 
 // A picker drag whose end event never fires (koharu#866), ported from Booharu 0.0.4: closing the
 // picker applies the dragged colour, Escape discards it, and any later choice wins over it.
 
 describe('colour well with an unfinished drag', () => {
+  beforeEach(() => useColorHistory.setState({ colors: [] }))
+
   it('commits an unfinished black drag when the picker closes from its swatch', async () => {
     const onChange = vi.fn()
     await unfinishedBlackDrag(onChange)
@@ -81,6 +84,61 @@ describe('colour well with an unfinished drag', () => {
 
     await waitFor(() => expect(picker).not.toBeInTheDocument())
     expect(onChange).toHaveBeenCalledOnce()
+  })
+})
+
+// Koharu 0.90.0's Recent colors keep the colour a well closes on; Booharu's unfinished drag joins
+// them only when closing applies it.
+describe('colour well with recent colours and an unfinished drag', () => {
+  beforeEach(() => useColorHistory.setState({ colors: [] }))
+
+  it('remembers an unfinished drag that closing applies', async () => {
+    const onChange = vi.fn()
+    await unfinishedBlackDrag(onChange)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Brush color' }))
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledExactlyOnceWith('#000000'))
+    expect(useColorHistory.getState().colors).toEqual(['#000000'])
+  })
+
+  it('remembers nothing when Escape discards an unfinished drag', async () => {
+    const onChange = vi.fn()
+    const picker = await unfinishedBlackDrag(onChange)
+
+    fireEvent.keyDown(picker, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByRole('slider', { name: 'Color' })).toBeNull())
+    expect(onChange).not.toHaveBeenCalled()
+    expect(useColorHistory.getState().colors).toEqual([])
+  })
+
+  it('lets a recent colour settle an unfinished drag', async () => {
+    useColorHistory.setState({ colors: ['#ABCDEF'] })
+    const onChange = vi.fn()
+    await unfinishedBlackDrag(onChange)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recent color #ABCDEF' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Brush color' }))
+
+    await waitFor(() => expect(screen.queryByRole('slider', { name: 'Color' })).toBeNull())
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('#ABCDEF')
+    expect(useColorHistory.getState().colors).toEqual(['#ABCDEF'])
+  })
+
+  it('remembers a colour closed on with no drag waiting, as Koharu does', async () => {
+    const onChange = vi.fn()
+    render(<ColorWell value='#111111' onChange={onChange} />)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Brush color' }))
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hex color code' }), {
+      target: { value: '#ABCDEF' },
+    })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Hex color code' }), { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByRole('slider', { name: 'Color' })).toBeNull())
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('#ABCDEF')
+    expect(useColorHistory.getState().colors).toEqual(['#ABCDEF'])
   })
 })
 

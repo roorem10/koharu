@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, type ComponentProps } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SelectionBoxActions } from '@/components/booharu/boxes/BoxActionItems'
@@ -20,7 +20,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@koharu/ui/components/dropdown-menu'
-import { cn } from '@koharu/ui/lib/utils'
 
 /** The box menu (S12-l): the menu a right-click on a box on the canvas opens where the pointer
  * pressed, "Box actions", listing the box actions for the selection, which holds the box by then,
@@ -95,21 +94,9 @@ function ShownMenu({ menu, page }: { menu: ShownBoxMenu; page: Page }) {
         aria-label={t('booharu.boxes.menu')}
         className='w-auto min-w-44 p-1'
       >
-        <SelectionBoxActions page={page} Item={BoxMenuItem} />
+        {/* Its items are Koharu's menu items, sized as the Edit menu's. */}
+        <SelectionBoxActions page={page} Item={DropdownMenuItem} />
       </DropdownMenuContent>
     </DropdownMenu>
-  )
-}
-
-/** An item sized as the Edit menu's. */
-function BoxMenuItem({ className, ...props }: ComponentProps<typeof DropdownMenuItem>) {
-  return (
-    <DropdownMenuItem
-      className={cn(
-        "min-h-8 gap-1.5 px-2 py-1 text-xs [&_svg:not([class*='size-'])]:size-3.5",
-        className,
-      )}
-      {...props}
-    />
   )
 }

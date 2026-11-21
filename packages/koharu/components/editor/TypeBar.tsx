@@ -1,31 +1,23 @@
 'use client'
 
-import {
-  AlignCenter,
-  AlignLeft,
-  AlignRight,
-  ArrowRightLeft, // Booharu: the colour swap.
-  ChevronDown,
-  Italic,
-  Minus,
-  Plus,
-  SquareSlash,
-} from 'lucide-react'
+import { useMutation } from '@tanstack/react-query'
+import { AlignCenter, AlignLeft, AlignRight, ChevronDown, Italic } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { FxPopover } from '@/components/booharu/effects/FxPopover' // Booharu: S12-k.
 import { AppliesTo, WholeBoxOnly } from '@/components/booharu/typebar/AppliesTo' // Booharu: S11-f.
+import { BorderExtras } from '@/components/booharu/typebar/BorderExtras' // Booharu: 2nd border (Q2).
 import { ClearWordStyles } from '@/components/booharu/typebar/ClearWordStyles' // Booharu: S11-g.
 import { DoneButton } from '@/components/booharu/typebar/DoneButton' // Booharu: S11-c.
 import { Spacing } from '@/components/booharu/typebar/Spacing' // Booharu: S11-i, S12-k.
 import { WordSizeSteps } from '@/components/booharu/typebar/WordSizeSteps' // Booharu: S11-e.
 import { BoldToggle } from '@/components/booharu/words/BoldToggle' // Booharu: B (D12).
 import { EmphasisButton } from '@/components/booharu/words/EmphasisButton' // Booharu: the star.
+import { Choice } from '@/components/controls/Choice'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { FontPicker } from '@/components/controls/FontPicker'
 import { ContextBar } from '@/components/editor/ContextBar'
-import { call, dispatch } from '@/lib/backend'
 import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: favourites and local names.
 import { useFxBar } from '@/lib/booharu/fx' // Booharu: Text effects goes with the bar (S12-k).
 // Booharu: the values the selected texts don't share (S11-h).
@@ -41,6 +33,7 @@ import {
   useChosenWords,
   weightChoices,
 } from '@/lib/booharu/words' // Booharu: I, the weights (D12) and words chosen in Story.
+import { toHex, toRgba } from '@/lib/color'
 import {
   expandLayerSelection,
   isBlockLayer,
@@ -48,9 +41,9 @@ import {
   letteringOf,
   walkLayers,
 } from '@/lib/document'
-import { useFonts, usePage } from '@/lib/queries'
+import { readPage, send, useFonts, usePage, usePreferences } from '@/lib/queries'
 import { setStyle, updateLayer } from '@/lib/scene'
-import { hexToRgba, rgbaToHex, useKoharuStore, type CanvasTool } from '@/lib/store'
+import { useKoharuStore, type CanvasTool } from '@/lib/store'
 import {
   commands,
   type Align,
@@ -60,7 +53,6 @@ import {
   type FontFamily,
   type Layer, // Booharu: a style edit of each target's own (S11-h).
   type LayerId,
-  type StrokeMethod, // Booharu: the border method.
   type Text,
   type TextStyle,
   type Value,
@@ -73,23 +65,10 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@koharu/ui/components/dropdown-menu'
-import {
-  NumberField,
-  NumberFieldDecrement,
-  NumberFieldGroup,
-  NumberFieldIncrement,
-  NumberFieldInput,
-} from '@koharu/ui/components/number-field'
-import { Popover, PopoverContent, PopoverTrigger } from '@koharu/ui/components/popover'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@koharu/ui/components/select'
+import { NumberField, NumberFieldGroup, NumberFieldInput } from '@koharu/ui/components/number-field'
 import { Toggle } from '@koharu/ui/components/toggle'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/tooltip'
+import { cn } from '@koharu/ui/lib/utils'
 
 /** The renderer's own default when `[renderer]` names no font. */
 const FALLBACK_FONT = 'CCWildWords'
@@ -109,13 +88,9 @@ const TOOLS: CanvasTool[] = ['select', 'direct_select', 'text']
 export function TypeBar() {
   const { t } = useTranslation()
   const tool = useKoharuStore((state) => state.tool)
-  const borderWidthId = useId()
-  const secondBorderWidthId = useId() // Booharu: the second border's width.
   const page = usePage().data
   const selectedIds = useKoharuStore((state) => state.selectedLayers)
-  const defaultFont = useKoharuStore(
-    (state) => state.preferences?.renderer.font_families?.[0] ?? FALLBACK_FONT,
-  )
+  const defaultFont = usePreferences().data?.renderer.font_families?.[0] ?? FALLBACK_FONT
   const availableFonts = useFonts().data
   const booharuFonts = useBooharuFontPicker() // Booharu: favourites and local names.
   const targets = useMemo(() => {
@@ -131,10 +106,17 @@ export function TypeBar() {
   const lettering: Text | null = targets.map(letteringOf).find((text) => text !== null) ?? null
   const typing = useKoharuStore((state) => state.typing)
   const chosen = useChosenWords(targets, typing) // Booharu: words chosen in Story in the one text shown.
-  const [draft, setDraft] = useState<{ layer: LayerId; style: TextStyle } | null>(null)
-  const sequence = useRef(0)
-
-  useEffect(() => setDraft(null), [current?.id])
+  // The newest style asked for shows on the first target until the page is read with it.
+  const restyle = useMutation({
+    mutationFn: (edit: {
+      layer: LayerId
+      style: TextStyle
+      targets: Layer[]
+      patch: TextStyle
+      each?: (layer: Layer) => TextStyle | null // Booharu: each target's own patch (S11-h).
+    }) => (edit.each ? setEach(edit.targets, edit.each) : setStyle(edit.targets, edit.patch)),
+    onSettled: readPage,
+  })
 
   // While typing, what the canvas says its selected characters share; otherwise what every
   // character of the selected texts shares.
@@ -149,7 +131,10 @@ export function TypeBar() {
       ),
     [typing, targets, chosen, lettering],
   )
-  const drafted = current && draft?.layer === current.id ? draft.style : null
+  const drafted =
+    current && restyle.isPending && restyle.variables.layer === current.id
+      ? restyle.variables.style
+      : null
   const style: TextStyle = {
     ...lettering?.style,
     ...drafted,
@@ -160,7 +145,8 @@ export function TypeBar() {
   const frame = lettering?.frame ?? 'point'
   // A box and a path fit their text alike, a balloon's translation in a path; point text has no fit.
   const fitted = typeof frame !== 'object' ? null : frame.box ? 'box' : 'path'
-  const autoFit = typeof frame === 'object' && (frame.box ?? frame.path)?.fit === 'best'
+  const fit = typeof frame === 'object' ? (frame.box ?? frame.path)?.fit : undefined
+  const autoFit = fit === 'best'
   // Booharu: what the targets' paragraphs share; a value they don't shows empty, unless the draft
   // sets it, which every target then takes (S11-h).
   const share = useMemo(() => paragraphShare(targets), [targets])
@@ -171,17 +157,14 @@ export function TypeBar() {
   // every target takes (S11-h).
   const apply = (patch: TextStyle, each?: (layer: Layer) => TextStyle | null) => {
     if (!current) return
-    setDraft({
+    restyle.mutate({
       layer: current.id,
       // Booharu: only what's set, so a value the targets don't share stays empty (S11-h).
       style: { ...drafted, ...patch, chars: { ...drafted?.chars, ...patch.chars } },
+      targets,
+      patch,
+      each, // Booharu: each target's own (S11-h).
     })
-    const request = ++sequence.current
-    void (each ? call(setEach, targets, each) : call(setStyle, targets, patch)) // Booharu: each (S11-h).
-      .catch(() => undefined)
-      .finally(() => {
-        if (sequence.current === request) setDraft(null)
-      })
   }
 
   /** A character setting: while typing, the canvas styles the selected characters, or holds it
@@ -197,13 +180,13 @@ export function TypeBar() {
       marked = { ...marked, outer_stroke: undefined, outer_stroke_width: 0 }
     }
     if (chosen) return void styleWords(chosen, words ?? { set: marked }) // Booharu: words chosen in Story.
-    void call(commands.styleTyping, marked).catch(() => undefined)
+    send(commands.styleTyping, marked)
   }
 
   /** Merges `patch` into each target's lettering: a text's own values, a block's translation's. */
   const update = (patch: { [key in string]: Value }) => {
     for (const layer of targets) {
-      dispatch(updateLayer, layer.id, isBlockLayer(layer) ? { translation: patch } : patch)
+      send(updateLayer, layer.id, isBlockLayer(layer) ? { translation: patch } : patch)
     }
   }
 
@@ -250,17 +233,11 @@ export function TypeBar() {
     strokeEnabled ||
     ((mixed.has('stroke') || mixed.has('stroke_width')) &&
       ('bordered' in shared ? shared.bordered : true))
-  const outerWidth = chars.outer_stroke_width ?? 0
-  const outer = chars.outer_stroke ?? null
-  const outerEnabled = bordered && outer !== null && outer[3] > 0 && outerWidth > 0
-  const strokeMethod: StrokeMethod = style.stroke_method ?? 'expansion'
-  // Booharu: none shown while the targets' methods differ (S11-h).
-  const strokeMethodMixed = share.stroke_method.mixed && drafted?.stroke_method === undefined
-  // Booharu: Koharu's border, the default, listed first.
-  const strokeMethods: Record<StrokeMethod, string> = {
-    expansion: t('booharu.borders.outlineExpansion'),
-    contour: t('booharu.borders.outlineContour'),
-  }
+  // Booharu: how the borders are drawn, none shown while the targets' methods differ (S11-h).
+  const strokeMethod =
+    share.stroke_method.mixed && drafted?.stroke_method === undefined
+      ? null
+      : (style.stroke_method ?? 'expansion')
   const direction: Direction = lettering?.direction ?? 'horizontal'
   // Booharu: none pressed while the targets' alignments differ (S11-h).
   const alignMixed = share.align.mixed && drafted?.align === undefined
@@ -282,8 +259,8 @@ export function TypeBar() {
   if (!selectionBounds || !(targets.length || typing) || !TOOLS.includes(tool)) return null
 
   // One row, as Photoshop's type options bar, at the user's choice: the face, its size, and its
-  // colour, then the paragraph; italic and vertical text are toggles, and the border sits behind
-  // one button, as Photoshop keeps a stroke out of the bar.
+  // colour, then the paragraph; italic and vertical text are toggles, and the border's colour and
+  // width close the row, as Clip Studio Paint's text tool shows a text's edge beside its colour.
   const toggle =
     'h-6 w-6 min-w-6 rounded-md bg-background px-0 text-muted-foreground data-[pressed]:border-primary data-[pressed]:bg-primary data-[pressed]:text-primary-foreground data-[pressed]:hover:bg-primary/90'
   return (
@@ -307,21 +284,14 @@ export function TypeBar() {
           onChange={(next) => applyChars({ family: next })}
         />
       </div>
-      <Select
+      <Choice
+        size='sm'
         value={mixed.has('weight') ? '' : String(weight)}
-        onValueChange={(next) => next && applyChars({ weight: Number(next) })}
-      >
-        <SelectTrigger size='sm' aria-label={t('inspector.fontWeight')} className='w-16'>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {weights.map((value) => (
-            <SelectItem key={value} value={String(value)}>
-              {value}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        choices={Object.fromEntries(weights.map((value) => [value, String(value)]))}
+        label={t('inspector.fontWeight')}
+        className='w-14'
+        onChange={(next) => applyChars({ weight: Number(next) })}
+      />
       {/* Booharu: B beside the weights, pressed while every character is bold (D12). */}
       <BoldToggle chars={chars} mixed={mixed} className={toggle} onChange={applyChars} />
       <Tooltip>
@@ -357,21 +327,34 @@ export function TypeBar() {
       <EmphasisButton words={chosen} />
       {/* Booharu: Clear, which takes the word styles off (S11-g). */}
       <ClearWordStyles words={chosen} targets={targets} />
-      <div className='w-[4.5rem]'>
-        <FontSizeField
-          disabled={false}
+      <div className='w-15'>
+        <PresetField
+          name='font-size'
+          testId='type-size'
           // Booharu: empty, "Mixed", and neither Auto nor a size chosen while the boxes' fits differ;
           // "Mixed" too while their sizes do (S11-h).
           value={fitMixed ? null : size}
-          autoFit={autoFit && !fitMixed}
-          mixed={fitMixed || size === null}
-          canAutoFit={fitted !== null}
+          mixed={fitMixed || size === null ? t('booharu.typebar.mixed') : undefined}
+          min={0.5}
+          // Photoshop's largest type size.
+          max={1296}
+          presets={fontSizes}
+          label={t('inspector.fontSize')}
+          menuLabel={t('inspector.chooseFontSize')}
+          auto={{
+            label: t('inspector.auto'),
+            active: autoFit && !fitMixed, // Booharu: not while the fits differ (S11-h).
+            available: fitted !== null,
+            onPick: () => fitted && update({ frame: { [fitted]: { fit: 'best' } } }),
+          }}
           onChange={(next) => {
             applyChars({ size: next })
-            // A set size is the most the text takes, as the frame's best fit would grow it.
-            if (autoFit && fitted) update({ frame: { [fitted]: { fit: 'shrink' } } })
+            // A typed size is the size the text draws at, as in Photoshop and Clip Studio Paint, so
+            // a frame that shrinks or grows its text stops fitting it; a growing box keeps the size.
+            if (fitted && fit !== 'none' && fit !== 'grow') {
+              update({ frame: { [fitted]: { fit: 'none' } } })
+            }
           }}
-          onAutoFit={() => fitted && update({ frame: { [fitted]: { fit: 'best' } } })}
         />
       </div>
       {/* Booharu: A− and A+, for the characters typed or the words chosen in Story (S11-e). */}
@@ -381,8 +364,8 @@ export function TypeBar() {
         size='sm'
         // Booharu: empty too while a gradient shows, and a colour picked takes the gradient off,
         // a fill and a gradient fill being one paint (S12-c).
-        value={paint && 'color' in paint ? rgbaToHex(paint.color) : ''}
-        onChange={(color) => color && applyChars({ fill: hexToRgba(color), fill_gradient: null })}
+        value={!paint || 'gradient' in paint ? '' : chars.fill ? toHex(chars.fill) : BLACK}
+        onChange={(color) => color && applyChars({ fill: toRgba(color), fill_gradient: null })}
       />
       <div
         role='group'
@@ -408,8 +391,7 @@ export function TypeBar() {
             ],
           ] as const
         ).map(([value, Icon, label]) => (
-          // Booharu: each button's name in a tooltip, which adds "Mixed" while the targets'
-          // alignments differ (S11-h).
+          // Booharu: the tooltip adds "Mixed" while the targets' alignments differ (S11-h).
           <Tooltip key={value}>
             <TooltipTrigger
               render={
@@ -491,227 +473,60 @@ export function TypeBar() {
           <WholeBoxOnly words={chosen} />
         </TooltipContent>
       </Tooltip>
-      <Popover>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <PopoverTrigger
-                aria-label={t('inspector.border')}
-                className='grid size-6 shrink-0 place-items-center rounded-md border border-input bg-background text-muted-foreground hover:bg-muted'
-              />
+      <div role='group' aria-label={t('inspector.border')} className='flex items-center gap-1'>
+        <ColorWell
+          label={t('inspector.borderColor')}
+          size='sm'
+          allowTransparent
+          value={
+            // Booharu: empty while the colours differ, and the colour shared while only the widths
+            // do (S11-h).
+            mixed.has('stroke')
+              ? ''
+              : stroke && stroke[3] > 0 && (strokeWidth > 0 || mixed.has('stroke_width'))
+                ? toHex(stroke)
+                : null
+          }
+          onChange={(color) =>
+            color === null
+              ? applyChars({ stroke: null })
+              : // Booharu: through applyBorder, so each box keeps its own width (S11-h).
+                applyBorder({ stroke: toRgba(color) }, 'stroke_width', {
+                  stroke_width: strokeWidth > 0 ? strokeWidth : 1.5,
+                })
+          }
+        />
+        <div className='w-12'>
+          <PresetField
+            name='border-width'
+            // Booharu: empty, "Mixed", while the widths differ (S11-h).
+            value={mixed.has('stroke_width') ? null : strokeWidth > 0 ? strokeWidth : 1.5}
+            mixed={mixed.has('stroke_width') ? t('booharu.typebar.mixed') : undefined}
+            min={0.5}
+            max={32}
+            presets={borderWidths}
+            label={t('inspector.borderWidth')}
+            menuLabel={t('inspector.chooseBorderWidth')}
+            onChange={(next) =>
+              // Booharu: through applyBorder, so each box keeps its own colour (S11-h).
+              applyBorder({ stroke_width: next }, 'stroke', { stroke: stroke ?? toRgba(WHITE) })
             }
-          >
-            {strokeEnabled && stroke ? (
-              <span
-                aria-hidden='true'
-                className='size-3 rounded-[3px] border-2'
-                style={{ borderColor: rgbaToHex(stroke) }}
-              />
-            ) : (
-              <SquareSlash aria-hidden='true' className='size-3.5' />
-            )}
-          </TooltipTrigger>
-          <TooltipContent>{t('inspector.border')}</TooltipContent>
-        </Tooltip>
-        <PopoverContent side='bottom' align='end' className='w-auto gap-1.5 rounded-xl p-2'>
-          <span className='text-[10px] font-medium text-muted-foreground'>
-            {t('inspector.border')}
-          </span>
-          <div className='flex items-center gap-1'>
-            <ColorWell
-              label={t('inspector.borderColor')}
-              size='sm'
-              allowTransparent
-              value={
-                // Booharu: empty while the colours differ, and the colour shared while only the
-                // widths do (S11-h).
-                mixed.has('stroke')
-                  ? ''
-                  : stroke && stroke[3] > 0 && (strokeWidth > 0 || mixed.has('stroke_width'))
-                    ? rgbaToHex(stroke)
-                    : null
-              }
-              onChange={(color) =>
-                // Booharu: through applyBorder, so each box keeps its own width (S11-h).
-                color === null
-                  ? applyChars({ stroke: null })
-                  : applyBorder({ stroke: hexToRgba(color) }, 'stroke_width', {
-                      stroke_width: strokeWidth > 0 ? strokeWidth : 1.5,
-                    })
-              }
-            />
-            <NumberField
-              id={borderWidthId}
-              name='border-width'
-              className='w-24'
-              // Booharu: empty while the widths differ (S11-h).
-              value={mixed.has('stroke_width') ? null : strokeWidth > 0 ? strokeWidth : 1.5}
-              min={0.5}
-              max={32}
-              step={0.5}
-              onValueChange={(next) => {
-                if (next !== null && next >= 0.5 && next <= 32) {
-                  // Booharu: through applyBorder, so each box keeps its own colour (S11-h).
-                  applyBorder({ stroke_width: next }, 'stroke', {
-                    stroke: stroke ?? hexToRgba(WHITE),
-                  })
-                }
-              }}
-            >
-              <NumberFieldGroup>
-                <NumberFieldDecrement aria-label={t('inspector.decreaseBorderWidth')}>
-                  <Minus />
-                </NumberFieldDecrement>
-                <NumberFieldInput
-                  aria-label={t('inspector.borderWidth')}
-                  // Booharu: "Mixed" while the widths differ (S11-h).
-                  placeholder={mixed.has('stroke_width') ? t('booharu.typebar.mixed') : undefined}
-                />
-                <NumberFieldIncrement aria-label={t('inspector.increaseBorderWidth')}>
-                  <Plus />
-                </NumberFieldIncrement>
-              </NumberFieldGroup>
-            </NumberField>
-            {/* Booharu: swap the text's colour and its border's. */}
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type='button'
-                    aria-label={t('booharu.borders.swapFillOutline')}
-                    // Not while a gradient shows, or the paints differ, the fill being the paint
-                    // (S12-c).
-                    disabled={
-                      !(paint && 'color' in paint) ||
-                      mixed.has('stroke') ||
-                      mixed.has('stroke_width')
-                    }
-                    className='grid size-6 shrink-0 place-items-center rounded-md border border-input bg-background text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50'
-                    onClick={() => applyChars(swappedColors(chars))}
-                  />
-                }
-              >
-                <ArrowRightLeft aria-hidden='true' className='size-3.5' />
-              </TooltipTrigger>
-              <TooltipContent>{t('booharu.borders.swapFillOutline')}</TooltipContent>
-            </Tooltip>
-          </div>
-          {/* Booharu: a second border around the first, and how both are drawn. */}
-          <span className='text-[10px] font-medium text-muted-foreground'>
-            {t('booharu.borders.secondBorder')}
-          </span>
-          <div className='flex items-center gap-1'>
-            <ColorWell
-              label={t('booharu.borders.secondBorderColor')}
-              size='sm'
-              allowTransparent
-              disabled={!bordered}
-              value={
-                // Booharu: the colour shared while only the widths differ (S11-h).
-                mixed.has('outer_stroke')
-                  ? ''
-                  : bordered &&
-                      outer &&
-                      outer[3] > 0 &&
-                      (outerWidth > 0 || mixed.has('outer_stroke_width'))
-                    ? rgbaToHex(outer)
-                    : null
-              }
-              onChange={(color) => {
-                // Both keys go, so the text is as Koharu writes it again. While typing, or for
-                // words chosen in Story, a mark can't unset them, so characters with no second
-                // border are left unmarked.
-                if (color === null) {
-                  const some =
-                    outerEnabled || mixed.has('outer_stroke') || mixed.has('outer_stroke_width')
-                  if (some || (!typing && !chosen)) {
-                    applyChars({ outer_stroke: null, outer_stroke_width: null })
-                  }
-                  return
-                }
-                // Widths that differ stay each character's own, and each box's own, 3 only
-                // where one has none (S11-h).
-                applyBorder(
-                  { outer_stroke: hexToRgba(color) },
-                  'outer_stroke_width',
-                  outerWidth > 0 ? {} : { outer_stroke_width: 3 },
-                )
-              }}
-            />
-            <NumberField
-              id={secondBorderWidthId}
-              name='second-border-width'
-              className='w-24'
-              // Empty while the widths differ (S11-h).
-              value={mixed.has('outer_stroke_width') ? null : outerWidth > 0 ? outerWidth : 3}
-              min={0.5}
-              max={32}
-              step={0.5}
-              disabled={!bordered}
-              onValueChange={(next) => {
-                if (next !== null && next >= 0.5 && next <= 32) {
-                  // Colours that differ stay each character's own, and each box's own, black
-                  // only where one has none (S11-h).
-                  applyBorder(
-                    { outer_stroke_width: next },
-                    'outer_stroke',
-                    outer ? {} : { outer_stroke: hexToRgba(BLACK) },
-                  )
-                }
-              }}
-            >
-              <NumberFieldGroup>
-                <NumberFieldDecrement aria-label={t('booharu.borders.decreaseSecondBorderWidth')}>
-                  <Minus />
-                </NumberFieldDecrement>
-                <NumberFieldInput
-                  aria-label={t('booharu.borders.secondBorderWidth')}
-                  placeholder={
-                    mixed.has('outer_stroke_width') ? t('booharu.typebar.mixed') : undefined
-                  }
-                />
-                <NumberFieldIncrement aria-label={t('booharu.borders.increaseSecondBorderWidth')}>
-                  <Plus />
-                </NumberFieldIncrement>
-              </NumberFieldGroup>
-            </NumberField>
-          </div>
-          <span className='text-[10px] font-medium text-muted-foreground'>
-            {t('booharu.borders.outlineMethod')}
-            {/* Booharu: the whole box's, while typing or with words chosen in Story (S11-f). */}
-            <WholeBoxOnly words={chosen} />
-          </span>
-          <Select
-            value={strokeMethodMixed ? null : strokeMethod} // Booharu: "Mixed" (S11-h).
-            items={strokeMethods}
-            disabled={!paragraph}
-            onValueChange={(next) =>
-              // Expansion, Koharu's border, is what no method means, so the text stays readable
-              // by Koharu.
-              next && apply({ stroke_method: next === 'expansion' ? null : (next as StrokeMethod) })
-            }
-          >
-            <SelectTrigger
-              size='sm'
-              aria-label={t('booharu.borders.outlineMethod')}
-              className='w-full'
-            >
-              <SelectValue placeholder={t('booharu.typebar.mixed')} />
-            </SelectTrigger>
-            <SelectContent
-              // A pick with the pointer leaves the keys to the canvas, as FillBar's model does, so
-              // a tool's key that follows switches the tool, not the method by its name.
-              finalFocus={(closed) => closed === 'keyboard'}
-            >
-              {(Object.keys(strokeMethods) as StrokeMethod[]).map((method) => (
-                <SelectItem key={method} value={method}>
-                  {strokeMethods[method]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </PopoverContent>
-      </Popover>
+          />
+        </div>
+        {/* Booharu: the second border, the colour swap and the outline method, behind a small
+            button beside the border (Q2). */}
+        <BorderExtras
+          chars={chars}
+          mixed={mixed}
+          bordered={bordered}
+          method={strokeMethod}
+          paragraph={paragraph}
+          words={chosen}
+          onChars={applyChars}
+          onBorder={applyBorder}
+          onStyle={apply}
+        />
+      </div>
       {/* Booharu: Text effects, after the border's and before Done (S12-k). */}
       <FxPopover
         targets={targets}
@@ -726,27 +541,6 @@ export function TypeBar() {
       <DoneButton />
     </ContextBar>
   )
-}
-
-/** Booharu: `chars` with the text's colour and its border's swapped, as Booharu 0.0.4 swapped them.
- * Text without a visible border gets one in its colour, at the bar's default width, over a black
- * or white fill, whichever stands out from that colour. The new fill takes off any gradient, as a
- * colour picked in the colour well does, a fill and a gradient fill being one paint (S12-c), so a
- * box gradient its words' own colours hid doesn't show again. */
-export function swappedColors(chars: CharStyle): CharStyle {
-  const fill = chars.fill ?? hexToRgba(BLACK)
-  const stroke = chars.stroke ?? null
-  const width = chars.stroke_width ?? 0
-  if (stroke && stroke[3] > 0 && width > 0)
-    return { fill: stroke, fill_gradient: null, stroke: fill }
-  const [red, green, blue] = fill
-  const light = 0.2126 * red + 0.7152 * green + 0.0722 * blue > 0.5
-  return {
-    fill: hexToRgba(light ? BLACK : WHITE),
-    fill_gradient: null,
-    stroke: [red, green, blue, 1],
-    stroke_width: width > 0 ? width : 1.5,
-  }
 }
 
 /** A family the font list hasn't loaded, so the default still shows. */
@@ -828,114 +622,126 @@ function sameFont(left: string, right: string): boolean {
   return normalize(left) === normalize(right)
 }
 
-const fontSizePresets = [8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72, 96]
+/** The font sizes the size field lists, as Photoshop's options bar does. */
+const fontSizes = [8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72, 96]
+/** The border widths the width field lists. */
+const borderWidths = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32]
 
-function FontSizeField({
+/** A number typed in, in half steps, or picked from `presets` behind the arrow beside it, as
+ * Photoshop's options bar sets a font size. A typed number applies on Enter or on leaving the
+ * field, and one outside `min` to `max` goes back. `auto` is a choice above the presets that the
+ * field shows by its label. */
+function PresetField({
+  name,
   value,
-  autoFit,
+  min,
+  max,
+  presets,
+  label,
+  menuLabel,
+  auto,
   mixed, // Booharu: "Mixed" (S11-h).
-  canAutoFit,
-  disabled,
+  testId,
   onChange,
-  onAutoFit,
 }: {
-  /** `null` when the characters don't share one. */
+  name: string
+  /** `null` when the selection doesn't share one. */
   value: number | null
-  autoFit: boolean
-  /** Booharu: the boxes' sizes or fits differ, which the empty field says (S11-h). */
-  mixed?: boolean
-  canAutoFit: boolean
-  disabled: boolean
+  min: number
+  max: number
+  presets: number[]
+  label: string
+  menuLabel: string
+  auto?: { label: string; active: boolean; available: boolean; onPick: () => void }
+  /** Booharu: what the empty field shows while the selection doesn't share a value (S11-h). */
+  mixed?: string
+  testId?: string
   onChange: (value: number) => void
-  onAutoFit: () => void
 }) {
-  const { t } = useTranslation()
   const id = useId()
-  const [draft, setDraft] = useState<number | null>(value)
+  const field = useRef<HTMLDivElement>(null)
+  const shown = auto?.active ? null : value
+  const [draft, setDraft] = useState<number | null>(shown)
 
   useEffect(() => {
-    setDraft(autoFit ? null : value)
-  }, [autoFit, value])
+    setDraft(shown)
+  }, [shown])
 
-  const select = (choice: string) => {
+  const pick = (choice: string) => {
     if (choice === 'auto') {
       setDraft(null)
-      onAutoFit()
+      auto?.onPick()
       return
     }
-    const size = Number(choice)
-    if (Number.isFinite(size) && size > 0 && size <= 300) {
-      setDraft(size)
-      onChange(size)
-    }
+    const preset = Number(choice)
+    setDraft(preset)
+    onChange(preset)
   }
 
+  // The chosen one shows as a select's chosen item does, its tick left out, which the field's
+  // narrow list has no room for.
+  const item =
+    'pr-2 data-checked:bg-accent data-checked:text-accent-foreground [&>[data-slot=dropdown-menu-radio-item-indicator]]:hidden'
+
   const commit = (next: number | null) => {
-    if (next !== null && next > 0 && next <= 300) {
-      onChange(next)
-    } else {
-      setDraft(autoFit ? null : value)
-    }
+    if (next !== null && next >= min && next <= max) onChange(next)
+    else setDraft(shown)
   }
 
   return (
     <NumberField
       id={id}
-      name='font-size'
+      name={name}
       className='min-w-0'
-      disabled={disabled}
       value={draft}
-      min={0.5}
-      max={300}
+      min={min}
+      max={max}
       step={0.5}
       onValueChange={setDraft}
       onValueCommitted={commit}
     >
-      <NumberFieldGroup>
-        <NumberFieldInput
-          data-testid='type-size'
-          aria-label={t('inspector.fontSize')}
-          placeholder={
-            // Booharu: or "Mixed" (S11-h).
-            autoFit ? t('inspector.auto') : mixed ? t('booharu.typebar.mixed') : undefined
-          }
-          className='px-1.5 text-left text-ellipsis'
-          // Booharu: Enter applies a typed size at once; the field commits only on blur.
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') event.currentTarget.blur()
-          }}
-        />
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            disabled={disabled}
-            aria-label={t('inspector.chooseFontSize')}
-            className='grid size-6 shrink-0 place-items-center border-l border-input text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground disabled:pointer-events-none disabled:opacity-40'
-          >
-            <ChevronDown className='size-3' />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align='end'
-            className='w-28 min-w-28 border border-border/50 p-0.5 shadow-sm ring-0'
-          >
-            <DropdownMenuRadioGroup value={autoFit ? 'auto' : String(value)} onValueChange={select}>
-              {canAutoFit && (
-                <DropdownMenuRadioItem value='auto' className='min-h-6 py-0.5 text-[10px]'>
-                  {t('inspector.auto')}
-                </DropdownMenuRadioItem>
-              )}
-              {fontSizePresets.map((size) => (
-                <DropdownMenuRadioItem
-                  key={size}
-                  value={String(size)}
-                  className='min-h-6 py-0.5 text-[10px] tabular-nums'
-                >
-                  {size}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </NumberFieldGroup>
+      <Tooltip>
+        <TooltipTrigger render={<NumberFieldGroup ref={field} />}>
+          <NumberFieldInput
+            data-testid={testId}
+            aria-label={label}
+            placeholder={auto?.active ? auto.label : mixed /* Booharu: S11-h. */}
+            className='px-1 text-left text-ellipsis'
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={menuLabel}
+              className='grid h-full w-4 shrink-0 place-items-center border-l border-input text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground'
+            >
+              <ChevronDown className='size-3' />
+            </DropdownMenuTrigger>
+            {/* Under the whole field and as wide, as a select's list opens, wider only for a
+              label that needs it. */}
+            <DropdownMenuContent anchor={field} align='start' className='min-w-fit'>
+              <DropdownMenuRadioGroup
+                value={auto?.active ? 'auto' : String(value)}
+                onValueChange={pick}
+              >
+                {auto?.available && (
+                  <DropdownMenuRadioItem value='auto' className={item}>
+                    {auto.label}
+                  </DropdownMenuRadioItem>
+                )}
+                {presets.map((preset) => (
+                  <DropdownMenuRadioItem
+                    key={preset}
+                    value={String(preset)}
+                    className={cn(item, 'tabular-nums')}
+                  >
+                    {preset}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
     </NumberField>
   )
 }

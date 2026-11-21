@@ -1,68 +1,131 @@
-import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { screen, waitFor } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 
-import { TypeBar } from '@/components/editor/TypeBar'
-import { fontsKey, pageKey, queryClient } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
-import { commands, type Edit, type Page } from '@koharu/ipc/protocol'
+import { commands, type Edit, type Fit } from '@koharu/ipc/protocol'
 
-const page: Page = {
-  id: 'page',
-  size: { width: 800, height: 1200 },
-  background: null,
-  layers: [
-    {
-      id: 'text',
-      name: 'Text',
-      visible: true,
-      locked: false,
-      opacity: 1,
-      blend: 'normal',
-      attributes: {},
-      kind: 'text',
-      content: [{ insert: 'Hello' }],
-      style: { chars: { size: 24 } },
-    },
-  ],
-}
+import { renderBar, restyled, settled, text } from './typeBar'
 
-describe('Booharu font size on Enter', () => {
+// Koharu's size field in the Booharu type bar: a size typed or picked is the size the text draws
+// at, as in Photoshop, from 0.5 to 1296 pixels, so a box that shrinks or fits its text by the best
+// size stops fitting it, and a growing box keeps its fit. Booharu adds "Mixed" while the boxes'
+// sizes or fits differ (S11-h), and A− and A+ (S11-e), which step each character from its own size
+// and never touch the fit.
+
+/** A box frame fitting its text by `fit`. */
+const box = (fit: Fit) => ({ box: { bounds: { x: 0, y: 0, width: 100, height: 50 }, fit } })
+
+/** The edit Koharu sends to fit a box's text by `fit`. */
+const refit = (layer: string, fit: Fit): Edit => ({
+  label: 'update_layer',
+  ops: [{ op: 'update_layer', layer, patch: { frame: { box: { fit } } } }],
+})
+
+describe('Booharu font size', () => {
   it('applies a typed size as one edit when Enter is pressed', async () => {
-    const edits: Edit[] = []
-    const table = commands as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
-    for (const name of Object.keys(table)) vi.spyOn(table, name).mockResolvedValue(null)
-    vi.spyOn(commands, 'edit').mockImplementation(async (edit) => {
-      edits.push(edit)
-      return null as never
-    })
-    queryClient.setQueryData(pageKey, page)
-    queryClient.setQueryData(fontsKey, [])
-    useKoharuStore.setState({
-      tool: 'select',
-      selectedLayers: ['text'],
-      selectionBounds: { x: 100, y: 100, width: 200, height: 80 },
-    })
-    const user = userEvent.setup()
-    render(
-      <QueryClientProvider client={queryClient}>
-        <TypeBar />
-      </QueryClientProvider>,
-    )
+    const { edits, user } = await renderBar([text('text')])
 
     const size = screen.getByTestId('type-size')
     await user.clear(size)
     await user.type(size, '8')
+    await settled()
     expect(edits).toEqual([])
     await user.keyboard('{Enter}')
 
     expect(size).not.toHaveFocus()
-    expect(edits).toEqual([
-      {
-        label: 'set_style',
-        ops: [{ op: 'update_layer', layer: 'text', patch: { style: { chars: { size: 8 } } } }],
-      },
+    await waitFor(() => expect(edits).toEqual([restyled([['text', { chars: { size: 8 } }]])]))
+  })
+
+  it('sets a typed size exactly, past the A+ steps’ 300, and turns an Auto box’s fitting off', async () => {
+    const { edits, user } = await renderBar([text('one', { frame: box('best') })])
+
+    const size = screen.getByTestId('type-size')
+    expect(size).toHaveAttribute('placeholder', 'Auto')
+    await user.type(size, '412.3{Enter}')
+
+    await waitFor(() => expect(edits).toHaveLength(2))
+    expect(edits).toEqual(
+      expect.arrayContaining([
+        restyled([['one', { chars: { size: 412.3 } }]]),
+        refit('one', 'none'),
+      ]),
+    )
+  })
+
+  it('turns a shrinking box’s fitting off for a size picked from the menu', async () => {
+    const { edits, user } = await renderBar([text('one', { frame: box('shrink') })])
+
+    await user.click(screen.getByRole('button', { name: 'Choose font size' }))
+    await user.click(await screen.findByRole('menuitemradio', { name: '36' }))
+
+    await waitFor(() => expect(edits).toHaveLength(2))
+    expect(edits).toEqual(
+      expect.arrayContaining([restyled([['one', { chars: { size: 36 } }]]), refit('one', 'none')]),
+    )
+  })
+
+  it('keeps a growing box’s fit, which keeps the size', async () => {
+    const { edits, user } = await renderBar([text('one', { frame: box('grow') })])
+
+    const size = screen.getByTestId('type-size')
+    await user.clear(size)
+    await user.type(size, '30{Enter}')
+
+    await waitFor(() => expect(edits).toHaveLength(1))
+    await settled()
+    expect(edits).toEqual([restyled([['one', { chars: { size: 30 } }]])])
+  })
+
+  it('sizes every box while their sizes and fits differ, shown as Mixed, and turns their fitting off', async () => {
+    const { edits, user } = await renderBar([
+      text('one', { frame: box('best'), style: { chars: { size: 20 } } }),
+      text('two', { frame: box('shrink'), style: { chars: { size: 30 } } }),
     ])
+
+    const size = screen.getByTestId('type-size')
+    expect(size).toHaveValue('')
+    expect(size).toHaveAttribute('placeholder', 'Mixed')
+    await user.type(size, '16{Enter}')
+
+    await waitFor(() => expect(edits).toHaveLength(3))
+    expect(edits).toEqual(
+      expect.arrayContaining([
+        restyled([
+          ['one', { chars: { size: 16 } }],
+          ['two', { chars: { size: 16 } }],
+        ]),
+        refit('one', 'none'),
+        refit('two', 'none'),
+      ]),
+    )
+  })
+
+  it('fits every box by the best size again with Auto, setting no size, while their fits differ', async () => {
+    const { edits, user } = await renderBar([
+      text('one', { frame: box('none') }),
+      text('two', { frame: box('best') }),
+    ])
+
+    await user.click(screen.getByRole('button', { name: 'Choose font size' }))
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Auto' }))
+
+    await waitFor(() => expect(edits).toHaveLength(2))
+    await settled()
+    expect(edits).toEqual(expect.arrayContaining([refit('one', 'best'), refit('two', 'best')]))
+    expect(edits).toHaveLength(2)
+  })
+
+  it('steps the characters typed with A− and A+, never touching the fit (S11-e)', async () => {
+    const { edits, user } = await renderBar([text('one', { frame: box('best') })], {
+      typing: { layer: 'one', chars: { size: 24 }, mixed: [] },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Bigger' }))
+    await user.click(screen.getByRole('button', { name: 'Smaller' }))
+
+    await waitFor(() => expect(commands.booharuStepTypingSize).toHaveBeenCalledTimes(2))
+    expect(commands.booharuStepTypingSize).toHaveBeenNthCalledWith(1, true)
+    expect(commands.booharuStepTypingSize).toHaveBeenNthCalledWith(2, false)
+    await settled()
+    expect(edits).toEqual([])
   })
 })

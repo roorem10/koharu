@@ -13,9 +13,8 @@ import { readingSection } from '@/lib/booharu/reading'
 import { openSettingsSection } from '@/lib/booharu/settingsLink'
 import { commitTranslation } from '@/lib/booharu/translation'
 import { isBlockLayer } from '@/lib/document'
-import { useProject } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
-import { modelName } from '@/lib/translation'
+import { modelName } from '@/lib/models'
+import { useModels, useProject } from '@/lib/queries'
 import { Button } from '@koharu/ui/components/button'
 
 /** Booharu 0.0.4's LineContextCard, as Box details' Explain this line section for a block: Read
@@ -32,7 +31,7 @@ export function LineContextCard({ box: { layer, locked } }: BoxDetailsProps) {
   const project = useProject().data?.name ?? null
   const explanation = useExplanation(project, layer.id)
   const { model, known } = useExplainModel()
-  const models = useKoharuStore((state) => state.models)
+  const models = useModels().data ?? []
   if (!isBlockLayer(layer)) return null
 
   const note = readNote(layer)

@@ -127,8 +127,12 @@ describe('Booharu box actions in the menus', () => {
     expect(lettering).toHaveBeenCalledWith('page')
     fireEvent.click(item)
     await waitFor(() => expect(subtitle).toHaveBeenCalledWith('bang', null))
-    // The subtitle is selected, as the canvas shows its page.
+    // The subtitle is selected, as the canvas shows its page, and stays so once the menu has
+    // closed, the focus not going back to the row, which would select the sound effect again.
     await waitFor(() => expect(useKoharuStore.getState().selectedLayers).toEqual(['bang-subtitle']))
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+    expect(useKoharuStore.getState().selectedLayers).toEqual(['bang-subtitle'])
 
     // A text the lettering doesn't call a sound effect takes none.
     await openRow(user, 'lo')

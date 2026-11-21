@@ -7,8 +7,7 @@ import { ContextPanel } from '@/components/booharu/context/ContextPanel'
 import { useBooharuJobs } from '@/lib/booharu/booharuJobs'
 import { refreshContext } from '@/lib/booharu/context'
 import { cantRead, isLocal, type Reading } from '@/lib/booharu/reading'
-import { queryClient } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
+import { modelsKey, preferencesKey, queryClient } from '@/lib/queries'
 import {
   commands,
   type ChapterBrief,
@@ -97,7 +96,8 @@ function readDesktop({
   const preferences = koharuPreferences(translation)
   vi.spyOn(commands, 'listModels').mockResolvedValue(models)
   vi.spyOn(commands, 'getPreferences').mockResolvedValue(preferences)
-  useKoharuStore.setState({ models, preferences })
+  queryClient.setQueryData(modelsKey, models)
+  queryClient.setQueryData(preferencesKey, preferences)
   layOutModelMenus()
   vi.spyOn(commands, 'booharuGetReadingModel').mockImplementation(
     async (): Promise<ReadingModel> => {

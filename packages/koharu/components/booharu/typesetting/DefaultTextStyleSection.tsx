@@ -15,7 +15,7 @@ import {
   MAX_OUTLINE_WIDTH,
   useDefaultTextStyle,
 } from '@/lib/booharu/lettering'
-import { hexToRgba, rgbaToHex } from '@/lib/store'
+import { toHex, toRgba } from '@/lib/color'
 import { Button } from '@koharu/ui/components/button'
 import {
   NumberField,
@@ -40,8 +40,8 @@ export function DefaultTextStyleSection() {
   const { look, loaded, change } = useDefaultTextStyle()
   const titleId = useId()
   const widthId = useId()
-  const fill = look.fill ? rgbaToHex(look.fill) : BLACK
-  const stroke = look.stroke ? rgbaToHex(look.stroke) : null
+  const fill = look.fill ? toHex(look.fill) : BLACK
+  const stroke = look.stroke ? toHex(look.stroke) : null
   const outlined = look.stroke !== null || look.stroke_width !== builtInLook.stroke_width
 
   return (
@@ -88,7 +88,7 @@ export function DefaultTextStyleSection() {
               disabled={!loaded}
               value={fill}
               // Picking the black an unset colour shows changes nothing, so it stays unset.
-              onChange={(color) => color !== fill && change({ fill: hexToRgba(color) })}
+              onChange={(color) => color !== fill && change({ fill: toRgba(color) })}
             />
             <span className='min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground'>
               {fill}
@@ -119,7 +119,7 @@ export function DefaultTextStyleSection() {
                 // border does.
                 const width =
                   look.stroke_width > 0 ? {} : { stroke_width: builtInLook.stroke_width }
-                change(color === null ? { stroke: null } : { stroke: hexToRgba(color), ...width })
+                change(color === null ? { stroke: null } : { stroke: toRgba(color), ...width })
               }}
             />
             <span className='min-w-0 flex-1 truncate text-[11px] text-muted-foreground'>
@@ -149,7 +149,7 @@ export function DefaultTextStyleSection() {
                 change(
                   look.stroke || width === 0
                     ? { stroke_width: width }
-                    : { stroke_width: width, stroke: hexToRgba(WHITE) },
+                    : { stroke_width: width, stroke: toRgba(WHITE) },
                 )
               }}
             >

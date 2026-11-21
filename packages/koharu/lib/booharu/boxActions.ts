@@ -1,8 +1,10 @@
 'use client'
 
-import { call } from '@/lib/backend'
+import type { ParseKeys } from 'i18next'
+
 import { openBoxDetails, showLayer } from '@/lib/booharu/boxDetails'
 import { fetchLettering } from '@/lib/booharu/boxLettering'
+import { call } from '@/lib/booharu/call'
 import { openExplanation } from '@/lib/booharu/explain'
 import { openFxOn } from '@/lib/booharu/fx'
 import { redoBoxes } from '@/lib/booharu/redo'
@@ -75,7 +77,7 @@ export function balloonTexts(balloon: Layer): BlockLayer[] {
 export interface BoxAction {
   id: string
   /** Its name, an interface string's key. */
-  label: string
+  label: ParseKeys
   enabled: (selection: BoxSelection) => boolean
   /** Acts on a selection it's enabled for. A failed command shows its error, as every command's
    * does, and rejects. */
@@ -346,6 +348,17 @@ export const boxActions: readonly BoxAction[] = [
  * error. */
 export function runBoxAction(action: BoxAction, selection: BoxSelection): void {
   void action.run(selection).catch(() => undefined)
+}
+
+/** Whether a Story row's menu, as it closes, gives the focus back to the row's "…" button, which
+ * selects the row's text, `ids` its layer and parts. It does as Koharu's menu does, unless the
+ * focus went on to another control, such as Box details', or a box action left another layer
+ * selected, as Add subtitle leaves its subtitle, which the row would take the selection back from. */
+export function storyMenuReturnsFocus(ids: readonly LayerId[]): boolean {
+  const active = document.activeElement
+  const elsewhere =
+    active !== null && active !== document.body && active.closest('[role="menu"]') === null
+  return !elsewhere && useKoharuStore.getState().selectedLayers.some((id) => ids.includes(id))
 }
 
 /** Joins every balloon of `page` whose text is split, `split` as the desktop found them among

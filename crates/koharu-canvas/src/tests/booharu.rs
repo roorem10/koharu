@@ -1653,6 +1653,64 @@ fn a_box_styled_before_its_translated_moves_and_turns_its_source() {
 }
 
 #[test]
+fn an_arrow_key_moves_a_box_styled_before_its_translated_by_its_source() {
+    let Some((mut fixture, talk, _)) = untranslated() else {
+        return;
+    };
+    style_before_translating(
+        &mut fixture,
+        talk,
+        json!({"style": {"chars": {"fill": GREEN}}}),
+    );
+    let styled = layer(&fixture, talk)["translation"].clone();
+    fixture.canvas.select(vec![talk]);
+    let (before, start) = (steps(&fixture), fixture.canvas.selection_bounds());
+    // An arrow's pixel to the right moves its source, an update of the
+    // source's transform where Koharu's nudge would move the placeholder's,
+    // in one move step.
+    let effects = fixture.canvas.nudge(Vec2::new(1.0, 0.0));
+    assert_eq!(
+        json_of(&edit_ops(&effects, "move")),
+        json_of(&[Op::UpdateLayer {
+            layer: talk.into(),
+            patch: json!({"source": {"transform": [[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]]}}),
+        }])
+    );
+    assert_eq!(apply(&mut fixture, effects), ["move"]);
+    assert_eq!(steps(&fixture), before + 1);
+    assert_eq!(
+        fixture.session.lock().history().undo(),
+        Some("move"),
+        "the step undo takes back"
+    );
+    // Shift's ten pixels down goes after what the source had.
+    let effects = fixture.canvas.nudge(Vec2::new(0.0, 10.0));
+    assert_eq!(apply(&mut fixture, effects), ["move"]);
+    assert_eq!(steps(&fixture), before + 2);
+    let moved = layer(&fixture, talk);
+    assert!(close(
+        affine(&moved["source"]["transform"]) * Point::ZERO,
+        Point::new(1.0, 10.0)
+    ));
+    assert_eq!(moved["translation"], styled);
+    assert!(placeholder(&fixture, talk));
+    // Its control, its source's, went with it, handles and all.
+    let (start, bounds) = (
+        start.expect("bounds"),
+        fixture.canvas.selection_bounds().expect("bounds"),
+    );
+    let shifted = start + Vec2::new(1.0, 10.0);
+    assert!(
+        close(bounds.origin(), shifted.origin())
+            && close(
+                Point::new(bounds.x1, bounds.y1),
+                Point::new(shifted.x1, shifted.y1)
+            ),
+        "{bounds:?} isn't {shifted:?}"
+    );
+}
+
+#[test]
 fn a_translated_box_types_resizes_and_moves_its_translation_as_before() {
     let Some((mut fixture, talk, boom)) = untranslated() else {
         return;

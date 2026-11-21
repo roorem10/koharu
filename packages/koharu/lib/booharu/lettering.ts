@@ -3,7 +3,11 @@
 import { useMutation } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { saveBooharuSection, useBooharuPreferences } from '@/lib/booharu/preferences'
+import {
+  saveBooharuSection,
+  useBooharuPreferences,
+  writeBooharuSection,
+} from '@/lib/booharu/preferences'
 import type { DefaultTextStyle } from '@koharu/ipc/protocol'
 
 /** The id of Settings' default text style section, which the colour detection switch links to. */
@@ -116,7 +120,10 @@ export function useDetectColors() {
   const preferences = useBooharuPreferences()
   const save = useMutation({
     mutationFn: (detect: boolean) =>
-      saveBooharuSection('booharu-lettering', (section) => ({ ...section, detect_colors: detect })),
+      writeBooharuSection('booharu-lettering', (section) => ({
+        ...section,
+        detect_colors: detect,
+      })),
   })
   const saved = preferences.data?.['booharu-lettering'].detect_colors ?? true
   return {

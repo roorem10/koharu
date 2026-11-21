@@ -16,6 +16,7 @@
     "borders": {
       "decreaseSecondBorderWidth": "두 번째 테두리 너비 줄이기",
       "increaseSecondBorderWidth": "두 번째 테두리 너비 늘리기",
+      "more": "테두리 옵션 더 보기",
       "outlineContour": "외곽선 획",
       "outlineExpansion": "확장",
       "outlineMethod": "윤곽선 방식",
@@ -308,13 +309,8 @@
       "weight": "굵기"
     },
     "fonts": {
-      "addFavorite": "{{family}} 즐겨찾기에 추가",
       "allFonts": "모든 글꼴",
-      "favorites": "즐겨찾기",
-      "favoritesOnly": "즐겨찾기만",
-      "noFavorites": "글꼴에 별표를 추가하면 여기에 표시됩니다",
-      "noFavoritesHere": "여기에서 사용할 수 있는 즐겨찾기 글꼴이 없습니다. 모든 글꼴을 보려면 “즐겨찾기만”을 끄세요.",
-      "removeFavorite": "{{family}} 즐겨찾기에서 제거"
+      "favorites": "즐겨찾기"
     },
     "lettering": {
       "auto": "자동으로 글꼴 선택",
@@ -395,6 +391,7 @@
     "menu": {
       "booharuGithub": "GitHub의 Booharu",
       "koharuDiscord": "Koharu Discord",
+      "koharuDonate": "Koharu 후원하기",
       "koharuGithub": "GitHub의 Koharu"
     },
     "notice": {

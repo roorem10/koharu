@@ -97,6 +97,7 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         canvas::fit,
         canvas::set_zoom,
         canvas::select,
+        canvas::nudge,
         processing::fill,
         canvas::deselect,
         #[cfg(debug_assertions)]
@@ -226,6 +227,7 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         canvas::fit,
         canvas::set_zoom,
         canvas::select,
+        canvas::nudge,
         processing::fill,
         canvas::deselect,
         // Booharu: Booharu's commands, the same as in `handler`.

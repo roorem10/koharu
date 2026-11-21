@@ -1,5 +1,6 @@
 'use client'
 
+import type { ParseKeys } from 'i18next'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -7,11 +8,11 @@ import { GlossaryTextMenu } from '@/components/booharu/context/GlossaryTextMenu'
 import { LineContextCard } from '@/components/booharu/context/LineContextCard'
 import { LetteringSection } from '@/components/booharu/lettering/LetteringSection'
 import { QcSection } from '@/components/booharu/qc/QcSection'
-import { call } from '@/lib/backend'
 import { reviewNote } from '@/lib/booharu/attrs'
 import { boxActions, runBoxAction, type Box } from '@/lib/booharu/boxActions'
 import { showInStory } from '@/lib/booharu/boxDetails'
 import { useLettering } from '@/lib/booharu/boxLettering'
+import { call } from '@/lib/booharu/call'
 import { explainSection } from '@/lib/booharu/explain'
 import { qcSection } from '@/lib/booharu/qc'
 import { isBlockLayer, plainText } from '@/lib/document'
@@ -29,7 +30,7 @@ export interface BoxDetailsProps {
  * for which texts, every one when left out. */
 export interface BoxDetailsSection {
   id: string
-  title: string
+  title: ParseKeys
   Section: ComponentType<BoxDetailsProps>
   shows?: (box: Box) => boolean
 }

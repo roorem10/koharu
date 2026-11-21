@@ -4,10 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ModelPicker } from '@/components/controls/ModelPicker'
-import { refreshModels } from '@/lib/backend'
 import { canRead, listedModel, saveReading, useReadingSettings } from '@/lib/booharu/reading'
-import { useKoharuStore } from '@/lib/store'
-import { vendorOf } from '@/lib/translation'
+import { vendorOf } from '@/lib/models'
+import { useModels } from '@/lib/queries'
 import type { Model } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
 
@@ -24,11 +23,12 @@ export function readingChoices(models: readonly Model[], saved: string | null): 
 }
 
 /** The reading-model picker: Koharu's model menu, given only the models that can read a chapter's
- * pages, listed again as it opens, with the saved Read chapter model checked. A pick saves it as
- * `[booharu-reading] model` at once, then `onPicked` runs with it; a save that fails shows its
- * error as every failed command's does, and picks nothing. `onCancel` gives it a heading with
- * Cancel, which picks nothing, for a menu it opens inside of; a dialog has its own. Under the menu,
- * what to pick and that the pick is saved, unless `hint` is off, for a dialog that says it above. */
+ * pages, listed again as it opens, as Koharu's own menu is, with the saved Read chapter model
+ * checked. A pick saves it as `[booharu-reading] model` at once, the menu taking no other pick
+ * till it's saved, then `onPicked` runs with it; a save that fails shows its error as every failed
+ * command's does, and picks nothing. `onCancel` gives it a heading with Cancel, which picks
+ * nothing, for a menu it opens inside of; a dialog has its own. Under the menu, what to pick and
+ * that the pick is saved, unless `hint` is off, for a dialog that says it above. */
 export function ReadingModelPicker({
   onPicked,
   onCancel,
@@ -39,23 +39,21 @@ export function ReadingModelPicker({
   hint?: boolean
 }) {
   const { t } = useTranslation()
-  const models = useKoharuStore((state) => state.models)
+  const models = useModels()
+  const { refetch } = models
   const saved = useReadingSettings()?.model ?? null
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const mounted = useRef(true)
 
+  // The models are listed again as the menu opens; a listing that fails shows its error, as every
+  // failed read's does.
   useEffect(() => {
     mounted.current = true
-    void refreshModels(true)
-      .catch(() => undefined)
-      .finally(() => {
-        if (mounted.current) setLoading(false)
-      })
+    void refetch()
     return () => {
       mounted.current = false
     }
-  }, [])
+  }, [refetch])
 
   const pick = (reference: string) => {
     if (saving) return
@@ -91,9 +89,9 @@ export function ReadingModelPicker({
       )}
       <ModelPicker
         value={saved}
-        models={readingChoices(models, saved)}
-        loading={loading}
-        busyModel={saving}
+        models={readingChoices(models.data ?? [], saved)}
+        loading={models.isFetching}
+        disabled={saving !== null}
         onSelect={pick}
       />
       {hint && (

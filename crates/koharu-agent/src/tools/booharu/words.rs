@@ -64,7 +64,7 @@ pub(super) struct StyleWordsArgs {
     emphasis: bool,
     /// Each of the words a step bigger or smaller from its own size, else
     /// the box's: 5% to the half pixel, at least half a pixel, from 0.5 to
-    /// 300 pixels, as the type bar's A+ and A− step them. Not with
+    /// 1296 pixels, as the type bar's A+ and A− step them. Not with
     /// `emphasis`, values of the words' own, or `clear`.
     step: Option<SizeStep>,
     /// Bold, weight 700; false gives the words the box's own weight back,
@@ -299,7 +299,7 @@ impl Tool for StyleWords {
          tells a block's category), or the default one for a text layer, bold at 115% of the \
          box's size to start with; `step` `bigger` or `smaller`, each of the words a step \
          bigger or smaller from its own size, else the box's, as the type bar's A+ and A− make \
-         them: 5% to the half pixel, at least half a pixel, from 0.5 to 300 pixels, so words of \
+         them: 5% to the half pixel, at least half a pixel, from 0.5 to 1296 pixels, so words of \
          different sizes keep their order (for words a little bigger or smaller than they are \
          now; `size_percent` sets a share of the box's size instead); values of the words' \
          own, which go together: `bold`, `italic`, `family`, `size_percent` (25 to 400, of the \
@@ -329,7 +329,7 @@ impl Tool for StyleWords {
          only the empty placeholder a style set on it before it was translated leaves. Answers \
          the `words` styled, their `start` and `end` in characters, and what changed \
          (`change`), null when nothing did, as when they already looked so or a step found them \
-         at 300 or 0.5 pixels already, which makes no undo step. Example: {\"layer\": \"<id>\", \
+         at 1296 or 0.5 pixels already, which makes no undo step. Example: {\"layer\": \"<id>\", \
          \"text\": \"NO\", \"emphasis\": true}."
             .to_owned()
     }

@@ -28,13 +28,13 @@ const preferences: Preferences = {
 async function openRuns(user: ReturnType<typeof userEvent.setup>) {
   vi.spyOn(commands, 'getPreferences').mockResolvedValue(preferences)
   vi.spyOn(commands, 'listModels').mockResolvedValue([])
-  useKoharuStore.setState({ settingsOpen: true, preferences })
+  useKoharuStore.setState({ settingsOpen: true })
   render(
     <QueryClientProvider client={queryClient}>
       <SettingsPage />
     </QueryClientProvider>,
   )
-  await user.click(screen.getByRole('button', { name: 'Runs' }))
+  await user.click(screen.getByRole('tab', { name: 'Runs' }))
   expect(screen.getByRole('heading', { name: 'Runs', level: 2 })).toBeInTheDocument()
   await screen.findByRole('group', { name: 'Detect + OCR' })
 }
@@ -222,7 +222,7 @@ describe('Booharu Runs settings', () => {
     settingsDesktop()
     vi.spyOn(commands, 'getPreferences').mockRejectedValue('config.toml is unreadable')
     vi.spyOn(commands, 'listModels').mockResolvedValue([])
-    useKoharuStore.setState({ settingsOpen: true, preferences: null })
+    useKoharuStore.setState({ settingsOpen: true })
     const user = userEvent.setup()
     render(
       <QueryClientProvider client={queryClient}>
@@ -230,10 +230,10 @@ describe('Booharu Runs settings', () => {
       </QueryClientProvider>,
     )
     // Koharu's tabs wait for its settings.
-    await user.click(screen.getByRole('button', { name: 'Pipeline' }))
+    await user.click(screen.getByRole('tab', { name: 'Pipeline' }))
     expect(screen.getByText('Loading preferences…')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Runs' }))
+    await user.click(screen.getByRole('tab', { name: 'Runs' }))
     await screen.findByRole('group', { name: 'Detect + OCR' })
     expect(screen.queryByText('Loading preferences…')).toBeNull()
   })

@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next'
 import { useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import { useKoharuStore, type Panel } from '@/lib/store'
 import {
   commands,

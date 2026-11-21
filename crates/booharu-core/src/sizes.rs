@@ -14,7 +14,7 @@ pub const SIZE: f64 = 24.0;
 
 /// The smallest and largest sizes a step gives, in pixels, the type bar's
 /// size field's bounds.
-const SIZES: std::ops::RangeInclusive<f64> = 0.5..=300.0;
+const SIZES: std::ops::RangeInclusive<f64> = 0.5..=1296.0;
 
 /// How much a step scales a size by.
 const FACTOR: f64 = 1.05;
@@ -24,7 +24,7 @@ const GRAIN: f64 = 0.5;
 
 /// `size` a step bigger or smaller: 5% more or less, rounded to the nearest
 /// half pixel and moved by at least half a pixel, so a small size never
-/// stalls, within 0.5 to 300 pixels. A size that isn't finite steps from
+/// stalls, within 0.5 to 1296 pixels. A size that isn't finite steps from
 /// 24 pixels, and one outside the bounds from the nearest.
 pub fn stepped(size: f64, bigger: bool) -> f64 {
     let (min, max) = (*SIZES.start(), *SIZES.end());
@@ -117,14 +117,15 @@ mod tests {
     }
 
     #[test]
-    fn a_step_stays_within_half_a_pixel_and_three_hundred() {
+    fn a_step_stays_within_half_a_pixel_and_1296() {
         assert_eq!(stepped(0.5, false), 0.5);
-        assert_eq!(stepped(300.0, true), 300.0);
-        assert_eq!(stepped(299.0, true), 300.0);
+        assert_eq!(stepped(1296.0, true), 1296.0);
+        assert_eq!(stepped(1295.0, true), 1296.0);
+        assert_eq!(stepped(300.0, true), 315.0);
         // A size outside the bounds steps from the nearest.
         assert_eq!(stepped(0.1, true), 1.0);
-        assert_eq!(stepped(1000.0, false), 285.5);
-        assert_eq!(stepped(1000.0, true), 300.0);
+        assert_eq!(stepped(2000.0, false), 1234.5);
+        assert_eq!(stepped(2000.0, true), 1296.0);
     }
 
     #[test]

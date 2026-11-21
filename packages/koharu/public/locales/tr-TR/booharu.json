@@ -16,6 +16,7 @@
     "borders": {
       "decreaseSecondBorderWidth": "İkinci kenarlık genişliğini azalt",
       "increaseSecondBorderWidth": "İkinci kenarlık genişliğini artır",
+      "more": "Diğer kenarlık seçenekleri",
       "outlineContour": "Kontur çizgisi",
       "outlineExpansion": "Genişletme",
       "outlineMethod": "Anahat yöntemi",
@@ -308,13 +309,8 @@
       "weight": "Kalınlık"
     },
     "fonts": {
-      "addFavorite": "{{family}} yazı tipini favorilere ekle",
       "allFonts": "Tüm yazı tipleri",
-      "favorites": "Favoriler",
-      "favoritesOnly": "Yalnızca favoriler",
-      "noFavorites": "Yazı tiplerini buraya eklemek için yıldızlayın",
-      "noFavoritesHere": "Favori yazı tiplerinizin hiçbiri burada kullanılamıyor. Tüm yazı tiplerini görmek için “Yalnızca favoriler” seçeneğini kapatın.",
-      "removeFavorite": "{{family}} yazı tipini favorilerden kaldır"
+      "favorites": "Favoriler"
     },
     "lettering": {
       "auto": "Yazı tiplerini otomatik seç",
@@ -395,6 +391,7 @@
     "menu": {
       "booharuGithub": "GitHub'da Booharu",
       "koharuDiscord": "Koharu Discord",
+      "koharuDonate": "Koharu'ya bağış yap",
       "koharuGithub": "GitHub'da Koharu"
     },
     "notice": {

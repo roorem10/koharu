@@ -1,5 +1,6 @@
 'use client'
 
+import { useMutation } from '@tanstack/react-query'
 import { defaultRangeExtractor, observeElementRect, useVirtualizer } from '@tanstack/react-virtual'
 import { Languages, MoreHorizontal } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -11,7 +12,7 @@ import { BoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the row
 import { CategoryTag } from '@/components/booharu/lettering/CategoryTag' // Booharu: the row's lettering category.
 import { StoryWordToolbar } from '@/components/booharu/words/StoryWordToolbar' // Booharu: the word toolbar.
 import { CommitTextarea } from '@/components/controls/CommitTextarea'
-import { call, dispatch } from '@/lib/backend'
+import { storyMenuReturnsFocus } from '@/lib/booharu/boxActions' // Booharu: the row menu's focus.
 import { redoBoxes } from '@/lib/booharu/redo' // Booharu: Translate through Redo boxes.
 import { commitTranslation } from '@/lib/booharu/translation' // Booharu: a block's first translation.
 import { useWordSelection } from '@/lib/booharu/wordSelection' // Booharu: words chosen to style.
@@ -24,7 +25,7 @@ import {
   type BlockLayer,
   type TextLayer,
 } from '@/lib/document'
-import { usePageStory, useProject } from '@/lib/queries'
+import { send, usePageStory, useProject } from '@/lib/queries'
 import { deleteLayers, setSourceText, setText } from '@/lib/scene'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type LayerId, type PageId } from '@koharu/ipc/protocol'
@@ -114,19 +115,24 @@ export function StoryPanel() {
   )
 }
 
-/** Shows `page` on the canvas as clicking it in the page rail does: it alone selected among the
+/** Shows a page on the canvas as clicking it in the page rail does: it alone selected among the
  * pages, and no layer. */
-function showPage(page: PageId): Promise<null> {
-  const { selectPages, selectLayers } = useKoharuStore.getState()
-  selectPages([page])
-  selectLayers([])
-  return call(commands.show, page)
+function useShowPage() {
+  return useMutation({
+    mutationFn: (page: PageId) => {
+      const { selectPages, selectLayers } = useKoharuStore.getState()
+      selectPages([page])
+      selectLayers([])
+      return commands.show(page)
+    },
+  })
 }
 
 /** A page's heading, which shows the page, and its texts, read when the list first reaches it. */
 function StoryPage({ page, number, shown }: { page: PageId; number: number; shown: boolean }) {
   const { t } = useTranslation()
   const data = usePageStory(page).data
+  const show = useShowPage()
   // The scene's order, each text found in the page as it shows; one the page doesn't have yet,
   // between the two reads of a change, waits for the next.
   const texts = useMemo(
@@ -151,7 +157,7 @@ function StoryPage({ page, number, shown }: { page: PageId; number: number; show
           size='xs'
           className='h-5 px-1 text-[10px] font-semibold text-muted-foreground hover:bg-primary/10 hover:text-foreground in-data-[shown=true]:text-primary'
           onClick={() => {
-            if (!shown) void showPage(page).catch(() => undefined)
+            if (!shown) show.mutate(page)
           }}
         >
           {t('navigator.pageNumber', { number })}
@@ -217,6 +223,7 @@ function StoryText({
   )
   const setStoryHover = useKoharuStore((state) => state.setStoryHover)
   const words = useWordSelection(layer) // Booharu: words chosen in the text's field to style.
+  const show = useShowPage()
 
   useEffect(() => {
     const element = row.current
@@ -232,19 +239,17 @@ function StoryText({
       return
     }
     // Then the text, once the canvas shows its page.
-    void showPage(page)
-      .then(() => selectLayers([layer.id]))
-      .catch(() => undefined)
+    show.mutate(page, { onSuccess: () => selectLayers([layer.id]) })
   }
 
   // As Layers deletes a layer: Undo brings it back, so nothing asks first.
-  const remove = () =>
-    void call(deleteLayers, [layer.id])
-      .then(() => {
-        const { selectedLayers, selectLayers } = useKoharuStore.getState()
-        selectLayers(selectedLayers.filter((selected) => !ids.includes(selected)))
-      })
-      .catch(() => undefined)
+  const removal = useMutation({
+    mutationFn: () => deleteLayers([layer.id]),
+    onSuccess: () => {
+      const { selectedLayers, selectLayers } = useKoharuStore.getState()
+      selectLayers(selectedLayers.filter((selected) => !ids.includes(selected)))
+    },
+  })
 
   const name = plainText(isBlockLayer(layer) ? (layer.translation ?? layer.source) : layer)
   const field =
@@ -302,15 +307,17 @@ function StoryText({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align='start'
-            className='w-auto min-w-20 border border-border/50 p-0.5 shadow-sm ring-0'
+            className='w-auto min-w-20'
+            // Booharu: no focus back to the "…" button, which selects the text, once a box action
+            // left another layer selected, as Add subtitle does.
+            finalFocus={() => storyMenuReturnsFocus(ids)}
           >
             {/* Booharu: the text's box actions, above Delete. */}
             <StoryBoxActions page={page} layer={layer.id} />
             <DropdownMenuItem
               variant='destructive'
               disabled={locked}
-              className='min-h-7 gap-1 px-1.5 py-0.5 text-[11px]'
-              onClick={remove}
+              onClick={() => removal.mutate()}
             >
               {t('navigator.delete')}
             </DropdownMenuItem>
@@ -340,7 +347,7 @@ function StoryText({
                 disabled={locked}
                 className={`${field} text-muted-foreground`}
                 value={plainText(layer.source)}
-                onCommit={(text) => dispatch(setSourceText, layer.id, text)}
+                onCommit={(text) => send(setSourceText, layer.id, text)}
               />
               <CommitTextarea
                 aria-label={t('layers.translationLabel', { name })}
@@ -363,7 +370,7 @@ function StoryText({
             disabled={locked}
             className={field}
             value={plainText(layer)}
-            onCommit={(text) => dispatch(setText, layer.id, text)}
+            onCommit={(text) => send(setText, layer.id, text)}
             {...words} // Booharu: choosing words to style.
           />
         )}

@@ -1,6 +1,6 @@
 import { vi } from 'vitest'
 
-import { useKoharuStore } from '@/lib/store'
+import { modelsKey, preferencesKey, queryClient } from '@/lib/queries'
 import {
   commands,
   type ChapterBrief,
@@ -87,7 +87,8 @@ export function layOutModelMenus(): void {
 
 /** The desktop as `settingsDesktop` has it, translating with `translation`, the Read chapter model
  * `saved`, and the open project's chapter `chapter`, with `models` to pick from, which Koharu's
- * model menu shows. */
+ * model menu shows; Koharu's settings and the models as the app last read them, as the editor
+ * reads both as it opens. */
 export function readingDesktop({
   translation = gpt.reference,
   saved = null as string | null,
@@ -101,7 +102,8 @@ export function readingDesktop({
   const read = vi
     .spyOn(commands, 'booharuGetChapterContext')
     .mockImplementation(async () => structuredClone(chapter))
-  useKoharuStore.setState({ models, preferences })
+  queryClient.setQueryData(modelsKey, models)
+  queryClient.setQueryData(preferencesKey, preferences)
   layOutModelMenus()
   return { ...desktop, read }
 }

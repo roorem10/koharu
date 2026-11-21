@@ -15,8 +15,14 @@ import {
   type SavedTurn,
 } from '@/lib/booharu/agentChat'
 import { resources, supportedLanguages } from '@/lib/i18n'
-import { projectKey, queryClient, useProject, type ProjectView } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
+import {
+  modelsKey,
+  preferencesKey,
+  projectKey,
+  queryClient,
+  useProject,
+  type ProjectView,
+} from '@/lib/queries'
 import { commands, events, type AgentEntry, type AgentEvent } from '@koharu/ipc/protocol'
 
 import { gpt, koharuPreferences, models } from './reading'
@@ -127,9 +133,10 @@ beforeEach(() => {
   // A run's channel registers its callback with the webview.
   vi.stubGlobal('__TAURI_INTERNALS__', { transformCallback: () => 1, unregisterCallback: vi.fn() })
   useAgentChat.setState({ project: null, turns: [], running: null, stale: false })
-  useKoharuStore.setState({
-    models,
-    preferences: { ...koharuPreferences(gpt.reference), agent: { model: gpt.reference } },
+  queryClient.setQueryData(modelsKey, models)
+  queryClient.setQueryData(preferencesKey, {
+    ...koharuPreferences(gpt.reference),
+    agent: { model: gpt.reference },
   })
 })
 
@@ -194,6 +201,8 @@ describe("Booharu agent's chat", () => {
     expect(useAgentChat.getState()).toMatchObject({ project: 'Other', turns: [], running: null })
     act(() => openProject('Other'))
     expect(screen.queryByText('Translate page 1')).toBeNull()
+    // The read runs as a mutation does, a few promises after the project opened.
+    await waitFor(() => expect(history).toHaveBeenCalledTimes(2))
     act(() => read())
     expect(await screen.findByText('Check the other book')).toBeInTheDocument()
     expect(history).toHaveBeenCalledTimes(2)

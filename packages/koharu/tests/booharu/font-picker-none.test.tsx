@@ -1,10 +1,16 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
-import { setFavoritesOnly } from '@/lib/booharu/fonts'
-
-import { favoritesDesktop, highlighted, listed, renderPicker, search } from './fonts'
+import {
+  favoritesDesktop,
+  highlighted,
+  listed,
+  openPicker,
+  renderPicker,
+  search,
+  trigger,
+} from './fonts'
 
 const SAME = 'Same as Normal Dialogue'
 
@@ -13,36 +19,33 @@ describe('Booharu font picker leading row', () => {
     const user = userEvent.setup()
     const { onChange } = renderPicker({ noneLabel: SAME })
 
-    const button = screen.getByRole('button', { name: 'Font' })
-    expect(button).toHaveTextContent(SAME)
-    await user.click(button)
+    // On the button as a family's name is, not muted as a placeholder is.
+    expect(trigger()).toHaveTextContent(SAME)
+    expect(within(trigger()).getByText(SAME)).not.toHaveClass('text-muted-foreground')
+    await openPicker(user)
 
     // First, before the families, chosen, and where the arrows start.
     expect(listed()).toEqual([SAME, 'Anime Ace', 'CCMeanwhile', 'Komika Text', 'Wild Words'])
     const none = screen.getByRole('option', { name: SAME })
     expect(none).toHaveAttribute('aria-selected', 'true')
     expect(highlighted()).toBe(none)
-    // The families count, the leading row not among them, and the summary names it.
-    const summary = screen.getByRole('status')
-    expect(summary).toHaveTextContent('4 fonts')
-    expect(summary).toHaveTextContent(SAME)
+    // The families count, the leading row not among them.
+    expect(screen.getByText('4 fonts')).toBeInTheDocument()
 
     await user.keyboard('{ArrowDown}')
     expect(highlighted()).toHaveAccessibleName('Anime Ace')
-    await user.keyboard('{ArrowUp}{ArrowUp}')
-    expect(highlighted()).toHaveAccessibleName('Wild Words')
-    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{ArrowUp}')
     expect(highlighted()).toBe(screen.getByRole('option', { name: SAME }))
 
     await user.keyboard('{Enter}')
     expect(onChange).toHaveBeenCalledExactlyOnceWith('')
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
   })
 
   it('starts from the family in use, and picking the leading row gives no family', async () => {
     const user = userEvent.setup()
     const { onChange } = renderPicker({ value: 'Komika Text', noneLabel: SAME })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
 
     expect(highlighted()).toHaveAccessibleName('Komika Text')
     expect(screen.getByRole('option', { name: SAME })).toHaveAttribute('aria-selected', 'false')
@@ -55,29 +58,31 @@ describe('Booharu font picker leading row', () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith('')
   })
 
-  it('leaves a search to the families, so Enter picks the first match', async () => {
+  it('leaves a search to the families', async () => {
     const user = userEvent.setup()
     const { onChange } = renderPicker({ noneLabel: SAME })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
 
     await user.type(search(), 'w')
     expect(listed()).toEqual(['CCMeanwhile', 'Wild Words'])
+    await user.keyboard('{ArrowDown}')
     expect(highlighted()).toHaveAccessibleName('CCMeanwhile')
 
-    // Cleared, the search shows it again, where the arrows start.
+    // Cleared, the search shows it again.
     await user.clear(search())
-    expect(highlighted()).toBe(screen.getByRole('option', { name: SAME }))
+    expect(listed()[0]).toBe(SAME)
 
     await user.type(search(), 'wild')
-    await user.keyboard('{Enter}')
+    await user.keyboard('{ArrowDown}{Enter}')
     expect(onChange).toHaveBeenCalledExactlyOnceWith('Wild Words')
   })
 
-  it('stays above the favourites, and above how to star one when Favorites only finds none', async () => {
+  // Show favorite fonts stays on for the next test, so this one turns it off again at its end.
+  it('stays above the favourites, and with Show favorite fonts above them alone', async () => {
     favoritesDesktop(['Komika Text'])
     const user = userEvent.setup()
     renderPicker({ noneLabel: SAME }, { booharu: true })
-    await user.click(screen.getByRole('button', { name: 'Font' }))
+    await openPicker(user)
     await screen.findByText('Favorites')
 
     expect(listed()).toEqual([
@@ -89,16 +94,16 @@ describe('Booharu font picker leading row', () => {
       'Wild Words',
     ])
 
-    setFavoritesOnly(true)
-    await user.type(search(), 'x')
-    await user.clear(search())
+    const only = screen.getByRole('button', { name: 'Show favorite fonts' })
+    await user.click(only)
     expect(listed()).toEqual([SAME, 'Komika Text'])
-    expect(screen.getByRole('status')).toHaveTextContent('1 font')
+    expect(screen.getByText('1 font')).toBeInTheDocument()
 
+    // With none left, the leading row still offers no family.
     await user.click(screen.getByRole('button', { name: 'Remove Komika Text from favorites' }))
-    const listbox = await screen.findByRole('listbox')
-    expect(await within(listbox).findByText('Star fonts to add them here')).toBeInTheDocument()
-    expect(listed()).toEqual([SAME])
-    setFavoritesOnly(false)
+    await waitFor(() => expect(listed()).toEqual([SAME]))
+
+    await user.click(only)
+    expect(only).toHaveAttribute('aria-pressed', 'false')
   })
 })

@@ -5,7 +5,7 @@ import type { TFunction } from 'i18next'
 import { useCallback, useRef, useState } from 'react'
 
 import { prepareFinishSound } from '@/components/booharu/runs/sound'
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import {
   booharuPreferencesKey,
   booharuPreferencesQuery,

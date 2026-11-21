@@ -17,7 +17,7 @@ import {
 } from '@koharu/ipc/protocol'
 
 import { block } from './boxes'
-import { renderBar, restyled, styled, text } from './typeBar'
+import { renderBar, restyled, settled, styled, text } from './typeBar'
 
 const RED: Rgba = [1, 0, 0, 1]
 const GREEN: Rgba = [0, 1, 0, 1]
@@ -80,13 +80,14 @@ const tooltip = (label: string) =>
   screen.findByText(label, { selector: '[data-slot=tooltip-content]' })
 
 describe('Booharu Text effects in the type bar (S12-k)', () => {
-  it('is an italic fx after the border, Done staying last', async () => {
-    const { bar, user } = renderBar([hello({})], { typing: typing({}) })
+  it("is an italic fx after the border's, Done staying last", async () => {
+    const { bar, user } = await renderBar([hello({})], { typing: typing({}) })
 
     const buttons = bar.getAllByRole('button')
     const fx = bar.getByRole('button', { name: 'Text effects' })
+    // Right after More border options, the last of the border's.
     expect(buttons.indexOf(fx)).toBe(
-      buttons.indexOf(bar.getByRole('button', { name: 'Border' })) + 1,
+      buttons.indexOf(bar.getByRole('button', { name: 'More border options' })) + 1,
     )
     expect(buttons.at(-1)).toBe(bar.getByRole('button', { name: 'Done' }))
     expect(fx).toHaveTextContent('fx')
@@ -108,8 +109,8 @@ describe('Booharu Text effects in the type bar (S12-k)', () => {
       'true',
     ],
     ['no character shows one', [styled('box', { fill: RED })], 'false'],
-  ])('is pressed while %s', (_, layers, pressed) => {
-    const { bar } = renderBar(layers)
+  ])('is pressed while %s', async (_, layers, pressed) => {
+    const { bar } = await renderBar(layers)
 
     expect(bar.getByRole('button', { name: 'Text effects' })).toHaveAttribute(
       'aria-pressed',
@@ -118,7 +119,7 @@ describe('Booharu Text effects in the type bar (S12-k)', () => {
   })
 
   it('opens a popover titled Text effects, the effects still to come shown off', async () => {
-    const { user } = renderBar([styled('box', { fill: RED })])
+    const { user } = await renderBar([styled('box', { fill: RED })])
 
     const effects = await openEffects(user)
 
@@ -130,7 +131,7 @@ describe('Booharu Text effects in the type bar (S12-k)', () => {
   })
 
   it('opens from openFx, as a box’s menu opens it, and closes when nothing is selected', async () => {
-    renderBar([styled('box', { fill: RED })])
+    await renderBar([styled('box', { fill: RED })])
 
     act(() => openFx())
     expect(await screen.findByRole('dialog', { name: 'Text effects' })).toBeInTheDocument()
@@ -140,7 +141,7 @@ describe('Booharu Text effects in the type bar (S12-k)', () => {
   })
 
   it('closes when the bar shows another page', async () => {
-    renderBar([styled('box', { fill: RED })])
+    await renderBar([styled('box', { fill: RED })])
     act(() => openFx())
     expect(await screen.findByRole('dialog', { name: 'Text effects' })).toBeInTheDocument()
     expect(useFx.getState().page).toBe('page')
@@ -153,9 +154,12 @@ describe('Booharu Text effects in the type bar (S12-k)', () => {
   })
 
   it('closes as the bar goes, and never comes back with it, over the same text or another', async () => {
-    const { bar, user } = renderBar([styled('a', { fill: RED }), styled('c', { fill: RED })], {
-      selected: ['a'],
-    })
+    const { bar, user } = await renderBar(
+      [styled('a', { fill: RED }), styled('c', { fill: RED })],
+      {
+        selected: ['a'],
+      },
+    )
     await user.click(bar.getByRole('button', { name: 'Text effects' }))
     expect(await screen.findByRole('dialog', { name: 'Text effects' })).toBeInTheDocument()
 
@@ -177,7 +181,7 @@ describe('Booharu Text effects in the type bar (S12-k)', () => {
   })
 
   it('opens once the bar shows the texts it was opened over, and never over others', async () => {
-    renderBar([styled('a', { fill: RED }), styled('c', { fill: RED })], { selected: ['a'] })
+    await renderBar([styled('a', { fill: RED }), styled('c', { fill: RED })], { selected: ['a'] })
     const bounds = useKoharuStore.getState().selectionBounds
 
     // Opened before the canvas tells where the text lies, as FX… and an fx tag open it.
@@ -198,9 +202,9 @@ describe('Booharu Text effects in the type bar (S12-k)', () => {
     expect(useFx.getState().open).toBe(false)
   })
 
-  it('closes, waiting, once the bar’s page hides the texts it was opened over', () => {
+  it('closes, waiting, once the bar’s page hides the texts it was opened over', async () => {
     // An fx tag in Story opens it over a text on another page, which shows it hidden.
-    renderBar([{ ...styled('a', { fill: RED }), visible: false }], { selected: ['a'] })
+    await renderBar([{ ...styled('a', { fill: RED }), visible: false }], { selected: ['a'] })
     act(() => useKoharuStore.setState({ selectionBounds: null }))
 
     act(() => openFx())
@@ -212,7 +216,7 @@ describe('Booharu Text effects in the type bar (S12-k)', () => {
 
 describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
   it('is on while every character shows a gradient, with its kind, angle and ends', async () => {
-    const { user } = renderBar([
+    const { user } = await renderBar([
       styled('one', { fill_gradient: GRADIENT }),
       styled('two', { fill: GREEN, fill_gradient: GRADIENT }),
     ])
@@ -228,7 +232,7 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
   })
 
   it('is off, with no gradient controls, while no character shows one', async () => {
-    const { user } = renderBar([styled('box', { fill: RED })])
+    const { user } = await renderBar([styled('box', { fill: RED })])
 
     const effects = await openEffects(user)
 
@@ -237,7 +241,9 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
   })
 
   it('says Mixed while only some characters show one, and leaves the controls out', async () => {
-    const { user } = renderBar([hello({ fill: RED, fill_gradient: GRADIENT }, { fill: GREEN })])
+    const { user } = await renderBar([
+      hello({ fill: RED, fill_gradient: GRADIENT }, { fill: GREEN }),
+    ])
 
     const effects = await openEffects(user)
 
@@ -248,7 +254,7 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
   })
 
   it('is on, without controls, while every box shows a gradient of its own', async () => {
-    const { user } = renderBar([
+    const { user } = await renderBar([
       styled('one', { fill_gradient: GRADIENT }),
       styled('two', { fill_gradient: OTHER }),
     ])
@@ -261,7 +267,7 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
   })
 
   it('turns on with a gradient seeded from the box’s colour, shown at once', async () => {
-    const { edits, user } = renderBar([styled('box', { fill: RED })], { pending: true })
+    const { edits, user } = await renderBar([styled('box', { fill: RED })], { pending: true })
 
     const effects = await openEffects(user)
     await user.click(effects.getByRole('switch', { name: 'Gradient fill' }))
@@ -276,7 +282,7 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
   })
 
   it('gives several boxes each a gradient from its own colour in one step, one with a gradient keeping its own', async () => {
-    const { edits, user } = renderBar([
+    const { edits, user } = await renderBar([
       styled('one', { fill: RED }),
       styled('two', { fill: BLUE }),
       styled('three', { fill_gradient: OTHER }),
@@ -316,7 +322,7 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
   })
 
   it('gives a box back the gradient its style has, which a word’s colour hid', async () => {
-    const { edits, user } = renderBar([hello({ fill_gradient: GRADIENT }, { fill: GREEN })])
+    const { edits, user } = await renderBar([hello({ fill_gradient: GRADIENT }, { fill: GREEN })])
 
     const effects = await openEffects(user)
     await user.click(effects.getByRole('switch', { name: 'Gradient fill' }))
@@ -344,7 +350,7 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
   })
 
   it('turns on for words chosen in Story, from the colour they show', async () => {
-    const { edits, user } = renderBar([hello({ fill: BLUE }, { fill: RED })])
+    const { edits, user } = await renderBar([hello({ fill: BLUE }, { fill: RED })])
     act(() => setWordRange(world))
 
     const effects = await openEffects(user)
@@ -357,11 +363,12 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
       'Hello world',
       { set: { fill_gradient: seedGradient(RED) } },
     )
+    await settled()
     expect(edits).toEqual([])
   })
 
   it('turns on for the characters typed, from the colour they share', async () => {
-    const { edits, user } = renderBar([hello({})], { typing: typing({ fill: BLUE }) })
+    const { edits, user } = await renderBar([hello({})], { typing: typing({ fill: BLUE }) })
 
     const effects = await openEffects(user)
     await user.click(effects.getByRole('switch', { name: 'Gradient fill' }))
@@ -369,11 +376,12 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
     expect(commands.styleTyping).toHaveBeenCalledExactlyOnceWith({
       fill_gradient: seedGradient(BLUE),
     })
+    await settled()
     expect(edits).toEqual([])
   })
 
   it('turns off by taking the gradient off whole boxes, their colours showing again', async () => {
-    const { edits, user } = renderBar(
+    const { edits, user } = await renderBar(
       [
         styled('one', { fill: RED, fill_gradient: GRADIENT }),
         styled('two', { fill: BLUE, fill_gradient: OTHER }),
@@ -394,7 +402,7 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
   })
 
   it('turns off for words chosen in Story by giving them the colour they show', async () => {
-    const { user } = renderBar([hello({ fill: RED, fill_gradient: GRADIENT })])
+    const { user } = await renderBar([hello({ fill: RED, fill_gradient: GRADIENT })])
     act(() => setWordRange(world))
 
     const effects = await openEffects(user)
@@ -410,7 +418,7 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
   })
 
   it('turns off for the characters typed by giving them their colour', async () => {
-    const { user } = renderBar([hello({})], {
+    const { user } = await renderBar([hello({})], {
       typing: typing({ fill: BLUE, fill_gradient: GRADIENT }),
     })
 
@@ -437,7 +445,7 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
     ])
 
   it('changes the kind, the angle going off for a radial gradient', async () => {
-    const { edits, user } = renderBar(sharing(), { pending: true })
+    const { edits, user } = await renderBar(sharing(), { pending: true })
 
     const effects = await openEffects(user)
     await user.click(effects.getByRole('combobox', { name: 'Gradient kind' }))
@@ -448,7 +456,7 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
   })
 
   it('sets a typed angle on Enter, one past 180 as 180, then nothing on leaving', async () => {
-    const { edits, user } = renderBar(sharing(), { pending: true })
+    const { edits, user } = await renderBar(sharing(), { pending: true })
 
     const effects = await openEffects(user)
     const angle = effects.getByRole('textbox', { name: 'Gradient angle' })
@@ -462,12 +470,13 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
     await user.type(angle, '400{Enter}')
     fireEvent.blur(angle)
 
+    await settled()
     expect(edits).toEqual([shared({ ...GRADIENT, angle: 45 }), shared({ ...GRADIENT, angle: 180 })])
     expect(angle).toHaveValue('180')
   })
 
   it('sends a typed angle once, leaving the box after Enter sending nothing more', async () => {
-    const { edits, user } = renderBar(sharing(), { pending: true })
+    const { edits, user } = await renderBar(sharing(), { pending: true })
 
     const effects = await openEffects(user)
     const angle = effects.getByRole('textbox', { name: 'Gradient angle' })
@@ -476,11 +485,29 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
     await user.type(angle, '45.3{Enter}')
     fireEvent.blur(angle)
 
+    await settled()
     expect(edits).toEqual([shared({ ...GRADIENT, angle: 45.3 })])
   })
 
+  it('leaves the Enter ending an IME’s composing be, as Koharu’s number boxes do', async () => {
+    const { edits, user } = await renderBar(sharing(), { pending: true })
+
+    const effects = await openEffects(user)
+    const angle = effects.getByRole('textbox', { name: 'Gradient angle' })
+    await user.clear(angle)
+    await user.type(angle, '45')
+    fireEvent.keyDown(angle, { key: 'Enter', isComposing: true })
+    await settled()
+    expect(edits).toEqual([])
+    expect(angle).toHaveFocus()
+
+    // Once it's done, Enter sends the angle.
+    fireEvent.keyDown(angle, { key: 'Enter' })
+    await waitFor(() => expect(edits).toEqual([shared({ ...GRADIENT, angle: 45 })]))
+  })
+
   it('sends an angle typed for words chosen in Story once, as no draft shows it', async () => {
-    const { user } = renderBar([hello({ fill_gradient: GRADIENT })])
+    const { user } = await renderBar([hello({ fill_gradient: GRADIENT })])
     act(() => setWordRange(world))
 
     const effects = await openEffects(user)
@@ -489,6 +516,7 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
     await user.type(angle, '45{Enter}')
     fireEvent.blur(angle)
 
+    await settled()
     expect(commands.booharuStyleWords).toHaveBeenCalledExactlyOnceWith(
       'text',
       6,
@@ -499,7 +527,7 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
   })
 
   it('sends an angle typed for the characters typed once, as the canvas tells it back', async () => {
-    const { user } = renderBar([hello({})], { typing: typing({ fill_gradient: GRADIENT }) })
+    const { user } = await renderBar([hello({})], { typing: typing({ fill_gradient: GRADIENT }) })
 
     const effects = await openEffects(user)
     const angle = effects.getByRole('textbox', { name: 'Gradient angle' })
@@ -510,13 +538,14 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
     )
     fireEvent.blur(angle)
 
+    await settled()
     expect(commands.styleTyping).toHaveBeenCalledExactlyOnceWith({
       fill_gradient: { ...GRADIENT, angle: 45.3 },
     })
   })
 
   it('colours the start and the end, each keeping its alpha', async () => {
-    const { edits, user } = renderBar(sharing())
+    const { edits, user } = await renderBar(sharing())
 
     const effects = await openEffects(user)
     await user.click(effects.getByRole('button', { name: 'Start color' }))
@@ -525,6 +554,8 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
     await user.click(effects.getByRole('button', { name: 'End color' }))
     pickColor('#00FF00')
 
+    // Each goes as a mutation, a turn after the pick, from the gradient the page shows.
+    await waitFor(() => expect(edits).toHaveLength(2))
     expect(edits).toEqual([
       shared({
         ...GRADIENT,
@@ -544,7 +575,7 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
   })
 
   it('changes the gradient of words chosen in Story through the words edit', async () => {
-    const { edits, user } = renderBar([hello({ fill_gradient: GRADIENT })])
+    const { edits, user } = await renderBar([hello({ fill_gradient: GRADIENT })])
     act(() => setWordRange(world))
 
     const effects = await openEffects(user)
@@ -558,13 +589,14 @@ describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
       'Hello world',
       { set: { fill_gradient: { ...GRADIENT, kind: 'radial' } } },
     )
+    await settled()
     expect(edits).toEqual([])
   })
 })
 
 describe('Booharu Reset to lettering default in Text effects (S12-k)', () => {
   it('resets the boxes the bar styles, as a box’s menu does', async () => {
-    const { user } = renderBar([styled('one', { fill: RED }), styled('two', {})])
+    const { user } = await renderBar([styled('one', { fill: RED }), styled('two', {})])
     vi.mocked(commands.booharuResetLettering).mockResolvedValue({
       changed: 2,
       locked: 0,
@@ -578,14 +610,14 @@ describe('Booharu Reset to lettering default in Text effects (S12-k)', () => {
   })
 
   it('is off while the canvas types, and where nothing can be reset', async () => {
-    const { user } = renderBar([hello({})], { typing: typing({}) })
+    const { user } = await renderBar([hello({})], { typing: typing({}) })
 
     const effects = await openEffects(user)
     expect(effects.getByRole('button', { name: 'Reset to lettering default' })).toBeDisabled()
   })
 
   it('is off for a block with no translation yet', async () => {
-    const { user } = renderBar([block('first', 'やあ')])
+    const { user } = await renderBar([block('first', 'やあ')])
 
     const effects = await openEffects(user)
     expect(effects.getByRole('button', { name: 'Reset to lettering default' })).toBeDisabled()

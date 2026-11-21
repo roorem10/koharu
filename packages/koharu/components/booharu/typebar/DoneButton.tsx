@@ -2,7 +2,7 @@
 
 import { useTranslation } from 'react-i18next'
 
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import { useKoharuStore } from '@/lib/store'
 import { commands } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'

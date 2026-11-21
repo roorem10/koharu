@@ -9,11 +9,6 @@ import { useKoharuStore } from '@/lib/store'
 export const booharuTabs = ['runs'] as const
 export type BooharuTab = (typeof booharuTabs)[number]
 
-/** Whether `tab` is one of Booharu's Settings tabs, whose page reads only Booharu's settings. */
-export function isBooharuTab(tab: string): tab is BooharuTab {
-  return (booharuTabs as readonly string[]).includes(tab)
-}
-
 /** The Settings page's tabs, by SettingsPage's names for them. */
 export type SettingsTab = 'appearance' | 'pipeline' | 'providers' | 'typesetting' | BooharuTab
 

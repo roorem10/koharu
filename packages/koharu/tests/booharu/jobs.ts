@@ -13,7 +13,7 @@ export function openChapter(name: string, pages: string[] = ['p1', 'p2', 'p3', '
   const project: ProjectView = {
     name,
     page: pages[0] ?? null,
-    pages: pages.map((id) => ({ id, size, background: null })),
+    pages: pages.map((id) => ({ id, size, background: null, texts: 0, translated: 0 })),
     history: { steps: [], current: 0 },
     revisions: {},
   }

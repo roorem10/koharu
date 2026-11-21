@@ -4,9 +4,9 @@ import { useEffect } from 'react'
 import { create } from 'zustand'
 
 import i18n from '@/lib/i18n'
-import { useKoharuStore } from '@/lib/store'
-import { modelName } from '@/lib/translation'
-import { commands, events, type BooharuJob, type Skip } from '@koharu/ipc/protocol'
+import { modelName } from '@/lib/models'
+import { modelsKey, queryClient } from '@/lib/queries'
+import { commands, events, type BooharuJob, type Model, type Skip } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
 /** Booharu's jobs going, by id, as the desktop last told them: the reads of a chapter, which tell
@@ -45,7 +45,8 @@ function skipWords(skip: Skip, message: string | null): string | null {
     case 'no_text':
       return i18n.t('booharu.runs.read.noText')
     case 'cant_read': {
-      const model = modelName(useKoharuStore.getState().models, skip.model)
+      const models = queryClient.getQueryData<Model[]>(modelsKey) ?? []
+      const model = modelName(models, skip.model)
       const why =
         skip.why === 'no_vision' ? 'booharu.context.noVision' : 'booharu.context.onlyTranslates'
       return `${i18n.t(why, { model })} ${i18n.t('booharu.runs.read.pickModel')}`

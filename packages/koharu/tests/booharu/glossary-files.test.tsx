@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { GlossaryDialog } from '@/components/booharu/context/GlossaryDialog'
 import { SettingsPage } from '@/components/preferences/SettingsPage'
-import { queryClient } from '@/lib/queries'
+import { preferencesKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type Preferences, type Series } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
@@ -177,14 +177,15 @@ describe('Booharu glossary files', () => {
         return { series: structuredClone(series), added: 1, skipped: 1, instructions: after }
       })
     const shown = vi.spyOn(toast, 'add')
-    useKoharuStore.setState({ settingsOpen: true, preferences: preferences(before) })
+    queryClient.setQueryData(preferencesKey, preferences(before))
+    useKoharuStore.setState({ settingsOpen: true })
     const user = userEvent.setup()
     render(
       <QueryClientProvider client={queryClient}>
         <SettingsPage />
       </QueryClientProvider>,
     )
-    await user.click(screen.getByRole('button', { name: 'Pipeline' }))
+    await user.click(screen.getByRole('tab', { name: 'Pipeline' }))
     const field = await screen.findByRole('textbox', { name: 'Additional instructions' })
     expect(field).toHaveValue(before)
 
@@ -222,7 +223,7 @@ describe('Booharu glossary files', () => {
     })
     // The preferences are read again, so Settings shows the Instructions as saved now…
     await waitFor(() => expect(field).toHaveValue(after))
-    expect(useKoharuStore.getState().preferences).toEqual(preferences(after))
+    expect(queryClient.getQueryData(preferencesKey)).toEqual(preferences(after))
     // …and its draft, the old text, is never saved back over them.
     await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
     expect(

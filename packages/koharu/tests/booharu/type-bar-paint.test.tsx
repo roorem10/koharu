@@ -1,11 +1,11 @@
-import { act, fireEvent, screen } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import { setWordRange, type WordRange } from '@/lib/booharu/words'
 import { commands, type CharStyle, type Gradient, type Rgba } from '@koharu/ipc/protocol'
 
-import { renderBar, restyled, styled, text } from './typeBar'
+import { renderBar, restyled, settled, styled, text } from './typeBar'
 
 const RED: Rgba = [1, 0, 0, 1]
 const GREEN: Rgba = [0, 1, 0, 1]
@@ -50,29 +50,36 @@ function hello(chars: CharStyle, marks?: CharStyle) {
 
 describe('Booharu text colour over a gradient fill (S12-c)', () => {
   it('shows none over a gradient box, and a colour picked takes the gradient off', async () => {
-    const { edits, user } = renderBar([styled('box', { fill: RED, fill_gradient: GRADIENT })], {
-      pending: true,
-    })
+    const { edits, user } = await renderBar(
+      [styled('box', { fill: RED, fill_gradient: GRADIENT })],
+      {
+        pending: true,
+      },
+    )
 
     expect(await openTextColor(user)).toBe('')
     pickColor('#00FF00')
 
-    expect(edits).toEqual([restyled([['box', { chars: { fill: GREEN, fill_gradient: null } }]])])
+    // The edit goes as a mutation, a turn after the pick.
+    await waitFor(() =>
+      expect(edits).toEqual([restyled([['box', { chars: { fill: GREEN, fill_gradient: null } }]])]),
+    )
     // The colour shows at once, the gradient gone, so it can swap with the border's.
     await user.keyboard('{Escape}')
-    await user.click(screen.getByRole('button', { name: 'Border' }))
+    await user.click(screen.getByRole('button', { name: 'More border options' }))
     expect(
       await screen.findByRole('button', { name: 'Swap fill and outline colors' }),
     ).toBeEnabled()
   })
 
   it("takes the words' own paint off a box whose words show a gradient", async () => {
-    const { edits, user } = renderBar([hello({ fill: RED }, { fill_gradient: GRADIENT })])
+    const { edits, user } = await renderBar([hello({ fill: RED }, { fill_gradient: GRADIENT })])
 
     // The box shows two paints.
     expect(await openTextColor(user)).toBe('')
     pickColor('#0000FF')
 
+    await waitFor(() => expect(edits).toHaveLength(1))
     expect(edits).toEqual([
       {
         label: 'set_style',
@@ -96,7 +103,7 @@ describe('Booharu text colour over a gradient fill (S12-c)', () => {
   })
 
   it('shows the colour of a word given one in a gradient box, as the words edit gives it', async () => {
-    const { edits, user } = renderBar([hello({ fill_gradient: GRADIENT }, { fill: RED })])
+    const { edits, user } = await renderBar([hello({ fill_gradient: GRADIENT }, { fill: RED })])
     act(() => setWordRange(world))
 
     expect(await openTextColor(user)).toBe('#FF0000')
@@ -109,33 +116,38 @@ describe('Booharu text colour over a gradient fill (S12-c)', () => {
       'Hello world',
       { set: { fill: GREEN, fill_gradient: null } },
     )
+    await settled()
     expect(edits).toEqual([])
   })
 
   it('shows none for chosen words showing the gradient of their box', async () => {
-    const { user } = renderBar([hello({ fill: RED, fill_gradient: GRADIENT })])
+    const { user } = await renderBar([hello({ fill: RED, fill_gradient: GRADIENT })])
     act(() => setWordRange(world))
 
     expect(await openTextColor(user)).toBe('')
   })
 
   it('shows none while typing characters showing a gradient, and a colour picked styles them', async () => {
-    const { edits, user } = renderBar([hello({})], {
+    const { edits, user } = await renderBar([hello({})], {
       typing: { layer: 'text', chars: { fill: RED, fill_gradient: GRADIENT }, mixed: [] },
     })
 
     expect(await openTextColor(user)).toBe('')
     pickColor('#00FF00')
 
-    expect(commands.styleTyping).toHaveBeenCalledExactlyOnceWith({
-      fill: GREEN,
-      fill_gradient: null,
-    })
+    // The canvas styles them a turn after the pick.
+    await waitFor(() =>
+      expect(commands.styleTyping).toHaveBeenCalledExactlyOnceWith({
+        fill: GREEN,
+        fill_gradient: null,
+      }),
+    )
+    await settled()
     expect(edits).toEqual([])
   })
 
   it('shows the colour typed characters share with no gradient', async () => {
-    const { user } = renderBar([hello({})], {
+    const { user } = await renderBar([hello({})], {
       typing: { layer: 'text', chars: { fill: RED }, mixed: [] },
     })
 
@@ -146,9 +158,9 @@ describe('Booharu text colour over a gradient fill (S12-c)', () => {
     ['shows a gradient', styled('box', { fill: RED, fill_gradient: GRADIENT })],
     ['shows one in some characters', hello({ fill: RED }, { fill_gradient: GRADIENT })],
   ])('offers no colour swap while the text %s', async (_, layer) => {
-    const { user } = renderBar([layer])
+    const { user } = await renderBar([layer])
 
-    await user.click(screen.getByRole('button', { name: 'Border' }))
+    await user.click(screen.getByRole('button', { name: 'More border options' }))
 
     expect(
       await screen.findByRole('button', { name: 'Swap fill and outline colors' }),
@@ -156,11 +168,12 @@ describe('Booharu text colour over a gradient fill (S12-c)', () => {
   })
 
   it('swaps a flat colour as before', async () => {
-    const { edits, user } = renderBar([styled('box', { fill: RED })])
+    const { edits, user } = await renderBar([styled('box', { fill: RED })])
 
-    await user.click(screen.getByRole('button', { name: 'Border' }))
+    await user.click(screen.getByRole('button', { name: 'More border options' }))
     await user.click(await screen.findByRole('button', { name: 'Swap fill and outline colors' }))
 
+    await waitFor(() => expect(edits).toHaveLength(1))
     expect(edits).toEqual([
       restyled([
         [
@@ -176,12 +189,13 @@ describe('Booharu text colour over a gradient fill (S12-c)', () => {
       style: { chars: { fill_gradient: GRADIENT } },
       content: [{ insert: 'Hello world', attributes: { fill: RED } }],
     })
-    const { edits, user } = renderBar([hidden])
+    const { edits, user } = await renderBar([hidden])
 
-    await user.click(screen.getByRole('button', { name: 'Border' }))
+    await user.click(screen.getByRole('button', { name: 'More border options' }))
     await user.click(await screen.findByRole('button', { name: 'Swap fill and outline colors' }))
 
     // The words' colour goes to the box with its gradient off, which would show again otherwise.
+    await waitFor(() => expect(edits).toHaveLength(1))
     expect(edits).toEqual([
       {
         label: 'set_style',

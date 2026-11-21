@@ -3,6 +3,7 @@
 import { Fragment, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Choice } from '@/components/controls/Choice'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { FontPicker } from '@/components/controls/FontPicker'
 import { PreferenceRow } from '@/components/preferences/PreferenceFields'
@@ -26,18 +27,11 @@ import {
   type EmphasisLook,
 } from '@/lib/booharu/emphasis'
 import { useBooharuFontPicker } from '@/lib/booharu/fonts'
+import { toHex, toRgba } from '@/lib/color'
 import { useFonts } from '@/lib/queries'
-import { hexToRgba, rgbaToHex } from '@/lib/store'
 import { Button } from '@koharu/ui/components/button'
 import { Checkbox } from '@koharu/ui/components/checkbox'
 import { NumberField, NumberFieldGroup, NumberFieldInput } from '@koharu/ui/components/number-field'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@koharu/ui/components/select'
 
 /** What Settings shows, in its list's order: the default, then every lettering category. */
 const choices: EmphasisChoice[] = ['default', ...letteringCategories]
@@ -115,9 +109,9 @@ export function EmphasisPreferences() {
   const colourRow = (key: Colour) => {
     const { name, standIn } = colourRows[key]
     const value = look[key]
-    const hex = value ? rgbaToHex(value) : null
+    const hex = value ? toHex(value) : null
     // A category without its own shows the default's.
-    const shown = hex ?? (base[key] ? rgbaToHex(base[key]) : standIn)
+    const shown = hex ?? (base[key] ? toHex(base[key]) : standIn)
     return (
       <PreferenceRow title={t(`booharu.emphasis.${name}`)}>
         <div className='flex min-w-0 items-center gap-2'>
@@ -127,7 +121,7 @@ export function EmphasisPreferences() {
             disabled={!loaded}
             value={shown}
             // A colour picked while none is set is saved, even the one the well shows.
-            onChange={(color) => (hex === null || color !== hex) && set(key, hexToRgba(color))}
+            onChange={(color) => (hex === null || color !== hex) && set(key, toRgba(color))}
           />
           <span className='min-w-0 flex-1 truncate text-[11px] text-muted-foreground'>
             {hex ? <span className='font-mono'>{hex}</span> : inherit}
@@ -179,25 +173,12 @@ export function EmphasisPreferences() {
           </div>
         </div>
         <PreferenceRow title={t('booharu.emphasis.category')}>
-          <Select
+          <Choice
             value={choice}
-            items={names}
-            onValueChange={(next) => next && setChoice(next as EmphasisChoice)}
-          >
-            <SelectTrigger
-              aria-label={t('booharu.emphasis.labels.category')}
-              className='h-8 w-full text-[11px]'
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {choices.map((candidate) => (
-                <SelectItem key={candidate} value={candidate} label={names[candidate]}>
-                  {names[candidate]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            choices={names}
+            label={t('booharu.emphasis.labels.category')}
+            onChange={setChoice}
+          />
         </PreferenceRow>
         {/* Each choice's own fields, so one's half-typed number never shows under another. */}
         <Fragment key={choice}>
@@ -225,29 +206,13 @@ export function EmphasisPreferences() {
             />
           </PreferenceRow>
           <PreferenceRow title={t('booharu.emphasis.italic')}>
-            <Select
+            <Choice
               value={slant}
-              items={slants}
+              choices={slants}
+              label={t('booharu.emphasis.labels.italic')}
               disabled={!loaded}
-              onValueChange={(next) => {
-                if (!next || next === slant) return
-                set('italic', next === 'inherit' ? null : next === 'italic')
-              }}
-            >
-              <SelectTrigger
-                aria-label={t('booharu.emphasis.labels.italic')}
-                className='h-8 w-full text-[11px]'
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(slants) as Slant[]).map((candidate) => (
-                  <SelectItem key={candidate} value={candidate} label={slants[candidate]}>
-                    {slants[candidate]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(next) => set('italic', next === 'inherit' ? null : next === 'italic')}
+            />
           </PreferenceRow>
           <PreferenceRow title={t('booharu.emphasis.sizePercent')}>
             <OptionalNumber

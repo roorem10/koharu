@@ -55,7 +55,7 @@ describe('Booharu B and I rules', () => {
     expect(italicWords(false)).toEqual({ italic: true })
   })
 
-  it('styles the characters typed on, and takes the mark off them for real off (S11-d)', () => {
+  it('styles the characters typed on, and takes the mark off them for real off (S11-d)', async () => {
     const styled = vi.spyOn(commands, 'styleTyping').mockResolvedValue(null)
     const unmarked = vi.spyOn(commands, 'booharuUnmarkTyping').mockResolvedValue(null)
     const typing = (typed: Partial<Typed>): Typed => ({
@@ -69,6 +69,8 @@ describe('Booharu B and I rules', () => {
     pressTyped('bold', typing({ mixed: ['weight'] }))
     pressTyped('italic', typing({ chars: { italic: false } }))
     pressTyped('italic', typing({ mixed: ['italic'] }))
+    // Each through call(), which runs the command once the mutation it makes starts.
+    await vi.waitFor(() => expect(styled).toHaveBeenCalledTimes(4))
     expect(styled.mock.calls).toEqual([
       [{ weight: 700 }],
       [{ weight: 700 }],
@@ -80,6 +82,7 @@ describe('Booharu B and I rules', () => {
     // A new text being typed too: the canvas knows its own style.
     pressTyped('bold', typing({ layer: null, chars: { weight: 600 } }))
     pressTyped('italic', typing({ chars: { italic: true } }))
+    await vi.waitFor(() => expect(unmarked).toHaveBeenCalledTimes(2))
     expect(unmarked.mock.calls).toEqual([['bold'], ['italic']])
     expect(styled).toHaveBeenCalledTimes(4)
   })

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { PipelinePreferences } from '@/components/preferences/PipelinePreferences'
 import { SettingsPage } from '@/components/preferences/SettingsPage'
-import { queryClient } from '@/lib/queries'
+import { preferencesKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type Preferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
@@ -109,7 +109,8 @@ describe('Booharu colour detection switch', () => {
     }
     vi.spyOn(commands, 'getPreferences').mockResolvedValue(preferences)
     vi.spyOn(commands, 'listModels').mockResolvedValue([])
-    useKoharuStore.setState({ settingsOpen: true, preferences })
+    queryClient.setQueryData(preferencesKey, preferences)
+    useKoharuStore.setState({ settingsOpen: true })
     const user = userEvent.setup()
     render(
       <QueryClientProvider client={queryClient}>
@@ -117,7 +118,7 @@ describe('Booharu colour detection switch', () => {
       </QueryClientProvider>,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Pipeline' }))
+    await user.click(screen.getByRole('tab', { name: 'Pipeline' }))
     await user.click(await screen.findByRole('button', { name: 'default text colors' }))
 
     const section = await screen.findByRole('region', { name: 'Default text style' })

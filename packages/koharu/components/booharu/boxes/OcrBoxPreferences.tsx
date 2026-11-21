@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { PreferenceRow, PreferenceSection } from '@/components/preferences/PreferenceFields'
-import { saveBooharuSection, useBooharuPreferences } from '@/lib/booharu/preferences'
+import { writeBooharuSection, useBooharuPreferences } from '@/lib/booharu/preferences'
 import type { OcrBoxMode } from '@koharu/ipc/protocol'
 import {
   Select,
@@ -27,7 +27,7 @@ export function OcrBoxPreferences() {
   const preferences = useBooharuPreferences()
   const save = useMutation({
     mutationFn: (mode: OcrBoxMode) =>
-      saveBooharuSection('booharu-ocr-box', (section) => ({ ...section, default_mode: mode })),
+      writeBooharuSection('booharu-ocr-box', (section) => ({ ...section, default_mode: mode })),
   })
   // The choice being saved shows at once, then what the file holds once the save ends.
   const mode = save.isPending ? save.variables : preferences.data?.['booharu-ocr-box'].default_mode

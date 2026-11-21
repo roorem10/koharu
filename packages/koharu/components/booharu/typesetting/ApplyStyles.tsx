@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PreferenceRow } from '@/components/preferences/PreferenceFields'
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import { flushDefaultTextStyle } from '@/lib/booharu/lettering'
 import { queueBooharuWrite, useBooharuPreferences } from '@/lib/booharu/preferences'
 import { useProject } from '@/lib/queries'

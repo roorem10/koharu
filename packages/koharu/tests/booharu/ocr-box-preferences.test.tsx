@@ -126,5 +126,10 @@ describe('Booharu O tool settings', () => {
       ),
     )
     await waitFor(() => expect(shownMode(select)).toBe('Read only'))
+    // Once: the save's mutation shows it, and nothing shows it again.
+    const failures = shown.mock.calls.filter(
+      ([shownToast]) => shownToast.description === 'config.toml is read-only',
+    )
+    expect(failures).toHaveLength(1)
   })
 })

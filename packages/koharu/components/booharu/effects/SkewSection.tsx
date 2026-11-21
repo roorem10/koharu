@@ -4,7 +4,7 @@ import { RotateCcw } from 'lucide-react'
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import { sharedSkew, type PageEffects } from '@/lib/booharu/effects'
 import { isPlaceholder } from '@/lib/booharu/translation'
 import { isBlockLayer, letteringOf } from '@/lib/document'
@@ -146,8 +146,8 @@ export function SkewSection({
 }
 
 /** An axis's number box under its label: `value` shown, nothing where it's `null`, with "Mixed"
- * when `mixed`. A value goes once: Enter sends it, and the box's commit as it loses the focus
- * doesn't send it again, nor a value the box shows. */
+ * when `mixed`. A value goes once: Enter leaves the box, as Koharu's number boxes do, and the box
+ * sends it as it loses the focus, but not again, nor a value the box shows. */
 function SkewField({
   axis,
   label,
@@ -203,9 +203,6 @@ function SkewField({
             data-axis={axis}
             aria-label={label}
             placeholder={mixed ? t('booharu.typebar.mixed') : undefined}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') commit(draft)
-            }}
           />
         </NumberFieldGroup>
       </NumberField>

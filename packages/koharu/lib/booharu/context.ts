@@ -3,8 +3,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-import { call, refreshPreferences } from '@/lib/backend'
-import { queueBooharuWrite } from '@/lib/booharu/preferences'
+import { call } from '@/lib/booharu/call'
+import { queueBooharuWrite, refreshPreferences } from '@/lib/booharu/preferences'
 import { projectKey, queryClient, refresh, useProject } from '@/lib/queries'
 import {
   commands,
@@ -202,7 +202,7 @@ const fillAll = (list: Series[]) => list.map(fillSeries)
 export function useSeriesList() {
   return useQuery({
     queryKey: seriesKey,
-    queryFn: () => call(commands.booharuListSeries),
+    queryFn: () => commands.booharuListSeries(),
     select: fillAll,
   })
 }
@@ -215,6 +215,7 @@ export function useSeries(id: string | null) {
     queryFn: () => commands.booharuGetSeries(id ?? ''),
     enabled: id !== null,
     select: fillSeries,
+    meta: { booharuQuiet: true },
   })
 }
 
@@ -229,6 +230,7 @@ export function useChapterContext() {
     queryFn: () => commands.booharuGetChapterContext(),
     enabled: project !== null,
     select: fillChapter,
+    meta: { booharuQuiet: true },
   })
 }
 
@@ -386,6 +388,7 @@ export function useGlossaryUsage(source: string) {
     queryKey: [...usageKey, project ?? '', source],
     queryFn: () => commands.booharuGlossaryUsage(source),
     enabled: project !== null && source.trim() !== '',
+    meta: { booharuQuiet: true },
   })
 }
 
@@ -445,13 +448,14 @@ export async function importInstructionGlossary(
 export const firstStartNoteKey = ['booharu', 'first-start-note'] as const
 
 /** The note on a first start: whether to show it, and where Booharu 0.0.4's series are, read once
- * a session. It names the app's query client itself, as Koharu's home page needs no query provider
- * around it, and its own tests render it without one; a failed read shows no note. */
+ * a session. It names the app's query client itself, so its own tests render it without a query
+ * provider around it; a failed read shows no note, and no toast. */
 export function useFirstStartNote() {
   return useQuery(
     {
       queryKey: firstStartNoteKey,
       queryFn: () => commands.booharuGetFirstStartNote(),
+      meta: { booharuQuiet: true },
     },
     queryClient,
   )

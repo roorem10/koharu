@@ -20,6 +20,7 @@ import { commands, type Edit, type Layer, type Page, type Span } from '@koharu/i
 import { toast } from '@koharu/ui/components/toast'
 
 import { comicFonts } from './fonts'
+import { settled, shownBar } from './typeBar'
 
 // Booharu: words chosen in the Story panel's fields (S10-l): the word toolbar by the field, its
 // close rules, Ctrl+B and Ctrl+I there, and the type bar following the words.
@@ -85,7 +86,7 @@ function story(page: Page, bar = false) {
   const project: ProjectView = {
     name: 'Demo',
     page: page.id,
-    pages: [{ id: page.id, size: page.size, background: null }],
+    pages: [{ id: page.id, size: page.size, background: null, texts: 0, translated: 0 }],
     history: { steps: [], current: 0 },
     revisions: {},
   }
@@ -468,7 +469,7 @@ describe('Booharu type bar on words chosen in Story', () => {
     )
     const field = await screen.findByPlaceholderText('Text')
     choose(field, 6, 11)
-    const bar = within(await screen.findByTestId('type-bar'))
+    const bar = within(await shownBar())
 
     expect(bar.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'true')
     expect(bar.getByRole('button', { name: 'Italic' })).toHaveAttribute('aria-pressed', 'true')
@@ -480,8 +481,7 @@ describe('Booharu type bar on words chosen in Story', () => {
     await user.click(bar.getByRole('button', { name: 'Italic' }))
     await user.click(bar.getByRole('combobox', { name: 'Font weight' }))
     await user.click(await screen.findByRole('option', { name: '400' }))
-    await user.click(bar.getByRole('button', { name: 'Border' }))
-    await user.click(await screen.findByRole('button', { name: 'Border color' }))
+    await user.click(bar.getByRole('button', { name: 'Border color' }))
     await user.click(await screen.findByRole('button', { name: 'Transparent' }))
 
     const words = ['text', 6, 11, 'Hello world'] as const
@@ -510,7 +510,7 @@ describe('Booharu type bar on words chosen in Story', () => {
       true,
     )
     choose(await screen.findByPlaceholderText('Text'), 6, 11)
-    const bar = within(await screen.findByTestId('type-bar'))
+    const bar = within(await shownBar())
     expect(bar.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'true')
 
     act(() => void window.dispatchEvent(new Event(CANVAS_PRESS)))
@@ -523,12 +523,13 @@ describe('Booharu type bar on words chosen in Story', () => {
     const border = { stroke: [1, 1, 1, 1] as [number, number, number, number], stroke_width: 2 }
     story(pageOf(textLayer('text', [{ insert: 'Hello world', attributes: border }])), true)
     choose(await screen.findByPlaceholderText('Text'), 0, 5)
-    const bar = within(await screen.findByTestId('type-bar'))
+    const bar = within(await shownBar())
 
-    await user.click(bar.getByRole('button', { name: 'Border' }))
+    await user.click(bar.getByRole('button', { name: 'More border options' }))
     await user.click(await screen.findByRole('button', { name: 'Second border color' }))
     await user.click(await screen.findByRole('button', { name: 'Transparent' }))
 
+    await settled()
     expect(styled()).toEqual([])
     expect(range()).not.toBeNull()
   })

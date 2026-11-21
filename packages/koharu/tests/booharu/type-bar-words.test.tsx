@@ -18,6 +18,7 @@ import {
 } from '@koharu/ipc/protocol'
 
 import { comicFonts } from './fonts'
+import { shownBar } from './typeBar'
 
 /** A family with a light upright face and a semibold italic one, and no regular or bold face. */
 const comic: FontFamily = {
@@ -53,7 +54,7 @@ function pageWith(chars: CharStyle, content: Span[] = [{ insert: 'Hello' }]): Pa
 
 /** The TypeBar over the text of `page`, selected, with every command answering null, the edits it
  * sends, and, given `typing`, the canvas typing into it. */
-function renderBar(page: Page, typing: Typed | null = null) {
+async function renderBar(page: Page, typing: Typed | null = null) {
   const edits: Edit[] = []
   const table = commands as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
   for (const name of Object.keys(table)) vi.spyOn(table, name).mockResolvedValue(null)
@@ -75,7 +76,7 @@ function renderBar(page: Page, typing: Typed | null = null) {
       <TypeBar />
     </QueryClientProvider>,
   )
-  return { edits, bar: within(screen.getByTestId('type-bar')) }
+  return { edits, bar: within(await shownBar()) }
 }
 
 /** The one edit setting `chars` on the text's style, as setStyle sends it to a text no word of
@@ -90,7 +91,7 @@ function restyled(chars: CharStyle): Edit {
 describe('Booharu italic and the font picker in the TypeBar', () => {
   it('turns italic on for a family with no italic face, sending only italic', async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(pageWith({ family: 'Wild Words', weight: 700 }))
+    const { edits, bar } = await renderBar(pageWith({ family: 'Wild Words', weight: 700 }))
 
     const italic = bar.getByRole('button', { name: 'Italic' })
     expect(italic).toBeEnabled()
@@ -102,7 +103,7 @@ describe('Booharu italic and the font picker in the TypeBar', () => {
 
   it('shows italic on such a family as the text has it, and sends only italic off', async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(pageWith({ family: 'Wild Words', italic: true }))
+    const { edits, bar } = await renderBar(pageWith({ family: 'Wild Words', italic: true }))
 
     const italic = bar.getByRole('button', { name: 'Italic' })
     expect(italic).toHaveAttribute('aria-pressed', 'true')
@@ -113,7 +114,7 @@ describe('Booharu italic and the font picker in the TypeBar', () => {
 
   it('takes the italic off the characters typed for real (S11-d)', async () => {
     const user = userEvent.setup()
-    const { bar } = renderBar(pageWith({ family: 'Wild Words' }), {
+    const { bar } = await renderBar(pageWith({ family: 'Wild Words' }), {
       layer: 'text',
       chars: { family: 'Wild Words', italic: true },
       mixed: [],
@@ -127,7 +128,7 @@ describe('Booharu italic and the font picker in the TypeBar', () => {
 
   it('changes only the family, so bold words stay bold and the box stays italic (D22)', async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(
+    const { edits, bar } = await renderBar(
       pageWith({ family: 'Komika Text', italic: true }, [
         { insert: 'Hello ' },
         { insert: 'world', attributes: { weight: 700, family: 'Anime Ace' } },
@@ -163,7 +164,7 @@ describe('Booharu italic and the font picker in the TypeBar', () => {
 describe('Booharu weights and B in the TypeBar', () => {
   it("lists the family's weights of either style with regular, bold and the one shown", async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(pageWith({ family: 'Comic', weight: 550 }))
+    const { edits, bar } = await renderBar(pageWith({ family: 'Comic', weight: 550 }))
 
     const weights = bar.getByRole('combobox', { name: 'Font weight' })
     expect(weights).toHaveTextContent('550')
@@ -178,7 +179,7 @@ describe('Booharu weights and B in the TypeBar', () => {
 
   it('shows B pressed for a bold text and makes it regular', async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(pageWith({ family: 'Comic', weight: 700 }))
+    const { edits, bar } = await renderBar(pageWith({ family: 'Comic', weight: 700 }))
 
     const bold = bar.getByRole('button', { name: 'Bold' })
     expect(bold).toHaveAttribute('aria-pressed', 'true')
@@ -189,7 +190,7 @@ describe('Booharu weights and B in the TypeBar', () => {
 
   it('shows B off for a light or regular text and makes it bold', async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(pageWith({ family: 'Comic', weight: 300 }))
+    const { edits, bar } = await renderBar(pageWith({ family: 'Comic', weight: 300 }))
 
     const bold = bar.getByRole('button', { name: 'Bold' })
     expect(bold).toBeEnabled()
@@ -201,7 +202,7 @@ describe('Booharu weights and B in the TypeBar', () => {
 
   it('makes words of mixed weights bold, every word', async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(
+    const { edits, bar } = await renderBar(
       pageWith({ family: 'Comic' }, [
         { insert: 'Hello ', attributes: { weight: 800 } },
         { insert: 'world' },
@@ -232,7 +233,7 @@ describe('Booharu weights and B in the TypeBar', () => {
 
   it('takes the bold off the characters typed for real when B goes off (S11-d)', async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(pageWith({ family: 'Comic', weight: 300 }), {
+    const { edits, bar } = await renderBar(pageWith({ family: 'Comic', weight: 300 }), {
       layer: 'text',
       chars: { family: 'Comic', weight: 700 },
       mixed: [],
@@ -249,7 +250,7 @@ describe('Booharu weights and B in the TypeBar', () => {
 
   it('makes the characters typed bold while typing, mixed weights too', async () => {
     const user = userEvent.setup()
-    const { bar } = renderBar(pageWith({ family: 'Comic', weight: 700 }), {
+    const { bar } = await renderBar(pageWith({ family: 'Comic', weight: 700 }), {
       layer: 'text',
       chars: { family: 'Comic', weight: 400 },
       mixed: [],
@@ -269,8 +270,8 @@ describe('Booharu weights and B in the TypeBar', () => {
 })
 
 describe('Booharu emphasis star in the TypeBar', () => {
-  it('is disabled on a whole box, and on a new text being typed', () => {
-    const { bar } = renderBar(pageWith({ family: 'Comic' }))
+  it('is disabled on a whole box, and on a new text being typed', async () => {
+    const { bar } = await renderBar(pageWith({ family: 'Comic' }))
     expect(bar.getByRole('button', { name: 'Emphasis' })).toBeDisabled()
 
     useKoharuStore.setState({ typing: { layer: null, chars: {}, mixed: [] } })
@@ -279,7 +280,7 @@ describe('Booharu emphasis star in the TypeBar', () => {
 
   it("gives the characters typed their category's emphasis", async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(pageWith({ family: 'Comic' }), {
+    const { edits, bar } = await renderBar(pageWith({ family: 'Comic' }), {
       layer: 'text',
       chars: { family: 'Comic' },
       mixed: [],
@@ -299,7 +300,7 @@ describe('Booharu emphasis star in the TypeBar', () => {
 
   it('sends nothing to a text the canvas stopped typing into meanwhile', async () => {
     const user = userEvent.setup()
-    const { bar } = renderBar(pageWith({ family: 'Comic' }), {
+    const { bar } = await renderBar(pageWith({ family: 'Comic' }), {
       layer: 'text',
       chars: {},
       mixed: [],
@@ -319,7 +320,9 @@ describe('Booharu emphasis star in the TypeBar', () => {
 
   it('stresses the words chosen in Story in the text the bar shows, and no others', async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(pageWith({ family: 'Comic' }, [{ insert: 'Hello world' }]))
+    const { edits, bar } = await renderBar(
+      pageWith({ family: 'Comic' }, [{ insert: 'Hello world' }]),
+    )
 
     setWordRange({ layer: 'other', start: 0, end: 5, text: 'Hello' })
     await waitFor(() => expect(bar.getByRole('button', { name: 'Emphasis' })).toBeDisabled())
@@ -343,7 +346,9 @@ describe('Booharu emphasis star in the TypeBar', () => {
 describe('Booharu TypeBar and words chosen in Story', () => {
   it('styles the whole text when its words were chosen before it changed', async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(pageWith({ family: 'Comic' }, [{ insert: 'Hello world' }]))
+    const { edits, bar } = await renderBar(
+      pageWith({ family: 'Comic' }, [{ insert: 'Hello world' }]),
+    )
     setWordRange({ layer: 'text', start: 6, end: 11, text: 'Hello there' })
 
     await user.click(bar.getByRole('button', { name: 'Bold' }))
@@ -354,11 +359,14 @@ describe('Booharu TypeBar and words chosen in Story', () => {
 
   it('styles the characters typed, not the words chosen, while the canvas types', async () => {
     const user = userEvent.setup()
-    const { edits, bar } = renderBar(pageWith({ family: 'Comic' }, [{ insert: 'Hello world' }]), {
-      layer: 'text',
-      chars: { family: 'Comic' },
-      mixed: [],
-    })
+    const { edits, bar } = await renderBar(
+      pageWith({ family: 'Comic' }, [{ insert: 'Hello world' }]),
+      {
+        layer: 'text',
+        chars: { family: 'Comic' },
+        mixed: [],
+      },
+    )
     setWordRange({ layer: 'text', start: 6, end: 11, text: 'Hello world' })
 
     await user.click(bar.getByRole('button', { name: 'Italic' }))

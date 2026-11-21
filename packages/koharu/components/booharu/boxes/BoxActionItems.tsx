@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, type ComponentProps, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { call } from '@/lib/backend'
 import {
   boxActions,
   joinPage,
@@ -18,7 +17,6 @@ import { pageKey, usePageStory } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type LayerId, type Page, type PageId } from '@koharu/ipc/protocol'
 import { DropdownMenuItem, DropdownMenuSeparator } from '@koharu/ui/components/dropdown-menu'
-import { cn } from '@koharu/ui/lib/utils'
 
 type ItemProps = ComponentProps<typeof DropdownMenuItem>
 
@@ -52,7 +50,7 @@ function ActionItems({
   )
 }
 
-/** A Story row's menu items: its text's box actions, above Delete. */
+/** A Story row's menu items: its text's box actions, above Delete, Koharu's items as its Delete. */
 export function StoryBoxActions({ page, layer }: { page: PageId; layer: LayerId }) {
   // The page as its Story section read it, so the text's balloon and locks are known.
   const layers = usePageStory(page).data?.page.layers
@@ -62,19 +60,9 @@ export function StoryBoxActions({ page, layer }: { page: PageId; layer: LayerId 
   )
   return (
     <>
-      <ActionItems selection={selection} Item={StoryItem} />
-      <DropdownMenuSeparator className='-mx-0.5 my-0.5' />
+      <ActionItems selection={selection} Item={DropdownMenuItem} />
+      <DropdownMenuSeparator />
     </>
-  )
-}
-
-/** An item sized as Story's own row-menu items. */
-function StoryItem({ className, ...props }: ItemProps) {
-  return (
-    <DropdownMenuItem
-      className={cn('min-h-7 gap-1 px-1.5 py-0.5 text-[11px]', className)}
-      {...props}
-    />
   )
 }
 
@@ -133,7 +121,7 @@ export function BoxMenuItems({
 function useSplitBalloons(page: PageId | null) {
   return useQuery({
     queryKey: [...pageKey, 'booharu', 'split-balloons', page],
-    queryFn: () => call(commands.booharuFindSplitBalloons, page),
+    queryFn: () => commands.booharuFindSplitBalloons(page),
     enabled: page !== null,
   }).data
 }

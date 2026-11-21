@@ -1,8 +1,9 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 
+import { PickerSearch } from '@/components/controls/PickerSearch'
 import { choiceName, letteringChoices, type LetteringChoice } from '@/lib/booharu/boxLettering'
 import {
   categoryName,
@@ -17,7 +18,6 @@ import {
   Combobox,
   ComboboxContent,
   ComboboxEmpty,
-  ComboboxInput,
   ComboboxItem,
   ComboboxList,
   ComboboxTrigger,
@@ -42,6 +42,7 @@ export function CategoryPicker({
   onChange: (category: LetteringCategory) => void
 }) {
   const { t } = useTranslation()
+  const [query, setQuery] = useState('')
 
   return (
     <Combobox
@@ -50,6 +51,9 @@ export function CategoryPicker({
       itemToStringLabel={(category: LetteringCategory) => t(categoryName(category))}
       autoHighlight
       disabled={disabled}
+      inputValue={query}
+      onInputValueChange={setQuery}
+      onOpenChange={(open) => !open && setQuery('')}
       onValueChange={(category) => {
         if (category) onChange(category)
       }}
@@ -63,7 +67,7 @@ export function CategoryPicker({
           <ComboboxValue />
         </span>
       </ComboboxTrigger>
-      <CategoryOptions />
+      <CategoryOptions query={query} onClear={() => setQuery('')} />
     </Combobox>
   )
 }
@@ -92,6 +96,7 @@ export function BlockCategoryPicker({
   children: ReactNode
 }) {
   const { t } = useTranslation()
+  const [query, setQuery] = useState('')
 
   return (
     <Combobox
@@ -100,34 +105,49 @@ export function BlockCategoryPicker({
       itemToStringLabel={(choice: LetteringChoice) => t(choiceName(choice))}
       autoHighlight
       readOnly={readOnly}
+      inputValue={query}
+      onInputValueChange={setQuery}
+      onOpenChange={(open) => !open && setQuery('')}
       onValueChange={(choice) => {
         if (choice) onChange(choice)
       }}
     >
       {children}
-      <CategoryOptions footer={footer} className={className} />
+      <CategoryOptions
+        query={query}
+        onClear={() => setQuery('')}
+        footer={footer}
+        className={className}
+      />
     </Combobox>
   )
 }
 
-/** A category picker's list: its search line, then each choice by its name, or a line saying
- * nothing matches, and `footer` under them. */
-function CategoryOptions({ footer, className }: { footer?: ReactNode; className?: string }) {
+/** A category picker's list: Koharu's search line for pickers over `query`, which `onClear`
+ * empties, then each choice by its name, or a line saying nothing matches, and `footer` under
+ * them. */
+function CategoryOptions({
+  query,
+  onClear,
+  footer,
+  className,
+}: {
+  query: string
+  onClear: () => void
+  footer?: ReactNode
+  className?: string
+}) {
   const { t } = useTranslation()
-  const search = t('booharu.lettering.search')
 
   return (
     <ComboboxContent className={className}>
-      <ComboboxInput
-        showTrigger={false}
-        aria-label={search}
-        placeholder={search}
-        className='text-[11px]'
-      />
+      <div className='border-b p-1'>
+        <PickerSearch query={query} label={t('booharu.lettering.search')} onClear={onClear} />
+      </div>
       <ComboboxEmpty>{t('booharu.lettering.noMatch')}</ComboboxEmpty>
       <ComboboxList>
         {(choice: LetteringChoice) => (
-          <ComboboxItem key={choice} value={choice} className='text-[12px]'>
+          <ComboboxItem key={choice} value={choice}>
             {t(choiceName(choice))}
           </ComboboxItem>
         )}

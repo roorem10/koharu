@@ -1029,7 +1029,7 @@ mod tests {
             "plain",
             11..13,
             &WordChange {
-                set: sized(300.0),
+                set: sized(1296.0),
                 ..WordChange::default()
             },
         )?;

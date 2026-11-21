@@ -47,9 +47,38 @@ export function mergeStrings<T extends object>(upstream: T, overlay: object): T 
   return merged as T
 }
 
+/** The type of `B` deep-merged over `A`, as `mergeStrings` merges them: objects merge key by key,
+ * and any other value of `B` replaces `A`'s at the same path. */
+export type MergedStrings<A, B> = A extends object
+  ? B extends object
+    ? {
+        [K in keyof A | keyof B]: K extends keyof B
+          ? K extends keyof A
+            ? MergedStrings<A[K], B[K]>
+            : B[K]
+          : K extends keyof A
+            ? A[K]
+            : never
+      }
+    : B
+  : B
+
+/** Koharu's i18next resources `R` with en-US's booharu.json merged into each language's
+ * translation, so i18next's typed keys (lib/i18n.ts types them from en-US) take every Booharu
+ * string and every key a booharu.json adds at Koharu's paths, such as `settings.tabs.<tab>` for a
+ * Booharu tab. Every language has each of them: Booharu's own from its booharu.json, as
+ * tests/booharu/strings.test.ts checks, and the rest from its translation.json. */
+export type WithBooharu<R extends Record<string, { translation: object }>> = {
+  [L in keyof R]: {
+    [K in keyof R[L]]: K extends 'translation' ? MergedStrings<R[L][K], typeof enUS> : R[L][K]
+  }
+}
+
 /** Koharu's i18next resources with each language's Booharu strings merged over its translation. A
  * language without a booharu.json keeps Koharu's strings, and tests/booharu flags it. */
-export function withBooharu<R extends Record<string, { translation: object }>>(resources: R): R {
+export function withBooharu<R extends Record<string, { translation: object }>>(
+  resources: R,
+): WithBooharu<R> {
   return Object.fromEntries(
     Object.entries(resources).map(([language, resource]) => [
       language,
@@ -58,5 +87,5 @@ export function withBooharu<R extends Record<string, { translation: object }>>(r
         translation: mergeStrings(resource.translation, booharuStrings[language] ?? {}),
       },
     ]),
-  ) as R
+  ) as WithBooharu<R>
 }

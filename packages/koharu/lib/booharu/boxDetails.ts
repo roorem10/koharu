@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import { projectKey, queryClient, type ProjectView } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type LayerId, type PageId } from '@koharu/ipc/protocol'

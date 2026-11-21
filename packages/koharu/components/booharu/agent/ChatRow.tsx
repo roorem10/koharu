@@ -4,8 +4,8 @@ import { Lightbulb } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { BooharuTurn } from '@/lib/booharu/agentChat'
-import { useKoharuStore } from '@/lib/store'
-import { modelName } from '@/lib/translation'
+import { modelName } from '@/lib/models'
+import { useModels } from '@/lib/queries'
 
 type Divider = Extract<BooharuTurn, { role: 'divider' }>
 type Note = Extract<BooharuTurn, { role: 'note' }>
@@ -40,7 +40,7 @@ function DividerRow({ divider }: { divider: Divider }) {
  * explanation, the other translations, and which model answered. */
 function NoteRow({ note }: { note: Note }) {
   const { t } = useTranslation()
-  const models = useKoharuStore((state) => state.models)
+  const models = useModels().data ?? []
   return (
     <article
       aria-label={t('booharu.agent.explained')}

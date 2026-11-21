@@ -26,7 +26,7 @@ function openDemo(shown: string) {
   const project: ProjectView = {
     name: 'Demo',
     page: shown,
-    pages: order.map((id) => ({ id, size, background: null })),
+    pages: order.map((id) => ({ id, size, background: null, texts: 0, translated: 0 })),
     history: { steps: [], current: 0 },
     revisions: {},
   }

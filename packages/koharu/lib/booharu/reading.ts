@@ -4,8 +4,15 @@ import { useQuery } from '@tanstack/react-query'
 import { create } from 'zustand'
 
 import { booharuPreferencesQuery, saveBooharuSection } from '@/lib/booharu/preferences'
-import { projectKey, queryClient, type ProjectView } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
+import {
+  modelsKey,
+  preferencesKey,
+  projectKey,
+  queryClient,
+  useModels,
+  usePreferences,
+  type ProjectView,
+} from '@/lib/queries'
 import {
   commands,
   type BooharuPreferences,
@@ -123,10 +130,8 @@ export function readerOf(
 /** The model a read would use now, as `readerOf` picks it from Koharu's list of models, the
  * translation model and the saved Read chapter model. */
 export function useReader(): string | null {
-  const models = useKoharuStore((state) => state.models)
-  const translation = useKoharuStore(
-    (state) => state.preferences?.pipeline.translator?.model ?? null,
-  )
+  const models = useModels().data ?? []
+  const translation = usePreferences().data?.pipeline.translator?.model ?? null
   const saved = useReadingSettings()?.model ?? null
   return readerOf(models, saved, translation)
 }
@@ -162,22 +167,27 @@ export function openProject(): string | null {
 }
 
 /** Whether a Run press reads the chapter first, as the Run menu's Read chapter shows: as switched
- * in the open project, else its default, from the chapter as the desktop reads it now, and the
- * settings and the models as last read. A read that fails reads nothing. The run settings load
- * this before the chapter's queries can, so it asks the desktop itself. */
+ * in the open project, else its default, from the chapter as the desktop reads it now, the
+ * settings as last read, read now when none were, and the models as last listed, none when they
+ * weren't, as listing them can take a while. A read that fails reads nothing. The run settings
+ * load this before the chapter's queries can, so it asks the desktop itself. */
 export async function readChapterOn(): Promise<boolean> {
   const project = openProject()
   if (project === null) return false
   const switched = useReadSwitches.getState().on[project]
   if (switched !== undefined) return switched
   try {
-    const [chapter, preferences] = await Promise.all([
+    const [chapter, preferences, koharu] = await Promise.all([
       commands.booharuGetChapterContext(),
       queryClient.fetchQuery(booharuPreferencesQuery),
+      queryClient.ensureQueryData({
+        queryKey: preferencesKey,
+        queryFn: () => commands.getPreferences(),
+      }),
     ])
-    const { models, preferences: koharu } = useKoharuStore.getState()
+    const models = queryClient.getQueryData<Model[]>(modelsKey) ?? []
     const saved = completeReading(preferences['booharu-reading']).model
-    const translation = koharu?.pipeline.translator?.model ?? null
+    const translation = koharu.pipeline.translator?.model ?? null
     return readsByDefault(chapter, readerOf(models, saved, translation))
   } catch {
     return false

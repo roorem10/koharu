@@ -14,8 +14,7 @@ import {
   useChapterContext,
   useSeriesList,
 } from '@/lib/booharu/context'
-import { queryClient } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
+import { preferencesKey, queryClient, usePreferences } from '@/lib/queries'
 import { commands, events, type Preferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
@@ -136,10 +135,12 @@ describe('Booharu context data', () => {
       agent: {},
       providers: {},
     })
-    useKoharuStore.setState({ preferences: settings('Keep honorifics.\n潔 = Isagi') })
+    queryClient.setQueryData(preferencesKey, settings('Keep honorifics.\n潔 = Isagi'))
     const read = vi
       .spyOn(commands, 'getPreferences')
       .mockResolvedValue(settings('Keep honorifics.'))
+    // The editor reads Koharu's settings while it's open, as its model menu shows them.
+    const shown = renderHook(() => usePreferences(), { wrapper })
     let tell: () => void = () => undefined
     const stop = vi.fn()
     vi.spyOn(events, 'booharuContextChanged').mockResolvedValue(stop)
@@ -155,9 +156,8 @@ describe('Booharu context data', () => {
 
     // Every later save of the cached settings, such as the Run popover's choice of model, then
     // keeps the Instructions without the imported lines.
-    await waitFor(() =>
-      expect(useKoharuStore.getState().preferences).toEqual(settings('Keep honorifics.')),
-    )
+    await waitFor(() => expect(shown.result.current.data).toEqual(settings('Keep honorifics.')))
+    expect(queryClient.getQueryData(preferencesKey)).toEqual(settings('Keep honorifics.'))
     expect(read).toHaveBeenCalledOnce()
     hook.unmount()
     await waitFor(() => expect(stop).toHaveBeenCalledTimes(2))

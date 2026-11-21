@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import i18n from '@/lib/i18n'
 import { commands, type LayerId, type RedoAnswer, type RedoCounts } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'

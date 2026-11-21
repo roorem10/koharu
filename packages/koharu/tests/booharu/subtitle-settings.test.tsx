@@ -125,7 +125,8 @@ describe('Booharu sound effect subtitles settings', () => {
     renderTypesetting(fontFamilies('Anime Ace', 'CCWildWords'))
     const region = await card()
 
-    const font = region.getByRole('button', { name: 'Sound effect subtitle font' })
+    // Koharu's font picker, its button a combobox.
+    const font = region.getByRole('combobox', { name: 'Sound effect subtitle font' })
     expect(font).toHaveTextContent('Default font')
     await user.click(font)
     const list = await screen.findByRole('listbox', { name: 'Fonts' })

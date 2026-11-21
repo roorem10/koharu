@@ -1,14 +1,15 @@
 'use client'
 
+import { useMutation } from '@tanstack/react-query'
 import { Channel } from '@tauri-apps/api/core'
 import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Square, SquarePen, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ChatRow } from '@/components/booharu/agent/ChatRow' // Booharu: its rows in the chat.
+import { Choice } from '@/components/controls/Choice'
 import { Markdown } from '@/components/controls/Markdown'
 import { ModelPicker } from '@/components/controls/ModelPicker'
-import { call, savePreferences } from '@/lib/backend'
 import {
   chattedSinceDivider,
   isBooharuTurn,
@@ -18,8 +19,8 @@ import {
   withDivider,
   type BooharuTurn,
 } from '@/lib/booharu/agentChat' // Booharu: the chat kept with the project, and Discuss.
-import { useKoharuStore } from '@/lib/store'
-import { modelName, REASONING } from '@/lib/translation'
+import { modelName, REASONING } from '@/lib/models'
+import { send, useModels, usePreferences, useSavePreferences } from '@/lib/queries'
 import { commands, type AgentConfig, type AgentEvent, type Event } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
 import {
@@ -29,13 +30,6 @@ import {
 } from '@koharu/ui/components/collapsible'
 import { Popover, PopoverContent, PopoverTrigger } from '@koharu/ui/components/popover'
 import { ScrollArea } from '@koharu/ui/components/scroll-area'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@koharu/ui/components/select'
 import { Spinner } from '@koharu/ui/components/spinner'
 import { Textarea } from '@koharu/ui/components/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/tooltip'
@@ -75,11 +69,19 @@ export function AgentPanel() {
   const [running, setRunning] = useBooharuAgentRun() // Booharu: kept with the chat, for Stop.
   const [choosing, setChoosing] = useState(false)
   const busy = turns.some((turn) => turn.role === 'assistant' && turn.state === 'running')
-  const models = useKoharuStore((state) => state.models).filter((model) => model.tools)
-  const preferences = useKoharuStore((state) => state.preferences)
+  const models = (useModels().data ?? []).filter((model) => model.tools)
+  const preferences = usePreferences().data
+  const save = useSavePreferences()
   const list = useRef<HTMLDivElement>(null)
   // Whether the transcript follows what arrives: until the user scrolls up from its end.
   const following = useRef(true)
+  const reset = useMutation({
+    mutationFn: () => commands.resetAgent(),
+    onSettled: () => {
+      setTurns((current) => withDivider(current)) // Booharu: what was said stays, above a divider.
+      following.current = true
+    },
+  })
 
   useEffect(() => {
     const viewport = list.current
@@ -99,8 +101,6 @@ export function AgentPanel() {
   const model = config.model ?? null
   const picker =
     'h-6 w-auto max-w-36 min-w-0 gap-1 border-0 bg-transparent px-1.5 text-[11px] text-muted-foreground shadow-none hover:bg-muted hover:text-foreground dark:bg-transparent dark:hover:bg-muted'
-  // A reasoning level's row, sized and checked as the model menu's rows are.
-  const choice = 'min-h-7 pr-7 pl-2 *:[span]:last:right-2'
 
   return (
     <div className='flex min-h-0 flex-1 flex-col'>
@@ -159,7 +159,7 @@ export function AgentPanel() {
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault()
-                void send()
+                void submit()
               }
             }}
           />
@@ -182,52 +182,32 @@ export function AgentPanel() {
                 side='top'
                 align='start'
                 sideOffset={6}
-                className='w-64 min-w-0 gap-0 overflow-hidden rounded-xl border border-border/50 p-1 shadow-sm ring-0'
+                className='w-64 gap-0 overflow-hidden p-1'
               >
                 <ModelPicker
                   value={model}
                   models={models}
                   onSelect={(next) => {
                     setChoosing(false)
-                    void saveConfig({ ...config, model: next })
+                    saveConfig({ ...config, model: next })
                   }}
                 />
               </PopoverContent>
             </Popover>
-            <Select
+            <Choice
+              size='sm'
+              side='top'
               value={config.reasoning ?? 'default'}
-              items={Object.fromEntries([
+              choices={Object.fromEntries([
                 ['default', t('inference.providerDefault')],
                 ...REASONING.map((level) => [level, t(`reasoning.${level}`)]),
               ])}
-              onValueChange={(reasoning) =>
-                reasoning &&
-                void saveConfig({
-                  ...config,
-                  reasoning: reasoning === 'default' ? null : reasoning,
-                })
+              label={t('agent.reasoning')}
+              className={picker}
+              onChange={(reasoning) =>
+                saveConfig({ ...config, reasoning: reasoning === 'default' ? null : reasoning })
               }
-            >
-              <SelectTrigger size='sm' className={picker} aria-label={t('agent.reasoning')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                side='top'
-                align='start'
-                sideOffset={6}
-                alignItemWithTrigger={false}
-                className='w-auto min-w-36 rounded-xl border border-border/50 p-1 shadow-sm ring-0'
-              >
-                <SelectItem value='default' className={choice}>
-                  {t('inference.providerDefault')}
-                </SelectItem>
-                {REASONING.map((level) => (
-                  <SelectItem key={level} value={level} className={choice}>
-                    {t(`reasoning.${level}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
             <div className='ml-auto flex shrink-0 items-center gap-1'>
               <Tooltip>
                 <TooltipTrigger
@@ -238,9 +218,9 @@ export function AgentPanel() {
                       size='icon-sm'
                       aria-label={t('agent.newChat')}
                       // Booharu: once something was said since the last New chat.
-                      disabled={busy || !chattedSinceDivider(turns)}
+                      disabled={busy || !chattedSinceDivider(turns) || reset.isPending}
                       className='size-7 rounded-full text-muted-foreground hover:text-foreground'
-                      onClick={() => void newChat()}
+                      onClick={() => reset.mutate()}
                     />
                   }
                 >
@@ -265,7 +245,7 @@ export function AgentPanel() {
                   aria-label={t('agent.send')}
                   disabled={!prompt.trim() || !model}
                   className='size-7 rounded-full'
-                  onClick={() => void send()}
+                  onClick={() => void submit()}
                 >
                   <ArrowUp className='size-4' />
                 </Button>
@@ -277,18 +257,12 @@ export function AgentPanel() {
     </div>
   )
 
-  async function saveConfig(agent: AgentConfig) {
-    if (preferences) await savePreferences({ ...preferences, agent })
-  }
-
-  async function newChat() {
-    await call(commands.resetAgent).catch(() => undefined)
-    setTurns((current) => withDivider(current)) // Booharu: what was said stays, above a divider.
-    following.current = true
+  function saveConfig(agent: AgentConfig) {
+    if (preferences) save.mutate({ ...preferences, agent })
   }
 
   function cancel() {
-    if (running !== null) void call(commands.stopAgent, running).catch(() => undefined)
+    if (running !== null) send(commands.stopAgent, running)
     // A cancelled run tells nothing more.
     setRunning(null)
     setTurns((current) =>
@@ -300,7 +274,7 @@ export function AgentPanel() {
     )
   }
 
-  async function send() {
+  async function submit() {
     const message = prompt.trim()
     if (!message || busy || !model) return
     const assistant = crypto.randomUUID()
@@ -336,7 +310,7 @@ export function AgentPanel() {
       )
     }
     try {
-      const run = await call(commands.runAgent, message, channel)
+      const run = await commands.runAgent(message, channel)
       if (!settled) setRunning(run)
     } catch (error) {
       updateAssistant((turn) => ({

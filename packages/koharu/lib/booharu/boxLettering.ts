@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import { categoryName, letteringCategories } from '@/lib/booharu/categories'
 import i18n from '@/lib/i18n'
 import { pagesKey, queryClient } from '@/lib/queries'
@@ -67,6 +67,7 @@ export function useLettering(page: PageId | null | undefined) {
     queryFn: () => commands.booharuGetLettering(page ?? ''),
     enabled: !!page,
     select: byBlock,
+    meta: { booharuQuiet: true },
   })
 }
 

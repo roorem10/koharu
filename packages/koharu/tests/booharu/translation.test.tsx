@@ -87,7 +87,7 @@ function story() {
   const project: ProjectView = {
     name: 'Demo',
     page: 'page',
-    pages: [{ id: page.id, size: page.size, background: null }],
+    pages: [{ id: page.id, size: page.size, background: null, texts: 0, translated: 0 }],
     history: { steps: [], current: 0 },
     revisions: {},
   }

@@ -79,7 +79,7 @@ describe('Booharu Lettering categories', () => {
     expect(region.getByRole('combobox', { name: 'Lettering category' })).toHaveTextContent(
       'Normal Dialogue',
     )
-    expect(showing(region.getByRole('button', { name: 'Normal Dialogue: Font' }))).toBe(
+    expect(showing(region.getByRole('combobox', { name: 'Normal Dialogue: Font' }))).toBe(
       'Same as the default font',
     )
     expect(region.getByText('Also used for round bubbles.')).toBeInTheDocument()
@@ -163,7 +163,7 @@ describe('Booharu Lettering categories', () => {
     await waitFor(() => expect(picker).toHaveTextContent('Shout'))
     await waitFor(() => expect(picker).toHaveFocus())
 
-    expect(showing(region.getByRole('button', { name: 'Shout: Font' }))).toBe('Komika Text')
+    expect(showing(region.getByRole('combobox', { name: 'Shout: Font' }))).toBe('Komika Text')
     expect(region.getByRole('button', { name: 'Shout: Bold' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -179,7 +179,7 @@ describe('Booharu Lettering categories', () => {
     await categorySearch()
     await user.keyboard('whis{ArrowDown}{ArrowUp}{Enter}')
     await waitFor(() => expect(picker).toHaveTextContent('Whisper'))
-    expect(showing(region.getByRole('button', { name: 'Whisper: Font' }))).toBe(
+    expect(showing(region.getByRole('combobox', { name: 'Whisper: Font' }))).toBe(
       'Same as Normal Dialogue',
     )
     expect(region.queryByText(/^Also used for/)).toBeNull()
@@ -217,7 +217,7 @@ describe('Booharu Lettering categories', () => {
     )
     expect(own.getByRole('button', { name: /^Whisper/ })).toHaveAttribute('aria-pressed', 'true')
 
-    const font = region.getByRole('button', { name: 'Whisper: Font' })
+    const font = region.getByRole('combobox', { name: 'Whisper: Font' })
     expect(showing(font)).toBe('Anime Ace')
     await user.click(font)
     expect(await fontsListed()).toEqual([
@@ -297,7 +297,15 @@ describe('Booharu Lettering categories', () => {
     const project: ProjectView = {
       name: 'Demo',
       page: 'page',
-      pages: [{ id: 'page', size: { width: 800, height: 1200 }, background: null }],
+      pages: [
+        {
+          id: 'page',
+          size: { width: 800, height: 1200 },
+          background: null,
+          texts: 0,
+          translated: 0,
+        },
+      ],
       history: { steps: [], current: 0 },
       revisions: {},
     }

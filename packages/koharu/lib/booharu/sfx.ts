@@ -3,7 +3,11 @@
 import { useMutation } from '@tanstack/react-query'
 import { useCallback, useRef, useState } from 'react'
 
-import { saveBooharuSection, useBooharuPreferences } from '@/lib/booharu/preferences'
+import {
+  saveBooharuSection,
+  useBooharuPreferences,
+  writeBooharuSection,
+} from '@/lib/booharu/preferences'
 import type { SfxMode, SubtitleStyle } from '@koharu/ipc/protocol'
 
 /** Each SFX mode, in Settings' order: a record over every mode, so one the desktop adds fails to
@@ -29,7 +33,7 @@ export function useSfxMode() {
   const preferences = useBooharuPreferences()
   const save = useMutation({
     mutationFn: (sfx: SfxMode) =>
-      saveBooharuSection('booharu-lettering', (section) => ({ ...section, sfx })),
+      writeBooharuSection('booharu-lettering', (section) => ({ ...section, sfx })),
   })
   const section = preferences.data?.['booharu-lettering']
   const saved = section ? (section.sfx ?? DEFAULT_SFX_MODE) : undefined

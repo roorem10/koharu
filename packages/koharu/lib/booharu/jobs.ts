@@ -1,7 +1,9 @@
 'use client'
 
+import type { ParseKeys } from 'i18next'
+
 import { prepareFinishSound } from '@/components/booharu/runs/sound'
-import { call } from '@/lib/backend'
+import { call } from '@/lib/booharu/call'
 import { chime } from '@/lib/booharu/chime'
 import i18n from '@/lib/i18n'
 import { projectKey, queryClient, useProject, type ProjectView } from '@/lib/queries'
@@ -183,7 +185,7 @@ function leftAlone(record: RunRecord): string[] {
   )
   const keptOnly = pipelineStages.every((stage) => stage === 'detect' || !total(stage, 'locked'))
   const soundEffects = record.namedBlocks ? total('translate', 'sound_effects') : 0
-  const counts: Array<[string, number]> = [
+  const counts: Array<[ParseKeys, number]> = [
     ['booharu.runs.skipped.detectHandFixed', total('detect', 'hand_fixed')],
     ['booharu.runs.skipped.recognizeHandFixed', total('recognize', 'hand_fixed')],
     ['booharu.runs.skipped.translateHandFixed', total('translate', 'hand_fixed')],

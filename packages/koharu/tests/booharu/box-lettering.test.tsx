@@ -76,6 +76,7 @@ describe("Booharu's lettering category in Box details", () => {
     const { lettering: read } = letteredDesktop()
     const refused = "shout's font family can't be blank: leave it out for the default font"
     read.mockRejectedValue(refused)
+    const shown = vi.spyOn(toast, 'add')
     mount(
       <>
         <StoryPanel />
@@ -97,6 +98,8 @@ describe("Booharu's lettering category in Box details", () => {
       await section.findByText(`Couldn't read the lettering category: ${refused}`),
     ).toBeInTheDocument()
     expect(section.queryByRole('combobox', { name: 'Lettering category' })).toBeNull()
+    // The read is quiet: Box details says why, and no error toast shows besides.
+    expect(shown).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
   })
 
   it('leaves the Lettering section out for a text layer', async () => {

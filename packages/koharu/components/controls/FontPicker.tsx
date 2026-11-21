@@ -1,55 +1,81 @@
 'use client'
 
-// Booharu: the list's range and scrolling, the check on the font in use, and the ids and refs the
-// arrows go through.
-import {
-  defaultRangeExtractor,
-  observeElementRect,
-  useVirtualizer,
-  type Virtualizer,
-} from '@tanstack/react-virtual'
-import { Check, ChevronDown, Search, X } from 'lucide-react'
-import { useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
+import { observeElementRect, useVirtualizer } from '@tanstack/react-virtual'
+import { Star } from 'lucide-react'
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
-// Booharu: the favourites, and the leading row.
-import {
-  FavoritesOnlySwitch,
-  FontHeading,
-  WithFavoriteStar,
-} from '@/components/booharu/fonts/FontFavorites'
+// Booharu: the sections' headings, the leading row, the local names, and the favourites, which the
+// settings file keeps.
+import { FontHeadings } from '@/components/booharu/fonts/FontFavorites'
 import { NoneOption } from '@/components/booharu/fonts/NoneOption'
+import { PickerSearch } from '@/components/controls/PickerSearch'
 import {
-  activeRow,
-  fontRows,
+  familyCount,
+  fontHeadings,
+  fontItemKey,
+  fontItems,
+  leadingItem,
+  useBooharuFavoriteFonts,
   type BooharuFontProps,
-  type BooharuListProps,
-  type FontRow,
+  type FontItem,
 } from '@/lib/booharu/fonts'
 import { useFontPreview } from '@/lib/queries'
 import type { FontFamily } from '@koharu/ipc/protocol'
 import { Button } from '@koharu/ui/components/button'
-import { Empty, EmptyTitle } from '@koharu/ui/components/empty'
 import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@koharu/ui/components/input-group'
-import { Popover, PopoverContent, PopoverTrigger } from '@koharu/ui/components/popover'
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+  useComboboxFilteredItems,
+} from '@koharu/ui/components/combobox'
 import { ScrollArea } from '@koharu/ui/components/scroll-area'
 import { Separator } from '@koharu/ui/components/separator'
+import { Toggle } from '@koharu/ui/components/toggle'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/tooltip'
 import { cn } from '@koharu/ui/lib/utils'
 
 const rowHeight = 38
 const listHeight = 248
-/** Booharu: a section's heading, Favorites or All fonts. */
+/** Booharu: a section's heading, Favorites or All fonts, over its first row. */
 const headingHeight = 24
-const height = (row: FontRow | undefined) => (row && 'heading' in row ? headingHeight : rowHeight)
 
-/** Booharu: the list's scrolling, which brings the family the arrows move to into view. */
-type Scroller = Virtualizer<HTMLDivElement, Element>
+/** The families starred as favorites, by normalized name, and whether the picker lists only them,
+ * as Photoshop's font menu keeps favorites and its Show Favorite Fonts filter. Every picker shares
+ * them, and the interface keeps them in its browser profile, as it does the editor's panel widths. */
+const useFavoriteFonts = create<{
+  favorites: string[]
+  only: boolean
+  toggle: (family: string) => void
+  showOnly: (only: boolean) => void
+}>()(
+  persist(
+    (set) => ({
+      favorites: [],
+      only: false,
+      toggle: (family) =>
+        set(({ favorites }) => {
+          const name = normalizeFontName(family)
+          return {
+            favorites: favorites.includes(name)
+              ? favorites.filter((favorite) => favorite !== name)
+              : [...favorites, name],
+          }
+        }),
+      showOnly: (only) => set({ only }),
+    }),
+    { name: 'favorite-fonts' },
+  ),
+)
 
+/** Picks a font family, each shown in its own face: a search line that matches a family's name or
+ * any of its faces' PostScript names, and a star beside it that lists only the favorites, then the
+ * matches in alphabetical order, the keyboard's arrows and Enter moving through them. */
 export function FontPicker({
   value,
   families,
@@ -58,8 +84,7 @@ export function FontPicker({
   ariaLabel,
   placeholder,
   onChange,
-  // Booharu: favourites and local names, as lib/booharu/fonts.ts's hook gives them, and a
-  // mount's leading row.
+  // Booharu: the local names, as lib/booharu/fonts.ts's hook gives them, and a mount's leading row.
   ...booharu
 }: {
   value: string
@@ -71,14 +96,8 @@ export function FontPicker({
   onChange: (family: string) => void
 } & BooharuFontProps) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const input = useRef<HTMLInputElement>(null)
-  // Booharu: the family the arrows move to and Enter picks, by its row's key, as ModelPicker's
-  // arrows and Enter go through its models; null for the first. The pointer moves it too.
-  const id = useId()
-  const [active, setActive] = useState<string | null>(null)
-  const scroller = useRef<Scroller>(null)
+  const list = useRef<{ reveal: (index: number) => void }>(null)
   const orderedFamilies = useMemo(
     () =>
       [...families].sort((left, right) =>
@@ -86,79 +105,53 @@ export function FontPicker({
       ),
     [families],
   )
-  const results = useMemo(() => {
-    const normalized = normalizeFontName(query)
-    return orderedFamilies.filter(
-      (family) =>
-        !normalized ||
-        [
-          family.name,
-          ...family.faces.map((face) => face.post_script_name),
-          ...(booharu.localNames?.[family.name] ?? []), // Booharu: its names in other languages.
-        ].some((name) => normalizeFontName(name).includes(normalized)),
-    )
-  }, [orderedFamilies, query, booharu.localNames]) // Booharu: and the local names.
   const selectedFamily = useMemo(
     () =>
       orderedFamilies.find((family) => normalizeFontName(family.name) === normalizeFontName(value)),
     [orderedFamilies, value],
   )
-  // Booharu: the matches, the favourites among them pinned above them, or alone, each with its
-  // first name in another language, after a mount's leading row while nothing is searched.
-  const rows = useMemo(
+  const { only, showOnly } = useFavoriteFonts() // Booharu: its favourites are Booharu's, below.
+  const { favorites } = useBooharuFavoriteFonts() // Booharu: the settings file's.
+  const listed = useMemo(
     () =>
-      fontRows(
-        results,
-        booharu.favorites,
-        booharu.favoritesOnly,
-        booharu.localNames,
-        query ? undefined : booharu.noneLabel,
-      ),
-    [
-      results,
-      booharu.favorites,
-      booharu.favoritesOnly,
-      booharu.localNames,
-      query,
-      booharu.noneLabel,
-    ],
+      only
+        ? orderedFamilies.filter((family) => favorites.includes(normalizeFontName(family.name)))
+        : orderedFamilies,
+    [only, favorites, orderedFamilies],
   )
-  // Booharu: the family the arrows are on, which they move from, skipping the headings and
-  // wrapping around as ModelPicker's do; on a favourite whose pinned row goes, as when it's
-  // unstarred, they stay on its row under All fonts. The leading row is one of them.
-  const options = rows.flatMap((row, index) => ('heading' in row ? [] : [index]))
-  const found = activeRow(rows, active)
-  const shown = found >= 0 ? found : (options[0] ?? -1)
-  const shownRow = rows.at(shown)
-  const shownFamily = shownRow && 'family' in shownRow ? shownRow.family : undefined
-  const shownNone = shownRow && 'none' in shownRow ? shownRow.none : undefined
-  const move = (by: number) => {
-    if (!options.length) return
-    const next = options[(options.indexOf(shown) + by + options.length) % options.length]
-    setActive(rows[next].key)
-    // The first family brings the list's top into view, with the heading above it.
-    scroller.current?.scrollToIndex(next === options[0] ? 0 : next, { align: 'auto' })
-  }
-  const pick = (family: string) => {
-    onChange(family)
-    setOpen(false)
-  }
+  // Booharu: the leading row, then the favourites pinned above every family, unless only they show.
+  const items = useMemo(
+    () => fontItems(listed, only ? [] : favorites, booharu.noneLabel),
+    [listed, only, favorites, booharu.noneLabel],
+  )
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next)
-        if (!next) setQuery('')
-        // Booharu: the arrows start from the font in use, pinned or not.
-        const current = rows.find(
-          (row) =>
-            'family' in row && normalizeFontName(row.family.name) === normalizeFontName(value),
-        )
-        if (next) setActive(current?.key ?? null)
+    <Combobox<FontFamily>
+      virtualized
+      items={items} // Booharu: with the leading row and the pinned favourites.
+      value={selectedFamily ?? leadingItem(items, value) ?? null} // Booharu: or the leading row.
+      inputValue={query}
+      disabled={disabled}
+      itemToStringLabel={(family) => family.name}
+      isItemEqualToValue={(family, other) =>
+        normalizeFontName(family.name) === normalizeFontName(other.name)
+      }
+      filter={(family, text) => {
+        const normalized = normalizeFontName(text)
+        return [
+          family.name,
+          ...family.faces.map((face) => face.post_script_name),
+          ...(booharu.localNames?.[family.name] ?? []), // Booharu: its names in other languages.
+        ].some((name) => normalizeFontName(name).includes(normalized))
+      }}
+      onInputValueChange={setQuery}
+      onOpenChange={(open) => !open && setQuery('')}
+      onValueChange={(family) => family && onChange(family.name)}
+      onItemHighlighted={(_, { reason, index }) => {
+        if (reason === 'keyboard') list.current?.reveal(index)
       }}
     >
-      <PopoverTrigger
+      <ComboboxTrigger
         render={
           <Button
             variant='outline'
@@ -166,11 +159,10 @@ export function FontPicker({
             className='w-full min-w-0 justify-between font-normal'
           />
         }
-        disabled={disabled}
         aria-label={ariaLabel}
         data-testid='type-font-picker'
         className={cn(
-          'w-full min-w-0 justify-between font-normal',
+          'w-full min-w-0 justify-between font-normal [&>svg:last-child]:size-3.5',
           size === 'sm' ? 'h-6 gap-1 px-1.5 text-[11px]' : 'h-8 gap-2 px-2.5 text-[12px]',
         )}
       >
@@ -180,276 +172,205 @@ export function FontPicker({
             className='min-w-0 flex-1 py-1 [&>img]:max-h-3.5'
           />
         ) : (
-          // Booharu: the leading row's label, which an empty value stands for.
-          <span className='truncate'>
+          // Booharu: or the leading row's label, which an empty value stands for, not muted.
+          <span
+            className={cn(
+              'truncate',
+              !value && booharu.noneLabel === undefined && 'text-muted-foreground',
+            )}
+          >
             {value || booharu.noneLabel || placeholder || t('fontPicker.choose')}
           </span>
         )}
-        <ChevronDown className='size-3.5 shrink-0 text-muted-foreground' />
-      </PopoverTrigger>
-      <PopoverContent
-        align='start'
-        className='w-(--anchor-width) min-w-44 gap-0 overflow-hidden rounded-lg p-0'
-        initialFocus={input}
-      >
-        <div className='border-b p-1'>
-          <InputGroup className='h-6 border-0 bg-muted/50 shadow-none focus-within:bg-background has-[>[data-align=inline-start]]:[&>input]:pl-0'>
-            <InputGroupAddon className='pr-1 pl-1.5'>
-              <Search className='size-3' />
-            </InputGroupAddon>
-            <InputGroupInput
-              ref={input}
-              value={query}
-              aria-label={t('fontPicker.search')}
-              placeholder={t('fontPicker.search')}
-              className='h-6 px-0 text-[11px]'
-              onChange={(event) => {
-                setQuery(event.currentTarget.value)
-                setActive(null) // Booharu: the arrows start again from the first match.
-              }}
-              // Booharu: a combobox whose arrows move through the families and whose Enter picks
-              // one, but not while an IME is composing, whose candidates they choose.
-              role='combobox'
-              aria-expanded={open}
-              aria-autocomplete='list'
-              aria-controls={`${id}-fonts`}
-              aria-activedescendant={
-                shownFamily || shownNone !== undefined ? `${id}-${shown}` : undefined
+      </ComboboxTrigger>
+      <ComboboxContent className='w-(--anchor-width) min-w-44'>
+        <div className='flex items-center gap-1 border-b p-1'>
+          <div className='min-w-0 flex-1'>
+            <PickerSearch
+              query={query}
+              label={t('fontPicker.search')}
+              onClear={() => setQuery('')}
+            />
+          </div>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Toggle
+                  size='sm'
+                  aria-label={t('fontPicker.favoritesOnly')}
+                  pressed={only}
+                  onPressedChange={showOnly}
+                  // The search line keeps the keys, so the arrows still move through the list.
+                  onMouseDown={(event) => event.preventDefault()}
+                  className='size-7 shrink-0 px-0 text-muted-foreground aria-pressed:bg-transparent aria-pressed:text-primary aria-pressed:hover:bg-muted'
+                />
               }
-              onKeyDown={(event) => {
-                if (event.nativeEvent.isComposing) return
-                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                  event.preventDefault()
-                  move(event.key === 'ArrowDown' ? 1 : -1)
-                } else if (event.key === 'Enter' && (shownFamily || shownNone !== undefined)) {
-                  event.preventDefault()
-                  pick(shownFamily?.name ?? '') // The leading row stands for no family.
-                }
-              }}
-            />
-            {query && (
-              <InputGroupAddon align='inline-end' className='gap-0.5 pr-0.5'>
-                <InputGroupButton aria-label={t('common.clearSearch')} onClick={() => setQuery('')}>
-                  <X />
-                </InputGroupButton>
-              </InputGroupAddon>
-            )}
-            {/* Booharu: the switch that shows only the favourites. */}
-            <FavoritesOnlySwitch booharu={booharu} search={input} />
-          </InputGroup>
+            >
+              <Star className={cn('size-3.5', only && 'fill-current')} />
+            </TooltipTrigger>
+            <TooltipContent>{t('fontPicker.favoritesOnly')}</TooltipContent>
+          </Tooltip>
         </div>
-        {/* Booharu: the count, and the family the arrows are on in its own face, read out as they
-            change. */}
-        <div
-          role='status'
-          className='flex h-6 items-center justify-between gap-2 px-2 text-[9px] text-muted-foreground'
+        <ComboboxEmpty className='py-4'>
+          {only && favorites.length === 0 ? t('fontPicker.noFavorites') : t('fontPicker.noResults')}
+        </ComboboxEmpty>
+        <ComboboxList
+          aria-label={t('fontPicker.fonts')}
+          className='max-h-none overflow-visible p-0'
         >
-          <span className='shrink-0'>
-            {t('fontPicker.fontCount', {
-              count: booharu.favoritesOnly
-                ? rows.filter((row) => 'family' in row).length
-                : results.length,
-            })}
-          </span>
-          {shownFamily && (
-            <FontPreviewLabel
-              family={shownFamily}
-              className='min-w-0 justify-end [&>img]:max-h-3.5 [&>img]:object-right'
-            />
-          )}
-          {shownNone !== undefined && <span className='min-w-0 truncate'>{shownNone}</span>}
-        </div>
-        <Separator />
-        {/* Booharu: the list takes the rows, the family the arrows are on, which it marks and
-            scrolls to, and the favourites, and opens afresh when Favorites only changes too. */}
-        {open && (
+          {/* Anew for each query, so a filtered list starts at its top. */}
           <FontList
-            key={`${booharu.favoritesOnly ?? false}:${query}`}
-            id={id}
-            rows={rows}
-            value={value}
-            active={shown}
-            scroller={scroller}
-            onActive={setActive}
-            onSelect={pick}
-            booharu={{ ...booharu, search: input, searched: query !== '' }}
+            key={query}
+            selected={value}
+            ref={list}
+            localNames={booharu.localNames} // Booharu: on the families' rows.
           />
-        )}
-      </PopoverContent>
-    </Popover>
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   )
 }
 
+/** The matches, how many, then each in its own face behind its favorite star, opening on
+ * `selected`. Only the rows in view exist, as a system can hold thousands of families; `reveal`
+ * scrolls to a match the keyboard reaches. */
 function FontList({
-  id,
-  rows,
-  value,
-  active,
-  scroller,
-  onActive,
-  onSelect,
-  booharu,
+  selected,
+  ref,
+  localNames,
 }: {
-  /** Booharu: names the list and its options, for the search line's active descendant. */
-  id: string
-  /** Booharu: the families, under their sections' headings when there are favourites. */
-  rows: FontRow[]
-  value: string
-  /** Booharu: the family the arrows are on, which the list opens on and marks and `scroller`
-   * scrolls to; `onActive` moves it to the family the pointer or the focus is on, by its row's
-   * key. */
-  active: number
-  scroller: Ref<Scroller>
-  onActive: (key: string) => void
-  onSelect: (family: string) => void
-  /** Booharu: the favourites, the search line, which a star gives the focus back to, and whether
-   * anything is searched. */
-  booharu: BooharuListProps
+  selected: string
+  ref: Ref<{ reveal: (index: number) => void }>
+  /** Booharu: the names each family goes by in other languages, the first shown on its row. */
+  localNames?: BooharuFontProps['localNames']
 }) {
   const { t } = useTranslation()
-  const list = useRef<HTMLDivElement>(null)
-  // Booharu: rows of two heights, keyed by their rows, opening on the family the arrows are on.
+  // Booharu: with the leading row and the pinned favourites.
+  const families = useComboboxFilteredItems<FontItem>()
+  const { favorites, toggle } = useBooharuFavoriteFonts() // Booharu: the settings file's.
+  // Booharu: the sections' headings, each over its first row, which is taller by it.
+  const headings = fontHeadings(families)
+  const selectedIndex = families.findIndex(
+    (family) => normalizeFontName(family.name) === normalizeFontName(selected),
+  )
+  const viewport = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => list.current,
-    getItemKey: (index) => rows[index]?.key ?? index,
-    estimateSize: (index) => height(rows[index]),
+    count: families.length,
+    getScrollElement: () => viewport.current,
+    getItemKey: (index) =>
+      // Booharu: a pinned favourite's key and the leading row's differ from the families'.
+      fontItemKey(families[index], normalizeFontName(families[index]?.name ?? String(index))),
+    // Booharu: a row under a heading is taller by it.
+    estimateSize: (index) => rowHeight + (headings.has(index) ? headingHeight : 0),
     overscan: 6,
     initialOffset: Math.max(
       0,
-      rows.slice(0, Math.max(active, 0)).reduce((top, row) => top + height(row), 0) -
-        Math.floor((listHeight / rowHeight - 1) / 2) * rowHeight,
+      selectedIndex * rowHeight -
+        Math.floor((listHeight / rowHeight - 1) / 2) * rowHeight +
+        // Booharu: and the headings above the chosen family.
+        [...headings.keys()].filter((index) => index < selectedIndex).length * headingHeight,
     ),
     initialRect: { width: 240, height: listHeight },
     observeElementRect: (instance, callback) =>
       observeElementRect(instance, (rect) =>
         callback({ width: rect.width || 240, height: rect.height || listHeight }),
       ),
-    // Booharu: the family the arrows are on stays in the list out of view too, so the search
-    // line's active descendant is always there.
-    rangeExtractor: (range) => {
-      const shown = defaultRangeExtractor(range)
-      return active < 0 || active >= range.count || shown.includes(active)
-        ? shown
-        : [...shown, active].sort((left, right) => left - right)
-    },
   })
-  useImperativeHandle(scroller, () => virtualizer, [virtualizer]) // Booharu: the arrows' scrolling.
-  // Booharu: whether no family matches, and the leading row's height above what says so.
-  const noFamilies = !rows.some((row) => 'family' in row)
-  const lead = rows[0] && 'none' in rows[0] ? rowHeight : 0
 
+  useImperativeHandle(ref, () => ({
+    reveal: (index) => virtualizer.scrollToIndex(index, { align: 'auto' }),
+  }))
+
+  if (families.length === 0) return null
   return (
-    <ScrollArea
-      viewportRef={list}
-      role='listbox'
-      id={`${id}-fonts`} // Booharu: the list the search line controls.
-      aria-label={t('fontPicker.fonts')}
-      className='relative'
-      viewportClassName='overflow-x-hidden'
-      // Booharu: as tall as its rows, which are of two heights, or as the leading row and what
-      // says no family matches.
-      style={{
-        height: noFamilies
-          ? lead + rowHeight * 2
-          : Math.min(listHeight, Math.max(rowHeight, virtualizer.getTotalSize())),
-      }}
-    >
-      <div className='relative' style={{ height: virtualizer.getTotalSize() }}>
-        {virtualizer.getVirtualItems().map((virtualRow) => {
-          // Booharu: a row, a family's or a section's heading.
-          const row = rows[virtualRow.index]
-          if (!row) return null
-          // Booharu: a section's heading, which the arrows skip.
-          if ('heading' in row) {
-            return <FontHeading key={virtualRow.key} heading={row.heading} top={virtualRow.start} />
-          }
-          // Booharu: the leading row, which stands for no family.
-          if ('none' in row) {
-            return (
-              <NoneOption
-                key={virtualRow.key}
-                id={`${id}-${virtualRow.index}`}
-                label={row.none}
-                top={virtualRow.start}
-                chosen={!value}
-                active={virtualRow.index === active}
-                onActive={() => onActive(row.key)}
-                onSelect={() => onSelect('')}
-              />
-            )
-          }
-          const family = row.family
-          const selected = normalizeFontName(family.name) === normalizeFontName(value)
-          // Booharu: the family's option, which its star follows.
-          const option = (
-            <button
-              key={virtualRow.key}
-              type='button'
-              role='option'
-              aria-label={family.name}
-              aria-selected={selected}
-              // Booharu: the family the arrows are on is marked, and the one in use checked, as
-              // ModelPicker marks and checks its models.
-              id={`${id}-${virtualRow.index}`}
-              data-active={virtualRow.index === active}
-              className={cn(
-                'absolute inset-x-0 top-0 flex h-9.5 w-full items-center gap-2 px-2 text-left focus-visible:outline-none data-[active=true]:bg-accent data-[active=true]:text-accent-foreground',
-                booharu.onToggleFavorite && 'pr-9', // Booharu: room for the star.
-              )}
-              style={{ transform: `translateY(${virtualRow.start}px)` }}
-              // Booharu: only the pointer's own moves move the mark, as in ModelPicker: rows
-              // passing under a still pointer as the list scrolls move nothing.
-              onPointerMove={(event) => {
-                if (event.movementX || event.movementY) onActive(row.key)
-              }}
-              onFocus={() => onActive(row.key)}
-              onClick={() => onSelect(family.name)}
-            >
-              <div className='flex min-w-0 flex-1 flex-col justify-center gap-px'>
-                <FontPreviewLabel family={family} className='h-4.5 w-full min-w-0' />
-                <span className='min-w-0 truncate text-[8px] leading-none text-muted-foreground'>
-                  {family.name}
-                  {/* Booharu: its first name in another language, muted, as 0.0.4 showed it. */}
-                  {row.localName && <span className='ml-1 opacity-70'>{row.localName}</span>}
-                </span>
-              </div>
-              {selected && <Check className='size-3.5 shrink-0' />}
-            </button>
-          )
-          // Booharu: its star right after it, over its row's end.
-          return (
-            <WithFavoriteStar
-              key={virtualRow.key}
-              option={option}
-              row={row}
-              top={virtualRow.start}
-              booharu={booharu}
-              onActive={onActive}
-            />
-          )
-        })}
+    <>
+      <div className='flex h-6 items-center px-2 text-[9px] text-muted-foreground'>
+        {/* Booharu: the families, the pinned favourites' copies and the leading row left out. */}
+        {t('fontPicker.fontCount', { count: familyCount(families) })}
       </div>
-      {/* Booharu: under the leading row, when there is one. */}
-      {noFamilies && (
-        <Empty
-          role='status'
-          className='absolute inset-1 rounded-md p-2'
-          style={lead ? { top: lead } : undefined}
-        >
-          <EmptyTitle className='text-[11px] text-muted-foreground'>
-            {/* Booharu: how to star a font, when only the favourites show and there are none, and
-                that Favorites only hides the other fonts, when none of them is here and nothing
-                is searched. */}
-            {booharu.favoritesOnly && !booharu.favorites?.length
-              ? t('booharu.fonts.noFavorites')
-              : booharu.favoritesOnly && !booharu.searched
-                ? t('booharu.fonts.noFavoritesHere')
-                : t('fontPicker.noResults')}
-          </EmptyTitle>
-        </Empty>
-      )}
-    </ScrollArea>
+      <Separator />
+      <ScrollArea
+        viewportRef={viewport}
+        className='relative'
+        viewportClassName='overflow-x-hidden'
+        // Booharu: as tall as its rows, some taller by a heading.
+        style={{ height: Math.min(listHeight, virtualizer.getTotalSize()) }}
+      >
+        <div className='relative' style={{ height: virtualizer.getTotalSize() }}>
+          {/* Booharu: the sections' headings over the rows in view. */}
+          <FontHeadings rows={virtualizer.getVirtualItems()} headings={headings} />
+          {virtualizer.getVirtualItems().map((row) => {
+            const family = families[row.index]
+            if (!family) return null
+            // Booharu: the leading row, which stands for no family.
+            if (family.none !== undefined) {
+              return (
+                <NoneOption
+                  key={row.key}
+                  index={row.index}
+                  item={family}
+                  count={families.length}
+                  top={row.start}
+                />
+              )
+            }
+            const favorite = favorites.includes(normalizeFontName(family.name))
+            const localName = localNames?.[family.name]?.[0] // Booharu: its first other name.
+            return (
+              <ComboboxItem
+                key={row.key}
+                index={row.index}
+                value={family}
+                aria-label={family.name}
+                aria-setsize={families.length}
+                aria-posinset={row.index + 1}
+                // The chosen family shows in the accent, as a bar's lists show their chosen item,
+                // with no tick. Base UI marks it with a bare `data-selected`, which shadcn's
+                // `data-selected:` variant, written for `="true"`, doesn't match. Its right is as
+                // wide as the star's strip and gaps on its left, so the face sits between even
+                // margins.
+                className='group/font absolute inset-x-0 top-0 h-9.5 gap-1 rounded-none pr-5.5 pl-1 data-[selected]:bg-accent data-[selected]:text-accent-foreground data-[selected]:**:text-accent-foreground [&>span]:hidden!'
+                // Booharu: below its section's heading, when it has one.
+                style={{
+                  transform: `translateY(${row.start + (headings.has(row.index) ? headingHeight : 0)}px)`,
+                }}
+              >
+                {/* Starred with the pointer, as in Photoshop's font menu; its click stops here, so
+                    it doesn't pick the family, and the item keeps focus on the search line. */}
+                <button
+                  type='button'
+                  tabIndex={-1}
+                  aria-pressed={favorite}
+                  aria-label={t(favorite ? 'fontPicker.removeFavorite' : 'fontPicker.addFavorite', {
+                    name: family.name,
+                  })}
+                  className={cn(
+                    'grid w-3.5 shrink-0 place-items-center self-stretch text-muted-foreground hover:text-foreground',
+                    favorite
+                      ? 'text-primary'
+                      : 'opacity-0 group-hover/font:opacity-100 group-data-highlighted/font:opacity-100',
+                  )}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    toggle(family.name)
+                  }}
+                >
+                  <Star className={cn('size-3', favorite && 'fill-current')} />
+                </button>
+                <div className='flex min-w-0 flex-1 flex-col justify-center gap-px'>
+                  <FontPreviewLabel family={family} className='h-4.5 w-full min-w-0' />
+                  <span className='min-w-0 truncate text-[8px] leading-none text-muted-foreground'>
+                    {family.name}
+                    {/* Booharu: its first name in another language, muted, as 0.0.4 showed it. */}
+                    {localName && <span className='ml-1 opacity-70'>{localName}</span>}
+                  </span>
+                </div>
+              </ComboboxItem>
+            )
+          })}
+        </div>
+      </ScrollArea>
+    </>
   )
 }
 

@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next'
 
 import { readingChoices } from '@/components/booharu/context/ReadingModelPicker'
 import { ModelPicker } from '@/components/controls/ModelPicker'
-import { vendorName } from '@/components/preferences/models'
 import { PreferenceRow, PreferenceSection } from '@/components/preferences/PreferenceFields'
 import { useBooharuPreferences } from '@/lib/booharu/preferences'
 import {
@@ -18,8 +17,9 @@ import {
   saveReading,
   type Reading,
 } from '@/lib/booharu/reading'
-import { useKoharuStore } from '@/lib/store'
-import { modelName, vendorOf } from '@/lib/translation'
+import { modelName, vendorOf } from '@/lib/models'
+import { useModels, usePreferences } from '@/lib/queries'
+import { vendorName } from '@/lib/vendors'
 import type { CantRead } from '@koharu/ipc/protocol'
 import { Badge } from '@koharu/ui/components/badge'
 import { Button } from '@koharu/ui/components/button'
@@ -141,10 +141,8 @@ function ReadingModel({
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const models = useKoharuStore((state) => state.models)
-  const translation = useKoharuStore(
-    (state) => state.preferences?.pipeline.translator?.model ?? null,
-  )
+  const models = useModels().data ?? []
+  const translation = usePreferences().data?.pipeline.translator?.model ?? null
   const choose = (model: string | null) => {
     setOpen(false)
     if (model !== value) onChange(model)
@@ -179,7 +177,7 @@ function ReadingModel({
         <PopoverContent
           align='start'
           sideOffset={4}
-          className='w-(--anchor-width) min-w-64 gap-0 overflow-hidden rounded-xl border border-border/50 p-1 shadow-sm ring-0'
+          className='w-(--anchor-width) min-w-64 gap-0 overflow-hidden p-1'
         >
           <Button
             type='button'

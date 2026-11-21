@@ -181,6 +181,33 @@ describe('Booharu number box wheel (D29)', () => {
     expect(commit).toHaveBeenCalledTimes(3)
   })
 
+  it("sends a waiting burst, or a typed value, once as Koharu's Enter leaves the box", () => {
+    const { change, commit, input } = renderField()
+    act(() => input.focus())
+
+    wheelUp(input)
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(input).not.toHaveFocus()
+    expect(change).toHaveBeenCalledExactlyOnceWith(
+      10.5,
+      expect.objectContaining({ reason: 'wheel' }),
+    )
+    expect(commit).toHaveBeenCalledExactlyOnceWith(
+      10.5,
+      expect.objectContaining({ reason: 'wheel' }),
+    )
+
+    act(() => input.focus())
+    fireEvent.change(input, { target: { value: '12' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(input).not.toHaveFocus()
+    expect(change).toHaveBeenLastCalledWith(12, expect.anything())
+    expect(commit).toHaveBeenCalledTimes(2)
+    expect(commit).toHaveBeenLastCalledWith(12, expect.objectContaining({ reason: 'input-blur' }))
+    act(() => vi.advanceTimersByTime(400))
+    expect(commit).toHaveBeenCalledTimes(2)
+  })
+
   it('sends a waiting burst before a change by the keys, to the latest callbacks', () => {
     const { change, commit, input, view } = renderField()
     act(() => input.focus())

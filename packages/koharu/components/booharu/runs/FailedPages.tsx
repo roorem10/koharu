@@ -106,17 +106,14 @@ export function FailedPages({ job }: { job: Job }) {
   )
 }
 
-/** Retrying (2/3) under a running run's row while one of its pages waits for its next try: the
- * try the page that waited last waits for, of its tries. */
+/** Retrying (2/3) under a running run's bar while one of its pages waits for its next try: the try
+ * the page that waited last waits for, of its tries. */
 export function RetryingNote({ job }: { job: Job }) {
   const { t } = useTranslation()
   const retry = job.booharu?.retrying.at(-1)
   if (!retry) return null
   return (
-    <p
-      role='status'
-      className='col-start-2 col-end-4 mt-0.5 truncate text-[10px] text-muted-foreground'
-    >
+    <p role='status' className='mt-1.5 truncate text-[10px] text-muted-foreground'>
       {t('booharu.runs.retrying', { attempt: retry.attempt, attempts: retry.attempts })}
     </p>
   )

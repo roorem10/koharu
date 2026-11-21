@@ -169,7 +169,9 @@ describe('Booharu emphasis settings', () => {
     expect(region.getByRole('textbox', { name: WEIGHT })).toHaveValue('700')
     expect(region.getByRole('textbox', { name: SIZE })).toHaveValue('115')
     // What the default leaves unset uses the box's style.
-    expect(region.getByRole('button', { name: 'Emphasis font' })).toHaveTextContent('Use box style')
+    expect(region.getByRole('combobox', { name: 'Emphasis font' })).toHaveTextContent(
+      'Use box style',
+    )
     expect(shown(region.getByRole('combobox', { name: 'Emphasis italic' }))).toBe('Use box style')
     expect(region.getByRole('textbox', { name: 'Emphasis outline width' })).toHaveAttribute(
       'placeholder',
@@ -201,7 +203,7 @@ describe('Booharu emphasis settings', () => {
     await waitFor(() => expect(ai).not.toBeChecked())
     expect(region.getByRole('textbox', { name: SIZE })).toHaveValue('150')
 
-    await user.click(region.getByRole('button', { name: 'Emphasis font' }))
+    await user.click(region.getByRole('combobox', { name: 'Emphasis font' }))
     const list = await screen.findByRole('listbox', { name: 'Fonts' })
     expect(
       within(list)
@@ -336,7 +338,7 @@ describe('Booharu emphasis settings', () => {
     await waitFor(() => expect(saves).toHaveLength(3))
     expect(savedEmphasis(saves)[2].default?.italic).toBeNull()
 
-    await user.click(region.getByRole('button', { name: 'Emphasis font' }))
+    await user.click(region.getByRole('combobox', { name: 'Emphasis font' }))
     await user.click(await screen.findByRole('option', { name: 'Use box style' }))
     await waitFor(() => expect(saves).toHaveLength(4))
     expect(savedEmphasis(saves)[3].default).toEqual(style({ size_factor: 1.15 }))
@@ -349,7 +351,7 @@ describe('Booharu emphasis settings', () => {
       'placeholder',
       'Same as default',
     )
-    expect(region.getByRole('button', { name: 'Emphasis font' })).toHaveTextContent(
+    expect(region.getByRole('combobox', { name: 'Emphasis font' })).toHaveTextContent(
       'Same as default',
     )
 

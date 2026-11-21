@@ -3,8 +3,8 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
 
-import { dispatch } from '@/lib/backend'
 import { CANVAS_PRESS } from '@/lib/booharu/wordSelection'
+import { send } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import { commands, events, type BooharuBoxMenu } from '@koharu/ipc/protocol'
 
@@ -50,7 +50,7 @@ export function closeBoxMenu(): void {
 export function dismissBoxMenu(): void {
   if (!useBoxMenu.getState().shown) return
   useBoxMenu.setState({ shown: null })
-  dispatch(commands.booharuCanvasKeys)
+  send(commands.booharuCanvasKeys)
 }
 
 /** Opens the box menu at each right-click on a box the desktop tells of while the editor shows,

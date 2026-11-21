@@ -39,6 +39,7 @@ export function useTextEffects(page: PageId | null | undefined) {
     queryFn: () => commands.booharuTextEffects(page ?? ''),
     enabled: !!page,
     select: byLayer,
+    meta: { booharuQuiet: true },
   })
 }
 

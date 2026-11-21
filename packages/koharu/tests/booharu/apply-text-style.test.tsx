@@ -25,7 +25,9 @@ function openProject() {
   const project: ProjectView = {
     name: 'Demo',
     page: 'page',
-    pages: [{ id: 'page', size: { width: 800, height: 1200 }, background: null }],
+    pages: [
+      { id: 'page', size: { width: 800, height: 1200 }, background: null, texts: 0, translated: 0 },
+    ],
     history: { steps: [], current: 0 },
     revisions: {},
   }

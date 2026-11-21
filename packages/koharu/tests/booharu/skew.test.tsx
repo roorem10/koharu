@@ -8,7 +8,7 @@ import { commands, type SkewCounts, type TextEffects, type Typed } from '@koharu
 import { toast } from '@koharu/ui/components/toast'
 
 import { block } from './boxes'
-import { renderBar, styled, text } from './typeBar'
+import { renderBar, settled, styled, text } from './typeBar'
 
 type User = ReturnType<typeof userEvent.setup>
 
@@ -47,7 +47,7 @@ function typing(layer: string | null = 'one'): Typed {
 describe('Booharu Skew in Text effects (S12-k)', () => {
   it('shows the skew the boxes share along each axis, and Mixed where they differ', async () => {
     skewed({ one: { x: 20, y: -5 }, two: { x: 20, y: 10 } })
-    const { user } = renderBar([styled('one', {}), styled('two', {})])
+    const { user } = await renderBar([styled('one', {}), styled('two', {})])
 
     const skew = await openSkew(user)
 
@@ -61,9 +61,12 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
 
   it('shows 0 for boxes with no skew, a block with no translation left out', async () => {
     skewed({ one: { x: 12.5, y: 0 } })
-    const { user } = renderBar([styled('one', {}), styled('two', {}), block('first', 'やあ')], {
-      selected: ['two', 'first'],
-    })
+    const { user } = await renderBar(
+      [styled('one', {}), styled('two', {}), block('first', 'やあ')],
+      {
+        selected: ['two', 'first'],
+      },
+    )
 
     const skew = await openSkew(user)
 
@@ -75,7 +78,7 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
     skewed({ one: { x: 12.5, y: 0 } })
     // Blank point text with the size it was given, as the type bar leaves it.
     const placeholder = { content: [], style: { chars: { size: 30 } }, frame: 'point' }
-    const { user } = renderBar([
+    const { user } = await renderBar([
       styled('one', {}),
       block('first', 'やあ', { translation: placeholder }),
     ])
@@ -88,7 +91,7 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
 
   it('shows angles that show alike as one, to the thousandth', async () => {
     skewed({ one: { x: 19.9999999, y: 0 }, two: { x: 20.0000001, y: -0.0000001 } })
-    const { user } = renderBar([styled('one', {}), styled('two', {})])
+    const { user } = await renderBar([styled('one', {}), styled('two', {})])
 
     const skew = await openSkew(user)
 
@@ -96,9 +99,9 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
     expect(skew.getByRole('textbox', { name: 'Vertical (°)' })).toHaveValue('0')
   })
 
-  it('presses the fx button while a box shows a skew', () => {
+  it('presses the fx button while a box shows a skew', async () => {
     skewed({ two: { x: 0, y: 15 } })
-    const { bar } = renderBar([styled('one', {}), styled('two', {})])
+    const { bar } = await renderBar([styled('one', {}), styled('two', {})])
 
     expect(bar.getByRole('button', { name: 'Text effects' })).toHaveAttribute(
       'aria-pressed',
@@ -106,9 +109,9 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
     )
   })
 
-  it('leaves the fx button up for boxes with no skew or gradient', () => {
+  it('leaves the fx button up for boxes with no skew or gradient', async () => {
     skewed({ other: { x: 10, y: 0 } })
-    const { bar } = renderBar([styled('one', {})])
+    const { bar } = await renderBar([styled('one', {})])
 
     expect(bar.getByRole('button', { name: 'Text effects' })).toHaveAttribute(
       'aria-pressed',
@@ -118,21 +121,42 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
 
   it('sends a typed Horizontal angle on Enter for that axis alone, once', async () => {
     skewed({ one: { x: 20, y: -5 }, two: { x: 0, y: 10 } })
-    const { user } = renderBar([styled('one', {}), styled('two', {})])
+    const { user } = await renderBar([styled('one', {}), styled('two', {})])
     answers({ changed: 2 })
 
     const field = (await openSkew(user)).getByRole('textbox', { name: 'Horizontal (°)' })
     await user.type(field, '15{Enter}')
     fireEvent.blur(field)
 
+    await settled()
     expect(commands.booharuSetSkew).toHaveBeenCalledExactlyOnceWith(['one', 'two'], 15, null)
     // The angle sent shows until the page's effects are read again.
     expect(field).toHaveValue('15')
   })
 
+  it('leaves the Enter ending an IME’s composing be, as Koharu’s number boxes do', async () => {
+    skewed({ one: { x: 20, y: -5 } })
+    const { user } = await renderBar([styled('one', {})])
+    answers({ changed: 1 })
+
+    const field = (await openSkew(user)).getByRole('textbox', { name: 'Horizontal (°)' })
+    await user.clear(field)
+    await user.type(field, '15')
+    fireEvent.keyDown(field, { key: 'Enter', isComposing: true })
+    await settled()
+    expect(commands.booharuSetSkew).not.toHaveBeenCalled()
+    expect(field).toHaveFocus()
+
+    // Once it's done, Enter sends the angle.
+    fireEvent.keyDown(field, { key: 'Enter' })
+    await waitFor(() =>
+      expect(commands.booharuSetSkew).toHaveBeenCalledExactlyOnceWith(['one'], 15, null),
+    )
+  })
+
   it('sends a typed Vertical angle as the box loses the focus, for that axis alone', async () => {
     skewed({ one: { x: 20, y: -5 } })
-    const { user } = renderBar([styled('one', {})])
+    const { user } = await renderBar([styled('one', {})])
     answers({ changed: 1 })
 
     const field = (await openSkew(user)).getByRole('textbox', { name: 'Vertical (°)' })
@@ -140,24 +164,29 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
     await user.type(field, '-12')
     fireEvent.blur(field)
 
-    expect(commands.booharuSetSkew).toHaveBeenCalledExactlyOnceWith(['one'], null, -12)
+    // The command goes a turn after the box commits.
+    await waitFor(() =>
+      expect(commands.booharuSetSkew).toHaveBeenCalledExactlyOnceWith(['one'], null, -12),
+    )
   })
 
   it('steps by 1 with the arrow keys, each step sent at once', async () => {
     skewed({ one: { x: 20, y: 0 } })
-    const { user } = renderBar([styled('one', {})])
+    const { user } = await renderBar([styled('one', {})])
     answers({ changed: 1 })
 
     const field = (await openSkew(user)).getByRole('textbox', { name: 'Horizontal (°)' })
     fireEvent.keyDown(field, { key: 'ArrowUp' })
 
-    expect(commands.booharuSetSkew).toHaveBeenCalledExactlyOnceWith(['one'], 21, null)
+    await waitFor(() =>
+      expect(commands.booharuSetSkew).toHaveBeenCalledExactlyOnceWith(['one'], 21, null),
+    )
     expect(field).toHaveValue('21')
   })
 
   it('sends nothing for a cleared or unchanged box, which shows the skew again', async () => {
     skewed({ one: { x: 20, y: 0 } })
-    const { user } = renderBar([styled('one', {})])
+    const { user } = await renderBar([styled('one', {})])
 
     const field = (await openSkew(user)).getByRole('textbox', { name: 'Horizontal (°)' })
     await user.clear(field)
@@ -165,12 +194,13 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
     expect(field).toHaveValue('20')
 
     await user.type(field, '{Enter}')
+    await settled()
     expect(commands.booharuSetSkew).not.toHaveBeenCalled()
   })
 
   it('keeps from -60 to 60: a step past an end sends nothing, an angle beyond goes as that end', async () => {
     skewed({ one: { x: 60, y: -60 } })
-    const { user } = renderBar([styled('one', {})])
+    const { user } = await renderBar([styled('one', {})])
     answers({ changed: 1 })
 
     const skew = await openSkew(user)
@@ -180,29 +210,32 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
     fireEvent.keyDown(vertical, { key: 'ArrowDown' })
     expect(horizontal).toHaveValue('60')
     expect(vertical).toHaveValue('-60')
+    await settled()
     expect(commands.booharuSetSkew).not.toHaveBeenCalled()
 
     await user.clear(horizontal)
     await user.type(horizontal, '-75{Enter}')
     fireEvent.blur(horizontal)
 
+    await settled()
     expect(commands.booharuSetSkew).toHaveBeenCalledExactlyOnceWith(['one'], -60, null)
   })
 
   it('takes the skew off along both axes with Reset skew', async () => {
     skewed({ one: { x: 20, y: -5 }, two: { x: 0, y: 10 } })
-    const { user } = renderBar([styled('one', {}), styled('two', {})])
+    const { user } = await renderBar([styled('one', {}), styled('two', {})])
     answers({ changed: 2 })
 
     const skew = await openSkew(user)
     await user.click(skew.getByRole('button', { name: 'Reset skew' }))
 
+    await settled()
     expect(commands.booharuSetSkew).toHaveBeenCalledExactlyOnceWith(['one', 'two'], 0, 0)
   })
 
   it('shows the skew again in place of a typed angle when Reset skew is pressed', async () => {
     skewed({ one: { x: 20, y: 0 } })
-    const { user } = renderBar([styled('one', {})])
+    const { user } = await renderBar([styled('one', {})])
     answers({ changed: 1 })
 
     const skew = await openSkew(user)
@@ -212,6 +245,7 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
     await user.click(skew.getByRole('button', { name: 'Reset skew' }))
 
     // Leaving the box for Reset sent the typed angle first, as the box commits as it loses focus.
+    await settled()
     expect(commands.booharuSetSkew).toHaveBeenCalledTimes(2)
     expect(commands.booharuSetSkew).toHaveBeenNthCalledWith(1, ['one'], 35, null)
     expect(commands.booharuSetSkew).toHaveBeenNthCalledWith(2, ['one'], 0, 0)
@@ -221,7 +255,7 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
 
   it('reports the locked and untranslated boxes it left, showing their skew again', async () => {
     skewed({ one: { x: 20, y: 0 }, two: { x: 20, y: 0 } })
-    const { user } = renderBar([styled('one', {}), styled('two', {}), block('first', 'やあ')])
+    const { user } = await renderBar([styled('one', {}), styled('two', {}), block('first', 'やあ')])
     answers({ locked: 2, untranslated: 1 })
     const shown = vi.spyOn(toast, 'add')
 
@@ -240,20 +274,43 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
       30,
       null,
     )
-    // Nothing changed, so nothing reads the effects again: the box shows their skew at once,
-    // keeping the focus, and its commit as it loses the focus sends nothing.
+    // Nothing changed, so nothing reads the effects again: the box shows their skew at once. Enter
+    // left the box, as Koharu's number boxes leave on Enter, and leaving it sent nothing more.
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Horizontal (°)' })).toHaveValue('20'),
+    )
+    expect(screen.getByRole('textbox', { name: 'Horizontal (°)' })).not.toHaveFocus()
+    await settled()
+    expect(commands.booharuSetSkew).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the focus in a box whose arrow step changed nothing, showing the skew again', async () => {
+    skewed({ one: { x: 20, y: 0 } })
+    const { user } = await renderBar([styled('one', {})])
+    answers({ locked: 1 })
+
+    const field = (await openSkew(user)).getByRole('textbox', { name: 'Horizontal (°)' })
+    await user.click(field)
+    await user.keyboard('{ArrowUp}')
+
+    await waitFor(() =>
+      expect(commands.booharuSetSkew).toHaveBeenCalledExactlyOnceWith(['one'], 21, null),
+    )
+    // The locked box kept its skew, which the box shows again, keeping the focus for the next
+    // step; its commit as it loses the focus sends nothing.
     await waitFor(() =>
       expect(screen.getByRole('textbox', { name: 'Horizontal (°)' })).toHaveValue('20'),
     )
     const fresh = screen.getByRole('textbox', { name: 'Horizontal (°)' })
     expect(fresh).toHaveFocus()
     fireEvent.blur(fresh)
+    await settled()
     expect(commands.booharuSetSkew).toHaveBeenCalledOnce()
   })
 
   it('reports a locked box alone in its own words', async () => {
     skewed({})
-    const { user } = renderBar([styled('one', {})])
+    const { user } = await renderBar([styled('one', {})])
     answers({ locked: 1 })
     const shown = vi.spyOn(toast, 'add')
 
@@ -269,7 +326,7 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
 
   it('reports untranslated boxes alone in their own words', async () => {
     skewed({})
-    const { user } = renderBar([block('first', 'やあ'), block('second', 'よう')])
+    const { user } = await renderBar([block('first', 'やあ'), block('second', 'よう')])
     answers({ untranslated: 2 })
     const shown = vi.spyOn(toast, 'add')
 
@@ -285,7 +342,7 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
 
   it('reports nothing when every box took the skew', async () => {
     skewed({})
-    const { user } = renderBar([styled('one', {})])
+    const { user } = await renderBar([styled('one', {})])
     answers({ changed: 1 })
     const shown = vi.spyOn(toast, 'add')
 
@@ -297,7 +354,7 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
 
   it('is off while the canvas types, saying to press Done first', async () => {
     skewed({ one: { x: 20, y: 0 } })
-    const { user } = renderBar([text('one')], { typing: typing() })
+    const { user } = await renderBar([text('one')], { typing: typing() })
 
     const skew = await openSkew(user)
 
@@ -313,7 +370,7 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
   })
 
   it('is off for a new text being typed, which has no box yet', async () => {
-    const { user } = renderBar([], { typing: typing(null), selected: [] })
+    const { user } = await renderBar([], { typing: typing(null), selected: [] })
 
     const skew = await openSkew(user)
 
@@ -324,7 +381,7 @@ describe('Booharu Skew in Text effects (S12-k)', () => {
 
   it('says nothing over the section while it is on, Reset skew naming itself', async () => {
     skewed({})
-    const { user } = renderBar([styled('one', {})])
+    const { user } = await renderBar([styled('one', {})])
 
     const skew = await openSkew(user)
     await user.hover(skew.getByRole('button', { name: 'Reset skew' }))

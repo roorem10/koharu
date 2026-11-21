@@ -20,6 +20,7 @@
     "borders": {
       "decreaseSecondBorderWidth": "Уменьшить ширину второй обводки",
       "increaseSecondBorderWidth": "Увеличить ширину второй обводки",
+      "more": "Другие параметры обводки",
       "outlineContour": "Контурная обводка",
       "outlineExpansion": "Расширение",
       "outlineMethod": "Способ обводки",
@@ -366,13 +367,8 @@
       "weight": "Насыщенность"
     },
     "fonts": {
-      "addFavorite": "Добавить {{family}} в избранное",
       "allFonts": "Все шрифты",
-      "favorites": "Избранное",
-      "favoritesOnly": "Только избранное",
-      "noFavorites": "Добавьте шрифты в избранное, чтобы они появились здесь",
-      "noFavoritesHere": "Здесь нет доступных избранных шрифтов. Отключите «Только избранное», чтобы увидеть все шрифты.",
-      "removeFavorite": "Удалить {{family}} из избранного"
+      "favorites": "Избранное"
     },
     "lettering": {
       "auto": "Подбирать шрифты автоматически",
@@ -457,6 +453,7 @@
     "menu": {
       "booharuGithub": "Booharu на GitHub",
       "koharuDiscord": "Discord Koharu",
+      "koharuDonate": "Поддержать Koharu",
       "koharuGithub": "Koharu на GitHub"
     },
     "notice": {

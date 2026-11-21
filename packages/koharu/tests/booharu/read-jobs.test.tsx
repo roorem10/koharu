@@ -6,8 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ActivityCenter } from '@/components/editor/ActivityCenter'
 import { CanvasCommandBar } from '@/components/editor/CanvasCommandBar'
 import { receiveBooharuJob, useBooharuJobEvents, useBooharuJobs } from '@/lib/booharu/booharuJobs'
-import { queryClient } from '@/lib/queries'
-import { useKoharuStore } from '@/lib/store'
+import { modelsKey, queryClient } from '@/lib/queries'
 import { commands, events, type BooharuJob } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
@@ -55,10 +54,9 @@ describe('Booharu’s reads in the Activity center', () => {
     )
 
     tell(read({ step: 1, steps: 4 }))
-    expect(screen.getByRole('progressbar', { name: 'Reading chapter' })).toHaveAttribute(
-      'aria-valuenow',
-      '25',
-    )
+    const bar = screen.getByRole('progressbar', { name: 'Reading chapter' })
+    expect(bar).toHaveAttribute('aria-valuenow', '1')
+    expect(bar).toHaveAttribute('aria-valuemax', '4')
     expect(screen.getByText('25%')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Stop' }))
@@ -115,17 +113,15 @@ describe('Booharu’s jobs', () => {
 
   it('says why a read a Run press started failed or was skipped, and nothing else', () => {
     const shown = vi.spyOn(toast, 'add')
-    useKoharuStore.setState({
-      models: [
-        {
-          reference: 'koharu/index-translate-9b',
-          name: 'Index-Translate 9B',
-          vendor: 'koharu',
-          images: true,
-          tools: false,
-        },
-      ],
-    })
+    queryClient.setQueryData(modelsKey, [
+      {
+        reference: 'koharu/index-translate-9b',
+        name: 'Index-Translate 9B',
+        vendor: 'koharu',
+        images: true,
+        tools: false,
+      },
+    ])
 
     tell(read({ id: 1, group: 5 }))
     // A skip is worded here, in the user's language, naming the model as Koharu's list does.

@@ -6,8 +6,9 @@ import { useTranslation } from 'react-i18next'
 
 import { ReadingModelPicker } from '@/components/booharu/context/ReadingModelPicker'
 import { useReadChapter } from '@/lib/booharu/readChapter'
+import { modelName } from '@/lib/models'
+import { useModels } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { modelName } from '@/lib/translation'
 import { Button } from '@koharu/ui/components/button'
 
 /** Read chapter among the Run menu's stages, before Translation, laid out as they are: on, a Run
@@ -19,7 +20,7 @@ import { Button } from '@koharu/ui/components/button'
  * Read chapter model and switches it on, and Cancel leaves it off. */
 export function ReadChapterOption() {
   const { t } = useTranslation()
-  const models = useKoharuStore((state) => state.models)
+  const models = useModels().data ?? []
   const translates = useKoharuStore((state) => state.processingStages.includes('translate'))
   const { project, reader, on, set } = useReadChapter()
   const [picking, setPicking] = useState(false)

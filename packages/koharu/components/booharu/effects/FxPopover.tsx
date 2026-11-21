@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SkewSection } from '@/components/booharu/effects/SkewSection'
+import { Choice } from '@/components/controls/Choice'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { boxActions, runBoxAction, selectedBoxes } from '@/lib/booharu/boxActions'
 import { showsSkew, useTextEffects } from '@/lib/booharu/effects'
@@ -29,9 +30,9 @@ import {
   type GradientShown,
 } from '@/lib/booharu/paint'
 import type { WordRange } from '@/lib/booharu/words'
+import { toHex, toRgba } from '@/lib/color'
 import { letteringOf } from '@/lib/document'
 import { usePage } from '@/lib/queries'
-import { hexToRgba, rgbaToHex } from '@/lib/store'
 import type {
   CharStyle,
   Gradient,
@@ -48,13 +49,6 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@koharu/ui/components/popover'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@koharu/ui/components/select'
 import { Switch } from '@koharu/ui/components/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@koharu/ui/components/tooltip'
 
@@ -122,7 +116,7 @@ export function FxPopover(props: FxProps) {
         </TooltipTrigger>
         <TooltipContent>{t('booharu.effects.title')}</TooltipContent>
       </Tooltip>
-      <PopoverContent side='bottom' align='end' className='w-80 gap-3 rounded-xl p-3'>
+      <PopoverContent side='bottom' align='end' className='w-80 gap-3 p-3'>
         <PopoverTitle className='text-xs'>{t('booharu.effects.title')}</PopoverTitle>
         <GradientSection {...props} shown={shown} />
         <SkewSection targets={targets} typing={typing} effects={effects} />
@@ -219,29 +213,15 @@ export function GradientSection({
       {gradient && (
         <div className='grid grid-cols-2 gap-x-2 gap-y-1.5'>
           <Field label={t('booharu.effects.kind')}>
-            <Select
+            {/* A bar's compact select: a pick with the pointer leaves the keys to the canvas. */}
+            <Choice
               value={gradient.kind}
-              items={kinds}
-              onValueChange={(kind) =>
-                kind &&
-                kind !== gradient.kind &&
-                change({ ...gradient, kind: kind as GradientKind })
-              }
-            >
-              <SelectTrigger size='sm' aria-label={t('booharu.effects.kind')} className='w-full'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                // A pick with the pointer leaves the keys to the canvas, as the border's method's.
-                finalFocus={(closed) => closed === 'keyboard'}
-              >
-                {(Object.keys(kinds) as GradientKind[]).map((kind) => (
-                  <SelectItem key={kind} value={kind}>
-                    {kinds[kind]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              choices={kinds}
+              label={t('booharu.effects.kind')}
+              size='sm'
+              className='w-full'
+              onChange={(kind) => change({ ...gradient, kind })}
+            />
           </Field>
           <Field label={t('booharu.effects.angle')}>
             <AngleField
@@ -256,10 +236,10 @@ export function GradientSection({
               <ColorWell
                 label={t(`booharu.effects.${end}`)}
                 size='sm'
-                value={rgbaToHex(endColor(gradient, end))}
+                value={toHex(endColor(gradient, end))}
                 onChange={(color) => {
-                  if (color && color !== rgbaToHex(endColor(gradient, end))) {
-                    change(withEndColor(gradient, end, hexToRgba(color)))
+                  if (color && color !== toHex(endColor(gradient, end))) {
+                    change(withEndColor(gradient, end, toRgba(color)))
                   }
                 }}
               />
@@ -297,8 +277,8 @@ function AngleField({
   const id = useId()
   const [draft, setDraft] = useState<number | null>(value)
   // The angle the box last showed or sent, as the type bar's spacing boxes keep it, so leaving the
-  // box after Enter sends nothing more: words chosen and characters typed show no draft, an edit
-  // refused leaves the angle as it was, and an angle sent shows back through normalAngle.
+  // box again sends nothing more: words chosen and characters typed show no draft, an edit refused
+  // leaves the angle as it was, and an angle sent shows back through normalAngle.
   const last = useRef(value)
 
   useEffect(() => {
@@ -327,12 +307,7 @@ function AngleField({
       onValueCommitted={commit}
     >
       <NumberFieldGroup>
-        <NumberFieldInput
-          aria-label={t('booharu.effects.angle')}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') commit(draft)
-          }}
-        />
+        <NumberFieldInput aria-label={t('booharu.effects.angle')} />
       </NumberFieldGroup>
     </NumberField>
   )
