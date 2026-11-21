@@ -326,3 +326,277 @@ fn a_page_exports_as_layers_photoshop_can_edit() {
         assert_eq!(words(translation_record), translation);
     }
 }
+
+// Booharu: a text's effects as Photoshop holds them. Effects its words all
+// share stay on its type layer, a second border and a gradient in `lmfx`; a
+// text whose words carry their own is drawn into a pixel layer over a hidden
+// type layer of its words in plain styles to edit, and the export notes it
+// (S13).
+mod booharu {
+    use koharu_psd::{Notice, export_noting};
+    use koharu_scene::{LayerId, PageId};
+
+    use super::*;
+
+    const RED: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
+    const BLUE: [f64; 4] = [0.0, 0.0, 1.0, 1.0];
+    const GREEN: [f64; 4] = [0.0, 1.0, 0.0, 1.0];
+    const DARK_GREEN: [f64; 4] = [0.0, 0.5, 0.0, 1.0];
+
+    /// The words every text here holds.
+    const WORDS: &str = "Hello brave world";
+
+    /// The red of a gradient's first stop as EngineData writes a fill: alpha,
+    /// red, green, blue.
+    const FIRST_STOP: &str = "[ 1.0 1.0 0.0 0.0 ]";
+
+    /// A gradient from red to blue, which paints nothing green.
+    fn gradient() -> Json {
+        json!({"kind": "linear", "angle": 0.0, "stops": [
+            {"offset": 0.0, "color": RED},
+            {"offset": 1.0, "color": BLUE},
+        ]})
+    }
+
+    /// `WORDS`, the middle word with a green border of its own.
+    fn bordered() -> Json {
+        json!([
+            {"insert": "Hello "},
+            {"insert": "brave", "attributes": {"stroke": GREEN, "stroke_width": 3.0}},
+            {"insert": " world"},
+        ])
+    }
+
+    /// A 200×200 page with no scan, holding what `ops` add to `$page`.
+    fn page(ops: Vec<Json>) -> (tempfile::TempDir, Session, PageId) {
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        let mut session = Session::create(dir.path().join("test.khr")).expect("a project");
+        let page = json!({"op": "add_page", "id": "$page", "index": 0,
+            "size": {"width": 200, "height": 200}});
+        let change = session
+            .apply(Edit {
+                label: "test".into(),
+                ops: std::iter::once(page)
+                    .chain(ops)
+                    .map(|op| serde_json::from_value::<Op>(op).expect("a valid op"))
+                    .collect(),
+            })
+            .expect("an edit");
+        (dir, session, change.pages.added[0])
+    }
+
+    /// `page` exported and read back, with the notices of its export; `None`
+    /// without a GPU.
+    fn exported(session: &Session, page: PageId) -> Option<(PsdFile, Vec<Notice>)> {
+        // Installed fonts only, so the test downloads none.
+        let renderer = Renderer::new(RendererConfig {
+            font_families: Vec::new(),
+        });
+        if let Err(error) = Gpu::get() {
+            eprintln!("skipped without a GPU: {error}");
+            return None;
+        }
+        let mut notices = Vec::new();
+        let bytes =
+            export_noting(session, &renderer, page, &labels(), &mut notices).expect("a PSD");
+        let file = PsdFile::from_bytes(&bytes).expect("it reads back");
+        Some((file, notices))
+    }
+
+    /// The names of `file`'s layers, bottom to top.
+    fn names(file: &PsdFile) -> Vec<String> {
+        file.layers().iter().map(LayerRecord::name).collect()
+    }
+
+    /// The id of the layer of `page` named `name`.
+    fn id(session: &Session, page: PageId, name: &str) -> LayerId {
+        session
+            .project()
+            .layers_of(page)
+            .expect("its layers")
+            .into_iter()
+            .find(|layer| layer.name == name)
+            .expect("a layer of that name")
+            .id
+    }
+
+    /// What the export tells of a text it drew into pixels over a copy.
+    fn notice(page: PageId, layer: LayerId, name: &str) -> Notice {
+        Notice {
+            editable_copy: "hidden_plain_styles",
+            layer,
+            name: name.to_owned(),
+            page,
+            reason: "word_effects_rasterized",
+        }
+    }
+
+    /// The fill of each style run of a type layer, as EngineData writes it.
+    fn fills(record: &LayerRecord) -> Vec<String> {
+        let data = engine_data(record);
+        let runs = data.split("/StyleRun").nth(1).expect("style runs");
+        let runs = runs.split("/GridInfo").next().unwrap_or(runs);
+        runs.split("/FillColor")
+            .skip(1)
+            .map(|fill| {
+                let values = fill.split("/Values").nth(1).expect("a colour");
+                values[..=values.find(']').expect("its end")]
+                    .trim()
+                    .to_owned()
+            })
+            .collect()
+    }
+
+    /// Whether a layer is a type layer of `WORDS` in plain styles: each run
+    /// filled with the gradient's first stop, and no effects.
+    fn plain(record: &LayerRecord) -> bool {
+        let fills = fills(record);
+        words(record) == WORDS
+            && !fills.is_empty()
+            && fills.iter().all(|fill| fill == FIRST_STOP)
+            && !effects(record)
+    }
+
+    /// Whether `record` carries layer effects.
+    fn effects(record: &LayerRecord) -> bool {
+        record.block(b"lfx2").is_some() || record.block(b"lmfx").is_some()
+    }
+
+    /// Whether some pixel of `record` is green, as a border is here, which
+    /// no fill from red to blue is.
+    fn green(record: &LayerRecord) -> bool {
+        let channel = |id| record.decode_channel(id, 8, Version::Psd).expect("pixels");
+        let (red, green, blue) = (channel(0), channel(1), channel(2));
+        red.iter()
+            .zip(&green)
+            .zip(&blue)
+            .any(|((&red, &green), &blue)| green > red.max(blue).saturating_add(64))
+    }
+
+    /// A drawing of `WORDS`, borders and all, as a shown pixel layer with no
+    /// type data and no effects, over its hidden copy to edit, whose pixels
+    /// are its letters alone.
+    fn drawn_over_a_copy(copy: &LayerRecord, drawing: &LayerRecord) {
+        assert!(!copy.is_visible());
+        assert!(plain(copy), "{:?}", fills(copy));
+        assert!(!green(copy), "a border is in the copy's pixels");
+        assert!(drawing.is_visible());
+        assert!(drawing.block(b"TySh").is_none());
+        assert!(!effects(drawing));
+        assert!(
+            green(drawing),
+            "the word's border is missing from its pixels"
+        );
+    }
+
+    #[test]
+    fn a_text_s_effects_stay_effects_or_go_into_pixels_over_a_copy() {
+        let (_dir, session, page) = page(vec![
+            json!({"op": "add_layer", "id": "$words", "page": "$page", "index": 0, "layer": {
+                "kind": "text", "name": "Words", "opacity": 0.5, "blend": "multiply",
+                "language": "en", "content": bordered(),
+                "style": {"chars": {"size": 16.0, "fill_gradient": gradient()}},
+                "frame": {"box": {"bounds": {"x": 10.0, "y": 10.0, "width": 180.0, "height": 40.0}}},
+            }}),
+            json!({"op": "add_layer", "id": "$keep", "page": "$page", "parent": "$words", "index": 0, "layer": {"kind": "mask"}}),
+            json!({"op": "write_pixels", "layer": "$keep", "rect": {"x": 0, "y": 0, "width": 100, "height": 200}, "pixels": vec![255u8; 100 * 200]}),
+            json!({"op": "add_layer", "page": "$page", "index": 1, "layer": {
+                "kind": "text", "name": "Shared", "language": "en", "content": WORDS,
+                "style": {"chars": {
+                    "size": 16.0, "fill_gradient": gradient(),
+                    "stroke": GREEN, "stroke_width": 3.0,
+                    "outer_stroke": DARK_GREEN, "outer_stroke_width": 2.0,
+                }},
+                "frame": {"box": {"bounds": {"x": 10.0, "y": 110.0, "width": 180.0, "height": 40.0}}},
+            }}),
+            // Locked last: a locked layer takes no more writes.
+            json!({"op": "update_layer", "layer": "$words", "patch": {"locked": true}}),
+        ]);
+        let Some((file, notices)) = exported(&session, page) else {
+            return;
+        };
+
+        // Bottom to top: the text whose one word has a border of its own,
+        // drawn over its copy, then the text whose words share their effects.
+        assert_eq!(names(&file), ["Words", "Words", "Shared"]);
+        let (copy, drawing) = (&file.layers()[0], &file.layers()[1]);
+        drawn_over_a_copy(copy, drawing);
+        // Both keep the layer's opacity, blend mode, lock, and mask.
+        for record in [copy, drawing] {
+            assert_eq!(
+                (record.blend_mode, record.opacity),
+                (BlendMode::Multiply, 128)
+            );
+            assert_eq!(
+                record.block(b"lspf").expect("a lock").data,
+                0x8000_0000u32.to_be_bytes()
+            );
+            let MaskData::Mask(mask) = &record.mask else {
+                panic!("the text's mask is its user mask");
+            };
+            assert_eq!(
+                (
+                    mask.rect.left,
+                    mask.rect.top,
+                    mask.rect.right,
+                    mask.rect.bottom
+                ),
+                (0, 0, 100, 200)
+            );
+        }
+        // One notice, of the text by its own id and name.
+        assert_eq!(
+            notices,
+            [notice(page, id(&session, page, "Words"), "Words")]
+        );
+
+        // Effects the words share stay one type layer's: both borders and
+        // the gradient in `lmfx`, while its pixels are its letters alone.
+        let shared = record(&file, "Shared");
+        assert!(shared.is_visible());
+        assert_eq!(words(shared), WORDS);
+        assert!(shared.block(b"lfx2").is_none());
+        let data = &shared
+            .block(b"lmfx")
+            .expect("effects of more than one kind")
+            .data;
+        let (lmfx, _) = VersionedDescriptor::parse_prefix(&data[4..]).expect("a descriptor");
+        let count = |key| match lmfx.descriptor.get(key) {
+            Some(Value::List(items)) => items.len(),
+            _ => 0,
+        };
+        assert_eq!((count("frameFXMulti"), count("gradientFillMulti")), (2, 1));
+        assert!(!green(shared), "a border is in the pixels");
+    }
+
+    #[test]
+    fn a_translation_whose_words_carry_their_own_effects_stays_in_its_block() {
+        let (_dir, session, page) = page(vec![
+            json!({"op": "add_layer", "id": "$block", "page": "$page", "index": 0, "layer": block("Boxed", 10.0, "箱")}),
+            json!({"op": "set_rich_text", "layer": "$block", "spans": bordered()}),
+            json!({"op": "update_layer", "layer": "$block", "patch": {"translation": {
+                "language": "en",
+                "style": {"chars": {"size": 16.0, "fill_gradient": gradient()}},
+                "frame": {"box": {"bounds": {"x": 10.0, "y": 100.0, "width": 180.0, "height": 40.0}}},
+            }}}),
+        ]);
+        let Some((file, notices)) = exported(&session, page) else {
+            return;
+        };
+
+        // Inside the block's folder, bottom to top: its clean-up, its source
+        // hidden, then its translation drawn over its copy.
+        assert_eq!(
+            names(&file),
+            ["</Layer group>", "Clean-up", "箱", WORDS, WORDS, "Boxed"]
+        );
+        assert_eq!(
+            record(&file, "Boxed").section_type(),
+            SectionType::OpenFolder
+        );
+        assert!(!record(&file, "箱").is_visible());
+        drawn_over_a_copy(&file.layers()[3], &file.layers()[4]);
+        // One notice, of the translation by its block's id and its words.
+        assert_eq!(notices, [notice(page, id(&session, page, "Boxed"), WORDS)]);
+    }
+}
