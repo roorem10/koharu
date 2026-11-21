@@ -37,8 +37,7 @@ pub(crate) fn pixels(
         copy,
         drawing,
         noted,
-    } = fallback(&leaf, blocks, text, resolved, layer, export.texts);
-    export.texts += 1;
+    } = fallback(&leaf, blocks, text, resolved, layer, &mut export.texts);
     let hidden = Leaf {
         visible: false,
         ..leaf
@@ -65,7 +64,8 @@ struct Fallback {
 }
 
 /// What `pixels` pushes for `text`, laid out as `resolved`, given the
-/// `blocks` its layer gathered: the copy's type layer is numbered `index`,
+/// `blocks` its layer gathered: the copy's type layer takes the next number
+/// after the `texts` the export has numbered, and counts itself among them;
 /// and the text is noted by `layer` and the name `leaf` gives its layers.
 fn fallback(
     leaf: &Leaf<'_>,
@@ -73,10 +73,11 @@ fn fallback(
     text: &Text,
     resolved: &ResolvedText,
     layer: LayerId,
-    index: i32,
+    texts: &mut i32,
 ) -> Fallback {
     let mut copy = blocks.clone();
-    copy.extend(blocks::type_layer(text, &plain(resolved), index));
+    copy.extend(blocks::type_layer(text, &plain(resolved), *texts));
+    *texts += 1;
     Fallback {
         copy,
         drawing: blocks,
@@ -87,12 +88,12 @@ fn fallback(
 #[cfg(test)]
 mod tests {
     use koharu_scene::{Blend, Color, Gradient, GradientKind, GradientStop, Rgba, Uuid};
-    use photocraft_psd::{VersionedDescriptor, descriptor::Value};
+    use photocraft_psd::descriptor::Value;
 
     use super::*;
     use crate::{
         LOCK_ALL,
-        booharu::{glyphs_only, plain_run, resolved, word_effects},
+        booharu::{glyphs_only, plain_run, resolved, type_text, word_effects},
     };
 
     /// "Hello brave world", whose words differ in their effects: the first
@@ -147,13 +148,15 @@ mod tests {
         let (text, resolved) = worded();
         let lock = TaggedBlock::protection(LOCK_ALL);
         let layer = LayerId(Uuid::from_u128(1));
+        // Three type layers numbered before it.
+        let mut texts = 3;
         let Fallback { copy, drawing, .. } = fallback(
             &leaf("Hello"),
             vec![lock.clone()],
             &text,
             &resolved,
             layer,
-            3,
+            &mut texts,
         );
         // Both keep the lock; only the copy is a type layer, and neither
         // carries effects.
@@ -164,18 +167,17 @@ mod tests {
         // keep its borders and gradients.
         assert!(glyphs_only(&copy));
         assert!(!glyphs_only(&drawing));
-        // The copy's type layer is the plain text's, the next one numbered.
+        // The copy's type layer is the plain text's, the next one numbered,
+        // and counts itself, so the type layer after it is numbered 4.
         assert_eq!(
             copy[1..],
             blocks::type_layer(&text, &plain(&resolved), 3)[..]
         );
-        let data = &copy[1].data;
-        let (descriptor, _) =
-            VersionedDescriptor::parse_prefix(&data[2 + 48 + 2..]).expect("a text descriptor");
         assert_eq!(
-            descriptor.descriptor.get("TextIndex"),
+            type_text(&copy[1]).get("TextIndex"),
             Some(&Value::Integer(3))
         );
+        assert_eq!(texts, 4);
     }
 
     #[test]
@@ -185,7 +187,7 @@ mod tests {
         // id and its words.
         for (id, name) in [(5, "Sign"), (9, "Hello brave world")] {
             let layer = LayerId(Uuid::from_u128(id));
-            let noted = fallback(&leaf(name), Vec::new(), &text, &resolved, layer, 0).noted;
+            let noted = fallback(&leaf(name), Vec::new(), &text, &resolved, layer, &mut 0).noted;
             assert_eq!(noted, (layer, name.to_owned()));
         }
     }
