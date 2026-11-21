@@ -134,11 +134,11 @@ join.
 <!-- Booharu: text borders. -->
 Booharu adds a second border, `outer_stroke` and `outer_stroke_width`,
 character keys drawn around the stroke and only with one, and a paragraph key,
-`stroke_method`: `contour` (no value) grows the borders from the letters merged
-into one shape, and `expansion` grows each glyph, as Koharu draws them. All
-three are left out of the file while unset and the project version stays
-Koharu's, so a project that doesn't use them still opens in Koharu, and one
-that does fails to open there, unchanged.
+`stroke_method`: `expansion`, the default and what no value means, grows each
+glyph, as Koharu draws borders, and `contour` grows the borders from the
+letters merged into one shape. All three are left out of the file while unset
+and the project version stays Koharu's, so a project that doesn't use them
+still opens in Koharu, and one that does fails to open there, unchanged.
 
 <!-- Booharu: gradient fills and letter spacing. -->
 Booharu adds two more character keys, so a whole text or single words can have

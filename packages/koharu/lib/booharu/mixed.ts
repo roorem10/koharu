@@ -39,7 +39,7 @@ export type ParagraphShare = {
   /** The line spacing, a multiple of each line's largest size: Koharu's 1.2 where the text sets
    * none. */
   line_height: Shared<number>
-  /** How the borders are drawn: contour where the text sets no method. */
+  /** How the borders are drawn: expansion, Koharu's border, where the text sets no method. */
   stroke_method: Shared<StrokeMethod>
 }
 
@@ -60,8 +60,8 @@ export function paragraphShare(targets: Layer[]): ParagraphShare {
       DEFAULT_LINE_HEIGHT,
     ),
     stroke_method: share(
-      texts.map((text) => text.style?.stroke_method ?? 'contour'),
-      'contour',
+      texts.map((text) => text.style?.stroke_method ?? 'expansion'),
+      'expansion',
     ),
   }
 }

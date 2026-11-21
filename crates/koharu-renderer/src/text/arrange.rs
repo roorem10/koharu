@@ -36,8 +36,8 @@ pub(crate) struct TextLayout {
     pub bounds: Rect,
     /// Booharu: the borders the Contour method grew from the merged letters,
     /// each a colour and the region it fills, in the order they draw under
-    /// every fill; `None` when the Expansion method grows them from the
-    /// glyphs as they draw.
+    /// every fill; `None` when the Expansion method, Koharu's and the
+    /// default, grows them from the glyphs as they draw.
     pub contours: Option<Vec<(Color, BezPath)>>,
 }
 

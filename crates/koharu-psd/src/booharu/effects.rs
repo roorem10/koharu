@@ -211,7 +211,7 @@ fn normalized(angle: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use koharu_scene::{GradientStop, Rgba, Transform};
+    use koharu_scene::{GradientStop, Rgba, StrokeMethod, Transform};
     use photocraft_psd::VersionedDescriptor;
 
     use super::*;
@@ -319,6 +319,25 @@ mod tests {
         let text = words(|run| run.stroke = Some((WHITE, 3.0)));
         let layer = layer(Affine::scale_non_uniform(4.0, 1.0));
         assert_eq!(effects(&layer, &text), Some(stroke_effect(WHITE, 6.0)));
+    }
+
+    // Koharu's border, the default, and Contour are one Outside stroke.
+    #[test]
+    fn every_border_method_is_the_outside_stroke() {
+        let text = words(|run| run.stroke = Some((WHITE, 3.0)));
+        for method in [
+            None,
+            Some(StrokeMethod::Expansion),
+            Some(StrokeMethod::Contour),
+        ] {
+            let mut layer = layer(Affine::IDENTITY);
+            layer.style.stroke_method = method;
+            assert_eq!(
+                effects(&layer, &text),
+                Some(stroke_effect(WHITE, 3.0)),
+                "{method:?}"
+            );
+        }
     }
 
     #[test]

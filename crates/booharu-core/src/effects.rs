@@ -40,7 +40,9 @@ pub enum TextEffect {
     Border,
     /// A second border the default doesn't give.
     SecondBorder,
-    /// Borders drawn letter by letter (`StrokeMethod::Expansion`).
+    /// Borders drawn another way than the lettering default draws them:
+    /// Contour's (`StrokeMethod::Contour`), as no default sets a method and
+    /// so draws Koharu's border.
     OutlineMethod,
     /// A gradient fill, on the box or on any of its words.
     Gradient,
@@ -147,10 +149,9 @@ fn found(text: &Text, look: Option<&Look>, record: &Auto) -> Vec<TextEffect> {
     }) {
         effects.push(TextEffect::SecondBorder);
     }
+    // No method is Koharu's border, the text's or the default's.
     let method = |method: Option<StrokeMethod>| method.unwrap_or_default();
-    if method(text.style.stroke_method) == StrokeMethod::Expansion
-        && method(look.and_then(|look| look.stroke_method)) != StrokeMethod::Expansion
-    {
+    if method(text.style.stroke_method) != method(look.and_then(|look| look.stroke_method)) {
         effects.push(TextEffect::OutlineMethod);
     }
     if own.fill_gradient.is_some()
@@ -478,17 +479,55 @@ mod tests {
             json!({"style": {"chars": {"outer_stroke": YELLOW, "outer_stroke_width": 2.0}}}),
         );
         assert_eq!(fixture.tags(fixture.typed), [TextEffect::SecondBorder]);
-        // Borders letter by letter.
-        fixture.patch(
-            fixture.block,
-            json!({"translation": {"style": {"stroke_method": "expansion"}}}),
-        );
-        assert_eq!(fixture.tags(fixture.block), [TextEffect::OutlineMethod]);
+        // Contour borders, where the default draws Koharu's.
         fixture.patch(
             fixture.block,
             json!({"translation": {"style": {"stroke_method": "contour"}}}),
         );
-        assert_eq!(fixture.tags(fixture.block), []);
+        assert_eq!(fixture.tags(fixture.block), [TextEffect::OutlineMethod]);
+        // Koharu's border, named or not, is the default's.
+        for method in [json!("expansion"), Value::Null] {
+            fixture.patch(
+                fixture.block,
+                json!({"translation": {"style": {"stroke_method": method}}}),
+            );
+            assert_eq!(fixture.tags(fixture.block), [], "{method}");
+        }
+    }
+
+    // The tag names the method unlike the default's, either way.
+    #[test]
+    fn the_method_unlike_the_defaults_is_the_effect() {
+        let text = |method| Text {
+            style: koharu_scene::TextStyle {
+                stroke_method: method,
+                ..Default::default()
+            },
+            ..Text::default()
+        };
+        let look = |method| Look {
+            chars: CharStyle::default(),
+            stroke_method: method,
+        };
+        let record = Auto::default();
+        let tagged = |method, default| {
+            found(&text(method), Some(&look(default)), &record) == [TextEffect::OutlineMethod]
+        };
+        let (contour, expansion) = (Some(StrokeMethod::Contour), Some(StrokeMethod::Expansion));
+        // A default that sets no method draws Koharu's border.
+        assert!(tagged(contour, None));
+        assert!(!tagged(expansion, None));
+        assert!(!tagged(None, None));
+        // One that drew Contour would tag Koharu's.
+        assert!(!tagged(contour, contour));
+        assert!(tagged(expansion, contour));
+        assert!(tagged(None, contour));
+        // No default at all is one that sets no method.
+        assert_eq!(
+            found(&text(contour), None, &record),
+            [TextEffect::OutlineMethod]
+        );
+        assert_eq!(found(&text(None), None, &record), []);
     }
 
     #[test]

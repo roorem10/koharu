@@ -207,8 +207,11 @@ mod tests {
             let layout = text::layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout");
             Ok(Weight.weight(&Hash::of(b"text"), &Some(Content::Text(Arc::new(layout)))))
         };
+        // No method, as Expansion, draws Koharu's border, which holds no
+        // regions.
+        assert_eq!(weight(None)?, 1024);
         assert_eq!(weight(Some(StrokeMethod::Expansion))?, 1024);
-        assert!(weight(None)? > 10 * 1024);
+        assert!(weight(Some(StrokeMethod::Contour))? > 10 * 1024);
         Ok(())
     }
 }

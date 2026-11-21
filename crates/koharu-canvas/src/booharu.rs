@@ -722,7 +722,7 @@ mod tests {
                 "styled",
                 json!({"direction": "vertical", "style": {
                     "chars": {"family": "Comic Neue", "fill": GREEN},
-                    "align": "center", "line_height": 1.5, "stroke_method": "expansion",
+                    "align": "center", "line_height": 1.5, "stroke_method": "contour",
                 }}),
             ),
             upright,
@@ -752,7 +752,7 @@ mod tests {
                 },
                 align: Some(Align::Center),
                 line_height: Some(1.5),
-                stroke_method: Some(StrokeMethod::Expansion),
+                stroke_method: Some(StrokeMethod::Contour),
             }
         );
         assert_eq!(typed.direction, Direction::Vertical);

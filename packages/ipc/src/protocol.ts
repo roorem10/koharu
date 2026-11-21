@@ -2180,16 +2180,21 @@ export type Stroke = {
 
 /**
  *  Booharu: how a text's borders are drawn, both outside the letters with
- *  round corners.
+ *  round corners. Koharu's own border is the default, so a text with no
+ *  method, Koharu's or Booharu's, draws as Koharu draws it.
  */
 export type StrokeMethod =
   /**
-   *  Grown from the letters merged into one shape, so a dot, a counter,
-   *  and touching letters get the same border as the rest.
+   *  Each letter grown on its own, as Koharu draws borders: the default,
+   *  and what a text with no method draws.
+   */
+  | 'expansion'
+  /**
+   *  Grown from the letters merged into one shape, every run with that
+   *  border together, so a translucent border shows no darker overlap
+   *  where letters touch, and no border shows through a see-through letter.
    */
   | 'contour'
-  /**  Each letter grown on its own, as Koharu draws borders. */
-  | 'expansion'
 
 /**
  *  How many blocks of a scope Apply changed, or would change, kept, and
@@ -2286,7 +2291,11 @@ export type TextEffect =
   | 'border'
   /**  A second border the default doesn't give. */
   | 'second_border'
-  /**  Borders drawn letter by letter (`StrokeMethod::Expansion`). */
+  /**
+   *  Borders drawn another way than the lettering default draws them:
+   *  Contour's (`StrokeMethod::Contour`), as no default sets a method and
+   *  so draws Koharu's border.
+   */
   | 'outline_method'
   /**  A gradient fill, on the box or on any of its words. */
   | 'gradient'
@@ -2313,8 +2322,8 @@ export type TextStyle = {
   line_height?: number | null
   /**
    *  A paragraph key, Booharu's: how the borders are drawn; `None` is
-   *  Contour. Left out when unset, so a text without one stays readable by
-   *  Koharu.
+   *  Expansion, Koharu's border. Left out when unset, so a text without one
+   *  stays readable by Koharu.
    */
   stroke_method?: StrokeMethod | null
 }

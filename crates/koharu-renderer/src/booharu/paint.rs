@@ -120,7 +120,9 @@ fn spread(gradient: &Gradient, extent: Rect) -> peniko::Gradient {
 mod tests {
     use anyhow::Result;
     use fontique::FontStyle;
-    use koharu_scene::{CharStyle, Direction, GradientStop, Rgba, RichText, Span, Text, TextStyle};
+    use koharu_scene::{
+        CharStyle, Direction, GradientStop, Rgba, RichText, Span, StrokeMethod, Text, TextStyle,
+    };
     use kurbo::Point;
 
     use super::*;
@@ -562,16 +564,24 @@ mod tests {
         let laid = |alpha: f32| -> Result<TextLayout> {
             let mut gradient = gradient(GradientKind::Linear, 0.0);
             gradient.stops[1].color.0[3] = alpha;
-            let style = CharStyle {
-                size: Some(100.0),
-                stroke: Some(Rgba([1.0, 1.0, 1.0, 1.0])),
-                stroke_width: Some(4.0),
-                ..filled(gradient)
+            let text = Text {
+                content: "I".into(),
+                style: TextStyle {
+                    chars: CharStyle {
+                        size: Some(100.0),
+                        stroke: Some(Rgba([1.0, 1.0, 1.0, 1.0])),
+                        stroke_width: Some(4.0),
+                        ..filled(gradient)
+                    },
+                    stroke_method: Some(StrokeMethod::Contour),
+                    ..TextStyle::default()
+                },
+                ..Text::default()
             };
-            laid(&font, style, vec![("I", CharStyle::default())])
+            Ok(layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout"))
         };
         let border = |layout: &TextLayout| {
-            let regions = layout.contours.as_ref().expect("Contour is the default");
+            let regions = layout.contours.as_ref().expect("Contour's regions");
             assert_eq!(regions.len(), 1);
             regions[0].1.clone()
         };

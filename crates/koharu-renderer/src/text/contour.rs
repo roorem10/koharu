@@ -1,17 +1,17 @@
 //! Booharu's Contour borders: a text's letters merged into one shape and
 //! grown outward with round corners, filled as regions under every fill.
-//! Koharu's own borders, the Expansion method, stroke every run's glyphs
-//! under every fill. Koharu 0.89.0 grows them, and a synthetic bold, by a
-//! stroke in place of `kurbo::expand_path`, which grew a whole outline one
-//! way, so a dot wound against the rest of its letter shrank and lost its
-//! border (koharu-rs #1073, #1292); now every contour keeps one, and Contour
-//! grows a synthetic bold the same way. Contour stays a choice beside them:
-//! it grows one border around the letters merged, every run with that border
-//! together, filled once, so a translucent border shows no darker overlap
-//! where letters touch, even across runs. Its regions leave out every letter
-//! whose fill isn't opaque, bordered or not, and such a fill's own border is
-//! only the ring outside its letters, so no border shows through a letter,
-//! as a stroke under the fill does.
+//! Koharu's own borders, the Expansion method and the default, stroke every
+//! run's glyphs under every fill. Koharu 0.89.0 grows them, and a synthetic
+//! bold, by a stroke in place of `kurbo::expand_path`, which grew a whole
+//! outline one way, so a dot wound against the rest of its letter shrank and
+//! lost its border (koharu-rs #1073, #1292); now every contour keeps one, and
+//! Contour grows a synthetic bold the same way. Contour stays a choice beside
+//! them: it grows one border around the letters merged, every run with that
+//! border together, filled once, so a translucent border shows no darker
+//! overlap where letters touch, even across runs. Its regions leave out every
+//! letter whose fill isn't opaque, bordered or not, and such a fill's own
+//! border is only the ring outside its letters, so no border shows through a
+//! letter, as a stroke under the fill does.
 
 use i_overlay::{
     core::{fill_rule::FillRule, overlay_rule::OverlayRule},
@@ -290,8 +290,8 @@ mod tests {
             };
             Ok(crate::text::layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout"))
         };
-        let contour = laid(None)?;
-        let regions = contour.contours.as_ref().expect("Contour is the default");
+        let contour = laid(Some(StrokeMethod::Contour))?;
+        let regions = contour.contours.as_ref().expect("Contour's regions");
         let colors: Vec<_> = regions.iter().map(|(color, _)| color.components).collect();
         assert_eq!(colors, [[1.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0]]);
         // The second border holds the first, which holds the letters.
@@ -320,14 +320,18 @@ mod tests {
             ink.inflate(2.5, 2.5).contains_rect(first),
             "{first:?} {ink:?}"
         );
-        let expansion = laid(Some(StrokeMethod::Expansion))?;
-        assert!(expansion.contours.is_none());
-        assert_eq!(
-            expansion.resolved.runs[0]
-                .outer_stroke
-                .map(|(_, width)| width),
-            Some(3.0)
-        );
+        // No method is Koharu's border, as Expansion: the glyphs' own strokes,
+        // no regions.
+        for method in [None, Some(StrokeMethod::Expansion)] {
+            let expansion = laid(method)?;
+            assert!(expansion.contours.is_none(), "{method:?}");
+            assert_eq!(
+                expansion.resolved.runs[0]
+                    .outer_stroke
+                    .map(|(_, width)| width),
+                Some(3.0)
+            );
+        }
         Ok(())
     }
 
@@ -363,12 +367,13 @@ mod tests {
                     size: Some(100.0),
                     ..CharStyle::default()
                 },
+                stroke_method: Some(StrokeMethod::Contour),
                 ..TextStyle::default()
             },
             ..Text::default()
         };
         let layout = crate::text::layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout");
-        let regions = layout.contours.as_ref().expect("Contour is the default");
+        let regions = layout.contours.as_ref().expect("Contour's regions");
         assert_eq!(regions.len(), 1);
         let ink: Vec<Rect> = layout
             .runs

@@ -278,8 +278,8 @@ mod tests {
                     }),
                     ..CharStyle::default()
                 },
-                // Its border drawn in a pass before the fill's.
-                stroke_method: Some(koharu_scene::StrokeMethod::Expansion),
+                // No border method: Koharu's border, drawn in a pass before
+                // the fill's.
                 ..TextStyle::default()
             },
             ..Text::default()

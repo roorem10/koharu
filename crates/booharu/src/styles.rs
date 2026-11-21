@@ -245,6 +245,8 @@ pub fn reset_lettering(
         };
         let at = ops.len();
         let style = &text.style;
+        // A method stored as Koharu's own counts too, so Reset writes it as
+        // none, which Koharu can read.
         if AutoStyle::of(&style.chars) != AutoStyle::of(&look.chars)
             || style.stroke_method != look.stroke_method
         {
@@ -1221,7 +1223,7 @@ mod tests {
             Op::UpdateLayer {
                 layer: a.into(),
                 patch: json!({"translation": {
-                    "style": {"stroke_method": "expansion", "align": "end", "line_height": 1.5},
+                    "style": {"stroke_method": "contour", "align": "end", "line_height": 1.5},
                     "frame": frame,
                 }}),
             },

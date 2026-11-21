@@ -1475,7 +1475,7 @@ fn a_first_translation_keeps_the_paragraph_keys_and_a_vertical_direction_set_bef
         &mut fixture,
         talk,
         json!({"direction": "vertical", "style":
-            {"align": "center", "line_height": 1.5, "stroke_method": "expansion"}}),
+            {"align": "center", "line_height": 1.5, "stroke_method": "contour"}}),
     );
     style_before_translating(&mut fixture, boom, json!({"style": {"align": "end"}}));
     for (block, at) in [(talk, (100.0, 100.0)), (boom, (300.0, 100.0))] {
@@ -1486,7 +1486,7 @@ fn a_first_translation_keeps_the_paragraph_keys_and_a_vertical_direction_set_bef
     assert_eq!(
         typed["style"],
         json!({"chars": typed["style"]["chars"], "align": "center", "line_height": 1.5,
-            "stroke_method": "expansion"})
+            "stroke_method": "contour"})
     );
     assert_eq!(typed["direction"], json!("vertical"));
     let typed = layer(&fixture, boom)["translation"].clone();
@@ -1510,7 +1510,7 @@ fn a_whole_box_style_written_while_typing_into_a_block_with_none_keeps_the_caret
     style_before_translating(
         &mut fixture,
         talk,
-        json!({"style": {"stroke_method": "expansion"}}),
+        json!({"style": {"stroke_method": "contour"}}),
     );
     assert!(fixture.canvas.is_typing());
     assert_eq!(caret(&fixture.canvas), before);
@@ -1521,7 +1521,7 @@ fn a_whole_box_style_written_while_typing_into_a_block_with_none_keeps_the_caret
     assert_eq!(typed["translation"]["frame"], typed["source"]["frame"]);
     assert_eq!(
         typed["translation"]["style"]["stroke_method"],
-        json!("expansion")
+        json!("contour")
     );
 }
 

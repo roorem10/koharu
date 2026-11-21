@@ -116,23 +116,26 @@ pub struct TextStyle {
     #[serde(default)]
     pub line_height: Option<f64>,
     /// A paragraph key, Booharu's: how the borders are drawn; `None` is
-    /// Contour. Left out when unset, so a text without one stays readable by
-    /// Koharu.
+    /// Expansion, Koharu's border. Left out when unset, so a text without one
+    /// stays readable by Koharu.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stroke_method: Option<StrokeMethod>,
 }
 
 /// Booharu: how a text's borders are drawn, both outside the letters with
-/// round corners.
+/// round corners. Koharu's own border is the default, so a text with no
+/// method, Koharu's or Booharu's, draws as Koharu draws it.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum StrokeMethod {
-    /// Grown from the letters merged into one shape, so a dot, a counter,
-    /// and touching letters get the same border as the rest.
+    /// Each letter grown on its own, as Koharu draws borders: the default,
+    /// and what a text with no method draws.
     #[default]
-    Contour,
-    /// Each letter grown on its own, as Koharu draws borders.
     Expansion,
+    /// Grown from the letters merged into one shape, every run with that
+    /// border together, so a translucent border shows no darker overlap
+    /// where letters touch, and no border shows through a see-through letter.
+    Contour,
 }
 
 /// Booharu: a gradient fill: its stops spread along a line at `angle`, or

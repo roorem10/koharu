@@ -232,11 +232,11 @@ fn booharu_border_keys_are_left_out_until_set() {
             outer_stroke_width: Some(3.0),
             ..CharStyle::default()
         },
-        stroke_method: Some(StrokeMethod::Expansion),
+        stroke_method: Some(StrokeMethod::Contour),
         ..TextStyle::default()
     };
     let written = serde_json::to_value(&style).expect("a style");
-    assert_eq!(written["stroke_method"], json!("expansion"));
+    assert_eq!(written["stroke_method"], json!("contour"));
     assert_eq!(
         serde_json::from_value::<TextStyle>(written).expect("it reads back"),
         style
@@ -251,6 +251,28 @@ fn booharu_border_keys_are_left_out_until_set() {
         marked.or(&style.chars).outer_stroke,
         style.chars.outer_stroke
     );
+}
+
+// Booharu: a text with no border method, Koharu's or Booharu's, takes
+// Koharu's border, and each stored method reads back as itself.
+#[test]
+fn booharu_no_border_method_is_koharus_border() {
+    use koharu_scene::{StrokeMethod, TextStyle};
+
+    let koharus: TextStyle = serde_json::from_value(json!({"line_height": 1.1})).expect("a style");
+    assert_eq!(koharus.stroke_method, None);
+    assert_eq!(
+        koharus.stroke_method.unwrap_or_default(),
+        StrokeMethod::Expansion
+    );
+    for (stored, method) in [
+        ("expansion", StrokeMethod::Expansion),
+        ("contour", StrokeMethod::Contour),
+    ] {
+        let style: TextStyle =
+            serde_json::from_value(json!({"stroke_method": stored})).expect("a style");
+        assert_eq!(style.stroke_method, Some(method), "{stored}");
+    }
 }
 
 // Booharu: a gradient and letter spacing stay out of the file until set, and

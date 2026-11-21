@@ -97,7 +97,7 @@ impl Styled {
                 .and_then(Lang::from_iso),
             chinese: text.language.language.as_str() == "zh",
             frame: text.frame.clone(),
-            // Booharu: the border method.
+            // Booharu: the border method, Koharu's where the text sets none.
             stroke_method: text.style.stroke_method.unwrap_or_default(),
         })
     }

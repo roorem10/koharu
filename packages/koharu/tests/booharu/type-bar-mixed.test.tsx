@@ -148,7 +148,7 @@ describe('Booharu type bar over texts whose paragraphs differ (S11-h)', () => {
     const { user } = renderBar([
       styled('one', { stroke: WHITE, stroke_width: 2 }),
       text('two', {
-        style: { stroke_method: 'expansion', chars: { stroke: WHITE, stroke_width: 2 } },
+        style: { stroke_method: 'contour', chars: { stroke: WHITE, stroke_width: 2 } },
       }),
     ])
 
@@ -165,7 +165,7 @@ describe('Booharu type bar over texts whose paragraphs differ (S11-h)', () => {
         text('two', {
           direction: 'vertical',
           frame: box('best'),
-          style: { align: 'end', line_height: 1.5, stroke_method: 'expansion' },
+          style: { align: 'end', line_height: 1.5, stroke_method: 'contour' },
         }),
       ],
       { pending: true },
@@ -180,7 +180,7 @@ describe('Booharu type bar over texts whose paragraphs differ (S11-h)', () => {
     expect(bar.getByTestId('type-size')).toHaveAttribute('placeholder', 'Auto')
     await openBorder(user)
     expect(await screen.findByRole('combobox', { name: 'Outline method' })).toHaveTextContent(
-      'Expansion',
+      'Contour stroke',
     )
     await user.keyboard('{Escape}')
 

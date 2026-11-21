@@ -44,7 +44,7 @@ pub const LOOK: [&str; 10] = [
 
 /// A lettering default: the character values of the [`LOOK`] keys, beside
 /// which a size may stand, which Reset never writes, and how the borders
-/// are drawn, which no default sets.
+/// are drawn, which no default sets, so it draws Koharu's border.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Look {
     pub chars: CharStyle,
@@ -619,6 +619,7 @@ mod tests {
         assert_eq!(patch["chars"]["fill_gradient"], Value::Null);
         assert_eq!(patch["chars"]["tracking"], Value::Null);
         assert_eq!(patch["chars"]["fill"], json!(BLUE));
+        // No method: Koharu's border, and a text Koharu can read.
         assert_eq!(patch["stroke_method"], Value::Null);
         assert_eq!(patch.as_object().map(|patch| patch.len()), Some(2));
     }

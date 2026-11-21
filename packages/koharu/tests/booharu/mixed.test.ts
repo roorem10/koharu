@@ -53,8 +53,8 @@ async function editsOf(run: () => Promise<unknown>): Promise<Edit[]> {
 describe('Booharu paragraph values the selected texts share (S11-h)', () => {
   it('tells each paragraph value the texts share, as each is drawn', () => {
     const share = paragraphShare([
-      text('one', { style: { align: 'center', line_height: 1.2, stroke_method: 'contour' } }),
-      // Unset, each is the same as drawn: centred, 1.2 and contour.
+      text('one', { style: { align: 'center', line_height: 1.2, stroke_method: 'expansion' } }),
+      // Unset, each is the same as drawn: centred, 1.2 and expansion, Koharu's border.
       translated('two', { frame: box('shrink') }),
       text('three', { frame: 'point' }),
     ])
@@ -65,7 +65,7 @@ describe('Booharu paragraph values the selected texts share (S11-h)', () => {
       // A box that shrinks its text, and point text, show the size set alike.
       fit: { mixed: false, value: false },
       line_height: { mixed: false, value: 1.2 },
-      stroke_method: { mixed: false, value: 'contour' },
+      stroke_method: { mixed: false, value: 'expansion' },
     })
   })
 
@@ -74,7 +74,7 @@ describe('Booharu paragraph values the selected texts share (S11-h)', () => {
       text('one', {
         direction: 'vertical',
         frame: box('best'),
-        style: { line_height: 1.5, stroke_method: 'expansion' },
+        style: { line_height: 1.5, stroke_method: 'contour' },
       }),
       translated('two', { frame: box() }),
     ])
@@ -106,7 +106,7 @@ describe('Booharu paragraph values the selected texts share (S11-h)', () => {
       vertical: { mixed: false, value: false },
       fit: { mixed: false, value: false },
       line_height: { mixed: false, value: 1.2 },
-      stroke_method: { mixed: false, value: 'contour' },
+      stroke_method: { mixed: false, value: 'expansion' },
     })
   })
 })

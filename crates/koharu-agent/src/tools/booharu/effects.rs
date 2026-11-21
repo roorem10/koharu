@@ -148,9 +148,10 @@ impl Tool for GetTextEffects {
          tags in the app show them, changing nothing: for each translated block and text layer \
          of `page` with any, in reading order, its `layer`, its `effects`, from `border` (an \
          outline unlike its lettering default's, or none where that has one), `second_border` \
-         (a second outline drawn outside the first), `outline_method` (outlines drawn letter \
-         by letter, `stroke_method` `expansion`), `gradient` (a gradient fill, on the box or on \
-         any of its words) and `skew`, and the `skew` it shows, `x` and `y` in degrees, null \
+         (a second outline drawn outside the first), `outline_method` (outlines grown around \
+         the letters merged, `stroke_method` `contour`, where the default, no method, grows \
+         each letter's own as Koharu does), `gradient` (a gradient fill, on the box or on any \
+         of its words) and `skew`, and the `skew` it shows, `x` and `y` in degrees, null \
          with none. A box with none is left out. Its lettering default is the look \
          booharu_reset_lettering gives it at its size now, and what Booharu's automatic steps \
          wrote is no effect, so neither an outline Koharu placed nor a translation run's \

@@ -253,12 +253,13 @@ export function TypeBar() {
   const outerWidth = chars.outer_stroke_width ?? 0
   const outer = chars.outer_stroke ?? null
   const outerEnabled = bordered && outer !== null && outer[3] > 0 && outerWidth > 0
-  const strokeMethod: StrokeMethod = style.stroke_method ?? 'contour'
+  const strokeMethod: StrokeMethod = style.stroke_method ?? 'expansion'
   // Booharu: none shown while the targets' methods differ (S11-h).
   const strokeMethodMixed = share.stroke_method.mixed && drafted?.stroke_method === undefined
+  // Booharu: Koharu's border, the default, listed first.
   const strokeMethods: Record<StrokeMethod, string> = {
-    contour: t('booharu.borders.outlineContour'),
     expansion: t('booharu.borders.outlineExpansion'),
+    contour: t('booharu.borders.outlineContour'),
   }
   const direction: Direction = lettering?.direction ?? 'horizontal'
   // Booharu: none pressed while the targets' alignments differ (S11-h).
@@ -685,8 +686,9 @@ export function TypeBar() {
             items={strokeMethods}
             disabled={!paragraph}
             onValueChange={(next) =>
-              // Contour is what no method means, so the text stays readable by Koharu.
-              next && apply({ stroke_method: next === 'contour' ? null : (next as StrokeMethod) })
+              // Expansion, Koharu's border, is what no method means, so the text stays readable
+              // by Koharu.
+              next && apply({ stroke_method: next === 'expansion' ? null : (next as StrokeMethod) })
             }
           >
             <SelectTrigger
