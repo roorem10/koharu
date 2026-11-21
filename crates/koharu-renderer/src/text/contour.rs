@@ -1,17 +1,32 @@
-//! Booharu's Contour borders: a text's letters merged into one shape and
-//! grown outward with round corners, filled as regions under every fill.
-//! Koharu's own borders, the Expansion method and the default, stroke every
-//! run's glyphs under every fill. Koharu 0.89.0 grows them, and a synthetic
-//! bold, by a stroke in place of `kurbo::expand_path`, which grew a whole
-//! outline one way, so a dot wound against the rest of its letter shrank and
-//! lost its border (koharu-rs #1073, #1292); now every contour keeps one, and
-//! Contour grows a synthetic bold the same way. Contour stays a choice beside
-//! them: it grows one border around the letters merged, every run with that
-//! border together, filled once, so a translucent border shows no darker
-//! overlap where letters touch, even across runs. Its regions leave out every
+//! Booharu's text borders as regions, filled under every fill: Contour's, a
+//! text's letters merged into one shape and grown outward with round corners,
+//! and Koharu's own, the Expansion method and the default, each run's glyphs
+//! grown as Koharu's border pass grows them.
+//!
+//! Koharu 0.89.0 grows its borders, and a synthetic bold, by stroking every
+//! run's glyphs under every fill, in place of `kurbo::expand_path`, which grew
+//! a whole outline one way, so a dot wound against the rest of its letter
+//! shrank and lost its border (koharu-rs #1073, #1292); now every contour
+//! keeps one. But where the stroke's half-width passes a contour's own size,
+//! as beside the dot of an i or a colon once the border is wider than about a
+//! fifth of the text size, the stroke's inner side folds back past the
+//! contour, and filled by the non-zero rule the folds cancel it, leaving holes
+//! in the border beside the dot, as Koharu 0.89.0 draws it too. So Expansion's
+//! border passes fill the region the glyphs and their stroke cover where the
+//! stroke doesn't fold: each run's glyphs, as glifo strokes them, grown by the
+//! pass's growth with round joins ([`grown`]), made once as the text is laid
+//! out. It looks as Koharu draws it everywhere else, and the fill pass is
+//! still Koharu's own.
+//!
+//! Contour stays a choice beside it: it grows one border around the letters
+//! merged, every run with that border together, filled once, so a translucent
+//! border shows no darker overlap where letters touch, even across runs, and
+//! grows a synthetic bold as Koharu's fill does. Its regions leave out every
 //! letter whose fill isn't opaque, bordered or not, and such a fill's own
 //! border is only the ring outside its letters, so no border shows through a
-//! letter, as a stroke under the fill does.
+//! letter, as a border under the fill does.
+
+use std::collections::HashMap;
 
 use i_overlay::{
     core::{fill_rule::FillRule, overlay_rule::OverlayRule},
@@ -28,8 +43,10 @@ use skrifa::{
     instance::{LocationRef, NormalizedCoord, Size},
     outline::{DrawSettings, OutlinePen},
 };
+use vello_gpu::peniko::Fill;
 
 use super::{TextRun, arrange::GlyphRun, draw};
+use crate::Drawing;
 
 /// A region as i_overlay holds it: shapes, each an outer contour and its
 /// holes.
@@ -60,7 +77,9 @@ pub(super) fn regions(runs: &[GlyphRun], resolved: &[TextRun]) -> Vec<(Color, Be
     for (glyphs, run) in runs.iter().zip(resolved) {
         // Booharu: a gradient fill is translucent where any stop is.
         if !crate::booharu::opaque(run) {
-            outlines(glyphs, run.size, &mut clear);
+            outlines(glyphs, run.size, Outlines::Filled, |_, path| {
+                clear.extend(path)
+            });
         }
         let Some(stroke) = run.stroke else {
             continue;
@@ -82,7 +101,9 @@ pub(super) fn regions(runs: &[GlyphRun], resolved: &[TextRun]) -> Vec<(Color, Be
         };
         let group = &mut groups[at];
         group.opaque &= crate::booharu::opaque(run); // Booharu: every stop too.
-        outlines(glyphs, run.size, &mut group.letters);
+        outlines(glyphs, run.size, Outlines::Filled, |_, path| {
+            group.letters.extend(path);
+        });
     }
     let clear = merged(&clear);
     let cut = |region: Shapes| match clear.is_empty() {
@@ -121,11 +142,163 @@ pub(super) fn regions(runs: &[GlyphRun], resolved: &[TextRun]) -> Vec<(Color, Be
     outer
 }
 
-/// Adds the outlines of `run`'s glyphs at `size` to `letters`, where the
-/// fill draws them: grown by a synthetic bold ([`emboldened`]) and slanted or
-/// turned as `draw` draws them, each wound the same way, so letters that
-/// overlap merge rather than cancel.
-fn outlines(run: &GlyphRun, size: f32, letters: &mut BezPath) {
+/// A run's border by the Expansion method, Koharu's and the default, as the
+/// regions `draw`'s border passes fill: its glyphs grown by what each pass
+/// grows them by, in the text's own coordinates. `None` where the run has no
+/// such border or the pass grows it by nothing, which `draw` draws as Koharu
+/// does.
+#[derive(Default)]
+pub(crate) struct Grown {
+    /// Grown by the second border's width too (`Pass::Outer`).
+    pub(crate) outer: Option<BezPath>,
+    /// Grown by the border's width (`Pass::Stroke`).
+    pub(crate) stroke: Option<BezPath>,
+}
+
+/// The borders of a text's glyph `runs`, as `resolved` paints them, by the
+/// Expansion method: for each run, its glyphs as Koharu's border pass strokes
+/// them ([`Outlines::Stroked`]), each merged by the non-zero rule and grown
+/// with round joins by that pass's growth, the border's width and its
+/// synthetic bold's growth (`draw::bold`), and the second border's width as
+/// well for the second border. That's every point within the growth of the
+/// glyphs, which the pass's fill and its stroke twice as wide cover together
+/// wherever the stroke doesn't fold, with no hole beside a dot or in a small
+/// counter. Empty when no run has a border.
+///
+/// Each glyph grows alone, once for every glyph it repeats, and the run's
+/// region holds them all where the run sets them, overlapping, which the
+/// non-zero rule fills as one: the glyphs merged and grown together are the
+/// same shape, but growing them so costs many times more, as a long run's
+/// curves fold over each other far more often than one glyph's do.
+pub(super) fn grown(runs: &[GlyphRun], resolved: &[TextRun]) -> Vec<Grown> {
+    if resolved.iter().all(|run| run.stroke.is_none()) {
+        return Vec::new();
+    }
+    runs.iter()
+        .zip(resolved)
+        .map(|(glyphs, run)| {
+            let Some((_, width)) = run.stroke else {
+                return Grown::default();
+            };
+            // What `draw` grows each pass by, reckoned as it does.
+            let bold = draw::bold(&glyphs.font, run.size);
+            let stroke = bold + f64::from(width);
+            let outer = run
+                .outer_stroke
+                .map(|(_, outer)| (bold + f64::from(width + outer), f64::from(outer)));
+            if stroke <= 0.0 && outer.is_none_or(|(outer, _)| outer <= 0.0) {
+                return Grown::default();
+            }
+            let turn = draw::turn(&glyphs.font, glyphs.sideways).unwrap_or(Affine::IDENTITY);
+            let mut alike: HashMap<u32, [Option<BezPath>; 2]> = HashMap::new();
+            let mut regions = [BezPath::new(), BezPath::new()];
+            outlines(glyphs, run.size, Outlines::Stroked, |glyph, outline| {
+                let grown = alike.entry(glyph.id).or_insert_with(|| {
+                    let letter = merged(&outline);
+                    let first = (stroke > 0.0).then(|| grow(&letter, stroke));
+                    // The second border grows on from the first where there's
+                    // one, the same shape as the letter grown by both at once,
+                    // at less cost.
+                    let second = outer.and_then(|(reach, more)| match &first {
+                        Some(first) if more > 0.0 => Some(grow(first, more)),
+                        _ => (reach > 0.0).then(|| grow(&letter, reach)),
+                    });
+                    // Turned once grown, as glifo strokes a glyph before its
+                    // glyph transform (see `Outlines::Stroked`).
+                    [second, first].map(|grown| {
+                        let mut grown = path(&grown?);
+                        grown.apply_affine(turn);
+                        Some(grown)
+                    })
+                });
+                let at = Affine::translate((f64::from(glyph.x), f64::from(glyph.y)));
+                for (region, grown) in regions.iter_mut().zip(grown.iter()) {
+                    if let Some(grown) = grown {
+                        region.extend(grown.elements().iter().map(|element| at * *element));
+                    }
+                }
+            });
+            let [outer, stroke] = regions.map(|region| (!region.is_empty()).then_some(region));
+            Grown { outer, stroke }
+        })
+        .collect()
+}
+
+/// `letter` grown outward by `distance` with round corners ([`offset`]),
+/// its holes no wider than twice the distance filled in first: every point
+/// of such a hole lies within the distance of its side, one way across it
+/// or the other, so it fills anyway, and growing it would cost the most, as
+/// its sides grown pass over each other.
+fn grow(letter: &Shapes, distance: f64) -> Shapes {
+    let wide = |hole: &&Vec<[f64; 2]>| {
+        let (mut low, mut high) = ([f64::MAX; 2], [f64::MIN; 2]);
+        for point in hole.iter() {
+            for axis in 0..2 {
+                low[axis] = low[axis].min(point[axis]);
+                high[axis] = high[axis].max(point[axis]);
+            }
+        }
+        (0..2).all(|axis| high[axis] - low[axis] > 2.0 * distance)
+    };
+    let letter: Shapes = letter
+        .iter()
+        .map(|shape| match shape.split_first() {
+            Some((outline, holes)) => std::iter::once(outline)
+                .chain(holes.iter().filter(wide))
+                .cloned()
+                .collect(),
+            None => Vec::new(),
+        })
+        .collect();
+    offset(&letter, distance)
+}
+
+/// Fills `region`, a run's glyphs grown, in `paint` by the non-zero rule,
+/// through the drawing's transform, which Koharu's stroke drew through too.
+/// One shape, it shows a translucent paint at one even alpha with no layer of
+/// its own, which the stroke needed for its overlap with the glyphs. The
+/// scene's fill rule is left as it was, for the fills after it.
+pub(super) fn fill(drawing: &mut Drawing, region: &BezPath, paint: Color) {
+    let state = drawing.scene.save_current_state();
+    drawing.scene.set_fill_rule(Fill::NonZero);
+    drawing.scene.set_paint(paint);
+    drawing.scene.fill_path(region);
+    drawing.scene.restore_state(state);
+}
+
+/// Which outlines of a run's glyphs [`outlines`] gives.
+#[derive(Clone, Copy)]
+enum Outlines {
+    /// Where the fill draws them, as Contour grows its border from them:
+    /// grown by a synthetic bold ([`emboldened`]), then slanted or turned and
+    /// placed as `draw` draws them, each wound the same way, so letters that
+    /// overlap merge rather than cancel.
+    Filled,
+    /// As Koharu's border pass strokes them, for the Expansion method's
+    /// regions ([`grown`]): not grown by a synthetic bold, which the pass
+    /// grows them by with its border, and neither slanted, turned nor placed.
+    /// glifo strokes a glyph's outline in its own space, at the run's size,
+    /// and only then applies the run's glyph transform: glifo 0.5 keeps a
+    /// stroked outline at its font size (`GlyphScaleProperties`), and its
+    /// `stroke_uncached_outline_glyph` sets the glyph's transform, its place
+    /// after the glyph transform (`draw::turn`) after a flip from the font's
+    /// y up, while vello_common 0.4's `flatten::stroke` expands the stroke in
+    /// the path's own space before it applies that transform. So the stroke's
+    /// round joins slant and turn with the glyph: a synthetic slant shears
+    /// them into ellipses, while a quarter turn only moves them. [`grown`]
+    /// grows each glyph so, and turns it after. A colour glyph, which glifo
+    /// paints in its colours in place of a stroke, is left out.
+    Stroked,
+}
+
+/// Gives `each` of `run`'s glyphs with its outline at `size`, as `which`
+/// gives it, flipped from the font's y up to the text's y down.
+fn outlines(
+    run: &GlyphRun,
+    size: f32,
+    which: Outlines,
+    mut each: impl FnMut(&glifo::Glyph, BezPath),
+) {
     let font = &run.font;
     let Ok(face) = skrifa::FontRef::from_index(font.data.data.as_ref(), font.data.index) else {
         return;
@@ -136,12 +309,17 @@ fn outlines(run: &GlyphRun, size: f32, letters: &mut BezPath) {
         .map(|bits| NormalizedCoord::from_bits(*bits))
         .collect();
     let outlines = face.outline_glyphs();
+    let colours = face.color_glyphs();
     let bold = draw::bold(font, size);
     // As glifo places an outline: the run's glyph transform after flipping
     // it from the font's y up.
     let turn = draw::turn(font, run.sideways).unwrap_or(Affine::IDENTITY) * Affine::FLIP_Y;
     for glyph in &run.glyphs {
-        let Some(outline) = outlines.get(GlyphId::new(glyph.id)) else {
+        let id = GlyphId::new(glyph.id);
+        if matches!(which, Outlines::Stroked) && colours.get(id).is_some() {
+            continue;
+        }
+        let Some(outline) = outlines.get(id) else {
             continue;
         };
         let mut pen = Pen(BezPath::new());
@@ -150,14 +328,21 @@ fn outlines(run: &GlyphRun, size: f32, letters: &mut BezPath) {
             continue;
         }
         let mut path = pen.0;
-        if bold > 0.0 {
-            path = emboldened(&path, bold);
+        match which {
+            Outlines::Filled => {
+                if bold > 0.0 {
+                    path = emboldened(&path, bold);
+                }
+                path.apply_affine(
+                    Affine::translate((f64::from(glyph.x), f64::from(glyph.y))) * turn,
+                );
+                if path.area() < 0.0 {
+                    path = path.reverse_subpaths();
+                }
+            }
+            Outlines::Stroked => path.apply_affine(Affine::FLIP_Y),
         }
-        path.apply_affine(Affine::translate((f64::from(glyph.x), f64::from(glyph.y))) * turn);
-        if path.area() < 0.0 {
-            path = path.reverse_subpaths();
-        }
-        letters.extend(path.elements().iter().copied());
+        each(glyph, path);
     }
 }
 
@@ -259,7 +444,7 @@ impl OutlinePen for Pen {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use koharu_scene::{CharStyle, Rgba, StrokeMethod, Text, TextStyle};
+    use koharu_scene::{CharStyle, Direction, Rgba, StrokeMethod, Text, TextStyle};
     use kurbo::{Circle, Point, Rect};
 
     use super::*;
@@ -607,5 +792,278 @@ mod tests {
         assert!(grown.contains(Point::new(5.0, -3.9)));
         assert!(grown.contains(Point::new(-2.8, -2.8)));
         assert!(!grown.contains(Point::new(-2.9, -2.9)));
+    }
+
+    /// The installed sans-serif the tests set text in.
+    fn sans() -> crate::fonts::Font {
+        let mut library = Library::new();
+        ["Arial", "DejaVu Sans", "Helvetica"]
+            .into_iter()
+            .find_map(|family| library.family(family).ok())
+            .expect("an installed sans-serif")
+    }
+
+    /// `content` set at 48 px in `font`, in `direction`, filled in `fill`,
+    /// with a `border` and maybe a `second` border, each a colour and a
+    /// width, by Koharu's method, the default. Its borders are each run's
+    /// glyphs grown, which lie inside its bounds.
+    fn bordered(
+        content: &str,
+        font: &crate::fonts::Font,
+        direction: Direction,
+        fill: Rgba,
+        border: (Rgba, f64),
+        second: Option<(Rgba, f64)>,
+    ) -> Result<crate::text::TextLayout> {
+        let text = Text {
+            content: content.into(),
+            direction,
+            style: TextStyle {
+                chars: CharStyle {
+                    size: Some(48.0),
+                    fill: Some(fill),
+                    stroke: Some(border.0),
+                    stroke_width: Some(border.1),
+                    outer_stroke: second.map(|(color, _)| color),
+                    outer_stroke_width: second.map(|(_, width)| width),
+                    ..CharStyle::default()
+                },
+                ..TextStyle::default()
+            },
+            ..Text::default()
+        };
+        let layout = crate::text::layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout");
+        assert!(layout.contours.is_none());
+        assert_eq!(layout.grown.len(), layout.runs.len());
+        for grown in &layout.grown {
+            assert!(grown.stroke.is_some());
+            assert_eq!(grown.outer.is_some(), second.is_some());
+            for region in [&grown.outer, &grown.stroke].into_iter().flatten() {
+                let reach = region.bounding_box();
+                assert!(
+                    layout.bounds.contains_rect(reach),
+                    "{reach:?} past {:?}",
+                    layout.bounds
+                );
+            }
+        }
+        Ok(layout)
+    }
+
+    /// The pixels of `image` within `reach` of its ink, the pixels it covers
+    /// at least half, from one pixel's centre to another's.
+    fn near_ink(image: &image::RgbaImage, reach: f64) -> Vec<(u32, u32)> {
+        let (width, height) = (i64::from(image.width()), i64::from(image.height()));
+        let mut near = vec![false; (width * height) as usize];
+        let span = reach.floor() as i64;
+        for (x, y, pixel) in image.enumerate_pixels() {
+            if pixel.0[3] < 128 {
+                continue;
+            }
+            for dy in -span..=span {
+                for dx in -span..=span {
+                    let (x, y) = (i64::from(x) + dx, i64::from(y) + dy);
+                    let inside = (0..width).contains(&x) && (0..height).contains(&y);
+                    if inside && ((dx * dx + dy * dy) as f64) <= reach * reach {
+                        near[(y * width + x) as usize] = true;
+                    }
+                }
+            }
+        }
+        (0..height)
+            .flat_map(|y| (0..width).map(move |x| (x, y)))
+            .filter(|(x, y)| near[(y * width + x) as usize])
+            .map(|(x, y)| (x as u32, y as u32))
+            .collect()
+    }
+
+    #[test]
+    fn a_wide_border_leaves_no_hole_beside_a_dot() -> Result<()> {
+        let font = sans();
+        let (white, clear) = (Rgba([1.0, 1.0, 1.0, 1.0]), Rgba([1.0, 1.0, 1.0, 0.0]));
+        let (red, black) = (Rgba([1.0, 0.0, 0.0, 1.0]), Rgba([0.0, 0.0, 0.0, 1.0]));
+        // Borders reaching a quarter of the size, past where Koharu's stroke
+        // folds beside a dot and leaves a hole there (about a fifth): one
+        // border, then a second border under a narrow one, opaque, and clear
+        // so that the second border's own holes show through it.
+        let borders = [
+            ((black, 12.0), None),
+            ((red, 4.0), Some((black, 8.0))),
+            ((clear, 4.0), Some((black, 8.0))),
+        ];
+        for (border, second) in borders {
+            let content = ": … i! j? ;";
+            let layout = bordered(content, &font, Direction::Horizontal, white, border, second)?;
+            let Some(image) = drawn(&layout, true)? else {
+                return Ok(());
+            };
+            let letters = drawn(&layout, false)?.expect("a GPU");
+            // Every pixel within the borders' reach of the letters' own ink,
+            // short of a pixel and a half for the edges' antialiasing, is
+            // opaque. Koharu's stroke leaves 430 such pixels clear with one
+            // border, and 6 and 430 with the second.
+            let reach = border.1 + second.map_or(0.0, |(_, width)| width) - 1.5;
+            let near = near_ink(&letters, reach);
+            let holes: Vec<_> = near
+                .iter()
+                .filter(|(x, y)| image.get_pixel(*x, *y).0[3] < 250)
+                .collect();
+            assert!(
+                holes.is_empty(),
+                "{} of {} pixels show through, as at {:?}",
+                holes.len(),
+                near.len(),
+                &holes[..holes.len().min(8)]
+            );
+        }
+        Ok(())
+    }
+
+    /// `layout`'s borders as Koharu 0.89.0 draws them, in black, on a
+    /// drawing as `drawn`'s: each run's glyphs filled, then stroked twice as
+    /// wide as the border grows them, with round joins, through
+    /// `Drawing::glyphs`; `None` without a GPU.
+    fn koharus(layout: &crate::text::TextLayout) -> Result<Option<image::RgbaImage>> {
+        let Ok(gpu) = crate::Gpu::get() else {
+            eprintln!("skipped drawing without a GPU");
+            return Ok(None);
+        };
+        let size = layout.bounds.size();
+        let mut drawing = gpu.drawing(size.width.ceil() as u16, size.height.ceil() as u16);
+        drawing
+            .scene
+            .set_transform(Affine::translate((-layout.bounds.x0, -layout.bounds.y0)));
+        drawing.scene.set_paint(Color::BLACK);
+        for (glyphs, run) in layout.runs.iter().zip(&layout.resolved.runs) {
+            let Some((_, width)) = run.stroke else {
+                continue;
+            };
+            let grow = draw::bold(&glyphs.font, run.size) + f64::from(width);
+            let stroke = Stroke::new(2.0 * grow).with_join(Join::Round);
+            let turn = draw::turn(&glyphs.font, glyphs.sideways);
+            drawing.glyphs(&glyphs.font, run.size, turn, Some(stroke), &glyphs.glyphs)?;
+        }
+        Ok(Some(drawing.read()?))
+    }
+
+    /// How far `ours` lies from `theirs`, by their alpha: the largest
+    /// difference at a pixel; how many pixels differ by more than 8 away from
+    /// the edge `theirs` antialiases, its pixels neither clear nor opaque and
+    /// those beside them; and how far apart the two edges lie on average, in
+    /// pixels: the differences summed, over that edge's length in pixels.
+    fn difference(ours: &image::RgbaImage, theirs: &image::RgbaImage) -> (u8, usize, f64) {
+        let (width, height) = theirs.dimensions();
+        let edge = |x: u32, y: u32| (1..255).contains(&theirs.get_pixel(x, y).0[3]);
+        let beside = |x: u32, y: u32| {
+            (x.saturating_sub(1)..=(x + 1).min(width - 1))
+                .any(|x| (y.saturating_sub(1)..=(y + 1).min(height - 1)).any(|y| edge(x, y)))
+        };
+        let (mut largest, mut off_edge, mut sum, mut length) = (0, 0, 0.0, 0);
+        for (x, y, pixel) in ours.enumerate_pixels() {
+            let difference = pixel.0[3].abs_diff(theirs.get_pixel(x, y).0[3]);
+            largest = largest.max(difference);
+            off_edge += usize::from(difference > 8 && !beside(x, y));
+            sum += f64::from(difference) / 255.0;
+            length += usize::from(edge(x, y));
+        }
+        (largest, off_edge, sum / length.max(1) as f64)
+    }
+
+    #[test]
+    fn a_border_draws_as_koharus_stroke_where_it_does_not_fold() -> Result<()> {
+        // Letters with no dot, which Koharu's stroke doesn't fold beside at
+        // these widths: plain, under a synthetic bold and a synthetic slant,
+        // and sideways in a column.
+        let plain = sans();
+        let mut cases = vec![("plain", plain.clone(), Direction::Horizontal)];
+        let faked = [
+            ("bold", fontique::FontStyle::Normal, 900.0),
+            ("slanted", fontique::FontStyle::Italic, 400.0),
+        ];
+        for (name, style, weight) in faked {
+            match crate::booharu::faked(style, weight) {
+                Some(font) => cases.push((name, font, Direction::Horizontal)),
+                None => eprintln!("skipped the {name} letters"),
+            }
+        }
+        cases.push(("sideways", plain, Direction::Vertical));
+        let clear = Rgba([1.0, 1.0, 1.0, 0.0]);
+        let black = Rgba([0.0, 0.0, 0.0, 1.0]);
+        for (name, font, direction) in &cases {
+            for content in ["Hello World", "WAVE MAW"] {
+                for width in [2.0, 4.0, 8.0] {
+                    // The border alone, under a clear fill.
+                    let layout = bordered(content, font, *direction, clear, (black, width), None)?;
+                    let run = &layout.runs[0];
+                    match *name {
+                        "bold" => assert!(draw::bold(&run.font, 48.0) > 0.0),
+                        "slanted" => assert!(draw::turn(&run.font, false).is_some()),
+                        "sideways" => assert!(layout.runs.iter().all(|run| run.sideways)),
+                        _ => {}
+                    }
+                    let Some(ours) = drawn(&layout, true)? else {
+                        return Ok(());
+                    };
+                    let theirs = koharus(&layout)?.expect("a GPU");
+                    let (largest, off_edge, apart) = difference(&ours, &theirs);
+                    // vello expands Koharu's stroke, then flattens it, each
+                    // within a quarter of a pixel (vello_common 0.4's `TOL`),
+                    // its chords inside the curve, where the region keeps
+                    // within a fiftieth. Measured on llvmpipe in DejaVu Sans:
+                    // the largest difference 105 of 255, at a round join; the
+                    // edges 0.073 of a pixel apart on average at most, the
+                    // region's outside; and no pixel off Koharu's antialiased
+                    // edge differing by more than 8, an edge which takes in
+                    // the faint seam (alpha 236) its stroke leaves where
+                    // World's l and d meet at 8 px. So a pixel may differ
+                    // only on or beside that edge, by 144 at most, and the
+                    // edges lie within 0.15 of a pixel on average, where
+                    // growth off by a pixel, or mitred joins, differ by whole
+                    // pixels.
+                    let case = format!("{name} {content:?} at {width} px");
+                    assert_eq!(off_edge, 0, "{case}: {off_edge} pixels off the edge");
+                    assert!(largest <= 144, "{case}: {largest} of 255 apart");
+                    assert!(apart <= 0.15, "{case}: {apart:.3} px apart");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_see_through_border_shows_one_alpha_over_its_run() -> Result<()> {
+        let font = sans();
+        let clear = Rgba([1.0, 1.0, 1.0, 0.0]);
+        let half = Rgba([0.0, 0.0, 0.0, 0.5]);
+        // Letters set close in one run under a clear fill, their glyphs grown
+        // overlapping: a border at half alpha, then a second border at half
+        // alpha under a clear border.
+        for (border, second) in [((half, 8.0), None), ((clear, 4.0), Some((half, 4.0)))] {
+            let layout = bordered(
+                "WAVE MAW",
+                &font,
+                Direction::Horizontal,
+                clear,
+                border,
+                second,
+            )?;
+            assert_eq!(layout.runs.len(), 1);
+            let Some(image) = drawn(&layout, true)? else {
+                return Ok(());
+            };
+            // Half alpha through and through, where an overlap drawn twice
+            // would show three quarters, but for its antialiased edge: 7% of
+            // the pixels it inks, measured in DejaVu Sans.
+            let alphas: Vec<u8> = image.pixels().map(|pixel| pixel.0[3]).collect();
+            let most = alphas.iter().copied().max().unwrap_or_default();
+            let inked = alphas.iter().filter(|alpha| **alpha > 0).count();
+            let even = alphas
+                .iter()
+                .filter(|alpha| alpha.abs_diff(128) <= 2)
+                .count();
+            assert!(most <= 130, "{most}");
+            assert!(even * 5 > inked * 4, "{even} of {inked}");
+        }
+        Ok(())
     }
 }

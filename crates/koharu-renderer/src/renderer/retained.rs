@@ -28,7 +28,8 @@ pub(super) type Cache = quick_cache::sync::Cache<Hash, Option<Content>, Weight>;
 
 /// What retained content may take, in bytes: pixels count with their levels;
 /// a text's layout or a shape counts as a kilobyte.
-/// Booharu: a text's Contour border regions count as what they hold.
+/// Booharu: a text's border regions, by either method, count as what they
+/// hold.
 const CACHE_BYTES: u64 = 2 << 30;
 
 #[derive(Clone)]
@@ -38,13 +39,18 @@ impl quick_cache::Weighter<Hash, Option<Content>> for Weight {
     fn weight(&self, _: &Hash, content: &Option<Content>) -> u64 {
         match content {
             Some(Content::Pixels(pixels)) => pixels.bytes(),
-            // Booharu: a long text's borders can take megabytes.
+            // Booharu: a long text's borders can take megabytes, Contour's
+            // regions or Expansion's, one for each run and border.
             Some(Content::Text(layout)) => {
-                1024 + layout
-                    .contours
+                let contours = layout.contours.iter().flatten().map(|(_, region)| region);
+                let grown = layout
+                    .grown
                     .iter()
-                    .flatten()
-                    .map(|(_, region)| std::mem::size_of_val(region.elements()) as u64)
+                    .flat_map(|grown| [&grown.outer, &grown.stroke])
+                    .flatten();
+                1024 + contours
+                    .chain(grown)
+                    .map(|region| std::mem::size_of_val(region.elements()) as u64)
                     .sum::<u64>()
             }
             _ => 1024,
@@ -174,7 +180,7 @@ impl Renderer {
     }
 }
 
-// Booharu: a text weighs what its Contour borders hold.
+// Booharu: a text weighs what its border regions hold.
 #[cfg(test)]
 mod tests {
     use koharu_scene::{CharStyle, Rgba, StrokeMethod, TextStyle};
@@ -184,18 +190,18 @@ mod tests {
     use crate::fonts::Library;
 
     #[test]
-    fn a_text_weighs_what_its_contour_borders_hold() -> Result<()> {
+    fn a_text_weighs_what_its_border_regions_hold() -> Result<()> {
         let mut library = Library::new();
         let font = ["Arial", "DejaVu Sans", "Helvetica"]
             .into_iter()
             .find_map(|family| library.family(family).ok())
             .expect("an installed sans-serif");
-        let weight = |method| -> Result<u64> {
+        let weight = |stroke, method| -> Result<u64> {
             let text = Text {
                 content: "Bordered".into(),
                 style: TextStyle {
                     chars: CharStyle {
-                        stroke: Some(Rgba([1.0, 1.0, 1.0, 1.0])),
+                        stroke,
                         stroke_width: Some(3.0),
                         ..CharStyle::default()
                     },
@@ -207,11 +213,14 @@ mod tests {
             let layout = text::layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout");
             Ok(Weight.weight(&Hash::of(b"text"), &Some(Content::Text(Arc::new(layout)))))
         };
-        // No method, as Expansion, draws Koharu's border, which holds no
-        // regions.
-        assert_eq!(weight(None)?, 1024);
-        assert_eq!(weight(Some(StrokeMethod::Expansion))?, 1024);
-        assert!(weight(Some(StrokeMethod::Contour))? > 10 * 1024);
+        // A text with no border holds no regions; no method, as Expansion,
+        // holds its runs' grown glyphs, and Contour its merged letters grown.
+        let white = Some(Rgba([1.0, 1.0, 1.0, 1.0]));
+        assert_eq!(weight(None, None)?, 1024);
+        assert_eq!(weight(None, Some(StrokeMethod::Contour))?, 1024);
+        assert!(weight(white, None)? > 10 * 1024);
+        assert!(weight(white, Some(StrokeMethod::Expansion))? > 10 * 1024);
+        assert!(weight(white, Some(StrokeMethod::Contour))? > 10 * 1024);
         Ok(())
     }
 }

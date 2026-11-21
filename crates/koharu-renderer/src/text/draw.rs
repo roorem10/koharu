@@ -21,8 +21,10 @@ enum Pass {
 /// strokes too when `strokes` says so. Strokes draw first, under every fill,
 /// as Photoshop draws an Outside stroke under its type: as the glyphs grown
 /// by the stroke's width with round joins.
-/// Booharu: or, by its Contour method, as the regions the layout grew from
-/// its merged letters.
+/// Booharu: each run's border filled as the region its glyphs grown cover,
+/// which the layout grew once (`TextLayout::grown`), in place of a stroke,
+/// which folds beside a dot and leaves holes there; or, by its Contour
+/// method, as the regions the layout grew from its merged letters.
 pub(crate) fn draw(
     drawing: &mut Drawing,
     layout: &TextLayout,
@@ -45,7 +47,8 @@ pub(crate) fn draw(
         (false, _) => &[Pass::Fill],
     };
     for &pass in passes {
-        for (glyphs, run) in layout.runs.iter().zip(&layout.resolved.runs) {
+        // Booharu: `at`, the run's place, for its grown borders.
+        for (at, (glyphs, run)) in layout.runs.iter().zip(&layout.resolved.runs).enumerate() {
             let (paint, width, join) = match (pass, run.stroke, run.outer_stroke) {
                 (Pass::Outer, Some((_, width)), Some((color, outer))) => {
                     (color, f64::from(width + outer), Join::Round)
@@ -64,8 +67,27 @@ pub(crate) fn draw(
             // and it grows every contour one way, by the glyph's area, so a
             // contour wound against the rest, like some fonts' dots on i and
             // j, shrinks instead (koharu-rs/koharu#1073).
+            // Booharu: but where the stroke's half-width passes a small
+            // contour, as beside a dot once a border is wider than about a
+            // fifth of the size, its inner side folds back past the contour
+            // and the folds cancel by the non-zero rule, leaving holes, so
+            // the border passes below fill the run's glyphs grown instead
+            // (contour.rs); the fill's synthetic bold still strokes here.
             let grow = bold + width;
             let stroke = (grow > 0.0).then(|| Stroke::new(2.0 * grow).with_join(join));
+            // Booharu: a border pass fills the run's glyphs grown by `grow`
+            // with round joins, as the layout grew them: what the fill and
+            // the stroke cover together where the stroke doesn't fold, with
+            // no holes, and one shape, so a translucent paint needs no layer.
+            let grown = layout.grown.get(at).and_then(|grown| match pass {
+                Pass::Outer => grown.outer.as_ref(),
+                Pass::Stroke => grown.stroke.as_ref(),
+                Pass::Fill => None,
+            });
+            if let Some(region) = grown.filter(|_| stroke.is_some()) {
+                super::contour::fill(drawing, region, paint);
+                continue;
+            }
             // Booharu: a gradient fill paints in place of the flat one.
             let gradient = match pass {
                 Pass::Fill => glyphs.fill.as_ref(),

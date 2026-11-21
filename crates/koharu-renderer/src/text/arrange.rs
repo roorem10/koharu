@@ -39,6 +39,10 @@ pub(crate) struct TextLayout {
     /// every fill; `None` when the Expansion method, Koharu's and the
     /// default, grows them from the glyphs as they draw.
     pub contours: Option<Vec<(Color, BezPath)>>,
+    /// Booharu: by the Expansion method, each run's borders as the regions
+    /// its border passes fill, one for each of `runs`, in order; empty when
+    /// no run has a border or the Contour method grows them.
+    pub grown: Vec<contour::Grown>,
 }
 
 /// The font and positioned glyphs of one of a layout's runs.
@@ -144,6 +148,12 @@ pub(super) fn arrange(
         );
     let contours = (styled.stroke_method == StrokeMethod::Contour)
         .then(|| contour::regions(&runs, &text_runs));
+    // Booharu: Expansion borders fill each run's glyphs grown, made here once
+    // with the layout, which a change of text or style lays out anew.
+    let grown = match contours {
+        Some(_) => Vec::new(),
+        None => contour::grown(&runs, &text_runs),
+    };
     let utf16 = |at: &usize| utf16(&styled.text, *at);
     Ok(TextLayout {
         runs,
@@ -169,6 +179,7 @@ pub(super) fn arrange(
             |bounds, (_, region)| bounds.union(region.bounding_box()),
         ),
         contours,
+        grown, // Booharu: Expansion borders' regions.
     })
 }
 
