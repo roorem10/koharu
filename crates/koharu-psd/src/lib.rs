@@ -74,8 +74,8 @@ pub fn export(
 
 /// Booharu: `export`, which also adds to `notices`, once the file is
 /// written, a `Notice` for each text it drew into its layer's pixels as its
-/// words' effects differ, with a hidden type layer beside it to edit
-/// (S13-i).
+/// words' effects differ, with a hidden type layer directly under it to
+/// edit (S13-i).
 pub fn export_noting(
     session: &Session,
     renderer: &Renderer,
@@ -228,6 +228,14 @@ impl Export<'_> {
                 if let Some(resolved) = drawn.text()
                     && !resolved.runs.is_empty()
                 {
+                    // Booharu: pixels over a hidden copy when its words
+                    // carry effects of their own (S13-g).
+                    if crate::booharu::word_effects(resolved) {
+                        let mask = self.masks(layer)?;
+                        return crate::booharu::pixels(
+                            self, drawn, leaf, blocks, text, resolved, mask, layer.id,
+                        );
+                    }
                     blocks.extend(blocks::type_layer(text, resolved, self.texts));
                     self.texts += 1;
                 }
@@ -346,6 +354,27 @@ impl Export<'_> {
         if let Some(resolved) = translation.text()
             && !resolved.runs.is_empty()
         {
+            // Booharu: pixels over a hidden copy when its words carry
+            // effects of their own, noted by the block (S13-g).
+            if crate::booharu::word_effects(resolved) {
+                let name = text.content.text();
+                let leaf = Leaf {
+                    name: &name,
+                    visible: true,
+                    opacity: 255,
+                    blend: Blend::Normal,
+                };
+                return crate::booharu::pixels(
+                    self,
+                    translation,
+                    leaf,
+                    blocks,
+                    text,
+                    resolved,
+                    None,
+                    id,
+                );
+            }
             blocks.extend(blocks::type_layer(text, resolved, self.texts));
             self.texts += 1;
         }

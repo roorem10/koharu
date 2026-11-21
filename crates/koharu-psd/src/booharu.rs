@@ -1,19 +1,21 @@
 //! Booharu's part of PSD export: the rules a text follows on its way into a
 //! layer. A type layer's effects hold one border, one second border, and
 //! one gradient fill for all its words (`effects`), so a text whose words
-//! differ in them can't keep them as effects (`word_effects`); a layer
-//! whose effects Photoshop draws keeps its glyphs alone in its pixels
-//! (`glyphs_only`); and an export tells which texts it drew into pixels
-//! (`Notice`).
+//! differ in them can't keep them as effects (`word_effects`): it's drawn
+//! into a pixel layer over a hidden type layer of its words in plain
+//! styles to edit (`pixels`, `plain`). A layer whose effects Photoshop
+//! draws keeps its glyphs alone in its pixels (`glyphs_only`), and an
+//! export tells which texts it drew into pixels (`Notice`).
 
 use koharu_renderer::ResolvedText;
 use koharu_scene::{LayerId, PageId};
 use photocraft_psd::TaggedBlock;
 use serde::Serialize;
 
-pub(crate) use self::effects::effects;
+pub(crate) use self::{effects::effects, pixels::pixels};
 
 mod effects;
+mod pixels;
 
 /// Whether `text`'s words differ in their effects: its runs don't all share
 /// one border, one second border, and one gradient fill spread over one
@@ -32,6 +34,22 @@ pub(crate) fn word_effects(text: &ResolvedText) -> bool {
     })
 }
 
+/// `text` in plain styles, which a type layer holds with no effects: each
+/// run without its border, its second border, and its gradient fill with
+/// the box it spreads over, keeping its flat fill, which is a gradient's
+/// first stop, its face and size, its faked bold and slant, its letter
+/// spacing, and its range.
+pub(crate) fn plain(text: &ResolvedText) -> ResolvedText {
+    let mut plain = text.clone();
+    for run in &mut plain.runs {
+        run.stroke = None;
+        run.outer_stroke = None;
+        run.fill_gradient = None;
+        run.fill_extent = None;
+    }
+    plain
+}
+
 /// Whether a layer with `blocks` keeps its glyphs alone in its pixels, with
 /// no border: a type layer, as Photoshop draws its pixels again from its
 /// text, and a layer with effects, as Photoshop draws those around them.
@@ -45,11 +63,12 @@ pub(crate) fn glyphs_only(blocks: &[TaggedBlock]) -> bool {
 
 /// A text an export drew into its layer's pixels, as its words' effects
 /// differ and one type layer's effects can't hold them, with a hidden type
-/// layer beside it to edit. Its keys serialize in alphabetical order.
+/// layer directly under it to edit. Its keys serialize in alphabetical
+/// order.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Notice {
     /// Where its words stay editable: `hidden_plain_styles`, a hidden type
-    /// layer beside it, with plain styles.
+    /// layer directly under it, in plain styles.
     pub editable_copy: &'static str,
     /// The layer the text is: a translation's block, or a free text's own.
     pub layer: LayerId,
@@ -204,6 +223,67 @@ mod tests {
         assert!(word_effects(&words(|index, run| {
             effects(run, TEXT + kurbo::Vec2::new(index as f64 * 60.0, 0.0));
         })));
+    }
+
+    #[test]
+    fn plain_styles_take_off_the_effects_and_keep_the_rest() {
+        let text = words(|index, run| {
+            effects(run, if index == 1 { WORD } else { TEXT });
+            run.post_script_name = format!("Face{index}");
+            run.size = 20.0 + index as f32;
+            // A gradient's first stop, as the renderer gives it.
+            run.fill = Color::new([1.0, 0.0, 0.0, 1.0]);
+            run.faux_bold = index == 1;
+            run.faux_italic = index == 2;
+            run.tracking = index as f32 * 12.5;
+        });
+        assert!(word_effects(&text));
+        let plain = plain(&text);
+        assert_eq!(plain.runs.len(), text.runs.len());
+        for (plain, run) in plain.runs.iter().zip(&text.runs) {
+            assert_eq!(
+                (
+                    plain.stroke,
+                    plain.outer_stroke,
+                    &plain.fill_gradient,
+                    plain.fill_extent
+                ),
+                (None, None, &None, None)
+            );
+            assert_eq!(
+                (
+                    &plain.range,
+                    &plain.post_script_name,
+                    plain.size,
+                    plain.fill,
+                    plain.faux_bold,
+                    plain.faux_italic,
+                    plain.tracking
+                ),
+                (
+                    &run.range,
+                    &run.post_script_name,
+                    run.size,
+                    run.fill,
+                    run.faux_bold,
+                    run.faux_italic,
+                    run.tracking
+                )
+            );
+        }
+        // The layout around the runs stays as it was.
+        let runs = text.runs.clone();
+        assert_eq!(
+            ResolvedText {
+                runs,
+                ..plain.clone()
+            },
+            text
+        );
+        // So its words share their effects, none, and a type layer of it
+        // carries no effects block.
+        assert!(!word_effects(&plain));
+        assert_eq!(super::effects(&koharu_scene::Text::default(), &plain), None);
     }
 
     #[test]
