@@ -46,6 +46,10 @@ pub struct TextRun {
     /// Booharu: a gradient fill, drawn in place of `fill`, which is then its
     /// first stop's colour.
     pub fill_gradient: Option<koharu_scene::Gradient>,
+    /// Booharu: the box, in the text's own coordinates, that `fill_gradient`
+    /// spreads over: the whole text's ink, or its run of words' own; `None`
+    /// without a gradient, or when nothing inks.
+    pub fill_extent: Option<Rect>,
     /// The stroke colour and width.
     pub stroke: Option<(Color, f32)>,
     /// Booharu: the second border's colour and width, outward from the
@@ -57,6 +61,9 @@ pub struct TextRun {
     /// Booharu: its face's slant is faked, as fontique fakes it on an
     /// upright face asked for italic: Photoshop's Faux Italic.
     pub faux_italic: bool,
+    /// Booharu: its letter spacing, after each cluster, in thousandths of an
+    /// em; 0 unset.
+    pub tracking: f32,
 }
 
 /// What laying out a text resolved, for the inspector and PSD export.

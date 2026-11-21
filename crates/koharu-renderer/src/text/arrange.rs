@@ -118,12 +118,14 @@ pub(super) fn arrange(
     }
 
     let (runs, text_runs) = runs(shaped, &glyphs, scale);
-    // Booharu: gradient fills, spread over the ink of the text or of words.
+    // Booharu: gradient fills, spread over the ink of the text or of words,
+    // which each run that spreads one keeps.
     let gradients = glyphs.chunk_by(|a, b| a.0 == b.0).map(|run| {
         let (span, ..) = run[0].0;
         styled.spans[span].booharu.gradient.as_ref()
     });
-    let runs = crate::booharu::paint(runs, &text_runs, gradients);
+    let mut text_runs = text_runs;
+    let runs = crate::booharu::paint(runs, &mut text_runs, gradients);
     // Booharu: text borders. A second border reaches past the first.
     let stroke = styled
         .spans
@@ -449,6 +451,8 @@ fn runs(shaped: &ShapedText, glyphs: &[Positioned], scale: f32) -> (Vec<GlyphRun
                 .gradient
                 .as_ref()
                 .map(|(gradient, _)| gradient.clone()),
+            // Booharu: what the gradient spreads over, which `arrange` finds.
+            fill_extent: None,
             stroke: span.stroke.map(|(color, width)| (color, width * scale)),
             // Booharu: the second border.
             outer_stroke: span
@@ -458,6 +462,8 @@ fn runs(shaped: &ShapedText, glyphs: &[Positioned], scale: f32) -> (Vec<GlyphRun
             // Booharu: what fontique fakes on the run's face, for Photoshop (D12).
             faux_bold: font.synthesis.embolden(),
             faux_italic: font.synthesis.skew().is_some(),
+            // Booharu: the letter spacing after each cluster, for Photoshop.
+            tracking: span.booharu.tracking,
         });
         glyph_runs.push(GlyphRun {
             font: font.clone(),

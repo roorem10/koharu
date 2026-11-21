@@ -19,11 +19,12 @@ use crate::text::{GlyphRun, TextRun, bold, turn};
 
 /// `runs` with the gradient fills that `gradients`, one for each run, give
 /// them, each spread over the ink of what it fills; `resolved` holds the
-/// runs as the layout resolved them. A text without a gradient is left as
-/// it is.
+/// runs as the layout resolved them, and each run that spreads a gradient
+/// keeps there, as its `fill_extent`, the box it spreads it over, for PSD
+/// export. A text without a gradient is left as it is.
 pub(crate) fn paint<'a>(
     mut runs: Vec<GlyphRun>,
-    resolved: &[TextRun],
+    resolved: &mut [TextRun],
     gradients: impl IntoIterator<Item = Option<&'a (Gradient, Unit)>>,
 ) -> Vec<GlyphRun> {
     let gradients: Vec<_> = gradients.into_iter().collect();
@@ -32,12 +33,12 @@ pub(crate) fn paint<'a>(
     }
     let inks: Vec<Option<Rect>> = runs
         .iter()
-        .zip(resolved)
+        .zip(resolved.iter())
         .map(|(run, text)| ink(run, text.size))
         .collect();
     // What each unit spreads over: the whole text's ink, or its own runs'.
     let mut extents: Vec<(Unit, Option<Rect>)> = Vec::new();
-    for (run, gradient) in runs.iter_mut().zip(&gradients) {
+    for ((run, text), gradient) in runs.iter_mut().zip(resolved).zip(&gradients) {
         let Some((gradient, unit)) = gradient else {
             continue;
         };
@@ -57,6 +58,7 @@ pub(crate) fn paint<'a>(
             }
         };
         run.fill = extent.map(|extent| spread(gradient, extent));
+        text.fill_extent = extent;
     }
     runs
 }
@@ -249,6 +251,14 @@ mod tests {
         let (start, end) = ends(fill.expect("a gradient fill"));
         let middle = ink.center().y;
         near(start, Point::new(ink.x0, middle)) && near(end, Point::new(ink.x1, middle))
+    }
+
+    /// Whether `extent` is `ink`, to rounding.
+    fn kept(extent: Option<Rect>, ink: Rect) -> bool {
+        extent.is_some_and(|extent| {
+            near(extent.origin(), ink.origin())
+                && near(Point::new(extent.x1, extent.y1), Point::new(ink.x1, ink.y1))
+        })
     }
 
     #[test]
@@ -458,6 +468,64 @@ mod tests {
         // word's too.
         let whole = ink_of(&layout, |_| true);
         assert!(across(words.fill.as_ref(), whole), "{:?}", words.fill);
+        Ok(())
+    }
+
+    #[test]
+    fn each_run_keeps_the_box_its_gradient_spreads_over() -> Result<()> {
+        let Some(font) = static_sans() else {
+            eprintln!("skipped: no static sans-serif is installed");
+            return Ok(());
+        };
+        // A text's gradient spreads over the whole text's ink, so each run
+        // it fills keeps that box, whatever its size.
+        let text = laid(
+            &font,
+            filled(gradient(GradientKind::Linear, 30.0)),
+            vec![
+                ("Big ", sized(40.0, CharStyle::default())),
+                ("small", CharStyle::default()),
+            ],
+        )?;
+        let whole = ink_of(&text, |_| true);
+        assert_eq!(text.resolved.runs.len(), 2);
+        for run in &text.resolved.runs {
+            assert!(
+                kept(run.fill_extent, whole),
+                "{:?} in {whole:?}",
+                run.fill_extent
+            );
+        }
+        // Words given a gradient of their own keep their own ink, and the
+        // words around them under the text's gradient the whole text's.
+        let layout = laid(
+            &font,
+            filled(gradient(GradientKind::Linear, 0.0)),
+            vec![
+                ("Text ", CharStyle::default()),
+                ("own", filled(gradient(GradientKind::Radial, 0.0))),
+                (" text", CharStyle::default()),
+            ],
+        )?;
+        let [before, own, after] = &layout.resolved.runs[..] else {
+            panic!("three runs");
+        };
+        let whole = ink_of(&layout, |_| true);
+        let words = ink_of(&layout, |run| run.range == own.range);
+        assert!(
+            words.width() + 10.0 < whole.width(),
+            "{words:?} in {whole:?}"
+        );
+        assert!(kept(own.fill_extent, words), "{:?}", own.fill_extent);
+        assert!(kept(before.fill_extent, whole), "{:?}", before.fill_extent);
+        assert!(kept(after.fill_extent, whole), "{:?}", after.fill_extent);
+        // Without a gradient, a run keeps none.
+        let flat = CharStyle {
+            fill: Some(GREEN),
+            ..CharStyle::default()
+        };
+        let plain = laid(&font, flat, vec![("Plain", CharStyle::default())])?;
+        assert_eq!(plain.resolved.runs[0].fill_extent, None);
         Ok(())
     }
 

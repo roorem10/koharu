@@ -717,4 +717,43 @@ mod tests {
         assert_eq!(along[2], along[3]);
         Ok(())
     }
+
+    #[test]
+    fn a_run_keeps_its_span_s_letter_spacing() -> Result<()> {
+        let Some(font) = static_sans() else {
+            eprintln!("skipped: no static sans-serif is installed");
+            return Ok(());
+        };
+        // A fraction stays as set, and a span without one, or with one that
+        // isn't a number, has none.
+        let spans = [
+            ("Spaced", Some(12.5)),
+            (" plain", None),
+            (" odd", Some(f64::INFINITY)),
+        ];
+        let text = koharu_scene::Text {
+            content: koharu_scene::RichText(
+                spans
+                    .into_iter()
+                    .map(|(words, tracking)| koharu_scene::Span {
+                        insert: words.to_owned(),
+                        attributes: CharStyle {
+                            tracking,
+                            ..CharStyle::default()
+                        },
+                    })
+                    .collect(),
+            ),
+            ..koharu_scene::Text::default()
+        };
+        let layout = crate::text::layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout");
+        let tracking: Vec<f32> = layout
+            .resolved
+            .runs
+            .iter()
+            .map(|run| run.tracking)
+            .collect();
+        assert_eq!(tracking, [12.5, 0.0, 0.0]);
+        Ok(())
+    }
 }
