@@ -151,12 +151,17 @@ mod tests {
         let stored: BooharuShaped = read(&path).unwrap();
         assert!(stored.auto && stored.fonts.is_empty());
 
-        // A change elsewhere leaves the map as the file holds it.
+        // A change elsewhere leaves the map as the file holds it, its
+        // comment and its bad entry with it.
         write(&path, |shaped: &mut BooharuShaped| shaped.auto = false).unwrap();
+        let text = fs_err::read_to_string(&path).unwrap();
         assert!(
-            fs_err::read_to_string(&path)
-                .unwrap()
-                .contains("whisper = \"\"")
+            text.contains(indoc! {r#"
+                [booharu-shaped.fonts]
+                shout = "Anime Ace" # chosen
+                whisper = ""
+            "#}),
+            "{text}"
         );
 
         // A change to the map writes it as read, with the change.
@@ -187,6 +192,48 @@ mod tests {
         // Set back to its default, the map leaves the file.
         write(&path, |shaped: &mut BooharuShaped| shaped.fonts.clear()).unwrap();
         assert!(!fs_err::read_to_string(&path).unwrap().contains("Komika"));
+    }
+
+    #[test]
+    fn a_hand_written_inline_or_dotted_booharu_map_is_written_whole_too() {
+        // The shapes a hand-edited file often has, each holding the bad
+        // entry: an inline section, dotted keys at the root, and dotted keys
+        // in the section's table.
+        let shapes = [
+            "booharu-shaped = { auto = true, fonts = { shout = \"Anime Ace\", whisper = \"\" } }\n",
+            indoc! {r#"
+                booharu-shaped.auto = true
+                booharu-shaped.fonts.shout = "Anime Ace"
+                booharu-shaped.fonts.whisper = ""
+            "#},
+            indoc! {r#"
+                [booharu-shaped]
+                auto = true
+                fonts.shout = "Anime Ace"
+                fonts.whisper = ""
+            "#},
+        ];
+        for stored in shapes {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("config.toml");
+            fs_err::write(&path, stored).unwrap();
+
+            write(&path, |shaped: &mut BooharuShaped| {
+                shaped.fonts.insert(Kind::Thoughts, "Komika".into());
+            })
+            .unwrap_or_else(|error| panic!("{error}, saving over:\n{stored}"));
+            let text = fs_err::read_to_string(&path).unwrap();
+            assert!(text.parse::<toml::Table>().is_ok(), "{text}");
+            assert_eq!(
+                read::<BooharuShaped>(&path).unwrap(),
+                BooharuShaped {
+                    auto: true,
+                    fonts: BTreeMap::from([(Kind::Thoughts, "Komika".to_owned())]),
+                },
+                "{text}"
+            );
+            assert!(!text.contains("Anime Ace"), "{text}");
+        }
     }
 
     #[test]
