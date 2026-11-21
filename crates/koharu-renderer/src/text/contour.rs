@@ -1,10 +1,17 @@
 //! Booharu's Contour borders: a text's letters merged into one shape and
 //! grown outward with round corners, filled as regions under every fill.
-//! Koharu's own borders, the Expansion method, grow each glyph's outline on
-//! its own with `kurbo::expand_path`, which grows a whole outline by one sign,
-//! so a dot or counter wound the other way shrinks instead and loses its
-//! border (koharu-rs #1073, #1292). Merging the letters first gives every
-//! dot, counter, overlap, and pair of touching letters the same border.
+//! Koharu's own borders, the Expansion method, stroke every run's glyphs
+//! under every fill. Koharu 0.89.0 grows them, and a synthetic bold, by a
+//! stroke in place of `kurbo::expand_path`, which grew a whole outline one
+//! way, so a dot wound against the rest of its letter shrank and lost its
+//! border (koharu-rs #1073, #1292); now every contour keeps one, and Contour
+//! grows a synthetic bold the same way. Contour stays a choice beside them:
+//! it grows one border around the letters merged, every run with that border
+//! together, filled once, so a translucent border shows no darker overlap
+//! where letters touch, even across runs. Its regions leave out every letter
+//! whose fill isn't opaque, bordered or not, and such a fill's own border is
+//! only the ring outside its letters, so no border shows through a letter,
+//! as a stroke under the fill does.
 
 use i_overlay::{
     core::{fill_rule::FillRule, overlay_rule::OverlayRule},
@@ -15,7 +22,7 @@ use i_overlay::{
     },
 };
 use koharu_scene::Color;
-use kurbo::{Affine, BezPath, Diagonal2, Join, PathEl, Shape as _};
+use kurbo::{Affine, BezPath, Join, PathEl, Shape as _, Stroke, StrokeOpts};
 use skrifa::{
     GlyphId, MetadataProvider,
     instance::{LocationRef, NormalizedCoord, Size},
@@ -115,9 +122,9 @@ pub(super) fn regions(runs: &[GlyphRun], resolved: &[TextRun]) -> Vec<(Color, Be
 }
 
 /// Adds the outlines of `run`'s glyphs at `size` to `letters`, where the
-/// fill draws them: grown by a synthetic bold and slanted or turned as
-/// `draw` draws them, each wound the same way, so letters that overlap merge
-/// rather than cancel.
+/// fill draws them: grown by a synthetic bold ([`emboldened`]) and slanted or
+/// turned as `draw` draws them, each wound the same way, so letters that
+/// overlap merge rather than cancel.
 fn outlines(run: &GlyphRun, size: f32, letters: &mut BezPath) {
     let font = &run.font;
     let Ok(face) = skrifa::FontRef::from_index(font.data.data.as_ref(), font.data.index) else {
@@ -144,8 +151,7 @@ fn outlines(run: &GlyphRun, size: f32, letters: &mut BezPath) {
         }
         let mut path = pen.0;
         if bold > 0.0 {
-            // glifo's synthetic bold, as the fill draws it.
-            path = kurbo::expand_path(&path, Diagonal2::new(bold, bold), Join::Miter, 4.0, 0.1);
+            path = emboldened(&path, bold);
         }
         path.apply_affine(Affine::translate((f64::from(glyph.x), f64::from(glyph.y))) * turn);
         if path.area() < 0.0 {
@@ -153,6 +159,20 @@ fn outlines(run: &GlyphRun, size: f32, letters: &mut BezPath) {
         }
         letters.extend(path.elements().iter().copied());
     }
+}
+
+/// `outline` grown by a synthetic `bold` as the fill draws it (`draw`): the
+/// outline together with its stroke twice as wide, with mitred joins, so
+/// every contour grows by `bold`, whichever way it's wound.
+fn emboldened(outline: &BezPath, bold: f64) -> BezPath {
+    let stroke = Stroke::new(2.0 * bold).with_join(Join::Miter);
+    let stroked = kurbo::stroke(
+        outline.elements().iter().copied(),
+        &stroke,
+        &StrokeOpts::default(),
+        FLATTEN,
+    );
+    path(&merged(outline).overlay(&merged(&stroked), OverlayRule::Union, FillRule::NonZero))
 }
 
 /// `letters` merged into one shape: flattened, since the boolean operations
@@ -407,6 +427,36 @@ mod tests {
         assert!(!grown.contains(Point::new(8.0, 15.0)));
         assert!(grown.contains(Point::new(-1.0, 15.0)));
         assert!(!grown.contains(Point::new(-2.0, 15.0)));
+    }
+
+    #[test]
+    fn a_synthetic_bold_grows_a_dot_wound_against_the_rest() {
+        // kurbo's `expand_path` grew a whole outline one way, by its area, so
+        // this dot, wound like the hole, shrank.
+        let grown = emboldened(&square_with_a_reversed_dot(), 1.0);
+        // The dot grows from a radius of 2 to 3, the hole shrinks by 1 and the
+        // square grows by 1.
+        assert!(grown.contains(Point::new(15.0 + 2.8, 15.0)));
+        assert!(!grown.contains(Point::new(15.0 + 3.2, 15.0)));
+        assert!(grown.contains(Point::new(5.8, 15.0)));
+        assert!(!grown.contains(Point::new(6.2, 15.0)));
+        assert!(grown.contains(Point::new(-0.8, 15.0)));
+        assert!(!grown.contains(Point::new(-1.2, 15.0)));
+    }
+
+    #[test]
+    fn a_synthetic_bold_holds_its_outline_and_mitres_its_corners() {
+        let outline = square_with_a_reversed_dot();
+        let grown = emboldened(&outline, 1.0);
+        // Nothing of the outline lies outside it.
+        let outside =
+            merged(&outline).overlay(&merged(&grown), OverlayRule::Difference, FillRule::NonZero);
+        assert!(outside.is_empty(), "{outside:?}");
+        // A corner grows to a point, as the fill's mitred stroke draws it,
+        // and nothing reaches further than the bold.
+        assert!(grown.contains(Point::new(-0.9, -0.9)));
+        let reach = outline.bounding_box().inflate(1.01, 1.01);
+        assert!(reach.contains_rect(grown.bounding_box()), "{reach:?}");
     }
 
     #[test]
