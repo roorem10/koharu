@@ -17,12 +17,16 @@ pub(crate) use remove::remove_others;
 /// The one store everything downloads into: Koharu's root's `store`, and the
 /// OS cache folder's `koharu/store` otherwise, which is a per-user install's
 /// store too.
+///
+/// Booharu: the cache folder's `booharu/store` in place of `koharu/store`,
+/// so it never shares an installed Koharu's store (see `crate::booharu`).
 pub(crate) fn root() -> &'static Path {
     static ROOT: LazyLock<PathBuf> = LazyLock::new(|| match crate::root() {
         Some(folder) => folder.join("store"),
         None => dirs::cache_dir()
             .unwrap_or_else(std::env::temp_dir)
-            .join("koharu")
+            // Booharu: its own store, apart from Koharu's.
+            .join("booharu")
             .join("store"),
     });
     &ROOT

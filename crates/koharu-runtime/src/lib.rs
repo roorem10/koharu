@@ -1,5 +1,7 @@
 //! Gets Koharu ready to run models on this machine's GPU.
 
+// Booharu: Booharu's own code in this crate, its store's fallback folder.
+mod booharu;
 mod device;
 mod hardware;
 mod huggingface;
