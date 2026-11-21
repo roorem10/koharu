@@ -129,11 +129,23 @@ pub(crate) fn resolved(runs: Vec<koharu_renderer::TextRun>) -> ResolvedText {
     }
 }
 
+/// The text descriptor a type layer's `TySh` block holds, read back with
+/// photocraft: after the block's version, its transform, and its text
+/// version.
+#[cfg(test)]
+pub(crate) fn type_text(block: &TaggedBlock) -> photocraft_psd::descriptor::Descriptor {
+    let data = &block.data[2 + 48 + 2..];
+    let (text, _) =
+        photocraft_psd::VersionedDescriptor::parse_prefix(data).expect("a text descriptor");
+    text.descriptor
+}
+
 #[cfg(test)]
 mod tests {
     use koharu_renderer::TextRun;
     use koharu_scene::{Color, Gradient, GradientKind, GradientStop, Rgba, Uuid};
     use kurbo::Rect;
+    use photocraft_psd::descriptor::Value;
 
     use super::*;
 
@@ -298,6 +310,40 @@ mod tests {
         assert!(glyphs_only(&blocks(&[b"lmfx"])));
         assert!(!glyphs_only(&blocks(&[b"luni", b"vmsk", b"SoCo"])));
         assert!(!glyphs_only(&[]));
+    }
+
+    #[test]
+    fn a_run_s_letter_spacing_is_its_style_run_s_tracking_to_the_nearest_whole() {
+        // Thousandths of an em either way, rounded, and none where it's 0.
+        let text = koharu_scene::Text {
+            content: "Wide tight even".into(),
+            ..koharu_scene::Text::default()
+        };
+        let runs = [(0..5, 12.6), (5..11, -12.6), (11..15, 0.0)]
+            .into_iter()
+            .map(|(range, tracking)| TextRun {
+                tracking,
+                ..plain_run(range)
+            })
+            .collect();
+        let blocks = crate::blocks::type_layer(&text, &resolved(runs), 0);
+        let descriptor = type_text(&blocks[0]);
+        let Some(Value::RawData(data)) = descriptor.get("EngineData") else {
+            panic!("no EngineData");
+        };
+        let data = String::from_utf8_lossy(data);
+        let runs = data.split("/StyleRun").nth(1).expect("style runs");
+        let runs = runs.split("/GridInfo").next().unwrap_or(runs);
+        // Each run's style sheet, after the default run's.
+        let tracking: Vec<Option<i32>> = runs
+            .split("/StyleSheetData")
+            .skip(2)
+            .map(|style| {
+                let value = style.split("/Tracking ").nth(1)?;
+                value.split_whitespace().next()?.parse().ok()
+            })
+            .collect();
+        assert_eq!(tracking, [Some(13), Some(-13), None]);
     }
 
     #[test]
