@@ -48,6 +48,8 @@ pub(crate) enum Command {
     Run(Run),
     Stop,
     Unload,
+    /// Booharu: `Unload`, then libtorch's cache of the models unloaded.
+    BooharuUnload,
     /// The settings changed: unload what nothing uses now.
     Settle,
     Close(ProjectId),
@@ -183,6 +185,7 @@ impl Scheduler {
             Command::Unload => self
                 .gpu
                 .run(Turn::Upkeep, |models| models.retain(&HashSet::new())),
+            Command::BooharuUnload => booharu::unload_models(&self.gpu), // Booharu: and libtorch's cache.
             Command::Settle => self.settle(),
             Command::Close(project) => self.conversations.close(project),
         }

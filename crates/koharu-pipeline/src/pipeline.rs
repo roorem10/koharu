@@ -128,6 +128,14 @@ impl Pipeline {
         self.send(Command::Unload);
     }
 
+    /// Booharu: unloads every model as [`unload`](Self::unload) does, then
+    /// gives back to the device what libtorch's cache keeps of them, so a
+    /// model loaded outside the pipeline, as Read chapter's, which fits
+    /// itself to the memory free, finds that memory free.
+    pub fn booharu_unload_models(&self) {
+        self.send(Command::BooharuUnload);
+    }
+
     /// Forgets the translation conversation of a project that closed.
     pub fn close(&self, project: ProjectId) {
         self.send(Command::Close(project));

@@ -38,8 +38,8 @@ const STOPPED: &str = "Explain this line was stopped.";
 /// with the model Explain this line uses: the Read chapter model, else the
 /// translation model when it's a general model, else the agent's. Sends the
 /// page with it when the model reads images. One of Koharu's own models is
-/// loaded for it, once the pipeline unloads its own while no run goes, and
-/// dropped as it answers. Answers the explanation and two or three other
+/// loaded for it, once the pipeline unloads its own, and gives back
+/// libtorch's cache of them, while no run goes, and dropped as it answers. Answers the explanation and two or three other
 /// translations, with the line as it was asked about and the model that
 /// answered, and adds them to the project's agent file as a note, unless
 /// that file can't be read or written, which is logged and never fails the
@@ -92,8 +92,9 @@ async fn explain_line(app: Arc<App>, layer: LayerId) -> anyhow::Result<ExplainAn
         .await??
     };
     if models::local(&reference) && !runs::run_going(&app.pipeline.told()) {
-        // As Read chapter does: the pipeline's models free their memory.
-        app.pipeline.unload();
+        // As Read chapter does: the pipeline's models, and libtorch's cache
+        // of them, free their memory.
+        app.pipeline.booharu_unload_models();
     }
     let size = Size {
         sequences: 1,

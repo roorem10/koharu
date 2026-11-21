@@ -21,11 +21,15 @@
 //! - A recognition task reads pages of runs whose filters leave out the same
 //!   blocks only ([`alike`]), as it reads them all with its first page's
 //!   settings, whatever policy each run has.
+//!
+//! It also holds [`unload_models`], how `Pipeline::booharu_unload_models`
+//! frees the models' memory for one loaded outside the pipeline.
 
 use std::collections::{BTreeSet, HashSet};
 
 use booharu_core::runs::{OnPageFailure, RunOrder, RunPolicy, retry_wait};
 use koharu_scene::{PageId, ProjectId};
+use koharu_torch::Cuda;
 use petgraph::{
     Direction::{Incoming, Outgoing},
     stable_graph::{NodeIndex, StableDiGraph},
@@ -36,7 +40,7 @@ use super::{Candidate, Mode, Run, Scheduler, run::Job};
 use crate::{
     Event, Outcome, PageFailure, RunId, Stage,
     booharu::{Class, Failure},
-    gpu::{Key, Turn},
+    gpu::{Gpu, Key, Turn},
 };
 
 /// A job's tries that failed, when it may go again after the last, and
@@ -303,6 +307,24 @@ impl Scheduler {
         self.gpu
             .run(Turn::Upkeep, move |models| models.retain(&wanted));
     }
+}
+
+/// Unloads every model once the GPU's current call ends, ahead of every
+/// stage's call, as Koharu's `Unload` does, then gives back to the device
+/// what libtorch's cache keeps of them: llama.cpp, which fits a model loaded
+/// outside the pipeline to the memory free, as Read chapter's, counts that
+/// cache as used. libtorch is left alone until a model has loaded, as it
+/// isn't loaded before.
+pub(super) fn unload_models(gpu: &Gpu) {
+    gpu.run(Turn::Upkeep, |models| {
+        models.retain(&HashSet::new());
+        if models.booharu_started()
+            && Cuda::device_count() > 0
+            && let Err(error) = Cuda::empty_cache()
+        {
+            tracing::warn!("libtorch's cache wasn't emptied: {error}");
+        }
+    });
 }
 
 #[cfg(test)]
@@ -910,5 +932,18 @@ mod tests {
             .map(|(_, pages, _)| pages)
             .collect();
         assert_eq!(batches, [vec![0, 1, 2], vec![0, 1, 2]]);
+    }
+
+    #[tokio::test]
+    async fn unloading_the_models_before_any_loaded_leaves_libtorch_alone() {
+        // No model has loaded, so libtorch hasn't: a call to it would panic
+        // the GPU thread, and nothing queued after would run.
+        let gpu = Gpu::spawn(tokio::runtime::Handle::current());
+        unload_models(&gpu);
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        gpu.run(Turn::Upkeep, move |_| {
+            let _ = sender.send(());
+        });
+        receiver.await.expect("the GPU thread runs the next call");
     }
 }

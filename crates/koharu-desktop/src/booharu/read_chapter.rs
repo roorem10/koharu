@@ -41,7 +41,8 @@ use super::{context::changed, styles::look};
 use crate::{app::App, commands::Result};
 
 /// How long a load of one of Koharu's own models that didn't fit in free
-/// memory waits to try once more, as the pipeline's models free theirs.
+/// memory waits to try once more, as the pipeline's models, and libtorch's
+/// cache of them, free theirs once the GPU's current call ends.
 const REFIT: Duration = Duration::from_secs(2);
 
 /// Reads the open project's whole chapter with the Read chapter model, or
@@ -144,7 +145,8 @@ pub(crate) struct ReadRequest {
 /// on a chapter whose brief has a summary, read meanwhile, which only a Run
 /// step checks; with no text on the pages; and with no model that can read
 /// them. One of Koharu's own models is loaded once the pipeline unloads its
-/// own, with images and the context a chunk needs, trying once more after
+/// own and gives back libtorch's cache of them, with images and the context
+/// a chunk needs, trying once more after
 /// two seconds when it doesn't fit, and dropped as the read ends. It writes
 /// only while the project read is still the one open and the job wasn't
 /// stopped, then tells `booharu_context_changed`; otherwise it answers
@@ -242,8 +244,9 @@ async fn reading(
         }
     };
     if models::local(&reference) {
-        // No run is going: the pipeline's models free their memory for it.
-        app.pipeline.unload();
+        // No run is going: the pipeline's models, and libtorch's cache of
+        // them, free their memory for it.
+        app.pipeline.booharu_unload_models();
     }
     let size = Size {
         sequences: 1,
