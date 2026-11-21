@@ -4,6 +4,8 @@ mod blocks;
 mod booharu; // Booharu: a text's layer effects and the rules they follow.
 mod engine_data;
 
+pub use booharu::Notice; // Booharu: what `export_noting` tells (S13-i).
+
 use koharu_renderer::{Drawn, Frame, Raster, Renderer};
 use koharu_scene::{
     Background, Balloon, Blend, Block, Content, FillRule, Layer, LayerId, Offset, PageId, Path,
@@ -66,6 +68,21 @@ pub fn export(
     page: PageId,
     labels: &Labels,
 ) -> Result<Vec<u8>> {
+    // Booharu: `export_noting`'s body, its notices dropped (S13-i).
+    export_noting(session, renderer, page, labels, &mut Vec::new())
+}
+
+/// Booharu: `export`, which also adds to `notices`, once the file is
+/// written, a `Notice` for each text it drew into its layer's pixels as its
+/// words' effects differ, with a hidden type layer beside it to edit
+/// (S13-i).
+pub fn export_noting(
+    session: &Session,
+    renderer: &Renderer,
+    page: PageId,
+    labels: &Labels,
+    notices: &mut Vec<Notice>,
+) -> Result<Vec<u8>> {
     let project = session.project();
     let view = project.page(page)?;
     let (width, height) = (view.size.width, view.size.height);
@@ -81,6 +98,7 @@ pub fn export(
         builder: PsdBuilder::new(width, height).resolution(72.0),
         folders: Vec::new(),
         texts: 0,
+        noted: Vec::new(), // Booharu: the texts it draws into pixels (S13-i).
     };
     if let Some(background) = view.background {
         export.background(background)?;
@@ -113,7 +131,11 @@ pub fn export(
             record.flags.set_pixel_data_irrelevant(true);
         }
     }
-    Ok(file.to_bytes()?)
+    // Booharu: what it noted, once the file is written (S13-i).
+    let bytes = file.to_bytes()?;
+    let noted = export.noted.into_iter();
+    notices.extend(noted.map(|noted| Notice::rasterized(page, noted)));
+    Ok(bytes)
 }
 
 struct Export<'a> {
@@ -126,6 +148,10 @@ struct Export<'a> {
     /// record, in the order its groups end.
     folders: Vec<(Vec<TaggedBlock>, Option<MaskSpec>)>,
     texts: i32,
+    /// Booharu: the texts drawn into their layers' pixels as their words'
+    /// effects differ, each by the layer its notice names (a translation's
+    /// block, a free text's own) and the name its layers carry (S13-i).
+    noted: Vec<(LayerId, String)>,
 }
 
 /// A pixel layer's properties.

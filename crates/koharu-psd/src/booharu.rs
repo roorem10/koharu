@@ -3,10 +3,13 @@
 //! one gradient fill for all its words (`effects`), so a text whose words
 //! differ in them can't keep them as effects (`word_effects`); a layer
 //! whose effects Photoshop draws keeps its glyphs alone in its pixels
-//! (`glyphs_only`).
+//! (`glyphs_only`); and an export tells which texts it drew into pixels
+//! (`Notice`).
 
 use koharu_renderer::ResolvedText;
+use koharu_scene::{LayerId, PageId};
 use photocraft_psd::TaggedBlock;
+use serde::Serialize;
 
 pub(crate) use self::effects::effects;
 
@@ -38,6 +41,38 @@ pub(crate) fn glyphs_only(blocks: &[TaggedBlock]) -> bool {
     blocks
         .iter()
         .any(|block| matches!(&block.key, b"TySh" | b"lfx2" | b"lmfx"))
+}
+
+/// A text an export drew into its layer's pixels, as its words' effects
+/// differ and one type layer's effects can't hold them, with a hidden type
+/// layer beside it to edit. Its keys serialize in alphabetical order.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Notice {
+    /// Where its words stay editable: `hidden_plain_styles`, a hidden type
+    /// layer beside it, with plain styles.
+    pub editable_copy: &'static str,
+    /// The layer the text is: a translation's block, or a free text's own.
+    pub layer: LayerId,
+    /// The name its layers carry.
+    pub name: String,
+    /// The page it's on.
+    pub page: PageId,
+    /// Why: `word_effects_rasterized`, its words' effects went into pixels.
+    pub reason: &'static str,
+}
+
+impl Notice {
+    /// What an export of `page` tells about a text it noted, by its layer
+    /// and name.
+    pub(crate) fn rasterized(page: PageId, (layer, name): (LayerId, String)) -> Self {
+        Self {
+            editable_copy: "hidden_plain_styles",
+            layer,
+            name,
+            page,
+            reason: "word_effects_rasterized",
+        }
+    }
 }
 
 /// A run over `range` in black 24-pixel type with no effects.
@@ -78,7 +113,7 @@ pub(crate) fn resolved(runs: Vec<koharu_renderer::TextRun>) -> ResolvedText {
 #[cfg(test)]
 mod tests {
     use koharu_renderer::TextRun;
-    use koharu_scene::{Color, Gradient, GradientKind, GradientStop, Rgba};
+    use koharu_scene::{Color, Gradient, GradientKind, GradientStop, Rgba, Uuid};
     use kurbo::Rect;
 
     use super::*;
@@ -183,5 +218,17 @@ mod tests {
         assert!(glyphs_only(&blocks(&[b"lmfx"])));
         assert!(!glyphs_only(&blocks(&[b"luni", b"vmsk", b"SoCo"])));
         assert!(!glyphs_only(&[]));
+    }
+
+    #[test]
+    fn a_notice_writes_its_keys_in_alphabetical_order() -> serde_json::Result<()> {
+        let page = PageId(Uuid::from_u128(1));
+        let layer = LayerId(Uuid::from_u128(2));
+        let notice = Notice::rasterized(page, (layer, "Words".to_owned()));
+        assert_eq!(
+            serde_json::to_string(&notice)?,
+            r#"{"editable_copy":"hidden_plain_styles","layer":"00000000-0000-0000-0000-000000000002","name":"Words","page":"00000000-0000-0000-0000-000000000001","reason":"word_effects_rasterized"}"#
+        );
+        Ok(())
     }
 }
