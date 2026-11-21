@@ -464,6 +464,140 @@ mod tests {
         assert!(reach.contains_rect(grown.bounding_box()), "{reach:?}");
     }
 
+    /// `layout` drawn as the canvas and the export draw a text, with its
+    /// borders while `strokes` says so, on a transparent drawing its bounds'
+    /// size; `None` without a GPU.
+    fn drawn(layout: &crate::text::TextLayout, strokes: bool) -> Result<Option<image::RgbaImage>> {
+        let Ok(gpu) = crate::Gpu::get() else {
+            eprintln!("skipped drawing without a GPU");
+            return Ok(None);
+        };
+        let size = layout.bounds.size();
+        let mut drawing = gpu.drawing(size.width.ceil() as u16, size.height.ceil() as u16);
+        crate::text::draw(
+            &mut drawing,
+            layout,
+            Affine::translate((-layout.bounds.x0, -layout.bounds.y0)),
+            strokes,
+        )?;
+        Ok(Some(drawing.read()?))
+    }
+
+    /// How many of `image`'s pixels are opaque and near `color`.
+    fn count(image: &image::RgbaImage, color: [u8; 3]) -> usize {
+        image
+            .pixels()
+            .filter(|pixel| {
+                pixel.0[3] > 200 && (0..3).all(|at| pixel.0[at].abs_diff(color[at]) < 60)
+            })
+            .count()
+    }
+
+    #[test]
+    fn contour_borders_draw_second_border_then_first_under_the_fill() -> Result<()> {
+        let mut library = Library::new();
+        let font = ["Arial", "DejaVu Sans", "Helvetica"]
+            .into_iter()
+            .find_map(|family| library.family(family).ok())
+            .expect("an installed sans-serif");
+        let text = Text {
+            content: "Stroked".into(),
+            style: TextStyle {
+                chars: CharStyle {
+                    size: Some(48.0),
+                    stroke: Some(Rgba([1.0, 0.0, 0.0, 1.0])),
+                    stroke_width: Some(3.0),
+                    outer_stroke: Some(Rgba([0.0, 0.0, 1.0, 1.0])),
+                    outer_stroke_width: Some(3.0),
+                    ..CharStyle::default()
+                },
+                stroke_method: Some(StrokeMethod::Contour),
+                ..TextStyle::default()
+            },
+            ..Text::default()
+        };
+        let layout = crate::text::layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout");
+        assert!(layout.contours.is_some());
+        let Some(image) = drawn(&layout, true)? else {
+            return Ok(());
+        };
+        // Each region shows where the one over it doesn't reach: the blue
+        // second border round the red first one, round the black letters.
+        let (blue, red, black) = (
+            count(&image, [0, 0, 255]),
+            count(&image, [255, 0, 0]),
+            count(&image, [0, 0, 0]),
+        );
+        assert!(
+            blue > 100 && red > 100 && black > 100,
+            "{blue} {red} {black}"
+        );
+        // Without strokes, the letters alone.
+        let image = drawn(&layout, false)?.expect("a GPU");
+        assert_eq!(count(&image, [0, 0, 255]) + count(&image, [255, 0, 0]), 0);
+        assert!(count(&image, [0, 0, 0]) > 100);
+        Ok(())
+    }
+
+    #[test]
+    fn no_contour_border_shows_through_the_see_through_letter_it_rings() -> Result<()> {
+        let mut library = Library::new();
+        let font = ["Arial", "DejaVu Sans", "Helvetica"]
+            .into_iter()
+            .find_map(|family| library.family(family).ok())
+            .expect("an installed sans-serif");
+        // An I at half opacity, its border wider than half its stem.
+        let laid = |method| -> Result<crate::text::TextLayout> {
+            let text = Text {
+                content: "I".into(),
+                style: TextStyle {
+                    chars: CharStyle {
+                        size: Some(100.0),
+                        fill: Some(Rgba([0.0, 0.0, 0.0, 0.5])),
+                        stroke: Some(Rgba([1.0, 0.0, 0.0, 1.0])),
+                        stroke_width: Some(10.0),
+                        ..CharStyle::default()
+                    },
+                    stroke_method: method,
+                    ..TextStyle::default()
+                },
+                ..Text::default()
+            };
+            Ok(crate::text::layout(&text, |_, _| Ok(vec![font.clone()]))?.expect("a layout"))
+        };
+        // The middle of the I's ink, where the drawing puts it.
+        let middle = |layout: &crate::text::TextLayout| -> (u32, u32) {
+            let (run, glyph) = (&layout.runs[0], &layout.runs[0].glyphs[0]);
+            let ink = run
+                .font
+                .ink(glyph.id, layout.resolved.runs[0].size)
+                .expect("the I's ink");
+            let at = kurbo::Vec2::new(f64::from(glyph.x), f64::from(glyph.y));
+            let middle = Rect::new(ink.x0, -ink.y1, ink.x1, -ink.y0).center() + at;
+            (
+                (middle.x - layout.bounds.x0) as u32,
+                (middle.y - layout.bounds.y0) as u32,
+            )
+        };
+        let contour = laid(Some(StrokeMethod::Contour))?;
+        let Some(image) = drawn(&contour, true)? else {
+            return Ok(());
+        };
+        let (x, y) = middle(&contour);
+        let pixel = image.get_pixel(x, y).0;
+        // Half see-through black, with no red under it, ringed by the border.
+        assert!(pixel[0] < 16 && pixel[3].abs_diff(128) < 16, "{pixel:?}");
+        assert!(count(&image, [255, 0, 0]) > 100);
+        // Koharu's border reaches that far in, under the whole letter, so it
+        // shows through there.
+        let expansion = laid(None)?;
+        let image = drawn(&expansion, true)?.expect("a GPU");
+        let (x, y) = middle(&expansion);
+        let pixel = image.get_pixel(x, y).0;
+        assert!(pixel[0] > 100 && pixel[3] > 250, "{pixel:?}");
+        Ok(())
+    }
+
     #[test]
     fn corners_round_off_at_the_border_width() {
         let letters = merged(&Rect::new(0.0, 0.0, 10.0, 10.0).to_path(0.1));
