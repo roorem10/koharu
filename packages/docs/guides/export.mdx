@@ -33,6 +33,19 @@ Review the pages before choosing **File → Export Project**. Export always writ
   </Step>
 </Steps>
 
+{/* Booharu: text effects in PSD. */}
+
+<Note>
+  In Booharu, a PSD keeps each text's effects editable where Photoshop can: a second border becomes
+  a second Stroke effect, a gradient fill becomes a Gradient Overlay, and letter spacing becomes
+  tracking. A text whose words differ in their borders or gradient, such as one word with a border
+  of its own or in a flat color inside a gradient, can't keep them as one type layer's effects, so
+  it's exported as pixels that look as Booharu draws it, over a hidden type layer of the same name
+  holding its words without those effects, which you can show and edit in its place. Each page with
+  such texts gets a report beside its PSD, such as `001.psd.report.json`, listing them by layer and
+  name. Two strokes on one layer need Photoshop CC 2015 or later.
+</Note>
+
 <Note>
   PSD is an interchange format. It does not keep model provenance, undo history, or Koharu's
   automatic fitting. Keep the `.khr` project file as your editable source and backup.
