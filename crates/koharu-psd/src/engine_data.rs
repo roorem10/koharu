@@ -276,8 +276,8 @@ fn style(run: &Run) -> Value {
         ("Kerning", Int(0)),
         ("FillColor", color(run.fill)),
     ];
-    // Booharu: letter spacing where there is some, before AutoKerning, where
-    // ag-psd writes Tracking (S13-k).
+    // Booharu: letter spacing where there is some, after AutoLeading and
+    // before AutoKerning, where Photoshop writes Tracking (S13-k).
     if run.tracking != 0 {
         let at = style.iter().position(|(key, _)| *key == "AutoKerning");
         style.insert(at.unwrap_or(style.len()), ("Tracking", Int(run.tracking)));
@@ -518,7 +518,7 @@ mod tests {
         };
         assert_eq!(count(b"/Tracking"), 1);
         assert_eq!(count(b"/Tracking 120\n"), 1);
-        // After AutoLeading and before AutoKerning, as ag-psd writes it.
+        // After AutoLeading and before AutoKerning, as Photoshop writes it.
         let at = |key: &[u8]| encoded.windows(key.len()).position(|window| window == key);
         assert!(at(b"/AutoLeading") < at(b"/Tracking"));
         assert!(at(b"/Tracking") < at(b"/AutoKerning"));
