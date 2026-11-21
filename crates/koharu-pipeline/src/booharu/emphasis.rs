@@ -46,7 +46,8 @@ pub(crate) const INSTRUCTION: &str = "Each value is an object: text is the trans
 /// whenever the switch or the model changes whether it asks; any other
 /// keeps them byte for byte, so its request is Koharu's. A run that doesn't
 /// translate never reads the section; one that does is refused when it
-/// can't be read, naming it, as a bad stored value is an error.
+/// can't be read, as when the file isn't TOML, naming it; a stored value that
+/// doesn't read reads as its default.
 pub(crate) fn asked(
     booharu: Snapshot,
     translator: TranslatorConfig,

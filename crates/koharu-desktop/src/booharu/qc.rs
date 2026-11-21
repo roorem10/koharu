@@ -413,12 +413,12 @@ fn gone(
         .collect()
 }
 
-/// What a check of `project`, which the project file `file` holds, reads
-/// now: `[booharu-qc]`, `[pipeline]`'s target language, and
-/// `[booharu-lettering]` as the settings file holds them, a bad stored
-/// value in one of them failing, as the agent's tools read them through
-/// `BooharuHost::qc_settings`, and the series the chapter links in the
-/// Booharu home's series folder.
+/// What a check of `project`, which the project file `file` holds, reads now:
+/// `[booharu-qc]`, `[pipeline]`'s target language, and `[booharu-lettering]` as
+/// the settings file holds them, a stored value that doesn't read reading as
+/// its default and a file that can't be read failing, as the agent's tools read
+/// them through `BooharuHost::qc_settings`, and the series the chapter links in
+/// the Booharu home's series folder.
 pub(crate) fn inputs(file: &Path, project: &Project) -> anyhow::Result<Inputs> {
     let settings = Settings {
         qc: koharu_config::get::<QcSettings>()?,

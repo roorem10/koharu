@@ -15,8 +15,9 @@ pub fn booharu_get_preferences() -> Result<BooharuPreferences> {
     Ok(BooharuPreferences::get()?)
 }
 
-/// Saves every Booharu settings section, or none when one holds a bad value,
-/// and answers them as the file holds them now.
+/// Saves every Booharu settings section, or none when one of them holds a
+/// bad value or the settings file can't be read, and answers them as the file
+/// holds them now.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_save_preferences(

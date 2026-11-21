@@ -92,9 +92,9 @@ use crate::{
 /// ([`snapshot`]); and, when it translates, the chapter's glossary and notes
 /// after its Instructions ([`chapter`]), and `[booharu-emphasis]`, with the
 /// instruction to pick the words to stress after those when the run asks
-/// its model for them ([`emphasis::asked`]). A section that can't be read
-/// refuses the run, as a bad stored value is an error, never replaced by its
-/// default.
+/// its model for them ([`emphasis::asked`]). A section that can't be read, as
+/// when the file isn't TOML, refuses the run; a stored value that doesn't read
+/// reads as its default.
 pub(crate) fn queued(
     config: PipelineConfig,
     session: &Mutex<Session>,

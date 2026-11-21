@@ -225,9 +225,9 @@ impl Inputs {
 }
 
 /// What a check reads of the settings: these three sections and no other,
-/// so a bad stored value elsewhere, which fails the section holding it,
-/// fails no check. The app's quality check and the agent's tools read them
-/// alike, each section as the settings file holds it.
+/// each as the settings file holds it, where a stored value that doesn't
+/// read reads as its default. The app's quality check and the agent's tools
+/// read them alike.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
     /// `[booharu-qc]`.

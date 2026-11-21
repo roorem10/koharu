@@ -2561,7 +2561,7 @@ export const commands = {
   /** Every Booharu settings section, as the file holds it now. */
   booharuGetPreferences: () =>
     invoke<BooharuPreferences>('booharu_get_preferences', {}, { headers: headers() }),
-  /** Saves every Booharu settings section, or none when one holds a bad value, and answers them as the file holds them now. */
+  /** Saves every Booharu settings section, or none when one of them holds a bad value or the settings file can't be read, and answers them as the file holds them now. */
   booharuSavePreferences: (preferences: BooharuPreferences) =>
     invoke<BooharuPreferences>('booharu_save_preferences', { preferences }, { headers: headers() }),
   /** Sets `block`'s translation to `text` as one undo step, placing it first as the Translation stage places its own, in the translator's target language, when the block has none of its own: none, or only the placeholder a style set before translating leaves, whose values stay. */

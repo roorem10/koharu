@@ -287,7 +287,8 @@ impl Tool for ResetLettering {
 /// The default look as the app holds it now, `[booharu-lettering]`, and the
 /// default font, the first of Koharu's Preferred fonts, none when they list
 /// none; outside the app, both as the file holds them. A section that can't
-/// be read is an error, so nothing is restyled by a value never chosen.
+/// be read, as when the file isn't TOML, is an error; a stored value that
+/// doesn't read reads as its default.
 pub(super) fn look(tools: &Tools) -> anyhow::Result<(LetteringSettings, Option<String>)> {
     let settings = lettering(tools)?;
     let families = match &tools.booharu {

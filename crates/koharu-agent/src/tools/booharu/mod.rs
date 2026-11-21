@@ -90,8 +90,9 @@ use super::{Tools, failed};
 /// pipeline, and renderer. The desktop app gives one; a host blocks, so a
 /// tool calls it on a blocking thread.
 pub trait BooharuHost: Send + Sync {
-    /// Every Booharu settings section, as the file holds it now; a bad stored
-    /// value is an error.
+    /// Every Booharu settings section, as the file holds it now: a stored
+    /// value that doesn't read reads as its default, and a file that can't be
+    /// read is an error.
     fn preferences(&self) -> anyhow::Result<BooharuPreferences>;
 
     /// Sets each key `values` names in the Booharu settings section named
@@ -154,8 +155,8 @@ pub trait BooharuHost: Send + Sync {
 
     /// What the quality check reads of the settings as saved now,
     /// `[booharu-qc]`, `[pipeline] translator.target` and
-    /// `[booharu-lettering]`, each as the app's quality check reads it, so a
-    /// bad stored value in another section fails neither.
+    /// `[booharu-lettering]`, each as the app's quality check reads it, and no
+    /// other section.
     fn qc_settings(&self) -> anyhow::Result<booharu::qc::Settings> {
         Ok(booharu::qc::Settings {
             qc: koharu_config::get()?,

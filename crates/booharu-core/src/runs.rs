@@ -144,8 +144,9 @@ impl RunsSettings {
     }
 }
 
-/// Presets the Run menu can keep: a bad one fails them all, as a bad stored
-/// value is an error, never dropped.
+/// Presets the Run menu can keep: a bad one fails them all, so a file holding
+/// one reads the default presets, as a stored value that doesn't read reads as
+/// its default.
 fn presets<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<RunPreset>, D::Error> {
     let presets = Vec::<RunPreset>::deserialize(deserializer)?;
     if presets.len() > MAX_PRESETS {
@@ -204,8 +205,9 @@ pub struct RunPolicy {
 }
 
 impl RunPolicy {
-    /// The policy `[booharu-runs]` sets as the file holds it now. A bad
-    /// stored value fails, naming the section, never taken for its default.
+    /// The policy `[booharu-runs]` sets as the file holds it now: a stored
+    /// value that doesn't read reads as its default, and a file that can't be
+    /// read, such as one that isn't TOML, fails, naming the section.
     pub fn read() -> anyhow::Result<Self> {
         Self::of(koharu_config::get())
     }

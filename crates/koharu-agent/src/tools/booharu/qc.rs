@@ -400,9 +400,9 @@ fn opened(tools: &Tools) -> (PathBuf, Project) {
 /// What a check of `project`, which the project file `file` holds, reads,
 /// as the app's quality check reads it: the three settings sections it
 /// reads, as the app holds them, and the series the chapter links, from
-/// the app's series folder. One of those sections that can't be read is an
-/// error, which reaches the model, and a bad value in any other section
-/// changes nothing; a chapter or series that can't be read skips the
+/// the app's series folder. One of those sections that can't be read, as
+/// when the file isn't TOML, is an error, which reaches the model, and no
+/// other section is read; a chapter or series that can't be read skips the
 /// glossary check alone.
 fn inputs(host: &dyn BooharuHost, file: &Path, project: &Project) -> anyhow::Result<Inputs> {
     Ok(qc::inputs(
@@ -481,16 +481,16 @@ mod tests {
     ];
 
     /// The app as the quality check tools reach it: the quality check's and
-    /// the lettering's default settings, English the target, a bad value in
-    /// a section the check doesn't read, and its series in a folder of the
-    /// test's.
+    /// the lettering's default settings, English the target, the whole of
+    /// Booharu's settings failing to read, which the check never asks for,
+    /// and its series in a folder of the test's.
     struct Checked {
         series: SeriesStore,
     }
 
     impl BooharuHost for Checked {
         fn preferences(&self) -> anyhow::Result<BooharuPreferences> {
-            anyhow::bail!("[booharu-reading] pages_per_request = 99 is over 40")
+            anyhow::bail!("config.toml is invalid: it isn't UTF-8")
         }
 
         fn save_section(

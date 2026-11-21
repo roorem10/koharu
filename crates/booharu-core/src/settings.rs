@@ -1,8 +1,10 @@
 //! Booharu's settings: a `[booharu-<area>]` table per area in the Booharu
 //! home's `config.toml`, each a [`Section`] that owns its defaults, as
-//! Koharu's own sections do. A value is checked as it is read, so a bad one
-//! fails whether the file or a caller holds it, and a save writes only what
-//! differs from the defaults.
+//! Koharu's own sections do. A value is checked as it is read, as Koharu reads
+//! its own: one the file holds that doesn't read reads as its default, and
+//! only a file that can't be read, such as one that isn't TOML, fails; one a
+//! caller gives that doesn't read is refused, so a save never writes it. A
+//! save writes only what differs from the defaults.
 //!
 //! [`BooharuPreferences`] holds every section, keyed by its table's name as
 //! Koharu's `Preferences` keys its own: the desktop's settings commands read
@@ -163,9 +165,9 @@ impl Section for LetteringSettings {
 }
 
 impl LetteringSettings {
-    /// The section as the file holds it now, as a run's snapshot reads it:
-    /// a bad stored value fails, never replaced by its default, so nothing
-    /// follows a setting nobody chose.
+    /// The section as the file holds it now, as a run's snapshot reads it: a
+    /// stored value that doesn't read reads as its default, and only a file
+    /// that can't be read, such as one that isn't TOML, fails.
     pub fn read() -> anyhow::Result<Self> {
         Self::checked(koharu_config::get())
     }
@@ -511,9 +513,10 @@ pub struct Snapshot {
 impl Snapshot {
     /// The settings as the file holds them now, with `families`, Koharu's
     /// Preferred fonts as `[renderer] font_families` reads them now, and no
-    /// run policy, which only a queued run reads. A bad stored value fails,
-    /// never replaced by its default, so nothing is lettered with a look
-    /// nobody chose.
+    /// run policy, which only a queued run reads. A stored value that doesn't
+    /// read reads as its default, and only a file that can't be read, such as
+    /// one that isn't TOML, fails, so nothing is lettered while the look the
+    /// file holds is unknown.
     pub fn read(families: koharu_config::Result<Vec<String>>) -> anyhow::Result<Self> {
         Self::of(koharu_config::get(), families)
     }
@@ -563,8 +566,9 @@ pub struct BooharuPreferences {
 }
 
 impl BooharuPreferences {
-    /// Every section as the file holds it now. A bad stored value is an
-    /// error, never its default.
+    /// Every section as the file holds it now: a stored value that doesn't
+    /// read reads as its default, and only a file that can't be read, such as
+    /// one that isn't TOML, fails.
     pub fn get() -> anyhow::Result<Self> {
         Ok(Self {
             mcp: koharu_config::get()?,
@@ -580,10 +584,14 @@ impl BooharuPreferences {
     }
 
     /// Saves every section, writing only what differs from its defaults, and
-    /// answers them as the file holds them now.
+    /// answers them as the file holds them now. A stored value that doesn't
+    /// read, which reads as its default, stays in the file until a save sets
+    /// that key to another value, as koharu-config writes only the keys that
+    /// change.
     pub fn save(self) -> anyhow::Result<Self> {
-        // Every section is read and checked before any is written, so a bad
-        // value, stored or given, writes nothing.
+        // Every section is read and every given value checked before any is
+        // written, so a bad value given, or a file that can't be read, writes
+        // nothing.
         Self::get()?;
         self.check()?;
         let Self {
@@ -640,18 +648,21 @@ impl BooharuPreferences {
     /// holds it, and saves that section alone, in one read and write of it
     /// under the settings file's lock: what another writer saved meanwhile,
     /// such as a font's star, stays. Answers every section as the file holds
-    /// them then. An unknown section or key, or a bad value, stored or given,
-    /// writes nothing.
+    /// them then. An unknown section or key, a bad value given, or a file
+    /// that can't be read writes nothing; a stored value that doesn't read
+    /// reads as its default, and stays in the file unless `values` sets it to
+    /// another value.
     pub fn save_section(name: &str, values: Map<String, Value>) -> anyhow::Result<Self> {
         let save = saver(name).ok_or_else(|| unknown(name))?;
-        // Every section is read and checked first, as `save` does.
+        // The file is read first, as `save` reads it, so one that can't be
+        // read writes nothing.
         Self::get()?;
         save(values)?;
         Self::get()
     }
 
-    /// Fails on a value its section doesn't take, as reading it from the
-    /// file would.
+    /// Fails on a value its section doesn't take, which reading the file
+    /// would take for its default.
     fn check(&self) -> anyhow::Result<()> {
         serde_json::from_value::<Self>(serde_json::to_value(self)?)?;
         Ok(())
@@ -683,7 +694,7 @@ fn saver(name: &str) -> Option<Saver> {
 
 /// Sets each key `values` names in the section `S` as the file holds it, as
 /// [`merged`] sets them, and writes it, in one read and write under the
-/// settings file's lock. A bad value writes nothing.
+/// settings file's lock. A bad value given writes nothing.
 fn saved<S: Section>(values: Map<String, Value>) -> anyhow::Result<()> {
     let mut outcome = Ok(());
     koharu_config::update(|section: &mut S| {
@@ -701,14 +712,14 @@ fn saved<S: Section>(values: Map<String, Value>) -> anyhow::Result<()> {
 }
 
 /// `tables`, sections as JSON keyed by their tables' names, with each key
-/// `values` names in the section `name` set to its value, read as `T` as the
-/// file would read it, so a bad value fails. A table among the values sets
-/// only the keys it names, so its others keep theirs; anything else is set
-/// whole. A key the section doesn't have fails too, as does one a table in
-/// it doesn't have: the file would drop it, but a caller naming one made a
-/// mistake. A key the section's JSON leaves out, as `skip_serializing_if`
-/// does, counts as one it doesn't have, unless it held the key and the value
-/// is null, which removes it, as it removes a category's font.
+/// `values` names in the section `name` set to its value, read as `T`, so a bad
+/// value fails, where the file's would read as its default. A table among the
+/// values sets only the keys it names, so its others keep theirs; anything else
+/// is set whole. A key the section doesn't have fails too, as does one a table
+/// in it doesn't have: the file would drop it, but a caller naming one made a
+/// mistake. A key the section's JSON leaves out, as `skip_serializing_if` does,
+/// counts as one it doesn't have, unless it held the key and the value is null,
+/// which removes it, as it removes a category's font.
 fn merged<T: Serialize + DeserializeOwned>(
     mut tables: Map<String, Value>,
     name: &str,

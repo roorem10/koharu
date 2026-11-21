@@ -117,8 +117,9 @@ pub async fn booharu_emphasis_patch(app: State<'_, Arc<App>>, layer: LayerId) ->
     .await??)
 }
 
-/// The saved `[booharu-emphasis]` and `[booharu-lettering]`, a bad stored
-/// value failing, never replaced by its default.
+/// The saved `[booharu-emphasis]` and `[booharu-lettering]`: a stored value
+/// that doesn't read reads as its default, and a file that can't be read
+/// fails.
 fn settings() -> anyhow::Result<(EmphasisSettings, LetteringSettings)> {
     Ok((
         EmphasisSettings::read()?,

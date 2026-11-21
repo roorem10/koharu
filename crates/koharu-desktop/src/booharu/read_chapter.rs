@@ -283,7 +283,8 @@ pub(super) struct Settings {
     pub target_language: String,
 }
 
-/// The settings as saved now. A bad stored value fails.
+/// The settings as saved now: a stored value that doesn't read reads as its
+/// default, and a file that can't be read fails.
 pub(super) fn settings() -> anyhow::Result<Settings> {
     let pipeline = koharu_config::get::<PipelineConfig>()?;
     Ok(Settings {

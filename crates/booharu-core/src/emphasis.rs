@@ -73,9 +73,9 @@ impl Section for EmphasisSettings {
 }
 
 impl EmphasisSettings {
-    /// The section as the file holds it now. A bad stored value fails, never
-    /// replaced by its default, so no word is stressed in a look nobody
-    /// chose.
+    /// The section as the file holds it now: a stored value that doesn't read
+    /// reads as its default, and only a file that can't be read, such as one
+    /// that isn't TOML, fails, naming the section.
     pub fn read() -> anyhow::Result<Self> {
         koharu_config::get()
             .with_context(|| format!("Booharu's emphasis can't be read from [{}]", Self::NAME))

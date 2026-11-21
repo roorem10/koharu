@@ -118,8 +118,9 @@ pub trait RunHost: Send + Sync + 'static {
 
     /// The lettering settings as saved now, `[booharu-lettering]`, read
     /// once for each press, as a run's snapshot reads them: the planner's
-    /// sound-effect rule follows the SFX mode. A bad stored value fails, so
-    /// nothing is planned by a mode nobody chose.
+    /// sound-effect rule follows the SFX mode. A stored value that doesn't
+    /// read reads as its default, and a file that can't be read fails, so
+    /// nothing is planned while the mode is unknown.
     fn lettering(&self) -> anyhow::Result<LetteringSettings> {
         LetteringSettings::read()
     }

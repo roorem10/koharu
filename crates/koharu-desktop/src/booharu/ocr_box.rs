@@ -68,8 +68,8 @@ fn add(app: &Arc<App>, page: PageId, rect: Rect, modifiers: BoxModifiers) -> Res
 /// through, as Booharu 0.0.4's O tool chose: Alt only reads it, Shift also
 /// cleans it, Alt winning when both are held, and with neither, the default
 /// mode the O tool's settings, read by `settings` only then, give. Settings
-/// that can't be read refuse the box, as a bad stored value is never taken
-/// for its default.
+/// that can't be read, as when the file isn't TOML, refuse the box; a stored
+/// mode that doesn't read reads as its default, Read & Translate.
 fn mode(
     modifiers: BoxModifiers,
     settings: impl FnOnce() -> koharu_config::Result<OcrBoxSettings>,

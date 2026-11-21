@@ -384,7 +384,8 @@ impl Tool for StyleWords {
 /// `[booharu-emphasis]` and `[booharu-lettering]` as the app holds them now,
 /// or outside the app as the file holds them: how a stressed word looks, and
 /// the lettering categories that choose its look. A section that can't be
-/// read is an error, so no word is stressed in a look nobody chose.
+/// read, as when the file isn't TOML, is an error; a stored value that doesn't
+/// read reads as its default.
 fn settings(tools: &Tools) -> anyhow::Result<(EmphasisSettings, LetteringSettings)> {
     Ok(match &tools.booharu {
         Some(host) => {
@@ -497,10 +498,7 @@ mod tests {
 
     impl BooharuHost for App {
         fn preferences(&self) -> anyhow::Result<BooharuPreferences> {
-            anyhow::ensure!(
-                !self.broken,
-                "[booharu-reading] pages_per_request = 99 is over 40"
-            );
+            anyhow::ensure!(!self.broken, "config.toml is invalid: it isn't UTF-8");
             let mut preferences = BooharuPreferences::default();
             preferences.emphasis.categories.insert(
                 LetteringCategory::Shout,
@@ -1037,7 +1035,7 @@ mod tests {
         let error = style(&tools, stress)
             .await
             .expect_err("no emphasis to read");
-        assert!(error.to_string().contains("pages_per_request"), "{error}");
+        assert!(error.to_string().contains("isn't UTF-8"), "{error}");
     }
 
     #[tokio::test]

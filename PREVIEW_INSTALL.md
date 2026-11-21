@@ -40,7 +40,7 @@ While Booharu runs, an MCP client on the same computer can work on the open proj
 port = 47822
 ```
 
-If the port is taken or outside that range, Booharu starts without the MCP server. Agents connected over MCP can't change this setting.
+A port outside that range is read as 47821. If the port is taken, or `config.toml` isn't valid TOML, Booharu starts without the MCP server. Agents connected over MCP can't change this setting.
 
 ## Projects from Booharu 0.0.4 and earlier
 

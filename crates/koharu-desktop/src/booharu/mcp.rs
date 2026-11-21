@@ -18,8 +18,9 @@ static STATUS: OnceLock<McpStatus> = OnceLock::new();
 pub(crate) enum McpStatus {
     /// It listens on 127.0.0.1 at `port`.
     Listening { port: u16 },
-    /// It doesn't listen, for `error`: the setting is bad, which fails
-    /// closed, or the port is taken.
+    /// It doesn't listen, for `error`: the settings file can't be read, as
+    /// when it isn't TOML, or the port is taken. A stored port that doesn't
+    /// read reads as its default, 47821.
     Failed { error: String },
 }
 

@@ -48,9 +48,11 @@ do: with the scene's own queries and edits, its undo and redo, and its history.
   settings stay valid from one launch to the next.
 - **Booharu** serves MCP on its own port instead, so it runs beside Koharu: <!-- Booharu: its own MCP port. -->
   `port` in `[booharu-mcp]`, 47821 by default, read at launch and so kept from
-  one launch to the next. A bad port, or one that's taken, leaves Booharu
-  without the server rather than moving it, and an outside agent can't change
-  the setting.
+  one launch to the next. A stored port that doesn't read, such as one below
+  1024, reads as 47821, as Koharu reads a bad setting as its default; a port
+  that's taken, or a settings file that can't be read, leaves Booharu without
+  the server rather than moving it, and an outside agent can't change the
+  setting.
 
 ## 3. Projects
 
