@@ -2,8 +2,7 @@
 //! face's synthetic bold and slant.
 
 use anyhow::Result;
-use glifo::FontEmbolden;
-use kurbo::{Affine, Diagonal2, Join};
+use kurbo::{Affine, Join, Stroke};
 use vello_gpu::peniko::{Color, Fill}; // Booharu: Fill, for the Contour borders.
 
 use super::TextLayout;
@@ -56,19 +55,43 @@ pub(crate) fn draw(
                 (Pass::Fill, ..) => (run.fill, 0.0, Join::Miter),
             };
             let font = &glyphs.font;
-            let bold = bold(font, run.size);
-            drawing.scene.set_paint(Color::from(paint));
+            let bold = bold(font, run.size); // Booharu: shared, as contour.rs grows by it too.
+            let turn = turn(font, glyphs.sideways); // Booharu: shared, as contour.rs turns by it too.
+            // Glyphs grow under a stroke twice as wide, as Skia fakes a bold,
+            // not by glifo's embolden: kurbo 0.13.1's `expand_path` fits one
+            // cubic to each segment's offset, so a short handle turning back,
+            // as many comic fonts have, sends the outline far off the glyph,
+            // and it grows every contour one way, by the glyph's area, so a
+            // contour wound against the rest, like some fonts' dots on i and
+            // j, shrinks instead (koharu-rs/koharu#1073).
+            let grow = bold + width;
+            let stroke = (grow > 0.0).then(|| Stroke::new(2.0 * grow).with_join(join));
             // Booharu: a gradient fill paints in place of the flat one.
-            if let (Pass::Fill, Some(gradient)) = (pass, &glyphs.fill) {
+            let gradient = match pass {
+                Pass::Fill => glyphs.fill.as_ref(),
+                Pass::Outer | Pass::Stroke => None,
+            };
+            // The stroke overlaps the fill inside the outline, so a
+            // translucent paint draws opaque in a layer of its alpha, or the
+            // overlap would show darker.
+            let color = Color::from(paint);
+            let alpha = color.components[3];
+            let layered = stroke.is_some() && alpha < 1.0 && gradient.is_none(); // Booharu: a gradient stays one paint.
+            if layered {
+                drawing.scene.push_opacity_layer(alpha);
+            }
+            drawing.scene.set_paint(match layered {
+                true => color.with_alpha(1.0),
+                false => color,
+            });
+            // Booharu: the gradient, over the flat paint set above.
+            if let Some(gradient) = gradient {
                 drawing.scene.set_paint(gradient.clone());
             }
-            drawing.glyphs(
-                font,
-                run.size,
-                turn(font, glyphs.sideways),
-                FontEmbolden::new(Diagonal2::new(bold + width, bold + width)).with_join(join),
-                &glyphs.glyphs,
-            )?;
+            drawing.glyphs(font, run.size, turn, stroke, &glyphs.glyphs)?;
+            if layered {
+                drawing.scene.pop_layer();
+            }
         }
     }
     Ok(())

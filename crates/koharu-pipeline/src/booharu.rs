@@ -395,8 +395,9 @@ pub(crate) enum Class {
     /// or the project refused the page's edit, naming a layer that's gone or
     /// locked: another try fails the same way.
     Invalid,
-    /// The project couldn't be read, written, or saved: the run ends, whatever
-    /// its policy.
+    /// The project couldn't be read, written, or saved, or the runtime shut
+    /// down while a model loaded: the run ends, whatever its policy, as a try
+    /// after either would find the same.
     Write,
     /// A model couldn't load: another try, with nothing freed meanwhile, fails
     /// the same way.
@@ -422,15 +423,16 @@ impl Failure {
 }
 
 /// The class of `error`, a stage's, read from the first cause in its chain
-/// that says: Koharu's own invalid request, scene, and load errors, a scene
-/// error from the session, then the HTTP status of a hosted model's reply,
-/// however rig carries it; anything else is worth another try.
+/// that says: Koharu's own invalid request, scene, load, and shutdown errors,
+/// a scene error from the session, then the HTTP status of a hosted model's
+/// reply, however rig carries it; anything else is worth another try.
 pub(crate) fn class(error: &anyhow::Error) -> Class {
     for cause in error.chain() {
         match cause.downcast_ref::<crate::Error>() {
             Some(crate::Error::Invalid(_)) => return Class::Invalid,
             Some(crate::Error::Scene(error)) => return scene(error),
             Some(crate::Error::Load { .. }) => return Class::Load,
+            Some(crate::Error::Shutdown) => return Class::Write,
             Some(crate::Error::Stage { .. }) | None => {}
         }
         if let Some(error) = cause.downcast_ref::<koharu_scene::Error>() {
@@ -901,14 +903,15 @@ mod tests {
                 ..read.clone()
             }
         );
-        // A bad [booharu-runs] refuses the run, naming the section.
-        let bad = anyhow::anyhow!("9 retries aren't between 0 and 5")
+        // A [booharu-runs] that can't be read, in a settings file that isn't
+        // TOML, refuses the run, naming the section.
+        let unreadable = anyhow::anyhow!("config.toml is invalid: TOML parse error")
             .context("Booharu's run settings can't be read from [booharu-runs]");
-        let refused =
-            super::snapshot(Ok(read), Err(bad), &Snapshot::default()).expect_err("a bad policy");
+        let refused = super::snapshot(Ok(read), Err(unreadable), &Snapshot::default())
+            .expect_err("an unreadable policy");
         assert!(
             matches!(&refused, crate::Error::Invalid(message)
-                if message.contains("[booharu-runs]") && message.contains("9 retries")),
+                if message.contains("[booharu-runs]") && message.contains("TOML parse error")),
             "{refused}"
         );
         // A config a caller made, as upstream's tests and examples make one,
@@ -1967,6 +1970,11 @@ mod tests {
                 Class::Write,
             ),
             (load.into(), Class::Load),
+            // The app quitting while a model loaded, never tried again.
+            (
+                anyhow::Error::from(crate::Error::Shutdown).context("the model couldn't load"),
+                Class::Write,
+            ),
             // A rate limit or a server error koharu-llm's client sent again,
             // however rig carries it.
             (report(503).into(), Class::HostedRetried),

@@ -370,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn a_run_that_doesnt_translate_never_reads_the_section_and_a_bad_one_refuses_one_that_does()
+    fn a_run_that_doesnt_translate_never_reads_the_section_and_an_unreadable_one_refuses_one_that_does()
     -> crate::Result<()> {
         let own = "Keep honorifics.";
         let translator = TranslatorConfig {
@@ -383,15 +383,21 @@ mod tests {
         let (booharu, kept) = asked(snapshot(), translator.clone(), &stages, unread)?;
         assert_eq!((booharu, kept), (snapshot(), translator.clone()));
 
-        let bad = || {
-            Err(anyhow::anyhow!("weight 1200 isn't between 1 and 1000")
+        // A settings file that isn't TOML.
+        let unreadable = || {
+            Err(anyhow::anyhow!("config.toml is invalid: TOML parse error")
                 .context("Booharu's emphasis can't be read from [booharu-emphasis]"))
         };
-        let refused = asked(snapshot(), translator, &run(&[Stage::Translate]), bad)
-            .expect_err("a bad section");
+        let refused = asked(
+            snapshot(),
+            translator,
+            &run(&[Stage::Translate]),
+            unreadable,
+        )
+        .expect_err("an unreadable section");
         assert!(
             matches!(&refused, crate::Error::Invalid(message)
-                if message.contains("[booharu-emphasis]") && message.contains("1200")),
+                if message.contains("[booharu-emphasis]") && message.contains("TOML parse error")),
             "{refused}"
         );
         Ok(())

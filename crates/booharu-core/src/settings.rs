@@ -789,7 +789,10 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::runs::RunOrder;
+    use crate::{
+        runs::RunOrder,
+        testing::{stored, unreadable},
+    };
 
     fn values(values: Value) -> Map<String, Value> {
         match values {
@@ -845,7 +848,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bad_reading_model_or_page_count_fails_closed() {
+    fn a_bad_reading_model_or_page_count_isnt_taken_and_reads_as_its_default() {
         let refused = [
             r#"model = """#,
             r#"model = "  ""#,
@@ -861,7 +864,25 @@ mod tests {
                 toml::from_str::<ReadingSettings>(text).is_err(),
                 "took {text}"
             );
+            // Edited into the file, it reads as its default.
+            assert_eq!(
+                stored::<ReadingSettings>(text).ok(),
+                Some(ReadingSettings::default()),
+                "{text}"
+            );
         }
+        // The section's other values stay; a file that isn't TOML fails.
+        let kept: ReadingSettings =
+            stored("model = \"\"\nask = false\npages_per_request = 0").expect("the section");
+        assert_eq!(
+            kept,
+            ReadingSettings {
+                model: None,
+                ask: false,
+                pages_per_request: 20,
+            }
+        );
+        assert!(unreadable::<ReadingSettings>().is_err());
         let read: ReadingSettings =
             toml::from_str("model = \"openai/gpt-5.4\"\nask = false\npages_per_request = 40\n")
                 .expect("a model, no asking and the most pages");
@@ -910,7 +931,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bad_smallest_readable_size_fails_closed() {
+    fn a_bad_smallest_readable_size_isnt_taken_and_reads_as_its_default() {
         for text in [
             "min_size = 0",
             "min_size = -0.01",
@@ -921,7 +942,18 @@ mod tests {
             "min_size = \"0.01\"",
         ] {
             assert!(toml::from_str::<QcSettings>(text).is_err(), "took {text}");
+            // Edited into the file, it reads as its default, the section's
+            // only value.
+            assert_eq!(
+                stored::<QcSettings>(text).ok().map(|qc| qc.min_size),
+                Some(0.01),
+                "{text}"
+            );
         }
+        assert!(
+            unreadable::<QcSettings>().is_err(),
+            "a file that isn't TOML"
+        );
         for (text, share) in [("min_size = 0.1", 0.1), ("min_size = 0.0005", 0.0005)] {
             let read: QcSettings = toml::from_str(text).expect("a share");
             assert_eq!(read.min_size, share);
@@ -975,7 +1007,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bad_colour_width_or_favourite_fails_closed() {
+    fn a_bad_colour_width_or_favourite_isnt_taken_and_reads_as_its_default() {
         let refused = [
             "[default]\nfill = [1.5, 0, 0, 1]",
             "[default]\nfill = [-0.1, 0, 0, 1]",
@@ -992,13 +1024,35 @@ mod tests {
                 toml::from_str::<LetteringSettings>(text).is_err(),
                 "took {text}"
             );
+            // Edited into the file, it reads as its default.
+            assert_eq!(
+                stored::<LetteringSettings>(text).ok(),
+                Some(LetteringSettings::default()),
+                "{text}"
+            );
         }
+        // The section's other values stay; a file that isn't TOML fails.
+        let kept: LetteringSettings =
+            stored("detect_colors = false\n[default]\nfill = [1.5, 0, 0, 1]\nstroke_width = 3")
+                .expect("the section");
+        assert!(!kept.detect_colors);
+        assert_eq!(kept.default.fill, None);
+        assert_eq!(kept.default.stroke_width, 3.0);
+        assert!(unreadable::<LetteringSettings>().is_err());
         let widest: LetteringSettings =
             toml::from_str("[default]\nstroke_width = 50").expect("the widest");
         assert_eq!(widest.default.stroke_width, 50.0);
         for text in [r#"favorites = [""]"#, r#"favorites = ["Arial", "  "]"#] {
             assert!(toml::from_str::<FontSettings>(text).is_err(), "took {text}");
+            // One bad favourite, edited into the file, takes the list's
+            // default: no favourites.
+            assert_eq!(
+                stored::<FontSettings>(text).ok(),
+                Some(FontSettings::default()),
+                "{text}"
+            );
         }
+        assert!(unreadable::<FontSettings>().is_err());
     }
 
     #[test]
@@ -1153,7 +1207,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bad_sound_effect_setting_fails_closed() {
+    fn a_bad_sound_effect_setting_isnt_taken_and_reads_as_its_default() {
         let refused = [
             r#"sfx = "kept""#,
             r#"sfx = "translateAll""#,
@@ -1174,7 +1228,24 @@ mod tests {
                 toml::from_str::<LetteringSettings>(text).is_err(),
                 "took {text}"
             );
+            // Edited into the file, it reads as its default.
+            assert_eq!(
+                stored::<LetteringSettings>(text).ok(),
+                Some(LetteringSettings::default()),
+                "{text}"
+            );
         }
+        // The section's other values stay; a file that isn't TOML fails.
+        let kept: LetteringSettings = stored(
+            "sfx = \"kept\"\ndetect_colors = false\n\
+             [subtitle]\nsize = 0.11\nfamily = \"Comic Neue\"",
+        )
+        .expect("the section");
+        assert_eq!(kept.sfx, SfxMode::Skip);
+        assert!(!kept.detect_colors);
+        assert_eq!(kept.subtitle.size, SubtitleStyle::default().size);
+        assert_eq!(kept.subtitle.family.as_deref(), Some("Comic Neue"));
+        assert!(unreadable::<LetteringSettings>().is_err());
         // Through its section too, where a null colour is no colour at all,
         // and a bad value or an unknown key changes nothing.
         let mut preferences = BooharuPreferences::default();
@@ -1251,7 +1322,7 @@ mod tests {
     }
 
     #[test]
-    fn a_snapshot_fails_on_a_section_it_cant_read() {
+    fn a_snapshot_reads_a_bad_stored_value_as_its_default_and_fails_on_a_file_that_isnt_toml() {
         let lettering = LetteringSettings {
             detect_colors: false,
             ..LetteringSettings::default()
@@ -1269,20 +1340,24 @@ mod tests {
                 asks_emphasis: false,
             })
         );
-        // A bad stored value is an error, never Koharu's look or no font.
-        fn bad<T>() -> koharu_config::Result<T> {
-            Err(koharu_config::Error::Invalid {
-                path: "config.toml".into(),
-                message: "an outline 60 pixels wide".to_owned(),
-            })
-        }
-        let error = Snapshot::of(bad(), families()).expect_err("a bad text style");
+        // An outline 60 pixels wide, edited into the file, reads as the
+        // default width, and the section's other values stay.
+        let edited = stored("detect_colors = false\n[default]\nstroke_width = 60");
+        assert_eq!(
+            Snapshot::of(edited, families())
+                .ok()
+                .map(|snapshot| snapshot.lettering),
+            Some(lettering.clone())
+        );
+        // A file that isn't TOML is an error, never Koharu's look or no font.
+        let error = Snapshot::of(unreadable(), families()).expect_err("no text style");
         assert!(
             format!("{error:#}").contains("[booharu-lettering]")
-                && format!("{error:#}").contains("60 pixels"),
+                && format!("{error:#}").contains("config.toml is invalid"),
             "{error:#}"
         );
-        let error = Snapshot::of(Ok(lettering), bad()).expect_err("bad Preferred fonts");
+        let fonts = unreadable::<FontSettings>().map(|fonts| fonts.favorites.into_iter().collect());
+        let error = Snapshot::of(Ok(lettering), fonts).expect_err("no Preferred fonts");
         assert!(
             format!("{error:#}").contains("Preferred fonts"),
             "{error:#}"
@@ -1389,12 +1464,27 @@ mod tests {
     }
 
     #[test]
-    fn a_port_below_1024_fails_closed() {
+    fn a_port_below_1024_isnt_taken_and_reads_as_booharus_own() {
         let error = toml::from_str::<McpSettings>("port = 80").expect_err("a system port");
         assert!(error.to_string().contains("port 80 isn't"), "{error}");
         for port in [0, 1023, 65536] {
             assert!(toml::from_str::<McpSettings>(&format!("port = {port}")).is_err());
         }
+        // Edited into the file, it reads as Booharu's own port, the
+        // section's only value, never Koharu's 7878.
+        for port in [80, 0, 1023, 65536] {
+            assert_eq!(
+                stored::<McpSettings>(&format!("port = {port}"))
+                    .ok()
+                    .map(|mcp| mcp.port),
+                Some(47821),
+                "{port}"
+            );
+        }
+        assert!(
+            unreadable::<McpSettings>().is_err(),
+            "a file that isn't TOML"
+        );
         assert_eq!(
             toml::from_str::<McpSettings>("port = 1024")
                 .ok()
@@ -1411,10 +1501,22 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_ocr_box_mode_fails_closed() {
+    fn an_unknown_ocr_box_mode_isnt_taken_and_reads_as_read_and_translate() {
         let error = toml::from_str::<OcrBoxSettings>(r#"default_mode = "clean""#)
             .expect_err("no such mode");
         assert!(error.to_string().contains("unknown variant"), "{error}");
+        // Edited into the file, it reads as the default, the section's only
+        // value.
+        assert_eq!(
+            stored::<OcrBoxSettings>(r#"default_mode = "clean""#)
+                .ok()
+                .map(|ocr_box| ocr_box.default_mode),
+            Some(OcrBoxMode::ReadTranslate)
+        );
+        assert!(
+            unreadable::<OcrBoxSettings>().is_err(),
+            "a file that isn't TOML"
+        );
         let read: OcrBoxSettings =
             toml::from_str(r#"default_mode = "read_translate_clean""#).expect("a mode");
         assert_eq!(read.default_mode, OcrBoxMode::ReadTranslateClean);

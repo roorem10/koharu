@@ -611,7 +611,7 @@ mod tests {
 
     #[test]
     fn only_emphasis_reads_the_settings() -> Result<()> {
-        // A section that can't be read, as a bad one edited into the file.
+        // A section that can't be read, as in a file that isn't TOML.
         let unreadable = || -> Result<(EmphasisSettings, LetteringSettings)> {
             bail!("Booharu's emphasis can't be read from [booharu-emphasis]")
         };

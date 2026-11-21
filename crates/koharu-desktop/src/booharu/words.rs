@@ -193,7 +193,7 @@ mod tests {
             })
             .context("the block")?;
         let project = session.project();
-        // A bad section edited into the file, as `settings` reads it then.
+        // A settings file that isn't TOML, as `settings` reads it then.
         let unreadable = || -> anyhow::Result<(EmphasisSettings, LetteringSettings)> {
             bail!("Booharu's emphasis can't be read from [booharu-emphasis]")
         };

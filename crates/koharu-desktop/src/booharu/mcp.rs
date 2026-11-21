@@ -61,8 +61,6 @@ async fn listen(settings: Result<McpSettings>) -> (Result<McpServer>, McpStatus)
 mod tests {
     use std::net::{Ipv4Addr, TcpListener};
 
-    use serde_json::json;
-
     use super::*;
 
     #[tokio::test]
@@ -85,13 +83,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_bad_stored_port_starts_no_server() {
-        let settings = serde_json::from_value::<McpSettings>(json!({"port": 80}));
-        let (server, status) = listen(settings.map_err(Into::into)).await;
+    async fn a_bad_stored_port_reads_as_booharus_own_and_a_file_that_isnt_toml_starts_no_server() {
+        // A port below 1024, edited into the file, reads as Booharu's own,
+        // never as itself or Koharu's 7878.
+        let stored = koharu_config::booharu_read_section::<McpSettings>("[booharu-mcp]\nport = 80");
+        assert_eq!(stored.ok().map(|mcp| mcp.port), Some(47821));
+        let unreadable = koharu_config::booharu_read_section::<McpSettings>("[booharu-mcp");
+        let (server, status) = listen(unreadable.map_err(Into::into)).await;
         assert!(server.is_err());
         let McpStatus::Failed { error } = status else {
             panic!("{status:?}");
         };
-        assert!(error.contains("port 80 isn't"), "{error}");
+        assert!(error.contains("config.toml is invalid"), "{error}");
     }
 }

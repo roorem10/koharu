@@ -77,6 +77,20 @@ pub(crate) mod testing {
             patch: json!({"translation": {"style": {"chars": {"family": FAMILY, "fill": FILL}}}}),
         }
     }
+
+    /// The section `T` as `koharu_config::get` reads it from a settings
+    /// file holding `table` as `T`'s table.
+    pub(crate) fn stored<T: koharu_config::Section>(table: &str) -> koharu_config::Result<T> {
+        let table: toml::Table = table.parse().expect("a table");
+        let file = toml::Table::from_iter([(T::NAME.to_owned(), toml::Value::Table(table))]);
+        koharu_config::booharu_read_section(&toml::to_string(&file).expect("a settings file"))
+    }
+
+    /// The section `T` as `koharu_config::get` reads it from a settings
+    /// file that isn't TOML, as one cut off mid-edit.
+    pub(crate) fn unreadable<T: koharu_config::Section>() -> koharu_config::Result<T> {
+        koharu_config::booharu_read_section(&format!("[{}", T::NAME))
+    }
 }
 
 #[cfg(test)]

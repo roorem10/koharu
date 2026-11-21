@@ -113,7 +113,20 @@ mod tests {
     }
 
     #[test]
-    fn unreadable_settings_refuse_a_box_that_needs_them() -> Result<()> {
+    fn a_bad_stored_mode_reads_as_read_and_translate_and_unreadable_settings_refuse_the_box()
+    -> Result<()> {
+        // A mode Booharu doesn't have, edited into the file, reads as the
+        // default.
+        let stored = || {
+            koharu_config::booharu_read_section::<OcrBoxSettings>(
+                "[booharu-ocr-box]\ndefault_mode = \"clean\"",
+            )
+        };
+        assert_eq!(mode(held(false, false), stored)?, OcrBoxMode::ReadTranslate);
+        // A file that isn't TOML, or no home to keep it in, refuses a box
+        // that needs the settings.
+        let not_toml = || koharu_config::booharu_read_section("[booharu-ocr-box");
+        assert!(mode(held(false, false), not_toml).is_err());
         let unreadable = || Err(koharu_config::Error::NoHome);
         let error = mode(held(false, false), unreadable).expect_err("no mode");
         assert!(

@@ -239,6 +239,7 @@ pub fn retry_wait(attempt: u32) -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::{stored, unreadable};
 
     #[test]
     fn an_empty_table_reads_as_the_defaults() {
@@ -288,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bad_preset_retry_count_or_choice_fails_closed() {
+    fn a_bad_preset_retry_count_or_choice_isnt_taken_and_reads_as_its_default() {
         let preset = |name: &str, stages: &str| {
             format!("[[presets]]\nname = \"{name}\"\nstages = [{stages}]\n")
         };
@@ -316,7 +317,27 @@ mod tests {
                 toml::from_str::<RunsSettings>(&text).is_err(),
                 "took {text}"
             );
+            // Edited into the file, it reads as its default: a bad preset,
+            // as all the presets' default.
+            assert_eq!(
+                stored::<RunsSettings>(&text).ok(),
+                Some(RunsSettings::default()),
+                "{text}"
+            );
         }
+        // The section's other values stay; a file that isn't TOML fails.
+        let kept: RunsSettings = stored(
+            &("retries = 4\norder = \"overlapped\"\nfinish_sound = false\n".to_owned()
+                + &preset("Read", "\"detect\"")
+                + &preset("", "\"detect\"")),
+        )
+        .expect("the section");
+        assert_eq!(
+            (kept.retries, kept.order, kept.finish_sound),
+            (4, RunsSettings::default().order, false)
+        );
+        assert_eq!(kept.presets, RunsSettings::default().presets);
+        assert!(unreadable::<RunsSettings>().is_err());
         // A key after a `[[presets]]` header would be the last preset's.
         let most = "retries = 5\n".to_owned()
             + &(0..MAX_PRESETS)
@@ -337,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn a_policy_fails_on_a_section_it_cant_read() {
+    fn a_policy_reads_a_bad_stored_value_as_its_default_and_fails_on_a_file_that_isnt_toml() {
         let stop = RunsSettings {
             on_page_failure: OnPageFailure::Stop,
             ..RunsSettings::default()
@@ -348,14 +369,19 @@ mod tests {
                 .map(|policy| policy.on_page_failure),
             Some(OnPageFailure::Stop)
         );
-        let bad = Err(koharu_config::Error::Invalid {
-            path: "config.toml".into(),
-            message: "9 retries aren't between 0 and 5".to_owned(),
-        });
-        let error = RunPolicy::of(bad).expect_err("a bad section");
+        // 9 retries, edited into the file, read as the default 2, and the
+        // section's other values stay.
+        let edited = stored("retries = 9\non_page_failure = \"stop\"");
+        assert_eq!(
+            RunPolicy::of(edited)
+                .ok()
+                .map(|policy| (policy.retries, policy.on_page_failure)),
+            Some((2, OnPageFailure::Stop))
+        );
+        let error = RunPolicy::of(unreadable()).expect_err("an unreadable section");
         let error = format!("{error:#}");
         assert!(
-            error.contains("[booharu-runs]") && error.contains("9 retries"),
+            error.contains("[booharu-runs]") && error.contains("config.toml is invalid"),
             "{error}"
         );
     }

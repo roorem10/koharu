@@ -526,6 +526,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::testing::{stored, unreadable};
 
     const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
 
@@ -568,7 +569,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bad_value_fails_closed() {
+    fn a_bad_value_isnt_taken_and_reads_as_its_default() {
         let refused = [
             "[default]\nsize_factor = nan",
             "[default]\nsize_factor = 0",
@@ -589,12 +590,37 @@ mod tests {
             "[categories.tone]\nweight = 900",
             "ai = \"yes\"",
         ];
+        // The default's own italic, beside an empty entry, stays.
+        let italic = EmphasisSettings {
+            default: EmphasisStyle {
+                italic: Some(true),
+                ..EmphasisStyle::default()
+            },
+            ..EmphasisSettings::default()
+        };
         for text in refused {
             assert!(
                 toml::from_str::<EmphasisSettings>(text).is_err(),
                 "took {text}"
             );
+            // Edited into the file, it reads as its default.
+            let default = if text.contains("italic") {
+                italic.clone()
+            } else {
+                EmphasisSettings::default()
+            };
+            assert_eq!(
+                stored::<EmphasisSettings>(text).ok(),
+                Some(default),
+                "{text}"
+            );
         }
+        // The section's other values stay; a file that isn't TOML fails.
+        let kept: EmphasisSettings =
+            stored("ai = \"yes\"\n[categories.whisper]\nweight = 1").expect("the section");
+        assert!(kept.ai);
+        assert_eq!(kept.categories[&LetteringCategory::Whisper].weight, Some(1));
+        assert!(unreadable::<EmphasisSettings>().is_err());
         let empty = serde_json::from_value::<EmphasisSettings>(json!({"default": {}}));
         assert!(empty.is_err(), "a default setting nothing");
         let taken: EmphasisSettings = toml::from_str(

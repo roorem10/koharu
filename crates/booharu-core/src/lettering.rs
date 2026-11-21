@@ -558,7 +558,10 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::*;
-    use crate::settings::BooharuPreferences;
+    use crate::{
+        settings::BooharuPreferences,
+        testing::{stored, unreadable},
+    };
 
     fn label(
         category: LetteringCategory,
@@ -700,7 +703,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bad_category_font_or_share_fails_closed() {
+    fn a_bad_category_font_or_share_isnt_taken_and_reads_as_its_default() {
         let refused = [
             // A blank family, an empty entry, an unknown category.
             "[categories.shout]\nfamily = \"  \"",
@@ -726,7 +729,25 @@ mod tests {
                 toml::from_str::<LetteringSettings>(text).is_err(),
                 "took {text}"
             );
+            // Edited into the file, it reads as its default.
+            assert_eq!(
+                stored::<LetteringSettings>(text).ok(),
+                Some(LetteringSettings::default()),
+                "{text}"
+            );
         }
+        // The section's other values stay; a bad category font takes the
+        // categories' default, none, with the good ones beside it. A file
+        // that isn't TOML fails.
+        let kept: LetteringSettings = stored(
+            "auto = true\nsmall_text = 2\n\
+             [categories.shout]\nfamily = \"  \"\n[categories.sign]\nitalic = true",
+        )
+        .expect("the section");
+        assert!(kept.auto);
+        assert_eq!(kept.small_text, LetteringSettings::default().small_text);
+        assert!(kept.categories.is_empty());
+        assert!(unreadable::<LetteringSettings>().is_err());
         let edges: LetteringSettings = toml::from_str(
             "small_text = 1\nmodel_confidence = 0\n[categories.sign]\nitalic = true",
         )
