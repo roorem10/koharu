@@ -328,10 +328,11 @@ fn a_page_exports_as_layers_photoshop_can_edit() {
 }
 
 // Booharu: a text's effects as Photoshop holds them. Effects its words all
-// share stay on its type layer, a second border and a gradient in `lmfx`; a
-// text whose words carry their own is drawn into a pixel layer over a hidden
-// type layer of its words in plain styles to edit, and the export notes it
-// (S13).
+// share stay on its type layer, a second border and a gradient in `lmfx`, and
+// a word's letter spacing is its style run's tracking; a text whose words
+// carry their own is drawn into a pixel layer over a hidden type layer of its
+// words in plain styles to edit, numbered among the type layers, and the
+// export notes it (S13).
 mod booharu {
     use koharu_psd::{Notice, export_noting};
     use koharu_scene::{LayerId, PageId};
@@ -431,12 +432,17 @@ mod booharu {
         }
     }
 
-    /// The fill of each style run of a type layer, as EngineData writes it.
-    fn fills(record: &LayerRecord) -> Vec<String> {
+    /// The style runs of a type layer, as its EngineData writes them.
+    fn style_runs(record: &LayerRecord) -> String {
         let data = engine_data(record);
         let runs = data.split("/StyleRun").nth(1).expect("style runs");
-        let runs = runs.split("/GridInfo").next().unwrap_or(runs);
-        runs.split("/FillColor")
+        runs.split("/GridInfo").next().unwrap_or(runs).to_owned()
+    }
+
+    /// The fill of each style run of a type layer, as EngineData writes it.
+    fn fills(record: &LayerRecord) -> Vec<String> {
+        style_runs(record)
+            .split("/FillColor")
             .skip(1)
             .map(|fill| {
                 let values = fill.split("/Values").nth(1).expect("a colour");
@@ -455,6 +461,14 @@ mod booharu {
             && !fills.is_empty()
             && fills.iter().all(|fill| fill == FIRST_STOP)
             && !effects(record)
+    }
+
+    /// A type layer's number among the file's type layers (`TextIndex`).
+    fn index(record: &LayerRecord) -> i32 {
+        match type_text(record).descriptor.get("TextIndex") {
+            Some(Value::Integer(index)) => *index,
+            other => panic!("TextIndex is {other:?}"),
+        }
     }
 
     /// Whether `record` carries layer effects.
@@ -500,8 +514,13 @@ mod booharu {
             }}),
             json!({"op": "add_layer", "id": "$keep", "page": "$page", "parent": "$words", "index": 0, "layer": {"kind": "mask"}}),
             json!({"op": "write_pixels", "layer": "$keep", "rect": {"x": 0, "y": 0, "width": 100, "height": 200}, "pixels": vec![255u8; 100 * 200]}),
+            // Its middle word spaced out, which its style run holds.
             json!({"op": "add_layer", "page": "$page", "index": 1, "layer": {
-                "kind": "text", "name": "Shared", "language": "en", "content": WORDS,
+                "kind": "text", "name": "Shared", "language": "en", "content": [
+                    {"insert": "Hello "},
+                    {"insert": "brave", "attributes": {"tracking": 12.6}},
+                    {"insert": " world"},
+                ],
                 "style": {"chars": {
                     "size": 16.0, "fill_gradient": gradient(),
                     "stroke": GREEN, "stroke_width": 3.0,
@@ -555,6 +574,26 @@ mod booharu {
         let shared = record(&file, "Shared");
         assert!(shared.is_visible());
         assert_eq!(words(shared), WORDS);
+        // Type layers are numbered as they're written, the copy taking the
+        // number after those before it.
+        assert_eq!((index(copy), index(shared)), (0, 1));
+        // A word's letter spacing is its style run's tracking, rounded to a
+        // whole thousandth of an em, after AutoLeading and before
+        // AutoKerning as Photoshop writes it; the other words have none.
+        assert_eq!(engine_data(shared).matches("/Tracking").count(), 1);
+        let styles = style_runs(shared);
+        let style = styles
+            .split("/StyleSheetData")
+            .find(|style| style.contains("/Tracking"))
+            .expect("a style run with tracking");
+        assert!(style.contains("/Tracking 13\n"), "{style}");
+        let at = |key| {
+            style
+                .find(key)
+                .unwrap_or_else(|| panic!("no {key} in {style}"))
+        };
+        assert!(at("/AutoLeading") < at("/Tracking"), "{style}");
+        assert!(at("/Tracking") < at("/AutoKerning"), "{style}");
         assert!(shared.block(b"lfx2").is_none());
         let data = &shared
             .block(b"lmfx")
@@ -596,6 +635,8 @@ mod booharu {
         );
         assert!(!record(&file, "箱").is_visible());
         drawn_over_a_copy(&file.layers()[3], &file.layers()[4]);
+        // The hidden source is the first type layer, and the copy the next.
+        assert_eq!((index(&file.layers()[2]), index(&file.layers()[3])), (0, 1));
         // One notice, of the translation by its block's id and its words.
         assert_eq!(notices, [notice(page, id(&session, page, "Boxed"), WORDS)]);
     }
