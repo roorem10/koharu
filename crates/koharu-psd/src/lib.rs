@@ -1,6 +1,7 @@
 //! Writes a Koharu page as a layered PSD with photocraft-psd.
 
 mod blocks;
+mod booharu; // Booharu: a text's layer effects and the rules they follow.
 mod engine_data;
 
 use koharu_renderer::{Drawn, Frame, Raster, Renderer};
@@ -347,9 +348,8 @@ impl Export<'_> {
         let Raster { image, offset } = match drawn {
             // Under a stroke effect the pixels are the glyphs alone, as
             // Photoshop draws the effect around them.
-            Some(drawn) if blocks.iter().any(|block| &block.key == b"lfx2") => {
-                drawn.unstroked().rasterize()?
-            }
+            // Booharu: so are a type layer's, and under any layer effects (S13-h).
+            Some(drawn) if crate::booharu::glyphs_only(&blocks) => drawn.unstroked().rasterize()?,
             Some(drawn) => drawn.cropped().rasterize()?,
             None => Raster {
                 image: Default::default(),

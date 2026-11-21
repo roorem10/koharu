@@ -105,38 +105,40 @@ fn knots(path: &BezPath, (width, height): (u32, u32)) -> Vec<PsdSubpath> {
     subpaths
 }
 
+// Booharu: these helpers, down to `rgb`, and `stroke_effect` with its
+// `border`, serve src/booharu's layer effects too (S13-a).
 /// A block whose length counts its padding: the spec rounds a block's length
 /// up to an even byte count, and readers such as psd-tools skip exactly that
 /// many bytes, so the zero that evens it out goes inside the data.
-fn block(key: [u8; 4], mut data: Vec<u8>) -> TaggedBlock {
+pub(crate) fn block(key: [u8; 4], mut data: Vec<u8>) -> TaggedBlock {
     if data.len() % 2 == 1 {
         data.push(0);
     }
     TaggedBlock::new(key, data)
 }
 
-fn versioned(descriptor: Descriptor) -> Vec<u8> {
+pub(crate) fn versioned(descriptor: Descriptor) -> Vec<u8> {
     VersionedDescriptor::new(descriptor).to_bytes()
 }
 
-fn enumerated(type_id: &str, value: &str) -> Value {
+pub(crate) fn enumerated(type_id: &str, value: &str) -> Value {
     Value::Enumerated {
         type_id: Id::new(type_id),
         value: Id::new(value),
     }
 }
 
-fn unit(unit: &[u8; 4], value: f64) -> Value {
+pub(crate) fn unit(unit: &[u8; 4], value: f64) -> Value {
     Value::UnitFloat { unit: *unit, value }
 }
 
 /// A colour's alpha as a percentage, which a descriptor's colour leaves out.
-fn opacity(color: Color) -> Value {
+pub(crate) fn opacity(color: Color) -> Value {
     unit(b"#Prc", f64::from(color.components[3]) * 100.0)
 }
 
 /// A colour as a descriptor holds it: red, green, and blue from 0 to 255.
-fn rgb(color: Color) -> Value {
+pub(crate) fn rgb(color: Color) -> Value {
     let [red, green, blue, _] = color.components.map(|c| f64::from(c) * 255.0);
     Value::Descriptor(
         Descriptor::new("RGBC")
@@ -214,7 +216,8 @@ const LF: u16 = b'\n' as u16;
 /// stroke, an Outside stroke effect (`lfx2` with `FrFX`), how Photoshop
 /// strokes type outside its glyphs as the renderer does. Strokes that differ
 /// by span stay in the pixels only.
-/// Booharu: so do second borders, which one stroke effect can't hold.
+/// Booharu: `booharu::effects` writes the effects: the stroke effect as it
+/// was, or with a second border and a gradient fill, all the runs share.
 pub(crate) fn type_layer(layer: &Text, text: &ResolvedText, index: i32) -> Vec<TaggedBlock> {
     let vertical = layer.direction == Direction::Vertical;
     let frame = text.frame;
@@ -348,22 +351,26 @@ pub(crate) fn type_layer(layer: &Text, text: &ResolvedText, index: i32) -> Vec<T
     data.extend([0; 16]);
 
     let mut blocks = vec![block(*b"TySh", data)];
-    let stroke = text.runs[0].stroke;
-    if let Some((color, width)) = stroke
-        && text.runs.iter().all(|run| run.stroke == stroke)
-        // Booharu: a second border stays in the pixels.
-        && text.runs.iter().all(|run| run.outer_stroke.is_none())
-    {
-        // An effect's size is in page pixels, where the renderer's stroke
-        // grows with the layer's transform.
-        let scale = transform.determinant().abs().sqrt();
-        blocks.push(stroke_effect(color, f64::from(width) * scale));
-    }
+    // Booharu: the stroke effect, or the layer effects Booharu adds (S13-d).
+    blocks.extend(crate::booharu::effects(layer, text));
     blocks
 }
 
-fn stroke_effect(color: Color, width: f64) -> TaggedBlock {
-    let stroke = Descriptor::new("FrFX")
+pub(crate) fn stroke_effect(color: Color, width: f64) -> TaggedBlock {
+    let stroke = border(color, width); // Booharu: its border, which src/booharu writes too.
+    let effects = Descriptor::new("null")
+        .with("masterFXSwitch", Value::Boolean(true))
+        .with("Scl ", unit(b"#Prc", 100.0))
+        .with("FrFX", Value::Descriptor(stroke));
+    let mut data = 0u32.to_be_bytes().to_vec();
+    data.extend(versioned(effects));
+    block(*b"lfx2", data)
+}
+
+/// Booharu: an Outside border `width` pixels wide (`FrFX`), as
+/// `stroke_effect` writes it, apart for src/booharu's layer effects.
+pub(crate) fn border(color: Color, width: f64) -> Descriptor {
+    Descriptor::new("FrFX")
         .with("enab", Value::Boolean(true))
         .with("present", Value::Boolean(true))
         .with("showInDialog", Value::Boolean(true))
@@ -372,12 +379,5 @@ fn stroke_effect(color: Color, width: f64) -> TaggedBlock {
         .with("Md  ", enumerated("BlnM", "Nrml"))
         .with("Opct", opacity(color))
         .with("Sz  ", unit(b"#Pxl", width))
-        .with("Clr ", rgb(color));
-    let effects = Descriptor::new("null")
-        .with("masterFXSwitch", Value::Boolean(true))
-        .with("Scl ", unit(b"#Prc", 100.0))
-        .with("FrFX", Value::Descriptor(stroke));
-    let mut data = 0u32.to_be_bytes().to_vec();
-    data.extend(versioned(effects));
-    block(*b"lfx2", data)
+        .with("Clr ", rgb(color))
 }
