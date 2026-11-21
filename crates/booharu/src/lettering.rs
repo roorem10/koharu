@@ -292,9 +292,10 @@ pub(crate) fn category_ops(
         });
     }
     // The values written are Booharu's from now on. A translation no
-    // stage wrote keeps its other values hand edits.
+    // stage styled keeps its other values hand edits, as one typed on a
+    // line a later run gave back does.
     let mut record = Auto::of(layer);
-    if record.style.is_none() && !styles::recorded(layer, "translation") {
+    if record.style.is_none() && !styles::stage_styled(layer) {
         record.style = Some(AutoStyle::default());
     }
     let written = patch.keys().cloned().collect();
@@ -826,6 +827,71 @@ mod tests {
             &settings,
         )?;
         assert_eq!(fixture.font("b")?, font("Badaboom BB", Some(700)));
+        Ok(())
+    }
+
+    #[test]
+    fn a_style_set_on_a_line_a_later_run_gave_back_stays_the_users_through_a_pick() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let settings = lettered();
+        let look = Snapshot {
+            lettering: settings.clone(),
+            font: Some(FONT.to_owned()),
+            ..Snapshot::default()
+        };
+        let english: LanguageIdentifier = "en".parse()?;
+        // b, translated by a run, given back unchanged by a later one, which
+        // leaves Koharu's record of the first, then styled on the type bar
+        // and typed into as the Story panel types: its family and its fill
+        // are the user's.
+        let b = fixture.id("b");
+        let given = styles::given_back(&fixture.layer("b")?)?;
+        fixture.edit(vec![
+            Op::UpdateLayer {
+                layer: b.into(),
+                patch: json!({"translation": null, "cleanup": {"visible": false}}),
+            },
+            given,
+        ])?;
+        fixture.edit(vec![type_bar_style(b)])?;
+        let typed = crate::translation::edit(
+            &fixture.session.project(),
+            b,
+            "Why not?".to_owned(),
+            &english,
+            &look,
+        )?;
+        fixture.session.apply(typed)?;
+        let layer = fixture.layer("b")?;
+        assert!(styles::recorded(&layer, "translation"));
+        assert!(edited(&layer).style);
+        assert_eq!(fixture.font("b")?.0.as_deref(), Some(FAMILY));
+
+        // A model's pick leaves them.
+        let model = Chooser::Model {
+            confidence: Some(0.9),
+        };
+        let counts = fixture.set(&["b"], Some(LetteringCategory::Shout), model, &settings)?;
+        assert_eq!(counts.kept_hand_edited, 1);
+        assert_eq!(fixture.font("b")?.0.as_deref(), Some(FAMILY));
+
+        // The user's own pick gives Shout's font and records only it, so the
+        // fill set by hand stays a hand edit, which Apply leaves alone.
+        fixture.set(
+            &["b"],
+            Some(LetteringCategory::Shout),
+            Chooser::User,
+            &settings,
+        )?;
+        assert_eq!(fixture.font("b")?, font("Badaboom BB", Some(700)));
+        assert_eq!(fixture.translation("b")?.style.chars.fill, Some(FILL));
+        let layer = fixture.layer("b")?;
+        let style = Auto::of(&layer).style.context("a style")?;
+        assert_eq!(
+            (style.family.as_deref(), style.fill),
+            (Some("Badaboom BB"), None)
+        );
+        assert!(edited(&layer).style);
         Ok(())
     }
 

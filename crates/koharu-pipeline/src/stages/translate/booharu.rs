@@ -17,9 +17,10 @@ use booharu_core::{
     edited,
     emphasis::EmphasisSettings,
     lettering::{CategoryFont, LetteringCategory},
+    protect,
     settings::{DefaultTextStyle, LetteringSettings, Snapshot},
     sfx, skew, status,
-    styles::text_hash,
+    styles::{self, text_hash},
 };
 use koharu_scene::{
     Block, Content, Created, Direction, Edit, Frame, Layer, LayerId, Op, PageId, Rgba, RichText,
@@ -777,5 +778,65 @@ async fn a_box_styled_before_its_translated_and_given_back_keeps_its_style() -> 
     assert_eq!(found.translation, None);
     assert!(!found.cleanup.visible);
     assert!(status::given_back(&layer, found));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_box_styled_after_a_later_run_gave_its_line_back_keeps_its_style() -> Result<()> {
+    let chapter = Chapter::new(["まさか!", "どうして"])?;
+    let reference = "mock/pfix-given-back-later";
+    // Translated, then given back unchanged by a later run, as Redo boxes
+    // or Fix it everywhere can be, then translated once more.
+    let model = model(&[
+        r#"{"1": "No way!"}"#,
+        r#"{"1": "まさか!"}"#,
+        r#"{"1": "No way at all!"}"#,
+    ]);
+    let _hosted = Hosted::new(reference, model.clone().erase());
+    let first = Target::Pages(vec![chapter.pages[0]]);
+    chapter
+        .translate(first.clone(), reference, lettered())
+        .await?;
+    chapter
+        .translate(first.clone(), reference, lettered())
+        .await?;
+    // Given back: no translation, its clean-up hidden, and Koharu's record
+    // of the first run's translation still there.
+    let layer = chapter.layer(0)?;
+    let found = block(&layer)?;
+    assert_eq!(found.translation, None);
+    assert!(status::given_back(&layer, found));
+    assert!(styles::recorded(&layer, status::TRANSLATION));
+    // Styled on the type bar since: a placeholder whose values are the
+    // user's, whatever the first run recorded, so Detect again keeps it.
+    let styled = json!({"style": {"chars": {"family": "Comic Neue", "fill": GREEN}}});
+    chapter.edit(vec![type_bar(chapter.blocks[0], styled)])?;
+    let layer = chapter.layer(0)?;
+    let found = block(&layer)?;
+    assert!(status::placeholder(&layer, found));
+    assert!(status::given_back(&layer, found));
+    assert!(edited(&layer).style);
+    let project = chapter.session.lock().project();
+    assert!(protect::keeps(project.page(chapter.pages[0])?, &layer));
+    // Translated once more: the look fills the keys left unset, and the
+    // record holds only those, so the family and the colour set by hand
+    // stay hand edits, which Apply and a model's category pick leave alone.
+    chapter.translate(first, reference, lettered()).await?;
+    let layer = chapter.layer(0)?;
+    let found = block(&layer)?;
+    let translation = found.translation.as_ref().context("a translation")?;
+    assert_eq!(translation.content.text(), "No way at all!");
+    let chars = &translation.style.chars;
+    assert_eq!(
+        (chars.family.as_deref(), chars.fill, chars.stroke),
+        (Some("Comic Neue"), Some(GREEN), Some(BLACK))
+    );
+    let style = Auto::of(&layer).style.context("a style")?;
+    assert_eq!(
+        (style.family, style.fill, style.stroke),
+        (None, None, Some(BLACK))
+    );
+    let hand = edited(&layer);
+    assert_eq!((hand.text, hand.style), (false, true));
     Ok(())
 }

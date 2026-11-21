@@ -22,7 +22,9 @@
 //! - A style set on a block before it's translated leaves a placeholder
 //!   translation (`status::placeholder`): [`edited`] counts its values as
 //!   set by hand but no text as typed, and a run translating the block keeps
-//!   them, filling in only the keys left unset.
+//!   them, filling in only the keys left unset. Koharu's record of a run
+//!   before doesn't make them the stage's once a later run gives the line
+//!   back ([`stage_styled`]), so this holds on a block translated before too.
 
 use std::collections::BTreeSet;
 
@@ -293,7 +295,7 @@ pub fn translated(
     if !looked.existed {
         record.style = None;
         record.origin = Origin::Automatic;
-    } else if record.style.is_none() && !recorded(layer, "translation") {
+    } else if record.style.is_none() && !stage_styled(layer) {
         record.style = Some(AutoStyle::default());
     }
     record.text = Some(text_hash(text));
@@ -411,7 +413,10 @@ pub fn typed(
 /// so one typed there later counts as typed by hand, even as the wording
 /// the stage was given, and the record keeps no style, marks or origin,
 /// which went with any translation the block had, nor the kept mark, as the
-/// stage's own keeping replaces Booharu's. Its source part is kept.
+/// stage's own keeping replaces Booharu's. Its source part is kept. Koharu
+/// keeps its `c2pa.translation` record of a run before, but with the
+/// translation of no text recorded the stage styled nothing
+/// ([`stage_styled`]), so a value set on the block since stays a hand edit.
 pub fn given_back(layer: &Layer) -> Result<Op> {
     let record = Auto {
         origin: Origin::Automatic,
@@ -611,8 +616,8 @@ pub struct Edited {
     /// that still hold ([`Auto::trusted_marks`]), and their values on
     /// whitespace typed beside a mark that starts or ends the line, which
     /// Koharu gives the mark's values ([`emphasis::stripped`]), or the agent
-    /// chose its style on purpose; with nothing recorded, no stage wrote the
-    /// translation.
+    /// chose its style on purpose; with nothing recorded, no stage styled
+    /// it ([`stage_styled`]).
     pub style: bool,
     /// It was drawn by hand: no detection made it, as the O tool's boxes.
     /// A split's halves keep the detection record they were copied with, so
@@ -675,7 +680,7 @@ pub fn edited(layer: &Layer) -> Edited {
                 .any(|span| AutoStyle::of(&span.attributes) != AutoStyle::default());
             let differs = match &record.style {
                 Some(style) => *style != AutoStyle::of(&translation.style.chars),
-                None => !recorded("translation"),
+                None => !stage_styled(layer),
             };
             (text, record.origin == Origin::Agent || marked || differs)
         }
@@ -695,6 +700,18 @@ pub fn recorded(layer: &Layer, step: &str) -> bool {
         .attributes
         .get(C2PA)
         .is_some_and(|steps| steps.contains_key(step))
+}
+
+/// Whether the Translation stage styled `layer`'s translation, as a reader
+/// of a hand-edit record that holds no style asks: Koharu recorded
+/// translating the block, and the record doesn't hold the translation of no
+/// text a line given back leaves ([`given_back`]). Koharu keeps its record
+/// of a run before when a later run gives the line back, though that one
+/// wrote nothing, so a value set on the block since, on the placeholder a
+/// style set before translating leaves or on a translation typed there,
+/// stays the user's.
+pub fn stage_styled(layer: &Layer) -> bool {
+    recorded(layer, "translation") && Auto::of(layer).text != Some(text_hash(""))
 }
 
 #[cfg(test)]
@@ -1276,6 +1293,141 @@ mod tests {
         };
         assert!(!status::placeholder(&found, emptied));
         assert!(edited(&found).text);
+    }
+
+    /// A block a run translated under `look` and a later run gave back
+    /// unchanged, as Redo boxes or Fix it everywhere can: no translation, its
+    /// clean-up hidden and the given-back record, while Koharu's
+    /// `c2pa.translation` from the first run stays.
+    fn given_back_after_a_run(look: &LetteringSettings) -> (tempfile::TempDir, Session, LayerId) {
+        let (dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        translate(&mut session, block, "Why?", look, Some("CCWildWords"));
+        let given = given_back(&layer(&session, block)).expect("the record");
+        apply(
+            &mut session,
+            vec![
+                Op::UpdateLayer {
+                    layer: block.into(),
+                    patch: json!({"translation": null, "cleanup": {"visible": false}}),
+                },
+                given,
+            ],
+        );
+        let found = layer(&session, block);
+        assert!(recorded(&found, "translation"));
+        assert_eq!(edited(&found), Edited::default());
+        (dir, session, block)
+    }
+
+    #[test]
+    fn a_style_set_on_a_line_given_back_after_a_run_stays_the_users() {
+        use crate::testing::{FAMILY, FILL};
+        let look = settings(false, Some(RED), Some(BLACK));
+        let (_dir, mut session, block) = given_back_after_a_run(&look);
+        // Styled on the type bar since: a placeholder of a line given back,
+        // whose values are the user's whatever the first run recorded, so
+        // Detect again keeps the box.
+        apply(&mut session, vec![type_bar_style(block)]);
+        let found = layer(&session, block);
+        let Content::Block(styled) = &found.content else {
+            panic!("not a block");
+        };
+        assert!(status::placeholder(&found, styled));
+        assert!(status::given_back(&found, styled));
+        let hand = edited(&found);
+        assert_eq!((hand.text, hand.style), (false, true));
+        let project = session.project();
+        let (on, _) = project.parent(block).expect("the page");
+        assert!(crate::protect::keeps(on, &found));
+
+        // Translated again: the run fills only the keys left unset and
+        // records only those, so the family and the fill set by hand stay
+        // hand edits, which Apply and a model's category pick leave alone.
+        translate(&mut session, block, "Why not?", &look, Some("CCWildWords"));
+        let chars = translation(&session, block).style.chars;
+        assert_eq!(
+            (chars.family.as_deref(), chars.fill, chars.stroke),
+            (Some(FAMILY), Some(FILL), Some(BLACK))
+        );
+        let found = layer(&session, block);
+        let style = Auto::of(&found).style.expect("a style");
+        assert_eq!(
+            (style.family, style.fill, style.stroke),
+            (None, None, Some(BLACK))
+        );
+        let after = edited(&found);
+        assert_eq!((after.text, after.style), (false, true));
+
+        // A size alone, which no record holds, set on such a line counts
+        // as set by hand too, as on a box no run translated.
+        let (_dir, mut session, block) = given_back_after_a_run(&look);
+        apply(
+            &mut session,
+            vec![Op::UpdateLayer {
+                layer: block.into(),
+                patch: json!({"translation": {"style": {"chars": {"size": 30.0}}}}),
+            }],
+        );
+        let found = layer(&session, block);
+        assert_eq!(
+            AutoStyle::of(&translation(&session, block).style.chars),
+            AutoStyle::default()
+        );
+        assert!(edited(&found).style);
+        let project = session.project();
+        let (on, _) = project.parent(block).expect("the page");
+        assert!(crate::protect::keeps(on, &found));
+    }
+
+    #[test]
+    fn a_translation_typed_on_a_line_given_back_after_a_run_keeps_its_style_the_users() {
+        use crate::testing::FAMILY;
+        let look = settings(false, Some(RED), None);
+        let (_dir, mut session, block) = given_back_after_a_run(&look);
+        apply(&mut session, vec![type_bar_style(block)]);
+        // Typed as the Story panel types a first translation: placed, with
+        // the look in the keys left unset and no record of its own.
+        let placed = placement(&session, block);
+        let looked = typed(
+            &session.project(),
+            block,
+            &placed,
+            &look,
+            Some("CCWildWords"),
+        )
+        .expect("the look");
+        let mut ops = vec![
+            Op::SetText {
+                layer: block.into(),
+                text: "Why not?".to_owned(),
+            },
+            placed,
+        ];
+        ops.extend(looked);
+        apply(&mut session, ops);
+        let found = layer(&session, block);
+        assert_eq!(
+            translation(&session, block).style.chars.family.as_deref(),
+            Some(FAMILY)
+        );
+        let hand = edited(&found);
+        assert_eq!((hand.text, hand.style), (true, true));
+        // A line given back with nothing set on it since and typed into
+        // reads the same: the typed values are the user's.
+        let (_dir, mut session, block) = given_back_after_a_run(&look);
+        let placed = placement(&session, block);
+        let looked = typed(&session.project(), block, &placed, &look, None).expect("the look");
+        let mut ops = vec![
+            Op::SetText {
+                layer: block.into(),
+                text: "Why not?".to_owned(),
+            },
+            placed,
+        ];
+        ops.extend(looked);
+        apply(&mut session, ops);
+        let hand = edited(&layer(&session, block));
+        assert_eq!((hand.text, hand.style), (true, true));
     }
 
     #[test]

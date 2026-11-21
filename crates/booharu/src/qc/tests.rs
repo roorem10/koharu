@@ -598,6 +598,38 @@ fn a_font_the_agent_chose_or_changed_by_hand_is_hand_set() -> Result<()> {
 }
 
 #[test]
+fn a_font_typed_on_a_line_a_later_run_gave_back_is_hand_set() -> Result<()> {
+    // Translated by a run, whose `c2pa` record stays, given back unchanged
+    // by a later run, and typed into by hand since in a font of the
+    // user's: no stage styled the line as it reads now.
+    let mut page = Fixture::new(
+        400,
+        400,
+        vec![block(
+            "line",
+            0,
+            "原文",
+            translation(
+                "Hello",
+                boxed(10.0, 10.0, 300.0, 150.0, "best"),
+                Some("Beta"),
+            ),
+            c2pa(&["detection", "ocr", "translation"]),
+        )],
+    );
+    let given = styles::given_back(&page.layer("line"))?;
+    page.session.apply(Edit {
+        label: "test".to_owned(),
+        ops: vec![given],
+    })?;
+    let project = page.project();
+    let inputs = inputs(&project);
+    let found = facts(project.page(page.page)?, &page.layer("line"), true, &inputs).expect("facts");
+    assert!(found.hand_set);
+    Ok(())
+}
+
+#[test]
 fn marking_ok_keeps_one_current_entry_a_check_and_drops_the_rest() -> Result<()> {
     let mut page = Fixture::new(400, 400, vec![translated("line", 0, "The text")]);
     let line = page.id("line");

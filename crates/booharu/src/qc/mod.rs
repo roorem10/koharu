@@ -40,8 +40,8 @@ use booharu_core::{
     qc::{self as marks, GLOSSARY},
     settings::{LetteringSettings, QcSettings},
     sfx,
-    status::{self, DETECTION, OCR, TRANSLATION},
-    styles::recorded,
+    status::{self, DETECTION, OCR},
+    styles::{recorded, stage_styled},
 };
 use koharu_renderer::Renderer;
 use koharu_scene::{Content, LanguageIdentifier, Layer, LayerId, Page, PageId, Project, Text};
@@ -462,13 +462,14 @@ fn written(layer: &Layer) -> Option<&Text> {
 /// Whether the font of `translation`, which `layer` holds, was set by hand
 /// or by the agent on purpose (T3): the agent chose its style, its family
 /// isn't the one Booharu's automatic steps last wrote, or, with nothing
-/// recorded, no Koharu stage wrote the translation, as one typed by hand.
+/// recorded, no Koharu stage styled the translation, as one typed by hand,
+/// also on a line a later run gave back (`styles::stage_styled`).
 fn hand_set(layer: &Layer, translation: &Text) -> bool {
     let record = Auto::of(layer);
     record.origin == Origin::Agent
         || match &record.style {
             Some(style) => style.family != translation.style.chars.family,
-            None => !recorded(layer, TRANSLATION),
+            None => !stage_styled(layer),
         }
 }
 
