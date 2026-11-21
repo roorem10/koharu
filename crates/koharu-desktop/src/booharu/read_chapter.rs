@@ -313,8 +313,9 @@ pub(super) async fn listed(stops: &Stops) -> Option<Vec<Model>> {
 /// Frees what `pipeline`'s models, and libtorch's cache of them, hold, for
 /// one of Koharu's own models, which fits itself to the memory free, and
 /// waits for it, as the GPU's current call ends first, even one a Stop left
-/// running; or none once `stops` stops the wait. A run queued or going since
-/// a read or an explanation saw none keeps its models, and their memory.
+/// running; or none once `stops` stops the wait. A run queued or going
+/// keeps its models, and their memory: Explain this line goes on beside
+/// one, and a read refuses one only as it starts.
 pub(super) async fn unloaded(pipeline: &Pipeline, stops: &Stops) -> Option<()> {
     let unloading = pipeline.booharu_unload_models();
     tokio::select! {
