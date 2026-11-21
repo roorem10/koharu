@@ -22,8 +22,9 @@
 //!   blocks only ([`alike`]), as it reads them all with its first page's
 //!   settings, whatever policy each run has.
 //!
-//! It also holds [`unload_models`], how `Pipeline::booharu_unload_models`
-//! frees the models' memory for one loaded outside the pipeline.
+//! It also holds `Scheduler::unload_models`, how
+//! `Pipeline::booharu_unload_models` frees the models' memory for one loaded
+//! outside the pipeline, while no run is queued or going.
 
 use std::collections::{BTreeSet, HashSet};
 
@@ -34,7 +35,7 @@ use petgraph::{
     Direction::{Incoming, Outgoing},
     stable_graph::{NodeIndex, StableDiGraph},
 };
-use tokio::time::Instant;
+use tokio::{sync::oneshot, time::Instant};
 
 use super::{Candidate, Mode, Run, Scheduler, run::Job};
 use crate::{
@@ -307,29 +308,57 @@ impl Scheduler {
         self.gpu
             .run(Turn::Upkeep, move |models| models.retain(&wanted));
     }
+
+    /// Frees the models' memory for a model loaded outside the pipeline, as
+    /// Read chapter's, unless a run is queued or going, whose models stay:
+    /// `unloaded` hears false at once then, and otherwise true once
+    /// [`unload_all`] has unloaded them.
+    pub(super) fn unload_models(&self, unloaded: oneshot::Sender<bool>) {
+        if !self.runs.is_empty() {
+            let _ = unloaded.send(false);
+            return;
+        }
+        unload_all(&self.gpu, unloaded);
+    }
 }
 
 /// Unloads every model once the GPU's current call ends, ahead of every
 /// stage's call, as Koharu's `Unload` does, then gives back to the device
-/// what libtorch's cache keeps of them: llama.cpp, which fits a model loaded
-/// outside the pipeline to the memory free, as Read chapter's, counts that
-/// cache as used. libtorch is left alone until a model has loaded, as it
-/// isn't loaded before.
-pub(super) fn unload_models(gpu: &Gpu) {
-    gpu.run(Turn::Upkeep, |models| {
+/// what libtorch's cache keeps of them, and then tells `unloaded`: llama.cpp,
+/// which fits a model loaded outside the pipeline to the memory free, as
+/// Read chapter's, counts that cache as used, so that model loads once the
+/// answer comes. libtorch is left alone until it has loaded.
+fn unload_all(gpu: &Gpu, unloaded: oneshot::Sender<bool>) {
+    gpu.run(Turn::Upkeep, move |models| {
         models.retain(&HashSet::new());
-        if models.booharu_started()
-            && Cuda::device_count() > 0
-            && let Err(error) = Cuda::empty_cache()
-        {
-            tracing::warn!("libtorch's cache wasn't emptied: {error}");
-        }
+        give_back(crate::booharu::libtorch_loaded(), || {
+            if Cuda::device_count() > 0 {
+                Cuda::empty_cache()?;
+            }
+            Ok(())
+        });
+        let _ = unloaded.send(true);
     });
+}
+
+/// Empties libtorch's cache by `empty` once libtorch has `started`: before,
+/// it isn't loaded, and a call to it would stop the GPU thread.
+fn give_back(started: bool, empty: impl FnOnce() -> anyhow::Result<()>) {
+    if started && let Err(error) = empty() {
+        tracing::warn!("libtorch's cache wasn't emptied: {error}");
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeSet, sync::Arc, time::Duration};
+    use std::{
+        collections::BTreeSet,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        time::Duration,
+    };
 
     use booharu_core::settings::Snapshot;
     use koharu_scene::{Edit, Session};
@@ -342,7 +371,7 @@ mod tests {
         PipelineConfig, Target,
         booharu::stand_in::{Entry, Scripted, Try},
         event::Events,
-        scheduler::{Command, Plan},
+        scheduler::{Command, Plan, Priority},
     };
 
     const EVERY: [Stage; 4] = [
@@ -937,13 +966,74 @@ mod tests {
     #[tokio::test]
     async fn unloading_the_models_before_any_loaded_leaves_libtorch_alone() {
         // No model has loaded, so libtorch hasn't: a call to it would panic
-        // the GPU thread, and nothing queued after would run.
+        // the GPU thread, which would drop the answer unsent.
         let gpu = Gpu::spawn(tokio::runtime::Handle::current());
-        unload_models(&gpu);
-        let (sender, receiver) = tokio::sync::oneshot::channel();
-        gpu.run(Turn::Upkeep, move |_| {
-            let _ = sender.send(());
+        let (unloaded, answer) = oneshot::channel();
+        unload_all(&gpu, unloaded);
+        assert_eq!(answer.await, Ok(true));
+    }
+
+    #[test]
+    fn libtorchs_cache_is_emptied_once_libtorch_has_started() {
+        give_back(false, || panic!("libtorch isn't loaded yet"));
+        let mut emptied = 0;
+        give_back(true, || {
+            emptied += 1;
+            Ok(())
         });
-        receiver.await.expect("the GPU thread runs the next call");
+        // A cache that can't be emptied is only logged.
+        give_back(true, || anyhow::bail!("the cache is busy"));
+        assert_eq!(emptied, 1);
+    }
+
+    #[tokio::test]
+    async fn the_unload_answers_once_the_gpus_current_call_ends() {
+        let gpu = Gpu::spawn(tokio::runtime::Handle::current());
+        let (started, running) = oneshot::channel();
+        let ended = Arc::new(AtomicBool::new(false));
+        let inpainting = Priority {
+            mode: Mode::Batch,
+            run: RunId(0),
+            page: 0,
+            stage: Stage::Inpaint,
+        };
+        gpu.run(Turn::Stage(inpainting), {
+            let ended = Arc::clone(&ended);
+            move |_| {
+                let _ = started.send(());
+                std::thread::sleep(Duration::from_millis(300));
+                ended.store(true, Ordering::SeqCst);
+            }
+        });
+        running.await.expect("the long call starts");
+        let (unloaded, answer) = oneshot::channel();
+        unload_all(&gpu, unloaded);
+        assert_eq!(answer.await, Ok(true));
+        assert!(
+            ended.load(Ordering::SeqCst),
+            "the answer came while the long call still held its memory"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_models_stay_while_a_run_is_queued_or_going() {
+        let chapter = Chapter::new(1);
+        let slowly = Try::Slow(Duration::from_millis(300));
+        chapter.script.tries(0, Stage::Detect, vec![slowly]);
+        let unload = || {
+            let (unloaded, answer) = oneshot::channel();
+            chapter
+                .commands
+                .send(Command::BooharuUnload(unloaded))
+                .unwrap_or_else(|_| panic!("the scheduler runs"));
+            answer
+        };
+        // A run queued once Read chapter saw none going keeps its models.
+        let run = chapter.run(0, &[Stage::Detect], None);
+        assert_eq!(unload().await, Ok(false));
+        let told = chapter.told(run).await;
+        assert_eq!(ended(&told), Some(&Outcome::Done), "{told:#?}");
+        // With none queued or going, they go.
+        assert_eq!(unload().await, Ok(true));
     }
 }

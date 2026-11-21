@@ -43,6 +43,10 @@
 //!   page stage goes through: what it leaves out of a page, what it checks
 //!   again as it writes, what Detect again keeps, and the page's
 //!   `Event::Skipped`.
+//! - `libtorch_started`, in `gpu.rs`'s `loaded`, notes that a model load got
+//!   the runtime's device, and so libtorch, however the load then goes, so
+//!   Booharu's unload empties libtorch's cache once it may
+//!   (`libtorch_loaded`).
 
 pub(crate) mod emphasis;
 mod filters;
@@ -51,6 +55,7 @@ use std::{
     collections::{BTreeSet, HashMap},
     future::Future,
     path::Path,
+    sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 
@@ -515,6 +520,23 @@ async fn within<T, E: Into<anyhow::Error>>(
         Ok(answer) => answer.map_err(Into::into),
         Err(_) => Err(Unanswered.into()),
     }
+}
+
+/// Whether the pipeline got the runtime's device, which loads libtorch, for
+/// this process, as each model load does first, whether the load then
+/// succeeds or fails: before, libtorch isn't loaded and can't be called.
+static LIBTORCH: AtomicBool = AtomicBool::new(false);
+
+/// Notes that libtorch is loaded, as a model load got the runtime's device.
+pub(crate) fn libtorch_started() {
+    LIBTORCH.store(true, Ordering::Release);
+}
+
+/// Whether libtorch is loaded, so its cache may be emptied, as Booharu's
+/// unload (`scheduler/booharu.rs`) empties it, though no model loaded, as
+/// when the first load failed after it allocated.
+pub(crate) fn libtorch_loaded() -> bool {
+    LIBTORCH.load(Ordering::Acquire)
 }
 
 /// Stand-ins for the stages in the scheduler's tests, which load no model:

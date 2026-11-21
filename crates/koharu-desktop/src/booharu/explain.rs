@@ -13,7 +13,7 @@ use booharu::{
     calls::{self, Stops},
     context::explain::{self, ExplainAnswer},
     jobs::{self, JobKind},
-    models, runs,
+    models,
 };
 use booharu_core::context::{Chapter, SeriesStore};
 use koharu_agent::AgentConfig;
@@ -23,7 +23,7 @@ use tauri::State;
 
 use super::{
     events::AGENT_HISTORY_CHANGED,
-    read_chapter::{connect, listed, settings},
+    read_chapter::{connect, listed, settings, unloaded},
 };
 use crate::{app::App, commands::Result};
 
@@ -37,14 +37,15 @@ const STOPPED: &str = "Explain this line was stopped.";
 /// Explains the line `layer` of the open project, a block with source text,
 /// with the model Explain this line uses: the Read chapter model, else the
 /// translation model when it's a general model, else the agent's. Sends the
-/// page with it when the model reads images. One of Koharu's own models is
-/// loaded for it, once the pipeline unloads its own, and gives back
-/// libtorch's cache of them, while no run goes, and dropped as it answers. Answers the explanation and two or three other
-/// translations, with the line as it was asked about and the model that
-/// answered, and adds them to the project's agent file as a note, unless
-/// that file can't be read or written, which is logged and never fails the
-/// answer. Fails with no model to ask, an answer that doesn't read, or once
-/// Stop or closing the project stops it.
+/// page with it when the model reads images. Before one of Koharu's own
+/// models is loaded for it, the pipeline unloads its own models and gives
+/// back libtorch's cache of them, unless a run is queued or going, whose
+/// models stay; that model is dropped once it answers. Answers the
+/// explanation and two or three other translations, with the line as it was
+/// asked about and the model that answered, and adds them to the project's
+/// agent file as a note, unless that file can't be read or written, which is
+/// logged and never fails the answer. Fails with no model to ask, an answer
+/// that doesn't read, or once Stop or closing the project stops it.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_explain_line(
@@ -91,10 +92,9 @@ async fn explain_line(app: Arc<App>, layer: LayerId) -> anyhow::Result<ExplainAn
         })
         .await??
     };
-    if models::local(&reference) && !runs::run_going(&app.pipeline.told()) {
-        // As Read chapter does: the pipeline's models, and libtorch's cache
-        // of them, free their memory.
-        app.pipeline.booharu_unload_models();
+    if models::local(&reference) {
+        // As Read chapter does.
+        unloaded(&app.pipeline, &stops).await.context(STOPPED)?;
     }
     let size = Size {
         sequences: 1,

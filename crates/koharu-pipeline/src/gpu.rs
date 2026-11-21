@@ -203,12 +203,6 @@ impl Models {
     pub(crate) fn retain(&mut self, wanted: &HashSet<Key>) {
         self.loaded.retain(|key, _| wanted.contains(key));
     }
-
-    /// Booharu: whether a model has loaded, so libtorch has, and its cache
-    /// may keep what the models unloaded since freed.
-    pub(crate) fn booharu_started(&self) -> bool {
-        self.device.is_some()
-    }
 }
 
 /// The model `load` gives on the runtime's device, with the device, libtorch's
@@ -232,6 +226,7 @@ where
             active: ByteSize(0),
             source,
         })?;
+    crate::booharu::libtorch_started(); // Booharu: libtorch is loaded, though this load may fail.
     let cuda = Cuda::device_count() > 0;
     if cuda {
         Cuda::empty_cache().map_err(|source| failure(key, device, cuda, source.into()))?;

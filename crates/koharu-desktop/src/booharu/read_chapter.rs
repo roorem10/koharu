@@ -32,7 +32,7 @@ use koharu_llm::{
     Model, Size,
     rig::{driver::DynModel, operation::Completion},
 };
-use koharu_pipeline::PipelineConfig;
+use koharu_pipeline::{Pipeline, PipelineConfig};
 use koharu_scene::{PageId, Session};
 use parking_lot::Mutex;
 use tauri::State;
@@ -41,8 +41,10 @@ use super::{context::changed, styles::look};
 use crate::{app::App, commands::Result};
 
 /// How long a load of one of Koharu's own models that didn't fit in free
-/// memory waits to try once more, as the pipeline's models, and libtorch's
-/// cache of them, free theirs once the GPU's current call ends.
+/// memory waits to try once more. The pipeline's models are gone by then,
+/// unless a run keeps them, as [`unloaded`] waits for them, but a model of
+/// Koharu's dropped a moment before, as the last read's or explanation's,
+/// frees its memory as its thread ends.
 const REFIT: Duration = Duration::from_secs(2);
 
 /// Reads the open project's whole chapter with the Read chapter model, or
@@ -144,13 +146,15 @@ pub(crate) struct ReadRequest {
 /// step (`request.group`) skips, answering why, where a read by hand fails:
 /// on a chapter whose brief has a summary, read meanwhile, which only a Run
 /// step checks; with no text on the pages; and with no model that can read
-/// them. One of Koharu's own models is loaded once the pipeline unloads its
-/// own and gives back libtorch's cache of them, with images and the context
-/// a chunk needs, trying once more after
-/// two seconds when it doesn't fit, and dropped as the read ends. It writes
-/// only while the project read is still the one open and the job wasn't
-/// stopped, then tells `booharu_context_changed`; otherwise it answers
-/// stopped, having written nothing.
+/// them. One of Koharu's own models is loaded once the pipeline has unloaded
+/// its own and given back libtorch's cache of them, which waits for the
+/// GPU's current call to end, unless a run started meanwhile, whose models
+/// stay ([`unloaded`]); it's loaded with images and the context a chunk
+/// needs, trying once more after two seconds when it doesn't fit, and
+/// dropped as the read ends. It writes only while the project read is still
+/// the one open and the job wasn't stopped, then tells
+/// `booharu_context_changed`; otherwise it answers stopped, having written
+/// nothing.
 pub(crate) async fn read_chapter(
     app: Arc<App>,
     session: Arc<Mutex<Session>>,
@@ -243,10 +247,8 @@ async fn reading(
             }
         }
     };
-    if models::local(&reference) {
-        // No run is going: the pipeline's models, and libtorch's cache of
-        // them, free their memory for it.
-        app.pipeline.booharu_unload_models();
+    if models::local(&reference) && unloaded(&app.pipeline, &stops).await.is_none() {
+        return Ok(ReadOutcome::Stopped);
     }
     let size = Size {
         sequences: 1,
@@ -305,6 +307,25 @@ pub(super) async fn listed(stops: &Stops) -> Option<Vec<Model>> {
         biased;
         () = stops.wait() => None,
         listed = koharu_llm::models() => Some(listed),
+    }
+}
+
+/// Frees what `pipeline`'s models, and libtorch's cache of them, hold, for
+/// one of Koharu's own models, which fits itself to the memory free, and
+/// waits for it, as the GPU's current call ends first, even one a Stop left
+/// running; or none once `stops` stops the wait. A run queued or going since
+/// a read or an explanation saw none keeps its models, and their memory.
+pub(super) async fn unloaded(pipeline: &Pipeline, stops: &Stops) -> Option<()> {
+    let unloading = pipeline.booharu_unload_models();
+    tokio::select! {
+        biased;
+        () = stops.wait() => None,
+        unloaded = unloading => {
+            if unloaded == Ok(false) {
+                tracing::info!("a run is going, so the pipeline's models stay loaded");
+            }
+            Some(())
+        }
     }
 }
 
@@ -498,5 +519,22 @@ mod tests {
         let mut stopped = running();
         ended(&mut stopped, &Ok(ReadOutcome::Stopped));
         assert_eq!((stopped.state, stopped.group), (JobState::Stopped, Some(4)));
+    }
+
+    #[tokio::test]
+    async fn a_local_model_waits_for_the_unload_until_a_stop() {
+        let pipeline = Pipeline::new(PipelineConfig::default());
+        let stops = Stops::new(tokio_util::sync::CancellationToken::new(), pipeline.clone());
+        assert_eq!(
+            unloaded(&pipeline, &stops).await,
+            Some(()),
+            "an idle pipeline unloads"
+        );
+        pipeline.stop();
+        assert_eq!(
+            unloaded(&pipeline, &stops).await,
+            None,
+            "a Stop ends the wait"
+        );
     }
 }
