@@ -85,8 +85,15 @@ fn write(
         let frame = app.renderer.render(&session.lock(), page)?;
         match (format, &mut archive) {
             (ExportFormat::Psd, _) => {
-                let psd = koharu_psd::export(&session.lock(), &app.renderer, page, labels)?;
-                fs_err::write(destination.join(format!("{number}.psd")), psd)?;
+                // Booharu: the PSD, and the report of the texts it drew into pixels (S13-j).
+                crate::booharu::export::psd(
+                    &session,
+                    &app.renderer,
+                    page,
+                    labels,
+                    destination,
+                    &number,
+                )?;
             }
             (_, Some(archive)) => {
                 // Already-compressed PNGs gain nothing from deflate.

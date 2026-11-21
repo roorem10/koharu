@@ -6,9 +6,10 @@
 //! this line as jobs Stop and closing the project end (`jobs`), the agent's
 //! chat kept beside its project (`agent_history`), the quality check's
 //! findings, its watcher and its one-page check (`qc`), the type bar's
-//! commands for the text being typed on the canvas (`typing`), and the host
-//! Booharu's agent tools reach the app through, which tells the interface
-//! when they write a series or the chapter's notes, or save the
+//! commands for the text being typed on the canvas (`typing`), the report
+//! beside each PSD of the texts its export drew into pixels (`export`), and
+//! the host Booharu's agent tools reach the app through, which tells the
+//! interface when they write a series or the chapter's notes, or save the
 //! Instructions, has the quality check look again after those writes and
 //! after a settings save, and reads the chapter for them.
 
@@ -19,6 +20,7 @@ pub(crate) mod context;
 pub(crate) mod effects;
 pub(crate) mod events;
 pub(crate) mod explain;
+pub(crate) mod export;
 pub(crate) mod fonts;
 pub(crate) mod jobs;
 pub(crate) mod lettering;
