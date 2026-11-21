@@ -78,8 +78,8 @@ release that follow.
   point text, only a placeholder. The canvas shows such a block by its
   source's frame, typing into it starts from its source in that style and
   adds the first translation in the source's place, keeping the style, and a
-  resize, a reshape, a move or a turn changes its source, so the placeholder
-  stays one until something is typed.
+  resize, a reshape, a move, by a drag or an arrow key, or a turn changes its
+  source, so the placeholder stays one until something is typed.
 
 ## Sources
 
