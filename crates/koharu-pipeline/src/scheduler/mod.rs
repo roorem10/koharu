@@ -186,7 +186,7 @@ impl Scheduler {
             Command::Unload => self
                 .gpu
                 .run(Turn::Upkeep, |models| models.retain(&HashSet::new())),
-            Command::BooharuUnload(unloaded) => self.unload_models(unloaded), // Booharu: and libtorch's cache, unless a run is queued or going.
+            Command::BooharuUnload(unloaded) => self.unload_models(unloaded), // Booharu: and libtorch's cache.
             Command::Settle => self.settle(),
             Command::Close(project) => self.conversations.close(project),
         }
