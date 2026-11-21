@@ -18,9 +18,11 @@ static STATUS: OnceLock<McpStatus> = OnceLock::new();
 pub(crate) enum McpStatus {
     /// It listens on 127.0.0.1 at `port`.
     Listening { port: u16 },
-    /// It doesn't listen, for `error`: the settings file can't be read, as
-    /// when it isn't TOML, or the port is taken. A stored port that doesn't
-    /// read reads as its default, 47821.
+    /// It doesn't listen, for `error`: the port is taken, or the settings
+    /// file can't be read, as when it isn't TOML. The app stops at launch on a
+    /// file that can't be read, as Koharu's `run()` reads its own settings
+    /// from it first, so the server meets one only if the file changed since.
+    /// A stored port that doesn't read reads as its default, 47821.
     Failed { error: String },
 }
 
@@ -89,6 +91,8 @@ mod tests {
         // never as itself or Koharu's 7878.
         let stored = koharu_config::booharu_read_section::<McpSettings>("[booharu-mcp]\nport = 80");
         assert_eq!(stored.ok().map(|mcp| mcp.port), Some(47821));
+        // At launch Koharu's `run()` stops on such a file before the server
+        // starts; the server meets one only if the file changed since.
         let unreadable = koharu_config::booharu_read_section::<McpSettings>("[booharu-mcp");
         let (server, status) = listen(unreadable.map_err(Into::into)).await;
         assert!(server.is_err());
