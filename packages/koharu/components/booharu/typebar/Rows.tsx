@@ -35,11 +35,12 @@ export function RowBreak() {
  * bar is as wide as its widest row rather than as all of them. A row never wraps: what's marked
  * `data-booharu-gives-way` (`GIVES_WAY`), as Applies to's quote, narrows to fit it, and the row's
  * other controls keep their widths. While a row is wider than the room Koharu's bar has on the
- * canvas even with that cut to nothing, as the second is while typing in a window narrower
- * than about 950 px and the first with characters chosen in one narrower than about 955, the bar
- * is Koharu's one row instead, wrapping at the canvas's edge; its rows then lay nothing out
- * (`contents`), so no control remounts as the bar goes from one to the other. With no `RowBreak`,
- * Koharu's bar as it is. */
+ * canvas even with that cut to nothing, the bar is Koharu's one row instead, wrapping at the
+ * canvas's edge; its rows then lay nothing out (`contents`), so no control remounts as the bar goes
+ * from one to the other. In English, with Koharu's default panels, the type bar's second row is
+ * too wide while typing in a window narrower than about 950 px, and its first with characters
+ * chosen in one narrower than about 955; other languages' words move both, French's to about 966
+ * and 969 (AGENTS.md has each). With no `RowBreak`, Koharu's bar as it is. */
 export function ContextBar({
   children,
   className,

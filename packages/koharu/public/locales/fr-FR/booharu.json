@@ -644,7 +644,7 @@
       "smaller": "Plus petit",
       "spacing": "Espacement",
       "wheelHint": "Cliquez dans un champ numérique et faites tourner la molette pour modifier sa valeur. Maintenez Maj enfoncée pour des pas plus grands.",
-      "wholeBox": "Toute la zone de texte",
+      "wholeBox": "Toute la zone",
       "wholeBoxHint": "Mettre en forme toute la zone de texte à la place",
       "wholeBoxOnly": "S’applique à toute la zone de texte"
     },
