@@ -10,24 +10,26 @@ import { useKoharuStore } from '@/lib/store'
 import { commands } from '@koharu/ipc/protocol'
 
 /** Keys a focused control keeps: Space, the arrows, Enter, Delete, Escape, and the canvas's own
- * Ctrl, Cmd and Alt chords (undo, redo, select all, deselect, fit). */
+ * Ctrl, Cmd and Alt chords (undo, redo, select all, deselect, fit), as a browser names them, their
+ * `code` included: Koharu's Delete, Escape, arrow and Space hotkeys match by it, so a key without
+ * one would reach none of them and a test that the control kept it could never fail. */
 const controlKeys: KeyboardEventInit[] = [
   { key: ' ', code: 'Space' },
-  { key: 'ArrowLeft' },
-  { key: 'ArrowRight' },
-  { key: 'ArrowUp' },
-  { key: 'ArrowDown' },
-  { key: 'Enter' },
-  { key: 'Delete' },
-  { key: 'Backspace' },
-  { key: 'Escape' },
-  { key: 'z', ctrlKey: true },
-  { key: 'Z', ctrlKey: true, shiftKey: true },
-  { key: 'z', metaKey: true },
-  { key: 'a', ctrlKey: true },
-  { key: 'd', ctrlKey: true },
-  { key: '0', ctrlKey: true },
-  { key: 'v', altKey: true },
+  { key: 'ArrowLeft', code: 'ArrowLeft' },
+  { key: 'ArrowRight', code: 'ArrowRight' },
+  { key: 'ArrowUp', code: 'ArrowUp' },
+  { key: 'ArrowDown', code: 'ArrowDown' },
+  { key: 'Enter', code: 'Enter' },
+  { key: 'Delete', code: 'Delete' },
+  { key: 'Backspace', code: 'Backspace' },
+  { key: 'Escape', code: 'Escape' },
+  { key: 'z', code: 'KeyZ', ctrlKey: true },
+  { key: 'Z', code: 'KeyZ', ctrlKey: true, shiftKey: true },
+  { key: 'z', code: 'KeyZ', metaKey: true },
+  { key: 'a', code: 'KeyA', ctrlKey: true },
+  { key: 'd', code: 'KeyD', ctrlKey: true },
+  { key: '0', code: 'Digit0', ctrlKey: true },
+  { key: 'v', code: 'KeyV', altKey: true },
 ]
 
 /** Keys the canvas takes from the page, as a browser names them, its `code` included, which
@@ -244,13 +246,12 @@ describe('Booharu tool keys on the canvas', () => {
     expect(slider).not.toBeNull()
     act(() => slider!.focus())
 
-    for (const init of controlKeys.filter(({ key }) => !key?.startsWith('Arrow'))) {
-      // Not prevented: the canvas took none of them, Space included.
+    const arrow = ({ key }: KeyboardEventInit) => key?.startsWith('Arrow') ?? false
+    for (const init of controlKeys.filter((key) => !arrow(key))) {
+      // Not prevented: the canvas took none of them, Space, Delete and Escape included.
       expect(fireEvent.keyDown(slider!, init), JSON.stringify(init)).toBe(true)
     }
-    for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
-      fireEvent.keyDown(slider!, { key, code: key })
-    }
+    for (const init of controlKeys.filter(arrow)) fireEvent.keyDown(slider!, init)
     await settle()
     const state = useKoharuStore.getState()
     expect(state.tool).toBe('select')
