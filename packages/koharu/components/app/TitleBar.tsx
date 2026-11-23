@@ -169,8 +169,13 @@ export function TitleBar() {
                 {t('menu.delete')}
                 <MenubarShortcut>{shortcutLabel(shortcuts.delete)}</MenubarShortcut>
               </MenubarItem>
-              {/* Booharu: the selection's box actions, and joining the page's split texts. */}
-              <BoxMenuItems page={page} Item={MenubarItem} Separator={MenubarSeparator} />
+              {/* Booharu: the selection's box actions, and joining the page's split texts, none
+                  while reading. */}
+              <BoxMenuItems
+                page={reading ? null : page}
+                Item={MenubarItem}
+                Separator={MenubarSeparator}
+              />
               <MenubarSeparator />
               {/* Frees the GPU, as Photoshop's Edit → Purge frees memory. */}
               <MenubarItem onClick={() => send(commands.unload)}>

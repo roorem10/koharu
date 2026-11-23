@@ -6,6 +6,8 @@ import { useHotkeys } from 'react-hotkeys-hook'
 import { useTranslation } from 'react-i18next'
 
 import { useCanvasViewport } from '@/components/editor/CanvasWorkspace'
+import { call } from '@/lib/booharu/call' // Booharu: its command helper, to end typing.
+import { inDialog } from '@/lib/booharu/keys' // Booharu: its key rules on Koharu's hotkeys.
 import { useGallery } from '@/lib/gallery'
 import { send, useProject } from '@/lib/queries'
 import { commands, type FacingPage, type PageId, type PageSide } from '@koharu/ipc/protocol'
@@ -14,6 +16,11 @@ import { cn } from '@koharu/ui/lib/utils'
 
 /** How near the bottom, in pixels, the pointer brings up the page indicator. */
 const indicatorReach = 80
+
+// Booharu: a key pressed inside a dialog, a menu or an open list stays its own, as Booharu's key
+// rules keep it (lib/booharu/keys.ts): the arrows, Space, Page Up and Down, Home and End turn no
+// page while a title-bar menu, the Run popover or a dialog has them.
+const dialogKeeps = (event: KeyboardEvent) => inDialog(event.target)
 
 /** The way pages turn when the chapter doesn't say, a viewer's own choice. */
 const directionKey = 'koharu.reader.direction'
@@ -99,6 +106,10 @@ export function Reader() {
     send(commands.show, page.id, beside)
   }
   const turn = (by: number) => show(spreadsShown[at + by])
+  // Booharu: reading ends the canvas's typing as it mounts. Koharu's show commits it, but none goes
+  // while the page shown is its spread's first with nothing facing it, and Booharu's Ctrl+B and
+  // Ctrl+I would still style the hidden text. Nothing happens when nothing is typed.
+  useEffect(() => void call(commands.booharuFinishTyping).catch(() => undefined), [])
   // The spread holding the page shown, which another page shown from elsewhere moves to; the
   // canvas's facing page goes with any other show.
   const spread = spreadsShown[at]
@@ -128,10 +139,20 @@ export function Reader() {
   const backwardKey = direction === 'rtl' ? 'arrowright' : 'arrowleft'
   useHotkeys([forwardKey, 'arrowdown', 'pagedown', 'space'], () => turn(1), {
     preventDefault: true,
+    ignoreEventWhen: dialogKeeps, // Booharu: dialogKeeps.
   })
-  useHotkeys([backwardKey, 'arrowup', 'pageup'], () => turn(-1), { preventDefault: true })
-  useHotkeys('home', () => show(spreadsShown[0]), { preventDefault: true })
-  useHotkeys('end', () => show(spreadsShown.at(-1)), { preventDefault: true })
+  useHotkeys([backwardKey, 'arrowup', 'pageup'], () => turn(-1), {
+    preventDefault: true,
+    ignoreEventWhen: dialogKeeps, // Booharu: dialogKeeps.
+  })
+  useHotkeys('home', () => show(spreadsShown[0]), {
+    preventDefault: true,
+    ignoreEventWhen: dialogKeeps, // Booharu: dialogKeeps.
+  })
+  useHotkeys('end', () => show(spreadsShown.at(-1)), {
+    preventDefault: true,
+    ignoreEventWhen: dialogKeeps, // Booharu: dialogKeeps.
+  })
 
   // One turn for each wheel gesture, not each of its events.
   const wheeling = useRef(0)
