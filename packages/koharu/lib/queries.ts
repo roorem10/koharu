@@ -89,9 +89,13 @@ export function send<Args extends unknown[]>(
   command: (...args: Args) => Promise<unknown>,
   ...args: Args
 ): void {
-  void new MutationObserver(queryClient, { mutationFn: () => command(...args) })
+  // Booharu: let the mutation go once it settles, as call() does, so the cache drops it after its
+  // gcTime; an observed mutation stays for the whole session (lib/booharu/call.ts).
+  const observer = new MutationObserver(queryClient, { mutationFn: () => command(...args) })
+  void observer
     .mutate()
     .catch(() => undefined)
+    .finally(() => observer.reset())
 }
 
 const projectQuery = queryOptions({
