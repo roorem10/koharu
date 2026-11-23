@@ -1,3 +1,51 @@
+## [0.92.0](https://github.com/koharu-rs/koharu/compare/0.91.1..0.92.0) - 2026-11-22
+
+### ⛰️  Features
+
+- *(ml)* Update Hayai OCR to b00317e ([#1475](https://github.com/koharu-rs/koharu/issues/1475)) - ([491cabe](https://github.com/koharu-rs/koharu/commit/491cabec3c38a7e70e4cb1bc47f6f3f42609d4b9))
+
+### 🐛 Bug Fixes
+
+- *(ui)* Keep the detector threshold inputs inside their column in a narrow settings window - ([beaafaa](https://github.com/koharu-rs/koharu/commit/beaafaa3a76d02b3479955310d1007f42f35cd56))
+
+## [0.91.1](https://github.com/koharu-rs/koharu/compare/0.91.0..0.91.1) - 2026-11-22
+
+### 🐛 Bug Fixes
+
+- *(linux)* Draw the window on a child X window of GTK's, so Koharu starts on NVIDIA under X11 - ([a142321](https://github.com/koharu-rs/koharu/commit/a142321f78d554339195c416be70706009f96a3e))
+
+### 🎨 Styling
+
+- *(linux)* Format the child window's input shape call - ([65557c9](https://github.com/koharu-rs/koharu/commit/65557c9ffab41de4e4f4f97ff8d4315cdc3de912))
+
+## [0.91.0](https://github.com/koharu-rs/koharu/compare/0.90.3..0.91.0) - 2026-11-21
+
+### ⛰️  Features
+
+- *(linux)* Ship an AppImage again, packaged like the .deb so it runs on the host's own libraries - ([41d01b3](https://github.com/koharu-rs/koharu/commit/41d01b35897cdf3b4a5387f4edd33332a7f2949c))
+
+### 🐛 Bug Fixes
+
+- *(sentry)* Send reports over rustls, so Koharu no longer links the system's OpenSSL 3 - ([d1c5b2a](https://github.com/koharu-rs/koharu/commit/d1c5b2ab88443a1903fb58bf79facb887e044194))
+
+## [0.90.3](https://github.com/koharu-rs/koharu/compare/0.90.2..0.90.3) - 2026-11-21
+
+### 🐛 Bug Fixes
+
+- *(desktop)* Restore macOS editing keys and shortcuts ([#1448](https://github.com/koharu-rs/koharu/issues/1448)) - ([9dc7458](https://github.com/koharu-rs/koharu/commit/9dc745854753b782f0cc8f4b21ddd47c7f799cec))
+
+## [0.90.2](https://github.com/koharu-rs/koharu/compare/0.90.1..0.90.2) - 2026-11-21
+
+### 🐛 Bug Fixes
+
+- *(app)* Give real key presses their KeyboardEvent.code on Windows and Linux, so Delete, Backspace, and the arrow keys reach their shortcuts - ([22f4ec3](https://github.com/koharu-rs/koharu/commit/22f4ec300c675a374931e5b7a7929c4ae250eeba))
+
+## [0.90.1](https://github.com/koharu-rs/koharu/compare/0.90.0..0.90.1) - 2026-11-21
+
+### 🐛 Bug Fixes
+
+- *(ui)* List layers topmost first, as Photoshop's Layers panel does, with drags placing a row above or below where they're aimed - ([4828216](https://github.com/koharu-rs/koharu/commit/48282164755eeb691991c5db9d94ef09eb9140af))
+
 ## [0.90.0](https://github.com/koharu-rs/koharu/compare/0.89.0..0.90.0) - 2026-11-21
 
 ### ⛰️  Features

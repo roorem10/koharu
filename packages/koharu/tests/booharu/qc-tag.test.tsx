@@ -132,12 +132,13 @@ describe('Booharu QC ? tag', () => {
       </>,
     )
 
-    // Layers names each row by its layer's name.
+    // Layers names each row by its layer's name, and lists the rows topmost first, as Koharu
+    // 0.92.0 does: the caption, last in the scene, above the panel's blocks.
     expect(
       screen
         .getAllByRole('button', { name: /^Box details/ })
         .map((tag) => tag.getAttribute('aria-label')),
-    ).toEqual(['Box details for second: 2 QC issues', 'Box details for caption: 1 QC issue'])
+    ).toEqual(['Box details for caption: 1 QC issue', 'Box details for second: 2 QC issues'])
     const tag = screen.getByRole('button', { name: 'Box details for second: 2 QC issues' })
     expect(tag).toHaveClass('booharu-qc-tag', 'booharu-qc-blink')
 

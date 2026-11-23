@@ -67,7 +67,9 @@ describe('Booharu fx tag (S12-j)', () => {
     )
     mount(<LayersPanel />)
 
-    expect(fxTags()).toEqual(['Text effects for second', 'Text effects for caption'])
+    // Layers lists its rows topmost first, as Koharu 0.92.0 does: the caption, last in the
+    // scene, above the panel's blocks.
+    expect(fxTags()).toEqual(['Text effects for caption', 'Text effects for second'])
     // "second" has no open finding: its fx tag alone shows.
     expect(screen.queryByRole('button', { name: /^Box details for second/ })).toBeNull()
     expect(
