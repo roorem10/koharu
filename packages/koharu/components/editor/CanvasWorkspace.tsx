@@ -193,10 +193,11 @@ export function CanvasWorkspace() {
       keydown: true,
       keyup: true,
       preventDefault: true,
-      // Booharu: Space inside a dialog, a menu or an open list presses its focused button; a hold
-      // that began outside one still ends when Space is let go there.
+      // Booharu: Space inside a dialog, a menu or an open list presses its focused button, and
+      // Space let go with no hold to end is left alone, so a control that kept it pressed, as the
+      // Story word toolbar does, is pressed too; a hold that began outside still ends there.
       ignoreEventWhen: (event) =>
-        dialogKeeps(event) && (event.type === 'keydown' || held.current === null),
+        event.type === 'keyup' ? held.current === null : dialogKeeps(event),
     },
   )
   // A window that loses the focus mid-hold never hears Space let go.

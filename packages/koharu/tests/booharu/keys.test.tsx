@@ -348,6 +348,21 @@ describe('Booharu tool keys on the canvas', () => {
     expect(useKoharuStore.getState().tool).toBe('select')
   })
 
+  it('leaves alone Space let go that ends no hold, so a control that kept it pressed is pressed', async () => {
+    await renderWorkspace()
+    const button = document.createElement('button')
+    document.body.append(button)
+    // Space pressed never reached the canvas, as when a control stops it, so no hold began: the
+    // key let go isn't prevented, which would stop the browser pressing the focused button.
+    expect(fireEvent.keyUp(button, { key: ' ', code: 'Space' })).toBe(true)
+    expect(useKoharuStore.getState().tool).toBe('select')
+    // A hold begun on the page still takes the key let go on a button, and ends.
+    fireEvent.keyDown(document.body, { key: ' ', code: 'Space' })
+    expect(useKoharuStore.getState().tool).toBe('pan')
+    expect(fireEvent.keyUp(button, { key: ' ', code: 'Space' })).toBe(false)
+    expect(useKoharuStore.getState().tool).toBe('select')
+  })
+
   it('ends a Space hold begun on the page when Space is let go in a dialog', async () => {
     await renderWorkspace()
     const { button } = popup('dialog')

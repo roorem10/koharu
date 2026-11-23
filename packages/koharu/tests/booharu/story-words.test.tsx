@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
+import { CanvasWorkspace } from '@/components/editor/CanvasWorkspace'
 import { StoryPanel } from '@/components/editor/StoryPanel'
 import { TypeBar } from '@/components/editor/TypeBar'
 import { useWordRange } from '@/lib/booharu/words'
@@ -72,9 +73,10 @@ function show(page: Page) {
   })
 }
 
-/** `page` shown on the canvas, with the type bar when `bar`, and its texts in Story in the
- * sidebar; every command answers null, and the edits sent are kept. */
-function story(page: Page, bar = false) {
+/** `page` shown on the canvas, with the type bar when `bar`, or in Koharu's canvas workspace,
+ * its shortcuts listening, when `workspace`, and its texts in Story in the sidebar; every command
+ * answers null, and the edits sent are kept. */
+function story(page: Page, bar = false, workspace = false) {
   const table = commands as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
   for (const name of Object.keys(table)) vi.spyOn(table, name).mockResolvedValue(null)
   vi.spyOn(commands, 'getFontPreview').mockResolvedValue(new ArrayBuffer(0))
@@ -97,9 +99,11 @@ function story(page: Page, bar = false) {
     tool: 'select',
     selectionBounds: { x: 100, y: 100, width: 200, height: 80 },
   })
+  // jsdom has no 2D canvas; the workspace then sends black for its theme colours.
+  if (workspace) vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
   const view = render(
     <QueryClientProvider client={queryClient}>
-      <main data-testid='canvas'>{bar && <TypeBar />}</main>
+      {workspace ? <CanvasWorkspace /> : <main data-testid='canvas'>{bar && <TypeBar />}</main>}
       <aside>
         <StoryPanel />
       </aside>
@@ -322,6 +326,39 @@ describe('Booharu words chosen in Story', () => {
     expect(clear).toHaveFocus()
     await user.keyboard('{Tab}')
     expect(field).toHaveFocus()
+  })
+
+  it("presses its buttons with Space beside the canvas's Space hold, which still ends there", async () => {
+    const user = userEvent.setup()
+    // Koharu's canvas workspace, whose Space hotkey holds the Hand tool, listens on the page.
+    story(pageOf(block('block', [{ insert: 'Hello world' }])), false, true)
+    const field = await screen.findByPlaceholderText('Translation')
+    field.focus()
+    choose(field, 6, 11)
+    const bar = within(toolbar()!)
+    const bold = bar.getByRole('button', { name: 'Bold' })
+    const clear = bar.getByRole('button', { name: 'Clear' })
+    await user.keyboard('{Alt>}{F10}{/Alt}')
+    expect(bold).toHaveFocus()
+
+    // A browser presses a focused button as Space is let go, unless that's prevented: the
+    // toolbar keeps Space pressed from the canvas, so no hold began for it to end.
+    await user.keyboard('[Space]{End}[Space]')
+    expect(clear).toHaveFocus()
+    const words = ['block', 6, 11, 'Hello world'] as const
+    await waitFor(() =>
+      expect(styled()).toEqual([
+        [...words, { bold: true }],
+        [...words, { clear: true }],
+      ]),
+    )
+    expect(useKoharuStore.getState().tool).toBe('select')
+
+    // A hold begun on the page still ends when Space is let go on the toolbar.
+    fireEvent.keyDown(document.body, { key: ' ', code: 'Space' })
+    expect(useKoharuStore.getState().tool).toBe('pan')
+    fireEvent.keyUp(bold, { key: ' ', code: 'Space' })
+    expect(useKoharuStore.getState().tool).toBe('select')
   })
 
   it('keeps the focus in the field for Alt+F10 while the canvas types', async () => {
