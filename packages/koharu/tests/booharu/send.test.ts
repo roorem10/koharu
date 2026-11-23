@@ -4,9 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { queryClient, send } from '@/lib/queries'
 import { toast } from '@koharu/ui/components/toast'
 
-// Koharu's send() runs a command as a mutation nothing waits on; Booharu's marked lines let the
-// mutation go once the command settles, with gcTime 0, as call() does, so the cache drops it on
-// the next timer turn (koharu-rs/koharu#1477).
+// Koharu's send() runs a command as a mutation nothing waits on; Booharu's marked lines, the fix
+// koharu-rs/koharu#1479 proposes for koharu-rs/koharu#1477, let the mutation go once the command
+// settles, with gcTime 0, as call() does, so the cache drops it on the next timer turn.
 describe("Koharu's send()", () => {
   const mutations = queryClient.getMutationCache()
   /** Resolves, with the state its mutation settled in, once send() lets go of the mutation. */
