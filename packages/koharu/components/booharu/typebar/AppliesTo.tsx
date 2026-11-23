@@ -17,7 +17,8 @@ const BUTTON =
  * types with characters selected, those characters, as the canvas quotes them (`Typed.selected`);
  * with `words`, the words chosen in the Story panel, quoted the same way. The quote is cut to the
  * bar's room, giving way in the two-row bar's first row before the bar goes to one row, its whole
- * shown in a tooltip, which the page draws, as the desktop never shows a `title`. Whole box goes
+ * shown in a tooltip as the pointer rests on it or the keyboard reaches it, which the page draws,
+ * as the desktop never shows a `title`, breaking a quote anywhere it has no spaces. Whole box goes
  * back to the whole box: while typing it keeps what was typed, as Done does, and the text stays
  * selected; for words chosen in Story it lets them go. Nothing at a caret, where the settings are
  * the next characters', or with nothing chosen. */
@@ -39,13 +40,16 @@ export function AppliesTo({ words }: { words: WordRange | null }) {
           render={
             <span
               data-booharu-gives-way=''
+              tabIndex={0}
               className='min-w-0 truncate text-[11px] text-muted-foreground'
             />
           }
         >
           {label}
         </TooltipTrigger>
-        <TooltipContent className='break-words'>{label}</TooltipContent>
+        {/* The tooltip lays its text out in a flex box, whose least width a word with no spaces
+            keeps whole unless it may break anywhere. */}
+        <TooltipContent className='wrap-anywhere'>{label}</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger render={<button type='button' className={BUTTON} onClick={wholeBox} />}>

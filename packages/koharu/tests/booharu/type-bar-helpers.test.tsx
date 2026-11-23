@@ -5,7 +5,7 @@ import { setWordRange, useWordRange, type WordRange } from '@/lib/booharu/words'
 import { commands, type Layer, type Typed } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
-import { renderBar, settled, text } from './typeBar'
+import { renderBar, settled, tailwind, text } from './typeBar'
 
 /** The canvas typing into the text `text`: the characters `selected` quotes chosen, or a caret
  * without them. */
@@ -65,6 +65,33 @@ describe('Booharu Applies to in the type bar (S11-f)', () => {
     expect(bar.queryByText(/^Applies to/)).toBeNull()
     await settled()
     expect(commands.booharuFinishTyping).not.toHaveBeenCalled()
+  })
+
+  it('lets the keyboard reach the label, whose tooltip has the quote whole', async () => {
+    // Words chosen in Story leave the keys to the page, as the canvas typing never does.
+    const { bar, user } = await renderBar([hello()])
+    act(() => setWordRange(world))
+
+    await user.tab()
+    expect(bar.getByText('Applies to "world"')).toHaveFocus()
+    expect(await tooltip('Applies to "world"')).toBeInTheDocument()
+    await user.tab()
+    expect(bar.getByRole('button', { name: 'Whole box' })).toHaveFocus()
+  })
+
+  it('breaks a quote with no spaces anywhere in its tooltip, so none of it runs out of the box', async () => {
+    // A long scream, as the canvas quotes it: 80 characters, then an ellipsis.
+    const scream = `N${'O'.repeat(79)}…`
+    const { bar, user } = await renderBar([hello()], { typing: typing(scream) })
+    const label = `Applies to "${scream}"`
+
+    await user.hover(bar.getByText(label))
+    const tip = await tooltip(label)
+    await tailwind(tip)
+    // The tooltip lays its text out in a flex box, which keeps the scream's whole width as its
+    // least unless it may break anywhere: breaking words only where nothing else fits (`break-word`)
+    // leaves it running out of the box.
+    expect(getComputedStyle(tip).overflowWrap).toBe('anywhere')
   })
 
   it.each([
