@@ -29,6 +29,7 @@ pub fn initialize() -> sentry::ClientInitGuard {
     options.dsn = option_env!("SENTRY_DSN")
         .into_dsn()
         .expect("invalid SENTRY_DSN environment variable");
+    crate::booharu::keep_off(&options); // Booharu: Sentry stays off without a compiled-in DSN.
     let guard = sentry::init(options);
 
     let user = User {
