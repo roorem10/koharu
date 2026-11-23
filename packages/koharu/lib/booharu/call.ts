@@ -6,7 +6,10 @@
 // runs a command whose answer nothing waits on, so it hands back nothing. Booharu's code awaits a
 // command's answer and catches its failure in many places, so `call()` runs the command as a
 // keyless mutation, as `send()` does, but hands the answer back: a failure toasts once, through
-// Koharu's MutationCache, and the promise rejects with it as an Error, as lib/backend's did.
+// Koharu's MutationCache, and the promise rejects with it as an Error, as lib/backend's did. Once
+// the command settles, `call()` lets go of its mutation (`reset()`), so the cache drops it, answer
+// and all, when its gcTime, five minutes, has passed; a mutation still observed would stay for the
+// whole session, and with it every answer, such as the agent history read again after each turn.
 //
 // Where `send()` is enough, because nothing waits on the answer, use Koharu's `send()`. Inside a
 // query's `queryFn` or a mutation's `mutationFn`, run the command directly (`commands.x(...)`),
@@ -23,12 +26,13 @@ import { queryClient } from '@/lib/queries'
 type Command<Args extends unknown[], Result> = (...args: Args) => Promise<Result>
 
 /** Runs `command` with `args` and answers what it answers. A failure shows as every mutation's
- * does, as one error toast, and rejects as an Error carrying the command's message. */
+ * does, as one error toast, and rejects as an Error carrying the command's message. The mutation
+ * is let go once the command settles, so the cache drops it after its gcTime. */
 export function call<Args extends unknown[], Result>(
   command: Command<Args, Result>,
   ...args: Args
 ): Promise<Result> {
-  return new MutationObserver<Result, Error, void>(queryClient, {
+  const observer = new MutationObserver<Result, Error, void>(queryClient, {
     mutationFn: async () => {
       try {
         return await command(...args)
@@ -36,7 +40,8 @@ export function call<Args extends unknown[], Result>(
         throw asError(error)
       }
     },
-  }).mutate()
+  })
+  return observer.mutate().finally(() => observer.reset())
 }
 
 /** A command's failure as an Error: an Error as it is, a string, as the desktop rejects with its

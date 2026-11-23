@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { call } from '@/lib/booharu/call'
 import i18n from '@/lib/i18n'
+import { queryClient } from '@/lib/queries'
 import { toast } from '@koharu/ui/components/toast'
 
 describe("Booharu's command helper", () => {
@@ -54,5 +55,24 @@ describe("Booharu's command helper", () => {
 
     expect(command).toHaveBeenCalledWith(2, 3)
     expect(shown).not.toHaveBeenCalled()
+  })
+
+  it('lets each mutation go once its command settles, so the cache drops it and its answer', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.spyOn(toast, 'add')
+      const history = { entries: ['the whole agent file, read again after every turn'] }
+      await expect(call(async () => history)).resolves.toBe(history)
+      await expect(call(() => Promise.reject('No project is open.'))).rejects.toThrow()
+      const mutations = queryClient.getMutationCache()
+      expect(mutations.getAll()).toHaveLength(2)
+
+      // A mutation nothing observes leaves the cache once its gcTime, five minutes, has passed.
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+
+      expect(mutations.getAll()).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
