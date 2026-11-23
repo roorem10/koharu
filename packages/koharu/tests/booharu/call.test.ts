@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { call } from '@/lib/booharu/call'
 import i18n from '@/lib/i18n'
@@ -57,22 +57,38 @@ describe("Booharu's command helper", () => {
     expect(shown).not.toHaveBeenCalled()
   })
 
-  it('lets each mutation go once its command settles, so the cache drops it and its answer', async () => {
-    vi.useFakeTimers()
-    try {
-      vi.spyOn(toast, 'add')
-      const history = { entries: ['the whole agent file, read again after every turn'] }
-      await expect(call(async () => history)).resolves.toBe(history)
-      await expect(call(() => Promise.reject('No project is open.'))).rejects.toThrow()
-      const mutations = queryClient.getMutationCache()
-      expect(mutations.getAll()).toHaveLength(2)
+  describe('once a command settles', () => {
+    const mutations = queryClient.getMutationCache()
 
-      // A mutation nothing observes leaves the cache once its gcTime, five minutes, has passed.
-      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('lets its mutation go, so the cache drops it and its answer at once', async () => {
+      const shown = vi.spyOn(toast, 'add')
+      const history = { entries: ['the whole agent file, read again after every turn'] }
+
+      await expect(call(async () => history)).resolves.toBe(history)
+      // Its gcTime is 0, so the cache drops it on the timers' next turn, not five minutes on.
+      await vi.advanceTimersByTimeAsync(0)
 
       expect(mutations.getAll()).toEqual([])
-    } finally {
-      vi.useRealTimers()
-    }
+      expect(shown).not.toHaveBeenCalled()
+    })
+
+    it('lets a failed mutation go at once too, its failure toasted once', async () => {
+      const shown = vi.spyOn(toast, 'add')
+
+      await expect(call(() => Promise.reject('No project is open.'))).rejects.toThrow(
+        'No project is open.',
+      )
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(mutations.getAll()).toEqual([])
+      expect(shown).toHaveBeenCalledTimes(1)
+    })
   })
 })

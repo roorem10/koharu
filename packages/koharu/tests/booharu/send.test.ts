@@ -1,17 +1,23 @@
+import type { MutationState } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { queryClient, send } from '@/lib/queries'
 import { toast } from '@koharu/ui/components/toast'
 
-// Koharu's send() runs a command as a mutation nothing waits on; Booharu's marked line lets the
-// mutation go once the command settles, as call() does, so the cache drops it after its gcTime.
+// Koharu's send() runs a command as a mutation nothing waits on; Booharu's marked lines let the
+// mutation go once the command settles, with gcTime 0, as call() does, so the cache drops it at
+// once (koharu-rs/koharu#1477).
 describe("Koharu's send()", () => {
   const mutations = queryClient.getMutationCache()
-  /** Waits until the cache's mutations have settled as `statuses` says, in order. */
-  const settled = (...statuses: string[]) =>
-    vi.waitFor(() => expect(mutations.getAll().map(({ state }) => state.status)).toEqual(statuses))
-  /** A mutation's gcTime, TanStack's five minutes. */
-  const gcTime = 5 * 60 * 1000
+  /** Resolves, with the state its mutation settled in, once send() lets go of the mutation. */
+  const letGo = () =>
+    new Promise<MutationState>((resolve) => {
+      const stop = mutations.subscribe((event) => {
+        if (event.type !== 'observerRemoved') return
+        stop()
+        resolve(event.mutation.state)
+      })
+    })
 
   beforeEach(() => {
     vi.useFakeTimers()
@@ -20,36 +26,40 @@ describe("Koharu's send()", () => {
     vi.useRealTimers()
   })
 
-  it('lets a mutation go once its command answers, so the cache drops it and its answer', async () => {
+  it('lets a mutation go once its command answers, so the cache drops it and its answer at once', async () => {
     const shown = vi.spyOn(toast, 'add')
     const history = { entries: ['the whole agent file, read again after every turn'] }
     const command = vi.fn(async (_page: string) => history)
+    const released = letGo()
 
     send(command, 'page-1')
-    await settled('success')
+    const settled = await released
 
     expect(command).toHaveBeenCalledWith('page-1')
-    expect(mutations.getAll()[0]?.state.data).toBe(history)
+    expect(settled.status).toBe('success')
+    expect(settled.data).toBe(history)
     expect(shown).not.toHaveBeenCalled()
 
-    // A mutation nothing observes leaves the cache once its gcTime has passed.
-    await vi.advanceTimersByTimeAsync(gcTime)
+    // Its gcTime is 0, so the cache drops it on the timers' next turn, not five minutes on.
+    await vi.advanceTimersByTimeAsync(0)
 
     expect(mutations.getAll()).toEqual([])
   })
 
-  it('lets a failed mutation go too, its failure toasted once', async () => {
+  it('lets a failed mutation go at once too, its failure toasted once', async () => {
     const shown = vi.spyOn(toast, 'add')
+    const released = letGo()
 
     send(() => Promise.reject('No project is open.'))
-    await settled('error')
+    const settled = await released
 
+    expect(settled.status).toBe('error')
     expect(shown).toHaveBeenCalledTimes(1)
     expect(shown).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'error', description: 'No project is open.' }),
     )
 
-    await vi.advanceTimersByTimeAsync(gcTime)
+    await vi.advanceTimersByTimeAsync(0)
 
     expect(mutations.getAll()).toEqual([])
     expect(shown).toHaveBeenCalledTimes(1)
