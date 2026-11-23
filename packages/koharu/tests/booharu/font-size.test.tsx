@@ -35,7 +35,7 @@ describe('Booharu font size', () => {
     await waitFor(() => expect(edits).toEqual([restyled([['text', { chars: { size: 8 } }]])]))
   })
 
-  it('sets a typed size exactly, past the A+ steps’ 300, and turns an Auto box’s fitting off', async () => {
+  it('sets a typed size exactly, off the A− and A+ steps’ half-pixel grain, and turns an Auto box’s fitting off', async () => {
     const { edits, user } = await renderBar([text('one', { frame: box('best') })])
 
     const size = screen.getByTestId('type-size')
