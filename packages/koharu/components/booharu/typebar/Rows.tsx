@@ -18,8 +18,11 @@ import { cn } from '@koharu/ui/lib/utils'
 /** The canvas's width Koharu's bar keeps clear, 8 px at each side: its `max-w-[calc(100%-16px)]`. */
 const MARGIN = 16
 
-/** A part of a control that gives way in its row, as Applies to's quote, cut to nothing before the
- * bar goes to one row. */
+/** What gives way in a row, cut to nothing before the bar goes to one row: a part of a control, as
+ * Applies to's quote, or a control itself. The row lets the control that is or holds it narrow, and
+ * the measure counts it as nothing, so it goes on a box cut to fit (`min-w-0 truncate`), each box
+ * from it up to the control letting it narrow too (`min-w-0`) and the control's other parts
+ * keeping their widths (`shrink-0`), as Applies to's do. */
 const GIVES_WAY = '[data-booharu-gives-way]'
 
 /** Where a Booharu `ContextBar`'s next row starts. It draws nothing: the bar reads it. */
@@ -29,10 +32,10 @@ export function RowBreak() {
 
 /** Koharu's ContextBar in rows, as the owner asked of the type bar: its children split at each
  * `RowBreak`, each row on a line of its own, lined up at the start under the row before, so the
- * bar is as wide as its widest row rather than as all of them. A row never wraps: a part of a
- * control marked `data-booharu-gives-way`, as Applies to's quote, narrows to fit it, and the row's
+ * bar is as wide as its widest row rather than as all of them. A row never wraps: what's marked
+ * `data-booharu-gives-way` (`GIVES_WAY`), as Applies to's quote, narrows to fit it, and the row's
  * other controls keep their widths. While a row is wider than the room Koharu's bar has on the
- * canvas even with that part cut to nothing, as the second is while typing in a window narrower
+ * canvas even with that cut to nothing, as the second is while typing in a window narrower
  * than about 950 px and the first with characters chosen in one narrower than about 955, the bar
  * is Koharu's one row instead, wrapping at the canvas's edge; its rows then lay nothing out
  * (`contents`), so no control remounts as the bar goes from one to the other. With no `RowBreak`,
@@ -129,12 +132,12 @@ export function ContextBar({
             key={index}
             ref={index === 0 ? firstRow : undefined}
             data-booharu-row={index + 1}
-            // Laid out, a row keeps each control's width but that of one holding a part that
-            // gives way (`GIVES_WAY`, spelled out for Tailwind to read).
+            // Laid out, a row keeps each control's width but that of one that gives way or holds a
+            // part that does (`GIVES_WAY`, spelled out for Tailwind to read).
             className={
               flowing
                 ? 'contents'
-                : 'flex max-w-full items-center gap-1 [&>:not(:has([data-booharu-gives-way]))]:shrink-0'
+                : 'flex max-w-full items-center gap-1 [&>:not([data-booharu-gives-way]):not(:has([data-booharu-gives-way]))]:shrink-0'
             }
           >
             {cells}
@@ -175,8 +178,8 @@ function lined(cells: Element[], gap: number): number {
   return cells.reduce((sum, cell) => sum + gap + leastWidth(cell), -gap)
 }
 
-/** How narrow `cell` can be: as wide as it is, or, holding a part that gives way, as its parts in a
- * line with that part cut to nothing, however wide the part is now. */
+/** How narrow `cell` can be: nothing where it gives way itself; as wide as it is; or, holding a part
+ * that gives way, as its parts in a line with that part cut to nothing, however wide it is now. */
 function leastWidth(cell: Element): number {
   if (cell.matches(GIVES_WAY)) return 0
   if (!cell.querySelector(GIVES_WAY)) return cell.getBoundingClientRect().width

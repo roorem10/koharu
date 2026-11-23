@@ -256,6 +256,23 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
     expect(rowsOf(bar)[0]!.firstElementChild).toContainElement(bar.querySelector(GIVES_WAY))
   })
 
+  it('lets a control that is itself a part that gives way narrow too, as it measures it', async () => {
+    render(
+      <Bar
+        more={
+          <span data-booharu-gives-way='' className='min-w-0 truncate'>
+            Applies to
+          </span>
+        }
+      />,
+    )
+    const bar = screen.getByTestId('bar')
+    await tailwind(bar)
+
+    expect(bar).toHaveClass('flex-col')
+    expectRowsAsMeasured(bar)
+  })
+
   it('leaves a bar with no RowBreak as Koharu draws it, and draws no empty row', () => {
     const bounds = { x: 0, y: 0, width: 10, height: 10 }
     const { rerender } = render(
