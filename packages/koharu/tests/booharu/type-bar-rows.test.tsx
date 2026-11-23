@@ -1,5 +1,6 @@
-import { act, render, screen, within } from '@testing-library/react'
-import { StrictMode, type ReactNode } from 'react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { StrictMode, useLayoutEffect, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ContextBar, RowBreak } from '@/components/booharu/typebar/Rows'
@@ -53,8 +54,9 @@ afterEach(() => {
   globalThis.ResizeObserver = setupObserver
 })
 
-/** Resize observers that keep what they watch: a resize of `target`, told to those watching it,
- * how many watch it now, and how many were ever made to. */
+/** Resize observers that keep what they watch: a resize of `target`, told to those watching it in
+ * React's `act` or, as the browser tells it between laying out and painting, outside it; how many
+ * watch it now, and how many were ever made to. */
 function resizes() {
   class Observer {
     static made: Observer[] = []
@@ -78,14 +80,15 @@ function resizes() {
   }
   // The setup's can't be stubbed, as it's defined for good, but it can be written over.
   globalThis.ResizeObserver = Observer
+  const tell = (target: Element) => {
+    for (const observer of Observer.made) {
+      if (!observer.watched.has(target)) continue
+      observer.tell([{ target } as ResizeObserverEntry], observer)
+    }
+  }
   return {
-    resize: (target: Element) =>
-      act(() => {
-        for (const observer of Observer.made) {
-          if (!observer.watched.has(target)) continue
-          observer.tell([{ target } as ResizeObserverEntry], observer)
-        }
-      }),
+    resize: (target: Element) => act(() => tell(target)),
+    tell,
     watching: (target: Element) =>
       Observer.made.filter((observer) => observer.watched.has(target)).length,
     made: (target: Element) => Observer.made.filter((observer) => observer.ever.has(target)).length,
@@ -124,6 +127,38 @@ function Bar({
       </ContextBar>
     </div>
   )
+}
+
+/** Runs `run` outside React's act, as the browser runs what it tells of between laying out and
+ * painting. */
+async function outsideAct(run: () => void | Promise<void>) {
+  const env = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+  const before = env.IS_REACT_ACT_ENVIRONMENT
+  env.IS_REACT_ACT_ENVIRONMENT = false
+  try {
+    await run()
+  } finally {
+    env.IS_REACT_ACT_ENVIRONMENT = before
+  }
+}
+
+/** `Bar`, given a 10 px control E by `grow` at once, in `flushSync`, as Applies to comes. */
+function GrowingBar({ grow }: { grow: (now: () => void) => void }) {
+  const [grown, setGrown] = useState(false)
+  useLayoutEffect(() => {
+    grow(() => flushSync(() => setGrown(true)))
+  })
+  return <Bar more={grown && <span data-w='10'>E</span>} />
+}
+
+/** An update in the bar's React tree that React makes at once, as floating-ui's, placing the bar
+ * with `flushSync` when the browser tells it the bar's size: given to `place`. */
+function Placer({ place }: { place: (now: () => void) => void }) {
+  const [, setPlaced] = useState(0)
+  useLayoutEffect(() => {
+    place(() => flushSync(() => setPlaced((n) => n + 1)))
+  })
+  return null
 }
 
 describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
@@ -351,5 +386,67 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
     canvas.dataset.w = '290'
     resize(canvas)
     expect(screen.getByTestId('bar')).not.toHaveClass('flex-col')
+  })
+
+  it('goes from one to the other before the browser paints after a render', async () => {
+    laidOut()
+    resizes()
+    let grow = () => {}
+    render(
+      <GrowingBar
+        grow={(now) => {
+          grow = now
+        }}
+      />,
+    )
+    const bar = screen.getByTestId('bar')
+    expect(bar).toHaveClass('flex-col')
+
+    // As Applies to comes, 268 + 4 + 10 is too wide: Koharu's one row by the time React has
+    // drawn E, so no frame shows the first row wrapped in itself.
+    await outsideAct(() => {
+      grow()
+      expect(bar).not.toHaveClass('flex-col')
+    })
+  })
+
+  it('goes from one to the other before the browser paints as the canvas is resized', async () => {
+    laidOut()
+    const { tell } = resizes()
+    let place = () => {}
+    render(
+      <>
+        <Bar />
+        <Placer
+          place={(now) => {
+            place = now
+          }}
+        />
+      </>,
+    )
+    const bar = screen.getByTestId('bar')
+    const canvas = screen.getByTestId('canvas')
+    expect(bar).toHaveClass('flex-col')
+
+    await outsideAct(async () => {
+      // 290 leaves 260, too little for the first row: Koharu's one row as soon as it's told, so no
+      // frame shows the row wrapped in itself.
+      canvas.dataset.w = '290'
+      tell(canvas)
+      expect(bar).not.toHaveClass('flex-col')
+      canvas.dataset.w = '300'
+      tell(canvas)
+      expect(bar).toHaveClass('flex-col')
+
+      // A control resized alone: after the browser paints instead, even as floating-ui places the
+      // bar at once in the same frame, as going then would change the bar's size after the
+      // browser told floating-ui of it, which the browser leaves to the next frame.
+      const d = screen.getByText('D')
+      d.dataset.w = '271'
+      tell(d)
+      place()
+      expect(bar).toHaveClass('flex-col')
+      await waitFor(() => expect(bar).not.toHaveClass('flex-col'))
+    })
   })
 })

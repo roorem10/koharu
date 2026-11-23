@@ -3,12 +3,14 @@
 import {
   Children,
   isValidElement,
+  startTransition,
   useLayoutEffect,
   useRef,
   useState,
   type ComponentProps,
   type ReactNode,
 } from 'react'
+import { flushSync } from 'react-dom'
 
 import { ContextBar as KoharuContextBar } from '@/components/editor/ContextBar'
 import { cn } from '@koharu/ui/lib/utils'
@@ -36,15 +38,16 @@ export function ContextBar({
 }: ComponentProps<typeof KoharuContextBar>) {
   const firstRow = useRef<HTMLDivElement>(null)
   const [flowing, setFlowing] = useState(false)
-  // The measure of the rows the latest render left, which the observer below runs too.
-  const measure = useRef<() => void>(null)
+  // The measure of the rows the latest render left, which the observer below runs too, with what
+  // it tells of.
+  const measure = useRef<(resized?: readonly ResizeObserverEntry[]) => void>(null)
   // One resize observer for as long as the bar shows, and what it watches: a render never makes
   // another, whose first notices, made while the browser tells the others of a resize, it would
   // put off to the next frame, warning of a loop.
   const observer = useRef<{ resized: ResizeObserver; watched: Set<Element> }>(null)
   useLayoutEffect(() => {
     const own = {
-      resized: new ResizeObserver(() => measure.current?.()),
+      resized: new ResizeObserver((entries) => measure.current?.(entries)),
       watched: new Set<Element>(),
     }
     observer.current = own
@@ -67,9 +70,20 @@ export function ContextBar({
     }
     measure.current =
       bar && canvas
-        ? () => {
+        ? (resized) => {
             const flows = overflows(bar, canvas)
-            if (flows !== undefined) setFlowing(flows)
+            if (flows === undefined) return
+            // After a render, and as the canvas is resized, the bar goes from one to the other
+            // before the browser paints, never showing a row wrapped in itself: the canvas being
+            // the shallowest thing watched, the browser then tells floating-ui of the bar's new
+            // size in the same frame. As a control is resized alone, after the paint, in a
+            // transition, which floating-ui's flushSync as it places the bar leaves for later:
+            // going in this frame would change the bar's size after floating-ui is told of it,
+            // which the browser leaves to the next frame, warning of a loop.
+            if (!resized) setFlowing(flows)
+            else if (resized.some(({ target }) => target === canvas))
+              flushSync(() => setFlowing(flows))
+            else startTransition(() => setFlowing(flows))
           }
         : null
     measure.current?.()
