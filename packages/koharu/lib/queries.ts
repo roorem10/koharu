@@ -79,7 +79,11 @@ export const queryClient = new QueryClient({
       retry: false,
       refetchOnReconnect: false,
       refetchOnWindowFocus: false,
+      networkMode: 'always', // Booharu: as a mutation does, below.
     },
+    // Booharu: a command goes to the desktop, never the internet, so it runs at once while the
+    // browser says it's offline too, rather than waiting until it's online (offline.test.tsx).
+    mutations: { networkMode: 'always' },
   },
 })
 
