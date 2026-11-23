@@ -93,9 +93,9 @@ export function send<Args extends unknown[]>(
   command: (...args: Args) => Promise<unknown>,
   ...args: Args
 ): void {
-  // Booharu: let the mutation go once it settles, with gcTime 0, so the cache drops it at once, as
-  // call() does; an observed one stays for the session (koharu-rs/koharu#1477). These marked lines
-  // go once a Koharu release lets go of its mutations itself.
+  // Booharu: let the mutation go once it settles, with gcTime 0, so the cache drops it on the next
+  // timer turn, as call() does; an observed one stays for the session (koharu-rs/koharu#1477).
+  // These marked lines go once a Koharu release lets go of its mutations itself.
   const observer = new MutationObserver(queryClient, {
     mutationFn: () => command(...args),
     gcTime: 0,

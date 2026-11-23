@@ -8,8 +8,9 @@
 // keyless mutation, as `send()` does, but hands the answer back: a failure toasts once, through
 // Koharu's MutationCache, and the promise rejects with it as an Error, as lib/backend's did. Once
 // the command settles, `call()` lets go of its mutation (`reset()`), whose gcTime is 0, so the
-// cache drops it, answer and all, at once; a mutation still observed would stay for the whole
-// session, and with it every answer, such as the agent history read again after each turn.
+// cache drops it, answer and all, on the next timer turn (a 0 ms timeout); a mutation still
+// observed would stay for the whole session, and with it every answer, such as the agent history
+// read again after each turn.
 //
 // Where `send()` is enough, because nothing waits on the answer, use Koharu's `send()`. Inside a
 // query's `queryFn` or a mutation's `mutationFn`, run the command directly (`commands.x(...)`),
@@ -27,7 +28,8 @@ type Command<Args extends unknown[], Result> = (...args: Args) => Promise<Result
 
 /** Runs `command` with `args` and answers what it answers. A failure shows as every mutation's
  * does, as one error toast, and rejects as an Error carrying the command's message. The mutation
- * is let go once the command settles, and the cache drops it at once. */
+ * is let go once the command settles, and the cache drops it on the next timer turn
+ * (a 0 ms timeout). */
 export function call<Args extends unknown[], Result>(
   command: Command<Args, Result>,
   ...args: Args

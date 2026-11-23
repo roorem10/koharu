@@ -5,8 +5,8 @@ import { queryClient, send } from '@/lib/queries'
 import { toast } from '@koharu/ui/components/toast'
 
 // Koharu's send() runs a command as a mutation nothing waits on; Booharu's marked lines let the
-// mutation go once the command settles, with gcTime 0, as call() does, so the cache drops it at
-// once (koharu-rs/koharu#1477).
+// mutation go once the command settles, with gcTime 0, as call() does, so the cache drops it on
+// the next timer turn (koharu-rs/koharu#1477).
 describe("Koharu's send()", () => {
   const mutations = queryClient.getMutationCache()
   /** Resolves, with the state its mutation settled in, once send() lets go of the mutation. */
@@ -26,7 +26,7 @@ describe("Koharu's send()", () => {
     vi.useRealTimers()
   })
 
-  it('lets a mutation go once its command answers, so the cache drops it and its answer at once', async () => {
+  it('lets a mutation go once its command answers, so the cache drops it and its answer on the next timer turn', async () => {
     const shown = vi.spyOn(toast, 'add')
     const history = { entries: ['the whole agent file, read again after every turn'] }
     const command = vi.fn(async (_page: string) => history)
@@ -46,7 +46,7 @@ describe("Koharu's send()", () => {
     expect(mutations.getAll()).toEqual([])
   })
 
-  it('lets a failed mutation go at once too, its failure toasted once', async () => {
+  it('lets a failed mutation go the same way, its failure toasted once', async () => {
     const shown = vi.spyOn(toast, 'add')
     const released = letGo()
 

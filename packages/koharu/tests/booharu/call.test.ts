@@ -67,7 +67,7 @@ describe("Booharu's command helper", () => {
       vi.useRealTimers()
     })
 
-    it('lets its mutation go, so the cache drops it and its answer at once', async () => {
+    it('lets its mutation go, so the cache drops it and its answer on the next timer turn', async () => {
       const shown = vi.spyOn(toast, 'add')
       const history = { entries: ['the whole agent file, read again after every turn'] }
 
@@ -79,7 +79,7 @@ describe("Booharu's command helper", () => {
       expect(shown).not.toHaveBeenCalled()
     })
 
-    it('lets a failed mutation go at once too, its failure toasted once', async () => {
+    it('lets a failed mutation go the same way, its failure toasted once', async () => {
       const shown = vi.spyOn(toast, 'add')
 
       await expect(call(() => Promise.reject('No project is open.'))).rejects.toThrow(
