@@ -1,4 +1,5 @@
 import { act, render, screen, within } from '@testing-library/react'
+import { StrictMode, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ContextBar, RowBreak } from '@/components/booharu/typebar/Rows'
@@ -52,8 +53,9 @@ afterEach(() => {
   globalThis.ResizeObserver = setupObserver
 })
 
-/** Resize observers that keep what they watch, and a resize of `target`, told to those watching it. */
-function resizes(): (target: Element) => void {
+/** Resize observers that keep what they watch: a resize of `target`, told to those watching it,
+ * and how many watch it now. */
+function resizes() {
   class Observer {
     static made: Observer[] = []
     watched = new Set<Element>()
@@ -74,12 +76,51 @@ function resizes(): (target: Element) => void {
   }
   // The setup's can't be stubbed, as it's defined for good, but it can be written over.
   globalThis.ResizeObserver = Observer
-  return (target) =>
-    act(() => {
-      for (const observer of Observer.made) {
-        if (observer.watched.has(target)) observer.tell([], observer)
-      }
-    })
+  return {
+    resize: (target: Element) =>
+      act(() => {
+        for (const observer of Observer.made) {
+          if (!observer.watched.has(target)) continue
+          observer.tell([{ target } as ResizeObserverEntry], observer)
+        }
+      }),
+    watching: (target: Element) =>
+      Observer.made.filter((observer) => observer.watched.has(target)).length,
+  }
+}
+
+/** A Booharu ContextBar on a canvas `canvas` px wide, as `laidOut` lays it out, which leaves its
+ * controls 30 px less: A, B and C, 268 px with the gaps between them, then `more`, on the first
+ * row, and D on the second, or on the one row with no RowBreak when `rows` is false. */
+function Bar({
+  canvas = 300,
+  more,
+  rows = true,
+}: {
+  canvas?: number
+  more?: ReactNode
+  rows?: boolean
+}) {
+  return (
+    <div data-w={canvas} data-testid='canvas'>
+      <ContextBar bounds={{ x: 0, y: 0, width: 10, height: 10 }} data-testid='bar'>
+        <button type='button' data-w='100'>
+          A
+        </button>
+        <button type='button' data-w='100'>
+          B
+        </button>
+        <button type='button' data-w='60'>
+          C
+        </button>
+        {more}
+        {rows && <RowBreak />}
+        <button type='button' data-w='100'>
+          D
+        </button>
+      </ContextBar>
+    </div>
+  )
 }
 
 describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
@@ -154,7 +195,7 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
 
   it("is Koharu's one row, its controls kept, while a row is wider than the canvas leaves it", () => {
     laidOut()
-    const resize = resizes()
+    const { resize } = resizes()
     render(
       // A canvas 290 px wide leaves the bar's controls 260: 290 less Koharu's 8 px each side and
       // the bar's padding and border.
@@ -206,5 +247,82 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
     resize(d)
     expect(bar).not.toHaveClass('flex-col')
     expect(screen.getByText('A')).toBe(a)
+  })
+
+  it('measures again after a render that adds a control, with nothing resized', () => {
+    laidOut()
+    resizes()
+    const { rerender } = render(<Bar />)
+    // The 268 px the first row needs, of the 270 left.
+    expect(screen.getByTestId('bar')).toHaveClass('flex-col')
+
+    // As Applies to comes, with a render and no resize: 268 + 4 + 10 is too wide.
+    rerender(<Bar more={<span data-w='10'>E</span>} />)
+    expect(screen.getByTestId('bar')).not.toHaveClass('flex-col')
+  })
+
+  it('keeps the rows while a row is as wide as the room, no wider', () => {
+    laidOut()
+    resizes()
+    // 298 less 30 leaves the 268 the first row needs.
+    render(<Bar canvas={298} />)
+    expect(screen.getByTestId('bar')).toHaveClass('flex-col')
+  })
+
+  it('takes no room for a control laid out on its own: hidden, or placed absolutely or fixed', () => {
+    laidOut()
+    resizes()
+    render(
+      <Bar
+        more={
+          <>
+            <span data-w='50' style={{ display: 'none' }} />
+            <span data-w='50' style={{ position: 'absolute' }} />
+            <span data-w='50' style={{ position: 'fixed' }} />
+          </>
+        }
+      />,
+    )
+    expect(screen.getByTestId('bar')).toHaveClass('flex-col')
+  })
+
+  it('leaves one observer watching the canvas, and none once the bar has no rows or is gone', () => {
+    laidOut()
+    const { watching } = resizes()
+    // StrictMode mounts the bar, takes it down and mounts it again, as React may.
+    const { rerender, unmount } = render(
+      <StrictMode>
+        <Bar />
+      </StrictMode>,
+    )
+    const canvas = screen.getByTestId('canvas')
+    expect(watching(canvas)).toBe(1)
+
+    for (let n = 0; n < 25; n++) {
+      rerender(
+        <StrictMode>
+          <Bar more={<span data-w='1'>{n}</span>} />
+        </StrictMode>,
+      )
+    }
+    expect(watching(canvas)).toBe(1)
+
+    rerender(
+      <StrictMode>
+        <Bar rows={false} />
+      </StrictMode>,
+    )
+    expect(watching(canvas)).toBe(0)
+    // With a RowBreak again, it watches and measures again: the rows, as they fit.
+    rerender(
+      <StrictMode>
+        <Bar />
+      </StrictMode>,
+    )
+    expect(watching(canvas)).toBe(1)
+    expect(screen.getByTestId('bar')).toHaveClass('flex-col')
+
+    unmount()
+    expect(watching(canvas)).toBe(0)
   })
 })
