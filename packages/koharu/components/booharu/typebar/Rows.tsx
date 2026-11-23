@@ -36,37 +36,43 @@ export function ContextBar({
 }: ComponentProps<typeof KoharuContextBar>) {
   const firstRow = useRef<HTMLDivElement>(null)
   const [flowing, setFlowing] = useState(false)
-  // After each render, as the controls change, and as the canvas or a control is resized.
+  // The measure of the rows the latest render left, which the observer below runs too.
+  const measure = useRef<() => void>(null)
+  // One resize observer for as long as the bar shows, and what it watches: a render never makes
+  // another, whose first notices, made while the browser tells the others of a resize, it would
+  // put off to the next frame, warning of a loop.
+  const observer = useRef<{ resized: ResizeObserver; watched: Set<Element> }>(null)
+  useLayoutEffect(() => {
+    const own = {
+      resized: new ResizeObserver(() => measure.current?.()),
+      watched: new Set<Element>(),
+    }
+    observer.current = own
+    return () => {
+      own.resized.disconnect()
+      observer.current = null
+    }
+  }, [])
+  // After each render, as the controls change: the canvas and the controls shown watched, and the
+  // rows measured.
   useLayoutEffect(() => {
     const bar = firstRow.current?.parentElement
     const canvas = bar?.parentElement
-    if (!bar || !canvas) return
-    const measure = () => {
-      // A canvas that isn't laid out, as in jsdom, tells nothing of what fits.
-      const width = canvas.getBoundingClientRect().width
-      if (!width) return
-      const style = getComputedStyle(bar)
-      const px = (value: string) => parseFloat(value) || 0
-      // The room Koharu's bar has: the canvas's width but for its margin, padding and border.
-      const room =
-        width -
-        MARGIN -
-        px(style.paddingLeft) -
-        px(style.paddingRight) -
-        px(style.borderLeftWidth) -
-        px(style.borderRightWidth)
-      // A row's width is its controls' and the gaps between them, the rows' `gap-1` being the bar's
-      // own, so it's the same however the bar lays them out, and the bar never flips back and forth.
-      const gap = px(style.columnGap)
-      const widthOf = (row: Element) =>
-        cellsOf(row).reduce((sum, cell) => sum + gap + cell.getBoundingClientRect().width, -gap)
-      setFlowing(rowsOf(bar).some((row) => widthOf(row) > room))
+    const own = observer.current
+    if (own) {
+      const watching = new Set(bar && canvas ? [canvas, ...rowsOf(bar).flatMap(cellsOf)] : [])
+      for (const target of own.watched) if (!watching.has(target)) own.resized.unobserve(target)
+      for (const target of watching) if (!own.watched.has(target)) own.resized.observe(target)
+      own.watched = watching
     }
-    measure()
-    const resized = new ResizeObserver(measure)
-    resized.observe(canvas)
-    for (const row of rowsOf(bar)) for (const cell of cellsOf(row)) resized.observe(cell)
-    return () => resized.disconnect()
+    measure.current =
+      bar && canvas
+        ? () => {
+            const flows = overflows(bar, canvas)
+            if (flows !== undefined) setFlowing(flows)
+          }
+        : null
+    measure.current?.()
   })
 
   const items = Children.toArray(children)
@@ -114,6 +120,33 @@ export function ContextBar({
 
 function isRowBreak(node: ReactNode): boolean {
   return isValidElement(node) && node.type === RowBreak
+}
+
+/** Whether a row of `bar`'s is wider than the room Koharu's bar has on `canvas`, its parent; nothing
+ * where the canvas isn't laid out, as in jsdom, which tells nothing of what fits. */
+function overflows(bar: Element, canvas: Element): boolean | undefined {
+  const width = canvas.getBoundingClientRect().width
+  if (!width) return undefined
+  const style = getComputedStyle(bar)
+  // The room Koharu's bar has: the canvas's width but for its margin, padding and border.
+  const room =
+    width -
+    MARGIN -
+    px(style.paddingLeft) -
+    px(style.paddingRight) -
+    px(style.borderLeftWidth) -
+    px(style.borderRightWidth)
+  // A row's width is its controls' and the gaps between them, the rows' `gap-1` being the bar's
+  // own, so it's the same however the bar lays them out, and the bar never flips back and forth.
+  const gap = px(style.columnGap)
+  const widthOf = (row: Element) =>
+    cellsOf(row).reduce((sum, cell) => sum + gap + cell.getBoundingClientRect().width, -gap)
+  return rowsOf(bar).some((row) => widthOf(row) > room)
+}
+
+/** A length in CSS pixels, 0 for none. */
+function px(value: string): number {
+  return parseFloat(value) || 0
 }
 
 /** The rows `bar` shows. */

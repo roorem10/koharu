@@ -54,11 +54,12 @@ afterEach(() => {
 })
 
 /** Resize observers that keep what they watch: a resize of `target`, told to those watching it,
- * and how many watch it now. */
+ * how many watch it now, and how many were ever made to. */
 function resizes() {
   class Observer {
     static made: Observer[] = []
     watched = new Set<Element>()
+    ever = new Set<Element>()
     tell: ResizeObserverCallback
     constructor(tell: ResizeObserverCallback) {
       this.tell = tell
@@ -66,6 +67,7 @@ function resizes() {
     }
     observe(target: Element) {
       this.watched.add(target)
+      this.ever.add(target)
     }
     unobserve(target: Element) {
       this.watched.delete(target)
@@ -86,6 +88,7 @@ function resizes() {
       }),
     watching: (target: Element) =>
       Observer.made.filter((observer) => observer.watched.has(target)).length,
+    made: (target: Element) => Observer.made.filter((observer) => observer.ever.has(target)).length,
   }
 }
 
@@ -324,5 +327,29 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
 
     unmount()
     expect(watching(canvas)).toBe(0)
+  })
+
+  it('keeps one resize observer as long as it shows, watching the controls each render shows', () => {
+    laidOut()
+    const { made, resize, watching } = resizes()
+    const { rerender } = render(<Bar />)
+    const canvas = screen.getByTestId('canvas')
+    for (let n = 0; n < 25; n++) rerender(<Bar more={<span data-w='1'>{n}</span>} />)
+    // However often the bar renders, so a render while the browser tells of a resize never makes
+    // another, whose first notices the browser would put off to the next frame.
+    expect(made(canvas)).toBe(1)
+
+    // What it watches follows the controls: E while it shows, and no longer once it's gone.
+    rerender(<Bar more={<span data-w='10'>E</span>} />)
+    const e = screen.getByText('E')
+    expect(watching(e)).toBe(1)
+    rerender(<Bar />)
+    expect(watching(e)).toBe(0)
+
+    // And it still tells the bar of a resize: 290 leaves 260, too little for the first row.
+    expect(screen.getByTestId('bar')).toHaveClass('flex-col')
+    canvas.dataset.w = '290'
+    resize(canvas)
+    expect(screen.getByTestId('bar')).not.toHaveClass('flex-col')
   })
 })
