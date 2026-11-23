@@ -10,6 +10,8 @@ import { AppliesTo, WholeBoxOnly } from '@/components/booharu/typebar/AppliesTo'
 import { BorderExtras } from '@/components/booharu/typebar/BorderExtras' // Booharu: 2nd border (Q2).
 import { ClearWordStyles } from '@/components/booharu/typebar/ClearWordStyles' // Booharu: S11-g.
 import { DoneButton } from '@/components/booharu/typebar/DoneButton' // Booharu: S11-c.
+// Booharu: Koharu's ContextBar in two rows, as the owner asked, from a RowBreak after the size.
+import { ContextBar, RowBreak } from '@/components/booharu/typebar/Rows'
 import { Spacing } from '@/components/booharu/typebar/Spacing' // Booharu: S11-i, S12-k.
 import { WordSizeSteps } from '@/components/booharu/typebar/WordSizeSteps' // Booharu: S11-e.
 import { BoldToggle } from '@/components/booharu/words/BoldToggle' // Booharu: B (D12).
@@ -17,7 +19,6 @@ import { EmphasisButton } from '@/components/booharu/words/EmphasisButton' // Bo
 import { Choice } from '@/components/controls/Choice'
 import { ColorWell } from '@/components/controls/ColorWell'
 import { FontPicker } from '@/components/controls/FontPicker'
-import { ContextBar } from '@/components/editor/ContextBar'
 import { useBooharuFontPicker } from '@/lib/booharu/fonts' // Booharu: favourites and local names.
 import { useFxBar } from '@/lib/booharu/fx' // Booharu: Text effects goes with the bar (S12-k).
 // Booharu: the values the selected texts don't share (S11-h).
@@ -357,6 +358,8 @@ export function TypeBar() {
           }}
         />
       </div>
+      {/* Booharu: the rest on a second row, so the bar is about half as long (the owner's ask). */}
+      <RowBreak />
       {/* Booharu: A− and A+, for the characters typed or the words chosen in Story (S11-e). */}
       <WordSizeSteps words={chosen} />
       <ColorWell

@@ -35,7 +35,8 @@ describe('Booharu Applies to in the type bar (S11-f)', () => {
   it('quotes the characters selected while typing, first, and Whole box keeps what was typed', async () => {
     const { bar, user, edits } = await renderBar([hello()], { typing: typing('Hello wo') })
 
-    expect(screen.getByTestId('type-bar').firstElementChild).toHaveTextContent(
+    // First in the bar's first row (Booharu's two rows).
+    expect(screen.getByTestId('type-bar').firstElementChild?.firstElementChild).toHaveTextContent(
       /^Applies to "Hello wo"Whole box$/,
     )
     // The bar cuts the quote to its room, so a tooltip has it whole.
