@@ -16,10 +16,11 @@ const BUTTON =
 /** What the type bar's character settings apply to, first in the bar (S11-f): while the canvas
  * types with characters selected, those characters, as the canvas quotes them (`Typed.selected`);
  * with `words`, the words chosen in the Story panel, quoted the same way. The quote is cut to the
- * bar's room, its whole shown in a tooltip, which the page draws, as the desktop never shows a
- * `title`. Whole box goes back to the whole box: while typing it keeps what was typed, as Done
- * does, and the text stays selected; for words chosen in Story it lets them go. Nothing at a caret,
- * where the settings are the next characters', or with nothing chosen. */
+ * bar's room, giving way in the two-row bar's first row before the bar goes to one row, its whole
+ * shown in a tooltip, which the page draws, as the desktop never shows a `title`. Whole box goes
+ * back to the whole box: while typing it keeps what was typed, as Done does, and the text stays
+ * selected; for words chosen in Story it lets them go. Nothing at a caret, where the settings are
+ * the next characters', or with nothing chosen. */
 export function AppliesTo({ words }: { words: WordRange | null }) {
   const { t } = useTranslation()
   const typing = useKoharuStore((state) => state.typing !== null)
@@ -35,7 +36,12 @@ export function AppliesTo({ words }: { words: WordRange | null }) {
     <div className='flex max-w-48 min-w-0 items-center gap-1'>
       <Tooltip>
         <TooltipTrigger
-          render={<span className='min-w-0 truncate text-[11px] text-muted-foreground' />}
+          render={
+            <span
+              data-booharu-gives-way=''
+              className='min-w-0 truncate text-[11px] text-muted-foreground'
+            />
+          }
         >
           {label}
         </TooltipTrigger>

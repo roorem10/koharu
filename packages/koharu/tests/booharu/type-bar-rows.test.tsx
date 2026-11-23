@@ -196,6 +196,8 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
 
     const [first, second] = rowsOf(await shownBar())
     expect(first!.firstElementChild).toHaveTextContent(/^Applies to "Hello"Whole box$/)
+    // The quote gives way in its row, cut to fit, rather than send the bar to one row.
+    expect(within(first!).getByText('Applies to "Hello"')).toHaveAttribute('data-booharu-gives-way')
     const steps = within(second!).getByRole('button', { name: 'Smaller' })
     expect(second!.firstElementChild).toContainElement(steps)
     expect(within(second!).getByRole('button', { name: 'Bigger' })).toBeInTheDocument()
@@ -324,6 +326,54 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
     expect(screen.getByTestId('bar')).toHaveClass('flex-col')
   })
 
+  it("counts a part of a control that gives way, as Applies to's quote, as nothing, however wide it is now", () => {
+    laidOut()
+    const { resize } = resizes()
+    // A control holding a quote that gives way and a 36 px button 6 px apart, with 2 px of padding
+    // and a 1 px border at its start: 45 px at its narrowest, the quote cut to nothing.
+    const control = (
+      <div
+        data-testid='control'
+        data-w='86'
+        style={{
+          columnGap: '6px',
+          paddingLeft: '2px',
+          borderLeftWidth: '1px',
+          borderLeftStyle: 'solid',
+        }}
+      >
+        <span data-booharu-gives-way='' data-testid='quote' data-w='41'>
+          Applies to
+        </span>
+        <button type='button' data-w='36'>
+          Whole box
+        </button>
+      </div>
+    )
+    // The first row at its narrowest, 268 + 4 + 45, is the 317 a canvas 347 px wide leaves, though
+    // it's 358 with the quote whole: the rows, the quote to be cut to fit.
+    const { rerender } = render(<Bar canvas={347} more={control} />)
+    const bar = screen.getByTestId('bar')
+    expect(bar).toHaveClass('flex-col')
+
+    // With the quote cut to nothing, as the row lays it out, the same.
+    const quote = screen.getByTestId('quote')
+    const shown = screen.getByTestId('control')
+    quote.dataset.w = '0'
+    shown.dataset.w = '45'
+    resize(shown)
+    expect(bar).toHaveClass('flex-col')
+
+    // A pixel narrower, Koharu's one row, which shows the quote whole again, and still one row
+    // then: the bar never flips back and forth.
+    rerender(<Bar canvas={346} more={control} />)
+    expect(bar).not.toHaveClass('flex-col')
+    quote.dataset.w = '41'
+    shown.dataset.w = '86'
+    resize(shown)
+    expect(bar).not.toHaveClass('flex-col')
+  })
+
   it('leaves one observer watching the canvas, and none once the bar has no rows or is gone', () => {
     laidOut()
     const { watching } = resizes()
@@ -403,7 +453,7 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
     expect(bar).toHaveClass('flex-col')
 
     // As Applies to comes, 268 + 4 + 10 is too wide: Koharu's one row by the time React has
-    // drawn E, so no frame shows the first row wrapped in itself.
+    // drawn E, so no frame shows the first row too wide for the bar.
     await outsideAct(() => {
       grow()
       expect(bar).not.toHaveClass('flex-col')
@@ -430,7 +480,7 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
 
     await outsideAct(async () => {
       // 290 leaves 260, too little for the first row: Koharu's one row as soon as it's told, so no
-      // frame shows the row wrapped in itself.
+      // frame shows the row too wide for the bar.
       canvas.dataset.w = '290'
       tell(canvas)
       expect(bar).not.toHaveClass('flex-col')
