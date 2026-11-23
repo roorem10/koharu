@@ -6,11 +6,50 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ContextBar, RowBreak } from '@/components/booharu/typebar/Rows'
 import type { Typed } from '@koharu/ipc/protocol'
 
-import { renderBar, shownBar, text } from './typeBar'
+import { renderBar, shownBar, tailwind, text } from './typeBar'
 
 /** The rows of the type bar, or of a Booharu ContextBar, as it shows them. */
 function rowsOf(bar: HTMLElement): HTMLElement[] {
   return [...bar.querySelectorAll<HTMLElement>(':scope > [data-booharu-row]')]
+}
+
+/** What gives way in a row, as Rows.tsx marks it. */
+const GIVES_WAY = '[data-booharu-gives-way]'
+
+/** Whether `element` takes room in its line, as the bar's measure counts it: neither hidden nor
+ * laid out on its own. */
+function inLine(element: Element): boolean {
+  const { display, position } = getComputedStyle(element)
+  return display !== 'none' && position !== 'absolute' && position !== 'fixed'
+}
+
+/** That `bar`'s rows, in the CSS their classes make, lay out as the bar measures them at their
+ * narrowest: no row wraps, and each control keeps its width but one that is, or holds, a part that
+ * gives way, which the part, cut to fit, takes down to nothing, as it does each box between them,
+ * the control's other parts keeping their widths. */
+function expectRowsAsMeasured(bar: HTMLElement) {
+  for (const row of rowsOf(bar)) {
+    expect(getComputedStyle(row).flexWrap).toBe('nowrap')
+    for (const cell of [...row.children].filter(inLine)) {
+      const part = cell.matches(GIVES_WAY) ? cell : cell.querySelector(GIVES_WAY)
+      const name = cell.textContent
+      if (!part) {
+        expect(getComputedStyle(cell).flexShrink, name).toBe('0')
+        continue
+      }
+      expect(getComputedStyle(part).overflow, name).toBe('hidden')
+      for (let box = part; ; box = box.parentElement!) {
+        const { flexShrink, minWidth, overflow } = getComputedStyle(box)
+        expect(flexShrink, name).not.toBe('0')
+        // Narrower than its content, as a flex item is only with no least width of its own.
+        expect(minWidth === '0px' || overflow !== 'visible', name).toBe(true)
+        if (box === cell) break
+        for (const beside of [...box.parentElement!.children].filter(inLine)) {
+          if (beside !== box) expect(getComputedStyle(beside).flexShrink, name).toBe('0')
+        }
+      }
+    }
+  }
 }
 
 /** The canvas typing into the text `text` with "Hello" selected. */
@@ -54,9 +93,10 @@ afterEach(() => {
   globalThis.ResizeObserver = setupObserver
 })
 
-/** Resize observers that keep what they watch: a resize of `target`, told to those watching it in
- * React's `act` or, as the browser tells it between laying out and painting, outside it; how many
- * watch it now, and how many were ever made to. */
+/** Resize observers that keep what they watch: a resize of `targets`, told to those watching them in
+ * React's `act` or, as the browser tells it between laying out and painting, outside it, each
+ * observer told of all its targets at once, as the browser gives an observer everything of its that
+ * was resized since it last told it; how many watch a target now, and how many were ever made to. */
 function resizes() {
   class Observer {
     static made: Observer[] = []
@@ -80,10 +120,12 @@ function resizes() {
   }
   // The setup's can't be stubbed, as it's defined for good, but it can be written over.
   globalThis.ResizeObserver = Observer
-  const tell = (target: Element) => {
+  const tell = (...targets: Element[]) => {
     for (const observer of Observer.made) {
-      if (!observer.watched.has(target)) continue
-      observer.tell([{ target } as ResizeObserverEntry], observer)
+      const entries = targets
+        .filter((target) => observer.watched.has(target))
+        .map((target) => ({ target }) as ResizeObserverEntry)
+      if (entries.length) observer.tell(entries, observer)
     }
   }
   return {
@@ -202,6 +244,16 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
     expect(second!.firstElementChild).toContainElement(steps)
     expect(within(second!).getByRole('button', { name: 'Bigger' })).toBeInTheDocument()
     expect(second!.lastElementChild).toHaveTextContent('Done')
+  })
+
+  it('lays its rows out as it measures them, in the CSS its classes make', async () => {
+    await renderBar([text('text')], { typing })
+    const bar = await shownBar()
+    await tailwind(bar)
+
+    // Of every control, only Applies to narrows, with its quote, so no row ever wraps.
+    expectRowsAsMeasured(bar)
+    expect(rowsOf(bar)[0]!.firstElementChild).toContainElement(bar.querySelector(GIVES_WAY))
   })
 
   it('leaves a bar with no RowBreak as Koharu draws it, and draws no empty row', () => {
@@ -330,7 +382,8 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
     laidOut()
     const { resize } = resizes()
     // A control holding a quote that gives way and a 36 px button 6 px apart, with 2 px of padding
-    // and a 1 px border at its start: 45 px at its narrowest, the quote cut to nothing.
+    // and a 1 px border at its start: 45 px at its narrowest, the quote cut to nothing. A part laid
+    // out on its own, as a select's hidden input, fixed in place, takes no room in it either.
     const control = (
       <div
         data-testid='control'
@@ -345,6 +398,7 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
         <span data-booharu-gives-way='' data-testid='quote' data-w='41'>
           Applies to
         </span>
+        <input aria-hidden='true' tabIndex={-1} readOnly style={{ position: 'fixed' }} data-w='1' />
         <button type='button' data-w='36'>
           Whole box
         </button>
@@ -486,6 +540,18 @@ describe('Booharu type bar in two rows (the owner asked, 2026-11-23)', () => {
       expect(bar).not.toHaveClass('flex-col')
       canvas.dataset.w = '300'
       tell(canvas)
+      expect(bar).toHaveClass('flex-col')
+
+      // The same with a control told of with the canvas, as the browser tells of Applies to as
+      // its quote narrows with the canvas, and so when the bar goes to one row; in either order.
+      const a = screen.getByText('A')
+      canvas.dataset.w = '290'
+      a.dataset.w = '99'
+      tell(a, canvas)
+      expect(bar).not.toHaveClass('flex-col')
+      canvas.dataset.w = '300'
+      a.dataset.w = '100'
+      tell(canvas, a)
       expect(bar).toHaveClass('flex-col')
 
       // A control resized alone: after the browser paints instead, even as floating-ui places the

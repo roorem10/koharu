@@ -1,7 +1,11 @@
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+
 import { QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { expect, vi } from 'vitest'
+import { compile } from 'tailwindcss'
+import { expect, onTestFinished, vi } from 'vitest'
 
 import { TypeBar } from '@/components/editor/TypeBar'
 import { fontsKey, pageKey, queryClient } from '@/lib/queries'
@@ -50,6 +54,22 @@ export async function shownBar(): Promise<HTMLElement> {
   const bar = await screen.findByTestId('type-bar')
   await waitFor(() => expect(bar).toBeVisible())
   return bar
+}
+
+/** The CSS Tailwind builds, with its own theme, for the classes drawn in `root` and in it, as the
+ * app's build does from its sources, in the page until the test ends: jsdom cascades it, `:has()`
+ * and the theme's lengths included, though it lays nothing out. */
+export async function tailwind(root: Element): Promise<void> {
+  const theme = readFileSync(
+    createRequire(import.meta.url).resolve('tailwindcss/theme.css'),
+    'utf8',
+  )
+  const compiler = await compile(`${theme}\n@tailwind utilities;`)
+  const classes = [root, ...root.querySelectorAll('*')].flatMap((element) => [...element.classList])
+  const style = document.createElement('style')
+  style.textContent = compiler.build(classes)
+  document.head.append(style)
+  onTestFinished(() => style.remove())
 }
 
 /** A turn gone by, for a check that the bar sent nothing: its edits go as mutations, and its
