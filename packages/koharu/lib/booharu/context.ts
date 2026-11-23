@@ -9,6 +9,7 @@ import { projectKey, queryClient, refresh, useProject } from '@/lib/queries'
 import {
   commands,
   events,
+  type BooharuSeries,
   type ChapterState,
   type Character,
   type FirstStartNote,
@@ -17,7 +18,6 @@ import {
   type InstructionImport,
   type InstructionPreview,
   type ReadSummary,
-  type Series,
   type SeriesImport,
   type TermKind,
 } from '@koharu/ipc/protocol'
@@ -31,7 +31,7 @@ export type Filled<T> = T extends readonly (infer Item)[]
     : T
 
 /** A series: its glossary, characters and notes. */
-export type FullSeries = Filled<Series>
+export type FullSeries = Filled<BooharuSeries>
 /** A glossary term. */
 export type FullEntry = Filled<GlossaryEntry>
 /** A character of a series. */
@@ -69,7 +69,7 @@ function fillCharacter(character: Character): FullCharacter {
 }
 
 /** `series` with every field, a missing one taking booharu-core's default. */
-export function fillSeries(series: Series): FullSeries {
+export function fillSeries(series: BooharuSeries): FullSeries {
   return {
     id: series.id ?? '',
     name: series.name ?? '',
@@ -195,7 +195,7 @@ export const seriesKey = ['booharu', 'series'] as const
  * would send follows the text on its pages. */
 export const chapterKey = [...projectKey, 'booharu', 'chapter'] as const
 
-const fillAll = (list: Series[]) => list.map(fillSeries)
+const fillAll = (list: BooharuSeries[]) => list.map(fillSeries)
 
 /** Every series, by name, read while a view showing them is mounted and again after every change
  * to one. A failed read shows its error, as every failed command's does. */
@@ -296,7 +296,7 @@ export async function createSeries(name: string): Promise<FullSeries> {
 }
 
 /** Names the series `id` `name`, trimmed. */
-export function renameSeries(id: string, name: string): Promise<Series> {
+export function renameSeries(id: string, name: string): Promise<BooharuSeries> {
   return queueWrite(() => call(commands.booharuRenameSeries, id, name.trim()))
 }
 
@@ -415,7 +415,7 @@ export function previewSeriesImport(): Promise<SeriesImport | null> {
 
 /** Saves `series`, from a file being imported: in place of the series of its id with `replace`,
  * else beside it, with a new id when that one is taken. Answers it as saved. */
-export async function importSeries(series: Series, replace: boolean): Promise<FullSeries> {
+export async function importSeries(series: BooharuSeries, replace: boolean): Promise<FullSeries> {
   return fillSeries(await queueWrite(() => call(commands.booharuImportSeries, series, replace)))
 }
 

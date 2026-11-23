@@ -69,20 +69,19 @@ function report(error: unknown): void {
   toast.add({ type: 'error', title: i18n.t('errors.actionFailed'), description })
 }
 
-/** Every command runs as a query or a mutation, whose failure shows here. */
+/** Every command runs as a query or a mutation, whose failure shows here. Commands go to the
+ * desktop, not the network, so they run whether or not the browser reports being online. */
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: unlessQuiet(report) }), // Booharu: but its quiet reads.
   mutationCache: new MutationCache({ onError: report }),
   defaultOptions: {
     queries: {
+      networkMode: 'always',
       staleTime: Number.POSITIVE_INFINITY,
       retry: false,
       refetchOnReconnect: false,
       refetchOnWindowFocus: false,
-      networkMode: 'always', // Booharu: as a mutation does, below.
     },
-    // Booharu: a command goes to the desktop, never the internet, so it runs at once while the
-    // browser says it's offline too, rather than waiting until it's online (offline.test.tsx).
     mutations: { networkMode: 'always' },
   },
 })
@@ -93,9 +92,8 @@ export function send<Args extends unknown[]>(
   command: (...args: Args) => Promise<unknown>,
   ...args: Args
 ): void {
-  // Booharu: koharu-rs/koharu#1479's fix for #1477, until a Koharu release carries it: let the
-  // mutation go once it settles, with gcTime 0, so the cache drops it on the next timer turn, as
-  // call() does; an observed one stays for the session.
+  // TanStack Query never drops a mutation while an observer holds it, and nothing reads a
+  // settled command, so let go of it once it settles and let the cache drop it right away.
   const observer = new MutationObserver(queryClient, {
     mutationFn: () => command(...args),
     gcTime: 0,

@@ -128,7 +128,7 @@ describe('Booharu QC tab', () => {
 
     // A row on another page shows that page first.
     await user.click(qc.getByRole('button', { name: 'Missing translation No translation' }))
-    expect(show).toHaveBeenCalledWith('p2')
+    expect(show).toHaveBeenCalledWith('p2', null)
     await waitFor(() =>
       expect(useKoharuStore.getState()).toMatchObject({
         panel: 'qc',
@@ -180,7 +180,12 @@ describe('Booharu QC tab', () => {
         selectedLayers: ['a'],
       }),
     )
-    expect(show.mock.calls).toEqual([['p2'], ['p2'], ['p2'], ['p1']])
+    expect(show.mock.calls).toEqual([
+      ['p2', null],
+      ['p2', null],
+      ['p2', null],
+      ['p1', null],
+    ])
   })
 
   it('marks a finding OK, takes it back, dismisses a flag and filters the rows', async () => {

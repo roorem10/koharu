@@ -654,6 +654,9 @@
   "errors": {
     "fatalTitle": "Booharu 运行弗下去哉"
   },
+  "gallery": {
+    "removeDescription": "伊会拿“{{title}}”从侬个系列里拿脱。伊章节个项目还留勒 Booharu 里。"
+  },
   "history": {
     "steps": {
       "booharu_add_box": "加文字框",

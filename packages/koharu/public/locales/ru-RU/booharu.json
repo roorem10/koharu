@@ -754,6 +754,11 @@
     "fontCount_few": "Шрифтов: {{count}}",
     "fontCount_many": "Шрифтов: {{count}}"
   },
+  "gallery": {
+    "chapters_few": "Глав: {{count}}",
+    "chapters_many": "Глав: {{count}}",
+    "removeDescription": "Серия «{{title}}» будет убрана из ваших серий. Проекты её глав останутся в Booharu."
+  },
   "history": {
     "steps": {
       "booharu_add_box": "Добавление текстового блока",

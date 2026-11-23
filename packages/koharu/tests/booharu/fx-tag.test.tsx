@@ -153,7 +153,7 @@ describe('Booharu fx tag (S12-j)', () => {
     await user.click(screen.getByRole('button', { name: 'Text effects for Caption' }))
 
     await waitFor(() => expect(useFx.getState().open).toBe(true))
-    expect(show).toHaveBeenCalledWith('page')
+    expect(show).toHaveBeenCalledWith('page', null)
     expect(useKoharuStore.getState().selectedPages).toEqual(['page'])
     expect(useKoharuStore.getState().selectedLayers).toEqual(['caption'])
     expect(useKoharuStore.getState().tool).toBe('select')
@@ -164,7 +164,7 @@ describe('Booharu fx tag (S12-j)', () => {
 
     await act(() => openFxOn('page', ['first', 'second']))
 
-    expect(show).toHaveBeenCalledWith('page')
+    expect(show).toHaveBeenCalledWith('page', null)
     expect(useKoharuStore.getState().selectedLayers).toEqual(['first', 'second'])
     expect(useKoharuStore.getState().tool).toBe('select')
     expect(useFx.getState().open).toBe(true)
@@ -205,7 +205,7 @@ describe('Booharu fx tag (S12-j)', () => {
     shown()
     await act(() => opening)
 
-    expect(show).toHaveBeenCalledWith('page')
+    expect(show).toHaveBeenCalledWith('page', null)
     expect(useFx.getState().open).toBe(false)
     expect(useKoharuStore.getState().selectedLayers).toEqual(['free'])
   })

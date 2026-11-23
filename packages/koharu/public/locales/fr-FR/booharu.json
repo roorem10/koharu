@@ -706,6 +706,10 @@
   "fontPicker": {
     "fontCount_many": "{{count}} polices"
   },
+  "gallery": {
+    "chapters_many": "{{count}} chapitres",
+    "removeDescription": "Cela retire « {{title}} » de vos séries. Les projets de ses chapitres restent dans Booharu."
+  },
   "history": {
     "steps": {
       "booharu_add_box": "Ajouter une zone de texte",

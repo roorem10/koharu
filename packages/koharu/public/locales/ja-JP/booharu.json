@@ -654,6 +654,9 @@
   "errors": {
     "fatalTitle": "Booharuを続行できませんでした"
   },
+  "gallery": {
+    "removeDescription": "「{{title}}」をあなたのシリーズから削除します。各話のプロジェクトはBooharuに残ります。"
+  },
   "history": {
     "steps": {
       "booharu_add_box": "テキストボックスを追加",

@@ -706,6 +706,10 @@
   "fontPicker": {
     "fontCount_many": "{{count}} fontes"
   },
+  "gallery": {
+    "chapters_many": "{{count}} capítulos",
+    "removeDescription": "Isso remove “{{title}}” das suas séries. Os projetos dos capítulos continuam no Booharu."
+  },
   "history": {
     "steps": {
       "booharu_add_box": "Adicionar caixa de texto",

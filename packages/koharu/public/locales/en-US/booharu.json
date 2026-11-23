@@ -654,6 +654,9 @@
   "errors": {
     "fatalTitle": "Booharu could not continue"
   },
+  "gallery": {
+    "removeDescription": "This removes “{{title}}” from your series. Its chapters’ projects stay in Booharu."
+  },
   "history": {
     "steps": {
       "booharu_add_box": "Add text box",

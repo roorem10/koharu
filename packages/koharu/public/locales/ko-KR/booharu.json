@@ -654,6 +654,9 @@
   "errors": {
     "fatalTitle": "Booharu를 계속 실행할 수 없습니다"
   },
+  "gallery": {
+    "removeDescription": "“{{title}}”을(를) 내 시리즈에서 제거합니다. 회차 프로젝트는 Booharu에 남습니다."
+  },
   "history": {
     "steps": {
       "booharu_add_box": "텍스트 상자 추가",

@@ -55,6 +55,15 @@ impl Library {
         Session::open(&path).with_context(|| format!("failed to open {}", path.display()))
     }
 
+    /// The project `name`, created when there's none.
+    pub fn open_or_create(&self, name: &str) -> Result<Session> {
+        if self.path(name)?.exists() {
+            self.open(name)
+        } else {
+            self.create(name)
+        }
+    }
+
     pub fn delete(&self, name: &str) -> Result<()> {
         let path = self.path(name)?;
         let _side_files = booharu_core::context::SideFiles::of(&path); // Booharu: its side files go as this drops, once it's gone.

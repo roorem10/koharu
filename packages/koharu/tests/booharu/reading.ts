@@ -3,11 +3,11 @@ import { vi } from 'vitest'
 import { modelsKey, preferencesKey, queryClient } from '@/lib/queries'
 import {
   commands,
+  type BooharuSeries,
   type ChapterBrief,
   type ChapterState,
   type Model,
   type Preferences,
-  type Series,
 } from '@koharu/ipc/protocol'
 
 import { blueLock } from './context'
@@ -55,7 +55,7 @@ export const models = [gpt, gemma, indexTranslate, textOnly]
 /** The open project's chapter, linking `series`, with `brief`. */
 export function chapterState(
   brief: ChapterBrief | null = null,
-  series: Series | null = blueLock(),
+  series: BooharuSeries | null = blueLock(),
 ): ChapterState {
   return {
     context: { version: 1, series: series?.id ?? null, brief, suggestions: [] },

@@ -654,6 +654,9 @@
   "errors": {
     "fatalTitle": "Booharu devam edemedi"
   },
+  "gallery": {
+    "removeDescription": "Bu, “{{title}}” serisini serilerinizden kaldırır. Bölümlerinin projeleri Booharu’da kalır."
+  },
   "history": {
     "steps": {
       "booharu_add_box": "Metin kutusu ekle",

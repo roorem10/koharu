@@ -66,7 +66,7 @@ export async function showLayer(page: PageId, layer: LayerId): Promise<void> {
   selectPages([page])
   selectLayers([])
   showing += 1
-  const shown = shows.then(() => call(commands.show, page))
+  const shown = shows.then(() => call(commands.show, page, null))
   shows = shown.catch(() => undefined)
   try {
     await shown

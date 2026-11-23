@@ -337,5 +337,5 @@ export function showFailedPage(page: PageId): void {
   selectPages([page])
   if (queryClient.getQueryData<ProjectView | null>(projectKey)?.page === page) return
   selectLayers([])
-  void call(commands.show, page).catch(() => undefined)
+  void call(commands.show, page, null).catch(() => undefined)
 }

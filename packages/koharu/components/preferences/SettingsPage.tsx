@@ -1,12 +1,13 @@
 'use client'
 
-import { ArrowLeft, Cpu, KeyRound, Monitor, Moon, Palette, Sun, Type } from 'lucide-react'
+import { ArrowLeft, Cpu, KeyRound, Library, Monitor, Moon, Palette, Sun, Type } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react' // Booharu: useState, for the tab a link shows.
 import { useTranslation } from 'react-i18next'
 
 import { BooharuTabPage, booharuSettingsTabs } from '@/components/booharu/settings/BooharuTabs' // Booharu: its own tabs.
 import { Choice } from '@/components/controls/Choice'
+import { GalleryPreferences } from '@/components/preferences/GalleryPreferences'
 import { PipelinePreferences } from '@/components/preferences/PipelinePreferences'
 import {
   PreferencePage,
@@ -37,6 +38,7 @@ const tabs = [
   ['pipeline', Cpu],
   ['providers', KeyRound],
   ['typesetting', Type],
+  ['gallery', Library],
   ...booharuSettingsTabs, // Booharu: its own tabs, after Koharu's, such as Runs.
 ] as const
 
@@ -118,6 +120,9 @@ export function SettingsPage() {
               ) : (
                 <LoadingPreferences />
               )}
+            </TabsContent>
+            <TabsContent value='gallery'>
+              <GalleryPreferences />
             </TabsContent>
             <TabsContent value='typesetting'>
               {preferences ? (

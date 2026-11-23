@@ -6,6 +6,7 @@ mod app;
 mod booharu;
 mod commands;
 mod events;
+mod gallery;
 mod library;
 mod screen;
 
@@ -31,14 +32,13 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
     // Beside the store in Koharu's root, and in the app's local data folder
     // otherwise, which is a per-user install's folder too. That is Tauri's
     // `app_local_data_dir`, which needs the app this builds.
-    let projects = match koharu_runtime::root() {
-        Some(folder) => folder.join("projects"),
+    let data = match koharu_runtime::root() {
+        Some(folder) => folder.to_path_buf(),
         None => dirs::data_local_dir()
             .context("the user's local data folder is unknown")?
-            .join(&context.config().identifier)
-            .join("projects"),
+            .join(&context.config().identifier),
     };
-    let library = Library::new(projects)?;
+    let library = Library::new(data.join("projects"))?;
 
     // The process's, which the pipeline draws a painted area's page with.
     let renderer = Renderer::get().clone();
@@ -122,6 +122,8 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
         }))
         .plugin(
             tauri_plugin_window_state::Builder::default()
+                // Sign-in windows open anew each time.
+                .with_filter(|label| label == screen::MAIN)
                 .with_state_flags(
                     StateFlags::SIZE
                         | StateFlags::POSITION
@@ -138,6 +140,7 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
         .manage(app)
         .invoke_handler(commands::handler())
         .setup(move |tauri| {
+            tauri.manage(gallery::client(tauri.handle().clone())?);
             let app = tauri.state::<Arc<App>>();
             app.start(tauri.handle().clone());
             Ok(screen::open(tauri.handle(), &app.screen, gpu, shared)?)

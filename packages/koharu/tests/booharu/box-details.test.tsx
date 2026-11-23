@@ -131,7 +131,7 @@ describe('Booharu Box details', () => {
     act(() => openBoxDetails('page', 'caption'))
     await user.click(within(await details()).getByRole('button', { name: 'Show in Story' }))
     await waitFor(() => expect(useKoharuStore.getState().selectedLayers).toEqual(['caption']))
-    expect(show).toHaveBeenCalledWith('page')
+    expect(show).toHaveBeenCalledWith('page', null)
     expect(useKoharuStore.getState().selectedPages).toEqual(['page'])
     expect(useKoharuStore.getState().panel).toBe('story')
   })

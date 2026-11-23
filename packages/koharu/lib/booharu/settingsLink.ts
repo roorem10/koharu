@@ -10,7 +10,13 @@ export const booharuTabs = ['runs'] as const
 export type BooharuTab = (typeof booharuTabs)[number]
 
 /** The Settings page's tabs, by SettingsPage's names for them. */
-export type SettingsTab = 'appearance' | 'pipeline' | 'providers' | 'typesetting' | BooharuTab
+export type SettingsTab =
+  | 'appearance'
+  | 'pipeline'
+  | 'providers'
+  | 'typesetting'
+  | 'gallery'
+  | BooharuTab
 
 /** How long a link waits for the section it goes to to show, in milliseconds. */
 const revealWait = 2000

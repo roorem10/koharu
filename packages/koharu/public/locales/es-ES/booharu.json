@@ -706,6 +706,10 @@
   "fontPicker": {
     "fontCount_many": "{{count}} fuentes"
   },
+  "gallery": {
+    "chapters_many": "{{count}} capítulos",
+    "removeDescription": "Esto quita «{{title}}» de tus series. Los proyectos de sus capítulos se quedan en Booharu."
+  },
   "history": {
     "steps": {
       "booharu_add_box": "Añadir cuadro de texto",

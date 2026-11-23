@@ -1,7 +1,12 @@
 import { vi } from 'vitest'
 
 import { projectKey, queryClient, type ProjectView } from '@/lib/queries'
-import { commands, type ChapterState, type GlossaryEntry, type Series } from '@koharu/ipc/protocol'
+import {
+  commands,
+  type BooharuSeries,
+  type ChapterState,
+  type GlossaryEntry,
+} from '@koharu/ipc/protocol'
 
 /** A glossary term with every field, `fields` over a new unlocked one's. */
 export function term(id: string, source: string, target: string, fields: object = {}) {
@@ -9,7 +14,7 @@ export function term(id: string, source: string, target: string, fields: object 
 }
 
 /** The series "Blue Lock" with two terms, one locked, and a character. */
-export function blueLock(): Required<Series> {
+export function blueLock(): Required<BooharuSeries> {
   return {
     id: 'blue-lock-0123456789ab',
     name: 'Blue Lock',
@@ -23,7 +28,7 @@ export function blueLock(): Required<Series> {
 }
 
 /** The series "Haikyu" with nothing in it. */
-export function haikyu(): Required<Series> {
+export function haikyu(): Required<BooharuSeries> {
   return { id: 'haikyu-ba9876543210', name: 'Haikyu', notes: '', glossary: [], characters: [] }
 }
 
@@ -36,7 +41,7 @@ export function contextDesktop({
   series = [blueLock(), haikyu()],
   linked = blueLock().id as string | null,
   suggestions = [term('s1', 'ヒナ', 'Hina', { kind: 'name' })] as GlossaryEntry[],
-}: { series?: Series[]; linked?: string | null; suggestions?: GlossaryEntry[] } = {}) {
+}: { series?: BooharuSeries[]; linked?: string | null; suggestions?: GlossaryEntry[] } = {}) {
   const table = commands as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
   for (const name of Object.keys(table)) vi.spyOn(table, name).mockResolvedValue(null)
   const files = {
@@ -44,7 +49,7 @@ export function contextDesktop({
     chapter: { series: linked, suggestions: structuredClone(suggestions) },
     unreadable: new Set<string>(),
   }
-  const saves: Series[] = []
+  const saves: BooharuSeries[] = []
   const get = (id: string) => {
     const found = files.series.get(id)
     if (!found) throw `there is no series "${id}"`

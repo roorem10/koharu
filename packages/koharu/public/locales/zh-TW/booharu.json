@@ -654,6 +654,9 @@
   "errors": {
     "fatalTitle": "Booharu 無法繼續執行"
   },
+  "gallery": {
+    "removeDescription": "這會將「{{title}}」從你的系列中移除。其章節的專案仍保留在 Booharu 中。"
+  },
   "history": {
     "steps": {
       "booharu_add_box": "新增文字框",

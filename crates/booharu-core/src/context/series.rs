@@ -32,9 +32,12 @@ fn write_lock() -> MutexGuard<'static, ()> {
 /// The longest series id, in characters.
 const MAX_ID: usize = 80;
 
-/// A series' glossary, characters, and notes, as 0.0.4 kept them.
+/// A series' glossary, characters, and notes, as 0.0.4 kept them. It's
+/// exported to TypeScript as `BooharuSeries`, because Koharu's Gallery exports
+/// its own `Series`; a container rename changes no field, so the JSON and the
+/// saved series files don't change.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
-#[serde(default)]
+#[serde(default, rename = "BooharuSeries")]
 pub struct Series {
     /// Its file's name without `.json`: 1 to 80 of `a`–`z`, `0`–`9`, and
     /// `-`, a slug of its first name and 12 random hex digits.

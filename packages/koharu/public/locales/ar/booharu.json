@@ -850,6 +850,13 @@
     "fontCount_two": "خطّان ({{count}})",
     "fontCount_zero": "لا خطوط ({{count}})"
   },
+  "gallery": {
+    "chapters_few": "{{count}} من الفصول",
+    "chapters_many": "{{count}} من الفصول",
+    "chapters_two": "{{count}} من الفصول",
+    "chapters_zero": "{{count}} من الفصول",
+    "removeDescription": "سيؤدي هذا إلى إزالة «{{title}}» من سلاسلك. تبقى مشاريع فصولها في Booharu."
+  },
   "history": {
     "steps": {
       "booharu_add_box": "إضافة مربع نص",

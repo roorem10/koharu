@@ -7,7 +7,7 @@ import { GlossaryDialog } from '@/components/booharu/context/GlossaryDialog'
 import { SettingsPage } from '@/components/preferences/SettingsPage'
 import { preferencesKey, queryClient } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
-import { commands, type Preferences, type Series } from '@koharu/ipc/protocol'
+import { commands, type BooharuSeries, type Preferences } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
 import { blueLock, contextDesktop, haikyu, openChapter, term } from './context'
@@ -25,7 +25,7 @@ async function editor(initial: string = blueLock().id) {
 }
 
 /** Blue Lock as Booharu 0.0.4 exported it, under its old name, with a term more. */
-function exported(): Series {
+function exported(): BooharuSeries {
   const series = blueLock()
   return {
     ...series,
