@@ -13,11 +13,12 @@ import { Button } from '@koharu/ui/components/button'
 
 /** Read chapter among the Run menu's stages, before Translation, laid out as they are: on, a Run
  * press that translates reads the whole chapter first, with the model its line names, and never
- * asks. It's the open project's while the app runs, as Koharu's own switches aren't saved either;
- * until it's switched, or a preset sets it, it's on when the chapter links a series, has no brief,
- * and a model can read it. While Translation is off it's off, and says why. Switched on with no
- * model that can read the pages, it opens the reading-model picker in its place: a pick saves the
- * Read chapter model and switches it on, and Cancel leaves it off. */
+ * asks. It's the open project's while the app runs, not kept after a restart as Koharu's own
+ * Run menu choices are, since it follows the chapter: until it's switched, or a preset sets it,
+ * it's on when the chapter links a series, has no brief, and a model can read it. While
+ * Translation is off it's off, and says why. Switched on with no model that can read the pages, it
+ * opens the reading-model picker in its place: a pick saves the Read chapter model and switches it
+ * on, and Cancel leaves it off. */
 export function ReadChapterOption() {
   const { t } = useTranslation()
   const models = useModels().data ?? []

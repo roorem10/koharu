@@ -323,11 +323,13 @@ impl Scheduler {
 }
 
 /// Unloads every model once the GPU's current call ends, ahead of every
-/// stage's call, as Koharu's `Unload` does, then gives back to the device
-/// what libtorch's cache keeps of them, and then tells `unloaded`: llama.cpp,
-/// which fits a model loaded outside the pipeline to the memory free, as
-/// Read chapter's, counts that cache as used, so that model loads once the
-/// answer comes. libtorch is left alone until it has loaded.
+/// stage's call, as Koharu's `Unload` does, which gives back to the device
+/// what libtorch's cache keeps of them (koharu-rs/koharu#1484); empties that
+/// cache again even when nothing was loaded, as after a load that failed,
+/// whose memory it keeps too; and then tells `unloaded`: llama.cpp, which
+/// fits a model loaded outside the pipeline to the memory free, as Read
+/// chapter's, counts that cache as used, so that model loads once the answer
+/// comes. libtorch is left alone until it has loaded.
 fn unload_all(gpu: &Gpu, unloaded: oneshot::Sender<bool>) {
     gpu.run(Turn::Upkeep, move |models| {
         models.retain(&HashSet::new());

@@ -48,8 +48,9 @@ pub(crate) enum Command {
     Run(Run),
     Stop,
     Unload,
-    /// Booharu: `Unload`, then libtorch's cache of the models unloaded,
-    /// unless a run is queued or going; answers whether it unloaded.
+    /// Booharu: `Unload`, unless a run is queued or going, and libtorch's
+    /// cache emptied even when nothing was loaded, as after a failed load;
+    /// answers whether it unloaded.
     BooharuUnload(tokio::sync::oneshot::Sender<bool>),
     /// The settings changed: unload what nothing uses now.
     Settle,
@@ -186,7 +187,7 @@ impl Scheduler {
             Command::Unload => self
                 .gpu
                 .run(Turn::Upkeep, |models| models.retain(&HashSet::new())),
-            Command::BooharuUnload(unloaded) => self.unload_models(unloaded), // Booharu: and libtorch's cache.
+            Command::BooharuUnload(unloaded) => self.unload_models(unloaded), // Booharu: unless a run goes, and answers.
             Command::Settle => self.settle(),
             Command::Close(project) => self.conversations.close(project),
         }

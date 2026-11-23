@@ -19,7 +19,7 @@ const indicatorReach = 80
 
 // Booharu: a key pressed inside a dialog, a menu or an open list stays its own, as Booharu's key
 // rules keep it (lib/booharu/keys.ts): the arrows, Space, Page Up and Down, Home and End turn no
-// page while a title-bar menu, the Run popover or a dialog has them.
+// page while a title-bar menu or a dialog, as About, has them.
 const dialogKeeps = (event: KeyboardEvent) => inDialog(event.target)
 
 /** The way pages turn when the chapter doesn't say, a viewer's own choice. */

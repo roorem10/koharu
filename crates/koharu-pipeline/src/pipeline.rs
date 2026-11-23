@@ -128,13 +128,14 @@ impl Pipeline {
         self.send(Command::Unload);
     }
 
-    /// Booharu: unloads every model as [`unload`](Self::unload) does, then
-    /// gives back to the device what libtorch's cache keeps of them, so a
-    /// model loaded outside the pipeline, as Read chapter's, which fits
-    /// itself to the memory free, finds that memory free once the answer
-    /// comes: true once the GPU's current call ended and they're gone, or
-    /// false at once while a run is queued or going, whose models stay. The
-    /// answer fails only once the GPU thread has stopped.
+    /// Booharu: unloads every model as [`unload`](Self::unload) does, which
+    /// gives back to the device what libtorch's cache keeps of them, and
+    /// empties that cache even when nothing was loaded, as after a failed
+    /// load, so a model loaded outside the pipeline, as Read chapter's,
+    /// which fits itself to the memory free, finds that memory free once the
+    /// answer comes: true once the GPU's current call ended and they're
+    /// gone, or false at once while a run is queued or going, whose models
+    /// stay. The answer fails only once the GPU thread has stopped.
     pub fn booharu_unload_models(&self) -> tokio::sync::oneshot::Receiver<bool> {
         let (unloaded, answer) = tokio::sync::oneshot::channel();
         self.send(Command::BooharuUnload(unloaded));

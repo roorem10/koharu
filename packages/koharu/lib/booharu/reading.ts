@@ -151,9 +151,11 @@ export function readsByDefault(
   return Boolean(chapter && chapter.series !== null && briefMissing(chapter) && reader !== null)
 }
 
-/** The Run menu's Read chapter switch, by project, while the app runs, as Koharu's own switches
- * aren't saved either: a project shows none until the user switches it, or applies a preset, and
- * follows its default till then. */
+/** The Run menu's Read chapter switch, by project, while the app runs. Koharu keeps its own Run
+ * menu choices after a restart, but this one follows each chapter's default (`readsByDefault`: a
+ * series linked, the brief missing, a model to read it), so it stays the project's for the
+ * session: a project shows none until the user switches it, or applies a preset, and follows its
+ * default till then. */
 export const useReadSwitches = create<{ on: Record<string, boolean> }>()(() => ({ on: {} }))
 
 /** Switches Read chapter on or off in the Run menu of the project `project`. */

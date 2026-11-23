@@ -18,7 +18,7 @@ const turns: [KeyboardEventInit, string][] = [
 ]
 
 /** Where a key lands while something is open over the reader: a title-bar menu that took the
- * focus itself, and a button of a dialog, as the Run popover's and Settings' are. */
+ * focus itself, and a button of a dialog, as About's close button. */
 function opened(): [string, HTMLElement][] {
   const menu = document.createElement('div')
   menu.setAttribute('role', 'menu')
