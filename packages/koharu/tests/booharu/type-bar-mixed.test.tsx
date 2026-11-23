@@ -273,6 +273,25 @@ describe('Booharu type bar borders over texts whose borders differ (S11-h)', () 
     expect(screen.getByRole('textbox', { name: 'Hex color code' })).toHaveValue('#FF0000')
   })
 
+  it('says Mixed while the widths differ in a border width field as wide as the size field (V1)', async () => {
+    const { bar } = await renderBar([
+      styled('one', { stroke: WHITE, stroke_width: 2 }),
+      styled('two', { stroke: WHITE, stroke_width: 4 }),
+    ])
+
+    const width = bar.getByRole('textbox', { name: 'Border width' })
+    expect(width).toHaveValue('')
+    expect(width).toHaveAttribute('placeholder', 'Mixed')
+    // Booharu's marked wrapper gives it the size field's w-15, in which "Mixed" fits in English,
+    // for Koharu's w-12, which cuts it to "Mi…".
+    const size = bar.getByTestId('type-size')
+    expect(size.closest('.w-15')).not.toBeNull()
+    const wrapper = width.closest('.w-15')
+    expect(wrapper).not.toBeNull()
+    expect(wrapper).not.toContainElement(size)
+    expect(width.closest('.w-12')).toBeNull()
+  })
+
   it('keeps each box’s second border colour and width likewise, black and 3 where one has none', async () => {
     const first = { stroke: WHITE, stroke_width: 2 }
     const { edits, user } = await renderBar([

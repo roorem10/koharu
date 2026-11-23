@@ -496,7 +496,8 @@ export function TypeBar() {
                 })
           }
         />
-        <div className='w-12'>
+        {/* Booharu: as wide as the size field, not Koharu's w-12, so "Mixed" fits (V1). */}
+        <div className='w-15'>
           <PresetField
             name='border-width'
             // Booharu: empty, "Mixed", while the widths differ (S11-h).
