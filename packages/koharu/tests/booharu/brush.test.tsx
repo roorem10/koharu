@@ -210,6 +210,18 @@ describe('Booharu [ and ]', () => {
     expect(step({ key: '[', code: 'BracketLeft' })).toEqual(smaller)
   })
 
+  it('does nothing while Settings shows in place of the editor', () => {
+    pick('draw')
+    renderHook(() => useBooharuBrush())
+    act(() => useKoharuStore.getState().setSettingsOpen(true))
+    expect(step({ key: ']', code: 'BracketRight' })).toEqual(untouched)
+    expect(step({ key: 'ß', code: 'BracketLeft' })).toEqual(untouched)
+    expect(useBrushSlots.getState().draw.diameter).toBe(48)
+    act(() => useKoharuStore.getState().setSettingsOpen(false))
+    expect(step({ key: ']', code: 'BracketRight' })).toEqual(larger)
+    expect(useBrushSlots.getState().draw.diameter).toBe(53)
+  })
+
   it('leaves a key another handler took', () => {
     pick('draw')
     renderHook(() => useBooharuBrush())

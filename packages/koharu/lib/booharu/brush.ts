@@ -195,14 +195,16 @@ function leftAlone(event: KeyboardEvent): boolean {
 /** Each brush tool's brush, mounted once, among the providers' hooks: a brush tool picked brings
  * its own size into Koharu's brush, a size set while it's picked is its own, and the brushes' feel
  * reaches the canvas as restored, then on each change. `[` and `]` step the size, as Photoshop's
- * do, with Brush, the Eraser or Remove, outside Koharu's Read mode, and on a page shown: matched by
- * the character typed, a bracket typed with AltGr included, in either shape it reaches the page in,
- * and by the key's place, the US keyboard's, for a layout that types no bracket there. A key a
- * focused control keeps, as the canvas's tool letters leave it, stays the control's. The hook calls
- * no query hook: Providers calls it outside the QueryClientProvider it renders. */
+ * do, with Brush, the Eraser or Remove, in the editor, neither in Koharu's Read mode nor while
+ * Settings shows in its place, where the canvas's own keys are gone too, and on a page shown:
+ * matched by the character typed, a bracket typed with AltGr included, in either shape it reaches
+ * the page in, and by the key's place, the US keyboard's, for a layout that types no bracket there.
+ * A key a focused control keeps, as the canvas's tool letters leave it, stays the control's. The
+ * hook calls no query hook: Providers calls it outside the QueryClientProvider it renders. */
 export function useBooharuBrush(): void {
   const tool = useKoharuStore((state) => state.tool)
   const reading = useKoharuStore((state) => state.reading)
+  const settingsOpen = useKoharuStore((state) => state.settingsOpen)
 
   // A brush tool picked brings its size into Koharu's brush, keeping the colour, which every tool
   // shares, so CanvasWorkspace sends it to the canvas, as it sends any brush.
@@ -238,9 +240,10 @@ export function useBooharuBrush(): void {
 
   // As the tool letters' hotkey in CanvasWorkspace: a slider, a checkbox or another control that
   // takes no text lets a key through, while text entry, dialogs, popovers, menus and open lists
-  // keep it. On only with a brush tool outside Read mode, a boolean, so no listener waits otherwise.
+  // keep it. On only with a brush tool while the canvas shows, as CanvasWorkspace and its keys go
+  // in Read mode and while Settings shows, a boolean, so no listener waits otherwise.
   const shared = {
-    enabled: isBrushTool(tool) && !reading,
+    enabled: isBrushTool(tool) && !reading && !settingsOpen,
     enableOnFormTags: true,
     preventDefault: true,
   } as const
