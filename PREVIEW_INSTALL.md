@@ -28,8 +28,9 @@ Booharu is unsigned, so Windows may warn about an unknown publisher; choose **Mo
 - Downloaded models and the GPU libraries that run them: the **store** folder beside Booharu.exe. The first start downloads the GPU libraries and each model downloads the first time it runs, so both need a network connection and several gigabytes of free space.
 - If Booharu can't write to the folder it's in, such as a folder under Program Files, the **projects** and **store** folders go in `%LOCALAPPDATA%\Booharu` instead, never in official Koharu's folders.
 - Settings: `%USERPROFILE%\.booharu\config.toml` (official Koharu uses `.koharu`).
-- API keys and sign-ins: `%USERPROFILE%\.booharu\secrets.age`, locked with a key kept in the Windows credential store under **booharu**. These do not travel with the portable folder.
-- Logs: `%LOCALAPPDATA%\Booharu\logs`. Browser storage: `%LOCALAPPDATA%\Booharu\cef`.
+- API keys and the ChatGPT and Grok sign-ins from **Settings → Providers**: `%USERPROFILE%\.booharu\secrets.age`, locked with a key kept in the Windows credential store under **booharu**. These do not travel with the portable folder.
+- Logs: `%LOCALAPPDATA%\Booharu\logs`.
+- Browser storage: `%LOCALAPPDATA%\Booharu\cef`. The Gallery keeps its own things here: your sign-ins to its sites from **Settings → Gallery** (**Sign out** there clears one), the **Your series** list, and the reading direction of each chapter it opened as a project. These do not travel with the portable folder either.
 
 ## Agents in other programs
 
