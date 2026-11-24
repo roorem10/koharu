@@ -2076,6 +2076,89 @@ fn a_soft_draw_or_eraser_stroke_writes_its_soft_coverage() {
     assert!((1..255).contains(&erased(33, 40)[3]));
 }
 
+/// Booharu's settings with Draw's, the Eraser's and Remove's hardness each
+/// its own.
+fn hardnesses(draw: f64, eraser: f64, remove: f64) -> BooharuSettings {
+    BooharuSettings {
+        brush: BrushFeel {
+            draw_hardness: draw,
+            eraser_hardness: eraser,
+            remove_hardness: remove,
+            ..BrushFeel::default()
+        },
+        ..BooharuSettings::default()
+    }
+}
+
+/// An inpaint request's mask laid on a page of `size`, a byte a page pixel
+/// row by row, none outside its rect.
+fn on_page(size: (u32, u32), (rect, mask): (koharu_scene::Rect, Vec<u8>)) -> Vec<u8> {
+    let mut page = vec![0; (size.0 * size.1) as usize];
+    for row in 0..rect.height as i32 {
+        for column in 0..rect.width as i32 {
+            let (x, y) = (rect.x + column, rect.y + row);
+            if (0..size.0 as i32).contains(&x) && (0..size.1 as i32).contains(&y) {
+                page[(y * size.0 as i32 + x) as usize] =
+                    mask[(row * rect.width as i32 + column) as usize];
+            }
+        }
+    }
+    page
+}
+
+#[test]
+fn a_stroke_takes_its_own_tools_hardness_whatever_the_others_are() {
+    let size = (100, 100);
+    // Remove soft at its own hardness, with Draw's softer and the
+    // Eraser's hard.
+    let mut fixture = gpu_free(size, Vec::new());
+    fixture.canvas.set_tool(Tool::Remove);
+    fixture.canvas.set_brush(brush(16.0, [0.0, 0.0, 0.0, 1.0]));
+    let points = [(30.0, 40.0), (70.0, 55.5)];
+    fixture.canvas.set_booharu(hardnesses(0.3, 1.0, 0.6));
+    let asked = inpaint(&stroke(&mut fixture.canvas, &points));
+    assert_eq!(
+        on_page(size, asked),
+        soft_coverage(size, &points, 16.0, 0.6)
+    );
+    // And Koharu's own at its own 1, with Draw's and the Eraser's soft: a
+    // click asks to clean its dot's outline, antialiased.
+    fixture.canvas.set_booharu(hardnesses(0.3, 0.6, 1.0));
+    let click = [(40.3, 50.6)];
+    let dot = Circle::new(click[0], 8.0).to_path(0.1);
+    let koharu_dot = crate::tools::brush::coverage(&dot, Size::new(100.0, 100.0)).expect("a mask");
+    assert_eq!(inpaint(&stroke(&mut fixture.canvas, &click)), koharu_dot);
+
+    // The Eraser's click on a raster's white square, from the raster's own
+    // (30, 30), at page (40, 40): the square's pixels as it leaves them.
+    let erased = |settings: BooharuSettings| {
+        let mut fixture = gpu_free(size, offset_raster());
+        let raster = layers(&fixture)[0];
+        fixture.canvas.set_booharu(settings);
+        fixture.canvas.select(vec![raster]);
+        fixture.canvas.set_tool(Tool::Eraser);
+        fixture.canvas.set_brush(brush(16.0, [0.0, 0.0, 0.0, 1.0]));
+        let effects = stroke(&mut fixture.canvas, &[(50.0, 50.0)]);
+        assert_eq!(apply(&mut fixture, effects), ["erase"]);
+        let left = pixels(&fixture, raster);
+        let left = &left;
+        (30..50)
+            .flat_map(|y| (30..50).map(move |x| left(x, y)))
+            .collect::<Vec<_>>()
+    };
+    // Koharu's at its own 1, with Draw's and Remove's soft.
+    let koharu_erased = erased(BooharuSettings::default());
+    assert_eq!(erased(hardnesses(0.3, 1.0, 0.6)), koharu_erased);
+    // Soft at its own hardness, with Draw's and Remove's hard.
+    let coverage = soft_coverage(size, &[(50.0, 50.0)], 16.0, 0.6);
+    let left = |x: i32, y: i32| 255 - coverage[((y + 10) * 100 + x + 10) as usize];
+    let soft: Vec<_> = (30..50)
+        .flat_map(|y| (30..50).map(move |x| [255, 255, 255, left(x, y)]))
+        .collect();
+    assert_eq!(erased(hardnesses(1.0, 0.6, 1.0)), soft);
+    assert_ne!(soft, koharu_erased);
+}
+
 #[test]
 fn a_soft_strokes_preview_shows_its_tinted_coverage_across_its_tiles() {
     let Some(mut fixture) = fixture((600, 300), Vec::new()) else {
