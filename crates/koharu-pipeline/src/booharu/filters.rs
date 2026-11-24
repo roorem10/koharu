@@ -388,10 +388,10 @@ impl Writing {
     /// that held nothing else, up to the top; the rest numbered again within
     /// each parent from 0 (D2), but the page's own from
     /// `booharu_core::cleanup::detect_start` of the layers this Detect's
-    /// removals leave, so the new layers go above the Original scan and the
-    /// results that stay under the page's lettering, and never cover them
-    /// (D17, D37). Each block that stays is counted, as locked or as kept by
-    /// hand.
+    /// removals leave, as they stand once they're made ([`standing`]), so
+    /// the new layers go above the Original scan and the results that stay
+    /// under the page's lettering, and never cover them (D17, D37). Each
+    /// block that stays is counted, as locked or as kept by hand.
     pub(crate) fn added(&self, page: &Page, additions: Vec<Op>) -> Vec<Op> {
         let mut staying = Vec::new();
         for (layer, block, locked) in status::blocks(page) {
@@ -403,19 +403,21 @@ impl Writing {
             self.left.count(&self.member, reason);
             staying.extend(block.source.bounds());
         }
-        let remaining: Vec<&Layer> = page
+        let remaining: Vec<Layer> = page
             .layers
             .iter()
             .filter(|layer| remains(page, layer))
+            .map(|layer| standing(page, layer))
             .collect();
-        let start = booharu_core::cleanup::detect_start(&remaining);
+        let start = booharu_core::cleanup::detect_start(&remaining.iter().collect::<Vec<_>>());
         unrepeated(additions, &staying, start)
     }
 }
 
-/// Whether the top-level `layer` of `page` is still there after Detect's
-/// removals, by the rule `removals` (detect/mod.rs) applies: a locked layer,
-/// one that stays, and any but a panel, balloon or block are.
+/// Whether `layer` of `page`, at its top level or in a layer Detect's
+/// removals go into, is still there after them, by the rule `removals`
+/// (detect/mod.rs) applies: a locked layer, one that stays, and any but a
+/// panel, balloon or block are.
 fn remains(page: &Page, layer: &Layer) -> bool {
     layer.locked
         || stays(page, layer)
@@ -423,6 +425,24 @@ fn remains(page: &Page, layer: &Layer) -> bool {
             layer.content,
             Content::Panel(_) | Content::Balloon(_) | Content::Block(_)
         )
+}
+
+/// `layer`, one Detect's removals leave on `page`, as it stands once they're
+/// made: a locked layer as it is, as they never go into one, and any other
+/// holding only the layers they leave in it, at any depth. So a group, or a
+/// panel kept for a locked layer it holds, whose lettering all goes no
+/// longer letters the page.
+fn standing(page: &Page, layer: &Layer) -> Layer {
+    let mut kept = layer.clone();
+    if !layer.locked {
+        kept.children = layer
+            .children
+            .iter()
+            .filter(|child| remains(page, child))
+            .map(|child| standing(page, child))
+            .collect();
+    }
+    kept
 }
 
 /// Whether Detect again leaves the unlocked `layer` on `page` in place (D1):
@@ -2142,6 +2162,63 @@ mod tests {
         assert!(matches!(page.layers[3].content, Content::Panel(_)));
         assert!(matches!(page.layers[4].content, Content::Block(_)));
         assert_eq!(top[5..], ["locked", "free"].map(own));
+        Ok(())
+    }
+
+    #[test]
+    fn lettering_this_detect_removes_doesnt_hold_its_new_layers_under_a_result() -> Result<()> {
+        // From the bottom up: the Original scan, a group holding a detected
+        // block, a detected panel holding one too, kept for the locked
+        // raster it holds, a result, and a free text.
+        let fixture = Fixture::new(
+            true,
+            vec![
+                add("original", None, 0, original()?),
+                add("group", None, 1, json!({"kind": "group"})),
+                add("grouped", Some("group"), 0, block("text", (10.0, 10.0))),
+                add(
+                    "panel",
+                    None,
+                    2,
+                    detected("panel", "M90 0 L200 0 L200 90 L90 90 Z"),
+                ),
+                add("inside", Some("panel"), 0, block("text", (100.0, 10.0))),
+                add("pinned", Some("panel"), 1, json!({"kind": "raster"})),
+                add("result", None, 3, result()),
+                add("free", None, 4, json!({"kind": "text", "content": "Hi"})),
+            ],
+        )?;
+        fixture.lock("pinned")?;
+        let left = Left::of(Stage::Detect, Snapshot::default(), Events::new());
+        let page = fixture.page()?;
+        let added = left
+            .writing(&fixture.member(None))
+            .added(&page, finds(fixture.page)?);
+        // Both blocks go, so neither the group nor the panel letters the
+        // page once this Detect's removals are made: the new top-level
+        // layers start above the result, under the free text.
+        let own = |label: &str| label.to_owned();
+        assert_eq!(
+            shape(&added).0,
+            [
+                (own("d0"), None, 4),
+                (own("d1"), Some(own("d0")), 0),
+                (own("d2"), None, 5),
+            ]
+        );
+        let mut ops = Vec::new();
+        removals(&page, &page.layers, &mut ops);
+        let removed: Vec<Ref> = ops
+            .iter()
+            .filter_map(|op| match op {
+                Op::RemoveLayer { layer } => Some(layer.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            removed,
+            [fixture.id("grouped"), fixture.id("inside")].map(Ref::from)
+        );
         Ok(())
     }
 
