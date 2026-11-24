@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDebounce } from 'use-debounce'
 
+import { LevelsPageItems } from '@/components/booharu/levels/LevelsItems' // Booharu: Fix page levels.
 import { send, useImportPages, usePage, useProject } from '@/lib/queries'
 import { deletePages, movePage } from '@/lib/scene'
 import { pipelineStages, useKoharuStore } from '@/lib/store'
@@ -409,6 +410,7 @@ function PageItem({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align='end' className={pageMenu}>
                   <PageActions
+                    page={page.id} // Booharu: the page the levels items act on.
                     Item={DropdownMenuItem}
                     Separator={DropdownMenuSeparator}
                     onRun={onRun}
@@ -427,6 +429,7 @@ function PageItem({
       </ContextMenuTrigger>
       <ContextMenuContent className={pageMenu}>
         <PageActions
+          page={page.id} // Booharu: the page the levels items act on.
           Item={ContextMenuItem}
           Separator={ContextMenuSeparator}
           onRun={onRun}
@@ -484,11 +487,14 @@ const pageMenuItem =
 /** A page's actions, as the items of the menu `Item` and `Separator` belong to: each pipeline
  * stage on the page alone, in the pipeline's order, then deleting it. */
 function PageActions({
+  page,
   Item,
   Separator,
   onRun,
   onDelete,
 }: {
+  /** Booharu: the page the menu is for, which the levels items act on, or the selection with it. */
+  page: PageSummary['id']
   Item: typeof DropdownMenuItem | typeof ContextMenuItem
   Separator: typeof DropdownMenuSeparator | typeof ContextMenuSeparator
   onRun: (stage: Stage) => void
@@ -502,6 +508,8 @@ function PageActions({
           {t(`navigator.run.${stage}`)}
         </Item>
       ))}
+      {/* Booharu: Fix page levels…, and Restore original scan where the pages have one. */}
+      <LevelsPageItems page={page} Item={Item} Separator={Separator} className={pageMenuItem} />
       <Separator />
       <Item variant='destructive' className={pageMenuItem} onClick={onDelete}>
         {t('navigator.delete')}

@@ -176,10 +176,14 @@ describe('Booharu box actions in the menus', () => {
     show(<TitleBar />)
 
     await openEdit(user)
-    // Between Koharu's Delete Selected, whose name ends with its shortcut, and Unload Models.
+    // Between Koharu's Delete Selected, whose name ends with its shortcut, and Unload Models, with
+    // Fix page levels… after them.
     const names = (await items()).map(([name]) => name)
     const after = names.findIndex((name) => name.startsWith('Delete Selected'))
-    expect(names.slice(after + 1, names.indexOf('Unload Models'))).toEqual(boxItems)
+    expect(names.slice(after + 1, names.indexOf('Unload Models'))).toEqual([
+      ...boxItems,
+      'Fix page levels…',
+    ])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Clean again' }))
     await waitFor(() => expect(run).toHaveBeenCalledWith({ blocks: ['first'] }, ['inpaint']))
 

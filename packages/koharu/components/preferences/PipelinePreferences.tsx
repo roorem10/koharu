@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { OcrBoxPreferences } from '@/components/booharu/boxes/OcrBoxPreferences' // Booharu: the O tool.
 import { GlossaryRow } from '@/components/booharu/context/GlossaryRow' // Booharu: the glossary editor.
 import { ReadingPreferences } from '@/components/booharu/context/ReadingPreferences' // Booharu: Read chapter.
+import { LevelsPreferences } from '@/components/booharu/levels/LevelsPreferences' // Booharu: Fix page levels.
 import { ColourDetectionSwitch } from '@/components/booharu/pipeline/ColourDetectionSwitch' // Booharu: colour detection.
 import { SfxSection } from '@/components/booharu/pipeline/SfxSection' // Booharu: sound effects.
 import { QcPreferences } from '@/components/booharu/qc/QcPreferences' // Booharu: the quality check.
@@ -161,6 +162,8 @@ export function PipelinePreferences({
       <OcrBoxPreferences />
       {/* Booharu: the quality check's smallest readable text, saved to its own section. */}
       <QcPreferences />
+      {/* Booharu: what Fix page levels starts from, saved to its own section at once. */}
+      <LevelsPreferences />
     </PreferencePage>
   )
 }
