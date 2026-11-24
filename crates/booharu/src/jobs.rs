@@ -178,10 +178,11 @@ pub fn busy(kind: JobKind) -> bool {
 pub(crate) mod tests {
     use super::*;
 
-    /// Held by every test that registers jobs, or places a run group, one at
-    /// a time, as the registry and the group's place are the process's: a
-    /// group is refused while Read chapter reads, and a fix of page levels
-    /// while a group goes.
+    /// Held by every test that registers jobs, places a run group, or fixes
+    /// or restores page levels, one at a time, as the registry and the
+    /// group's place are the process's: a group is refused while Read
+    /// chapter reads, and a fix or a restore of page levels while a group
+    /// goes.
     pub(crate) static REGISTRY: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     #[test]

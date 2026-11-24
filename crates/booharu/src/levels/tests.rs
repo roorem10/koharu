@@ -531,6 +531,7 @@ fn neither_changes_a_page_with_work_made_from_its_scan_but_both_change_one_paint
 
 #[test]
 fn a_restore_leaves_an_original_held_by_a_locked_layer_or_holding_one() -> Result<()> {
+    let _held = REGISTRY.blocking_lock();
     let fixture = Fixture::new();
     let levelled = encoded(full());
     let file = Hash::of(&encoded(faded()));
