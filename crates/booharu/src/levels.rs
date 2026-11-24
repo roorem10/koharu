@@ -120,8 +120,9 @@ pub struct LevelsPreview {
     pub after: String,
 }
 
-/// A page as the levels dialog and the page menu read it: whether it has an
-/// Original scan to restore, and why a fix or a restore would skip it now.
+/// A page as the page menu reads it, to show Restore original scan: whether
+/// it has an Original scan to restore, and why a fix or a restore would
+/// skip it now.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct LevelsStatus {
     pub page: PageId,
@@ -200,9 +201,9 @@ fn previewed(bytes: &[u8], settings: &LevelsSettings) -> Result<LevelsPreview> {
     })
 }
 
-/// Each of `pages` the project `session` holds, as the levels dialog and
-/// the page menu read it, decoding nothing; a page the project doesn't hold
-/// is left out, as it was removed.
+/// Each of `pages` the project `session` holds, as the page menu reads it,
+/// decoding nothing; a page the project doesn't hold is left out, as it was
+/// removed.
 pub fn status(session: &Session, pages: &[PageId]) -> Result<Vec<LevelsStatus>> {
     let project = session.project();
     let mut statuses = Vec::new();

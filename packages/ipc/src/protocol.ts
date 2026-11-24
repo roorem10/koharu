@@ -1454,8 +1454,9 @@ export type LevelsSkipped = {
 }
 
 /**
- *  A page as the levels dialog and the page menu read it: whether it has an
- *  Original scan to restore, and why a fix or a restore would skip it now.
+ *  A page as the page menu reads it, to show Restore original scan: whether
+ *  it has an Original scan to restore, and why a fix or a restore would
+ *  skip it now.
  */
 export type LevelsStatus = {
   page: PageId
@@ -3181,7 +3182,7 @@ export const commands = {
   /** Sets how the brush tools' strokes feel: the hardness of Draw's, the Eraser's and Remove's, each from 0, soft from the stroke's centre line out, to 1, Koharu's hard edge, and Draw's opacity, above 0 and at most 1. Strokes started from then on take it, and a soft Remove stroke's result fades out with its edge. Refuses a value that isn't a number in its range, naming it. Changes nothing in the project. */
   booharuSetBrush: (feel: BrushFeel) =>
     runner('booharu_set_brush', (options) => invoke<null>('booharu_set_brush', { feel }, options)),
-  /** Each of `pages` as the page menu and the levels dialog read it: whether it has an Original scan to restore, and why a fix or a restore would skip it now: no scan, a block's clean-up with pixels, or a raster Inpainting made. A page the project no longer holds is left out. Decodes nothing, and changes nothing. */
+  /** Each of `pages` as the page menu reads it, to show Restore original scan: whether it has an Original scan to restore, and why a fix or a restore would skip it now: no scan, a block's clean-up with pixels, or a raster Inpainting made. A page the project no longer holds is left out. Decodes nothing, and changes nothing. */
   booharuGetLevelsStatus: (pages: PageId[]) =>
     runner('booharu_get_levels_status', (options) =>
       invoke<LevelsStatus[]>('booharu_get_levels_status', { pages }, options),

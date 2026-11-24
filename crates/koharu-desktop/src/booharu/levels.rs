@@ -27,10 +27,10 @@ use tauri::State;
 use super::{events::LEVELS_PROGRESS, read_chapter::pages_loading};
 use crate::{app::App, commands::Result};
 
-/// Each of `pages` as the page menu and the levels dialog read it: whether
-/// it has an Original scan to restore, and why a fix or a restore would
-/// skip it now: no scan, a block's clean-up with pixels, or a raster
-/// Inpainting made. A page the project no longer holds is left out.
+/// Each of `pages` as the page menu reads it, to show Restore original
+/// scan: whether it has an Original scan to restore, and why a fix or a
+/// restore would skip it now: no scan, a block's clean-up with pixels, or a
+/// raster Inpainting made. A page the project no longer holds is left out.
 /// Decodes nothing, and changes nothing.
 #[tauri::command]
 #[specta::specta]
