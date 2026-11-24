@@ -21,8 +21,8 @@
 //! Both are refused while a run is going ([`RUN_GOING`]), and a fix while
 //! another goes (`JobKind::Levels`). The desktop's command and the agent's
 //! tool refuse a fix while Koharu's Gallery still loads pages into the
-//! chapter, with [`PAGES_LOADING`], before they lock the session; Restore
-//! isn't refused then.
+//! chapter, with [`PAGES_LOADING`], before they lock the session
+//! ([`startable`]); Restore isn't refused then.
 
 use std::{collections::BTreeSet, io::Cursor};
 
@@ -35,6 +35,7 @@ use booharu_core::{
 };
 use booharu_rawprep::{auto_levels, levels_stats, whiten_paper};
 use image::{DynamicImage, GrayImage, ImageFormat, ImageReader, Luma, RgbImage};
+use koharu_pipeline::Event;
 use koharu_scene::{Background, Content, Edit, Hash, LayerId, Op, PageId, Project, Session};
 use parking_lot::Mutex;
 use schemars::JsonSchema;
@@ -459,6 +460,23 @@ fn locked_above(project: &Project, layer: LayerId) -> Result<bool> {
             (_, None) => return Ok(false),
         }
     }
+}
+
+/// Whether a fix may start now, with the events the pipeline `told`, as
+/// `Pipeline::told` gives them, and whether pages are still `loading` into
+/// the open project, as Koharu's Gallery loads a chapter's once it opened
+/// the chapter as the project: not while a run goes or a Run press does
+/// ([`RUN_GOING`]), nor while pages are still loading ([`PAGES_LOADING`]),
+/// as a fix levels only the pages the project has as it starts. Asked
+/// before the session's lock is taken, as the app tells whether pages load
+/// under the open project's.
+pub fn startable(told: &[Event], loading: bool) -> Result<()> {
+    ensure!(
+        !runs::run_going(told) && runs::group_going().is_none(),
+        RUN_GOING
+    );
+    ensure!(!loading, PAGES_LOADING);
+    Ok(())
 }
 
 /// Whether pages may not change now: `running` says a run is going, or a

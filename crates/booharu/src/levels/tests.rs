@@ -764,3 +764,28 @@ fn the_page_draws_the_same_with_its_original_scan() -> Result<()> {
     assert_eq!(with.image, without.image);
     Ok(())
 }
+
+#[test]
+fn a_fix_cant_start_while_a_run_goes_or_pages_still_load() {
+    use koharu_pipeline::{Outcome, RunId, Stage};
+
+    // No Run press goes while the registry is held.
+    let _held = REGISTRY.blocking_lock();
+    let queued = Event::Queued {
+        run: RunId(1),
+        steps: 1,
+        stages: vec![Stage::Inpaint],
+        pages: false,
+    };
+    let refused =
+        |told: &[Event], loading| startable(told, loading).expect_err("refused").to_string();
+    assert_eq!(refused(std::slice::from_ref(&queued), false), RUN_GOING);
+    assert_eq!(refused(&[], true), PAGES_LOADING);
+    assert_eq!(refused(std::slice::from_ref(&queued), true), RUN_GOING);
+    startable(&[], false).expect("with no run and every page in");
+    let ended = Event::Ended {
+        run: RunId(1),
+        outcome: Outcome::Done,
+    };
+    startable(&[queued, ended], false).expect("once the run ended");
+}
