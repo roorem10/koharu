@@ -2,6 +2,11 @@
 //! loading its pages into it in order, which the user then translates when
 //! they choose.
 
+// Booharu: the test of reading a chapter again into a project whose pages
+// page levels changed, which drives the page's own placing.
+#[cfg(test)]
+mod booharu;
+
 use std::sync::Arc;
 
 use anyhow::{Context as _, Result};
@@ -167,6 +172,8 @@ fn place(session: &Mutex<Session>, bytes: Vec<u8>, previous: Option<PageId>) -> 
     if let Some(page) = project.pages().find(|page| {
         page.background
             .is_some_and(|background| background.file == hash)
+            // Booharu: or a page levelled since, which keeps it as its Original scan.
+            || booharu_core::cleanup::original_scan(page).is_some_and(|(_, file)| file == hash)
     }) {
         return Ok(page.id);
     }
