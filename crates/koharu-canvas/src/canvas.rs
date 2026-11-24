@@ -233,9 +233,10 @@ impl Canvas {
     }
 
     /// Booharu: Booharu's settings, which the host pushes at startup and
-    /// whenever the settings they come from are saved. Only text drawn or
-    /// typed from then on reads them, so they neither redraw nor restyle
-    /// anything, and the same ones again change nothing.
+    /// whenever the settings they come from are saved, or the brush's feel
+    /// changes. Only text drawn or typed and strokes made from then on read
+    /// them, so they neither redraw nor restyle anything, and the same ones
+    /// again change nothing.
     pub fn set_booharu(&mut self, settings: crate::booharu::BooharuSettings) {
         self.booharu = settings;
     }
@@ -612,7 +613,7 @@ impl Canvas {
             snapshot: self.snapshot.as_ref()?,
             selection: &self.selection,
             tool: self.tool,
-            brush: self.brush,
+            brush: crate::booharu::brush::felt(self.brush, self.tool, &self.booharu), // Booharu: Draw's opacity.
             colors: self.colors,
             session: &self.session,
             booharu: &self.booharu, // Booharu: for the T tool's text.

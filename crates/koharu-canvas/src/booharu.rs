@@ -5,7 +5,9 @@
 //! into a sound effect kept as art also shows its clean-up again, without
 //! the kept mark, in the same step. The Booharu settings the canvas needs
 //! are one `BooharuSettings`, which the host pushes at startup and whenever
-//! the settings they come from are saved. What the type bar takes off the
+//! the settings they come from are saved, and whenever the brush's feel
+//! changes (`BrushFeel`): each brush tool's hardness and Draw's opacity,
+//! which its strokes take (`brush`). What the type bar takes off the
 //! characters being typed is an `Unmark`, which typing's own Booharu part,
 //! `typing/booharu.rs`, does, with the size steps and the selected text the
 //! type bar quotes. A right-click on a text or a block with the Select,
@@ -32,6 +34,7 @@ use serde_json::json;
 use ui_events::keyboard::Modifiers;
 
 use crate::{
+    Tool,
     control::Control,
     draw::overlay::Overlay,
     gesture::{self, Context, GestureLook, Press},
@@ -40,12 +43,59 @@ use crate::{
     view::Sample,
 };
 
+pub(crate) mod brush;
+
 /// The Booharu settings the canvas reads, as the host pushed them last. Their
 /// default is Koharu's own behaviour, which holds until the host pushes any.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BooharuSettings {
     /// The look of new text.
     pub text: TextDefaults,
+    /// How the brush tools' strokes feel, which the interface keeps and the
+    /// host pushes as it changes, beside the settings saved in the file,
+    /// which hold none of it.
+    pub brush: BrushFeel,
+}
+
+/// How the brush tools' strokes feel beyond Koharu's brush, its size and
+/// colour: each tool's hardness, from 0, soft from its centre line out, to 1,
+/// Koharu's hard edge, and Draw's opacity, from just above 0 to 1, at which
+/// a stroke paints as one pass, never building up within itself. Its
+/// default, every value 1, is Koharu's hard, opaque brush.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+pub struct BrushFeel {
+    /// The Draw tool's hardness.
+    pub draw_hardness: f64,
+    /// The Eraser's hardness.
+    pub eraser_hardness: f64,
+    /// The Remove tool's hardness.
+    pub remove_hardness: f64,
+    /// The Draw tool's opacity, which its colour's alpha is multiplied by.
+    pub draw_opacity: f64,
+}
+
+impl Default for BrushFeel {
+    fn default() -> Self {
+        Self {
+            draw_hardness: 1.0,
+            eraser_hardness: 1.0,
+            remove_hardness: 1.0,
+            draw_opacity: 1.0,
+        }
+    }
+}
+
+impl BrushFeel {
+    /// The hardness `tool`'s strokes take: Draw's, the Eraser's or Remove's
+    /// own, and Koharu's hard edge, 1, for any other tool.
+    pub fn hardness(self, tool: Tool) -> f64 {
+        match tool {
+            Tool::Draw => self.draw_hardness,
+            Tool::Eraser => self.eraser_hardness,
+            Tool::Remove => self.remove_hardness,
+            _ => 1.0,
+        }
+    }
 }
 
 /// The look new text gets on the canvas, as Booharu's Translation stage hook
@@ -415,6 +465,7 @@ mod tests {
                 family: Some(FONT.to_owned()),
                 fit: Fit::Best,
             },
+            ..BooharuSettings::default()
         }
     }
 

@@ -3,9 +3,11 @@
 //! clean-up such a translation shows again on a sound effect kept as art,
 //! and, while typing, Escape keeping what's typed, marks taken off, size
 //! steps, the selected text the type bar quotes and the empty line a line
-//! break typed at the end starts, a right-click's box menu, and a box styled
+//! break typed at the end starts, a right-click's box menu, a box styled
 //! before it's translated, which the canvas types into, outlines, resizes,
-//! moves and turns as a block with none, on the canvas's harness.
+//! moves and turns as a block with none, and the brush's feel, on the
+//! canvas's harness. The brush's tests ask for no GPU (`gpu_free`), so they
+//! run without one.
 
 use std::collections::BTreeMap;
 
@@ -18,7 +20,9 @@ use booharu_core::{
 use koharu_scene::{CharStyle, Fit, RichText};
 
 use super::*;
-use crate::booharu::{BooharuSettings, BoxModifiers, Effect as Booharu, TextDefaults, Unmark};
+use crate::booharu::{
+    BooharuSettings, BoxModifiers, BrushFeel, Effect as Booharu, TextDefaults, Unmark,
+};
 
 const NONE: Modifiers = Modifiers::empty();
 
@@ -289,6 +293,7 @@ fn pushed(detect_colors: bool, stroke: Option<Rgba>) -> BooharuSettings {
             family: Some(FONT.to_owned()),
             fit: Fit::Best,
         },
+        ..BooharuSettings::default()
     }
 }
 
@@ -1767,4 +1772,129 @@ fn a_translated_box_types_resizes_and_moves_its_translation_as_before() {
             Point::new(10.0, 10.0)
         ));
     }
+}
+
+/// A project of one page of `size` made by `ops` after `add_page` (labelled
+/// `$page`), shown on a canvas at its own size in a viewport of that size,
+/// as `unscaled_of` shows one, but asking for no GPU, so a test that never
+/// draws runs without one: since Koharu 0.89.0 neither a canvas nor its
+/// page's frame needs one, only a draw, a snapshot of the canvas and the
+/// colour picker do.
+fn gpu_free(size: (u32, u32), ops: Vec<Value>) -> Fixture {
+    let dir = tempfile::tempdir().expect("a folder");
+    let mut session = Session::create(dir.path().join("test.khr")).expect("a project");
+    let page = json!({"op": "add_page", "id": "$page", "index": 0,
+        "size": {"width": size.0, "height": size.1}});
+    let ops: Vec<Op> = std::iter::once(page)
+        .chain(ops)
+        .map(|op| serde_json::from_value(op).expect("an op"))
+        .collect();
+    let change = session
+        .apply(Edit {
+            label: "test".into(),
+            ops,
+        })
+        .expect("an edit");
+    let session = Arc::new(Mutex::new(session));
+    let mut fixture = Fixture {
+        _dir: dir,
+        session: Arc::clone(&session),
+        renderer: RENDERER.clone(),
+        canvas: Canvas::new(session, RENDERER.clone()),
+        page: change.pages.added[0],
+    };
+    fixture.render();
+    let (width, height) = (f64::from(size.0), f64::from(size.1));
+    fixture
+        .canvas
+        .set_viewport(Rect::new(0.0, 0.0, width, height), 1.0);
+    fixture.canvas.set_camera(TranslateScale::default());
+    fixture
+}
+
+/// Booharu's settings with Draw at half opacity and every edge hard.
+fn half_opacity() -> BooharuSettings {
+    BooharuSettings {
+        brush: BrushFeel {
+            draw_opacity: 0.5,
+            ..BrushFeel::default()
+        },
+        ..BooharuSettings::default()
+    }
+}
+
+#[test]
+fn draw_at_half_opacity_paints_half_alpha_and_uncovers_a_mask_by_half() {
+    // A new raster, under a stroke at full coverage.
+    let mut fixture = gpu_free((100, 100), Vec::new());
+    fixture.canvas.set_booharu(half_opacity());
+    fixture.canvas.set_tool(Tool::Draw);
+    fixture.canvas.set_brush(brush(10.0, [1.0, 0.0, 0.0, 1.0]));
+    let effects = gesture(&mut fixture.canvas, (20.0, 50.0), (80.0, 50.0));
+    assert_eq!(apply(&mut fixture, effects), ["paint"]);
+    let [raster] = layers(&fixture)[..] else {
+        panic!("one layer");
+    };
+    assert_eq!(pixel(&fixture, raster, (50, 50)), [255, 0, 0, 128]);
+    assert_eq!(pixel(&fixture, raster, (50, 70))[3], 0);
+
+    // A block's mask, whose clean-up it hides wholly to start with: the
+    // stroke uncovers it halfway, whatever its colour.
+    let mut fixture = gpu_free(
+        (400, 400),
+        vec![
+            json!({"op": "add_layer", "page": "$page", "index": 0, "layer": {
+                "kind": "block", "source": {"content": "やあ"}, "translation": {
+                    "content": "Hi",
+                    "frame": {"box": {"bounds": {"x": 0, "y": 0, "width": 60, "height": 30}}},
+                    "transform": [[1.0, 0.0, 300.0], [0.0, 1.0, 300.0]],
+                },
+            }}),
+        ],
+    );
+    let block = layers(&fixture)[0];
+    let mask: LayerId =
+        serde_json::from_value(layer(&fixture, block)["mask"]["id"].clone()).expect("an id");
+    fixture.canvas.set_booharu(half_opacity());
+    fixture.canvas.select(vec![mask]);
+    fixture.canvas.set_tool(Tool::Draw);
+    fixture.canvas.set_brush(brush(6.0, [0.0, 0.0, 0.0, 1.0]));
+    assert_eq!(grey(&fixture, mask, (20, 20)), 0);
+    let effects = gesture(&mut fixture.canvas, (20.0, 20.0), (20.0, 20.0));
+    assert_eq!(apply(&mut fixture, effects), ["paint"]);
+    assert_eq!(grey(&fixture, mask, (20, 20)), 128);
+    assert_eq!(grey(&fixture, mask, (12, 12)), 0);
+}
+
+#[test]
+fn the_eraser_and_remove_take_no_opacity() {
+    // Draw's opacity leaves the eraser erasing wholly.
+    let mut fixture = gpu_free((100, 100), offset_raster());
+    let raster = layers(&fixture)[0];
+    fixture.canvas.set_booharu(half_opacity());
+    fixture.canvas.select(vec![raster]);
+    fixture.canvas.set_tool(Tool::Eraser);
+    fixture.canvas.set_brush(brush(6.0, [0.0, 0.0, 0.0, 1.0]));
+    let effects = gesture(&mut fixture.canvas, (50.0, 50.0), (50.0, 50.0));
+    assert_eq!(apply(&mut fixture, effects), ["erase"]);
+    assert_eq!(pixel(&fixture, raster, (40, 40))[3], 0);
+    assert_eq!(pixel(&fixture, raster, (40, 30))[3], 255);
+
+    // A Remove stroke asks to clean the same pixels at any opacity.
+    let mut fixture = gpu_free((100, 100), Vec::new());
+    fixture.canvas.set_tool(Tool::Remove);
+    fixture.canvas.set_brush(brush(8.0, [0.0, 0.0, 0.0, 1.0]));
+    let mut asked = Vec::new();
+    for settings in [BooharuSettings::default(), half_opacity()] {
+        fixture.canvas.set_booharu(settings);
+        let effects = gesture(&mut fixture.canvas, (20.0, 20.0), (40.0, 20.0));
+        let [Effect::Inpaint { rect, mask, .. }] = &effects[..] else {
+            panic!("{effects:?}");
+        };
+        asked.push((*rect, mask.clone()));
+    }
+    assert_eq!(asked[0], asked[1]);
+    let (rect, mask) = &asked[0];
+    let at = ((20 - rect.y) * rect.width as i32 + (30 - rect.x)) as usize;
+    assert_eq!(mask[at], 255);
 }
