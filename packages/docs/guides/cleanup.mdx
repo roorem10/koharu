@@ -41,6 +41,19 @@ Inspect the result at normal reading size and high zoom. Look for glyph fragment
   </Step>
 </Steps>
 
+{/* Booharu: results under the lettering, and soft brushes. */}
+
+<Note>
+  In Booharu, a Remove or Generative Fill result goes under the lettering: above the scan and
+  earlier results, and below every panel, balloon, text block, and text that holds lettering, so it
+  never covers a translation, even once the page is detected again. In **Layers**, its row sits just
+  below the lowest of them. Where a text block's own clean-up shows, it covers a result under it; to
+  fix that clean-up, paint into it or clean the block again. The brush size control in the toolbar
+  also sets **Hardness** for Brush, Eraser, and Remove, which softens a stroke's edge, so a soft
+  Remove result fades out toward its edge, and **Opacity** for Brush; a stroke doesn't build up
+  where it crosses itself. Each of the three tools keeps its own settings.
+</Note>
+
 To start a text over, delete its text block: its clean-up goes with it and the original lettering shows again.
 
 ## Choose a model
