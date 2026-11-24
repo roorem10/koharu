@@ -190,6 +190,10 @@ impl Export<'_> {
     }
 
     fn layer(&mut self, layer: &Layer) -> Result<()> {
+        // Booharu: the Original scan page levels keep, never drawn, stays out (D37).
+        if crate::booharu::original_scan(layer) {
+            return Ok(());
+        }
         let leaf = Leaf {
             name: &layer.name,
             visible: layer.visible,

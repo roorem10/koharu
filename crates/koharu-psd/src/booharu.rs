@@ -5,10 +5,11 @@
 //! into a pixel layer over a hidden type layer of its words in plain
 //! styles to edit (`pixels`, `plain`). A layer whose effects Photoshop
 //! draws keeps its glyphs alone in its pixels (`glyphs_only`), and an
-//! export tells which texts it drew into pixels (`Notice`).
+//! export tells which texts it drew into pixels (`Notice`). The Original
+//! scan page levels keep is left out (`original_scan`).
 
 use koharu_renderer::ResolvedText;
-use koharu_scene::{LayerId, PageId};
+use koharu_scene::{Layer, LayerId, PageId};
 use photocraft_psd::TaggedBlock;
 use serde::Serialize;
 
@@ -59,6 +60,19 @@ pub(crate) fn glyphs_only(blocks: &[TaggedBlock]) -> bool {
     blocks
         .iter()
         .any(|block| matches!(&block.key, b"TySh" | b"lfx2" | b"lmfx"))
+}
+
+/// Whether `layer` is a page's Original scan, the scan as it was imported,
+/// which page levels keep hidden under everything (D37): its
+/// `booharu.original_scan` attribute is true. An export leaves it out, at
+/// any depth, as nothing draws it. booharu-core reads the attribute the same
+/// way, but PSD export doesn't depend on booharu-core.
+pub(crate) fn original_scan(layer: &Layer) -> bool {
+    layer
+        .attributes
+        .get("booharu")
+        .and_then(|booharu| booharu.get("original_scan"))
+        .is_some_and(|value| value.as_bool() == Some(true))
 }
 
 /// A text an export drew into its layer's pixels, as its words' effects
@@ -142,12 +156,18 @@ pub(crate) fn type_text(block: &TaggedBlock) -> photocraft_psd::descriptor::Desc
 
 #[cfg(test)]
 mod tests {
-    use koharu_renderer::TextRun;
-    use koharu_scene::{Color, Gradient, GradientKind, GradientStop, Rgba, Uuid};
+    use std::io::Cursor;
+
+    use koharu_renderer::{Renderer, RendererConfig, TextRun};
+    use koharu_scene::{
+        Color, Created, Edit, Gradient, GradientKind, GradientStop, Hash, Op, Rgba, Session, Uuid,
+    };
     use kurbo::Rect;
-    use photocraft_psd::descriptor::Value;
+    use photocraft_psd::{PsdBuilder, descriptor::Value};
+    use serde_json::json;
 
     use super::*;
+    use crate::{Export, Labels};
 
     const WHITE: Color = Color::new([1.0, 1.0, 1.0, 1.0]);
     const BLACK: Color = Color::new([0.0, 0.0, 0.0, 1.0]);
@@ -356,5 +376,93 @@ mod tests {
             r#"{"editable_copy":"hidden_plain_styles","layer":"00000000-0000-0000-0000-000000000002","name":"Words","page":"00000000-0000-0000-0000-000000000001","reason":"word_effects_rasterized"}"#
         );
         Ok(())
+    }
+
+    #[test]
+    fn the_original_scan_is_left_out_of_the_export_at_any_depth() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let mut session = Session::create(dir.path().join("test.khr")).expect("a project");
+        let mut scan = Vec::new();
+        image::RgbImage::from_pixel(8, 8, image::Rgb([200; 3]))
+            .write_to(&mut Cursor::new(&mut scan), image::ImageFormat::Png)
+            .expect("a PNG");
+        let original = |marked: bool| {
+            json!({"kind": "image", "file": Hash::of(&scan), "name": "Original scan",
+                "visible": false, "locked": true,
+                "attributes": {"booharu": {"original_scan": marked}}})
+        };
+        // One under everything, as page levels add it, and one moved into a
+        // group by hand.
+        let ops = [
+            json!({"op": "add_page", "id": "$page", "index": 0, "background": Hash::of(&scan)}),
+            json!({"op": "add_layer", "id": "$top", "page": "$page", "index": 0,
+                "layer": original(true)}),
+            json!({"op": "add_layer", "id": "$group", "page": "$page", "index": 1,
+                "layer": {"kind": "group", "name": "Moved"}}),
+            json!({"op": "add_layer", "id": "$inner", "page": "$page", "parent": "$group",
+                "index": 0, "layer": original(true)}),
+            json!({"op": "add_layer", "id": "$false", "page": "$page", "index": 2,
+                "layer": original(false)}),
+        ];
+        let mut edit = vec![Op::AddFile {
+            bytes: scan.clone(),
+        }];
+        edit.extend(ops.map(|op| serde_json::from_value::<Op>(op).expect("an op")));
+        let change = session
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops: edit,
+            })
+            .expect("a page");
+        let labelled = |label: &str| {
+            change.created.iter().find_map(|created| match created {
+                Created::Layer {
+                    id,
+                    label: Some(own),
+                } if own == label => Some(*id),
+                _ => None,
+            })
+        };
+        let project = session.project();
+        let page = project.page(change.pages.added[0]).expect("the page");
+        let layer = |label: &str| {
+            project
+                .layer(labelled(label).expect("a label"))
+                .expect("a layer")
+        };
+        assert!(original_scan(layer("top")) && original_scan(layer("inner")));
+        assert!(
+            !original_scan(layer("false")),
+            "marked false, it's no original"
+        );
+        assert!(!original_scan(layer("group")));
+
+        // Drawing the frame needs no GPU, nor does what the export writes of
+        // the page's layers but the image marked false, which it draws.
+        let renderer = Renderer::new(RendererConfig::default());
+        let frame = renderer.render(&session, page.id).expect("a frame");
+        let labels = Labels {
+            background: "Background".to_owned(),
+            cleanup: "Clean-up".to_owned(),
+            outline: "Balloon outline".to_owned(),
+        };
+        let mut export = Export {
+            renderer: &renderer,
+            frame: &frame,
+            labels: &labels,
+            size: (8, 8),
+            builder: PsdBuilder::new(8, 8).resolution(72.0),
+            folders: Vec::new(),
+            texts: 0,
+            noted: Vec::new(),
+        };
+        for layer in &page.layers[..2] {
+            export.layer(layer).expect("written");
+        }
+        // The group is an empty folder, and neither original has a record.
+        assert_eq!(export.folders.len(), 1);
+        let file = export.builder.build().expect("a PSD");
+        let names: Vec<String> = file.layers().iter().map(|record| record.name()).collect();
+        assert_eq!(names, ["</Layer group>", "Moved"]);
     }
 }
