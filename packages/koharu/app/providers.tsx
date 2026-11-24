@@ -9,6 +9,7 @@ import { StartupView } from '@/components/app/StartupView'
 import ClientOnly from '@/components/ClientOnly'
 import { useBooharuAgentChatEvents } from '@/lib/booharu/agentChat' // Booharu: the agent's chat.
 import { useBooharuJobEvents } from '@/lib/booharu/booharuJobs' // Booharu: its reads going.
+import { useBooharuBrush } from '@/lib/booharu/brush' // Booharu: a brush for each brush tool.
 import { useBooharuRunGroups } from '@/lib/booharu/chime' // Booharu: carrying-on groups' runs.
 import { useBooharuContextChanges } from '@/lib/booharu/context' // Booharu: glossary changes.
 import { useBooharuNotices } from '@/lib/booharu/notices' // Booharu: its notices, as toasts.
@@ -74,6 +75,7 @@ export function Providers({ children }: { children: ReactNode }) {
   useBooharuAgentChatEvents() // Booharu: keeps the agent's chat with the project, as it changes.
   useBooharuQcEvents() // Booharu: keeps the quality check's findings with the project, page by page.
   useTypingShortcuts() // Booharu: Ctrl+B and Ctrl+I make the characters typed bold or italic.
+  useBooharuBrush() // Booharu: each brush tool's own size, hardness and opacity, and [ and ].
 
   return (
     <QueryClientProvider client={queryClient}>
