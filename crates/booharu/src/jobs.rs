@@ -117,7 +117,7 @@ pub fn start(kind: JobKind) -> Result<Job> {
     let mut jobs = JOBS.lock();
     ensure!(
         kind != JobKind::ReadChapter || !jobs.values().any(|(going, _)| *going == kind),
-        "Read chapter is already reading; stop it or wait for it to end."
+        "Analyze chapter is already running; stop it or wait for it to end."
     );
     let id = MADE.fetch_add(1, Ordering::Relaxed) + 1;
     let cancel = CancellationToken::new();
@@ -169,7 +169,7 @@ pub(crate) mod tests {
         let read = start(JobKind::ReadChapter)?;
         assert!(busy(JobKind::ReadChapter));
         let error = start(JobKind::ReadChapter).expect_err("a second read");
-        assert!(error.to_string().contains("already reading"), "{error}");
+        assert!(error.to_string().contains("already running"), "{error}");
         // Explain goes beside it, as often as asked.
         let explain = start(JobKind::Explain)?;
         let again = start(JobKind::Explain)?;

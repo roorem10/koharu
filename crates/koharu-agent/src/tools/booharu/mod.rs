@@ -220,8 +220,8 @@ pub trait BooharuHost: Send + Sync {
         let _ = (session, model);
         Box::pin(async {
             anyhow::bail!(
-                "Read chapter runs in the app, which reads with its models, and can't read the \
-                 chapter here"
+                "Analyze chapter runs in the app, which analyzes with its models, and can't \
+                 analyze the chapter here"
             )
         })
     }

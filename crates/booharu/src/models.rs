@@ -35,7 +35,7 @@ impl CantRead {
         match self {
             Self::NoVision => format!("{model} has no vision, so it can't see the pages"),
             Self::OnlyTranslates => {
-                format!("{model} only translates, so it can't read the chapter")
+                format!("{model} only translates, so it can't analyze the chapter")
             }
         }
     }
@@ -95,8 +95,8 @@ pub fn named_reader<'m>(models: &[Model], model: &'m str) -> Result<&'m str> {
     match can_read(models, model) {
         Ok(()) => Ok(model),
         Err(why) => bail!(
-            "{}. Leave out `model` to read with the Read chapter model, or name a model that sees \
-             images and calls tools.",
+            "{}. Leave out `model` to analyze with the Analyze chapter model, or name a model that \
+             sees images and calls tools.",
             why.why(model)
         ),
     }
@@ -309,7 +309,7 @@ mod tests {
         assert_eq!(
             explain_model(&models, Some(TEXT), GEMMA, Some("openai/gpt")).as_deref(),
             Some(TEXT),
-            "the Read chapter model first, though it sees no pages"
+            "the Analyze chapter model first, though it sees no pages"
         );
         assert_eq!(
             explain_model(&models, None, GEMMA, Some("openai/gpt")).as_deref(),

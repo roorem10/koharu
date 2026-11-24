@@ -168,13 +168,13 @@ fn presets<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<RunPreset>,
         }
         if preset.stages.iter().all(|&stage| stage == RunStage::Read) {
             return Err(D::Error::custom(format!(
-                "the run preset \"{name}\" has no stage other than Read chapter"
+                "the run preset \"{name}\" has no stage other than Analyze chapter"
             )));
         }
         if preset.stages.contains(&RunStage::Read) && !preset.stages.contains(&RunStage::Translate)
         {
             return Err(D::Error::custom(format!(
-                "the run preset \"{name}\" reads the chapter without translating it"
+                "the run preset \"{name}\" analyzes the chapter without translating it"
             )));
         }
     }

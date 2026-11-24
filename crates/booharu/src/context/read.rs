@@ -878,15 +878,15 @@ pub enum Skip {
 impl fmt::Display for Skip {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::HasBrief => f.write_str("The chapter was read meanwhile."),
-            Self::NoText => f.write_str("There's no text to read; run OCR first."),
+            Self::HasBrief => f.write_str("The chapter was analyzed meanwhile."),
+            Self::NoText => f.write_str("There's no text to analyze; run OCR first."),
             Self::CantRead {
                 model,
                 why,
                 saved: true,
             } => write!(
                 f,
-                "{}. Choose another Read chapter model in Settings > Pipeline.",
+                "{}. Choose another Analyze chapter model in Settings > Pipeline.",
                 why.why(model)
             ),
             Self::CantRead {
@@ -895,11 +895,11 @@ impl fmt::Display for Skip {
                 saved: false,
             } => write!(
                 f,
-                "No model can read the chapter: {}. Choose a Read chapter model in Settings > \
-                 Pipeline.",
+                "No model can analyze the chapter: {}. Choose an Analyze chapter model in \
+                 Settings > Pipeline.",
                 why.why(model)
             ),
-            Self::OnlyInApp => f.write_str("Read chapter reads only in the app."),
+            Self::OnlyInApp => f.write_str("Analyze chapter runs only in the app."),
         }
     }
 }
@@ -991,7 +991,7 @@ where
     F: Fn(Question) -> Fut,
     Fut: Future<Output = Result<Option<String>>>,
 {
-    ensure!(!prepared.pages.is_empty(), "there are no pages to read");
+    ensure!(!prepared.pages.is_empty(), "there are no pages to analyze");
     let chunks = prepared.chunks(reader.pages_per_request, fit.window, fit.output);
     let steps = count(chunks.len());
     host.progress(0, steps);
@@ -1012,7 +1012,7 @@ where
             let sight = calls::page_sight(Arc::clone(&session), page.id, SIGHT)
                 .await
                 .with_context(|| {
-                    format!("Read chapter couldn't read page {}'s scan", page.number)
+                    format!("Analyze chapter couldn't read page {}'s scan", page.number)
                 })?;
             places.push(sight.as_ref().map(|_| images.len()));
             images.extend(sight);
@@ -1066,8 +1066,8 @@ where
 /// What a failed chunk's error says first.
 fn pages_named(first: u32, last: u32) -> String {
     match first == last {
-        true => format!("Read chapter couldn't read page {first}"),
-        false => format!("Read chapter couldn't read pages {first} to {last}"),
+        true => format!("Analyze chapter failed on page {first}"),
+        false => format!("Analyze chapter failed on pages {first} to {last}"),
     }
 }
 
@@ -2083,7 +2083,7 @@ mod tests {
         .await?;
         let error = outcome.expect_err("failed twice");
         assert!(
-            format!("{error:#}").contains("couldn't read pages 1 to 2: the server is busy"),
+            format!("{error:#}").contains("failed on pages 1 to 2: the server is busy"),
             "{error:#}"
         );
         assert_eq!(asked, 2);

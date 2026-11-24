@@ -39,7 +39,7 @@ beforeEach(() => {
 })
 
 describe('Booharu’s reads in the Activity center', () => {
-  it('lists a read going as Reading chapter, with its share done and Stop, until it ends', async () => {
+  it('lists a read going as Analyzing chapter, with its share done and Stop, until it ends', async () => {
     settingsDesktop()
     const user = userEvent.setup()
     renderWithQueries(<ActivityCenter />)
@@ -47,14 +47,14 @@ describe('Booharu’s reads in the Activity center', () => {
 
     tell(read())
     expect(screen.getByRole('complementary', { name: 'Activity' })).toBeInTheDocument()
-    expect(screen.getByText('Reading chapter')).toBeInTheDocument()
+    expect(screen.getByText('Analyzing chapter')).toBeInTheDocument()
     // It shows going before it knows how many requests the chapter takes.
-    expect(screen.getByRole('progressbar', { name: 'Reading chapter' })).not.toHaveAttribute(
+    expect(screen.getByRole('progressbar', { name: 'Analyzing chapter' })).not.toHaveAttribute(
       'aria-valuenow',
     )
 
     tell(read({ step: 1, steps: 4 }))
-    const bar = screen.getByRole('progressbar', { name: 'Reading chapter' })
+    const bar = screen.getByRole('progressbar', { name: 'Analyzing chapter' })
     expect(bar).toHaveAttribute('aria-valuenow', '1')
     expect(bar).toHaveAttribute('aria-valuemax', '4')
     expect(screen.getByText('25%')).toBeInTheDocument()
@@ -63,7 +63,7 @@ describe('Booharu’s reads in the Activity center', () => {
     expect(commands.stopPipeline).toHaveBeenCalledTimes(1)
 
     tell(read({ state: 'stopped', step: 1, steps: 4 }))
-    expect(screen.queryByText('Reading chapter')).toBeNull()
+    expect(screen.queryByText('Analyzing chapter')).toBeNull()
     expect(screen.queryByRole('complementary', { name: 'Activity' })).toBeNull()
   })
 
@@ -130,7 +130,7 @@ describe('Booharu’s jobs', () => {
         id: 1,
         group: 5,
         state: 'skipped',
-        message: 'No model can read the chapter: koharu/index-translate-9b only translates.',
+        message: 'No model can analyze the chapter: koharu/index-translate-9b only translates.',
         skip: {
           kind: 'cant_read',
           model: 'koharu/index-translate-9b',
@@ -144,7 +144,7 @@ describe('Booharu’s jobs', () => {
         id: 6,
         group: 5,
         state: 'skipped',
-        message: 'The chapter was read meanwhile.',
+        message: 'The chapter was analyzed meanwhile.',
         skip: { kind: 'has_brief' },
       }),
     )
@@ -159,11 +159,11 @@ describe('Booharu’s jobs', () => {
     ).toEqual([
       [
         'warning',
-        'Read chapter was skipped',
-        "Index-Translate 9B only translates, so it can't read the chapter. Choose a model that can read the pages.",
+        'Analyze chapter was skipped',
+        "Index-Translate 9B only translates, so it can't analyze the chapter. Choose a model that can analyze the pages.",
       ],
-      ['warning', 'Read chapter was skipped', 'The chapter already has a brief.'],
-      ['warning', 'Read chapter failed', 'no connection'],
+      ['warning', 'Analyze chapter was skipped', 'The chapter already has a brief.'],
+      ['warning', 'Analyze chapter failed', 'no connection'],
     ])
     expect(useBooharuJobs.getState().jobs).toEqual({})
   })

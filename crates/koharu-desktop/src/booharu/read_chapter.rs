@@ -197,15 +197,15 @@ pub(crate) async fn read_chapter(
 fn free(told: &[Event], group: Option<u64>, loading: bool) -> anyhow::Result<()> {
     ensure!(
         !runs::run_going(told),
-        "Read chapter can't start while a run is going; wait for it to end, or stop it."
+        "Analyze chapter can't start while a run is going; wait for it to end, or stop it."
     );
     ensure!(
         runs::group_going().is_none_or(|going| Some(going) == group),
-        "Read chapter can't start while a Run press is going; wait for it to end, or stop it."
+        "Analyze chapter can't start while a Run press is going; wait for it to end, or stop it."
     );
     ensure!(
         !loading,
-        "Read chapter can't start while pages are still loading into this chapter; wait until they're in."
+        "Analyze chapter can't start while pages are still loading into this chapter; wait until they're in."
     );
     Ok(())
 }
@@ -287,7 +287,7 @@ async fn reading(
     };
     let Some(model) = connect(&reference, size, &stops)
         .await
-        .with_context(|| format!("Read chapter couldn't load {reference}"))?
+        .with_context(|| format!("Analyze chapter couldn't load {reference}"))?
     else {
         return Ok(ReadOutcome::Stopped);
     };
@@ -502,7 +502,7 @@ mod tests {
     use super::*;
 
     /// Why a read is refused while pages are still loading into the project.
-    const LOADING: &str = "Read chapter can't start while pages are still loading into this chapter; wait until they're in.";
+    const LOADING: &str = "Analyze chapter can't start while pages are still loading into this chapter; wait until they're in.";
 
     fn running() -> BooharuJob {
         BooharuJob {
@@ -537,17 +537,17 @@ mod tests {
             (
                 JobState::Skipped,
                 Some(Skip::NoText),
-                Some("There's no text to read; run OCR first.")
+                Some("There's no text to analyze; run OCR first.")
             )
         );
         let mut failed = running();
-        let error = anyhow::anyhow!("no answer").context("Read chapter couldn't read page 1");
+        let error = anyhow::anyhow!("no answer").context("Analyze chapter failed on page 1");
         ended(&mut failed, &Err(error));
         assert_eq!(
             (failed.state, failed.message.as_deref()),
             (
                 JobState::Failed,
-                Some("Read chapter couldn't read page 1: no answer")
+                Some("Analyze chapter failed on page 1: no answer")
             )
         );
         let mut stopped = running();

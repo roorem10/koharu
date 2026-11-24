@@ -67,7 +67,7 @@ impl Tool for GetChapterContext {
          reads as background, its `characters` and how they speak, and its `glossary`), or none, \
          and whether that series' file is gone (`missing`); the terms suggested for this chapter \
          (`suggestions`), which its translation follows as the series' terms until the user \
-         accepts them into the series or dismisses them; the `brief` Read chapter wrote, what \
+         accepts them into the series or dismisses them; the `brief` Analyze chapter wrote, what \
          happens and who is in it; the glossary terms `found` in the chapter's text, locked ones \
          first; and `extras`, word for word what a run translating the chapter now adds after \
          the user's Instructions: the glossary terms the chapter uses, at most 60 (`left_out` \
@@ -298,13 +298,13 @@ impl Tool for AddGlossaryEntry {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        "Suggest a glossary term for the open chapter, as Read chapter does: its `source` as the \
-         pages write it, the `target` its translation should keep to, its `kind`, and a `note`. \
-         The chapter's translation follows a suggestion as it follows the series' terms, until \
-         the user accepts it into the series or dismisses it. It never replaces a term, locked \
-         or not: when the series the chapter is linked to, or the chapter's suggestions, have \
-         one with that source already, ignoring case and whitespace, it adds nothing and answers \
-         `suggested` false. Use it for a name or term you find while translating; \
+        "Suggest a glossary term for the open chapter, as Analyze chapter does: its `source` as \
+         the pages write it, the `target` its translation should keep to, its `kind`, and a \
+         `note`. The chapter's translation follows a suggestion as it follows the series' terms, \
+         until the user accepts it into the series or dismisses it. It never replaces a term, \
+         locked or not: when the series the chapter is linked to, or the chapter's suggestions, \
+         have one with that source already, ignoring case and whitespace, it adds nothing and \
+         answers `suggested` false. Use it for a name or term you find while translating; \
          booharu_save_glossary_entry changes the series' glossary when the user asks."
             .to_owned()
     }

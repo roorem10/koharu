@@ -172,7 +172,7 @@ pub fn usable(model: &DynModel<Completion>, reference: &str, images: bool) -> Re
         .is_some_and(|spec| spec.details.kind.as_deref() == Some(koharu_llm::TRANSLATION));
     ensure!(
         !translates,
-        "{reference} only translates, so it can't read or explain the chapter"
+        "{reference} only translates, so it can't analyze or explain the chapter"
     );
     ensure!(
         !images || reads_images(model),

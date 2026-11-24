@@ -37,26 +37,26 @@ impl Tool for ReadChapter {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        "Read chapter, as the Context tab's button does once the user says yes, but at once, \
-         asking nothing: a model that sees the pages reads the open chapter whole and, once \
-         every page is read, writes the chapter's brief, what happens and who is in it, keeping \
-         a summary the user wrote; suggests the terms it finds that the linked series and the \
-         suggestions lack; and gives each line its lettering category, never over a category \
-         the user chose, and a note, leaving locked lines alone. It reads with the Read chapter \
-         model, else with the translation model when that one can read pages, or with `model` \
-         for this read alone, which isn't saved; a model that reads must see images and call \
-         tools. A run you start doesn't read the chapter first on its own: call this before \
-         translating a chapter that has text but no brief, as the `booharu` part of the \
-         project's outline then says. A read takes a while, and a hosted model charges \
-         for it. Answers once the read ends: what it did, with the `model` that read and how \
-         many `pages` it read in how many `chunks`, or `stopped` when Stop or closing the \
-         project ended it, having written nothing. Refused while a run, a Run press or another \
-         read goes, or while Koharu's Gallery is still loading pages into the chapter, saying to \
-         wait until they're in; with no text on the pages, saying to run OCR first; and with no \
-         model that can read them, saying why: tell the user, who can choose a Read chapter \
-         model in Settings > Pipeline. A `model` you name that can't read is refused by name: \
-         call again without it, or with one that can. Only in the app. Needs a project open, as \
-         every tool here does."
+        "Analyze chapter, as the Context tab's button does once the user says yes, but at once, \
+         asking nothing: a model that sees the pages analyzes the open chapter whole and, once \
+         every page is analyzed, writes the chapter's brief, what happens and who is in it, \
+         keeping a summary the user wrote; suggests the terms it finds that the linked series \
+         and the suggestions lack; and gives each line its lettering category, never over a \
+         category the user chose, and a note, leaving locked lines alone. It analyzes with the \
+         Analyze chapter model, else with the translation model when that one can, or with \
+         `model` for this analysis alone, which isn't saved; a model that analyzes must see \
+         images and call tools. A run you start doesn't analyze the chapter first on its own: \
+         call this before translating a chapter that has text but no brief, as the `booharu` \
+         part of the project's outline then says. An analysis takes a while, and a hosted model \
+         charges for it. Answers once the analysis ends: what it did, with the `model` that \
+         analyzed and how many `pages` it analyzed in how many `chunks`, or `stopped` when Stop \
+         or closing the project ended it, having written nothing. Refused while a run, a Run \
+         press or another analysis goes, or while Koharu's Gallery is still loading pages into \
+         the chapter, saying to wait until they're in; with no text on the pages, saying to run \
+         OCR first; and with no model that can analyze them, saying why: tell the user, who can \
+         choose an Analyze chapter model in Settings > Pipeline. A `model` you name that can't \
+         analyze is refused by name: call again without it, or with one that can. Only in the \
+         app. Needs a project open, as every tool here does."
             .to_owned()
     }
 
@@ -105,10 +105,10 @@ impl Tool for SetChapterBrief {
 
     fn description(&self) -> String {
         "Set the summary of the open chapter's brief, what happens in it, as Save brief in the \
-         Context tab's brief dialog does: trimmed, and marked as the user's, so reading the \
+         Context tab's brief dialog does: trimmed, and marked as the user's, so analyzing the \
          chapter again keeps it; the brief's characters, and when and with which model the \
-         chapter was read, stay as they are. Every translation run on the chapter sends the \
-         summary. A blank summary counts as no brief, so the next read writes one. Answers \
+         chapter was analyzed, stay as they are. Every translation run on the chapter sends the \
+         summary. A blank summary counts as no brief, so the next analysis writes one. Answers \
          whether it `changed` anything, and the `brief` as saved. Needs a project open, as \
          every tool here does."
             .to_owned()

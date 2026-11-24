@@ -69,8 +69,8 @@ async fn explain_line(app: Arc<App>, layer: LayerId) -> anyhow::Result<ExplainAn
         agent.as_deref(),
     )
     .context(
-        "No model can explain this line: choose a Read chapter model in Settings > Pipeline, or \
-         a model for the agent.",
+        "No model can explain this line: choose an Analyze chapter model in Settings > Pipeline, \
+         or a model for the agent.",
     )?;
     let session = app.session()?;
     let (path, project) = {

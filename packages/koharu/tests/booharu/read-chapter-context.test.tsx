@@ -138,14 +138,14 @@ async function renderPanel() {
   await waitFor(() => expect(readButton()).toBeEnabled())
 }
 
-const readButton = () => screen.getByRole('button', { name: 'Read chapter' })
+const readButton = () => screen.getByRole('button', { name: 'Analyze chapter' })
 
-/** The Read chapter dialog, none while it's closed. Toasts are dialogs too. */
-const readDialog = () => screen.queryByRole('dialog', { name: 'Read chapter' })
+/** The Analyze chapter dialog, none while it's closed. Toasts are dialogs too. */
+const readDialog = () => screen.queryByRole('dialog', { name: 'Analyze chapter' })
 
-/** The Read chapter dialog, once it asks `question`. */
+/** The Analyze chapter dialog, once it asks `question`. */
 async function asking(question: string | RegExp) {
-  const dialog = await screen.findByRole('dialog', { name: 'Read chapter' })
+  const dialog = await screen.findByRole('dialog', { name: 'Analyze chapter' })
   await waitFor(() => expect(dialog).toHaveAccessibleDescription(question))
   return within(dialog)
 }
@@ -159,7 +159,7 @@ beforeEach(() => {
   useBooharuJobs.setState({ jobs: {} })
 })
 
-describe('Read chapter in the Context tab', () => {
+describe('Analyze chapter in the Context tab', () => {
   it('links a series first, asks for a separate model, saves the one picked, and asks once more', async () => {
     const { read, saves } = readDesktop({
       linked: null,
@@ -182,13 +182,13 @@ describe('Read chapter in the Context tab', () => {
 
     // The translation model sees no images, so no model can read the pages.
     const separate = await asking(
-      "Text Only has no vision capabilities, so it can't see the pages. Use a separate model for reading?",
+      "Text Only has no vision capabilities, so it can't see the pages. Use a separate model for analysis?",
     )
     expect(commands.booharuLinkSeries).toHaveBeenCalledWith('new-series-000000000000')
     await answer(user, separate, 'Yes')
 
     const pick = await asking(
-      'Choose a vision model for reading chapters. This choice is saved for next time. Local models download automatically when reading starts if needed.',
+      'Choose a vision model for analyzing chapters. This choice is saved for next time. Local models download automatically when analysis starts if needed.',
     )
     const choices = within(await pick.findByRole('listbox', { name: 'Choose a model' }))
     // Only the models that can read the pages.
@@ -199,7 +199,7 @@ describe('Read chapter in the Context tab', () => {
     await user.click(choices.getByRole('option', { name: 'Use Gemma 4 12B from Koharu' }))
 
     const confirm = await asking(
-      'Gemma 4 12B will read the whole chapter on this computer. This can take a while. Are you sure?',
+      'Gemma 4 12B will analyze the whole chapter on this computer. This can take a while. Are you sure?',
     )
     expect(saves).toHaveLength(1)
     expect(saves[0]!['booharu-reading']).toEqual({ ...builtInReading, model: gemma.reference })
@@ -216,10 +216,10 @@ describe('Read chapter in the Context tab', () => {
     })
     expect(readDialog()).toBeNull()
     // The button says so while the chapter is read.
-    expect(screen.getByRole('button', { name: 'Reading chapter…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Analyzing chapter…' })).toBeDisabled()
 
     await act(async () => finish(readSummary()))
-    expect(await screen.findByText('Read 12 pages with Gemma 4 12B')).toBeInTheDocument()
+    expect(await screen.findByText('Analyzed 12 pages with Gemma 4 12B')).toBeInTheDocument()
     expect(
       screen.getByText(
         'Found 3 characters. Suggested 2 terms for the glossary. Set the lettering category of 40 lines. Wrote notes on 5 lines. Skipped 1 locked line.',
@@ -236,7 +236,7 @@ describe('Read chapter in the Context tab', () => {
 
     await user.click(readButton())
     const separate = await asking(
-      "Index-Translate 9B only translates, so it can't read the chapter. Use a separate model for reading?",
+      "Index-Translate 9B only translates, so it can't analyze the chapter. Use a separate model for analysis?",
     )
     await answer(user, separate, 'No')
     await waitFor(() => expect(readDialog()).toBeNull())
@@ -244,7 +244,7 @@ describe('Read chapter in the Context tab', () => {
     await user.click(readButton())
     await answer(user, await asking(/only translates/), 'Yes')
     const pick = await asking(
-      'Choose a vision model for reading chapters. This choice is saved for next time. Local models download automatically when reading starts if needed.',
+      'Choose a vision model for analyzing chapters. This choice is saved for next time. Local models download automatically when analysis starts if needed.',
     )
     await answer(user, pick, 'Cancel')
     await waitFor(() => expect(readDialog()).toBeNull())
@@ -259,7 +259,7 @@ describe('Read chapter in the Context tab', () => {
 
     await user.click(readButton())
     const confirm = await asking(
-      'GPT-5.4 will read the whole chapter. This will use API credits. Are you sure?',
+      'GPT-5.4 will analyze the whole chapter. This will use API credits. Are you sure?',
     )
     await answer(user, confirm, 'No')
     await waitFor(() => expect(readDialog()).toBeNull())
@@ -272,7 +272,7 @@ describe('Read chapter in the Context tab', () => {
     await waitFor(() => expect(read).toHaveBeenCalledWith(null))
     expect(readDialog()).toBeNull()
     expect(
-      await screen.findByText('Stopped reading the chapter. Nothing was saved.'),
+      await screen.findByText('Stopped analyzing the chapter. Nothing was saved.'),
     ).toBeInTheDocument()
     expect(saves).toEqual([])
   })
@@ -296,17 +296,19 @@ describe('Read chapter in the Context tab', () => {
     expect(readButton()).toHaveAttribute('aria-busy', 'true')
 
     await act(async () => tell())
-    await asking('GPT-5.4 will read the whole chapter. This will use API credits. Are you sure?')
+    await asking('GPT-5.4 will analyze the whole chapter. This will use API credits. Are you sure?')
   })
 
-  it('shows a refusal’s error, and says Reading chapter… while a Run press reads', async () => {
+  it('shows a refusal’s error, and says Analyzing chapter… while a Run press analyzes', async () => {
     const { read } = readDesktop({ reading: { ask: false } })
-    read.mockRejectedValueOnce("There's no text to read; run OCR first.")
+    read.mockRejectedValueOnce("There's no text to analyze; run OCR first.")
     const user = userEvent.setup()
     await renderPanel()
 
     await user.click(readButton())
-    expect(await screen.findByText("There's no text to read; run OCR first.")).toBeInTheDocument()
+    expect(
+      await screen.findByText("There's no text to analyze; run OCR first."),
+    ).toBeInTheDocument()
     await waitFor(() => expect(readButton()).toBeEnabled())
 
     act(() =>
@@ -326,7 +328,7 @@ describe('Read chapter in the Context tab', () => {
         },
       }),
     )
-    expect(screen.getByRole('button', { name: 'Reading chapter…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Analyzing chapter…' })).toBeDisabled()
   })
 })
 
@@ -336,7 +338,7 @@ describe('The chapter brief in the Context tab', () => {
     const user = userEvent.setup()
     await renderPanel()
     expect(screen.getByRole('heading', { name: 'Chapter brief' })).toBeInTheDocument()
-    expect(screen.getByText('Not read yet')).toBeInTheDocument()
+    expect(screen.getByText('Not analyzed yet')).toBeInTheDocument()
 
     files.brief = {
       summary: 'Isagi joins Blue Lock.',
@@ -353,7 +355,7 @@ describe('The chapter brief in the Context tab', () => {
       dateStyle: 'medium',
       timeStyle: 'short',
     }).format(new Date('2026-11-19T09:30:00Z'))
-    expect(await screen.findByText(`Last read ${time} with GPT-5.4`)).toBeInTheDocument()
+    expect(await screen.findByText(`Last analyzed ${time} with GPT-5.4`)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'View' }))
     const dialog = within(await screen.findByRole('dialog', { name: 'Chapter brief' }))
@@ -378,10 +380,12 @@ describe('The chapter brief in the Context tab', () => {
       edited: true,
     })
     // Saving keeps when and with what the chapter was read.
-    expect(screen.getByText(`Last read ${time} with GPT-5.4`)).toBeInTheDocument()
+    expect(screen.getByText(`Last analyzed ${time} with GPT-5.4`)).toBeInTheDocument()
 
     files.brief = { ...files.brief!, read_model: null }
     await act(() => refreshContext())
-    expect(await screen.findByText(`Last read ${time} with an earlier model`)).toBeInTheDocument()
+    expect(
+      await screen.findByText(`Last analyzed ${time} with an earlier model`),
+    ).toBeInTheDocument()
   })
 })

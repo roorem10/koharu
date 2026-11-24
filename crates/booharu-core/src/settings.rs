@@ -447,7 +447,7 @@ fn reading_model<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<St
         .is_some_and(|model| model.trim().is_empty())
     {
         return Err(D::Error::custom(
-            "the Read chapter model can't be blank; leave it out for the translation model",
+            "the Analyze chapter model can't be blank; leave it out for the translation model",
         ));
     }
     Ok(model)
@@ -457,7 +457,7 @@ fn pages_per_request<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u32, 
     let pages = u32::deserialize(deserializer)?;
     if !(1..=MAX_PAGES_PER_REQUEST).contains(&pages) {
         return Err(D::Error::custom(format!(
-            "{pages} pages per Read chapter request aren't between 1 and {MAX_PAGES_PER_REQUEST}"
+            "{pages} pages per Analyze chapter request aren't between 1 and {MAX_PAGES_PER_REQUEST}"
         )));
     }
     Ok(pages)

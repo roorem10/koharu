@@ -98,7 +98,7 @@ impl Tool for Run {
          stages, the groups one after another, each run following Booharu's run settings \
          (`booharu-runs`). Answers the plan at once: its `group` number, `groups`, each with \
          its `stages` and `pages`, `run`, the group's run going now, and `reading`, true while \
-         the group reads the chapter instead; no groups and no run when nothing is left to do. \
+         the group analyzes the chapter instead; no groups and no run when nothing is left to do. \
          Follow it with wait on `run`. A run that ended failed or stopped ends its group: tell \
          the user so rather than call again. Once a run ended otherwise, call booharu_run \
          again: while its group goes on, it answers the same `group` with the run going now, \
@@ -116,21 +116,22 @@ impl Tool for Run {
          translation first, then one group of translation alone, on the pages that still need \
          it once the others went (with fewer stages, on every page named), leaving out any page \
          a run of the group gave up on; a page's stages are then those of every group it's in. \
-         `stages` left out are Koharu's four without `read`, so a call reads the chapter only \
-         when it names `read`. With `read` and `translate`, a plan that translates, on a \
-         chapter without a brief (none, or one with a blank summary), translates last whatever \
-         it finds, and reads the chapter just before: a group with `read` true, no `stages`, \
-         and every page of the project, whose read leaves out any page a run of the group gave \
-         up on and writes the chapter's brief, suggested terms, and each line's lettering \
-         category and note, as booharu_read_chapter does. While it reads, `run` is null and \
-         `reading` true, and wait can't wait on a read: call booharu_run again after a pause, \
-         and it answers the group as it is then, still reading, or with the translation run to \
-         wait on. A read that is skipped, as the chapter has a brief by then, the pages have no \
-         text, or no model can read them, or that fails, still goes on to translation; a Stop \
-         while it reads ends the group. `read` without `translate` changes nothing, and alone \
-         runs nothing. booharu_read_chapter reads the chapter by hand, and while it reads, this \
-         tool is refused. A call whose plan would read is refused while Koharu's Gallery is \
-         still loading pages into the chapter: wait until they're in, or call without `read`. \
+         `stages` left out are Koharu's four without `read`, Analyze chapter, so a call analyzes \
+         the chapter only when it names `read`. With `read` and `translate`, a plan that \
+         translates, on a chapter without a brief (none, or one with a blank summary), translates \
+         last whatever it finds, and analyzes the chapter just before: a group with `read` true, \
+         no `stages`, and every page of the project, whose analysis leaves out any page a run of \
+         the group gave up on and writes the chapter's brief, suggested terms, and each line's \
+         lettering category and note, as booharu_read_chapter does. While it analyzes, `run` is \
+         null and `reading` true, and wait can't wait on an analysis: call booharu_run again after \
+         a pause, and it answers the group as it is then, still analyzing, or with the translation \
+         run to wait on. An analysis that is skipped, as the chapter has a brief by then, the \
+         pages have no text, or no model can analyze them, or that fails, still goes on to \
+         translation; a Stop while it analyzes ends the group. `read` without `translate` changes \
+         nothing, and alone runs nothing. booharu_read_chapter analyzes the chapter by hand, and \
+         while it does, this tool is refused. A call whose plan would analyze the chapter is \
+         refused while Koharu's Gallery is still loading pages into the chapter: wait until \
+         they're in, or call without `read`. \
          Its runs leave blocks alone as run's do (locked blocks, blocks fixed by hand, and sound \
          effects the SFX mode keeps as art), as wait's `skipped` tells; booharu_redo_boxes runs \
          stages again on chosen blocks, the hand-fixed ones too on purpose. Needs a project \
@@ -152,8 +153,8 @@ impl Tool for Run {
         let stages = stages(args.stages);
         if !stages.iter().any(|&stage| pipeline_stage(stage).is_some()) {
             return Err(failed(
-                "A run needs a stage other than `read`: Read chapter reads only just before a \
-                 run translates; booharu_read_chapter reads the chapter by hand.",
+                "A run needs a stage other than `read`: Analyze chapter goes only just before a \
+                 run translates; booharu_read_chapter analyzes the chapter by hand.",
             ));
         }
         runs::carry_on(host, Arc::clone(&tools.session), args.target, stages)
@@ -450,7 +451,7 @@ mod tests {
         let error = Run
             .call(&mut tools.tool_context(), args)
             .await
-            .expect_err("a run of Read chapter alone");
+            .expect_err("a run of Analyze chapter alone");
         assert!(
             error.to_string().contains("booharu_read_chapter"),
             "{error}"

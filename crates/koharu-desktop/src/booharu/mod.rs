@@ -158,7 +158,7 @@ impl BooharuHost for DesktopHost {
             .handle()
             .and_then(|handle| Some(Arc::clone(handle.try_state::<Arc<App>>()?.inner())));
         Box::pin(async move {
-            let app = app.context("Read chapter can't start before the app is up")?;
+            let app = app.context("Analyze chapter can't start before the app is up")?;
             let open = app
                 .project
                 .lock()

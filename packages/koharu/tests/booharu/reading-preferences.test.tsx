@@ -9,7 +9,7 @@ import { queryClient } from '@/lib/queries'
 import { gemma, indexTranslate, models, readingDesktop, textOnly } from './reading'
 import { builtInEmphasis, builtInLettering, builtInReading, builtInRuns } from './settings'
 
-/** Settings > Pipeline, where Read chapter's section follows the translator's. */
+/** Settings > Pipeline, where Analyze chapter's section follows the translator's. */
 function renderPipeline() {
   render(
     <QueryClientProvider client={queryClient}>
@@ -18,29 +18,29 @@ function renderPipeline() {
   )
 }
 
-/** Read chapter's section, once it shows the file's values. */
+/** Analyze chapter's section, once it shows the file's values. */
 async function readingSection() {
   const section = within(
-    (await screen.findByRole('heading', { name: 'Read chapter', level: 3 })).closest('section')!,
+    (await screen.findByRole('heading', { name: 'Analyze chapter', level: 3 })).closest('section')!,
   )
   await waitFor(() =>
-    expect(section.getByRole('switch', { name: 'Ask before reading a chapter' })).toBeEnabled(),
+    expect(section.getByRole('switch', { name: 'Ask before analyzing a chapter' })).toBeEnabled(),
   )
   return section
 }
 
-describe('Booharu Read chapter settings', () => {
+describe('Booharu Analyze chapter settings', () => {
   it('saves each row to the reading section at once, over every section’s latest value', async () => {
     const { file, saves } = readingDesktop({ translation: indexTranslate.reference })
     const user = userEvent.setup()
     renderPipeline()
     const section = await readingSection()
 
-    const model = section.getByRole('button', { name: 'Read chapter model' })
+    const model = section.getByRole('button', { name: 'Analyze chapter model' })
     expect(model).toHaveTextContent('Same as translation model')
     // The translation model only translates, so a read with it refuses.
     expect(section.getByRole('status')).toHaveTextContent(
-      "Index-Translate 9B only translates, so it can't read the chapter.",
+      "Index-Translate 9B only translates, so it can't analyze the chapter.",
     )
     // Another writer changes another section after the page read the file.
     file.preferences['booharu-mcp'] = { port: 50000 }
@@ -67,7 +67,7 @@ describe('Booharu Read chapter settings', () => {
     await waitFor(() => expect(model).toHaveTextContent('Gemma 4 12B'))
     expect(section.queryByRole('status')).toBeNull()
 
-    await user.click(section.getByRole('switch', { name: 'Ask before reading a chapter' }))
+    await user.click(section.getByRole('switch', { name: 'Ask before analyzing a chapter' }))
     await waitFor(() => expect(saves).toHaveLength(2))
     expect(saves[1]!['booharu-reading']).toEqual({
       model: gemma.reference,
@@ -78,7 +78,7 @@ describe('Booharu Read chapter settings', () => {
     await user.click(section.getByRole('button', { name: 'More pages' }))
     await waitFor(() => expect(saves).toHaveLength(3))
     expect(saves[2]!['booharu-reading']?.pages_per_request).toBe(21)
-    const pages = section.getByRole('textbox', { name: 'Pages per Read chapter request' })
+    const pages = section.getByRole('textbox', { name: 'Pages per Analyze chapter request' })
     await user.clear(pages)
     await user.type(pages, '8')
     await user.tab()
@@ -95,7 +95,7 @@ describe('Booharu Read chapter settings', () => {
     readingDesktop({ saved: textOnly.reference })
     renderPipeline()
     const section = await readingSection()
-    expect(section.getByRole('button', { name: 'Read chapter model' })).toHaveTextContent(
+    expect(section.getByRole('button', { name: 'Analyze chapter model' })).toHaveTextContent(
       'Text Only',
     )
     expect(section.getByRole('status')).toHaveTextContent(

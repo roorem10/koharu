@@ -223,7 +223,7 @@ fn start(
     // refused, and its runs would go on beside the read: one at a time.
     ensure!(
         !jobs::busy(JobKind::ReadChapter),
-        "Read chapter is reading the chapter; wait for it to end, or stop it."
+        "Analyze chapter is running; wait for it to end, or stop it."
     );
     let read = stages.contains(&RunStage::Read);
     let stages: Vec<Stage> = stages.iter().copied().filter_map(pipeline_stage).collect();
@@ -235,7 +235,7 @@ fn start(
     // is, before it takes the place or queues anything.
     ensure!(
         !(groups.iter().any(|group| group.read) && host.loading()),
-        "Read chapter can't start while pages are still loading into this chapter; wait until they're in, or run without Read chapter."
+        "Analyze chapter can't start while pages are still loading into this chapter; wait until they're in, or run without Analyze chapter."
     );
     let first = groups.first().map(|first| match first.read {
         true => First::Read(first.pages.clone()),
@@ -1744,7 +1744,7 @@ mod tests {
         };
         let read = jobs::start(JobKind::ReadChapter).expect("a read");
         let error = press().expect_err("refused while it reads");
-        assert!(error.to_string().contains("Read chapter"), "{error}");
+        assert!(error.to_string().contains("Analyze chapter"), "{error}");
         drop(read);
         let (plan, following) = press().expect("a plan");
         assert!(plan.groups.is_empty() && following.is_none(), "{plan:?}");
@@ -1778,7 +1778,7 @@ mod tests {
         let error = press(&reads).expect_err("refused while pages load");
         assert_eq!(
             error.to_string(),
-            "Read chapter can't start while pages are still loading into this chapter; wait until they're in, or run without Read chapter."
+            "Analyze chapter can't start while pages are still loading into this chapter; wait until they're in, or run without Analyze chapter."
         );
         assert!(GOING.lock().is_none(), "it took no place");
         assert!(host.queued().is_empty() && host.reads().is_empty());

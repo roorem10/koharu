@@ -38,7 +38,7 @@ describe('Booharu reading rules', () => {
     expect(readerOf(models, null, null)).toBeNull()
   })
 
-  it('starts Read chapter on for a chapter with a series, no brief and a model to read it', () => {
+  it('starts Analyze chapter on for a chapter with a series, no brief and a model to read it', () => {
     expect(readsByDefault(chapterState(), gpt.reference)).toBe(true)
     // A blank summary counts as no brief.
     expect(readsByDefault(chapterState({ summary: '  \n' }), gpt.reference)).toBe(true)
@@ -54,8 +54,8 @@ describe('Booharu reading rules', () => {
   })
 })
 
-describe('Booharu presets with Read chapter', () => {
-  it('keeps Read chapter before Translation, and only together with it', () => {
+describe('Booharu presets with Analyze chapter', () => {
+  it('keeps Analyze chapter before Translation, and only together with it', () => {
     expect(inRunOrder(['translate', 'read', 'detect'])).toEqual(['detect', 'read', 'translate'])
     expect(inRunOrder(['read', 'inpaint'])).toEqual(['inpaint'])
     expect(sameStages(['translate', 'read'], ['read', 'translate'])).toBe(true)
@@ -70,7 +70,7 @@ describe('Booharu presets with Read chapter', () => {
       'inpaint',
     ])
 
-    // Translate + clean up: Read chapter goes on before Translation, and off with it.
+    // Translate + clean up: Analyze chapter goes on before Translation, and off with it.
     const reads = tickPresetStage('Translate + clean up', 'read', true)(runs())
     expect(reads.presets[1]!.stages).toEqual(['inpaint', 'read', 'translate'])
     const cleans = tickPresetStage('Translate + clean up', 'translate', false)(reads)

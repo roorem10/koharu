@@ -49,7 +49,7 @@ const answer: ExplainAnswer = {
   model: gpt.reference,
 }
 
-/** Which models Read chapter and Explain this line use, Explain this line's `explain`. */
+/** Which models Analyze chapter and Explain this line use, Explain this line's `explain`. */
 function readingModel(explain: string | null): ReadingModel {
   return {
     model: explain,
@@ -292,13 +292,13 @@ describe('Booharu Explain this line', () => {
       (_, element) =>
         element?.tagName === 'P' &&
         element.textContent ===
-          'No model can explain lines. Choose a Read chapter model (Pipeline), or a model for the agent.',
+          'No model can explain lines. Choose an Analyze chapter model (Pipeline), or a model for the agent.',
     )
     expect(hint).toBeInTheDocument()
     expect(card.getByRole('button', { name: 'Explain this line' })).toBeDisabled()
     expect(ask).not.toHaveBeenCalled()
 
-    await user.click(card.getByRole('button', { name: 'Read chapter model' }))
+    await user.click(card.getByRole('button', { name: 'Analyze chapter model' }))
     expect(useKoharuStore.getState().settingsOpen).toBe(true)
   })
 

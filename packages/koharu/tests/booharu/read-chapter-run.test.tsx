@@ -37,10 +37,10 @@ async function openStages(user: User) {
   await user.click(await screen.findByRole('button', { name: /^Stages / }))
 }
 
-const readRow = () => screen.getByRole('button', { name: /^Read chapter/ })
+const readRow = () => screen.getByRole('button', { name: /^Analyze chapter/ })
 
 /** The Run menu's stages, as the stage list and the preset editor show them, in order. */
-const stageNames = ['Detection', 'OCR', 'Inpainting', 'Read chapter', 'Translation']
+const stageNames = ['Detection', 'OCR', 'Inpainting', 'Analyze chapter', 'Translation']
 
 /** The Run menu's presets. */
 const presets = () => within(screen.getByRole('group', { name: 'Presets' }))
@@ -49,7 +49,7 @@ beforeEach(() => {
   useReadSwitches.setState({ on: {} })
 })
 
-describe('Booharu’s Read chapter in the Run menu', () => {
+describe('Booharu’s Analyze chapter in the Run menu', () => {
   it('starts on with a series, no brief and a model to read it, before Translation', async () => {
     readingDesktop()
     const user = userEvent.setup()
@@ -58,7 +58,7 @@ describe('Booharu’s Read chapter in the Run menu', () => {
 
     await waitFor(() => expect(readRow()).toHaveAttribute('aria-pressed', 'true'))
     expect(readRow()).toHaveTextContent(
-      'Read chapterReads the whole chapter with GPT-5.4 before translating.',
+      'Analyze chapterAnalyzes the whole chapter with GPT-5.4 before translating.',
     )
     const order = screen
       .getAllByRole('button')
@@ -69,7 +69,7 @@ describe('Booharu’s Read chapter in the Run menu', () => {
     await user.click(screen.getByRole('button', { name: /^Translation/ }))
     expect(readRow()).toBeDisabled()
     expect(readRow()).toHaveAttribute('aria-pressed', 'false')
-    expect(readRow()).toHaveTextContent('Turn on Translation to read the chapter first.')
+    expect(readRow()).toHaveTextContent('Turn on Translation to analyze the chapter first.')
   })
 
   it('starts off once the chapter has a brief', async () => {
@@ -79,7 +79,7 @@ describe('Booharu’s Read chapter in the Run menu', () => {
     await openStages(user)
     await waitFor(() =>
       expect(readRow()).toHaveTextContent(
-        'Reads the whole chapter with GPT-5.4 before translating.',
+        'Analyzes the whole chapter with GPT-5.4 before translating.',
       ),
     )
     expect(readRow()).toHaveAttribute('aria-pressed', 'false')
@@ -91,7 +91,7 @@ describe('Booharu’s Read chapter in the Run menu', () => {
     renderCommandBar()
     await openStages(user)
     await waitFor(() =>
-      expect(readRow()).toHaveTextContent('Choose a model that can read the pages.'),
+      expect(readRow()).toHaveTextContent('Choose a model that can analyze the pages.'),
     )
     expect(readRow()).toHaveAttribute('aria-pressed', 'false')
 
@@ -103,7 +103,7 @@ describe('Booharu’s Read chapter in the Run menu', () => {
       'Gemma 4 12B',
     ])
     expect(
-      screen.getByText(/Choose a vision model for reading chapters\. This choice is saved/),
+      screen.getByText(/Choose a vision model for analyzing chapters\. This choice is saved/),
     ).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -118,11 +118,13 @@ describe('Booharu’s Read chapter in the Run menu', () => {
       ask: true,
       pages_per_request: 20,
     })
-    expect(readRow()).toHaveTextContent('Reads the whole chapter with GPT-5.4 before translating.')
+    expect(readRow()).toHaveTextContent(
+      'Analyzes the whole chapter with GPT-5.4 before translating.',
+    )
   })
 })
 
-describe('A Run press with Read chapter', () => {
+describe('A Run press with Analyze chapter', () => {
   it('sends Read to booharu_run, also with only Translation on', async () => {
     readingDesktop()
     const user = userEvent.setup()
@@ -172,8 +174,8 @@ describe('A Run press with Read chapter', () => {
   })
 })
 
-describe('Booharu presets with Read chapter in the Run menu', () => {
-  it('sets Read chapter from a preset, matches it, and saves it with the stages', async () => {
+describe('Booharu presets with Analyze chapter in the Run menu', () => {
+  it('sets Analyze chapter from a preset, matches it, and saves it with the stages', async () => {
     const { file, saves } = readingDesktop({ chapter: chapterState({ summary: 'A match.' }) })
     file.preferences['booharu-runs'].presets = [
       ...builtInRuns.presets,
@@ -189,7 +191,7 @@ describe('Booharu presets with Read chapter in the Run menu', () => {
     await user.click(reads)
     expect(useKoharuStore.getState().processingStages).toEqual(['recognize', 'translate'])
     expect(useReadSwitches.getState().on).toEqual({ 'Chapter 1': true })
-    // A preset matches only with Read chapter as it has it.
+    // A preset matches only with Analyze chapter as it has it.
     expect(reads).toHaveAttribute('aria-pressed', 'true')
     expect(translates).toHaveAttribute('aria-pressed', 'false')
 
@@ -211,8 +213,8 @@ describe('Booharu presets with Read chapter in the Run menu', () => {
   })
 })
 
-describe('Booharu Runs settings with Read chapter', () => {
-  it('ticks Read chapter between Inpainting and Translation, only with Translation', async () => {
+describe('Booharu Runs settings with Analyze chapter', () => {
+  it('ticks Analyze chapter between Inpainting and Translation, only with Translation', async () => {
     const { saves } = readingDesktop()
     useKoharuStore.setState({ settingsOpen: true })
     const user = userEvent.setup()
@@ -228,12 +230,12 @@ describe('Booharu Runs settings with Read chapter', () => {
     expect(translate.getAllByRole('checkbox')).toEqual(
       stageNames.map((name) => translate.getByRole('checkbox', { name })),
     )
-    expect(detect.getByRole('checkbox', { name: 'Read chapter' })).toHaveAttribute(
+    expect(detect.getByRole('checkbox', { name: 'Analyze chapter' })).toHaveAttribute(
       'aria-disabled',
       'true',
     )
 
-    await user.click(translate.getByRole('checkbox', { name: 'Read chapter' }))
+    await user.click(translate.getByRole('checkbox', { name: 'Analyze chapter' }))
     await waitFor(() => expect(saves).toHaveLength(1))
     expect(saves[0]!['booharu-runs'].presets?.[1]).toEqual({
       name: 'Translate + clean up',

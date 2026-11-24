@@ -58,18 +58,18 @@ impl Tool for GetSettings {
          of its size wide; `booharu-fonts` has \
          the font picker's `favorites`, family names; `booharu-runs` has the Run menu's \
          `presets`, each a `name` and its `stages` (`detect`, `recognize`, `inpaint`, `read`, \
-         `translate`; `read`, Read chapter, only with `translate`), which set the menu's stage \
+         `translate`; `read`, Analyze chapter, only with `translate`), which set the menu's stage \
          switches and start nothing, and how runs over \
          pages go, whoever starts them: `retries`, from 0 to 5, how often a failed page stage is \
          tried again, `on_page_failure`, `continue` with the other pages or `stop` the run, \
          `order`, `pages` (each page through its stages) or `stages` (one stage at a time over \
          every page, using less graphics memory), and `finish_sound`, whether a run over pages \
-         chimes as it ends; `booharu-reading` has Read chapter's `model`, the model that reads a \
-         chapter's pages, which must see images and call tools, as a `vendor/model` reference, \
-         or null for the translation model when that one can, `ask`, whether the Context tab's \
-         Read chapter asks before it reads, and `pages_per_request`, from 1 to 40, the most \
-         pages one request to the model sends (booharu_read_chapter reads with that model, or \
-         one it names); Explain this line asks the same `model` when one is set; \
+         chimes as it ends; `booharu-reading` has Analyze chapter's `model`, the model that \
+         analyzes a chapter's pages, which must see images and call tools, as a `vendor/model` \
+         reference, or null for the translation model when that one can, `ask`, whether the \
+         Context tab's Analyze chapter asks before it analyzes, and `pages_per_request`, from 1 to \
+         40, the most pages one request to the model sends (booharu_read_chapter analyzes with \
+         that model, or one it names); Explain this line asks the same `model` when one is set; \
          `booharu-qc` has the quality check's `min_size`, the smallest drawn text that reads, \
          as a share of the page's shorter side, above 0 and at most 0.1 (0.01 is 12 pixels on \
          a page 1,200 wide), under which a box's text is too small; \
@@ -163,11 +163,11 @@ impl Tool for SetSettings {
          change to `booharu-runs` applies to runs started from then on, the next run of a group \
          booharu_run carries on with included; a run already going keeps the settings it \
          started with. A preset's `stages` are among `detect`, `recognize`, `inpaint`, `read` \
-         and `translate`, with at least one other than `read`, Read chapter, which goes only \
-         with `translate`. A change to `booharu-reading` applies to the next read and the next \
-         line explained; a blank `model` is refused, so set it to null for the translation \
-         model. A change to `booharu-qc` applies to booharu_get_qc_findings at once, and to \
-         the QC tab as the app checks every page again after any section's save. A change to \
+         and `translate`, with at least one other than `read`, Analyze chapter, which goes only \
+         with `translate`. A change to `booharu-reading` applies to the next analysis and the next \
+         line explained; a blank `model` is refused, so set it to null for the translation model. \
+         A change to `booharu-qc` applies to booharu_get_qc_findings at once, and to the QC tab as \
+         the app checks every page again after any section's save. A change to \
          `booharu-emphasis` applies to runs started from then on and to booharu_style_words's \
          `emphasis` at once; words already stressed keep their look. `default` and each of \
          `categories` change only in the keys named, so `{\"categories\": {\"shout\": \
