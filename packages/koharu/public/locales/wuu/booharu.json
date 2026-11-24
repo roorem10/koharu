@@ -46,6 +46,15 @@
       "subtitleTranslating": "正在翻译音效，好加字幕…",
       "translate": "重新翻译"
     },
+    "cleanup": {
+      "decreaseHardness": "拿硬度调低点",
+      "decreaseOpacity": "拿不透明度调低点",
+      "hardness": "硬度",
+      "increaseHardness": "拿硬度调高点",
+      "increaseOpacity": "拿不透明度调高点",
+      "opacity": "不透明度",
+      "removeNote": "清理会放到文字排版下头。要修正文字框自家个清理，就辣框里向涂，或者重新清理。"
+    },
     "context": {
       "accept": "接受",
       "actions": "操作",

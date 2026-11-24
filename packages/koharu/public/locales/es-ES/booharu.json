@@ -52,6 +52,15 @@
       "subtitleTranslating": "Traduciendo el efecto de sonido para su subtítulo…",
       "translate": "Volver a traducir"
     },
+    "cleanup": {
+      "decreaseHardness": "Reducir dureza",
+      "decreaseOpacity": "Reducir opacidad",
+      "hardness": "Dureza",
+      "increaseHardness": "Aumentar dureza",
+      "increaseOpacity": "Aumentar opacidad",
+      "opacity": "Opacidad",
+      "removeNote": "La limpieza va debajo de la rotulación. Para corregir la limpieza de un cuadro, pinta dentro de él o vuelve a limpiarlo."
+    },
     "context": {
       "accept": "Aceptar",
       "actions": "Acciones",

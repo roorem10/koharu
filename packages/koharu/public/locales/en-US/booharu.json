@@ -46,6 +46,15 @@
       "subtitleTranslating": "Translating the sound effect for its subtitle…",
       "translate": "Translate again"
     },
+    "cleanup": {
+      "decreaseHardness": "Decrease hardness",
+      "decreaseOpacity": "Decrease opacity",
+      "hardness": "Hardness",
+      "increaseHardness": "Increase hardness",
+      "increaseOpacity": "Increase opacity",
+      "opacity": "Opacity",
+      "removeNote": "Clean-up goes under the lettering. To fix a box's own clean-up, paint into it or clean it again."
+    },
     "context": {
       "accept": "Accept",
       "actions": "Actions",

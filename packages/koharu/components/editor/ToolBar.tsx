@@ -17,6 +17,7 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import { OcrBoxHint, ocrBoxTool } from '@/components/booharu/boxes/OcrBoxTool' // Booharu: the O tool.
+import { BrushOptions } from '@/components/booharu/cleanup/BrushOptions' // Booharu: hardness and opacity.
 import { ColorWell } from '@/components/controls/ColorWell'
 import { usePage } from '@/lib/queries'
 import { shortcutLabel, toolKeys } from '@/lib/shortcuts'
@@ -200,6 +201,8 @@ function BrushSize({ value, onChange }: { value: number; onChange: (value: numbe
           className='py-1 [&_[data-slot=slider-thumb]]:size-2.5'
           onValueChange={onChange}
         />
+        {/* Booharu: the brush tool's hardness, Draw's opacity, and where Remove's clean-up goes. */}
+        <BrushOptions />
       </PopoverContent>
     </Popover>
   )

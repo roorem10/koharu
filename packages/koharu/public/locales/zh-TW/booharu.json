@@ -46,6 +46,15 @@
       "subtitleTranslating": "正在翻譯音效，以便新增字幕…",
       "translate": "重新翻譯"
     },
+    "cleanup": {
+      "decreaseHardness": "降低硬度",
+      "decreaseOpacity": "降低不透明度",
+      "hardness": "硬度",
+      "increaseHardness": "提高硬度",
+      "increaseOpacity": "提高不透明度",
+      "opacity": "不透明度",
+      "removeNote": "清理結果會放在排字下方。要修正文字框本身的清理，請在框內塗抹，或重新清理。"
+    },
     "context": {
       "accept": "接受",
       "actions": "操作",

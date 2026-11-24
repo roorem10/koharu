@@ -64,6 +64,15 @@
       "subtitleTranslating": "جارٍ ترجمة المؤثر الصوتي لإضافة ترجمته المصاحبة…",
       "translate": "إعادة الترجمة"
     },
+    "cleanup": {
+      "decreaseHardness": "تقليل الصلابة",
+      "decreaseOpacity": "تقليل العتامة",
+      "hardness": "الصلابة",
+      "increaseHardness": "زيادة الصلابة",
+      "increaseOpacity": "زيادة العتامة",
+      "opacity": "العتامة",
+      "removeNote": "يوضع التنظيف تحت التنضيد. لإصلاح تنظيف مربع بعينه، ارسم داخله أو أعد تنظيفه."
+    },
     "context": {
       "accept": "قبول",
       "actions": "الإجراءات",

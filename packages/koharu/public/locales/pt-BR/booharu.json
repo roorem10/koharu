@@ -52,6 +52,15 @@
       "subtitleTranslating": "Traduzindo o efeito sonoro para a legenda…",
       "translate": "Traduzir novamente"
     },
+    "cleanup": {
+      "decreaseHardness": "Diminuir dureza",
+      "decreaseOpacity": "Diminuir opacidade",
+      "hardness": "Dureza",
+      "increaseHardness": "Aumentar dureza",
+      "increaseOpacity": "Aumentar opacidade",
+      "opacity": "Opacidade",
+      "removeNote": "A limpeza fica sob o letreiramento. Para corrigir a limpeza de uma caixa, pinte dentro dela ou limpe-a novamente."
+    },
     "context": {
       "accept": "Aceitar",
       "actions": "Ações",
