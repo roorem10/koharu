@@ -1,11 +1,12 @@
 //! Read chapter as the app runs it (F17): [`read_chapter`] is the one
 //! function the Context tab's command, the Run step of a Run press, and the
 //! agent's tool all call. It refuses while a run or another Run press goes,
-//! reads the settings as it starts, picks the model that reads
-//! (`booharu::models`), frees the pipeline's models for one of Koharu's own
-//! and loads it, reads with `booharu::context::read`, writes only while the
-//! project read is still the one open and the read wasn't stopped, and
-//! tells the interface how it goes as `booharu_job`, then
+//! or while Koharu's Gallery is still loading pages into the open project
+//! ([`pages_loading`]), reads the settings as it starts, picks the model
+//! that reads (`booharu::models`), frees the pipeline's models for one of
+//! Koharu's own and loads it, reads with `booharu::context::read`, writes
+//! only while the project read is still the one open and the read wasn't
+//! stopped, and tells the interface how it goes as `booharu_job`, then
 //! `booharu_context_changed` once it wrote.
 //!
 //! A read is a job of `booharu::jobs`, which its caller registers, so a
@@ -32,10 +33,11 @@ use koharu_llm::{
     Model, Size,
     rig::{driver::DynModel, operation::Completion},
 };
-use koharu_pipeline::{Pipeline, PipelineConfig};
+use koharu_pipeline::{Event, Pipeline, PipelineConfig};
 use koharu_scene::{PageId, Session};
 use parking_lot::Mutex;
 use tauri::State;
+use tokio_util::task::AbortOnDropHandle;
 
 use super::{context::changed, styles::look};
 use crate::{app::App, commands::Result};
@@ -51,8 +53,9 @@ const REFIT: Duration = Duration::from_secs(2);
 /// `model` in its place, as the Context tab's button and the agent's tool
 /// do: its brief, the terms it suggests, and each line's lettering category
 /// and note, written once every page is read. Refuses while another read, a
-/// run, or a Run press goes; with no text, saying to run OCR first; and with
-/// no model that can read the pages, naming why. Answers what it did; a read
+/// run, or a Run press goes, or while the Gallery is still loading pages
+/// into the chapter; with no text, saying to run OCR first; and with no
+/// model that can read the pages, naming why. Answers what it did; a read
 /// stopped answers `stopped`, having written nothing.
 #[tauri::command]
 #[specta::specta]
@@ -135,8 +138,9 @@ pub(crate) struct ReadRequest {
 /// `booharu::jobs::start`, which refuses a second read: the one function
 /// every read goes through.
 ///
-/// It refuses while a run goes, or a `booharu_run` group other than
-/// `request.group`'s: a Run step telling only its failed end, so the press
+/// It refuses while a run goes, a `booharu_run` group other than
+/// `request.group`'s, or pages are still loading into the open project
+/// ([`pages_loading`]): a Run step telling only its failed end, so the press
 /// says why it translates without the read, and a read by hand nothing, as
 /// its caller answers. Then it tells the interface `booharu_job` as it
 /// starts, after each chunk of pages read, and as it ends, however it ends.
@@ -162,7 +166,7 @@ pub(crate) async fn read_chapter(
     job: Job,
 ) -> anyhow::Result<ReadOutcome> {
     let telling = Arc::new(Telling::new(&app, &job, request.group));
-    if let Err(error) = free(&app, request.group) {
+    if let Err(error) = free(&app.pipeline.told(), request.group, pages_loading(&app)) {
         let refused = Err(error);
         if request.group.is_some() {
             telling.tell(|job| ended(job, &refused));
@@ -186,18 +190,44 @@ pub(crate) async fn read_chapter(
 }
 
 /// Whether a read may start, as the Run step of `group` or, with none, by
-/// hand: not while a run goes, nor a `booharu_run` group other than
-/// `group`.
-fn free(app: &App, group: Option<u64>) -> anyhow::Result<()> {
+/// hand, with the events the pipeline `told` and whether pages are still
+/// `loading` into the open project ([`pages_loading`]): not while a run
+/// goes, nor a `booharu_run` group other than `group`, nor while pages are
+/// still loading.
+fn free(told: &[Event], group: Option<u64>, loading: bool) -> anyhow::Result<()> {
     ensure!(
-        !runs::run_going(&app.pipeline.told()),
+        !runs::run_going(told),
         "Read chapter can't start while a run is going; wait for it to end, or stop it."
     );
     ensure!(
         runs::group_going().is_none_or(|going| Some(going) == group),
         "Read chapter can't start while a Run press is going; wait for it to end, or stop it."
     );
+    ensure!(
+        !loading,
+        "Read chapter can't start while pages are still loading into this chapter; wait until they're in."
+    );
     Ok(())
+}
+
+/// Whether pages are still loading into the open project, as Koharu's
+/// Gallery loads a chapter's once it opened the chapter as the project,
+/// until the last is in or one fails to load: a read meanwhile would read
+/// only those in so far. Takes the open project's lock, so it's never
+/// called while that's held, as the lock isn't reentrant.
+pub(crate) fn pages_loading(app: &App) -> bool {
+    still_loading(
+        app.project
+            .lock()
+            .as_ref()
+            .and_then(|project| project.loading.as_ref()),
+    )
+}
+
+/// Whether `loading`, a project's loading of pages, still goes: not once
+/// its task ended, however it ended.
+fn still_loading(loading: Option<&AbortOnDropHandle<()>>) -> bool {
+    loading.is_some_and(|loading| !loading.is_finished())
 }
 
 /// [`read_chapter`]'s work once it started.
@@ -471,6 +501,9 @@ impl Drop for Ending {
 mod tests {
     use super::*;
 
+    /// Why a read is refused while pages are still loading into the project.
+    const LOADING: &str = "Read chapter can't start while pages are still loading into this chapter; wait until they're in.";
+
     fn running() -> BooharuJob {
         BooharuJob {
             id: 1,
@@ -537,5 +570,31 @@ mod tests {
             None,
             "a Stop ends the wait"
         );
+    }
+
+    #[tokio::test]
+    async fn pages_still_load_until_their_task_ends() {
+        assert!(!still_loading(None), "nothing loads");
+        let going = AbortOnDropHandle::new(tokio::spawn(std::future::pending::<()>()));
+        assert!(still_loading(Some(&going)), "while its task goes");
+        let done = AbortOnDropHandle::new(tokio::spawn(async {}));
+        while !done.is_finished() {
+            tokio::task::yield_now().await;
+        }
+        assert!(!still_loading(Some(&done)), "once its task ended");
+        going.abort();
+        while !going.is_finished() {
+            tokio::task::yield_now().await;
+        }
+        assert!(!still_loading(Some(&going)), "once its task was stopped");
+    }
+
+    #[test]
+    fn a_read_is_refused_while_pages_still_load() {
+        let refused = |group| free(&[], group, true).expect_err("refused").to_string();
+        assert_eq!(refused(None), LOADING, "by hand");
+        assert_eq!(refused(Some(7)), LOADING, "as a Run step");
+        free(&[], None, false).expect("by hand once they're in");
+        free(&[], Some(7), false).expect("as a Run step once they're in");
     }
 }

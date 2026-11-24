@@ -40,7 +40,10 @@
 //! stopped, or a Stop since the group reached it, ends the group, as a run
 //! that stopped does. The pages a run of the press gave up on are left out
 //! of the read too, and the read is never announced, so the Translation
-//! run's announcement stays the last.
+//! run's announcement stays the last. As the read takes the pages the
+//! project has as the press is planned, a press whose plan would read is
+//! refused while pages are still loading into the project, as Koharu's
+//! Gallery loads a chapter's ([`RunHost::loading`]).
 
 use std::{
     collections::BTreeSet,
@@ -124,6 +127,17 @@ pub trait RunHost: Send + Sync + 'static {
     fn lettering(&self) -> anyhow::Result<LetteringSettings> {
         LetteringSettings::read()
     }
+
+    /// Whether pages are still loading into the open project, as Koharu's
+    /// Gallery loads a chapter's once it opened the chapter as the project:
+    /// a press whose plan would read is refused meanwhile, as its read takes
+    /// the pages the project has as the press is planned. It's asked while
+    /// the press holds the group's place, as `queue` is, so it may take the
+    /// open project's lock, never the place. A host outside the app loads
+    /// none.
+    fn loading(&self) -> bool {
+        false
+    }
 }
 
 /// The group going on, if one is. `carry_on` holds it while it answers one
@@ -173,7 +187,8 @@ pub fn group_going() -> Option<u64> {
 /// before its Translation run, whatever it finds, answering no run and
 /// `reading` when it reads first. While a group goes on in the project,
 /// answers that one, with its run going now, and queues nothing; while Read
-/// chapter reads by hand, refuses.
+/// chapter reads by hand, refuses, and so does a plan that would read while
+/// pages are still loading into the project ([`RunHost::loading`]).
 pub async fn carry_on(
     host: Arc<dyn RunHost>,
     session: Arc<Mutex<Session>>,
@@ -215,6 +230,13 @@ fn start(
     let lettering = host.lettering()?;
     let groups = groups(&session.lock(), target, &stages, &lettering)?;
     let (groups, narrows) = translating(&session, groups, &stages, read, store)?;
+    // The read takes the pages the project has now, so while more are still
+    // loading into it, a press that would read is refused, as a read by hand
+    // is, before it takes the place or queues anything.
+    ensure!(
+        !(groups.iter().any(|group| group.read) && host.loading()),
+        "Read chapter can't start while pages are still loading into this chapter; wait until they're in, or run without Read chapter."
+    );
     let first = groups.first().map(|first| match first.read {
         true => First::Read(first.pages.clone()),
         false => First::Run(Box::new(request(
@@ -936,6 +958,8 @@ mod tests {
         answer: Mutex<Answer>,
         /// Holds a read until the test lets it go, once it told it came.
         holding: Option<Holding>,
+        /// Whether pages are still loading into its project.
+        loading: AtomicBool,
     }
 
     struct Gate {
@@ -970,6 +994,7 @@ mod tests {
                 reads: Mutex::default(),
                 answer: Mutex::new(Answer::Done),
                 holding: None,
+                loading: AtomicBool::new(false),
             }
         }
 
@@ -1022,6 +1047,10 @@ mod tests {
 
         fn lettering(&self) -> anyhow::Result<LetteringSettings> {
             Ok(LetteringSettings::default())
+        }
+
+        fn loading(&self) -> bool {
+            self.loading.load(Ordering::Relaxed)
         }
 
         fn read(
@@ -1719,5 +1748,65 @@ mod tests {
         drop(read);
         let (plan, following) = press().expect("a plan");
         assert!(plan.groups.is_empty() && following.is_none(), "{plan:?}");
+    }
+
+    #[tokio::test]
+    async fn a_press_that_would_read_is_refused_while_pages_still_load() {
+        let _placing = PLACING.lock().await;
+        let _registry = REGISTRY.lock().await;
+        let (_dir, session, pages) = chapter(2);
+        // Text to read on the first page; the second, which it translates,
+        // has none, so its Translation run needs no model.
+        written(&session, pages[0]);
+        let host = Arc::new(Host::new());
+        host.loading.store(true, Ordering::Relaxed);
+        let target = RunTarget::Pages {
+            pages: vec![pages[1]],
+        };
+        let press = |stages: &[RunStage]| {
+            let held: Arc<dyn RunHost> = host.clone();
+            start(
+                held,
+                Arc::clone(&session),
+                &target,
+                stages,
+                unlinked,
+                &Handle::current(),
+            )
+        };
+        let reads = [RunStage::Read, RunStage::Translate];
+        let error = press(&reads).expect_err("refused while pages load");
+        assert_eq!(
+            error.to_string(),
+            "Read chapter can't start while pages are still loading into this chapter; wait until they're in, or run without Read chapter."
+        );
+        assert!(GOING.lock().is_none(), "it took no place");
+        assert!(host.queued().is_empty() && host.reads().is_empty());
+        // A press that wouldn't read goes: one without Read chapter, and one
+        // on a chapter with a brief.
+        let (plan, following) = press(&[RunStage::Translate]).expect("the plan");
+        assert_eq!(plan.groups, [translation(&pages[1..])]);
+        following
+            .expect("a follower")
+            .await
+            .expect("followed to the end");
+        briefed(&session, "Hina meets Sensei.");
+        let (plan, following) = press(&reads).expect("the plan");
+        assert_eq!(plan.groups, [translation(&pages[1..])]);
+        following
+            .expect("a follower")
+            .await
+            .expect("followed to the end");
+        assert!(host.reads().is_empty(), "nothing read");
+        // Once the pages are in, the chapter is read.
+        briefed(&session, " ");
+        host.loading.store(false, Ordering::Relaxed);
+        let (plan, following) = press(&reads).expect("the plan");
+        assert_eq!(plan.groups, [reading(&pages), translation(&pages[1..])]);
+        following
+            .expect("a follower")
+            .await
+            .expect("followed to the end");
+        assert_eq!(host.reads(), [(plan.group, pages.clone(), 0)]);
     }
 }

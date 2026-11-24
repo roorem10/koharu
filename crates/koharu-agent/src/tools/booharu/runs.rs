@@ -129,10 +129,12 @@ impl Tool for Run {
          text, or no model can read them, or that fails, still goes on to translation; a Stop \
          while it reads ends the group. `read` without `translate` changes nothing, and alone \
          runs nothing. booharu_read_chapter reads the chapter by hand, and while it reads, this \
-         tool is refused. Its runs leave blocks alone as run's do (locked blocks, blocks fixed \
-         by hand, and sound effects the SFX mode keeps as art), as wait's `skipped` tells; \
-         booharu_redo_boxes runs stages again on chosen blocks, the hand-fixed ones too on \
-         purpose. Needs a project open, as every tool here does."
+         tool is refused. A call whose plan would read is refused while Koharu's Gallery is \
+         still loading pages into the chapter: wait until they're in, or call without `read`. \
+         Its runs leave blocks alone as run's do (locked blocks, blocks fixed by hand, and sound \
+         effects the SFX mode keeps as art), as wait's `skipped` tells; booharu_redo_boxes runs \
+         stages again on chosen blocks, the hand-fixed ones too on purpose. Needs a project \
+         open, as every tool here does."
             .to_owned()
     }
 

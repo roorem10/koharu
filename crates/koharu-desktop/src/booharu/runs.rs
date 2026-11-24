@@ -14,7 +14,8 @@
 //! the interface as `booharu_run_group`; the read goes through
 //! `read_chapter`, as a Read chapter job of the group's, which Stop, closing
 //! the project and opening another end, and which writes only while the
-//! project it read is the one open.
+//! project it read is the one open; and while Koharu's Gallery is still
+//! loading pages into the project, a press that would read is refused.
 
 use std::sync::Arc;
 
@@ -33,7 +34,7 @@ use crate::{
     app::App,
     booharu::{
         events::{BooharuRunGroup, RUN_GROUP},
-        read_chapter::{ReadRequest, read_chapter},
+        read_chapter::{ReadRequest, pages_loading, read_chapter},
     },
     commands::Result,
 };
@@ -48,14 +49,15 @@ use crate::{
 /// find text and translate translates last: every group without Translation
 /// first, then one Translation run, leaving out the pages a run gave up on.
 /// While a group goes on in the open project, answers that one, with its run
-/// going now, and queues nothing; while Read chapter reads by hand, refuses.
-/// `stages` are the Run menu's: Koharu's four by their names, and `read`,
-/// Read chapter: with it, a plan that translates on a chapter without a
-/// brief reads the chapter just before its Translation run, every group
-/// without Translation first, leaving out the pages a run gave up on, unless
-/// by then the chapter has a brief or those pages no text. While it reads,
-/// the plan has no run and `reading`, and `booharu_job` tells the read as a
-/// job of the group.
+/// going now, and queues nothing; while Read chapter reads by hand, refuses,
+/// and so does a plan that would read while the Gallery is still loading
+/// pages into the chapter. `stages` are the Run menu's: Koharu's four by
+/// their names, and `read`, Read chapter: with it, a plan that translates on
+/// a chapter without a brief reads the chapter just before its Translation
+/// run, every group without Translation first, leaving out the pages a run
+/// gave up on, unless by then the chapter has a brief or those pages no
+/// text. While it reads, the plan has no run and `reading`, and
+/// `booharu_job` tells the read as a job of the group.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_run(
@@ -136,5 +138,9 @@ impl RunHost for App {
             };
             read_chapter(self, session, request, job).await
         })
+    }
+
+    fn loading(&self) -> bool {
+        pages_loading(self)
     }
 }
