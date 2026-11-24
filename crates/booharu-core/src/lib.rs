@@ -12,8 +12,9 @@
 //! (`sfx`), what a run's stages and Detect again leave alone (`protect`),
 //! the look Reset to lettering default gives back (`resolver`), the series
 //! glossaries and the chapter notes every translation
-//! follows (`context`), the quality check's Mark OK record (`qc`), and its
-//! version.
+//! follows (`context`), the quality check's Mark OK record (`qc`), where
+//! clean-up lands on a page and the scan page levels keep (`cleanup`), and
+//! its version.
 //!
 //! The crate sits just above the scene and the config, never above
 //! koharu-pipeline, koharu-agent, or koharu-desktop, so koharu-pipeline's
@@ -21,6 +22,7 @@
 //! needs the pipeline goes in the `booharu` crate.
 
 pub mod attrs;
+pub mod cleanup;
 pub mod context;
 pub mod effects;
 pub mod emphasis;
