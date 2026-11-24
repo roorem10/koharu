@@ -21,6 +21,11 @@ interface KeyAction {
 export const keyActions = {
   /** The O tool: a box drawn with it becomes a text block that is read. */
   ocrBoxTool: { key: 'o', tool: 'ocr_box' },
+  /** A smaller brush, with Brush, the Eraser or Remove: by a tenth of its size, at least 2 px, as
+   * Photoshop's [ steps it (`lib/booharu/brush.ts`). */
+  brushSmaller: { key: '[' },
+  /** A larger brush, with Brush, the Eraser or Remove, as Photoshop's ]. */
+  brushLarger: { key: ']' },
 } as const satisfies Record<string, KeyAction>
 
 /** The tools Booharu adds to Koharu's canvas, whose keys are Booharu's. */
@@ -89,10 +94,12 @@ export function inDialog(target: EventTarget | null): boolean {
  * arrows, Enter, Delete, Escape, and every Ctrl, Cmd or Alt chord. Only a bare printable character
  * other than Space, which means nothing to such an input, goes on to switch tools. Koharu's tool
  * hotkey in CanvasWorkspace takes this rule as its `ignoreEventWhen`, and its other hotkeys skip a
- * key inside a dialog, a menu or an open list. */
-export function controlKeepsKey(event: KeyboardEvent): boolean {
+ * key inside a dialog, a menu or an open list. `chord` counts the key as one typed with a chord
+ * whatever its modifiers say, as the brush's `[` and `]` count a character typed with AltGraph,
+ * which Windows reports as Ctrl+Alt and Chromium's key map may report alone. */
+export function controlKeepsKey(event: KeyboardEvent, chord = false): boolean {
   if (isTextEntry(event.target) || inDialog(event.target)) return true
   if (!(event.target instanceof HTMLInputElement)) return false
   const toolKey = event.key.length === 1 && event.key !== ' '
-  return !toolKey || event.ctrlKey || event.metaKey || event.altKey
+  return !toolKey || chord || event.ctrlKey || event.metaKey || event.altKey
 }

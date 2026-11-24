@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, vi } from 'vitest'
 
+import { useBrushSlots } from '@/lib/booharu/brush' // Booharu: each brush tool's own brush.
 import { useFx } from '@/lib/booharu/fx' // Booharu: the type bar's Text effects.
 import { useWordRange } from '@/lib/booharu/words' // Booharu: the words chosen in Story.
 import { queryClient } from '@/lib/queries'
@@ -95,6 +96,7 @@ beforeEach(() => {
   })
   useWordRange.setState({ range: null, field: null }) // Booharu: no words chosen in Story.
   useFx.setState({ open: false, page: null }) // Booharu: Text effects closed.
+  useBrushSlots.setState(useBrushSlots.getInitialState()) // Booharu: each brush as it starts.
 })
 
 afterEach(() => {
