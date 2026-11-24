@@ -7,20 +7,28 @@
 //! glyphs (`lines`); a span's own values, which a span of Koharu's text
 //! carries in one field (`SpanStyle`): its second border, its gradient fill
 //! with what the gradient spreads over (`Unit`), and its letter spacing,
-//! which follows each cluster (`track`); and where gradient fills spread
-//! and how they paint (`paint`).
+//! which follows each cluster (`track`); where gradient fills spread and
+//! how they paint (`paint`); and a pixmap drawn a pixel to each of its
+//! pixels, as the canvas previews a soft brush stroke's tiles (`image`).
 
 use std::{
     collections::{BTreeMap, HashMap},
     path::PathBuf,
-    sync::LazyLock,
+    sync::{Arc, LazyLock},
 };
 
 use anyhow::Result;
 use fontique::{Collection, CollectionOptions, SourceCache};
 use koharu_scene::{CharStyle, Color, Gradient, Rgba};
+use kurbo::{Affine, Rect};
 use parking_lot::Mutex;
 use skrifa::{FontRef, MetadataProvider, string::StringId};
+use vello_gpu::{
+    Image, PaintType, Pixmap,
+    peniko::{Extend, ImageQuality, ImageSampler},
+};
+
+use crate::Drawing;
 
 pub(crate) use self::{
     faces::{Traits, better, repick},
@@ -128,6 +136,48 @@ pub(crate) fn track<'a>(glyphs: impl IntoIterator<Item = (usize, &'a mut f32)>, 
             *advance += gap;
         }
     }
+}
+
+/// Draws `pixmap`, premultiplied, onto `drawing` through `transform`, from
+/// its pixels to the drawing's, each pixel as it is (nearest), as the canvas
+/// draws a soft brush stroke's tiles while it previews the stroke. It's
+/// uploaded as the page's images are (`Drawing::image`), so a pixmap kept
+/// from one drawing to the next keeps its texture, and it fails as they do
+/// when the GPU has no memory for it, which fails the drawing. Through a
+/// transform that only scales and moves, as the canvas's camera does, it
+/// fills the output pixels whose centres it covers, its edges on whole
+/// pixels, so pixmaps drawn side by side meet with no seam; drawn as they
+/// lie, each would cover only part of the pixels along their shared edge,
+/// which would show see-through.
+pub fn image(drawing: &mut Drawing, pixmap: &Arc<Pixmap>, transform: Affine) -> Result<()> {
+    let image = drawing.image(pixmap)?;
+    let own = Rect::new(
+        0.0,
+        0.0,
+        f64::from(pixmap.width()),
+        f64::from(pixmap.height()),
+    );
+    let scene = &mut drawing.scene;
+    scene.set_paint(PaintType::Image(Image {
+        image,
+        sampler: ImageSampler {
+            x_extend: Extend::Pad,
+            y_extend: Extend::Pad,
+            quality: ImageQuality::Low,
+            alpha: 1.0,
+        },
+    }));
+    let [_, shear_y, shear_x, _, _, _] = transform.as_coeffs();
+    if shear_x == 0.0 && shear_y == 0.0 {
+        scene.set_transform(Affine::IDENTITY);
+        scene.set_paint_transform(transform);
+        scene.fill_rect(&transform.transform_rect_bbox(own).round());
+        scene.reset_paint_transform();
+    } else {
+        scene.set_transform(transform);
+        scene.fill_rect(&own);
+    }
+    Ok(())
 }
 
 /// Each family with names in other languages, by the name the font list
@@ -754,6 +804,47 @@ mod tests {
             .map(|run| run.tracking)
             .collect();
         assert_eq!(tracking, [12.5, 0.0, 0.0]);
+        Ok(())
+    }
+
+    /// Pixmaps drawn side by side through a camera that puts the edge they
+    /// share inside an output pixel meet with no seam: each output pixel
+    /// shows wholly the pixel under its centre, as one pixmap drawn nearest
+    /// would.
+    #[test]
+    fn pixmaps_drawn_side_by_side_meet_with_no_seam() -> Result<()> {
+        let Ok(gpu) = crate::Gpu::get() else {
+            eprintln!("skipped without a GPU");
+            return Ok(());
+        };
+        let solid = |pixel: [u8; 4]| {
+            Arc::new(Pixmap::from_parts(
+                pixel.repeat(16 * 16),
+                16,
+                16,
+                vello_gpu::PixelMetadata {
+                    may_have_transparency: false,
+                    alpha_type: vello_gpu::peniko::ImageAlphaType::AlphaPremultiplied,
+                },
+            ))
+        };
+        let (black, red) = (solid([0, 0, 0, 255]), solid([255, 0, 0, 255]));
+        let camera = Affine::translate((3.3, 2.6)) * Affine::scale(1.37);
+        let mut drawing = gpu.drawing(64, 32);
+        image(&mut drawing, &black, camera)?;
+        image(&mut drawing, &red, camera * Affine::translate((16.0, 0.0)))?;
+        let pixels = drawing.read()?;
+        for x in 0..64 {
+            let under = (f64::from(x) + 0.5 - 3.3) / 1.37;
+            let want = if !(0.0..32.0).contains(&under) {
+                [0, 0, 0, 0]
+            } else if under < 16.0 {
+                [0, 0, 0, 255]
+            } else {
+                [255, 0, 0, 255]
+            };
+            assert_eq!(pixels.get_pixel(x, 12).0, want, "x {x}");
+        }
         Ok(())
     }
 }
