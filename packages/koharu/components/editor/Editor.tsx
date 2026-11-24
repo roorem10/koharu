@@ -3,6 +3,7 @@
 import { BoxMenu } from '@/components/booharu/boxes/BoxMenu' // Booharu: a box's right-click menu.
 import { RedoDialog } from '@/components/booharu/boxes/RedoDialog' // Booharu: Redo boxes' confirmation.
 import { BoxDetailsDialog } from '@/components/booharu/details/BoxDetailsDialog' // Booharu: Box details.
+import { LevelsDialog } from '@/components/booharu/levels/LevelsDialog' // Booharu: Fix page levels.
 import { ColorSamplingProvider } from '@/components/controls/ColorSampling'
 import { ActivityCenter } from '@/components/editor/ActivityCenter'
 import { CanvasWorkspace } from '@/components/editor/CanvasWorkspace'
@@ -35,6 +36,8 @@ export function Editor() {
         <BoxDetailsDialog />
         {/* Booharu: the confirmation before a box's Read or Translate replaces text fixed by hand. */}
         <RedoDialog />
+        {/* Booharu: Fix page levels, opened from the page menu and the Edit menu. */}
+        <LevelsDialog />
         {/* Booharu: the menu a right-click on a box on the canvas opens (S12-l). */}
         <BoxMenu />
         {reading ? (

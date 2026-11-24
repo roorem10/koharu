@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { AboutDialog } from '@/components/app/AboutDialog'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
 import { BoxMenuItems } from '@/components/booharu/boxes/BoxActionItems' // Booharu: box actions.
+import { LevelsMenuItem } from '@/components/booharu/levels/LevelsItems' // Booharu: Fix page levels.
 import { exceptOriginalScan } from '@/lib/booharu/attrs' // Booharu: Select all leaves the Original scan.
 import { send, useCommand, useImportPages, usePage, useProject } from '@/lib/queries'
 import { deleteSelection } from '@/lib/scene'
@@ -180,6 +181,8 @@ export function TitleBar() {
                 Item={MenubarItem}
                 Separator={MenubarSeparator}
               />
+              {/* Booharu: Fix page levels… for every page, greyed out while reading. */}
+              <LevelsMenuItem page={reading ? null : page} Item={MenubarItem} />
               <MenubarSeparator />
               {/* Frees the GPU, as Photoshop's Edit → Purge frees memory. */}
               <MenubarItem onClick={() => send(commands.unload)}>

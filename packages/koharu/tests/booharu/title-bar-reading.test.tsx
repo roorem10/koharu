@@ -24,6 +24,7 @@ const boxItems = [
   'Explain this line',
   'Box details',
   'Join split texts on this page',
+  'Fix page levels…',
 ]
 
 /** Booharu's items in the Edit menu open now, by name, each with whether it's enabled. */
@@ -69,6 +70,7 @@ describe("Booharu's Edit menu items in Koharu's Read mode", () => {
       expect(Object.fromEntries(await booharuItems())).toMatchObject({
         'Clean again': true,
         'Join split texts on this page': true,
+        'Fix page levels…': true,
       }),
     )
     expect(findSplit).toHaveBeenCalledWith('page')
