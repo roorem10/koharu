@@ -142,7 +142,9 @@ pub trait RunHost: Send + Sync + 'static {
 
 /// The group going on, if one is. `carry_on` holds it while it answers one
 /// or starts one, and a follower while it queues a group's next run or ends
-/// the group, so two groups never go at once.
+/// the group, so two groups never go at once. Each takes the session's lock
+/// while it holds this, so nothing takes this while it holds the session's
+/// lock, as each would wait on the other for good.
 static GOING: Mutex<Option<Going>> = Mutex::new(None);
 /// The number of the last group made.
 static MADE: AtomicU64 = AtomicU64::new(0);
@@ -168,7 +170,9 @@ struct Going {
 }
 
 /// The number of the group going on, if one is, in whatever project: its
-/// own Run step reads while it goes, and nothing else may.
+/// own Run step reads while it goes, and nothing else may. Never asked
+/// while the session's lock is held, as a press planning holds the place
+/// and takes that lock next.
 #[must_use]
 pub fn group_going() -> Option<u64> {
     GOING.lock().as_ref().map(|going| going.plan.group)
@@ -1093,6 +1097,72 @@ mod tests {
         assert_eq!(group_going(), Some(number));
         free(number);
         assert_eq!(group_going(), None);
+    }
+
+    /// A restore and a fix of page levels ask whether a press goes before
+    /// they take the session's lock, never under it: a press holds the place
+    /// as it plans and takes that lock next, so one holding the lock while it
+    /// waited on the place would wait on the press for good, and the press on
+    /// it. The test holds the place as a press planning does, while each
+    /// waits on it, and takes the session's lock as the press would, in time;
+    /// each goes on once the place is let go, with no group in it.
+    #[test]
+    fn a_restore_or_a_fix_waits_on_a_press_planning_without_the_sessions_lock() {
+        use crate::levels::{self, LevelsReport, LevelsSkip};
+
+        let _registry = REGISTRY.blocking_lock();
+        let (_dir, session, pages) = chapter(1);
+        let (session, page) = (&*session, pages[0]);
+        let reasons = |report: LevelsReport| -> Vec<LevelsSkip> {
+            report
+                .skipped
+                .iter()
+                .map(|skipped| skipped.reason)
+                .collect()
+        };
+        let place = GOING.lock();
+        let (planned, restored) = std::thread::scope(|scope| {
+            let restoring = scope.spawn(|| levels::restore(session, &[page], || false));
+            // The time for the restore to reach the place.
+            std::thread::sleep(Duration::from_millis(200));
+            let planned = session.try_lock_for(Duration::from_secs(5)).is_some();
+            drop(place);
+            (planned, restoring.join().expect("the restore"))
+        });
+        assert!(planned, "the restore held the session's lock as it waited");
+        let restored = restored.expect("no group went once the place was let go");
+        assert_eq!(reasons(restored), [LevelsSkip::NoOriginal]);
+        // A fix's second phase, the place taken as its first ends.
+        let job = jobs::start(JobKind::Levels).expect("the fix's job");
+        let (levelled, first) = std::sync::mpsc::channel();
+        let (taken, held) = std::sync::mpsc::channel();
+        let (planned, fixed) = std::thread::scope(|scope| {
+            let job = &job;
+            let fixing = scope.spawn(move || {
+                let settings = booharu_core::settings::LevelsSettings::default();
+                levels::fix(
+                    session,
+                    &[page],
+                    &settings,
+                    || false,
+                    job,
+                    |_| {
+                        levelled.send(()).expect("the test waits");
+                        held.recv().expect("the test took the place");
+                    },
+                )
+            });
+            first.recv().expect("the first phase ended");
+            let place = GOING.lock();
+            taken.send(()).expect("the fix goes on");
+            std::thread::sleep(Duration::from_millis(200));
+            let planned = session.try_lock_for(Duration::from_secs(5)).is_some();
+            drop(place);
+            (planned, fixing.join().expect("the fix"))
+        });
+        assert!(planned, "the fix held the session's lock as it waited");
+        let fixed = fixed.expect("no group went once the place was let go");
+        assert_eq!(reasons(fixed), [LevelsSkip::NoScan]);
     }
 
     /// Waits until no group holds the place, as once its follower went.

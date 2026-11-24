@@ -248,14 +248,15 @@ pub fn blocked(session: &Session, page: PageId) -> Result<Option<LevelsSkip>> {
 /// undo step, `booharu_levels`, answering what it changed and what it
 /// skipped. `running` tells whether a run is going on the pipeline, as
 /// `runs::run_going` of its events does; a Run press going refuses the fix
-/// too (`runs::group_going`). `job` is the fix's `JobKind::Levels` job,
-/// whose cancel stops it; `progress` is told after each page of its first
-/// phase.
+/// too (`runs::group_going`), asked only while the session's lock isn't
+/// held. `job` is the fix's `JobKind::Levels` job, whose cancel stops it;
+/// `progress` is told after each page of its first phase.
 ///
 /// The first phase levels each page in turn, holding the session's lock
 /// only to read its scan and to store the new one, as an edit holding only
 /// the file, which adds no undo step; the file is swept at the next open if
-/// no edit names it. The second, under one lock, checks each levelled page
+/// no edit names it. The second, refused while a Run press goes, then
+/// under one lock, refused while a run goes, checks each levelled page
 /// again, its scan unchanged and nothing made from it since, and applies one
 /// edit: each page's new scan, visible as the old one was, and, on a page
 /// with no Original scan yet, a hidden, locked Original scan layer under
@@ -270,7 +271,7 @@ pub fn fix(
     mut progress: impl FnMut(LevelsProgress),
 ) -> Result<LevelsReport> {
     checked(settings)?;
-    ensure!(!going(&running), RUN_GOING);
+    ensure!(!(running() || pressed()), RUN_GOING);
     let pages = distinct(pages);
     held(&session.lock().project(), &pages)?;
     let total = u32::try_from(pages.len()).unwrap_or(u32::MAX);
@@ -285,9 +286,10 @@ pub fn fix(
         }
         progress(LevelsProgress { done, total });
     }
+    ensure!(!pressed(), RUN_GOING);
     let mut session = session.lock();
     ensure!(!job.cancelled(), STOPPED);
-    ensure!(!going(&running), RUN_GOING);
+    ensure!(!running(), RUN_GOING);
     let project = session.project();
     let (mut changed, mut ops) = (Vec::new(), Vec::new());
     for (page, old, new) in levelled {
@@ -378,19 +380,22 @@ fn original(page: PageId, file: Hash) -> Result<Op> {
 /// Puts back the Original scan of each of `pages` the project `session`
 /// holds, as one undo step, `booharu_restore_original`, answering what it
 /// changed and what it skipped. `running` tells whether a run is going, as
-/// [`fix`] takes it. A page is skipped with no Original scan, when it's
-/// blocked ([`blocked`]), when its original is inside a locked layer or
-/// holds layers of its own, which removing it would take, or when its scan
-/// already is the original. On the others, the original's layer goes, and
-/// its file is the page's scan again, visible as the scan was. Refused, or
-/// with a page the project doesn't hold, it changes nothing.
+/// [`fix`] takes it, and a Run press going refuses it too, asked before the
+/// session's lock is taken, as a fix asks it. A page is skipped with no
+/// Original scan, when it's blocked ([`blocked`]), when its original is
+/// inside a locked layer or holds layers of its own, which removing it
+/// would take, or when its scan already is the original. On the others, the
+/// original's layer goes, and its file is the page's scan again, visible as
+/// the scan was. Refused, or with a page the project doesn't hold, it
+/// changes nothing.
 pub fn restore(
     session: &Mutex<Session>,
     pages: &[PageId],
     running: impl Fn() -> bool,
 ) -> Result<LevelsReport> {
+    ensure!(!pressed(), RUN_GOING);
     let mut session = session.lock();
-    ensure!(!going(&running), RUN_GOING);
+    ensure!(!running(), RUN_GOING);
     let pages = distinct(pages);
     let project = session.project();
     held(&project, &pages)?;
@@ -471,18 +476,21 @@ fn locked_above(project: &Project, layer: LayerId) -> Result<bool> {
 /// before the session's lock is taken, as the app tells whether pages load
 /// under the open project's.
 pub fn startable(told: &[Event], loading: bool) -> Result<()> {
-    ensure!(
-        !runs::run_going(told) && runs::group_going().is_none(),
-        RUN_GOING
-    );
+    ensure!(!(runs::run_going(told) || pressed()), RUN_GOING);
     ensure!(!loading, PAGES_LOADING);
     Ok(())
 }
 
-/// Whether pages may not change now: `running` says a run is going, or a
-/// Run press is.
-fn going(running: &impl Fn() -> bool) -> bool {
-    running() || runs::group_going().is_some()
+/// Whether a Run press, or a group of runs carrying on, is going: it holds
+/// the group's place (`runs::group_going`). Asked only while the session's
+/// lock isn't held, never under it: a press takes the place, then the
+/// session's lock as it plans and queues, as a group's follower does as it
+/// goes on, so asking for the place while holding the lock could wait on
+/// one waiting on it, for good. A press that takes the place once this was
+/// asked plans once the edit is in, as if the fix or the restore had ended
+/// first, unless its run was queued meanwhile, which `running` then tells.
+fn pressed() -> bool {
+    runs::group_going().is_some()
 }
 
 /// Fails on a clip a `[booharu-levels]` section wouldn't read.
