@@ -1,7 +1,7 @@
 //! What Booharu tells the interface on its own, as Koharu's events do;
 //! `events::bindings` lists them for the bindings.
 
-use booharu::{jobs::BooharuJob, qc::Finding};
+use booharu::{jobs::BooharuJob, levels::LevelsProgress, qc::Finding};
 use koharu_pipeline::RunId;
 use koharu_scene::{LayerId, PageId};
 use serde::Serialize;
@@ -88,3 +88,8 @@ pub struct BooharuBoxMenu {
 /// window gives the interface the keys, so the menu takes arrows, Enter and
 /// Escape.
 pub const BOX_MENU: Event<BooharuBoxMenu> = Event::new("booharu_box_menu");
+
+/// How far a fix of page levels is: `done` of its `total` pages levelled,
+/// told after each page it levels, before it changes any; the fix's command
+/// answers what it did once it's done.
+pub const LEVELS_PROGRESS: Event<LevelsProgress> = Event::new("booharu_levels_progress");

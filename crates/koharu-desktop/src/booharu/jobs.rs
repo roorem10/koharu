@@ -1,11 +1,13 @@
-//! Booharu's jobs as the app runs them, Read chapter and Explain this line,
-//! which `booharu::jobs` registers: Stop and closing the project end every
-//! one ([`stop`], which one marked line in `App::close` and one in
-//! `stop_pipeline` call, right after they stop the pipeline; opening and
-//! deleting a project close the one open), and each read tells the interface
-//! how it goes as `booharu_job` ([`tell`]), which [`booharu_get_jobs`]
-//! answers for the reads going, for an interface that loaded late. Explain
-//! this line's jobs tell nothing: their command answers.
+//! Booharu's jobs as the app runs them, Read chapter, Explain this line and
+//! Fix page levels (`levels`), which `booharu::jobs` registers: Stop and
+//! closing the project end every one ([`stop`], which one marked line in
+//! `App::close` and one in `stop_pipeline` call, right after they stop the
+//! pipeline; opening and deleting a project close the one open), and each
+//! read tells the interface how it goes as `booharu_job` ([`tell`]), which
+//! [`booharu_get_jobs`] answers for the reads going, for an interface that
+//! loaded late. Explain this line's jobs and fixes tell nothing as jobs:
+//! their command answers, and a fix tells how far it is as
+//! `booharu_levels_progress`.
 
 use std::collections::BTreeMap;
 
@@ -19,7 +21,8 @@ use crate::app::App;
 static READS: Mutex<BTreeMap<u64, BooharuJob>> = Mutex::new(BTreeMap::new());
 
 /// Ends every Booharu job going: a read stops before it writes anything,
-/// and Explain this line answers that it was stopped.
+/// Explain this line answers that it was stopped, and so does a fix of page
+/// levels, which changes no page.
 pub(crate) fn stop() {
     booharu::jobs::cancel_all();
 }

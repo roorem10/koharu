@@ -185,7 +185,7 @@ impl App {
             project.take()
         };
         self.pipeline.stop();
-        crate::booharu::jobs::stop(); // Booharu: closing ends Read chapter and Explain this line.
+        crate::booharu::jobs::stop(); // Booharu: closing ends Read chapter, Explain this line and Fix page levels.
         crate::booharu::qc::stop(); // Booharu: closing stops the quality check and forgets its findings.
         self.screen.set_canvas(None);
         if let Some(project) = project {

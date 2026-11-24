@@ -173,6 +173,11 @@ pub fn handler() -> impl Fn(Invoke<CefRuntime>) -> bool + Send + Sync + 'static 
         crate::booharu::effects::booharu_set_skew,
         crate::booharu::canvas::booharu_canvas_keys,
         crate::booharu::brush::booharu_set_brush,
+        crate::booharu::levels::booharu_get_levels_status,
+        crate::booharu::levels::booharu_preview_levels,
+        crate::booharu::levels::booharu_fix_page_levels,
+        crate::booharu::levels::booharu_stop_levels,
+        crate::booharu::levels::booharu_restore_original_pages,
     ];
     move |invoke: Invoke<CefRuntime>| {
         let message = &invoke.message;
@@ -309,5 +314,10 @@ pub fn bindings(types: &mut Types) -> Vec<Function> {
         crate::booharu::effects::booharu_set_skew,
         crate::booharu::canvas::booharu_canvas_keys,
         crate::booharu::brush::booharu_set_brush,
+        crate::booharu::levels::booharu_get_levels_status,
+        crate::booharu::levels::booharu_preview_levels,
+        crate::booharu::levels::booharu_fix_page_levels,
+        crate::booharu::levels::booharu_stop_levels,
+        crate::booharu::levels::booharu_restore_original_pages,
     ](types)
 }

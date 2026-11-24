@@ -98,5 +98,6 @@ pub fn bindings(types: &mut Types) -> Vec<(&'static str, DataType)> {
         crate::booharu::events::AGENT_HISTORY_CHANGED.binding(types), // Booharu: the agent conversation changed.
         crate::booharu::events::QC.binding(types), // Booharu: a page's quality check findings.
         crate::booharu::events::BOX_MENU.binding(types), // Booharu: a box's menu to open.
+        crate::booharu::events::LEVELS_PROGRESS.binding(types), // Booharu: how far a fix of page levels is.
     ]
 }

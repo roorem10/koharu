@@ -3,8 +3,9 @@
 //! canvas's Booharu effect does (`canvas::carry`: an O tool box, or a box's
 //! menu to open), the Booharu settings pushed to the canvas, the brush's
 //! feel, which a soft Remove stroke's run reads (`brush`), the MCP server's
-//! start on Booharu's own port, Read chapter and Explain this line as jobs
-//! Stop and closing the project end (`jobs`), the agent's
+//! start on Booharu's own port, Read chapter, Explain this line and Fix page
+//! levels as jobs Stop and closing the project end (`jobs`; `levels` runs
+//! the fix, and puts the original scans back), the agent's
 //! chat kept beside its project (`agent_history`), the quality check's
 //! findings, its watcher and its one-page check (`qc`), the type bar's
 //! commands for the text being typed on the canvas (`typing`), the report
@@ -26,6 +27,7 @@ pub(crate) mod export;
 pub(crate) mod fonts;
 pub(crate) mod jobs;
 pub(crate) mod lettering;
+pub(crate) mod levels;
 pub(crate) mod mcp;
 pub(crate) mod notes;
 pub(crate) mod ocr_box;
