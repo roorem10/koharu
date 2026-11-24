@@ -64,8 +64,15 @@ fn checked(feel: &BrushFeel) -> anyhow::Result<()> {
 /// the stroke's soft edge as its limit. A read that fails is logged and
 /// gives none, so the stroke still cleans, with a hard edge.
 pub(crate) fn remove_config() -> Option<PipelineConfig> {
+    remembered(|| Ok(koharu_config::get::<PipelineConfig>()?))
+}
+
+/// [`remove_config`] for the feel the interface sent last, by the Remove
+/// tool's own hardness, whatever the other tools' are, with `read` reading
+/// the saved pipeline settings.
+fn remembered(read: impl FnOnce() -> anyhow::Result<PipelineConfig>) -> Option<PipelineConfig> {
     let hardness = FEEL.lock().unwrap_or_default().remove_hardness;
-    soft(hardness, || Ok(koharu_config::get::<PipelineConfig>()?))
+    soft(hardness, read)
 }
 
 /// [`remove_config`] for a Remove stroke of `hardness`, with `read` reading
@@ -164,6 +171,22 @@ mod tests {
         assert_eq!(config, flagged);
         // Settings that don't read leave the stroke its hard edge.
         assert!(soft(0.0, || Err(anyhow::anyhow!("not TOML"))).is_none());
+
+        // The feel the interface sent decides by the Remove tool's own
+        // hardness, however soft or hard the other tools are. `FEEL` is the
+        // whole process's, so every assertion that sets it is in this one
+        // test, which puts it back as it found it.
+        *FEEL.lock() = Some(BrushFeel {
+            remove_hardness: 1.0,
+            ..SOFT
+        });
+        assert!(remembered(|| panic!("read at Remove's hardness 1")).is_none());
+        *FEEL.lock() = Some(BrushFeel {
+            remove_hardness: 0.25,
+            ..BrushFeel::default()
+        });
+        assert_eq!(remembered(|| Ok(PipelineConfig::default())), Some(flagged));
+        *FEEL.lock() = None;
     }
 
     #[test]
