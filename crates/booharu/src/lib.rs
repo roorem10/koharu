@@ -5,10 +5,11 @@
 //! changing blocks' lettering categories (`lettering`), words made bold,
 //! italic or stressed by hand (`words`), the skew the FX window sets and
 //! the text effects the fx tag shows (`effects`), sound effects' subtitles
-//! (`sfx`), Redo boxes (`redo`), and the series glossary and chapter notes
-//! as the user and the agent change them, Read chapter and Explain this
-//! line among them (`context`), with the model calls they make (`calls`),
-//! the models they choose (`models`), and the jobs they run as (`jobs`).
+//! (`sfx`), Redo boxes (`redo`), page levels and the Original scan they
+//! keep (`levels`), and the series glossary and chapter notes as the user
+//! and the agent change them, Read chapter and Explain this line among them
+//! (`context`), with the model calls they make (`calls`), the models they
+//! choose (`models`), and the jobs they run as (`jobs`).
 //!
 //! It may depend on koharu-pipeline, koharu-scene, koharu-llm, and
 //! koharu-renderer, as well as booharu-core. Koharu's pipeline calls only
@@ -21,6 +22,7 @@ pub mod context;
 pub mod effects;
 pub mod jobs;
 pub mod lettering;
+pub mod levels;
 pub mod models;
 pub mod qc;
 pub mod redo;

@@ -1,13 +1,15 @@
 //! Booharu's jobs: Read chapter and Explain this line, which ask a model
-//! outside the pipeline, in a registry for the process, as a run group's
-//! place is (`runs`), so Stop and closing the project end them, and a second
-//! read is refused while one goes.
+//! outside the pipeline, and Fix page levels, which levels pages' scans
+//! (`levels`), in a registry for the process, as a run group's place is
+//! (`runs`), so Stop and closing the project end them, and a second read, or
+//! a second fix, is refused while one goes.
 //!
 //! A [`Job`] is registered by [`start`] and leaves the registry as it's
 //! dropped, however its work ends, cancelling its token as it goes, so work
 //! still on a blocking thread writes nothing once its caller went away.
 //! [`cancel_all`] cancels every job, which the app calls where Stop and
-//! closing the project stop the pipeline; the agent's and MCP's stop tool
+//! closing the project stop the pipeline; [`cancel`] cancels the jobs of one
+//! kind, as the levels dialog's Stop does. The agent's and MCP's stop tool
 //! reach a job only through the pipeline's count of Stops, which every model
 //! call watches (`calls::Stops`).
 
@@ -29,6 +31,9 @@ use crate::context::read::{ReadSummary, Skip};
 pub enum JobKind {
     ReadChapter,
     Explain,
+    /// Fix page levels, which tells no `booharu_job` event: its caller
+    /// answers, as Explain's does.
+    Levels,
 }
 
 /// How a job stands, as the `booharu_job` event tells it.
@@ -111,13 +116,18 @@ impl Drop for Job {
     }
 }
 
-/// Registers a job of `kind`. A second Read chapter while one is going is
-/// refused.
+/// Registers a job of `kind`. A second Read chapter, or a second Fix page
+/// levels, while one is going is refused.
 pub fn start(kind: JobKind) -> Result<Job> {
     let mut jobs = JOBS.lock();
+    let going = jobs.values().any(|(going, _)| *going == kind);
     ensure!(
-        kind != JobKind::ReadChapter || !jobs.values().any(|(going, _)| *going == kind),
+        kind != JobKind::ReadChapter || !going,
         "Analyze chapter is already running; stop it or wait for it to end."
+    );
+    ensure!(
+        kind != JobKind::Levels || !going,
+        "Fix page levels is already running; stop it or wait for it to end."
     );
     let id = MADE.fetch_add(1, Ordering::Relaxed) + 1;
     let cancel = CancellationToken::new();
@@ -146,6 +156,16 @@ pub fn refused(kind: JobKind, group: Option<u64>, why: &anyhow::Error) -> Boohar
 pub fn cancel_all() {
     for (_, cancel) in JOBS.lock().values() {
         cancel.cancel();
+    }
+}
+
+/// Cancels every job of `kind` going, and no other, as the levels dialog's
+/// Stop does.
+pub fn cancel(kind: JobKind) {
+    for (going, cancel) in JOBS.lock().values() {
+        if *going == kind {
+            cancel.cancel();
+        }
     }
 }
 
@@ -202,12 +222,37 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn a_second_fix_of_page_levels_is_refused_and_its_stop_cancels_only_it() -> Result<()> {
+        let _held = REGISTRY.blocking_lock();
+        let fix = start(JobKind::Levels)?;
+        assert!(busy(JobKind::Levels));
+        let error = start(JobKind::Levels).expect_err("a second fix");
+        assert!(
+            error
+                .to_string()
+                .contains("Fix page levels is already running"),
+            "{error}"
+        );
+        // A read goes beside it, and the levels' Stop leaves the read alone.
+        let read = start(JobKind::ReadChapter)?;
+        cancel(JobKind::Levels);
+        assert!(fix.cancelled() && !read.cancelled());
+        drop(fix);
+        assert!(!busy(JobKind::Levels));
+        let again = start(JobKind::Levels)?;
+        assert!(!again.cancelled(), "a new fix starts afresh");
+        drop((again, read));
+        Ok(())
+    }
+
+    #[test]
     fn cancel_all_cancels_every_job_going() -> Result<()> {
         let _held = REGISTRY.blocking_lock();
         let (read, explain) = (start(JobKind::ReadChapter)?, start(JobKind::Explain)?);
-        assert!(!read.cancelled() && !explain.cancelled());
+        let fix = start(JobKind::Levels)?;
+        assert!(!read.cancelled() && !explain.cancelled() && !fix.cancelled());
         cancel_all();
-        assert!(read.cancelled() && explain.cancelled());
+        assert!(read.cancelled() && explain.cancelled() && fix.cancelled());
         // Cancelled, they stay registered until their work lets them go.
         assert!(busy(JobKind::ReadChapter));
         Ok(())
