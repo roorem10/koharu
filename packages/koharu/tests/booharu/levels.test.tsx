@@ -12,13 +12,21 @@ import { PipelinePreferences } from '@/components/preferences/PipelinePreference
 import {
   closeLevels,
   completeLevels,
+  levelsStatusKey,
   menuPages,
   openLevels,
   skipReason,
   useLevels,
 } from '@/lib/booharu/levels'
 import i18n from '@/lib/i18n'
-import { pageKey, projectKey, queryClient, type ProjectView } from '@/lib/queries'
+import {
+  pageKey,
+  pagesKey,
+  projectKey,
+  queryClient,
+  refresh,
+  type ProjectView,
+} from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
 import {
   commands,
@@ -35,19 +43,41 @@ import { TooltipProvider } from '@koharu/ui/components/tooltip'
 import { builtInLevels, builtInLettering, builtInReading, settingsDesktop } from './settings'
 
 const pageIds = ['p1', 'p2', 'p3']
+const size = { width: 800, height: 1200 }
+
+/** The project's three pages, as the desktop lists them. */
+function summaries() {
+  return pageIds.map((id) => ({ id, size, background: null, texts: 0, translated: 0 }))
+}
 
 /** The project open with three pages, the canvas showing the first. */
 function openProject(name = 'Demo'): void {
-  const size = { width: 800, height: 1200 }
   const project: ProjectView = {
     name,
     page: 'p1',
-    pages: pageIds.map((id) => ({ id, size, background: null, texts: 0, translated: 0 })),
+    pages: summaries(),
     history: { steps: [], current: 0 },
     revisions: {},
   }
   queryClient.setQueryData(projectKey, project)
   queryClient.setQueryData(pageKey, { id: 'p1', size, background: null, layers: [] } as Page)
+}
+
+/** The desktop answering the reads of the project open, as the editor reads it again after a
+ * change: its pages, its history and the page the canvas shows. */
+function readsTheProject(): void {
+  vi.spyOn(commands, 'getOpenProject').mockResolvedValue('Demo')
+  vi.spyOn(commands, 'getShownPage').mockResolvedValue('p1')
+  vi.spyOn(commands, 'query').mockImplementation(async (query) => {
+    switch (query.query) {
+      case 'get_project':
+        return { id: 'project', version: '1', pages: summaries() }
+      case 'get_history':
+        return { steps: [], current: 0 }
+      default:
+        return { id: 'p1', size, background: null, layers: [] } as Page
+    }
+  })
 }
 
 /** A promise and its two ends, as a command still running gives it. */
@@ -453,6 +483,50 @@ describe('Restore original scan', () => {
         expect.objectContaining({ type: 'info', title: 'Restored 1 original page.' }),
       ),
     )
+  })
+
+  it('is read again after any change, so Restore shows once a fix kept an original', async () => {
+    const { status } = levelsDesktop()
+    readsTheProject()
+    const user = userEvent.setup()
+    mount(<PageRail />)
+
+    const before = await pageMenu(user, 'Page 1')
+    await within(before).findByRole('menuitem', { name: 'Fix page levels…' })
+    await waitFor(() => expect(status).toHaveBeenCalledWith(['p1']))
+    expect(within(before).queryByRole('menuitem', { name: 'Restore original scan' })).toBeNull()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+
+    // A fix kept Page 1's scan: the desktop tells the change, and the editor reads the project
+    // again, as it does after every change (`receiveChange`).
+    status.mockImplementation(async (pages) =>
+      pages.map((page) => ({ page, original: true, blocked: null })),
+    )
+    await act(() => refresh(projectKey, pageKey, pagesKey))
+
+    const after = await pageMenu(user, 'Page 1')
+    expect(
+      await within(after).findByRole('menuitem', { name: 'Restore original scan' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows no toast when the status cannot be read, as it only adds the Restore item', async () => {
+    const { status } = levelsDesktop()
+    status.mockRejectedValue('The project is closing.')
+    const shown = vi.spyOn(toast, 'add')
+    const user = userEvent.setup()
+    mount(<PageRail />)
+
+    const menu = await pageMenu(user, 'Page 1')
+    await within(menu).findByRole('menuitem', { name: 'Fix page levels…' })
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryCache().findAll({ queryKey: levelsStatusKey })[0]?.state.status,
+      ).toBe('error'),
+    )
+    expect(within(menu).queryByRole('menuitem', { name: 'Restore original scan' })).toBeNull()
+    expect(shown).not.toHaveBeenCalled()
   })
 
   it('restores the selected pages that have one, and says why it skipped any', async () => {
