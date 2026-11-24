@@ -151,7 +151,7 @@ mod tests {
         };
         let refused =
             |told: &[Event], loading| free(told, loading).expect_err("refused").to_string();
-        assert_eq!(refused(&[queued.clone()], false), RUN_GOING);
+        assert_eq!(refused(std::slice::from_ref(&queued), false), RUN_GOING);
         assert_eq!(refused(&[], true), PAGES_LOADING);
         free(&[], false).expect("with no run and every page in");
         let ended = Event::Ended {
