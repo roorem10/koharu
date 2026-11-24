@@ -65,9 +65,10 @@ pub(super) struct RunArgs {
     /// The pages: every page, `{"kind": "project"}`, or some,
     /// `{"kind": "pages", "pages": [...]}`.
     target: RunTarget,
-    /// The stages: `detect`, `recognize`, `inpaint`, `read` (Read chapter,
-    /// only together with `translate`) and `translate`. Left out, Koharu's
-    /// four without `read`, which carries on with what the pages still need.
+    /// The stages: `detect`, `recognize`, `inpaint`, `read` (Analyze
+    /// chapter, only together with `translate`) and `translate`. Left out,
+    /// Koharu's four without `read`, which carries on with what the pages
+    /// still need.
     stages: Option<Vec<RunStage>>,
 }
 

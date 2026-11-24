@@ -2072,8 +2072,8 @@ export type RunStage =
   | 'recognize'
   | 'inpaint'
   /**
-   *  Read chapter: the whole chapter read before it is translated, which
-   *  a press takes only when it also translates.
+   *  Analyze chapter: the whole chapter analyzed before it is translated,
+   *  which a press takes only when it also translates.
    */
   | 'read'
   | 'translate'

@@ -23,8 +23,8 @@ use crate::tools::{failed, project, schema};
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ReadChapterArgs {
-    /// The model to read with in place of the Read chapter model, as a
-    /// `vendor/model` reference, for this read alone; it isn't saved.
+    /// The model to analyze with in place of the Analyze chapter model, as
+    /// a `vendor/model` reference, for this analysis alone; it isn't saved.
     model: Option<String>,
 }
 
@@ -301,6 +301,58 @@ mod tests {
             json!({"summary": "Hina meets Sensei.",
                 "characters": [{"name": "Hina", "original": "ヒナ", "pages": [1]}],
                 "edited": false, "read_at": "2026-11-19T10:00:00Z", "read_model": "openai/gpt-5.4"})
+        );
+    }
+
+    /// Every string in `value`, its keys too, after `into`.
+    fn strings(value: &Value, into: &mut String) {
+        match value {
+            Value::String(text) => {
+                into.push(' ');
+                into.push_str(text);
+            }
+            Value::Array(items) => items.iter().for_each(|item| strings(item, into)),
+            Value::Object(fields) => fields.iter().for_each(|(key, item)| {
+                into.push(' ');
+                into.push_str(key);
+                strings(item, into);
+            }),
+            _ => {}
+        }
+    }
+
+    /// The agent and MCP clients are offered Analyze chapter by that name,
+    /// never by Read chapter, its name until Koharu 0.94.0 brought its own
+    /// Read mode: in each tool's description, Koharu's tools' Booharu
+    /// sentences among them, and in its parameters, whose descriptions
+    /// schemars takes from the doc comments of the types they read, as
+    /// `booharu_run`'s `read` stage's from `RunStage::Read`.
+    #[test]
+    fn the_tools_offer_analyze_chapter_by_its_name() {
+        let definitions = Tools::toolset().tool_definitions();
+        let offered = |name: &str| {
+            let definition = definitions
+                .iter()
+                .find(|definition| definition.name.as_str() == name)
+                .unwrap_or_else(|| panic!("no {name}"));
+            let mut words = definition.description.clone();
+            strings(&definition.parameters, &mut words);
+            words.split_whitespace().collect::<Vec<_>>().join(" ")
+        };
+        for definition in &definitions {
+            let name = definition.name.as_str();
+            let words = offered(name);
+            assert!(!words.contains("Read chapter"), "{name}: {words}");
+        }
+        let run = offered("booharu_run");
+        assert!(run.contains("`read` (Analyze chapter, only together with `translate`)"));
+        assert!(
+            run.contains("Analyze chapter: the whole chapter analyzed before it is translated")
+        );
+        let read = offered("booharu_read_chapter");
+        assert!(
+            read.contains("in place of the Analyze chapter model"),
+            "{read}"
         );
     }
 }
