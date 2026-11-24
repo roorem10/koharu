@@ -400,6 +400,59 @@ fn min_size<'de, D: Deserializer<'de>>(deserializer: D) -> Result<f32, D::Error>
     Ok(share)
 }
 
+/// `[booharu-levels]`: Fix page levels, which stretches a page's scan from
+/// its darkest ink to its lightest paper, black to white, and can whiten its
+/// paper, keeping the scan as it came in the page's Original scan layer.
+/// Restore original pages puts that scan back.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(default)]
+pub struct LevelsSettings {
+    /// Whether the scan's greys are stretched, its darkest ink to black and
+    /// its lightest paper to white, by one curve every channel shares.
+    pub auto_levels: bool,
+    /// The share of the page's pixels, in percent, from 0 to 49.9, left out
+    /// at each end before its darkest ink and lightest paper are found, so a
+    /// speck of dust or a scanner's edge doesn't set them.
+    #[serde(deserialize_with = "clip_percent")]
+    #[specta(type = f64)]
+    pub clip_percent: f64,
+    /// Whether paper lighter than `threshold` turns white, after the levels.
+    pub whiten: bool,
+    /// The lightness, from 0 to 255, above which `whiten` turns a pixel
+    /// white.
+    pub threshold: u8,
+}
+
+impl Default for LevelsSettings {
+    fn default() -> Self {
+        Self {
+            auto_levels: true,
+            clip_percent: 0.5,
+            whiten: false,
+            threshold: 235,
+        }
+    }
+}
+
+impl Section for LevelsSettings {
+    const NAME: &'static str = "booharu-levels";
+}
+
+/// The largest `[booharu-levels] clip_percent`: just under half the page's
+/// pixels at each end, so some are always left between them.
+pub const MAX_CLIP_PERCENT: f64 = 49.9;
+
+fn clip_percent<'de, D: Deserializer<'de>>(deserializer: D) -> Result<f64, D::Error> {
+    let clip = f64::deserialize(deserializer)?;
+    if !(clip.is_finite() && (0.0..=MAX_CLIP_PERCENT).contains(&clip)) {
+        return Err(D::Error::custom(format!(
+            "clipping {clip}% of a page's pixels at each end of its levels isn't from 0 to \
+             {MAX_CLIP_PERCENT}%"
+        )));
+    }
+    Ok(clip)
+}
+
 /// The most pages one Read chapter request sends.
 pub const MAX_PAGES_PER_REQUEST: u32 = 40;
 
@@ -571,6 +624,8 @@ pub struct BooharuPreferences {
     pub start: StartSettings,
     #[serde(rename = "booharu-emphasis")]
     pub emphasis: EmphasisSettings,
+    #[serde(rename = "booharu-levels")]
+    pub levels: LevelsSettings,
 }
 
 impl BooharuPreferences {
@@ -588,6 +643,7 @@ impl BooharuPreferences {
             qc: koharu_config::get()?,
             start: koharu_config::get()?,
             emphasis: koharu_config::get()?,
+            levels: koharu_config::get()?,
         })
     }
 
@@ -613,6 +669,7 @@ impl BooharuPreferences {
             qc,
             start,
             emphasis,
+            levels,
         } = self;
         koharu_config::update(|section: &mut McpSettings| *section = mcp)?;
         koharu_config::update(|section: &mut OcrBoxSettings| *section = ocr_box)?;
@@ -623,6 +680,7 @@ impl BooharuPreferences {
         koharu_config::update(|section: &mut QcSettings| *section = qc)?;
         koharu_config::update(|section: &mut StartSettings| *section = start)?;
         koharu_config::update(|section: &mut EmphasisSettings| *section = emphasis)?;
+        koharu_config::update(|section: &mut LevelsSettings| *section = levels)?;
         Self::get()
     }
 
@@ -685,7 +743,7 @@ type Saver = fn(Map<String, Value>) -> anyhow::Result<()>;
 /// How the section named `name` is saved alone; none for a name Booharu has
 /// no section of.
 fn saver(name: &str) -> Option<Saver> {
-    let savers: [(&str, Saver); 9] = [
+    let savers: [(&str, Saver); 10] = [
         (McpSettings::NAME, saved::<McpSettings>),
         (OcrBoxSettings::NAME, saved::<OcrBoxSettings>),
         (LetteringSettings::NAME, saved::<LetteringSettings>),
@@ -695,6 +753,7 @@ fn saver(name: &str) -> Option<Saver> {
         (QcSettings::NAME, saved::<QcSettings>),
         (StartSettings::NAME, saved::<StartSettings>),
         (EmphasisSettings::NAME, saved::<EmphasisSettings>),
+        (LevelsSettings::NAME, saved::<LevelsSettings>),
     ];
     savers
         .into_iter()
@@ -811,7 +870,7 @@ mod tests {
     use super::*;
     use crate::{
         runs::RunOrder,
-        testing::{stored, unreadable},
+        testing::{saved, stored, unreadable},
     };
 
     fn values(values: Value) -> Map<String, Value> {
@@ -855,6 +914,7 @@ mod tests {
                 EmphasisSettings::NAME,
                 FontSettings::NAME,
                 LetteringSettings::NAME,
+                LevelsSettings::NAME,
                 McpSettings::NAME,
                 OcrBoxSettings::NAME,
                 QcSettings::NAME,
@@ -865,6 +925,16 @@ mod tests {
         );
         let qc: QcSettings = toml::from_str("").expect("the defaults");
         assert_eq!(qc.min_size, 0.01);
+        let levels: LevelsSettings = toml::from_str("").expect("the defaults");
+        assert_eq!(
+            levels,
+            LevelsSettings {
+                auto_levels: true,
+                clip_percent: 0.5,
+                whiten: false,
+                threshold: 235,
+            }
+        );
     }
 
     #[test]
@@ -997,6 +1067,97 @@ mod tests {
         assert_eq!(preferences.qc.min_size, 0.02);
         let refused = preferences.set_section(QcSettings::NAME, values(json!({"enabled": false})));
         assert!(refused.is_err(), "QC has no switch");
+    }
+
+    #[test]
+    fn a_bad_clip_isnt_taken_and_reads_as_its_default_while_the_levels_other_values_stay() {
+        for text in [
+            "clip_percent = -0.1",
+            "clip_percent = 50",
+            "clip_percent = 49.95",
+            "clip_percent = nan",
+            "clip_percent = inf",
+            "clip_percent = -inf",
+            "clip_percent = \"0.5\"",
+        ] {
+            assert!(
+                toml::from_str::<LevelsSettings>(text).is_err(),
+                "took {text}"
+            );
+            // Edited into the file, it reads as its default, and the
+            // section's other values stay.
+            let kept = stored::<LevelsSettings>(&format!(
+                "{text}\nauto_levels = false\nwhiten = true\nthreshold = 200"
+            ));
+            assert_eq!(
+                kept.ok(),
+                Some(LevelsSettings {
+                    auto_levels: false,
+                    clip_percent: 0.5,
+                    whiten: true,
+                    threshold: 200,
+                }),
+                "{text}"
+            );
+        }
+        for text in ["threshold = 256", "threshold = -1", "whiten = 1"] {
+            assert!(
+                toml::from_str::<LevelsSettings>(text).is_err(),
+                "took {text}"
+            );
+        }
+        assert!(
+            unreadable::<LevelsSettings>().is_err(),
+            "a file that isn't TOML"
+        );
+        for (text, clip) in [
+            ("clip_percent = 0", 0.0),
+            ("clip_percent = 0.0", 0.0),
+            ("clip_percent = 2", 2.0),
+            ("clip_percent = 49.9", MAX_CLIP_PERCENT),
+        ] {
+            let read: LevelsSettings = toml::from_str(text).expect("a clip");
+            assert_eq!(read.clip_percent, clip, "{text}");
+        }
+        // A save writes only what differs from the defaults.
+        let (outcome, read, text) = saved::<LevelsSettings>("", |levels| levels.whiten = true);
+        assert!(outcome.is_ok());
+        assert!(read.whiten && read.auto_levels);
+        assert!(text.contains("whiten = true"), "{text}");
+        assert!(
+            !text.contains("clip_percent") && !text.contains("threshold"),
+            "{text}"
+        );
+
+        // Saving a bad clip is refused, as it wouldn't read back, and so is
+        // a change to one by the section's name, which changes nothing.
+        for clip in [50.0, -1.0, f64::NAN, f64::INFINITY] {
+            let preferences = BooharuPreferences {
+                levels: LevelsSettings {
+                    clip_percent: clip,
+                    ..LevelsSettings::default()
+                },
+                ..BooharuPreferences::default()
+            };
+            assert!(preferences.check().is_err(), "saved {clip}");
+        }
+        let mut preferences = BooharuPreferences::default();
+        preferences
+            .set_section(
+                LevelsSettings::NAME,
+                values(json!({"clip_percent": 1.5, "whiten": true})),
+            )
+            .expect("a clip and whitening");
+        assert_eq!(preferences.levels.clip_percent, 1.5);
+        assert!(preferences.levels.whiten && preferences.levels.auto_levels);
+        let refused =
+            preferences.set_section(LevelsSettings::NAME, values(json!({"clip_percent": 50})));
+        assert!(refused.is_err());
+        assert_eq!(preferences.levels.clip_percent, 1.5);
+        // Fixing pages as they're imported is stage 16's, not a levels key.
+        let refused =
+            preferences.set_section(LevelsSettings::NAME, values(json!({"fix_on_import": true})));
+        assert!(refused.is_err());
     }
 
     #[test]
