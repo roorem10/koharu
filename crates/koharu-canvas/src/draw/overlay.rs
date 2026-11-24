@@ -302,6 +302,19 @@ impl<'a, 'g> Overlay<'a, 'g> {
         self.filled(self.view.to_screen(), color(tint), path);
     }
 
+    /// Booharu: `pixmap`, premultiplied, its corner at `at` in page pixels,
+    /// drawn through the camera a page pixel to each of its pixels, as a soft
+    /// brush stroke previews its tiles; it fails, as the page's images do,
+    /// when the GPU has no memory for it.
+    pub fn booharu_pixmap(
+        &mut self,
+        pixmap: &std::sync::Arc<vello_gpu::Pixmap>,
+        at: Vec2,
+    ) -> anyhow::Result<()> {
+        let transform = self.view.to_screen() * Affine::translate(at);
+        koharu_renderer::booharu::image(self.drawing, pixmap, transform)
+    }
+
     /// The brush's ring at `at` in the viewport, `diameter` page pixels
     /// across: white on a black ring, so it shows on any page.
     pub fn ring(&mut self, at: Point, diameter: f64) {

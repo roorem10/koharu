@@ -39,6 +39,8 @@ pub(crate) fn press(cx: &Context, sample: Sample) -> Press {
     Press::starts(Gesture::Stroke(Stroke {
         tool: cx.tool,
         outline: outline(&points, cx.brush.diameter),
+        // Booharu: soft below a hardness of 1, from its first point.
+        booharu: crate::booharu::brush::Soft::start(cx, target, sample.page),
         points,
         target,
     }))
@@ -52,6 +54,9 @@ pub(crate) struct Stroke {
     target: Option<LayerId>,
     /// The points' outline, expanded again only when a point arrives.
     outline: BezPath,
+    /// Booharu: its soft coverage, when its tool's hardness was below 1 as
+    /// it started.
+    booharu: Option<crate::booharu::brush::Soft>,
 }
 
 impl Stroke {
@@ -65,6 +70,10 @@ impl Stroke {
         if self.points.len() != before {
             self.outline = outline(&self.points, cx.brush.diameter);
         }
+        // Booharu: a soft stroke takes in its new segments, as its outline does.
+        if let Some(soft) = &mut self.booharu {
+            soft.moved(cx, &self.points, before);
+        }
         Vec::new()
     }
 
@@ -72,7 +81,10 @@ impl Stroke {
     /// edit.
     pub fn finish(self, cx: &Context) -> anyhow::Result<Vec<Effect>> {
         let page = cx.snapshot.page().id;
-        let Some((rect, coverage)) = coverage(&self.outline, cx.snapshot.size()) else {
+        // Booharu: a soft stroke's own coverage, over the same pixels.
+        let Some((rect, coverage)) =
+            crate::booharu::brush::coverage(self.booharu.as_ref(), &self.outline, cx)
+        else {
             return Ok(Vec::new());
         };
         if self.tool == Tool::Remove {
@@ -85,7 +97,14 @@ impl Stroke {
         self.stroked(cx, rect, &coverage)
     }
 
-    pub fn preview(&self, cx: &Context, overlay: &mut Overlay) {
+    /// Booharu: it fails when the GPU has no memory for a soft stroke's
+    /// tiles.
+    pub fn preview(&self, cx: &Context, overlay: &mut Overlay) -> anyhow::Result<()> {
+        // Booharu: a soft stroke shows its tiles, tinted as below
+        // (`booharu::brush::tint`).
+        if let Some(soft) = &self.booharu {
+            return soft.preview(overlay);
+        }
         // A mask takes coverage, not colour.
         let colored = self
             .target
@@ -99,6 +118,7 @@ impl Stroke {
             }
         };
         overlay.fill(&self.outline, tint);
+        Ok(()) // Booharu: a hard stroke's preview can't fail.
     }
 
     pub fn look(&self) -> GestureLook {

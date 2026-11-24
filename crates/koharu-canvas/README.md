@@ -63,6 +63,16 @@ release that follow.
   it, so a text typed with the text tool is selected the moment it's added.
 - **The brush stays the host's.** A request such as Alt and the wheel asks the
   host to change the brush, and the host decides.
+- **Booharu: a brush stroke can be soft.** The host pushes each brush tool's
+  hardness and Draw's opacity. Below a hardness of 1, a stroke's coverage is
+  Booharu 0.0.4's: full along the line through its points, then falling
+  evenly to nothing half a pixel past its radius, over a falloff that grows as
+  the hardness drops. It covers the pixels Koharu's stroke would, and paints,
+  erases, uncovers a mask or asks to clean them as Koharu's does. Its preview
+  shows those bytes in Koharu's tint, in tiles 256 page pixels square, each
+  made again only when the stroke's coverage in it rises. At a hardness of 1,
+  the default, a stroke is Koharu's, byte for byte. A soft brush much wider
+  than 1000 pixels is slow, and its cursor's ring shows its whole diameter.
 - **Booharu: a small frame moves from its middle.** A side's or a corner's
   reach is at most a third of the frame across it, so a press in the middle of
   any frame, however small, moves it rather than resizing it. This answers

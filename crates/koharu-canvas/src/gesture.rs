@@ -132,7 +132,7 @@ impl Gesture {
             Self::Transform(transform) => return transform.preview(overlay),
             Self::Draft(draft) => draft.preview(overlay),
             Self::Pan(_) => {}
-            Self::Stroke(stroke) => stroke.preview(cx, overlay),
+            Self::Stroke(stroke) => return stroke.preview(cx, overlay), // Booharu: a soft stroke's can fail.
             Self::Reshape(reshape) => reshape.preview(overlay),
             Self::Pick(pick) => pick.preview(overlay),
             Self::Mark(mark) => mark.preview(overlay),

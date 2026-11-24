@@ -7,13 +7,13 @@
 //! are one `BooharuSettings`, which the host pushes at startup and whenever
 //! the settings they come from are saved, and whenever the brush's feel
 //! changes (`BrushFeel`): each brush tool's hardness and Draw's opacity,
-//! which its strokes take (`brush`). What the type bar takes off the
-//! characters being typed is an `Unmark`, which typing's own Booharu part,
-//! `typing/booharu.rs`, does, with the size steps and the selected text the
-//! type bar quotes. A right-click on a text or a block with the Select,
-//! Direct Select or Text tool, while nothing is typed, selects it unless
-//! it's selected already and answers `Effect::Menu`, for the host to open
-//! the box's menu there.
+//! which its strokes take, soft below a hardness of 1 (`brush`). What the
+//! type bar takes off the characters being typed is an `Unmark`, which
+//! typing's own Booharu part, `typing/booharu.rs`, does, with the size steps
+//! and the selected text the type bar quotes. A right-click on a text or a
+//! block with the Select, Direct Select or Text tool, while nothing is
+//! typed, selects it unless it's selected already and answers
+//! `Effect::Menu`, for the host to open the box's menu there.
 //!
 //! A box styled before it's translated holds a translation that is only a
 //! placeholder ([`status::placeholder`]): the type bar writes a style set on
