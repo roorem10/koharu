@@ -12,8 +12,8 @@ use serde_json::json;
 
 use super::*;
 
-/// A project in a temporary folder holding a page of `WIDTH` by `HEIGHT`
-/// pixels with a scan, and one of that size without.
+/// A project in a temporary folder holding a page with a scan, `WIDTH` by
+/// `HEIGHT` pixels unless made larger, and one of that size without.
 struct Fixture {
     _dir: tempfile::TempDir,
     session: Session,
@@ -26,16 +26,21 @@ const HEIGHT: u32 = 16;
 
 impl Fixture {
     fn new() -> Result<Self> {
+        Self::of(WIDTH, HEIGHT)
+    }
+
+    /// The pages `width` by `height` pixels.
+    fn of(width: u32, height: u32) -> Result<Self> {
         let dir = tempfile::tempdir()?;
         let mut session = Session::create(dir.path().join("test.khr"))?;
         let mut scan = Vec::new();
-        GrayImage::from_pixel(WIDTH, HEIGHT, image::Luma([200]))
+        GrayImage::from_pixel(width, height, image::Luma([200]))
             .write_to(&mut Cursor::new(&mut scan), ImageFormat::Png)?;
         let file = Hash::of(&scan);
         let pages = [
             json!({"op": "add_page", "index": 0, "background": file}),
             json!({"op": "add_page", "index": 1,
-                "size": {"width": WIDTH, "height": HEIGHT}}),
+                "size": {"width": width, "height": height}}),
         ];
         let mut ops = vec![Op::AddFile { bytes: scan }];
         for page in pages {
@@ -159,6 +164,47 @@ fn a_rect_cleans_exactly_the_pixels_whose_centres_it_holds() -> Result<()> {
     assert_eq!(cleaned(&area), [(0, 0), (1, 0)]);
     let beside = fixture.area(&rects(vec![rect(2.5, 0.5, 1.0, 1.0)]))?;
     assert_eq!(cleaned(&beside), [(2, 0)]);
+    Ok(())
+}
+
+#[test]
+fn edges_through_pixel_centres_take_them_by_the_rule_on_every_row() -> Result<()> {
+    // Tall shapes, as a crossing worked out between an edge's ends can land
+    // a hair beside a centre on its edge, taking or leaving it against the
+    // rule on that row alone.
+    let fixture = Fixture::of(240, 320)?;
+    let placed = |area: &Area| (area.rect.x, area.rect.y, area.rect.width, area.rect.height);
+    // A centre on a left or top edge is in, on a right or bottom one out.
+    for (shape, pixels) in [
+        (rect(100.5, 0.0, 50.0, 300.0), (100, 0, 50, 300)),
+        (rect(150.5, 0.0, 50.0, 300.0), (150, 0, 50, 300)),
+        (rect(120.5, 80.0, 60.0, 40.0), (120, 80, 60, 40)),
+        (rect(10.5, 0.0, 20.0, 100.0), (10, 0, 20, 100)),
+    ] {
+        let area = fixture.area(&rects(vec![shape]))?;
+        assert_eq!(placed(&area), pixels, "{shape:?}");
+        assert!(area.pixels.iter().all(|&value| value == 255), "{shape:?}");
+    }
+    // So two rects sharing such an edge leave no pixel out between them.
+    let pair = rects(vec![
+        rect(100.5, 0.0, 50.0, 300.0),
+        rect(150.5, 0.0, 50.0, 300.0),
+    ]);
+    let area = fixture.area(&pair)?;
+    assert_eq!(placed(&area), (100, 0, 100, 300));
+    assert_eq!(covered(&area), 30_000);
+    // Nor two triangles sharing a diagonal through centres, though each goes
+    // round it the other way.
+    for side in [10, 30, 100] {
+        let corner = f64::from(side);
+        let halves = polygons(vec![
+            polygon(&[(0.0, 0.0), (corner, 0.0), (corner, corner)]),
+            polygon(&[(0.0, 0.0), (corner, corner), (0.0, corner)]),
+        ]);
+        let area = fixture.area(&halves)?;
+        assert_eq!(placed(&area), (0, 0, side, side));
+        assert_eq!(covered(&area), u64::from(side * side), "{side}");
+    }
     Ok(())
 }
 

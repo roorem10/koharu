@@ -230,17 +230,27 @@ fn filled(outlines: &[Outline], candidate: Rect) -> Option<Area> {
 fn crossed(outline: &[(f64, f64)], centre: f64, crossings: &mut Vec<(f64, i32)>) {
     crossings.clear();
     let ends = outline.iter().zip(outline.iter().cycle().skip(1));
-    for (&(x0, y0), &(x1, y1)) in ends {
-        let (turn, upper, lower) = match y0 < y1 {
-            true => (1, y0, y1),
-            false => (-1, y1, y0),
+    for (&start, &end) in ends {
+        let (turn, (upper_x, upper), (lower_x, lower)) = match start.1 < end.1 {
+            true => (1, start, end),
+            false => (-1, end, start),
         };
         if !(upper <= centre && centre < lower) {
             continue;
         }
-        // Weighed between the ends, which no finite corners overflow.
-        let along = ((centre - y0) / (y1 - y0)).clamp(0.0, 1.0);
-        crossings.push((x0 * (1.0 - along) + x1 * along, turn));
+        // An upright edge crosses every row at its own x, exactly, so a
+        // centre on it is in or out by the rule on every row. Any other is
+        // weighed between its ends, which no finite corners overflow, from
+        // its upper one, so an edge two shapes share crosses each row at the
+        // same place in both, whichever way each goes round it.
+        let x = match upper_x == lower_x {
+            true => upper_x,
+            false => {
+                let along = ((centre - upper) / (lower - upper)).clamp(0.0, 1.0);
+                upper_x * (1.0 - along) + lower_x * along
+            }
+        };
+        crossings.push((x, turn));
     }
     crossings.sort_by(|(a, _), (b, _)| a.total_cmp(b));
 }
