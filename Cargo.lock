@@ -1206,6 +1206,7 @@ dependencies = [
  "anyhow",
  "base64 0.23.1",
  "booharu-core",
+ "booharu-rawprep",
  "humantime",
  "image",
  "koharu-llm",
@@ -1247,6 +1248,14 @@ dependencies = [
  "toml 1.2.1+spec-1.1.0",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "booharu-rawprep"
+version = "0.94.0"
+dependencies = [
+ "anyhow",
+ "image",
 ]
 
 [[package]]

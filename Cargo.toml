@@ -21,6 +21,7 @@ publish = false
 # Booharu: Booharu's own crates.
 booharu = { path = "crates/booharu" }
 booharu-core = { path = "crates/booharu-core" }
+booharu-rawprep = { path = "crates/booharu-rawprep" }
 koharu-bindgen = { path = "crates/koharu-bindgen" }
 koharu-config = { path = "crates/koharu-config" }
 koharu-diffusion = { path = "crates/koharu-diffusion" }

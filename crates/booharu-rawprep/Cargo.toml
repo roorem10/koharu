@@ -1,0 +1,16 @@
+[package]
+name = "booharu-rawprep"
+version.workspace = true
+edition.workspace = true
+description = "Image clean-up applied to Booharu page images before detection."
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+image = { workspace = true }
