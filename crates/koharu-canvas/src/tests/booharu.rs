@@ -5,9 +5,10 @@
 //! steps, the selected text the type bar quotes and the empty line a line
 //! break typed at the end starts, a right-click's box menu, a box styled
 //! before it's translated, which the canvas types into, outlines, resizes,
-//! moves and turns as a block with none, and the brush's feel, on the
-//! canvas's harness. The brush's tests ask for no GPU (`gpu_free`), so they
-//! run without one.
+//! moves and turns as a block with none, and the brush's feel, Draw's
+//! opacity and the soft strokes below a hardness of 1, on the canvas's
+//! harness. The brush's tests ask for no GPU (`gpu_free`), so they run
+//! without one, but for a soft stroke's preview, which is drawn.
 
 use std::collections::BTreeMap;
 
@@ -18,6 +19,7 @@ use booharu_core::{
     sfx, status,
 };
 use koharu_scene::{CharStyle, Fit, RichText};
+use kurbo::{Circle, Size};
 
 use super::*;
 use crate::booharu::{
@@ -1897,4 +1899,232 @@ fn the_eraser_and_remove_take_no_opacity() {
     let (rect, mask) = &asked[0];
     let at = ((20 - rect.y) * rect.width as i32 + (30 - rect.x)) as usize;
     assert_eq!(mask[at], 255);
+}
+
+/// Booharu's settings with every brush tool at `hardness`.
+fn hardness(hardness: f64) -> BooharuSettings {
+    BooharuSettings {
+        brush: BrushFeel {
+            draw_hardness: hardness,
+            eraser_hardness: hardness,
+            remove_hardness: hardness,
+            ..BrushFeel::default()
+        },
+        ..BooharuSettings::default()
+    }
+}
+
+/// A press at the first of `points`, a drag to each of the rest in turn,
+/// and the release at the last.
+fn stroke(canvas: &mut Canvas, points: &[(f64, f64)]) -> Vec<Effect> {
+    let mut effects = canvas.input(down(points[0], NONE)).expect("input");
+    for &point in &points[1..] {
+        effects.extend(canvas.input(drag(1, point)).expect("input"));
+    }
+    let last = points[points.len() - 1];
+    effects.extend(canvas.input(up(1, last)).expect("input"));
+    effects
+}
+
+/// Booharu 0.0.4's coverage of a soft stroke through `points` on a page of
+/// `size`, a byte a page pixel row by row.
+fn soft_coverage(size: (u32, u32), points: &[(f64, f64)], diameter: f64, hard: f64) -> Vec<u8> {
+    let points: Vec<Point> = points.iter().map(|&point| Point::from(point)).collect();
+    crate::booharu::brush::tests::reference(size, &points, diameter, hard)
+}
+
+/// The one inpaint request `effects` hold: its rect and its mask.
+fn inpaint(effects: &[Effect]) -> (koharu_scene::Rect, Vec<u8>) {
+    let [Effect::Inpaint { rect, mask, .. }] = effects else {
+        panic!("{effects:?}");
+    };
+    (*rect, mask.clone())
+}
+
+/// A layer's pixels as the session holds them, read once, each by its own
+/// coordinates; transparent where it has none.
+fn pixels(fixture: &Fixture, layer: LayerId) -> impl Fn(i32, i32) -> [u8; 4] {
+    let tiles = fixture.session.lock().tiles(layer, None).expect("tiles");
+    let side = koharu_scene::Tile::SIZE as i32;
+    move |x, y| {
+        let tile = tiles
+            .tiles
+            .iter()
+            .find(|tile| x.div_euclid(side) == tile.x && y.div_euclid(side) == tile.y);
+        tile.map_or([0; 4], |tile| {
+            let at = ((y.rem_euclid(side) * side + x.rem_euclid(side)) * 4) as usize;
+            [0, 1, 2, 3].map(|channel| tile.pixels[at + channel])
+        })
+    }
+}
+
+#[test]
+fn a_soft_remove_stroke_asks_to_clean_its_soft_coverage_over_koharus_pixels() {
+    let size = (300, 200);
+    let mut fixture = gpu_free(size, Vec::new());
+    fixture.canvas.set_tool(Tool::Remove);
+    fixture.canvas.set_brush(brush(24.0, [0.0, 0.0, 0.0, 1.0]));
+    // A click, a two-point stroke, and a stroke running off the page's
+    // right and bottom edges.
+    for points in [
+        vec![(60.3, 80.6)],
+        vec![(20.0, 50.0), (120.5, 70.25)],
+        vec![(40.0, 150.0), (90.0, 120.0), (150.0, 170.0), (295.0, 196.0)],
+    ] {
+        fixture.canvas.set_booharu(BooharuSettings::default());
+        let (koharus, _) = inpaint(&stroke(&mut fixture.canvas, &points));
+        for hard in [0.0, 0.5, 0.9] {
+            fixture.canvas.set_booharu(hardness(hard));
+            let (rect, mask) = inpaint(&stroke(&mut fixture.canvas, &points));
+            // The pixels Koharu's stroke would clean, each at 0.0.4's
+            // coverage, and none it covers outside them.
+            assert_eq!(rect, koharus, "{points:?} at {hard}");
+            let coverage = soft_coverage(size, &points, 24.0, hard);
+            for y in 0..size.1 as i32 {
+                for x in 0..size.0 as i32 {
+                    let value = coverage[(y * size.0 as i32 + x) as usize];
+                    let (column, row) = (x - rect.x, y - rect.y);
+                    if (0..rect.width as i32).contains(&column)
+                        && (0..rect.height as i32).contains(&row)
+                    {
+                        let asked = mask[(row * rect.width as i32 + column) as usize];
+                        assert_eq!(asked, value, "({x}, {y}) of {points:?} at {hard}");
+                    } else {
+                        assert_eq!(value, 0, "({x}, {y}) lies outside {rect:?}");
+                    }
+                }
+            }
+            assert!(mask.iter().any(|&value| value > 0 && value < 255));
+        }
+    }
+}
+
+#[test]
+fn at_a_hardness_of_1_a_stroke_is_koharus_byte_for_byte() {
+    let mut fixture = gpu_free((100, 100), Vec::new());
+    fixture.canvas.set_tool(Tool::Remove);
+    fixture.canvas.set_brush(brush(9.0, [0.0, 0.0, 0.0, 1.0]));
+    // A click asks to clean its dot's outline, antialiased, as Koharu's
+    // brush outlines one, whatever else the feel sets.
+    let click = [(40.3, 50.6)];
+    let dot = Circle::new(click[0], 4.5).to_path(0.1);
+    let koharus = crate::tools::brush::coverage(&dot, Size::new(100.0, 100.0)).expect("a mask");
+    for settings in [BooharuSettings::default(), hardness(1.0), half_opacity()] {
+        fixture.canvas.set_booharu(settings);
+        assert_eq!(inpaint(&stroke(&mut fixture.canvas, &click)), koharus);
+    }
+    // Which no soft stroke's is, even the hardest.
+    fixture.canvas.set_booharu(hardness(0.99));
+    let (rect, mask) = inpaint(&stroke(&mut fixture.canvas, &click));
+    assert_eq!(rect, koharus.0);
+    assert_ne!(mask, koharus.1);
+}
+
+#[test]
+fn a_soft_draw_or_eraser_stroke_writes_its_soft_coverage() {
+    // Draw paints a new raster in the brush's colour at Draw's opacity
+    // times the coverage, as Koharu paints its own.
+    let mut fixture = gpu_free((100, 100), Vec::new());
+    fixture.canvas.set_booharu(BooharuSettings {
+        brush: BrushFeel {
+            draw_hardness: 0.3,
+            draw_opacity: 0.5,
+            ..BrushFeel::default()
+        },
+        ..BooharuSettings::default()
+    });
+    fixture.canvas.set_tool(Tool::Draw);
+    fixture.canvas.set_brush(brush(20.0, [1.0, 0.0, 0.0, 1.0]));
+    let points = [(20.0, 50.0), (80.0, 50.0)];
+    let effects = stroke(&mut fixture.canvas, &points);
+    assert_eq!(apply(&mut fixture, effects), ["paint"]);
+    let [raster] = layers(&fixture)[..] else {
+        panic!("one layer");
+    };
+    let coverage = soft_coverage((100, 100), &points, 20.0, 0.3);
+    let painted = pixels(&fixture, raster);
+    for y in 0..100 {
+        for x in 0..100 {
+            let alpha = (f32::from(coverage[(y * 100 + x) as usize]) * 0.5).round() as u8;
+            let [r, g, b, a] = painted(x, y);
+            assert_eq!(a, alpha, "({x}, {y})");
+            assert!(a == 0 || [r, g, b] == [255, 0, 0], "({x}, {y})");
+        }
+    }
+    assert_eq!(painted(50, 50), [255, 0, 0, 128]);
+    assert!((1..128).contains(&painted(50, 58)[3]));
+
+    // The eraser takes the coverage off a raster's alpha.
+    let mut fixture = gpu_free((100, 100), offset_raster());
+    let raster = layers(&fixture)[0];
+    fixture.canvas.set_booharu(hardness(0.5));
+    fixture.canvas.select(vec![raster]);
+    fixture.canvas.set_tool(Tool::Eraser);
+    fixture.canvas.set_brush(brush(16.0, [0.0, 0.0, 0.0, 1.0]));
+    let effects = stroke(&mut fixture.canvas, &[(50.0, 50.0)]);
+    assert_eq!(apply(&mut fixture, effects), ["erase"]);
+    let coverage = soft_coverage((100, 100), &[(50.0, 50.0)], 16.0, 0.5);
+    let erased = pixels(&fixture, raster);
+    // The raster's white square, from its own (30, 30), at page (40, 40).
+    for y in 30..50 {
+        for x in 30..50 {
+            let covered = coverage[((y + 10) * 100 + x + 10) as usize];
+            assert_eq!(erased(x, y), [255, 255, 255, 255 - covered], "({x}, {y})");
+        }
+    }
+    assert_eq!(erased(40, 40)[3], 0);
+    assert!((1..255).contains(&erased(33, 40)[3]));
+}
+
+#[test]
+fn a_soft_strokes_preview_shows_its_tinted_coverage_across_its_tiles() {
+    let Some(mut fixture) = fixture((600, 300), Vec::new()) else {
+        return;
+    };
+    let canvas = &mut fixture.canvas;
+    canvas.set_viewport(Rect::new(0.0, 0.0, 400.0, 200.0), 1.0);
+    let camera = TranslateScale::new(Vec2::new(10.3, 5.7), 0.61);
+    canvas.set_camera(camera);
+    let kept = canvas.camera();
+    assert_eq!(
+        (kept.translation, kept.scale),
+        (camera.translation, camera.scale)
+    );
+    canvas.set_booharu(hardness(0.5));
+    canvas.set_tool(Tool::Draw);
+    canvas.set_brush(brush(60.0, [0.0, 0.0, 0.0, 1.0]));
+    // Along the edge between the first and second rows of tiles, across
+    // the first column's edge, the stroke so far, still under way.
+    let points = [(150.0, 256.0), (400.0, 256.0)];
+    let window = |page: (f64, f64)| (camera * Point::from(page)).into();
+    canvas.input(down(window(points[0]), NONE)).expect("input");
+    canvas.input(drag(1, window(points[1]))).expect("input");
+    assert!(canvas.draw().expect("a draw").is_some());
+    let snapshot = canvas.snapshot().expect("pixels");
+    let coverage = soft_coverage((600, 300), &points, 60.0, 0.5);
+    // Where four tiles meet, at page pixel (256, 256), clear of the brush's
+    // ring at the pointer, each pixel shows the page pixel its centre
+    // lies over in the stroke's black at its coverage, over the white
+    // page: no tile's edge shows.
+    let mut compared = 0;
+    for y in 140..186 {
+        for x in 140..196 {
+            let page = camera.inverse() * Point::new(f64::from(x) + 0.5, f64::from(y) + 0.5);
+            // A centre on a page pixel's edge could show either side's.
+            let edge = |value: f64| (value - value.round()).abs() < 1e-3;
+            if edge(page.x) || edge(page.y) {
+                continue;
+            }
+            let at = page.y.floor() as usize * 600 + page.x.floor() as usize;
+            let want = 255 - coverage[at];
+            let [r, g, b, a] = snapshot.get_pixel(x, y).0;
+            assert!(
+                r.abs_diff(want) <= 2 && [g, b, a] == [r, r, 255],
+                "({x}, {y}) shows {:?}, not {want}",
+                [r, g, b, a]
+            );
+            compared += 1;
+        }
+    }
+    assert!(compared > 2000, "{compared}");
 }
