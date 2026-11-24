@@ -14,11 +14,13 @@
 //! first, the centres its outline winds around (nonzero winding, so a
 //! polygon crossing itself fills every loop, one it winds around twice
 //! too), a centre on its outline counting the same way, in on a left or top
-//! side and out on a right or bottom one. So two shapes sharing an edge
-//! share no pixel and leave none out between them. The shapes are joined,
-//! each filled on its own, so one drawn the other way round adds to the
-//! others as any does and never cuts a hole in them. The mask is 0 or 255,
-//! with no growth, clipped to the page.
+//! side and out on a right or bottom one, on a slanted side exactly where
+//! its corners lie on whole or half pixels within ten million pixels of the
+//! page. So two shapes sharing an edge, or, between such corners, part of
+//! one, share no pixel and leave none out between them. The shapes are
+//! joined, each filled on its own, so one drawn the other way round adds to
+//! the others as any does and never cuts a hole in them. The mask is 0 or
+//! 255, with no growth, clipped to the page.
 
 use std::collections::BTreeSet;
 
@@ -240,14 +242,26 @@ fn crossed(outline: &[(f64, f64)], centre: f64, crossings: &mut Vec<(f64, i32)>)
         }
         // An upright edge crosses every row at its own x, exactly, so a
         // centre on it is in or out by the rule on every row. Any other is
-        // weighed between its ends, which no finite corners overflow, from
-        // its upper one, so an edge two shapes share crosses each row at the
-        // same place in both, whichever way each goes round it.
+        // worked out from its upper end, so an edge two shapes share crosses
+        // each row at the same place in both, whichever way each goes round
+        // it, and product first, which is exact wherever an edge between
+        // corners on whole or half pixels, within ten million pixels of the
+        // page, runs through a centre, so a centre on a slanted edge is in
+        // or out by the rule on every row too, and shapes sharing part of
+        // such an edge leave none out between them. Corners so far apart
+        // that the product overflows have the edge weighed between its ends
+        // instead.
         let x = match upper_x == lower_x {
             true => upper_x,
             false => {
-                let along = ((centre - upper) / (lower - upper)).clamp(0.0, 1.0);
-                upper_x * (1.0 - along) + lower_x * along
+                let x = upper_x + (lower_x - upper_x) * (centre - upper) / (lower - upper);
+                match x.is_finite() {
+                    true => x,
+                    false => {
+                        let along = ((centre - upper) / (lower - upper)).clamp(0.0, 1.0);
+                        upper_x * (1.0 - along) + lower_x * along
+                    }
+                }
             }
         };
         crossings.push((x, turn));

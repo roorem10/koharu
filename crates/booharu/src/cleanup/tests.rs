@@ -209,6 +209,85 @@ fn edges_through_pixel_centres_take_them_by_the_rule_on_every_row() -> Result<()
 }
 
 #[test]
+fn slanted_edges_through_pixel_centres_take_them_by_the_rule_on_every_row() -> Result<()> {
+    // A crossing worked out between a slanted edge's ends can land a hair
+    // beside a centre the edge runs through, taking or leaving it against
+    // the rule on that row alone.
+    let fixture = Fixture::of(400, 400)?;
+    for side in 2..=400_u32 {
+        let corner = f64::from(side);
+        // x + y = side, through centres, as a right side: row r holds the
+        // side - 1 - r pixels left of it.
+        let under = polygon(&[(0.0, 0.0), (corner, 0.0), (0.0, corner)]);
+        let area = fixture.area(&polygons(vec![under]))?;
+        assert_eq!(covered(&area), u64::from(side * (side - 1) / 2), "{side}");
+        // x = y as a left side: row r holds the side - r pixels from the one
+        // it runs through.
+        let over = polygon(&[(0.0, 0.0), (corner, 0.0), (corner, corner)]);
+        let area = fixture.area(&polygons(vec![over]))?;
+        assert_eq!(covered(&area), u64::from(side * (side + 1) / 2), "{side}");
+        // x = y as a right side: row r holds the r pixels left of it.
+        let left = polygon(&[(0.0, 0.0), (corner, corner), (0.0, corner)]);
+        let area = fixture.area(&polygons(vec![left]))?;
+        assert_eq!(covered(&area), u64::from(side * (side - 1) / 2), "{side}");
+    }
+    let area = fixture.area(&polygons(vec![polygon(&[
+        (0.0, 0.0),
+        (40.0, 0.0),
+        (0.0, 40.0),
+    ])]))?;
+    let expected: Vec<(i32, i32)> = (0..39)
+        .flat_map(|y| (0..39 - y).map(move |x| (x, y)))
+        .collect();
+    assert_eq!(cleaned(&area), expected);
+    Ok(())
+}
+
+#[test]
+fn shapes_sharing_part_of_a_slanted_edge_leave_no_pixel_out_between_them() -> Result<()> {
+    let fixture = Fixture::of(700, 700)?;
+    // Under and over the diagonal x = y from (start, start), one reaching
+    // `short` down it and the other `long`, so they share it to `short`.
+    let corner = |at: i32| f64::from(at);
+    for (start, short, long) in [(0, 13, 39), (100, 400, 700), (0, 50, 77), (20, 129, 300)] {
+        let (from, near, far) = (corner(start), corner(short), corner(long));
+        // The shorter under it: rows down to `short` whole to `long`, then
+        // from the diagonal on.
+        let shapes = polygons(vec![
+            polygon(&[(from, from), (near, near), (from, near)]),
+            polygon(&[(from, from), (far, from), (far, far)]),
+        ]);
+        let expected: Vec<(i32, i32)> = (start..long)
+            .flat_map(|y| (if y < short { start } else { y }..long).map(move |x| (x, y)))
+            .collect();
+        let shared = (start, short, long);
+        assert_eq!(cleaned(&fixture.area(&shapes)?), expected, "{shared:?}");
+        // The shorter over it: rows down to `short` whole to it, then up to
+        // the diagonal.
+        let shapes = polygons(vec![
+            polygon(&[(from, from), (far, far), (from, far)]),
+            polygon(&[(from, from), (near, from), (near, near)]),
+        ]);
+        let expected: Vec<(i32, i32)> = (start..long)
+            .flat_map(|y| (start..if y < short { short } else { y }).map(move |x| (x, y)))
+            .collect();
+        assert_eq!(cleaned(&fixture.area(&shapes)?), expected, "{shared:?}");
+    }
+    // Under and over x + y = 300, sharing it from (300, 0) to (0, 300), the
+    // one over it running on past the page's top: rows down to 300 whole to
+    // 400.
+    let shapes = polygons(vec![
+        polygon(&[(0.0, 0.0), (300.0, 0.0), (0.0, 300.0)]),
+        polygon(&[(400.0, -100.0), (400.0, 300.0), (0.0, 300.0)]),
+    ]);
+    let expected: Vec<(i32, i32)> = (0..300)
+        .flat_map(|y| (0..400).map(move |x| (x, y)))
+        .collect();
+    assert_eq!(cleaned(&fixture.area(&shapes)?), expected);
+    Ok(())
+}
+
+#[test]
 fn a_triangle_takes_the_pixels_whose_centres_it_holds() -> Result<()> {
     let fixture = Fixture::new()?;
     // Its long side, x + y = 8, runs through centres, which it leaves out as
