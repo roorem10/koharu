@@ -49,8 +49,10 @@
 //! | `booharu_clear_word_styles` | takes every word style off whole boxes, blocks' translations and text layers, so their words look as their boxes, as one undo step, leaving locked ones alone, and answers how many it cleared and left alone as locked | no |
 //! | `booharu_set_skew` | skews whole boxes, blocks' translations and text layers, along their width, their height or both, about each box's centre, as one undo step, an axis left out keeping each box's own skew, leaving locked and untranslated ones alone, and answers how many it changed and left alone as locked or untranslated | no |
 //! | `booharu_get_text_effects` | each box of a page carrying text effects beyond its lettering default, as its fx tag shows them, a border, a second border, the outline method, a gradient fill or a skew, with the skew it shows | yes |
+//! | `booharu_clean_areas` | cleans the art under exact rectangles and polygons of a page at once, as Koharu's Remove brush cleans a stroke: one area, by pixel centres with no growth, in one Inpainting run whose result goes under all of the page's lettering, and answers the run, which wait follows, the rect the area covers and how many pixels | no |
 
 mod boxes;
+mod cleanup;
 mod context;
 mod effects;
 mod lettering;
@@ -284,6 +286,7 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(words::ClearWordStyles);
     tools.add_tool(effects::SetSkew);
     tools.add_tool(effects::GetTextEffects);
+    tools.add_tool(cleanup::CleanAreas);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one
