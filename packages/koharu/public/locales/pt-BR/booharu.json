@@ -429,6 +429,9 @@
       "title": "Categorias de letreiramento",
       "unread": "Não foi possível ler a categoria de letreiramento: {{error}}"
     },
+    "levels": {
+      "originalLayer": "Digitalização original"
+    },
     "menu": {
       "booharuGithub": "Booharu no GitHub",
       "koharuDiscord": "Discord do Koharu",

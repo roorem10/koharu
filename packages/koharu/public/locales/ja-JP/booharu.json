@@ -397,6 +397,9 @@
       "title": "写植カテゴリ",
       "unread": "写植カテゴリを読み込めませんでした：{{error}}"
     },
+    "levels": {
+      "originalLayer": "元のスキャン"
+    },
     "menu": {
       "booharuGithub": "GitHub の Booharu",
       "koharuDiscord": "Koharu の Discord",

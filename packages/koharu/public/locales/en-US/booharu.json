@@ -397,6 +397,9 @@
       "title": "Lettering categories",
       "unread": "Couldn't read the lettering category: {{error}}"
     },
+    "levels": {
+      "originalLayer": "Original scan"
+    },
     "menu": {
       "booharuGithub": "Booharu on GitHub",
       "koharuDiscord": "Koharu Discord",

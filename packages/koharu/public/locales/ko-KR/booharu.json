@@ -397,6 +397,9 @@
       "title": "레터링 범주",
       "unread": "레터링 범주를 읽지 못했습니다: {{error}}"
     },
+    "levels": {
+      "originalLayer": "원본 스캔"
+    },
     "menu": {
       "booharuGithub": "GitHub의 Booharu",
       "koharuDiscord": "Koharu Discord",

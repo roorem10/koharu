@@ -397,6 +397,9 @@
       "title": "文字排版类别",
       "unread": "文字排版类别读勿出：{{error}}"
     },
+    "levels": {
+      "originalLayer": "原始扫描"
+    },
     "menu": {
       "booharuGithub": "GitHub 浪个 Booharu",
       "koharuDiscord": "Koharu 个 Discord",

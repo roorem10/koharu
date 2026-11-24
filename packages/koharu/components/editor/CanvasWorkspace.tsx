@@ -11,6 +11,7 @@ import { HistoryWindow } from '@/components/editor/HistoryWindow'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { TypeBar } from '@/components/editor/TypeBar'
+import { exceptOriginalScan } from '@/lib/booharu/attrs' // Booharu: Select all leaves the Original scan.
 import { controlKeepsKey, inDialog } from '@/lib/booharu/keys' // Booharu: its key rules on Koharu's hotkeys.
 import { toRgba } from '@/lib/color'
 import { send, usePage } from '@/lib/queries'
@@ -121,7 +122,8 @@ export function CanvasWorkspace() {
   useHotkeys(shortcuts.redo, () => send(commands.redo), command)
   useHotkeys(
     shortcuts.selectAll,
-    () => page && selectLayers(page.layers.map((layer) => layer.id)),
+    // Booharu: all but the Original scan, hidden and locked under the page, so Delete takes the rest.
+    () => page && selectLayers(exceptOriginalScan(page.layers).map((layer) => layer.id)),
     command,
   )
   useHotkeys(shortcuts.deselect, () => send(commands.deselect), command)
