@@ -1077,9 +1077,18 @@ mod tests {
         }
     }
 
-    #[test]
-    fn the_group_going_is_the_one_in_the_place() {
-        let _registry = REGISTRY.blocking_lock();
+    /// A group [`placed`] in the place, freed as it drops, so a test that
+    /// fails while it holds the place leaves it free.
+    struct Placed(u64);
+
+    impl Drop for Placed {
+        fn drop(&mut self) {
+            free(self.0);
+        }
+    }
+
+    /// Places a group of its own, as a Run press does as it plans.
+    fn placed() -> Placed {
         let number = MADE.fetch_add(1, Ordering::Relaxed) + 1;
         *GOING.lock() = Some(Going {
             plan: RunPlan {
@@ -1094,8 +1103,15 @@ mod tests {
             failed: BTreeSet::new(),
             lettering: LetteringSettings::default(),
         });
-        assert_eq!(group_going(), Some(number));
-        free(number);
+        Placed(number)
+    }
+
+    #[test]
+    fn the_group_going_is_the_one_in_the_place() {
+        let _registry = REGISTRY.blocking_lock();
+        let group = placed();
+        assert_eq!(group_going(), Some(group.0));
+        drop(group);
         assert_eq!(group_going(), None);
     }
 
@@ -1163,6 +1179,98 @@ mod tests {
         assert!(planned, "the fix held the session's lock as it waited");
         let fixed = fixed.expect("no group went once the place was let go");
         assert_eq!(reasons(fixed), [LevelsSkip::NoScan]);
+    }
+
+    /// A project in a temporary folder holding one page whose scan is
+    /// faded, its ink and its paper both grey, which a fix of page levels
+    /// levels.
+    fn faded() -> (tempfile::TempDir, Mutex<Session>, PageId) {
+        use std::io::Cursor;
+
+        use image::{GrayImage, ImageFormat, Luma};
+        use koharu_scene::{Hash, Op};
+
+        let dir = tempfile::tempdir().expect("a folder");
+        let mut session = Session::create(dir.path().join("test.khr")).expect("a project");
+        let mut scan = Vec::new();
+        GrayImage::from_fn(100, 100, |x, _| Luma([60 + x as u8]))
+            .write_to(&mut Cursor::new(&mut scan), ImageFormat::Png)
+            .expect("a PNG");
+        let page = json!({"op": "add_page", "index": 0, "background": Hash::of(&scan)});
+        let ops = vec![
+            Op::AddFile { bytes: scan },
+            serde_json::from_value(page).expect("an op"),
+        ];
+        session
+            .apply(Edit {
+                label: "test".to_owned(),
+                ops,
+            })
+            .expect("the page");
+        let page = session.project().pages().next().expect("the page").id;
+        (dir, Mutex::new(session), page)
+    }
+
+    /// A Run press or a group carrying on, holding the group's place,
+    /// refuses a fix of page levels as it starts, before it levels a page,
+    /// and before its second phase, and a restore, each changing nothing;
+    /// once the place is free, each goes on.
+    #[test]
+    fn a_group_in_the_place_refuses_a_fix_or_a_restore_of_page_levels() {
+        use booharu_core::settings::LevelsSettings;
+
+        use crate::levels::{self, RUN_GOING};
+
+        fn refused<T: std::fmt::Debug>(result: anyhow::Result<T>) -> String {
+            format!("{:#}", result.expect_err("refused while a group goes"))
+        }
+
+        let _registry = REGISTRY.blocking_lock();
+        let (_dir, session, page) = faded();
+        let settings = LevelsSettings::default();
+        // The page's scan, and the history's steps.
+        let now = || {
+            let session = session.lock();
+            let project = session.project();
+            let scan = project.page(page).expect("the page").background;
+            (scan.expect("a scan").file, session.history().steps)
+        };
+        let fix = |progress: &mut dyn FnMut()| {
+            let job = jobs::start(JobKind::Levels).expect("the fix's job");
+            levels::fix(&session, &[page], &settings, || false, &job, |_| progress())
+        };
+        let imported = now();
+
+        // As a fix starts.
+        let group = placed();
+        let startable = levels::startable(&[], false);
+        let started = fix(&mut || panic!("levelled while a group goes"));
+        drop(group);
+        assert_eq!(refused(startable), RUN_GOING);
+        assert_eq!(refused(started), RUN_GOING);
+        assert_eq!(now(), imported);
+        // Before its second phase, a press having taken the place as its
+        // first ended.
+        let mut taken = None;
+        let fixed = fix(&mut || taken = Some(placed()));
+        drop(taken.expect("the first phase ended"));
+        assert_eq!(refused(fixed), RUN_GOING);
+        assert_eq!(now(), imported);
+
+        // Once the place is free, a fix goes on.
+        levels::startable(&[], false).expect("with no group going");
+        assert_eq!(fix(&mut || {}).expect("a fix").changed, [page]);
+        let levelled = now();
+        assert_ne!(levelled.0, imported.0);
+        // And a restore, refused while a group goes.
+        let group = placed();
+        let restored = levels::restore(&session, &[page], || false);
+        drop(group);
+        assert_eq!(refused(restored), RUN_GOING);
+        assert_eq!(now(), levelled);
+        let restored = levels::restore(&session, &[page], || false).expect("a restore");
+        assert_eq!(restored.changed, [page]);
+        assert_eq!(now().0, imported.0);
     }
 
     /// Waits until no group holds the place, as once its follower went.
