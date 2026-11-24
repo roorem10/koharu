@@ -51,7 +51,9 @@
 //! - `cleanup`'s `soft` and `limit`, in the Inpainting stage's `inpaint()`,
 //!   keep a soft Remove stroke's own coverage as its result's limit (T23),
 //!   for a run whose snapshot asks for it (`soft_limit`); its write puts an
-//!   area's result under all lettering (`booharu_core::cleanup`, D17).
+//!   area's result under all lettering (`booharu_core::cleanup`, D17), and
+//!   Detect again's additions go above the Original scan and the results
+//!   under the lettering (`filters`).
 
 pub(crate) mod cleanup;
 pub(crate) mod emphasis;

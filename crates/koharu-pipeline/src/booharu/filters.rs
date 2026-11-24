@@ -14,7 +14,8 @@
 //!   and the kept art of the effects it skips; the Recognition stage's
 //!   readings (R2); the Inpainting stage's clean-ups, with the kept art of
 //!   the effects a translation skips (I1, I2); and Detect again's additions
-//!   (D2).
+//!   (D2), which go above the Original scan and the results under the
+//!   page's lettering (D17, D37).
 //! - [`stays`], in Detect again's removals (D1), keeps what the user made (a
 //!   split's halves among it), fixed (a clean-up hidden by hand, or shown
 //!   again by hand on an effect kept as art, among it), labelled, noted,
@@ -385,8 +386,12 @@ impl Writing {
     /// stays, one locked or kept (`protect::keeps`), by at least half the
     /// smaller of their areas, with its mask, and each new panel or balloon
     /// that held nothing else, up to the top; the rest numbered again within
-    /// each parent from 0 (D2). Each block that stays is counted, as locked
-    /// or as kept by hand.
+    /// each parent from 0 (D2), but the page's own from
+    /// `booharu_core::cleanup::detect_start` of the layers this Detect's
+    /// removals leave, so the new layers go above the Original scan and the
+    /// results that stay under the page's lettering, and never cover them
+    /// (D17, D37). Each block that stays is counted, as locked or as kept by
+    /// hand.
     pub(crate) fn added(&self, page: &Page, additions: Vec<Op>) -> Vec<Op> {
         let mut staying = Vec::new();
         for (layer, block, locked) in status::blocks(page) {
@@ -398,8 +403,26 @@ impl Writing {
             self.left.count(&self.member, reason);
             staying.extend(block.source.bounds());
         }
-        unrepeated(additions, &staying)
+        let remaining: Vec<&Layer> = page
+            .layers
+            .iter()
+            .filter(|layer| remains(page, layer))
+            .collect();
+        let start = booharu_core::cleanup::detect_start(&remaining);
+        unrepeated(additions, &staying, start)
     }
+}
+
+/// Whether the top-level `layer` of `page` is still there after Detect's
+/// removals, by the rule `removals` (detect/mod.rs) applies: a locked layer,
+/// one that stays, and any but a panel, balloon or block are.
+fn remains(page: &Page, layer: &Layer) -> bool {
+    layer.locked
+        || stays(page, layer)
+        || !matches!(
+            layer.content,
+            Content::Panel(_) | Content::Balloon(_) | Content::Block(_)
+        )
 }
 
 /// Whether Detect again leaves the unlocked `layer` on `page` in place (D1):
@@ -422,8 +445,9 @@ struct New {
 /// `additions` but for each new block whose source lies over one of
 /// `staying` by at least half the smaller of their areas, with its parts'
 /// pixels, and each new panel or balloon whose layers were all dropped, up
-/// to the top; the rest numbered again within each parent from 0, in order.
-fn unrepeated(additions: Vec<Op>, staying: &[kurbo::Rect]) -> Vec<Op> {
+/// to the top; the rest numbered again within each parent from 0, in order,
+/// but the page's own top level from `start`.
+fn unrepeated(additions: Vec<Op>, staying: &[kurbo::Rect], start: usize) -> Vec<Op> {
     let mut new: Vec<New> = additions
         .iter()
         .filter_map(|op| {
@@ -484,7 +508,7 @@ fn unrepeated(additions: Vec<Op>, staying: &[kurbo::Rect]) -> Vec<Op> {
             .and_then(|label| label.split('.').next())
             .is_some_and(|label| dropped.contains(label))
     };
-    let mut places: HashMap<Option<String>, usize> = HashMap::new();
+    let mut places: HashMap<Option<String>, usize> = HashMap::from([(None, start)]);
     additions
         .into_iter()
         .filter_map(|op| match op {
@@ -2016,6 +2040,221 @@ mod tests {
             left.told();
             assert_eq!(skipped(&events.told()), [(Stage::Detect, 0, 2, 0, false)]);
         }
+        Ok(())
+    }
+
+    /// The hash of the scan a scanned fixture's page shows, which an image
+    /// layer may show too.
+    fn scan() -> Result<Hash> {
+        let mut scan = Vec::new();
+        RgbImage::from_pixel(SIDE, SIDE, Rgb([255; 3]))
+            .write_to(&mut Cursor::new(&mut scan), ImageFormat::Png)?;
+        Ok(Hash::of(&scan))
+    }
+
+    /// The Original scan, showing the page's scan, as page levels adds it:
+    /// hidden, locked, and marked.
+    fn original() -> Result<Value> {
+        Ok(
+            json!({"kind": "image", "file": scan()?, "name": "Original scan", "visible": false,
+            "locked": true, "attributes": {"booharu": {"original_scan": true}}}),
+        )
+    }
+
+    /// A Remove stroke's or a Generative Fill's result, as the Inpainting
+    /// stage records it.
+    fn result() -> Value {
+        json!({"kind": "raster", "attributes": {"c2pa": {
+            "inpainting": {"action": "c2pa.created"}}}})
+    }
+
+    /// What detection finds on any page here: a panel holding a block, and
+    /// a free block, none over a block the pages hold.
+    fn finds(at: PageId) -> Result<Vec<Op>> {
+        Ok(vec![
+            found(
+                at,
+                "d0",
+                None,
+                0,
+                detected("panel", "M0 90 L200 90 L200 200 L0 200 Z"),
+            )?,
+            found(at, "d1", Some("d0"), 0, lettering((10.0, 100.0)))?,
+            found_mask("d1", (10, 100))?,
+            found(at, "d2", None, 1, lettering((60.0, 100.0)))?,
+            found_mask("d2", (60, 100))?,
+        ])
+    }
+
+    #[test]
+    fn detect_again_adds_its_layers_above_the_original_scan_and_the_results_under_the_lettering()
+    -> Result<()> {
+        // From the bottom up: the Original scan, two results with a block
+        // between them, which goes, a locked block, which stays, and a free
+        // text.
+        let fixture = Fixture::new(
+            true,
+            vec![
+                add("original", None, 0, original()?),
+                add("first", None, 1, result()),
+                add("plain", None, 2, block("text", (10.0, 10.0))),
+                add("second", None, 3, result()),
+                add("locked", None, 4, block("text", (100.0, 10.0))),
+                add("free", None, 5, json!({"kind": "text", "content": "Hi"})),
+            ],
+        )?;
+        fixture.lock("locked")?;
+        let events = Events::new();
+        let left = Left::of(Stage::Detect, Snapshot::default(), events.clone());
+        let page = fixture.page()?;
+        let added = left
+            .writing(&fixture.member(None))
+            .added(&page, finds(fixture.page)?);
+        // The block that goes counts for nothing: the new top-level layers
+        // start above the second result, and the panel's block keeps its
+        // place in the panel.
+        let own = |label: &str| label.to_owned();
+        assert_eq!(
+            shape(&added),
+            (
+                vec![
+                    (own("d0"), None, 3),
+                    (own("d1"), Some(own("d0")), 0),
+                    (own("d2"), None, 4),
+                ],
+                vec![own("d1.mask"), own("d2.mask")],
+            )
+        );
+        left.told();
+        // Removing what goes and adding the rest is one edit that goes in.
+        let mut ops = Vec::new();
+        removals(&page, &page.layers, &mut ops);
+        ops.extend(added);
+        fixture.edit(ops)?;
+        let page = fixture.page()?;
+        let top: Vec<String> = page
+            .layers
+            .iter()
+            .map(|layer| fixture.label(layer.id))
+            .collect();
+        assert_eq!(top.len(), 7, "{top:?}");
+        assert_eq!(top[..3], ["original", "first", "second"].map(own));
+        assert!(matches!(page.layers[3].content, Content::Panel(_)));
+        assert!(matches!(page.layers[4].content, Content::Block(_)));
+        assert_eq!(top[5..], ["locked", "free"].map(own));
+        Ok(())
+    }
+
+    #[test]
+    fn with_no_original_scan_nor_result_detect_again_numbers_from_0_as_koharus_does() -> Result<()>
+    {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("draw", None, 0, json!({"kind": "raster"})),
+                add("free", None, 1, json!({"kind": "text", "content": "Hi"})),
+            ],
+        )?;
+        let left = Left::of(Stage::Detect, Snapshot::default(), Events::new());
+        let page = fixture.page()?;
+        let added = left
+            .writing(&fixture.member(None))
+            .added(&page, finds(fixture.page)?);
+        let own = |label: &str| label.to_owned();
+        assert_eq!(
+            shape(&added).0,
+            [
+                (own("d0"), None, 0),
+                (own("d1"), Some(own("d0")), 0),
+                (own("d2"), None, 1),
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_layers_detect_again_starts_among_are_those_its_removals_leave() -> Result<()> {
+        let fixture = Fixture::new(
+            true,
+            vec![
+                add("original", None, 0, original()?),
+                add("result", None, 1, result()),
+                add("draw", None, 2, json!({"kind": "raster"})),
+                add(
+                    "panel",
+                    None,
+                    3,
+                    detected("panel", "M0 0 L90 0 L90 90 L0 90 Z"),
+                ),
+                add(
+                    "locked_panel",
+                    None,
+                    4,
+                    detected("panel", "M100 0 L200 0 L200 90 Z"),
+                ),
+                add(
+                    "holding",
+                    None,
+                    5,
+                    detected("balloon", "M0 0 L80 0 L80 60 Z"),
+                ),
+                add("held", Some("holding"), 0, block("text", (10.0, 10.0))),
+                add(
+                    "balloon",
+                    None,
+                    6,
+                    detected("balloon", "M0 100 L40 100 L40 150 Z"),
+                ),
+                add("plain", None, 7, block("text", (100.0, 100.0))),
+                add("corrected", None, 8, block("text", (150.0, 100.0))),
+                add("locked", None, 9, block("text", (150.0, 150.0))),
+                add("group", None, 10, json!({"kind": "group"})),
+                add("grouped", Some("group"), 0, block("text", (100.0, 150.0))),
+                add("free", None, 11, json!({"kind": "text", "content": "Hi"})),
+            ],
+        )?;
+        fixture.lock("locked_panel")?;
+        fixture.lock("locked")?;
+        fixture.correct("held")?;
+        fixture.correct("corrected")?;
+        let page = fixture.page()?;
+        let mut ops = Vec::new();
+        removals(&page, &page.layers, &mut ops);
+        let removed: Vec<Ref> = ops
+            .iter()
+            .filter_map(|op| match op {
+                Op::RemoveLayer { layer } => Some(layer.clone()),
+                _ => None,
+            })
+            .collect();
+        let left: Vec<String> = page
+            .layers
+            .iter()
+            .filter(|layer| remains(&page, layer))
+            .map(|layer| fixture.label(layer.id))
+            .collect();
+        let unremoved: Vec<String> = page
+            .layers
+            .iter()
+            .filter(|layer| !removed.contains(&Ref::from(layer.id)))
+            .map(|layer| fixture.label(layer.id))
+            .collect();
+        assert_eq!(left, unremoved);
+        assert_eq!(
+            left,
+            [
+                "original",
+                "result",
+                "draw",
+                "locked_panel",
+                "holding",
+                "corrected",
+                "locked",
+                "group",
+                "free"
+            ]
+            .map(str::to_owned)
+        );
         Ok(())
     }
 }
