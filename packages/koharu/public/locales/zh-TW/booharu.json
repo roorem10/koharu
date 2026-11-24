@@ -397,6 +397,9 @@
       "title": "排字類別",
       "unread": "無法讀取排字類別：{{error}}"
     },
+    "levels": {
+      "originalLayer": "原始掃描"
+    },
     "menu": {
       "booharuGithub": "GitHub 上的 Booharu",
       "koharuDiscord": "Koharu 的 Discord",

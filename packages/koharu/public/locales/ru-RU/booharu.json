@@ -459,6 +459,9 @@
       "title": "Категории оформления текста",
       "unread": "Не удалось прочитать категорию оформления текста: {{error}}"
     },
+    "levels": {
+      "originalLayer": "Исходный скан"
+    },
     "menu": {
       "booharuGithub": "Booharu на GitHub",
       "koharuDiscord": "Discord Koharu",

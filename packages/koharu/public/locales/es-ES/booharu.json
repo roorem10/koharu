@@ -429,6 +429,9 @@
       "title": "Categorías de rotulación",
       "unread": "No se ha podido leer la categoría de rotulación: {{error}}"
     },
+    "levels": {
+      "originalLayer": "Escaneo original"
+    },
     "menu": {
       "booharuGithub": "Booharu en GitHub",
       "koharuDiscord": "Discord de Koharu",

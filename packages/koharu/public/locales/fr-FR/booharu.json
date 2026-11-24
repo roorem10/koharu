@@ -429,6 +429,9 @@
       "title": "Catégories de lettrage",
       "unread": "Impossible de lire la catégorie de lettrage : {{error}}"
     },
+    "levels": {
+      "originalLayer": "Scan original"
+    },
     "menu": {
       "booharuGithub": "Booharu sur GitHub",
       "koharuDiscord": "Discord de Koharu",

@@ -519,6 +519,9 @@
       "title": "فئات التنضيد",
       "unread": "تعذّرت قراءة فئة التنضيد: {{error}}"
     },
+    "levels": {
+      "originalLayer": "المسح الأصلي"
+    },
     "menu": {
       "booharuGithub": "Booharu على GitHub",
       "koharuDiscord": "Discord الخاص بـ Koharu",

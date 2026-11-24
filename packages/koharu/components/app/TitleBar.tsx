@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { AboutDialog } from '@/components/app/AboutDialog'
 import { useMacOS, WindowControls } from '@/components/app/WindowChrome'
 import { BoxMenuItems } from '@/components/booharu/boxes/BoxActionItems' // Booharu: box actions.
+import { exceptOriginalScan } from '@/lib/booharu/attrs' // Booharu: Select all leaves the Original scan.
 import { send, useCommand, useImportPages, usePage, useProject } from '@/lib/queries'
 import { deleteSelection } from '@/lib/scene'
 import { shortcutLabel, shortcuts } from '@/lib/shortcuts'
@@ -156,7 +157,10 @@ export function TitleBar() {
               <MenubarSeparator />
               <MenubarItem
                 disabled={!page}
-                onClick={() => selectLayers(page?.layers.map((layer) => layer.id) ?? [])}
+                onClick={() =>
+                  // Booharu: all but the Original scan, in Read mode too.
+                  selectLayers(exceptOriginalScan(page?.layers ?? []).map((layer) => layer.id))
+                }
               >
                 {t('menu.selectAllLayers')}
                 <MenubarShortcut>{shortcutLabel(shortcuts.selectAll)}</MenubarShortcut>

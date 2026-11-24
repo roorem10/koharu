@@ -397,6 +397,9 @@
       "title": "Dizgi kategorileri",
       "unread": "Dizgi kategorisi okunamadı: {{error}}"
     },
+    "levels": {
+      "originalLayer": "Orijinal tarama"
+    },
     "menu": {
       "booharuGithub": "GitHub'da Booharu",
       "koharuDiscord": "Koharu Discord",

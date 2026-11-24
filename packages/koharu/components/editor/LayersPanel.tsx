@@ -35,6 +35,7 @@ import { useTranslation } from 'react-i18next'
 
 import { LayerBoxTag } from '@/components/booharu/details/BoxTag' // Booharu: the QC ? and fx tags.
 import { LayerKind } from '@/components/booharu/lettering/LayerKind' // Booharu: a block's lettering category.
+import { isOriginalScan } from '@/lib/booharu/attrs' // Booharu: the Original scan's name.
 import {
   dropMoves,
   findLayer,
@@ -567,6 +568,7 @@ function layerIcon(layer: Layer): typeof Type {
 }
 
 function localizedLayerName(layer: Layer, index: number, t: TFunction): string {
+  if (isOriginalScan(layer)) return t('booharu.levels.originalLayer') // Booharu: in the user's language.
   if (layer.name) return layer.name
   if (isTextLayer(layer))
     return plainText(layer).trim() || t('layers.textName', { index: index + 1 })
