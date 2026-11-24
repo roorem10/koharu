@@ -48,6 +48,21 @@ Create, open, or delete projects here. A project's name is its file name, so a n
 
 Files that operating systems leave in archives, such as macOS's `__MACOSX` resource forks, are skipped. Imported bytes are copied into the project file, so moving or deleting an original does not affect the project.
 
+{/* Booharu: Fix page levels. */}
+
+<Note>
+  In Booharu, **Fix page levels…** in a page's actions menu fixes the scan's levels before
+  detection, on that page, or on the selected pages when it is one of them; **Edit → Fix page
+  levels…** starts with every page. **Auto levels** stretches the scan from its darkest ink to black
+  and its lightest paper to white, leaving out **Clip at each end (%)** of the pixels at each end,
+  and **Whiten paper** turns paper lighter than its threshold white. The dialog starts from the
+  values in **Settings → Pipeline → Page levels** and previews the first page before and after. Each
+  fix is one undo step, and pages with clean-up or inpainting on them are skipped. A levelled page
+  keeps its scan as it came in a hidden, locked **Original scan** layer, which **Select All Layers**
+  and PSD export leave out, and **Restore original scan** in the page's actions menu puts it back.
+  Fixing a page again levels its levelled scan, so restore it first to try gentler values.
+</Note>
+
 ## Back up and restore
 
 Close the project, then copy its `.khr` file. To restore it, close Koharu and put the file back in the projects folder.
