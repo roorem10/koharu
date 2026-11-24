@@ -7,11 +7,12 @@
 //! - `queued`, in `Pipeline::run`, takes the snapshot, the run policy of
 //!   `[booharu-runs]` included, with the flags the run's caller set on its
 //!   config's snapshot (Redo boxes' `redo`, a subtitle run's
-//!   `subtitle_run`), or refuses the run when a section it reads can't be
-//!   read. For a run that translates it also appends the chapter's
-//!   glossary and notes, from its side file and the series it links, to the
-//!   Instructions in the run's config, never in the saved setting, or
-//!   refuses the run when either file can't be read; and takes
+//!   `subtitle_run`, a soft Remove stroke's `soft_limit`), or refuses the
+//!   run when a section it reads can't be read. For a run that translates
+//!   it also appends the chapter's glossary and notes, from its side file
+//!   and the series it links, to the Instructions in the run's config,
+//!   never in the saved setting, or refuses the run when either file can't
+//!   be read; and takes
 //!   `[booharu-emphasis]`, with whether the run asks its model which words
 //!   to stress, which appends the instruction to ask after those
 //!   (`emphasis`).
@@ -47,7 +48,12 @@
 //!   the runtime's device, and so libtorch, however the load then goes, so
 //!   Booharu's unload empties libtorch's cache once it may
 //!   (`libtorch_loaded`).
+//! - `cleanup`'s `soft` and `limit`, in the Inpainting stage's `inpaint()`,
+//!   keep a soft Remove stroke's own coverage as its result's limit (T23),
+//!   for a run whose snapshot asks for it (`soft_limit`); its write puts an
+//!   area's result under all lettering (`booharu_core::cleanup`, D17).
 
+pub(crate) mod cleanup;
 pub(crate) mod emphasis;
 mod filters;
 
@@ -170,10 +176,10 @@ fn chapter(
 
 /// A run's snapshot: `read`, with `policy` in it and the run's own flags
 /// from `asked`, the snapshot of the config it was queued with: Redo boxes'
-/// `redo` and a subtitle run's `subtitle_run`, which only the caller that
-/// queued the run sets, and which no saved setting holds. Or the error of
-/// the first that couldn't be read, which refuses the run as an invalid
-/// request.
+/// `redo`, a subtitle run's `subtitle_run` and a soft Remove stroke's
+/// `soft_limit`, which only the caller that queued the run sets, and which
+/// no saved setting holds. Or the error of the first that couldn't be read,
+/// which refuses the run as an invalid request.
 fn snapshot(
     read: anyhow::Result<Snapshot>,
     policy: anyhow::Result<RunPolicy>,
@@ -185,6 +191,7 @@ fn snapshot(
         runs: Some(policy.map_err(invalid)?),
         redo: asked.redo,
         subtitle_run: asked.subtitle_run,
+        soft_limit: asked.soft_limit,
         ..read
     })
 }
@@ -946,12 +953,13 @@ mod tests {
     fn a_queued_run_keeps_its_callers_flags_and_reads_every_setting_again() -> Result<()> {
         let read = snapshot(true, None, None, Some("CCWildWords"));
         let policy = RunsSettings::default().policy();
-        // Redo boxes taking hand-fixed boxes, and a subtitle run, as their
-        // callers ask on the config they queue; a setting the caller's
-        // config holds is read again, as it's saved now.
+        // Redo boxes taking hand-fixed boxes, a subtitle run, and a soft
+        // Remove stroke, as their callers ask on the config they queue; a
+        // setting the caller's config holds is read again, as it's saved now.
         let asked = Snapshot {
             redo: true,
             subtitle_run: true,
+            soft_limit: true,
             font: Some("Comic Neue".to_owned()),
             ..Snapshot::default()
         };
@@ -961,25 +969,39 @@ mod tests {
                 runs: Some(policy),
                 redo: true,
                 subtitle_run: true,
-                ..read
+                soft_limit: true,
+                ..read.clone()
             }
         );
+        // Each alone, as no flag carries another.
+        let soft = Snapshot {
+            soft_limit: true,
+            ..Snapshot::default()
+        };
+        let queued = super::snapshot(Ok(read), Ok(policy), &soft)?;
+        assert!(queued.soft_limit && !queued.redo && !queued.subtitle_run);
         Ok(())
     }
 
     #[test]
-    fn the_redo_and_subtitle_flags_go_through_queued() -> Result<()> {
+    fn the_callers_flags_go_through_queued() -> Result<()> {
         let Page {
             _dir: _held,
             session,
             blocks: _,
         } = Page::new(&[("a", "text")])?;
         let session = Mutex::new(session);
-        for (redo, subtitle_run) in [(true, false), (false, true), (false, false)] {
+        for (redo, subtitle_run, soft_limit) in [
+            (true, false, false),
+            (false, true, false),
+            (false, false, true),
+            (false, false, false),
+        ] {
             let config = PipelineConfig {
                 booharu: Snapshot {
                     redo,
                     subtitle_run,
+                    soft_limit,
                     ..Snapshot::default()
                 },
                 ..PipelineConfig::default()
@@ -987,8 +1009,12 @@ mod tests {
             for stages in [&[Stage::Recognize][..], &[Stage::Translate, Stage::Inpaint]] {
                 let run = queued(config.clone(), &session, &stages.iter().copied().collect())?;
                 assert_eq!(
-                    (run.booharu.redo, run.booharu.subtitle_run),
-                    (redo, subtitle_run),
+                    (
+                        run.booharu.redo,
+                        run.booharu.subtitle_run,
+                        run.booharu.soft_limit
+                    ),
+                    (redo, subtitle_run, soft_limit),
                     "{stages:?}"
                 );
                 assert!(run.booharu.runs.is_some(), "the run policy is read");

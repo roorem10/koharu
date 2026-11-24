@@ -6,6 +6,10 @@
 //! mask, as Photoshop keeps a Generative Fill result whole under its layer
 //! mask, so painting or hiding the mask shows more of it.
 
+// Booharu: the tests of where an area's result goes and of a soft Remove
+// stroke's limit, which drive the stage's own write.
+#[cfg(test)]
+mod booharu;
 mod flat;
 mod model;
 mod read;
@@ -130,6 +134,7 @@ pub(crate) async fn inpaint(
     };
     let key = key(Stage::Inpaint, config).expect("an inpainter is Koharu's");
     let model = config.inpainter.model;
+    let soft = crate::booharu::cleanup::soft(config, area.as_deref()); // Booharu: a soft stroke's own coverage (T23).
     // An area's own prompt names its layer, as Photoshop names a Generative
     // Fill's layer after its prompt.
     let own = area.and_then(|area| area.prompt.clone());
@@ -174,6 +179,11 @@ pub(crate) async fn inpaint(
                 }
                 Target::Area { .. } => Vec::new(),
             };
+            // Booharu: a soft Remove stroke's result keeps the stroke's own
+            // coverage as its limit, Koharu's mask otherwise (T23).
+            if let Target::Area { rect, mask } = &mut work.target {
+                *mask = crate::booharu::cleanup::limit(soft.as_ref(), *rect, std::mem::take(mask));
+            }
             let mut ops = write::ops(project, page, work, &made, &name)?;
             ops.extend(kept); // Booharu: after the clean-ups (I2).
             Ok(ops)

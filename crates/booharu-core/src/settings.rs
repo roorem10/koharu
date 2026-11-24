@@ -500,6 +500,13 @@ pub struct Snapshot {
     /// hand. False as [`read`](Self::read) leaves it; only Booharu's own
     /// Rust callers set it, as `redo`.
     pub subtitle_run: bool,
+    /// Whether this run's area result keeps its area's own coverage as its
+    /// limit, as a soft Remove stroke's does, so its edge fades as the
+    /// stroke's does; otherwise every pixel the area touches limits it
+    /// whole, as Koharu limits it. The model redraws every pixel the area
+    /// touches either way. False as [`read`](Self::read) leaves it; only
+    /// Booharu's own Rust callers set it, as `redo`.
+    pub soft_limit: bool,
     /// `[booharu-emphasis]`, for a run that translates: how a stressed word
     /// looks, and whether the words its model picks are marked. None, as
     /// [`read`](Self::read) leaves it, marks no word, though a translation
@@ -535,6 +542,7 @@ impl Snapshot {
             runs: None,
             redo: false,
             subtitle_run: false,
+            soft_limit: false,
             emphasis: None,
             asks_emphasis: false,
         })
@@ -1348,6 +1356,7 @@ mod tests {
                 runs: None,
                 redo: false,
                 subtitle_run: false,
+                soft_limit: false,
                 emphasis: None,
                 asks_emphasis: false,
             })
@@ -1375,12 +1384,13 @@ mod tests {
             "{error:#}"
         );
         // Koharu's own, for what read nothing: no font, the colours Koharu
-        // gives kept, and no run policy. Nor a redo or a subtitle run, which
-        // no read sets, nor emphasis, which only a run's snapshot sets.
+        // gives kept, and no run policy. Nor a redo, a subtitle run, or a
+        // soft limit, which no read sets, nor emphasis, which only a run's
+        // snapshot sets.
         let default = Snapshot::default();
         assert!(default.lettering.detect_colors && default.font.is_none());
         assert_eq!(default.runs, None);
-        assert!(!default.redo && !default.subtitle_run);
+        assert!(!default.redo && !default.subtitle_run && !default.soft_limit);
         assert!(default.emphasis.is_none() && !default.asks_emphasis);
     }
 

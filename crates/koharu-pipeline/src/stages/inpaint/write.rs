@@ -139,6 +139,7 @@ fn pixels(cleanup: &Cleanup, image: &RgbImage, windows: &[(Window, RgbImage)]) -
 
 /// The area's new raster, named after its prompt, on top of the page, with
 /// `drawn` as its pixels and `limit`, the area, as its mask.
+/// Booharu: under all lettering rather than on top of the page (D17).
 fn layer(
     project: &Project,
     page: PageId,
@@ -156,7 +157,7 @@ fn layer(
             "op": "add_layer",
             "id": "$inpainted",
             "page": page,
-            "index": at.layers.len(),
+            "index": booharu_core::cleanup::under_lettering(at), // Booharu: under all lettering (D17).
             "layer": {"kind": "raster", "name": name, "attributes": {
                 "c2pa": {"inpainting": made},
             }},
