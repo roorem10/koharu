@@ -401,7 +401,7 @@ impl App {
                             prompt: None,
                         },
                         BTreeSet::from([Stage::Inpaint]),
-                        None,
+                        crate::booharu::brush::remove_config(), // Booharu: a soft stroke keeps its edge.
                     )
                     .map(drop),
                 // Booharu: a box drawn with the O tool, which Booharu adds

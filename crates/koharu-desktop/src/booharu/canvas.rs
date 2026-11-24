@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use booharu_core::settings::Snapshot;
 use koharu_canvas::{
     Effect as CanvasEffect,
-    booharu::{BooharuSettings, Effect, TextDefaults},
+    booharu::{BooharuSettings, BrushFeel, Effect, TextDefaults},
 };
 use koharu_renderer::RendererConfig;
 use koharu_scene::Fit;
@@ -86,7 +86,9 @@ fn settings() -> anyhow::Result<BooharuSettings> {
 
 /// The canvas's Booharu settings from `snapshot`: its look for new text, and
 /// a box drawn with the T tool fitting its text at the largest size it
-/// holds, as Booharu 0.0.4's did, whatever the sections held.
+/// holds, as Booharu 0.0.4's did, whatever the sections held. The brush's
+/// feel, which the file holds none of, is left at its default here, as the
+/// window keeps the one the interface last set (`brush::with_feel`).
 fn of(snapshot: Snapshot) -> BooharuSettings {
     let Snapshot {
         lettering, font, ..
@@ -97,6 +99,7 @@ fn of(snapshot: Snapshot) -> BooharuSettings {
             family: font,
             fit: Fit::Best,
         },
+        brush: BrushFeel::default(),
     }
 }
 

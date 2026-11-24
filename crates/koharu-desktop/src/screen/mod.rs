@@ -261,13 +261,27 @@ impl Screen {
     }
 
     /// Booharu: Booharu's settings, for the canvas and any made later, as
-    /// `set_brush` sets the brush.
+    /// `set_brush` sets the brush, keeping the brush's feel the window holds,
+    /// which `set_booharu_brush` sets and the saved settings hold none of.
     pub fn set_booharu(&self, settings: koharu_canvas::booharu::BooharuSettings) {
         self.change(move |main| {
+            let settings = crate::booharu::brush::with_feel(settings, &main.booharu); // Booharu: the brush's feel stays.
             if let Some(canvas) = &mut main.canvas {
                 canvas.set_booharu(settings.clone());
             }
             main.booharu = settings;
+        });
+    }
+
+    /// Booharu: the brush's feel, each brush tool's hardness and Draw's
+    /// opacity, for the canvas and any made later, as `set_brush` sets the
+    /// brush.
+    pub fn set_booharu_brush(&self, feel: koharu_canvas::booharu::BrushFeel) {
+        self.change(move |main| {
+            main.booharu.brush = feel;
+            if let Some(canvas) = &mut main.canvas {
+                canvas.set_booharu(main.booharu.clone());
+            }
         });
     }
 
