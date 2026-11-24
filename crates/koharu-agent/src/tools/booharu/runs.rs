@@ -423,6 +423,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_chapter_goes_only_with_translation() {
+        let _alone = crate::tools::booharu::ONE_AT_A_TIME.lock().await;
         let (_dir, tools, page) = open();
         // Without translation, Read chapter changes nothing.
         let args =
@@ -461,6 +462,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_run_answers_its_plan() {
+        let _alone = crate::tools::booharu::ONE_AT_A_TIME.lock().await;
         let (_dir, tools, page) = open();
         // With every stage it carries on, and a blank page without a scan
         // needs nothing.

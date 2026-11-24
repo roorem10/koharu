@@ -50,12 +50,15 @@
 //! | `booharu_set_skew` | skews whole boxes, blocks' translations and text layers, along their width, their height or both, about each box's centre, as one undo step, an axis left out keeping each box's own skew, leaving locked and untranslated ones alone, and answers how many it changed and left alone as locked or untranslated | no |
 //! | `booharu_get_text_effects` | each box of a page carrying text effects beyond its lettering default, as its fx tag shows them, a border, a second border, the outline method, a gradient fill or a skew, with the skew it shows | yes |
 //! | `booharu_clean_areas` | cleans the art under exact rectangles and polygons of a page at once, as Koharu's Remove brush cleans a stroke: one area, by pixel centres with no growth, in one Inpainting run whose result goes under all of the page's lettering, and answers the run, which wait follows, the rect the area covers and how many pixels | no |
+//! | `booharu_fix_page_levels` | levels pages' scans as Fix page levels does, at most 10 a call, each option it leaves out as `booharu-levels` has it, keeping a page's first scan in a hidden, locked Original scan layer, as one undo step, and answers the pages it changed and those it skipped, with why; refused while a run goes, while another fix does, and while Koharu's Gallery is still loading pages into the chapter | no |
+//! | `booharu_restore_original_pages` | puts back the Original scan of pages as their scans, as Restore original scan does, as one undo step, and answers the pages it changed and those it skipped, with why; refused while a run goes | no |
 
 mod boxes;
 mod cleanup;
 mod context;
 mod effects;
 mod lettering;
+mod levels;
 mod mcp;
 mod notes;
 mod project;
@@ -243,6 +246,12 @@ impl Tools {
 /// what only the user decides, such as how outside apps reach Booharu.
 pub(crate) struct OverMcp;
 
+/// Booharu's tests that fix page levels or start a group of runs hold this
+/// as they go, one at a time, as the process lets one fix and one group go
+/// at once: so one's fix or group never refuses another's.
+#[cfg(test)]
+pub(crate) static ONE_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 /// Adds Booharu's tools to `tools`.
 pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(project::GetProjectOverview);
@@ -287,6 +296,8 @@ pub(crate) fn register(tools: &mut ToolSet) {
     tools.add_tool(effects::SetSkew);
     tools.add_tool(effects::GetTextEffects);
     tools.add_tool(cleanup::CleanAreas);
+    tools.add_tool(levels::FixPageLevels);
+    tools.add_tool(levels::RestoreOriginalPages);
 }
 
 /// Builds an edit with `build` from the open project and applies it as one
