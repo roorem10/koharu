@@ -15,7 +15,9 @@
 
 Booharu 0.0.4 is based on Koharu 0.83.5. It keeps everything Koharu does and adds the typesetting, editing and translation changes listed below. The app's About page shows both the Koharu version and the Booharu version.
 
-**What comes next:** Koharu 0.84.0 and 0.85.0 rewrote the program from the ground up. Booharu 0.0.5 is being rebuilt on Koharu 0.85.0, with everything Booharu added up to 0.0.4, and nothing else. Until 0.0.5 is released, 0.0.4 is the current version and this page describes it. The other planned features come after that, built on top of 0.0.5; see the [roadmap issue](https://github.com/roorem10/koharu/issues/6).
+**What comes next:** Koharu 0.84.0 and 0.85.0 rewrote the program from the ground up. Booharu 0.0.5 is Booharu rebuilt on that rewrite: it started on Koharu 0.85.2 and is now built on Koharu 0.94.0. It carries every Booharu feature and fix up to 0.0.4 that passed testing, and keeps Koharu's fix wherever both fixed the same thing. A few 0.0.4 parts are left out. Batch chapters… becomes Import chapters…: it makes one project per chapter folder, archive or PDF, linked to a series picked in its dialog, and runs nothing. Each chapter is then run on its own. Text perspective waits for a later release. Read chapter is renamed Analyze chapter, because Koharu now has a Read mode of its own. A few things are new, such as a type bar with the text controls in two rows.
+
+Of the rebuild's 17 stages, 13 are built. Work is on hold before stage 14 until roorem10 says to go on. After stage 17 come a full review of all the code and one hand test of the whole build by roorem10, who then decides on the release. No date is set. Until 0.0.5 is released, 0.0.4 is the current version and this page describes it. The other planned features come after that, built on top of 0.0.5, in an order that is not settled yet; see the [roadmap issue](https://github.com/roorem10/koharu/issues/6).
 
 > [!WARNING]
 > Projects saved by Booharu 0.0.3 or later can't be opened in 0.0.2 or earlier. Keep a copy of any project you still need in an older version.
