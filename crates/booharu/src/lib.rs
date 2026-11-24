@@ -6,10 +6,11 @@
 //! italic or stressed by hand (`words`), the skew the FX window sets and
 //! the text effects the fx tag shows (`effects`), sound effects' subtitles
 //! (`sfx`), Redo boxes (`redo`), page levels and the Original scan they
-//! keep (`levels`), and the series glossary and chapter notes as the user
-//! and the agent change them, Read chapter and Explain this line among them
-//! (`context`), with the model calls they make (`calls`), the models they
-//! choose (`models`), and the jobs they run as (`jobs`).
+//! keep (`levels`), cleaning exact shapes of a page at once (`cleanup`),
+//! and the series glossary and chapter notes as the user and the agent
+//! change them, Read chapter and Explain this line among them (`context`),
+//! with the model calls they make (`calls`), the models they choose
+//! (`models`), and the jobs they run as (`jobs`).
 //!
 //! It may depend on koharu-pipeline, koharu-scene, koharu-llm, and
 //! koharu-renderer, as well as booharu-core. Koharu's pipeline calls only
@@ -18,6 +19,7 @@
 
 pub mod boxes;
 pub mod calls;
+pub mod cleanup;
 pub mod context;
 pub mod effects;
 pub mod jobs;
