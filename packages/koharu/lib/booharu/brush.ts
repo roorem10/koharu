@@ -240,8 +240,8 @@ export function useBooharuBrush(): void {
 
   // As the tool letters' hotkey in CanvasWorkspace: a slider, a checkbox or another control that
   // takes no text lets a key through, while text entry, dialogs, popovers, menus and open lists
-  // keep it. On only with a brush tool while the canvas shows, as CanvasWorkspace and its keys go
-  // in Read mode and while Settings shows, a boolean, so no listener waits otherwise.
+  // keep it. On only with a brush tool, neither in Read mode nor while Settings shows, where
+  // CanvasWorkspace and its keys are gone too, a boolean, so no listener waits otherwise.
   const shared = {
     enabled: isBrushTool(tool) && !reading && !settingsOpen,
     enableOnFormTags: true,
