@@ -18,7 +18,10 @@ import { Button } from '@koharu/ui/components/button'
  * it's on when the chapter links a series, has no brief, and a model can read it. While
  * Translation is off it's off, and says why. Switched on with no model that can read the pages, it
  * opens the reading-model picker in its place: a pick saves the Read chapter model and switches it
- * on, and Cancel leaves it off. */
+ * on, and Cancel leaves it off. Its text wraps (`whitespace-normal` over the Button's
+ * `whitespace-nowrap`): kept on one line, a long line, in some languages or with a long model
+ * name, would widen the stage list's one column past the menu, whose edge then cuts off every
+ * stage's check mark. */
 export function ReadChapterOption() {
   const { t } = useTranslation()
   const models = useModels().data ?? []
@@ -53,7 +56,7 @@ export function ReadChapterOption() {
       variant='ghost'
       aria-pressed={selected}
       disabled={!translates || project === null}
-      className='h-auto min-h-9 justify-start gap-2 rounded-lg px-2 py-1 text-left font-normal hover:bg-primary/10'
+      className='h-auto min-h-9 justify-start gap-2 rounded-lg px-2 py-1 text-left font-normal whitespace-normal hover:bg-primary/10'
       onClick={() => {
         if (selected) set(false)
         else if (reader === null) setPicking(true)

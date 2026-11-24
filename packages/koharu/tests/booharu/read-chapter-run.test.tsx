@@ -72,6 +72,23 @@ describe('Booharu’s Analyze chapter in the Run menu', () => {
     expect(readRow()).toHaveTextContent('Turn on Translation to analyze the chapter first.')
   })
 
+  it('wraps its line, so a long one never widens the stage list past the menu', async () => {
+    readingDesktop()
+    const user = userEvent.setup()
+    renderCommandBar()
+    await openStages(user)
+    await waitFor(() =>
+      expect(readRow()).toHaveTextContent(
+        'Analyzes the whole chapter with GPT-5.4 before translating.',
+      ),
+    )
+
+    // On one line, as a Button keeps its text, this row would size the stage list's one column
+    // past the menu's width, and the menu's edge would cut off every stage's check mark.
+    expect(readRow()).toHaveClass('whitespace-normal')
+    expect(readRow()).not.toHaveClass('whitespace-nowrap')
+  })
+
   it('starts off once the chapter has a brief', async () => {
     readingDesktop({ chapter: chapterState({ summary: 'Isagi meets the team.' }) })
     const user = userEvent.setup()
