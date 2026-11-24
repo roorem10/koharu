@@ -83,6 +83,18 @@ describe("Booharu's brush options in the brush size popover", () => {
     expect(fields(popover)).toEqual(['Brush size'])
   })
 
+  it('shows each share in whole percent, the number alone in its box and its % after it', async () => {
+    useBrushSlots.setState({ draw: { diameter: 48, hardness: 0.35, opacity: 1 } })
+    const { popover } = await openBrush('draw')
+    // "100%" would be wider than the box, which shows "100" whole.
+    const hardness = within(popover).getByRole('textbox', { name: 'Hardness' })
+    expect(hardness).toHaveValue('35')
+    expect(hardness).toHaveAccessibleDescription('%')
+    const opacity = within(popover).getByRole('textbox', { name: 'Opacity' })
+    expect(opacity).toHaveValue('100')
+    expect(opacity).toHaveAccessibleDescription('%')
+  })
+
   it("writes Draw's hardness and opacity, as percentages, to Draw's brush alone", async () => {
     const { user, popover } = await openBrush('draw')
     const hardness = within(popover).getByRole('textbox', { name: 'Hardness' })

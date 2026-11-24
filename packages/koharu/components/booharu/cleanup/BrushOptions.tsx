@@ -56,8 +56,10 @@ export function BrushOptions() {
 }
 
 /** A share from `min` percent to all of it, as the size row above it lays it out: its label and a
- * number box on one line, in whole percent, and a slider under them. `value` and what `onChange`
- * hears run from 0 to 1. */
+ * number box on one line, in whole percent, and a slider under them. The box shows the number
+ * alone, as the size box does, with its % after it, as "100%" is wider than the box; a label too
+ * long to share the line, as Russian's Opacity, puts the box and its % on a line of their own.
+ * `value` and what `onChange` hears run from 0 to 1. */
 function PercentRow({
   label,
   less,
@@ -75,6 +77,7 @@ function PercentRow({
 }) {
   const { t } = useTranslation()
   const labelId = useId()
+  const unitId = useId()
   const percent = Math.round(value * 100)
   const change = (next: number | null) => {
     if (next !== null && Number.isFinite(next)) onChange(clamp(Math.round(next), min, 100) / 100)
@@ -82,29 +85,33 @@ function PercentRow({
 
   return (
     <>
-      <div className='flex items-center justify-between gap-3'>
+      <div className='flex flex-wrap items-center justify-between gap-x-3 gap-y-1'>
         <span id={labelId} className='text-[11px] font-medium'>
           {t(label)}
         </span>
-        <NumberField
-          min={min}
-          max={100}
-          step={1}
-          value={percent}
-          format={{ style: 'unit', unit: 'percent', maximumFractionDigits: 0 }}
-          className='w-20'
-          onValueChange={change}
-        >
-          <NumberFieldGroup className='h-7'>
-            <NumberFieldDecrement aria-label={t(less)}>
-              <Minus />
-            </NumberFieldDecrement>
-            <NumberFieldInput aria-labelledby={labelId} />
-            <NumberFieldIncrement aria-label={t(more)}>
-              <Plus />
-            </NumberFieldIncrement>
-          </NumberFieldGroup>
-        </NumberField>
+        <div className='ml-auto flex items-center gap-1'>
+          <NumberField
+            min={min}
+            max={100}
+            step={1}
+            value={percent}
+            className='w-20'
+            onValueChange={change}
+          >
+            <NumberFieldGroup className='h-7'>
+              <NumberFieldDecrement aria-label={t(less)}>
+                <Minus />
+              </NumberFieldDecrement>
+              <NumberFieldInput aria-labelledby={labelId} aria-describedby={unitId} />
+              <NumberFieldIncrement aria-label={t(more)}>
+                <Plus />
+              </NumberFieldIncrement>
+            </NumberFieldGroup>
+          </NumberField>
+          <span id={unitId} className='text-[11px] text-muted-foreground'>
+            %
+          </span>
+        </div>
       </div>
       <Slider
         aria-labelledby={labelId}
