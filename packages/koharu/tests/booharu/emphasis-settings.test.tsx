@@ -23,6 +23,7 @@ import { fontFamilies } from './fonts'
 import {
   builtInEmphasis,
   builtInLettering,
+  builtInLevels,
   builtInReading,
   builtInRuns,
   settingsDesktop,
@@ -199,6 +200,7 @@ describe('Booharu emphasis settings', () => {
         ai: false,
         default: { ...builtInEmphasis.default, size_factor: 1.5 },
       },
+      'booharu-levels': builtInLevels,
     })
     await waitFor(() => expect(ai).not.toBeChecked())
     expect(region.getByRole('textbox', { name: SIZE })).toHaveValue('150')

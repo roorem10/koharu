@@ -13,6 +13,7 @@ import { commands } from '@koharu/ipc/protocol'
 import {
   builtInEmphasis,
   builtInLettering,
+  builtInLevels,
   builtInReading,
   builtInRuns,
   settingsDesktop,
@@ -91,6 +92,7 @@ describe('Booharu run presets in the Run menu', () => {
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
       'booharu-emphasis': builtInEmphasis,
+      'booharu-levels': builtInLevels,
     })
     // The menu goes back to its root view, where the new preset shows as the stages on.
     const saved = await within(screen.getByRole('group', { name: 'Presets' })).findByRole(

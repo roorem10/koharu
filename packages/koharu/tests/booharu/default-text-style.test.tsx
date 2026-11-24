@@ -11,6 +11,7 @@ import { toast } from '@koharu/ui/components/toast'
 import {
   builtInEmphasis,
   builtInLettering,
+  builtInLevels,
   builtInReading,
   builtInRuns,
   settingsDesktop,
@@ -94,6 +95,7 @@ describe('Booharu default text style', () => {
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
       'booharu-emphasis': builtInEmphasis,
+      'booharu-levels': builtInLevels,
     })
     expect(shown.getByText('#FF0000')).toBeInTheDocument()
     expect(shown.getByText('None')).toBeInTheDocument()

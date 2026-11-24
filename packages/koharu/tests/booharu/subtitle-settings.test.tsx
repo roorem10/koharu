@@ -12,6 +12,7 @@ import { fontFamilies } from './fonts'
 import {
   builtInEmphasis,
   builtInLettering,
+  builtInLevels,
   builtInReading,
   builtInRuns,
   settingsDesktop,
@@ -97,6 +98,7 @@ describe('Booharu sound effect subtitles settings', () => {
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
       'booharu-emphasis': builtInEmphasis,
+      'booharu-levels': builtInLevels,
     })
 
     await user.click(region.getByRole('button', { name: 'Increase sound effect subtitle size' }))

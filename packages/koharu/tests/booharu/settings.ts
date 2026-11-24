@@ -5,6 +5,7 @@ import {
   type BooharuPreferences,
   type EmphasisSettings,
   type LetteringSettings,
+  type LevelsSettings,
   type ReadingSettings,
   type RunsSettings,
 } from '@koharu/ipc/protocol'
@@ -57,6 +58,14 @@ export const builtInEmphasis = {
   categories: {},
 } satisfies EmphasisSettings
 
+/** `[booharu-levels]` as the desktop answers it while the file sets nothing. */
+export const builtInLevels = {
+  auto_levels: true,
+  clip_percent: 0.5,
+  whiten: false,
+  threshold: 235,
+} satisfies LevelsSettings
+
 /** The desktop with every command answering null, and the Booharu settings its file holds, which
  * another writer, such as the agent's settings tool, may change while a page shows them; `saves`
  * lists what each save sent. */
@@ -74,6 +83,7 @@ export function settingsDesktop(lettering: LetteringSettings = builtInLettering)
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
       'booharu-emphasis': structuredClone(builtInEmphasis),
+      'booharu-levels': structuredClone(builtInLevels),
     },
   }
   const saves: BooharuPreferences[] = []

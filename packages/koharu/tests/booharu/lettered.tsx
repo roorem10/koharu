@@ -14,7 +14,13 @@ import {
 import { TooltipProvider } from '@koharu/ui/components/tooltip'
 
 import { boxesPage, desktop, openProject } from './boxes'
-import { builtInEmphasis, builtInLettering, builtInReading, builtInRuns } from './settings'
+import {
+  builtInEmphasis,
+  builtInLettering,
+  builtInLevels,
+  builtInReading,
+  builtInRuns,
+} from './settings'
 
 /** A balloon's shape with the measures that decided it. */
 function shape(
@@ -109,6 +115,7 @@ export function letteredDesktop(auto = false) {
     'booharu-qc': { min_size: 0.01 },
     'booharu-start': { fresh_start_note_seen: false },
     'booharu-emphasis': builtInEmphasis,
+    'booharu-levels': builtInLevels,
   }
   vi.spyOn(commands, 'booharuGetPreferences').mockResolvedValue(preferences)
   const setCategory = vi.spyOn(commands, 'booharuSetLetteringCategory').mockResolvedValue(counts)

@@ -7,7 +7,13 @@ import { PipelinePreferences } from '@/components/preferences/PipelinePreference
 import { queryClient } from '@/lib/queries'
 
 import { gemma, indexTranslate, models, readingDesktop, textOnly } from './reading'
-import { builtInEmphasis, builtInLettering, builtInReading, builtInRuns } from './settings'
+import {
+  builtInEmphasis,
+  builtInLettering,
+  builtInLevels,
+  builtInReading,
+  builtInRuns,
+} from './settings'
 
 /** Settings > Pipeline, where Analyze chapter's section follows the translator's. */
 function renderPipeline() {
@@ -63,6 +69,7 @@ describe('Booharu Analyze chapter settings', () => {
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
       'booharu-emphasis': builtInEmphasis,
+      'booharu-levels': builtInLevels,
     })
     await waitFor(() => expect(model).toHaveTextContent('Gemma 4 12B'))
     expect(section.queryByRole('status')).toBeNull()

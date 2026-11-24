@@ -12,6 +12,7 @@ import { toast } from '@koharu/ui/components/toast'
 import {
   builtInEmphasis,
   builtInLettering,
+  builtInLevels,
   builtInReading,
   builtInRuns,
   settingsDesktop,
@@ -83,6 +84,7 @@ describe('Booharu Runs settings', () => {
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
       'booharu-emphasis': builtInEmphasis,
+      'booharu-levels': builtInLevels,
     })
     // The file's state shows once the save ends, the other writer's preset with it.
     expect(await screen.findByRole('group', { name: 'Clean only' })).toBeInTheDocument()

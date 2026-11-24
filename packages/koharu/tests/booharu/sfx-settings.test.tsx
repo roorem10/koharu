@@ -10,6 +10,7 @@ import { toast } from '@koharu/ui/components/toast'
 import {
   builtInEmphasis,
   builtInLettering,
+  builtInLevels,
   builtInReading,
   builtInRuns,
   settingsDesktop,
@@ -73,6 +74,7 @@ describe('Booharu sound effects setting', () => {
       'booharu-qc': { min_size: 0.01 },
       'booharu-start': { fresh_start_note_seen: false },
       'booharu-emphasis': builtInEmphasis,
+      'booharu-levels': builtInLevels,
     })
     await waitFor(() => expect(shownMode(select)).toBe('Translate all'))
     expect(select).toHaveAccessibleDescription(`Translate and letter every sound effect. ${NOTE}`)

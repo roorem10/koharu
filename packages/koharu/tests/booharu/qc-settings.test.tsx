@@ -10,6 +10,7 @@ import { queryClient } from '@/lib/queries'
 import {
   builtInEmphasis,
   builtInLettering,
+  builtInLevels,
   builtInReading,
   builtInRuns,
   settingsDesktop,
@@ -65,6 +66,7 @@ describe('Booharu quality check settings', () => {
       'booharu-qc': { min_size: 0.015 },
       'booharu-start': { fresh_start_note_seen: false },
       'booharu-emphasis': builtInEmphasis,
+      'booharu-levels': builtInLevels,
     })
 
     await user.click(section.getByRole('button', { name: 'Increase smallest readable text' }))

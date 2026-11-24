@@ -312,6 +312,7 @@ export type BooharuPreferences = {
   'booharu-qc': QcSettings
   'booharu-start': StartSettings
   'booharu-emphasis': EmphasisSettings
+  'booharu-levels': LevelsSettings
 }
 
 /**
@@ -376,6 +377,24 @@ export type Brush = {
   /**  In page pixels. */
   diameter: number
   color: Rgba
+}
+
+/**
+ *  How the brush tools' strokes feel beyond Koharu's brush, its size and
+ *  colour: each tool's hardness, from 0, soft from its centre line out, to 1,
+ *  Koharu's hard edge, and Draw's opacity, from just above 0 to 1, at which
+ *  a stroke paints as one pass, never building up within itself. Its
+ *  default, every value 1, is Koharu's hard, opaque brush.
+ */
+export type BrushFeel = {
+  /**  The Draw tool's hardness. */
+  draw_hardness: number
+  /**  The Eraser's hardness. */
+  eraser_hardness: number
+  /**  The Remove tool's hardness. */
+  remove_hardness: number
+  /**  The Draw tool's opacity, which its colour's alpha is multiplied by. */
+  draw_opacity: number
 }
 
 /**  The shape of a balloon's outline. */
@@ -1137,7 +1156,14 @@ export type InstructionTerm = {
 }
 
 /**  What a job does. */
-export type JobKind = 'read_chapter' | 'explain'
+export type JobKind =
+  | 'read_chapter'
+  | 'explain'
+  /**
+   *  Fix page levels, which tells no `booharu_job` event: its caller
+   *  answers, as Explain's does.
+   */
+  | 'levels'
 
 /**  How a job stands, as the `booharu_job` event tells it. */
 export type JobState =
@@ -1337,6 +1363,105 @@ export type LetteringSettings = {
 
 /**  Who chose a [`Lettering`] category. */
 export type LetteringSource = 'user' | 'model'
+
+/**
+ *  What a fix would do to a page: the black and white points its levels
+ *  take, measured on the whole scan, and the scan before and after, each a
+ *  base64 PNG at most [`PREVIEW_SIDE`] pixels on its longer side.
+ */
+export type LevelsPreview = {
+  black: number
+  white: number
+  before: string
+  after: string
+}
+
+/**
+ *  How far a fix's first phase is: `done` of its `total` pages levelled,
+ *  told after each page.
+ */
+export type LevelsProgress = {
+  done: number
+  total: number
+}
+
+/**
+ *  What a fix or a restore did: the pages it changed and those it left as
+ *  they were, each in the order they were asked for.
+ */
+export type LevelsReport = {
+  changed: PageId[]
+  skipped: LevelsSkipped[]
+}
+
+/**
+ *  `[booharu-levels]`: Fix page levels, which stretches a page's scan from
+ *  its darkest ink to its lightest paper, black to white, and can whiten its
+ *  paper, keeping the scan as it came in the page's Original scan layer.
+ *  Restore original pages puts that scan back.
+ */
+export type LevelsSettings = {
+  /**
+   *  Whether the scan's greys are stretched, its darkest ink to black and
+   *  its lightest paper to white, by one curve every channel shares.
+   */
+  auto_levels?: boolean
+  /**
+   *  The share of the page's pixels, in percent, from 0 to 49.9, left out
+   *  at each end before its darkest ink and lightest paper are found, so a
+   *  speck of dust or a scanner's edge doesn't set them.
+   */
+  clip_percent?: number
+  /**  Whether paper lighter than `threshold` turns white, after the levels. */
+  whiten?: boolean
+  /**
+   *  The lightness, from 0 to 255, above which `whiten` turns a pixel
+   *  white.
+   */
+  threshold?: number
+}
+
+/**
+ *  Why a fix or a restore left a page as it was, which the interface words in
+ *  the user's language.
+ */
+export type LevelsSkip =
+  /**  The page has no scan. */
+  | 'no_scan'
+  /**  A block's clean-up has pixels, made from the scan as it is. */
+  | 'cleanup'
+  /**
+   *  A raster the Inpainting stage made is on the page, a Remove stroke's
+   *  or a Generative Fill's, made from the scan as it is.
+   */
+  | 'inpainted'
+  /**  Levelling changes no pixel, or the scan already is the original. */
+  | 'unchanged'
+  /**  The scan changed while the fix levelled it. */
+  | 'scan_changed'
+  /**  The page has no Original scan to put back. */
+  | 'no_original'
+  /**
+   *  The Original scan is inside a locked layer, or holds layers of its
+   *  own.
+   */
+  | 'locked'
+
+/**  A page a fix or a restore left as it was, and why. */
+export type LevelsSkipped = {
+  page: PageId
+  reason: LevelsSkip
+}
+
+/**
+ *  A page as the levels dialog and the page menu read it: whether it has an
+ *  Original scan to restore, and why a fix or a restore would skip it now.
+ */
+export type LevelsStatus = {
+  page: PageId
+  original: boolean
+  blocked: LevelsSkip | null
+}
 
 /**  One page of a search or a catalog. */
 export type Listing = {
@@ -3053,6 +3178,32 @@ export const commands = {
   /** Gives the canvas the keyboard back, which a box's menu took for its keys (`opens_menu`), as the interface asks when the menu closes with nothing pressed on the page: on Escape, or as the camera moves, the window loses the focus, or its page, project or box goes. The next keys reach the canvas first again, as after the right-click's press, so Delete takes the anchors the Direct Select tool picked. Window input alone, changing nothing in the project. */
   booharuCanvasKeys: () =>
     runner('booharu_canvas_keys', (options) => invoke<null>('booharu_canvas_keys', {}, options)),
+  /** Sets how the brush tools' strokes feel: the hardness of Draw's, the Eraser's and Remove's, each from 0, soft from the stroke's centre line out, to 1, Koharu's hard edge, and Draw's opacity, above 0 and at most 1. Strokes started from then on take it, and a soft Remove stroke's result fades out with its edge. Refuses a value that isn't a number in its range, naming it. Changes nothing in the project. */
+  booharuSetBrush: (feel: BrushFeel) =>
+    runner('booharu_set_brush', (options) => invoke<null>('booharu_set_brush', { feel }, options)),
+  /** Each of `pages` as the page menu and the levels dialog read it: whether it has an Original scan to restore, and why a fix or a restore would skip it now: no scan, a block's clean-up with pixels, or a raster Inpainting made. A page the project no longer holds is left out. Decodes nothing, and changes nothing. */
+  booharuGetLevelsStatus: (pages: PageId[]) =>
+    runner('booharu_get_levels_status', (options) =>
+      invoke<LevelsStatus[]>('booharu_get_levels_status', { pages }, options),
+    ),
+  /** What a fix as `settings` say would do to `page`'s scan: the black and white points its levels take, measured on the whole scan, and the scan before and after, each a base64 PNG at most 800 pixels on its longer side. Fails on a page with no scan. Changes nothing. */
+  booharuPreviewLevels: (page: PageId, settings: LevelsSettings) =>
+    runner('booharu_preview_levels', (options) =>
+      invoke<LevelsPreview>('booharu_preview_levels', { page, settings }, options),
+    ),
+  /** Levels the scans of `pages` as `settings` say, each from its scan as it is, as one undo step labelled `booharu_levels`, telling `booharu_levels_progress` after each page it levelled; a page's first fix keeps the scan it had in a hidden, locked Original scan layer under everything, which Restore original pages puts back. Answers the pages it changed and those it skipped, with why: no scan, a block's clean-up with pixels, a raster Inpainting made, nothing to change, or a scan changed meanwhile. Refused while a run or a Run press goes, while Koharu's Gallery is still loading pages into the chapter, and while another fix goes; stopped, by the dialog's Stop, Koharu's Stop, or the project closing, it changes no page and fails saying so. */
+  booharuFixPageLevels: (pages: PageId[], settings: LevelsSettings) =>
+    runner('booharu_fix_page_levels', (options) =>
+      invoke<LevelsReport>('booharu_fix_page_levels', { pages, settings }, options),
+    ),
+  /** Stops the fix of page levels going, as the levels dialog's Stop: it changes no page. Nothing else Booharu runs stops. */
+  booharuStopLevels: () =>
+    runner('booharu_stop_levels', (options) => invoke<null>('booharu_stop_levels', {}, options)),
+  /** Puts back the Original scan of each of `pages` as its scan, as one undo step labelled `booharu_restore_original`, removing the layer that kept it. Answers the pages it changed and those it skipped, with why: no Original scan, a block's clean-up with pixels, a raster Inpainting made, an Original scan inside a locked layer or holding layers of its own, or a scan that already is the original. Refused while a run or a Run press goes. */
+  booharuRestoreOriginalPages: (pages: PageId[]) =>
+    runner('booharu_restore_original_pages', (options) =>
+      invoke<LevelsReport>('booharu_restore_original_pages', { pages }, options),
+    ),
 }
 
 export const events = {
@@ -3100,4 +3251,6 @@ export const events = {
     listen<BooharuQc>('booharu_qc', (event) => handler(event.payload)),
   booharuBoxMenu: (handler: (payload: BooharuBoxMenu) => void): Promise<UnlistenFn> =>
     listen<BooharuBoxMenu>('booharu_box_menu', (event) => handler(event.payload)),
+  booharuLevelsProgress: (handler: (payload: LevelsProgress) => void): Promise<UnlistenFn> =>
+    listen<LevelsProgress>('booharu_levels_progress', (event) => handler(event.payload)),
 }
