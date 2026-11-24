@@ -46,6 +46,15 @@
       "subtitleTranslating": "자막을 달기 위해 효과음을 번역하는 중…",
       "translate": "다시 번역"
     },
+    "cleanup": {
+      "decreaseHardness": "경도 낮추기",
+      "decreaseOpacity": "불투명도 낮추기",
+      "hardness": "경도",
+      "increaseHardness": "경도 높이기",
+      "increaseOpacity": "불투명도 높이기",
+      "opacity": "불투명도",
+      "removeNote": "정리 결과는 레터링 아래에 들어갑니다. 상자 자체의 정리를 고치려면 그 안을 칠하거나 다시 정리하세요."
+    },
     "context": {
       "accept": "수락",
       "actions": "작업",

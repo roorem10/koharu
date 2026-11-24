@@ -46,6 +46,15 @@
       "subtitleTranslating": "字幕を付けるため、効果音を翻訳しています…",
       "translate": "再翻訳"
     },
+    "cleanup": {
+      "decreaseHardness": "硬さを下げる",
+      "decreaseOpacity": "不透明度を下げる",
+      "hardness": "硬さ",
+      "increaseHardness": "硬さを上げる",
+      "increaseOpacity": "不透明度を上げる",
+      "opacity": "不透明度",
+      "removeNote": "クリーンアップは写植の下に入ります。ボックス自体のクリーンアップを直すには、その中を塗るか、クリーンアップを再実行してください。"
+    },
     "context": {
       "accept": "採用",
       "actions": "操作",

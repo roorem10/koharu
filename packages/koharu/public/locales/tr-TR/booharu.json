@@ -46,6 +46,15 @@
       "subtitleTranslating": "Altyazısı için ses efekti çevriliyor…",
       "translate": "Yeniden çevir"
     },
+    "cleanup": {
+      "decreaseHardness": "Sertliği azalt",
+      "decreaseOpacity": "Opaklığı azalt",
+      "hardness": "Sertlik",
+      "increaseHardness": "Sertliği artır",
+      "increaseOpacity": "Opaklığı artır",
+      "opacity": "Opaklık",
+      "removeNote": "Temizleme dizginin altına gelir. Bir kutunun kendi temizlemesini düzeltmek için içini boyayın ya da yeniden temizleyin."
+    },
     "context": {
       "accept": "Kabul et",
       "actions": "İşlemler",

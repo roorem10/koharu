@@ -52,6 +52,15 @@
       "subtitleTranslating": "Traduction de l’effet sonore pour son sous-titre…",
       "translate": "Retraduire"
     },
+    "cleanup": {
+      "decreaseHardness": "Réduire la dureté",
+      "decreaseOpacity": "Réduire l’opacité",
+      "hardness": "Dureté",
+      "increaseHardness": "Augmenter la dureté",
+      "increaseOpacity": "Augmenter l’opacité",
+      "opacity": "Opacité",
+      "removeNote": "Le nettoyage passe sous le lettrage. Pour corriger le nettoyage d’une zone de texte, peignez dedans ou nettoyez-la à nouveau."
+    },
     "context": {
       "accept": "Accepter",
       "actions": "Actions",
