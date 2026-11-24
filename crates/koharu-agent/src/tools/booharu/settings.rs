@@ -74,7 +74,7 @@ impl Tool for GetSettings {
          as a share of the page's shorter side, above 0 and at most 0.1 (0.01 is 12 pixels on \
          a page 1,200 wide), under which a box's text is too small; \
          `booharu-start` has `fresh_start_note_seen`, whether the note on a \
-         first start saying where Booharu 0.0.4's series are was dismissed; and \
+         first start saying where Booharu 0.0.4's series are was dismissed; \
          `booharu-emphasis` has how stressed words look: `ai`, whether a translation run asks \
          its translation model which words of each line to stress, and stresses them, though \
          never one of Koharu's own models trained only to translate, such as Index-Translate \
@@ -86,9 +86,15 @@ impl Tool for GetSettings {
          outline, drawn only with one) colours, and `stroke_width` and `outer_stroke_width` \
          from 0 to 100 pixels, each null to keep the text's own, bold at 1.15 times the size \
          to start with; and `categories`, the lettering categories whose stressed words look \
-         different, by id, each entry's keys replacing the default's. The default font is the \
-         first of Koharu's Preferred fonts, not a Booharu setting. Needs a project open, as \
-         every tool here does."
+         different, by id, each entry's keys replacing the default's; and `booharu-levels` has \
+         the options of Fix page levels, which the levels dialog starts from and \
+         booharu_fix_page_levels takes for each it leaves out: `auto_levels`, whether a page's \
+         scan is stretched from its darkest ink to black and its lightest paper to white, \
+         `clip_percent`, from 0 to 49.9, the share of its pixels, in percent, left out at each \
+         end before those are found, so a speck of dust doesn't set them, `whiten`, whether \
+         paper lighter than `threshold` turns white after the levels, and `threshold`, from 0 \
+         to 255. The default font is the first of Koharu's Preferred fonts, not a Booharu \
+         setting. Needs a project open, as every tool here does."
             .to_owned()
     }
 
@@ -175,7 +181,10 @@ impl Tool for SetSettings {
          `default` keeps the text's own value, and in a category takes the default's. \
          `default` keeps at least one key and a category entry sets at least one, so a change \
          leaving either with none is refused; a category set to null, `{\"categories\": \
-         {\"shout\": null}}`, takes the default look again. \
+         {\"shout\": null}}`, takes the default look again. A change to `booharu-levels` \
+         applies to the next fix, the options booharu_fix_page_levels leaves out and those the \
+         levels dialog starts from; pages already fixed keep their levels, and a `clip_percent` \
+         outside 0 to 49.9 is refused. \
          A call an outside app makes over MCP can't change `booharu-mcp`. Needs \
          a project open, as every tool here does."
             .to_owned()
@@ -350,6 +359,12 @@ mod tests {
                     "default": emphasis(json!({"weight": 700, "size_factor": 1.15})),
                     "categories": {},
                 },
+                "booharu-levels": {
+                    "auto_levels": true,
+                    "clip_percent": 0.5,
+                    "whiten": false,
+                    "threshold": 235,
+                },
             })
         );
 
@@ -516,6 +531,52 @@ mod tests {
             .await
             .expect("no shout of its own");
         assert_eq!(saved["categories"], json!({}));
+    }
+
+    #[tokio::test]
+    async fn the_page_levels_are_saved_and_a_clip_out_of_bounds_refused() {
+        let settings = Arc::new(Settings::default());
+        let (_dir, tools) = open(&settings);
+        let save = async |values: Value| {
+            let args = SetSettingsArgs {
+                section: "booharu-levels".to_owned(),
+                values: serde_json::from_value(values).expect("keys"),
+            };
+            SetSettings.call(&mut tools.tool_context(), args).await
+        };
+        let saved = save(json!({"whiten": true, "threshold": 200}))
+            .await
+            .expect("whitened paper");
+        assert_eq!(
+            json!(saved),
+            json!({
+                "section": "booharu-levels",
+                "saved": {"auto_levels": true, "clip_percent": 0.5, "whiten": true, "threshold": 200},
+            }),
+            "the other keys kept, and nothing waiting for a restart"
+        );
+        // A clip outside 0 to 49.9, a lightness past 255, and a key the
+        // section hasn't, save nothing.
+        for refused in [
+            json!({"clip_percent": 50}),
+            json!({"clip_percent": -0.5}),
+            json!({"threshold": 256}),
+            json!({"levels": false}),
+        ] {
+            assert!(save(refused.clone()).await.is_err(), "{refused}");
+        }
+        let error = save(json!({"clip_percent": 50}))
+            .await
+            .err()
+            .map(|error| error.to_string());
+        assert!(
+            error
+                .as_ref()
+                .is_some_and(|error| error.contains("isn't from 0 to 49.9%")),
+            "{error:?}"
+        );
+        let held = settings.0.lock().levels.clone();
+        assert_eq!((held.clip_percent, held.threshold), (0.5, 200));
     }
 
     #[tokio::test]
