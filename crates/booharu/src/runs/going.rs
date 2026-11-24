@@ -838,10 +838,6 @@ mod tests {
         );
     }
 
-    /// The tests that place groups, one at a time, as the place is the
-    /// app's one.
-    static PLACING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-
     /// A project of `pages` blank pages without a scan, on which a run of
     /// detection ends without loading a model, in a folder removed with it;
     /// and its pages, in order.
@@ -1079,7 +1075,7 @@ mod tests {
 
     #[test]
     fn the_group_going_is_the_one_in_the_place() {
-        let _placing = PLACING.blocking_lock();
+        let _registry = REGISTRY.blocking_lock();
         let number = MADE.fetch_add(1, Ordering::Relaxed) + 1;
         *GOING.lock() = Some(Going {
             plan: RunPlan {
@@ -1113,7 +1109,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_group_runs_its_groups_one_after_another_then_frees_its_place() {
-        let _placing = PLACING.lock().await;
+        let _registry = REGISTRY.lock().await;
         let (_dir, session, pages) = chapter(2);
         let host = Arc::new(Host::new());
         let groups = vec![detection(&pages[..1]), detection(&pages[1..])];
@@ -1162,7 +1158,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_group_ends_at_a_run_failed_or_stopped_a_stop_or_a_run_it_cant_queue() {
-        let _placing = PLACING.lock().await;
+        let _registry = REGISTRY.lock().await;
         let (_dir, session, pages) = chapter(2);
         let host = Host::new();
         let project = session.lock().id();
@@ -1223,7 +1219,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_group_whose_caller_went_away_is_followed_to_its_end() {
-        let _placing = PLACING.lock().await;
         let _registry = REGISTRY.lock().await;
         let (_dir, session, _) = chapter(1);
         let (came, mut coming) = tokio::sync::mpsc::unbounded_channel();
@@ -1355,7 +1350,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_press_on_a_chapter_with_notes_translates_last_and_chimes_once() {
-        let _placing = PLACING.lock().await;
         let _registry = REGISTRY.lock().await;
         let (_dir, session, pages) = chapter(2);
         noted(&session);
@@ -1393,7 +1387,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_press_translating_last_leaves_out_the_pages_a_run_gave_up_on() {
-        let _placing = PLACING.lock().await;
+        let _registry = REGISTRY.lock().await;
         let (_dir, session, pages) = chapter(3);
         let host = Host::new();
         let group = MADE.fetch_add(1, Ordering::Relaxed) + 1;
@@ -1579,7 +1573,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_press_that_reads_first_takes_its_place_reading_then_translates() {
-        let _placing = PLACING.lock().await;
         let _registry = REGISTRY.lock().await;
         for answer in [Answer::Done, Answer::Skipped, Answer::Failed] {
             let (_dir, session, pages) = chapter(2);
@@ -1620,7 +1613,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_press_reads_between_its_runs_and_a_stop_while_it_reads_ends_it() {
-        let _placing = PLACING.lock().await;
         let _registry = REGISTRY.lock().await;
         let (_dir, session, pages) = chapter(2);
         written(&session, pages[0]);
@@ -1675,7 +1667,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_press_leaves_the_pages_a_run_gave_up_on_out_of_its_read_and_translation() {
-        let _placing = PLACING.lock().await;
+        let _registry = REGISTRY.lock().await;
         let (_dir, session, pages) = chapter(3);
         let host = Host::new();
         let group = MADE.fetch_add(1, Ordering::Relaxed) + 1;
@@ -1729,7 +1721,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_press_is_refused_while_read_chapter_reads_by_hand() {
-        let _placing = PLACING.lock().await;
         let _registry = REGISTRY.lock().await;
         let (_dir, session, _) = chapter(1);
         let press = || {
@@ -1752,7 +1743,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_press_that_would_read_is_refused_while_pages_still_load() {
-        let _placing = PLACING.lock().await;
         let _registry = REGISTRY.lock().await;
         let (_dir, session, pages) = chapter(2);
         // Text to read on the first page; the second, which it translates,
