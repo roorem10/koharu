@@ -7,21 +7,20 @@
 //! the restore. A fix is a `JobKind::Levels` job for as long as it runs, so
 //! a second is refused, and it tells no `booharu_job` events, as its command
 //! answers. It's refused as it starts while a run or a Run press goes, or
-//! while Koharu's Gallery is still loading pages into the chapter
-//! ([`free`]); the driver checks again for a run, under the session's lock,
-//! before it changes anything, and so does a restore, which loading pages
-//! don't hold back.
+//! while Koharu's Gallery is still loading pages into the chapter, by the
+//! driver's `startable`, the agent's refusals in the same words and order;
+//! the driver checks again for a run, under the session's lock, before it
+//! changes anything, and so does a restore, which loading pages don't hold
+//! back.
 
 use std::sync::Arc;
 
-use anyhow::ensure;
 use booharu::{
     jobs::{self, JobKind},
-    levels::{self, LevelsPreview, LevelsReport, LevelsStatus, PAGES_LOADING, RUN_GOING},
+    levels::{self, LevelsPreview, LevelsReport, LevelsStatus},
     runs,
 };
 use booharu_core::settings::LevelsSettings;
-use koharu_pipeline::Event;
 use koharu_scene::PageId;
 use tauri::State;
 
@@ -76,7 +75,7 @@ pub async fn booharu_fix_page_levels(
     pages: Vec<PageId>,
     settings: LevelsSettings,
 ) -> Result<LevelsReport> {
-    free(&app.pipeline.told(), pages_loading(&app))?;
+    levels::startable(&app.pipeline.told(), pages_loading(&app))?;
     let session = app.session()?;
     let job = jobs::start(JobKind::Levels)?;
     let app = Arc::clone(&app);
@@ -91,19 +90,6 @@ pub async fn booharu_fix_page_levels(
         )
     })
     .await??)
-}
-
-/// Whether a fix may start, with the events the pipeline `told` and whether
-/// pages are still `loading` into the open project ([`pages_loading`]): not
-/// while a run goes, nor a Run press, nor while pages are still loading, as
-/// it levels only the pages the project has as it starts.
-fn free(told: &[Event], loading: bool) -> anyhow::Result<()> {
-    ensure!(
-        !runs::run_going(told) && runs::group_going().is_none(),
-        RUN_GOING
-    );
-    ensure!(!loading, PAGES_LOADING);
-    Ok(())
 }
 
 /// Stops the fix of page levels going, as the levels dialog's Stop: it
@@ -133,31 +119,4 @@ pub async fn booharu_restore_original_pages(
         levels::restore(&session, &pages, || runs::run_going(&app.pipeline.told()))
     })
     .await??)
-}
-
-#[cfg(test)]
-mod tests {
-    use koharu_pipeline::{RunId, Stage};
-
-    use super::*;
-
-    #[test]
-    fn a_fix_is_refused_while_a_run_goes_or_pages_still_load() {
-        let queued = Event::Queued {
-            run: RunId(1),
-            steps: 1,
-            stages: vec![Stage::Inpaint],
-            pages: false,
-        };
-        let refused =
-            |told: &[Event], loading| free(told, loading).expect_err("refused").to_string();
-        assert_eq!(refused(std::slice::from_ref(&queued), false), RUN_GOING);
-        assert_eq!(refused(&[], true), PAGES_LOADING);
-        free(&[], false).expect("with no run and every page in");
-        let ended = Event::Ended {
-            run: RunId(1),
-            outcome: koharu_pipeline::Outcome::Done,
-        };
-        free(&[queued, ended], false).expect("once the run ended");
-    }
 }

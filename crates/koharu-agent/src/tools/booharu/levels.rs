@@ -32,7 +32,10 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::{BooharuHost, context::blocking};
+use super::{
+    BooharuHost,
+    context::{blocking, host},
+};
 use crate::tools::{Tools, failed, project, schema};
 
 /// The most pages one call of `booharu_fix_page_levels` levels: it answers
@@ -139,15 +142,19 @@ impl Tool for FixPageLevels {
         args: FixPageLevelsArgs,
     ) -> Result<LevelsReport, Self::Error> {
         args.check()?;
-        // What the pipeline told as the call came, so a run queued before it
-        // counts as going until it ends.
-        let told = project(context)?.pipeline.told();
+        // Refused as the desktop's command refuses a fix, in the same order
+        // and words: while a run or a Run press goes, by what the pipeline
+        // told as the call came, so a run queued before it counts as going
+        // until it ends, then while pages still load, before the session's
+        // lock is taken, then while another fix goes.
+        let tools = project(context)?;
+        levels::startable(&tools.pipeline.told(), loading(&*host(&tools)))
+            .map_err(|error| failed(format!("{error:#}")))?;
         let job = jobs::start(JobKind::Levels).map_err(|error| failed(format!("{error:#}")))?;
         // A call dropped, as when the user stops the agent, stops the fix,
         // as Stop does: it changes no page.
         let _stops = job.cancel().clone().drop_guard();
-        blocking(context, move |tools, host| {
-            levels::startable(&told, loading(host))?;
+        blocking(context, move |tools, _| {
             let settings = args.settings(saved(tools)?);
             levels::fix(
                 &tools.session,
