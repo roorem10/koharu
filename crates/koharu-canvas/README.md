@@ -75,6 +75,11 @@ release that follow.
   made again only when the stroke's coverage in it rises. At a hardness of 1,
   the default, a stroke is Koharu's, byte for byte. A soft brush much wider
   than 1000 pixels is slow, and its cursor's ring shows its whole diameter.
+- **Booharu: Remove's own raster goes under the lettering.** The raster a
+  remove stroke adds when no raster or clean-up is selected goes under every
+  layer that letters the page, above the scan and earlier results, where the
+  pipeline puts an area's result, rather than at the top of the page. It
+  stays selected, so the next strokes go onto it.
 - **Booharu: a small frame moves from its middle.** A side's or a corner's
   reach is at most a third of the frame across it, so a press in the middle of
   any frame, however small, moves it rather than resizing it. This answers

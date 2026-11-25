@@ -1,15 +1,16 @@
 //! Booharu's tests of the Inpainting stage's write for a painted area: where
-//! its result goes, under all lettering (D17), and the limit a soft Remove
-//! stroke's result keeps (T23). The stage reads an area by drawing the page
-//! on the GPU, so these build its work by hand, as `read::area` reads it,
-//! give it the limit the stage's marked lines make, and apply the stage's own
-//! write.
+//! its result goes, under all lettering (D17), the limit a soft Remove
+//! stroke's result keeps (T23), and how a soft stroke onto a raster or a
+//! clean-up (Koharu 0.95) lays its result in. The stage reads an area by
+//! drawing the page on the GPU, so these build its work by hand, as
+//! `read::area` reads it, give it the limit the stage's marked lines make,
+//! and apply the stage's own write.
 
 use std::{collections::BTreeMap, io::Cursor};
 
 use booharu_core::settings::Snapshot;
 use image::{GrayImage, ImageFormat, Rgb, RgbImage};
-use koharu_scene::{Created, Edit, Hash, LayerId, Op, PageId, Rect, Session};
+use koharu_scene::{Content, Created, Edit, Hash, LayerId, Op, PageId, Rect, Ref, Session};
 use serde_json::{Value, json};
 
 use super::{AreaWork, Target, Work, write};
@@ -113,15 +114,29 @@ impl Fixture {
     /// does, with `config` as the run's: the stage's work as it reads the
     /// area, the limit its marked lines make, and its own write.
     fn inpaint(&mut self, config: &PipelineConfig, area: &Area) {
+        self.redrawn(config, area, None, Rgb([255; 3]));
+    }
+
+    /// Writes the result of a run on `area`, the model having redrawn it
+    /// all `color`, onto `layer`, a raster or a block's clean-up, when there
+    /// is one, as a Remove stroke onto one has it (Koharu 0.95), the way the
+    /// Inpainting stage does, with `config` as the run's.
+    fn redrawn(
+        &mut self,
+        config: &PipelineConfig,
+        area: &Area,
+        layer: Option<LayerId>,
+        color: Rgb<u8>,
+    ) {
         let painted = AreaWork {
             area: area.clone(),
             prompt: None,
-            layer: None,
+            layer,
         };
         let soft = cleanup::soft(config, Some(&painted));
         let (rect, mask) = cleanup::read(&painted.area, (SIDE, SIDE)).expect("on the page");
         let mut work = Work {
-            image: RgbImage::from_pixel(SIDE, SIDE, Rgb([255; 3])),
+            image: RgbImage::from_pixel(SIDE, SIDE, color),
             mask: GrayImage::new(SIDE, SIDE),
             regions: Vec::new(),
             target: Target::Area { rect, mask },
@@ -131,8 +146,39 @@ impl Fixture {
             *mask = cleanup::limit(soft.as_ref(), *rect, std::mem::take(mask));
         }
         let made = action("c2pa.created", "lama", None);
-        let ops = write::ops(&self.session, self.page, work, None, &made, "").expect("the ops");
+        let ops = write::ops(&self.session, self.page, work, layer, &made, "").expect("the ops");
         self.apply(ops);
+    }
+
+    /// The pixel at `x`, `y` on the page of `layer`, a raster or a block's
+    /// clean-up or mask, whose pixels sit at the page's own coordinates.
+    fn pixel(&self, layer: LayerId, (x, y): (i32, i32)) -> Vec<u8> {
+        let at = Rect {
+            x,
+            y,
+            width: 1,
+            height: 1,
+        };
+        self.session.pixels(layer, at).expect("the layer's pixels")
+    }
+
+    /// Fills `layer` with `pixel`, a byte a channel, over `rect`.
+    fn fill(&mut self, layer: LayerId, rect: Rect, pixel: &[u8]) {
+        let pixels = pixel.repeat((rect.width * rect.height) as usize);
+        self.apply(vec![Op::WritePixels {
+            layer: Ref::from(layer),
+            rect,
+            pixels,
+        }]);
+    }
+
+    /// The clean-up and the mask of the block `label`.
+    fn cleanup(&self, label: &str) -> (LayerId, LayerId) {
+        let project = self.session.project();
+        match &project.layer(self.id(label)).expect("the block").content {
+            Content::Block(block) => (block.cleanup.id, block.mask.id),
+            _ => panic!("{label} is no block"),
+        }
     }
 
     /// The limit the result written last holds over the whole page, a byte
@@ -315,4 +361,140 @@ fn a_soft_strokes_result_keeps_the_strokes_own_coverage_as_its_limit() {
             .expect("the result's pixels");
         assert!(drawn.chunks(4).all(|pixel| pixel == [255; 4]));
     }
+}
+
+/// A soft stroke's one row at 4, 4, eight pixels long, its coverage falling
+/// from 255 to 64 over its first four pixels and again over its last four,
+/// and the row under it, which it doesn't touch.
+fn fading() -> Area {
+    const ROW: [u8; 8] = [255, 192, 128, 64, 255, 192, 128, 64];
+    area((4, 4), (8, 2), |column, row| match row {
+        0 => ROW[column as usize],
+        _ => 0,
+    })
+}
+
+/// The left half of the page, 8 pixels wide.
+fn left_half() -> Rect {
+    Rect {
+        x: 0,
+        y: 0,
+        width: SIDE / 2,
+        height: SIDE,
+    }
+}
+
+/// What a straight RGBA `pixel`, gated by a mask's byte `open`, shows over
+/// the page's white scan, a channel each, as the renderer composites it.
+fn shown(pixel: &[u8], open: u8) -> [f64; 3] {
+    let alpha = f64::from(pixel[3]) / 255.0 * f64::from(open) / 255.0;
+    [0, 1, 2].map(|channel| f64::from(pixel[channel]) * alpha + 255.0 * (1.0 - alpha))
+}
+
+#[test]
+fn a_soft_stroke_onto_a_raster_blends_its_result_in_by_its_coverage() {
+    // A raster painted red over the left half of the page, clear on the
+    // right, which the stroke crosses from one to the other.
+    let new = || {
+        let mut fixture = Fixture::new(vec![add("paint", None, 0, raster(false))]);
+        fixture.fill(fixture.id("paint"), left_half(), &[255, 0, 0, 255]);
+        fixture
+    };
+    let blue = Rgb([0, 0, 255]);
+    let mut soft_page = new();
+    let paint = soft_page.id("paint");
+    soft_page.redrawn(&soft(), &fading(), Some(paint), blue);
+    let at = |x| soft_page.pixel(paint, (x, 4));
+    // Over red, the result laid in by its coverage, still opaque.
+    assert_eq!(at(4), [0, 0, 255, 255]);
+    assert_eq!(at(5), [63, 0, 192, 255]);
+    assert_eq!(at(6), [127, 0, 128, 255]);
+    assert_eq!(at(7), [191, 0, 64, 255]);
+    // Over nothing, the result at its coverage, a soft edge in the raster.
+    assert_eq!(at(8), [0, 0, 255, 255]);
+    assert_eq!(at(9), [0, 0, 255, 192]);
+    assert_eq!(at(10), [0, 0, 255, 128]);
+    assert_eq!(at(11), [0, 0, 255, 64]);
+    // What the stroke doesn't touch stays as it was.
+    assert_eq!(at(3), [255, 0, 0, 255]);
+    assert_eq!(soft_page.pixel(paint, (5, 5)), [255, 0, 0, 255]);
+    assert_eq!(soft_page.pixel(paint, (9, 5)), [0; 4]);
+    assert_eq!(soft_page.order(), ["paint"], "no new raster");
+    // A hard stroke's result replaces every pixel it touches whole, as
+    // Koharu's write lays it.
+    let mut hard_page = new();
+    let paint = hard_page.id("paint");
+    hard_page.redrawn(&hard(), &fading(), Some(paint), blue);
+    for x in 4..12 {
+        assert_eq!(hard_page.pixel(paint, (x, 4)), [0, 0, 255, 255], "at {x}");
+    }
+    assert_eq!(hard_page.pixel(paint, (3, 4)), [255, 0, 0, 255]);
+}
+
+#[test]
+fn a_soft_stroke_onto_a_clean_up_opens_its_mask_by_its_coverage_and_never_closes_it() {
+    // A block whose clean-up is red all over, its mask open on the left half
+    // of the page, so the red shows there, and closed on the right.
+    let new = || {
+        let mut fixture = Fixture::new(vec![add(
+            "block",
+            None,
+            0,
+            json!({"kind": "block", "source": {"content": "やあ"}}),
+        )]);
+        let (cleanup, mask) = fixture.cleanup("block");
+        let page = Rect {
+            width: SIDE,
+            ..left_half()
+        };
+        fixture.fill(cleanup, page, &[255, 0, 0, 255]);
+        fixture.fill(mask, left_half(), &[255]);
+        fixture
+    };
+    let blue = Rgb([0, 0, 255]);
+    let mut soft_page = new();
+    let (cleanup, mask) = soft_page.cleanup("block");
+    let before: Vec<[f64; 3]> = (3..12)
+        .map(|x| {
+            shown(
+                &soft_page.pixel(cleanup, (x, 4)),
+                soft_page.pixel(mask, (x, 4))[0],
+            )
+        })
+        .collect();
+    soft_page.redrawn(&soft(), &fading(), Some(cleanup), blue);
+    let coverage = [0, 255, 192, 128, 64, 255, 192, 128, 64];
+    for (at, x) in (3..12).enumerate() {
+        let (pixel, open) = (
+            soft_page.pixel(cleanup, (x, 4)),
+            soft_page.pixel(mask, (x, 4))[0],
+        );
+        // What shows is the result over what showed, by its coverage.
+        let c = f64::from(coverage[at]) / 255.0;
+        let wanted = [0, 1, 2].map(|channel| {
+            let result = [0.0, 0.0, 255.0][channel];
+            result * c + before[at][channel] * (1.0 - c)
+        });
+        let now = shown(&pixel, open);
+        for channel in 0..3 {
+            assert!(
+                (now[channel] - wanted[channel]).abs() <= 2.0,
+                "at {x}: {now:?}, not {wanted:?}"
+            );
+        }
+        // The mask opens by the coverage where it was closed, and stays
+        // open where it was.
+        let opened = if x < 8 { 255 } else { coverage[at] };
+        assert_eq!(open, opened, "the mask at {x}");
+    }
+    // A hard stroke's result opens the mask wholly wherever it touches, as
+    // Koharu's write lays it.
+    let mut hard_page = new();
+    let (cleanup, mask) = hard_page.cleanup("block");
+    hard_page.redrawn(&hard(), &fading(), Some(cleanup), blue);
+    for x in 4..12 {
+        assert_eq!(hard_page.pixel(cleanup, (x, 4)), [0, 0, 255, 255], "at {x}");
+        assert_eq!(hard_page.pixel(mask, (x, 4)), [255], "at {x}");
+    }
+    assert_eq!(hard_page.pixel(mask, (12, 4)), [0]);
 }

@@ -10,10 +10,14 @@
 //!
 //! Two marked lines in the Inpainting stage's `inpaint()` reach it: [`soft`]
 //! keeps the area before the stage takes it apart, and [`limit`] makes the
-//! limit the stage's write gives the result's mask.
+//! limit the stage's write gives the result's mask. A stroke onto a raster
+//! or a clean-up (Koharu 0.95) has no mask of its own for that limit, so a
+//! marked line in the write's `onto()` lays the result in by it instead
+//! ([`soften`]): blended into the layer's pixels by the limit's grey, and
+//! opening a clean-up's mask by it, never closing what's open.
 
 use image::{GrayImage, Luma};
-use koharu_scene::Rect;
+use koharu_scene::{LayerId, Op, Rect, Ref, Session};
 
 use crate::{Area, PipelineConfig, stages::inpaint::AreaWork};
 
@@ -63,6 +67,115 @@ fn coverage(area: &Area, (x, y): (i64, i64)) -> u8 {
         .and_then(|at| area.pixels.get(at))
         .copied()
         .unwrap_or(0)
+}
+
+/// Lays a soft limit's result onto `layer` as `ops` hold it, Koharu's write
+/// of `drawn`, the result's RGBA pixels over `rect` of the page, onto the
+/// layer, and of `area`, the limit over `rect`, onto `mask`, the block's
+/// mask when `layer` is a block's clean-up, which opens it there; Koharu's
+/// write takes the result whole wherever the limit is above 0. A limit of
+/// 0s and 255s, a hard stroke's, any but a soft Remove stroke's (T23),
+/// stays so, as blending gives the same bytes there. A soft one's edge is
+/// laid in by its grey instead ([`blended`]): what the layer and its mask
+/// show there afterwards is the result over what they showed, in that
+/// proportion, so a soft edge stays soft on a raster, where it has no mask
+/// of its own, and a clean-up's mask opens by it but never closes.
+pub(crate) fn soften(
+    session: &Session,
+    ops: &mut [Op],
+    (layer, mask): (LayerId, Option<LayerId>),
+    rect: Rect,
+    area: &GrayImage,
+    drawn: &[u8],
+) -> anyhow::Result<()> {
+    if area.pixels().all(|pixel| matches!(pixel.0[0], 0 | 255)) {
+        return Ok(());
+    }
+    let size = area.as_raw().len();
+    // Each layer's pixels over `rect`, in its own coordinates, as Koharu's
+    // write reads them.
+    let held = |id: LayerId| -> anyhow::Result<Vec<u8>> {
+        let offset = session.tiles(id, Some(rect))?.offset;
+        let own = Rect {
+            x: rect.x - offset.x,
+            y: rect.y - offset.y,
+            ..rect
+        };
+        Ok(session.pixels(id, own)?)
+    };
+    let (old, shown) = (held(layer)?, mask.map(held).transpose()?);
+    // A layer that isn't RGBA, or a mask that isn't a byte a pixel, Koharu's
+    // write lays as it does.
+    if old.len() != size * 4
+        || drawn.len() != size * 4
+        || shown.as_ref().is_some_and(|shown| shown.len() != size)
+    {
+        return Ok(());
+    }
+    let (pixels, opened) = blended(&old, shown.as_deref(), area.as_raw(), drawn);
+    for op in ops {
+        let Op::WritePixels {
+            layer: written,
+            pixels: bytes,
+            ..
+        } = op
+        else {
+            continue;
+        };
+        if *written == Ref::from(layer) {
+            bytes.clone_from(&pixels);
+        } else if let (Some(mask), Some(opened)) = (mask, &opened)
+            && *written == Ref::from(mask)
+        {
+            bytes.clone_from(opened);
+        }
+    }
+    Ok(())
+}
+
+/// `old`, a layer's straight RGBA pixels, with `drawn`, a result's, laid
+/// over them by `coverage`, a byte a pixel, and `mask`, the layer's mask's
+/// bytes, which gate what it shows, opened by it: what the two show
+/// afterwards is `drawn` over what they showed, at each pixel's coverage, as
+/// the renderer multiplies a clean-up's alpha by its mask. With no mask, it
+/// is `drawn` composited over `old`, as Photoshop's Normal blend lays a
+/// layer at that opacity. A mask opens as much again of what it held closed
+/// as the coverage takes, so it never closes; a layer's alpha is what shows
+/// over the mask's opening. Where the coverage is 0 both stay as they are,
+/// and where it's 255 they hold `drawn` and open wholly, as Koharu's write
+/// leaves them.
+fn blended(
+    old: &[u8],
+    mask: Option<&[u8]>,
+    coverage: &[u8],
+    drawn: &[u8],
+) -> (Vec<u8>, Option<Vec<u8>>) {
+    let mut pixels = old.to_vec();
+    let mut opened = mask.map(<[u8]>::to_vec);
+    let unit = |byte: u8| f64::from(byte) / 255.0;
+    let byte = |value: f64| (value * 255.0).round().clamp(0.0, 255.0) as u8;
+    for (at, &covered) in coverage.iter().enumerate() {
+        let new = &drawn[at * 4..at * 4 + 4];
+        let c = unit(covered) * unit(new[3]);
+        if c == 0.0 {
+            continue;
+        }
+        let pixel = &mut pixels[at * 4..at * 4 + 4];
+        let closed = mask.map_or(1.0, |mask| unit(mask[at]));
+        // What the layer showed through its mask, and what it shows now.
+        let was = unit(pixel[3]) * closed;
+        let shows = c + was * (1.0 - c);
+        let open = c + closed * (1.0 - c);
+        for channel in 0..3 {
+            let mixed = c * unit(new[channel]) + was * (1.0 - c) * unit(pixel[channel]);
+            pixel[channel] = byte(mixed / shows);
+        }
+        pixel[3] = byte(shows / open);
+        if let Some(opened) = &mut opened {
+            opened[at] = byte(open);
+        }
+    }
+    (pixels, opened)
 }
 
 /// The rectangle and the mask over it that the Inpainting stage reads from

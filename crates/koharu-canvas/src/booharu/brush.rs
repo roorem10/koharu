@@ -7,7 +7,7 @@
 
 use std::{collections::BTreeMap, sync::Arc};
 
-use koharu_scene::{LayerId, PixelFormat, Rgba};
+use koharu_scene::{LayerId, Op, Page, PixelFormat, Rgba};
 use kurbo::{BezPath, Point, Shape as _, Size, Vec2};
 use vello_gpu::{PixelMetadata, Pixmap, peniko::ImageAlphaType};
 
@@ -325,6 +325,32 @@ pub(crate) fn coverage(
     match soft {
         Some(soft) => soft.coverage(outline, page),
         None => crate::tools::brush::coverage(outline, page),
+    }
+}
+
+/// `add`, the op adding the raster a Remove stroke with no raster or
+/// clean-up selected goes onto (Koharu 0.95), at the top of `page`, put
+/// under all its lettering instead, where an area's result goes (D17,
+/// `booharu_core::cleanup::under_lettering`): above the scan, the Original
+/// scan and earlier results, so the next stroke, which goes onto it while
+/// it stays selected, builds on them, and under every layer that letters
+/// the page. Any other op, as it is.
+pub(crate) fn under_lettering(page: &Page, add: Op) -> Op {
+    match add {
+        Op::AddLayer {
+            id,
+            page: on,
+            parent: None,
+            layer,
+            ..
+        } => Op::AddLayer {
+            id,
+            page: on,
+            parent: None,
+            index: booharu_core::cleanup::under_lettering(page),
+            layer,
+        },
+        other => other,
     }
 }
 
