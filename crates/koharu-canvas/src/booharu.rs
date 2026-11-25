@@ -25,8 +25,12 @@
 //! that keeps the style ([`first_translation`]), and a resize, a reshape, a
 //! move or a turn changes its source ([`lettering()`], [`moved()`]), so the
 //! placeholder stays one.
+//!
+//! Show original draws a levelled page's Original scan, the scan as it came
+//! in, which its background no longer is ([`original_scan`]).
 
 use booharu_core::{lettering, settings::LetteringSettings, sfx, status, styles};
+use koharu_renderer::Drawn;
 use koharu_scene::{
     Block, Content, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text, Transform,
 };
@@ -307,6 +311,15 @@ pub(crate) fn moved(snapshot: &Snapshot, control: &Control, op: Op) -> Op {
         }
         (op, _) => op,
     }
+}
+
+/// What Show original draws of a levelled page: its Original scan, the scan
+/// as it came in, which its background no longer is (D37), shown though
+/// it's hidden, as Koharu shows a hidden background; `None` for a page with
+/// none, whose background is its scan.
+pub(crate) fn original_scan(snapshot: &Snapshot) -> Option<Drawn<'_>> {
+    let (layer, _) = booharu_core::cleanup::original_scan(snapshot.page())?;
+    snapshot.frame().layer(layer)
 }
 
 /// The layer `id` among `layers` and their children.
