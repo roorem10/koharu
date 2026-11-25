@@ -35,8 +35,9 @@ use super::{agent_file, chapter::UPDATE, series::write};
 pub const AGENT_VERSION: u32 = 1;
 
 /// The rig version Booharu saves the model's memory with, Koharu's pinned
-/// rig's.
-pub const RIG_VERSION: &str = "0.46.0";
+/// rig's: since Koharu 0.95.0, 0.47.0, whose conversation keeps its
+/// compaction's summary among its messages.
+pub const RIG_VERSION: &str = "0.47.0";
 
 /// What a project keeps of its conversation with the agent.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -281,6 +282,16 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn the_memory_is_saved_with_the_rig_the_workspace_pins() {
+        let manifest = include_str!("../../../../Cargo.toml");
+        let pinned = format!("rig-core = {{ version = \"={RIG_VERSION}\"");
+        assert!(
+            manifest.contains(&pinned),
+            "the workspace pins rig {RIG_VERSION}"
+        );
+    }
+
     /// A folder with the project file `Ch.1.khr` in it.
     fn project() -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().expect("a folder");
@@ -384,7 +395,7 @@ mod tests {
         );
         assert_eq!(text["entries"][2]["kind"], "explain");
         assert_eq!(text["entries"][3]["reason"], "memory_lost");
-        assert_eq!(text["memory"]["rig"], "0.46.0");
+        assert_eq!(text["memory"]["rig"], "0.47.0");
 
         // New chat clears the memory, written as null.
         AgentFile::update(&project, |file| file.memory = None)?;

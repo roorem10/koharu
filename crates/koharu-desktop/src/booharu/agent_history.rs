@@ -801,7 +801,7 @@ mod tests {
         let memory = kept.memory.as_ref().expect("the memory");
         assert_eq!(
             (memory.model.as_str(), memory.rig.as_str()),
-            ("m/1", "0.46.0")
+            ("m/1", RIG_VERSION)
         );
         let saved = memory.conversation.to_string();
         assert!(!saved.contains("aGVsbG8="), "no page");
@@ -814,6 +814,34 @@ mod tests {
         kept[0] = Message::user("What does page 1 say? My key is [REDACTED]");
         let kept: Vec<Arc<Message>> = kept.into_iter().map(Arc::new).collect();
         assert_eq!(restored.messages(), &kept[..]);
+    }
+
+    /// rig 0.47 keeps a compaction's summary in the conversation as an
+    /// entry by the compaction, which the saved memory keeps as it is, so
+    /// the next compaction folds it on rather than reading it as a message.
+    #[test]
+    fn the_memory_keeps_a_compactions_summary_as_its_summary() {
+        use koharu_llm::rig::conversation::{Author, Entry};
+
+        let (_dir, project) = project();
+        // As rig-memory's compaction marks its summary.
+        let compaction = Author::plugin("compaction");
+        let mut conversation = Conversation::from_messages([
+            Message::user("Translate page 1."),
+            Message::assistant("Done."),
+            Message::user("Translate page 2."),
+        ]);
+        let summary = Entry::new(Message::user("The story so far.")).by(compaction.clone());
+        conversation.splice(..2, [summary], compaction.clone());
+        let memory = saved(&conversation, "m/1").expect("saved");
+        AgentFile::update(&project, |file| file.memory = Some(memory)).expect("written");
+
+        let (read, lost) = remembered(&project).expect("read");
+        let read = read.expect("the memory");
+        assert!(!lost);
+        assert_eq!(read, conversation, "its messages, ids and authors");
+        let authors: Vec<Option<&Author>> = read.entries().map(|entry| entry.author).collect();
+        assert_eq!(authors, [Some(&compaction), None]);
     }
 
     #[test]

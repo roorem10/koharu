@@ -128,7 +128,10 @@ pub(crate) fn emphasis_schema(keys: &[String]) -> anyhow::Result<schemars::Schem
 /// is trimmed, and a blank one left out. An answer that isn't an object,
 /// and a text without a translation or with one that isn't a string, go on
 /// as they are, so Koharu's checks fail them in their own words. With no
-/// slot, `answer` is Koharu's answer, as it is.
+/// slot, `answer` is Koharu's answer, as it is. Since Koharu 0.95.0 rig
+/// checks a run's answer against [`emphasis_schema`] first, asking once more
+/// for one that misses it, so in a run neither a plain string nor a missing
+/// or malformed list reaches this.
 pub(crate) fn emphasis_answers(
     answer: String,
     keys: &[String],
