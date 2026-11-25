@@ -1,7 +1,7 @@
 /** Booharu's keys: its key actions with their default keys, the keys Koharu's canvas fixes, which
  * no Booharu key may take, and which keys a focused control keeps from the canvas's shortcuts. */
 
-import { toolKeys } from '@/lib/shortcuts'
+import { shortcuts, toolKeys } from '@/lib/shortcuts'
 import type { CanvasTool } from '@/lib/store'
 
 /** A key as the registry names it: the modifiers it needs, in the order `ctrl`, `alt`, `shift`,
@@ -34,10 +34,11 @@ export const booharuTools: ReadonlySet<CanvasTool> = new Set(
 )
 
 /** The keys no Booharu key action may take: those Koharu's hotkeys in CanvasWorkspace take (its
- * `shortcuts` and `toolKeys` in `lib/shortcuts.ts`), undo, redo, select all, deselect, fit, delete,
- * clear the selection, the hand tool held on Space, the arrows, which move the selection a pixel or
- * ten with Shift, and the letter of each of Koharu's tools, which selects it with or without Shift;
- * and bold and italic while the canvas types, which useTypingShortcuts takes. */
+ * `shortcuts` and `toolKeys` in `lib/shortcuts.ts`), undo, redo, select all, deselect, fit, Show
+ * Original's `\`, delete, clear the selection, the hand tool held on Space, the arrows, which move
+ * the selection a pixel or ten with Shift, and the letter of each of Koharu's tools, which selects
+ * it with or without Shift, the Block tool's K among them; F7, which RightSidebar takes to switch
+ * Layers and Story; and bold and italic while the canvas types, which useTypingShortcuts takes. */
 export const reservedKeys: ReadonlySet<KeyName> = new Set([
   'ctrl+z',
   'ctrl+shift+z',
@@ -46,6 +47,8 @@ export const reservedKeys: ReadonlySet<KeyName> = new Set([
   'ctrl+0',
   'ctrl+b',
   'ctrl+i',
+  shortcuts.original,
+  shortcuts.layers,
   'delete',
   'backspace',
   'escape',

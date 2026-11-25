@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CanvasWorkspace } from '@/components/editor/CanvasWorkspace'
 import { controlKeepsKey, keyActions, reservedKeys } from '@/lib/booharu/keys'
 import { pageKey, queryClient } from '@/lib/queries'
-import { toolKeys } from '@/lib/shortcuts'
+import { shortcuts, toolKeys } from '@/lib/shortcuts'
 import { useKoharuStore } from '@/lib/store'
 import { commands, type Page } from '@koharu/ipc/protocol'
 
@@ -33,13 +33,15 @@ const controlKeys: KeyboardEventInit[] = [
 ]
 
 /** Keys the canvas takes from the page, as a browser names them, its `code` included, which
- * Koharu's hotkeys match by: a tool's letter, with Shift too, Delete, Escape, the arrows, and its
- * Ctrl chords. */
+ * Koharu's hotkeys match by: a tool's letter, with Shift too, Show Original's `\`, Delete, Escape,
+ * the arrows, and its Ctrl chords. */
 const canvasKeys: KeyboardEventInit[] = [
   { key: 'v', code: 'KeyV' },
   { key: 'b', code: 'KeyB' },
+  { key: 'k', code: 'KeyK' },
   { key: 'o', code: 'KeyO' },
   { key: 'B', code: 'KeyB', shiftKey: true },
+  { key: '\\', code: 'Backslash' },
   { key: 'Delete', code: 'Delete' },
   { key: 'Backspace', code: 'Backspace' },
   { key: 'Escape', code: 'Escape' },
@@ -111,7 +113,19 @@ describe('Booharu key registry', () => {
     const fixed = ['ctrl+z', 'ctrl+shift+z', 'ctrl+a', 'ctrl+d', 'ctrl+0']
     const arrows = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown']
     const nudges = [...arrows, ...arrows.map((key) => `shift+${key}`)]
-    for (const key of [...fixed, 'delete', 'backspace', 'escape', 'space', ...nudges, 'a', 'm']) {
+    // Koharu 0.95.0's Show Original, F7, which switches Layers and Story, and the Block tool's K.
+    const koharu095 = ['\\', 'f7', 'k', 'shift+k']
+    for (const key of [
+      ...fixed,
+      'delete',
+      'backspace',
+      'escape',
+      'space',
+      ...nudges,
+      'a',
+      'm',
+      ...koharu095,
+    ]) {
       expect(reservedKeys.has(key), key).toBe(true)
     }
     // Koharu's tool hotkey selects a tool by its letter, and with Shift too as Booharu binds it,
@@ -126,6 +140,11 @@ describe('Booharu key registry', () => {
   it('maps O to the O tool, the key Koharu reads from toolKeys', () => {
     expect(keyActions.ocrBoxTool).toEqual({ key: 'o', tool: 'ocr_box' })
     expect(toolKeys.ocr_box).toBe(keyActions.ocrBoxTool.key)
+  })
+
+  it("keeps Booharu's [, ] and O apart from Koharu 0.95.0's K, F7 and \\", () => {
+    expect(Object.values(keyActions).map(({ key }) => key)).toEqual(['o', '[', ']'])
+    expect([shortcuts.original, shortcuts.layers, toolKeys.block]).toEqual(['\\', 'f7', 'k'])
   })
 })
 
@@ -279,6 +298,47 @@ describe('Booharu tool keys on the canvas', () => {
     // A chord stays the slider's: Alt+V leaves the O tool selected.
     fireEvent.keyDown(slider!, { key: 'v', altKey: true })
     expect(useKoharuStore.getState().tool).toBe('ocr_box')
+  })
+
+  it("selects Koharu's Block tool with K, with Shift too and from a focused slider, beside O", async () => {
+    const { view } = await renderWorkspace()
+    fireEvent.keyDown(document.body, { key: 'k', code: 'KeyK' })
+    expect(useKoharuStore.getState().tool).toBe('block')
+    fireEvent.keyDown(document.body, { key: 'o', code: 'KeyO' })
+    expect(useKoharuStore.getState().tool).toBe('ocr_box')
+    fireEvent.keyDown(document.body, { key: 'K', code: 'KeyK', shiftKey: true })
+    expect(useKoharuStore.getState().tool).toBe('block')
+
+    const slider = view.container.querySelector<HTMLInputElement>('footer input[type="range"]')
+    act(() => slider!.focus())
+    fireEvent.keyDown(slider!, { key: 'v', code: 'KeyV' })
+    fireEvent.keyDown(slider!, { key: 'k', code: 'KeyK' })
+    expect(useKoharuStore.getState().tool).toBe('block')
+  })
+
+  it("toggles Koharu's Show Original with \\ from the page, the key going with the canvas, as Read mode takes its place", async () => {
+    const { view, sent } = await renderWorkspace()
+    // Prevented: the canvas took it.
+    expect(fireEvent.keyDown(document.body, { key: '\\', code: 'Backslash' })).toBe(false)
+    expect(useKoharuStore.getState().original).toBe(true)
+    await settle()
+    expect(commands.setOriginal).toHaveBeenLastCalledWith(true)
+    fireEvent.keyDown(document.body, { key: '\\', code: 'Backslash' })
+    expect(useKoharuStore.getState().original).toBe(false)
+    // On again as Read mode comes.
+    fireEvent.keyDown(document.body, { key: '\\', code: 'Backslash' })
+    await settle()
+
+    // Read mode shows the reader in the canvas's place: the scan is shown no more, and the key
+    // toggles nothing there.
+    view.unmount()
+    await settle()
+    expect(commands.setOriginal).toHaveBeenLastCalledWith(false)
+    sent.length = 0
+    expect(fireEvent.keyDown(document.body, { key: '\\', code: 'Backslash' })).toBe(true)
+    expect(useKoharuStore.getState().original).toBe(true)
+    await settle()
+    expect(sent).toEqual([])
   })
 
   it('leaves every key to a text field, a select and editable text', async () => {
