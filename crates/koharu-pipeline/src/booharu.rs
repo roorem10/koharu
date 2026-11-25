@@ -75,6 +75,7 @@ use booharu_core::{
     status, styles,
 };
 use koharu_llm::rig::{
+    ProviderResponseError,
     catalog::ModelSpec,
     completion::{Message, Usage},
     driver::DynModel,
@@ -407,7 +408,9 @@ pub(crate) struct Failure {
 pub(crate) enum Class {
     /// The page's input is invalid, as a translation's placement finds it,
     /// or the project refused the page's edit, naming a layer that's gone or
-    /// locked: another try fails the same way.
+    /// locked, or a hosted model's reply names a condition the same request
+    /// meets again, a spent quota among them ([`final_reply`]): another try
+    /// fails the same way.
     Invalid,
     /// The project couldn't be read, written, or saved, or the runtime shut
     /// down while a model loaded: the run ends, whatever its policy, as a try
@@ -438,7 +441,8 @@ impl Failure {
 
 /// The class of `error`, a stage's, read from the first cause in its chain
 /// that says: Koharu's own invalid request, scene, load, and shutdown errors,
-/// a scene error from the session, then the HTTP status of a hosted model's
+/// a scene error from the session, a hosted model's reply naming a condition
+/// the same request meets again, then the HTTP status of a hosted model's
 /// reply, however rig carries it; anything else is worth another try.
 pub(crate) fn class(error: &anyhow::Error) -> Class {
     for cause in error.chain() {
@@ -451,6 +455,9 @@ pub(crate) fn class(error: &anyhow::Error) -> Class {
         }
         if let Some(error) = cause.downcast_ref::<koharu_scene::Error>() {
             return scene(error);
+        }
+        if final_reply(cause) {
+            return Class::Invalid;
         }
         let status = if let Some(error) = cause.downcast_ref::<PromptError>() {
             error.provider_response_status()
@@ -465,12 +472,60 @@ pub(crate) fn class(error: &anyhow::Error) -> Class {
         } else {
             None
         };
-        // What koharu-llm's client sends again: a 429 or a 5xx.
+        // What koharu-llm's client sends again: a 429 or a 5xx. Since Koharu
+        // 0.95.0 it also sends a 408, a 425 and a lost connection again,
+        // which the run policy still gives a page try.
         if status.is_some_and(|status| status.as_u16() == 429 || status.is_server_error()) {
             return Class::HostedRetried;
         }
     }
     Class::Retryable
+}
+
+/// Whether `cause` carries a hosted model's reply whose machine code rig
+/// calls final, naming a condition the same request meets again: a spent
+/// quota, a billing limit, or a request longer than the model takes. rig
+/// never sends such a reply's request again, whatever its status, so since
+/// Koharu 0.95.0 koharu-llm's client doesn't either, and a page try would
+/// only meet it once more. rig keeps that table to itself, but a reply
+/// naming one of its codes is the only kind it won't send again with a 503,
+/// as `ProviderResponseError::is_retryable` documents its order, which this
+/// asks.
+fn final_reply(cause: &(dyn std::error::Error + 'static)) -> bool {
+    let report = if let Some(error) = cause.downcast_ref::<PromptError>() {
+        match error {
+            PromptError::Report(report) => report.clone(),
+            PromptError::Provider(error) => error.report(),
+            _ => return false,
+        }
+    } else if let Some(error) = cause.downcast_ref::<ProviderError>() {
+        error.report()
+    } else if let Some(report) = cause.downcast_ref::<ErrorReport>() {
+        report.clone()
+    } else if let Some(http_client::Error::InvalidStatusCodeWithDetails {
+        status,
+        body,
+        headers,
+    }) = cause.downcast_ref::<http_client::Error>()
+    {
+        // As koharu-llm's client reads the reply it got.
+        let reply =
+            http_client::Error::non_success_with_details(*status, headers.clone(), body.clone());
+        ProviderError::from(reply).report()
+    } else {
+        return false;
+    };
+    let code = report.code.or_else(|| {
+        report
+            .provider_response
+            .as_ref()
+            .and_then(ProviderResponseError::machine_code)
+    });
+    code.is_some_and(|code| {
+        !ProviderResponseError::new(http_client::StatusCode::SERVICE_UNAVAILABLE, "")
+            .with_code(Some(code))
+            .is_retryable()
+    })
 }
 
 /// The class of a scene error: an edit the project refused, one naming a
@@ -2054,7 +2109,60 @@ mod tests {
                 replied(StatusCode::TOO_MANY_REQUESTS).into(),
                 Class::HostedRetried,
             ),
-            // What the client doesn't send again is worth a page try.
+            // A reply naming a condition the same request meets again, a
+            // spent quota among them, which the client never sends again,
+            // whatever its status or however rig carries it, nor a page try.
+            (
+                PromptError::Report(
+                    ErrorReport::new(ErrorKind::ProviderResponse, "You exceeded your quota")
+                        .with_http_status(429)
+                        .with_code("insufficient_quota"),
+                )
+                .into(),
+                Class::Invalid,
+            ),
+            (
+                anyhow::Error::from(ProviderError::from(
+                    http_client::Error::non_success_with_details(
+                        StatusCode::BAD_REQUEST,
+                        HeaderMap::new(),
+                        r#"{"error": {"code": "billing_hard_limit_reached"}}"#.to_owned(),
+                    ),
+                ))
+                .context("couldn't summarize the conversation"),
+                Class::Invalid,
+            ),
+            (
+                http_client::Error::InvalidStatusCodeWithDetails {
+                    status: StatusCode::TOO_MANY_REQUESTS,
+                    body: r#"{"error": {"type": "insufficient_quota"}}"#.to_owned(),
+                    headers: HeaderMap::new(),
+                }
+                .into(),
+                Class::Invalid,
+            ),
+            (
+                PromptError::Report(
+                    ErrorReport::new(ErrorKind::ProviderResponse, "too long")
+                        .with_code("context_length_exceeded"),
+                )
+                .into(),
+                Class::Invalid,
+            ),
+            // A rate limit the client sends again, naming its code, still
+            // isn't sent a page try's four more times.
+            (
+                PromptError::Report(
+                    ErrorReport::new(ErrorKind::ProviderResponse, "slow down")
+                        .with_http_status(429)
+                        .with_code("rate_limit_exceeded"),
+                )
+                .into(),
+                Class::HostedRetried,
+            ),
+            // What the client doesn't send again is worth a page try, as are
+            // a 408 and a connection lost, which it sends again since Koharu
+            // 0.95.0, as the run policy has it.
             (report(408).into(), Class::Retryable),
             (report(400).into(), Class::Retryable),
             (

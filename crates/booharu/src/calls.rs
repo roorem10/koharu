@@ -13,9 +13,13 @@
 //!
 //! The schema sent is Koharu's style, every property required, with no
 //! numeric bounds, no `oneOf` and no nullable types, so rig's strict rewrite
-//! leaves it as it is. An answer is read strictly by a second schema with
-//! the bounds ([`parse`]): it must be a JSON object that fits it and reads
-//! as the answer's type; nothing is repaired.
+//! leaves it as it is. Since Koharu 0.95.0 rig checks an answer against it
+//! and asks once more for one that misses it, and an answer its token limit
+//! cut off fails in the words Koharu's translator gives it ([`cut_off`]).
+//! An answer is then read by a second schema with the bounds ([`parse`]),
+//! found as rig and Koharu's translator find it, the whole text or the JSON
+//! in a code fence or in prose: it must be a JSON object that fits it and
+//! reads as the answer's type; nothing is repaired.
 
 use std::{
     future::{Future, IntoFuture as _},
@@ -26,15 +30,19 @@ use std::{
 use anyhow::{Context as _, Result, bail, ensure};
 use base64::Engine as _;
 use image::{DynamicImage, codecs::jpeg::JpegEncoder};
-use koharu_llm::rig::{
-    catalog::ModelSpec,
-    completion::{
-        Message,
-        message::{DocumentSourceKind, Image, ImageMediaType, UserContent},
+use koharu_llm::{
+    PromptError,
+    rig::{
+        catalog::ModelSpec,
+        completion::{
+            Message,
+            message::{DocumentSourceKind, Image, ImageMediaType, UserContent},
+        },
+        driver::DynModel,
+        operation::Completion,
+        structured_output::json_in_text,
+        tool::validate::validate,
     },
-    driver::DynModel,
-    operation::Completion,
-    tool::validate::validate,
 };
 use koharu_pipeline::Pipeline;
 use koharu_scene::{PageId, Session};
@@ -154,12 +162,24 @@ pub async fn ask(
         builder = builder.max_tokens(tokens);
     }
     let request = builder.build().prompt(Message::from(content));
+    let answered = async { request.into_future().await.map_err(cut_off) };
     tokio::select! {
         biased;
         () = stops.wait() => Ok(None),
-        response = within(ANSWER_LIMIT, hosted(spec), request.into_future()) => {
+        response = within(ANSWER_LIMIT, hosted(spec), answered) => {
             Ok(Some(response?.output()))
         }
+    }
+}
+
+/// `error`, a question's, as Koharu's translator words it: an answer the
+/// model's token limit cut off, which rig words as a cancelled run, as the
+/// reason Koharu's `answers` stopped it for, never a cancel; any other as it
+/// is.
+fn cut_off(error: PromptError) -> anyhow::Error {
+    match error {
+        PromptError::Cancelled { reason, .. } => anyhow::anyhow!(reason),
+        error => error.into(),
     }
 }
 
@@ -188,9 +208,11 @@ pub fn reads_images(model: &DynModel<Completion>) -> bool {
 }
 
 /// `answer` as `T`: a JSON object that fits `check`, the schema with its
-/// bounds, and reads as `T`. Nothing is repaired.
+/// bounds, and reads as `T`, found as rig checks an answer and Koharu's
+/// translator reads one, the whole text, else the JSON value at its first
+/// `{` or `[`, as in a code fence or in prose. Nothing is repaired.
 pub fn parse<T: DeserializeOwned>(answer: &str, check: &Value) -> Result<T> {
-    let value: Value = serde_json::from_str(answer).context("the answer isn't JSON")?;
+    let value: Value = json_in_text(answer).context("the answer isn't JSON")?;
     ensure!(value.is_object(), "the answer isn't a JSON object");
     if let Err(problems) = validate(check, &value) {
         let mut named: Vec<String> = problems
@@ -293,12 +315,17 @@ mod tests {
                 sure: 0.5
             }
         );
+        // Found as rig and Koharu's translator find it, in a code fence or
+        // in prose.
+        for wrapped in [
+            "```json\n{\"text\": \"Hi\", \"sure\": 0.5}\n```",
+            "Here it is: {\"text\": \"Hi\", \"sure\": 0.5} as asked.",
+        ] {
+            assert_eq!(parse::<Answer>(wrapped, &check()).expect(wrapped), read);
+        }
         let refused = [
             ("{\"text\": \"Hi\"", "isn't JSON"),
-            (
-                "```json\n{\"text\": \"Hi\", \"sure\": 0.5}\n```",
-                "isn't JSON",
-            ),
+            ("no answer", "isn't JSON"),
             ("[1]", "isn't a JSON object"),
             (r#"{"text": "Hi"}"#, "/sure: missing"),
             (r#"{"text": "Hi", "sure": 0.5, "more": 1}"#, "doesn't fit"),
@@ -309,6 +336,23 @@ mod tests {
             let error = parse::<Answer>(answer, &check()).expect_err(answer);
             assert!(format!("{error:#}").contains(why), "{answer}: {error:#}");
         }
+    }
+
+    #[test]
+    fn an_answer_cut_off_fails_in_koharus_words_and_another_error_as_it_is() {
+        let cut = PromptError::cancelled(Vec::new(), "the answer reached the model's token limit");
+        assert_eq!(
+            cut_off(cut).to_string(),
+            "the answer reached the model's token limit"
+        );
+        let turns = PromptError::MaxTurns {
+            max_turns: 2,
+            chat_history: Vec::new(),
+            prompt: Message::user("Hi"),
+        };
+        let error = cut_off(turns);
+        assert!(error.is::<PromptError>());
+        assert_eq!(error.to_string(), "reached the max turns limit of 2");
     }
 
     #[test]
