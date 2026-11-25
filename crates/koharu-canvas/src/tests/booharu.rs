@@ -5,10 +5,11 @@
 //! steps, the selected text the type bar quotes and the empty line a line
 //! break typed at the end starts, a right-click's box menu, a box styled
 //! before it's translated, which the canvas types into, outlines, resizes,
-//! moves and turns as a block with none, and the brush's feel, Draw's
-//! opacity and the soft strokes below a hardness of 1, on the canvas's
-//! harness. The brush's tests ask for no GPU (`gpu_free`), so they run
-//! without one, but for a soft stroke's preview, which is drawn.
+//! moves and turns as a block with none, the brush's feel, Draw's opacity
+//! and the soft strokes below a hardness of 1, and Show original on a
+//! levelled page, on the canvas's harness. The brush's tests ask for no GPU
+//! (`gpu_free`), so they run without one, but for a soft stroke's preview,
+//! which is drawn, as are Show original's pixels.
 
 use std::collections::BTreeMap;
 
@@ -2272,4 +2273,79 @@ fn a_soft_strokes_preview_shows_its_tinted_coverage_across_its_tiles() {
         }
     }
     assert!(compared > 2000, "{compared}");
+}
+
+/// A 200×200 levelled page: its scan levelled to blue, with the scan as it
+/// came in, green, kept in a hidden, locked Original scan as page levels
+/// adds it, and a red square over both. It asks for no GPU (`gpu_free`).
+fn levelled() -> Fixture {
+    let png = |color: [u8; 3]| {
+        let mut bytes = Vec::new();
+        RgbImage::from_pixel(200, 200, Rgb(color))
+            .write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png)
+            .expect("a PNG");
+        bytes
+    };
+    let (scan, original) = (png([0, 0, 255]), png([0, 255, 0]));
+    let (scan_file, original_file) = (Hash::of(&scan), Hash::of(&original));
+    gpu_free(
+        (200, 200),
+        vec![
+            json!({"op": "add_file", "bytes": scan}),
+            json!({"op": "add_file", "bytes": original}),
+            json!({"op": "set_background", "page": "$page",
+                "background": {"file": scan_file, "visible": true}}),
+            json!({"op": "add_layer", "page": "$page", "index": 0, "layer": {
+                "kind": "image", "file": original_file, "name": "Original scan",
+                "visible": false, "locked": true,
+                "attributes": {"booharu": {"original_scan": true}},
+            }}),
+            json!({"op": "add_layer", "page": "$page", "index": 1, "layer": {
+                "kind": "shape", "path": "M50 50 H100 V100 H50 Z", "fill": [1.0, 0.0, 0.0, 1.0],
+            }}),
+        ],
+    )
+}
+
+/// The layer Show original draws in place of `fixture`'s background, as its
+/// page stands now; none for Koharu's background.
+fn shown_original(fixture: &Fixture) -> Option<LayerId> {
+    let session = fixture.session.lock();
+    let frame = fixture
+        .renderer
+        .render(&session, fixture.page)
+        .expect("a frame");
+    let snapshot = crate::Snapshot::new(frame, &session).expect("the page");
+    crate::booharu::original_scan(&snapshot).and_then(|drawn| drawn.layer())
+}
+
+/// Show original draws a levelled page's scan as it came in, its hidden,
+/// locked Original scan, in place of the levelled background, and leaves
+/// the page as it was; a page with none shows its background, as Koharu's
+/// does.
+#[test]
+fn show_original_draws_a_levelled_pages_original_scan() {
+    let mut fixture = levelled();
+    let original = {
+        let session = fixture.session.lock();
+        let project = session.project();
+        let page = project.page(fixture.page).expect("the page");
+        booharu_core::cleanup::original_scan(page).map(|(layer, _)| layer)
+    };
+    assert!(original.is_some());
+    assert_eq!(shown_original(&fixture), original);
+    assert_eq!(shown_original(&gpu_free((200, 200), red_square())), None);
+
+    if Gpu::get().is_err() {
+        eprintln!("the drawing skipped without a GPU");
+        return;
+    }
+    let (red, green, blue) = ([255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255]);
+    for (shown, square, corner) in [(false, red, blue), (true, green, green), (false, red, blue)] {
+        fixture.canvas.set_original(shown);
+        assert!(fixture.canvas.draw().expect("a draw").is_some());
+        let snapshot = fixture.canvas.snapshot().expect("pixels");
+        assert_eq!(snapshot.get_pixel(75, 75).0, square, "shown: {shown}");
+        assert_eq!(snapshot.get_pixel(25, 25).0, corner, "shown: {shown}");
+    }
 }

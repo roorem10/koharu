@@ -1123,6 +1123,10 @@ impl Canvas {
             .and_then(Typing::target)
             .map(|layer| snapshot.frame().without(&[layer]));
         let scan = snapshot.frame().background().filter(|_| self.original);
+        // Booharu: a levelled page's scan as it came in, its Original scan (D37).
+        let scan = crate::booharu::original_scan(snapshot)
+            .filter(|_| self.original)
+            .or(scan);
         let scan = scan.map(|scan| scan.cropped());
         let under = self
             .gesture
