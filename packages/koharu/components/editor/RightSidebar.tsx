@@ -10,6 +10,7 @@ import { TabTooltip } from '@/components/booharu/sidebar/TabTooltip' // Booharu:
 import { AgentPanel } from '@/components/editor/AgentPanel'
 import { LayersPanel } from '@/components/editor/LayersPanel'
 import { StoryPanel } from '@/components/editor/StoryPanel'
+import { inDialog } from '@/lib/booharu/keys' // Booharu: its key rules on Koharu's hotkeys.
 import { useQcOpenCount } from '@/lib/booharu/qc' // Booharu: the QC tab shows while it lists a finding.
 import { useSidebarTabsFit } from '@/lib/booharu/sidebarTabs' // Booharu: five tabs in a narrow pane.
 import { shortcutLabel, shortcuts } from '@/lib/shortcuts'
@@ -31,6 +32,9 @@ export function RightSidebar() {
     preventDefault: true,
     useKey: true,
     enableOnFormTags: true,
+    // Booharu: a key pressed in a dialog, a menu or an open list stays its own, as every other
+    // shortcut leaves it, so F7 there switches no tab behind it.
+    ignoreEventWhen: (event) => inDialog(event.target),
   })
   const findings = useQcOpenCount() // Booharu: the QC tab's count of open findings.
   const fit = useSidebarTabsFit() // Booharu: the tabs give way as they stop fitting whole.

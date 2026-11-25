@@ -1,11 +1,12 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { RightSidebar } from '@/components/editor/RightSidebar'
 import { measureTabRow, tabsFit, type TabRow, useSidebarTabsFit } from '@/lib/booharu/sidebarTabs'
 import { queryClient } from '@/lib/queries'
+import { useKoharuStore } from '@/lib/store'
 import { TooltipProvider } from '@koharu/ui/components/tooltip'
 
 import { listenToEvents, qcDesktop, settle } from './qc'
@@ -347,6 +348,41 @@ describe('Booharu right pane tabs', () => {
     expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true')
     await user.hover(screen.getByRole('tab', { name: 'Layers' }))
     await waitFor(() => expect(tooltip()).toHaveTextContent(/^LayersF7$/))
+  })
+
+  it('shows Layers with F7 from Context, Agent or QC, as Koharu shows it from Story', () => {
+    pane(270)
+    for (const from of ['context', 'agent', 'qc', 'story'] as const) {
+      act(() => useKoharuStore.getState().showPanel(from))
+      fireEvent.keyDown(document.body, { key: 'F7', code: 'F7' })
+      expect(useKoharuStore.getState().panel, from).toBe('layers')
+    }
+  })
+
+  it('switches with F7 from a text field, typing nothing there, as Koharu chose', () => {
+    pane(270)
+    const field = document.createElement('textarea')
+    document.body.append(field)
+    field.focus()
+    // Prevented: the field takes no key.
+    expect(fireEvent.keyDown(field, { key: 'F7', code: 'F7' })).toBe(false)
+    expect(useKoharuStore.getState().panel).toBe('story')
+    field.remove()
+  })
+
+  it('leaves F7 to a dialog, a menu or an open list, switching no tab behind it', () => {
+    pane(270)
+    for (const role of ['dialog', 'alertdialog', 'menu', 'listbox']) {
+      const popup = document.createElement('div')
+      popup.setAttribute('role', role)
+      const inside = document.createElement(role === 'dialog' ? 'textarea' : 'button')
+      popup.append(inside)
+      document.body.append(popup)
+      inside.focus()
+      expect(fireEvent.keyDown(inside, { key: 'F7', code: 'F7' }), role).toBe(true)
+      expect(useKoharuStore.getState().panel, role).toBe('layers')
+      popup.remove()
+    }
   })
 
   it('fits the tabs whole while the row isn’t laid out', () => {
