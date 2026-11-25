@@ -372,7 +372,7 @@ function StoryText({
                 disabled={locked}
                 className={`${field} border-primary/25`}
                 value={plainText(layer.translation)}
-                // Booharu: a block's first translation goes in its frame, not the page's corner (#128).
+                // Booharu: a first translation gets the default look, language and clean-up shown.
                 onCommit={(text) => commitTranslation(layer, text)}
                 {...words} // Booharu: choosing words to style.
               />

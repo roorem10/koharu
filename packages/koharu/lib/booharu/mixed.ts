@@ -97,8 +97,9 @@ const BORDER_DEFAULTS: CharStyle = {
 
 /** What a border edit adds to `layer`'s own patch, `key` being the colour or the width that goes
  * with the value set: the type bar's default where the layer's characters have none, no colour or
- * no width, as a block with no translation yet, and nothing where they share one of their own, or
- * differ, so each keeps its own. */
+ * no width, as a block with no translation yet may not, its first translation starting as its
+ * source's blank (Koharu's #1494), and nothing where they share one of their own, or differ, so
+ * each keeps its own. */
 export function borderCompanion(layer: Layer, key: BorderKey): CharStyle {
   const text = letteringOf(layer)
   const own = text ? charShare(text, key) : { mixed: false as const, value: undefined }

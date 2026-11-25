@@ -37,17 +37,17 @@ function block(id: string, source: string, translation?: string | Text): Layer {
   }
 }
 
-/** What the type bar leaves on a block styled before it's translated: Koharu's default text, blank
- * point text, with the style merged in. */
+const bounds = { x: 0, y: 0, width: 120, height: 60 }
+
+/** What the type bar leaves on a block styled before it's translated: its source's blank, in its
+ * source's frame (Koharu's #1494), with the style merged in. */
 const placeholder: Text = {
   content: [],
   style: { chars: { size: 30 } },
-  frame: 'point',
+  frame: { box: { bounds } },
   direction: 'horizontal',
   language: 'und',
 }
-
-const bounds = { x: 0, y: 0, width: 120, height: 60 }
 
 const page: Page = {
   id: 'page',
@@ -57,7 +57,7 @@ const page: Page = {
     block('empty', ''),
     block('translated', 'こんにちは', 'Hello'),
     block('styled', 'やあ', placeholder),
-    // Translated, then its text cleared in Story: blank, but in the block's frame.
+    // Translated, then its text cleared in Story: blank in its frame, as a placeholder is.
     block('cleared', 'またね', { content: [], frame: { box: { bounds } } }),
   ],
 }
@@ -104,25 +104,25 @@ function story() {
 }
 
 describe('Booharu placeholder translation (P-d)', () => {
-  it('is blank point text, and not no translation, text, or a blank box or path', () => {
+  it('is blank text in whatever frame its source gave it, and not no translation or text', () => {
     expect(isPlaceholder(undefined)).toBe(false)
     expect(isPlaceholder(null)).toBe(false)
     expect(isPlaceholder(placeholder)).toBe(true)
-    // With no frame, as the desktop reads it: point text.
+    // A frame tells nothing since the scene starts it in its source's (#1494): point, path or none.
+    expect(isPlaceholder({ ...placeholder, frame: 'point' })).toBe(true)
+    expect(isPlaceholder({ content: [], frame: { path: { path: 'M0 0 L9 0 L9 9 Z' } } })).toBe(true)
     expect(isPlaceholder({})).toBe(true)
-    // Whitespace as the desktop trims it, NEL among it, which JavaScript's trim keeps.
+    // Whitespace as the desktop trims it, NEL among it, which JavaScript's trim keeps, and
+    // U+FEFF not, which JavaScript's trim takes.
     const blank = [{ insert: ' \n' }, { insert: '\u3000\u0085' }]
     expect(isPlaceholder({ ...placeholder, content: blank })).toBe(true)
+    expect(isPlaceholder({ ...placeholder, content: [{ insert: '\uFEFF' }] })).toBe(false)
     expect(isPlaceholder({ ...placeholder, content: [{ insert: ' Hi ' }] })).toBe(false)
-    expect(isPlaceholder({ content: blank, frame: { box: { bounds } } })).toBe(false)
-    expect(isPlaceholder({ content: [], frame: { path: { path: 'M0 0 L9 0 L9 9 Z' } } })).toBe(
-      false,
-    )
   })
 })
 
-describe('Booharu typed translation (#128)', () => {
-  it('sends the text to the desktop command that places it', async () => {
+describe('Booharu typed translation', () => {
+  it('sends the text to the desktop command that writes a first translation', async () => {
     const { typed } = desktop()
 
     await expect(setTranslation('empty', 'Hi')).resolves.toBe(change)
@@ -150,7 +150,7 @@ describe('Booharu typed translation (#128)', () => {
     ])
   })
 
-  it('places the text typed into a block styled before it was translated, and retypes a cleared one (P-d)', async () => {
+  it('writes the first translation typed into a block styled before it was translated, and leaves a cleared one to the desktop (P-d)', async () => {
     const { edits, typed } = desktop()
     story()
     const user = userEvent.setup()
@@ -163,12 +163,12 @@ describe('Booharu typed translation (#128)', () => {
     expect(typed).toHaveBeenCalledWith('styled', 'Hi')
     expect(edits).toEqual([])
 
-    // Blank text in the block's frame is a translation, retyped where it is.
+    // Only the block's record tells a run's translation emptied by hand from a placeholder, so the
+    // desktop takes it too, and retypes it where it is when a run wrote it.
     await user.type(cleared, 'Bye')
     await user.tab()
-    expect(typed).toHaveBeenCalledTimes(1)
-    expect(edits).toEqual([
-      { label: 'set_text', ops: [{ op: 'set_text', layer: 'cleared', text: 'Bye' }] },
-    ])
+    expect(typed).toHaveBeenCalledTimes(2)
+    expect(typed).toHaveBeenLastCalledWith('cleared', 'Bye')
+    expect(edits).toEqual([])
   })
 })
