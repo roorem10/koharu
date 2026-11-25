@@ -82,8 +82,10 @@ pub fn run(context: tauri::Context<CefRuntime>) -> Result<()> {
             // The macOS keychain item holding the cookies' key. Every Chromium
             // app shares the default one, and macOS asks for the user's
             // password when another app made it.
-            settings.keychain_service_name = "Koharu Safe Storage".into();
-            settings.keychain_account_name = "Koharu".into();
+            // Booharu: its own item, so Booharu and an installed Koharu never
+            // share it, as they never share the secrets' credential.
+            settings.keychain_service_name = "Booharu Safe Storage".into();
+            settings.keychain_account_name = "Booharu".into();
         })
         .on_window_event({
             let app = Arc::clone(&app);

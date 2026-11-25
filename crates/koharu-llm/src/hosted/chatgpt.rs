@@ -52,7 +52,8 @@ impl TokenStore for Secrets {
 }
 
 fn authenticator(device_code: DeviceCodeHandler) -> Authenticator {
-    Authenticator::new(AuthSource::OAuth, Secrets, device_code, true).with_app_name("Koharu")
+    // Booharu: its sign-in pages tell the user to return to Booharu.
+    Authenticator::new(AuthSource::OAuth, Secrets, device_code, true).with_app_name("Booharu")
 }
 
 /// Signs in with the user's ChatGPT plan in the system browser, or with a
