@@ -98,7 +98,7 @@ pub(crate) async fn detect(task: &Task, config: &PipelineConfig) -> anyhow::Resu
         .apply(Stage::Detect, move |session| {
             let project = session.project();
             let ops = ops(&project, page, &layout, &typography, masks, &name)?;
-            Ok(detecting.detected(&project, ops)) // Booharu: none over what stays (D2).
+            Ok(detecting.detected(&project, &layout, ops)) // Booharu: none over what stays (D2).
         })
         .await?;
     left.told(); // Booharu: what Detect again kept, once the edit is in.
@@ -107,7 +107,8 @@ pub(crate) async fn detect(task: &Task, config: &PipelineConfig) -> anyhow::Resu
 
 /// The ops putting the layout's parts in place of the page's, but the blocks
 /// kept, whose lettering takes no second one.
-fn ops(
+// Booharu: crate-wide, for the tests of Booharu's hooks.
+pub(crate) fn ops(
     project: &Project,
     page: PageId,
     layout: &Layout,

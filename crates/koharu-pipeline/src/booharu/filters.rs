@@ -36,7 +36,9 @@ use booharu_core::{
     sfx, status,
 };
 use icu_locale_core::LanguageIdentifier;
+use koharu_ml::koharu_layout_highres::Layout;
 use koharu_scene::{Block, Content, Layer, LayerId, Op, Page, PageId, Project, Ref, Session};
+use kurbo::Shape as _;
 use parking_lot::Mutex;
 use tokio_util::sync::CancellationToken;
 
@@ -430,14 +432,15 @@ impl Writing {
     /// made them, but for each new block whose source lies over a block that
     /// stays, one locked or kept (`protect::keeps`), by at least half the
     /// smaller of their areas, with its mask, and each new panel or balloon
-    /// that held nothing else, up to the top; the rest numbered again within
-    /// each parent from 0 (D2), but the page's own from
+    /// that held nothing else, up to the top, one `lettered` says held a
+    /// lettering Koharu's tree left out among them; the rest numbered again
+    /// within each parent from 0 (D2), but the page's own from
     /// `booharu_core::cleanup::detect_start` of the layers this Detect's
     /// removals leave, as they stand once they're made ([`standing`]), so
     /// the new layers go above the Original scan and the results that stay
     /// under the page's lettering, and never cover them (D17, D37). Each
     /// block that stays is counted, as locked or as kept by hand.
-    pub(crate) fn added(&self, page: &Page, additions: Vec<Op>) -> Vec<Op> {
+    pub(crate) fn added(&self, page: &Page, lettered: &Lettered, additions: Vec<Op>) -> Vec<Op> {
         let mut staying = Vec::new();
         for (layer, block, locked) in status::blocks(page) {
             let reason = match locked {
@@ -455,22 +458,81 @@ impl Writing {
             .map(|layer| standing(page, layer))
             .collect();
         let start = booharu_core::cleanup::detect_start(&remaining.iter().collect::<Vec<_>>());
-        unrepeated(additions, &staying, start)
+        unrepeated(additions, &staying, lettered, start)
     }
 
     /// Koharu's Detect ops for the page, `ops`, made of `project` as the
-    /// write finds it, its removals and then its additions: the removals as
-    /// they are, and the additions through [`Self::added`] (D2), so the
-    /// stage's own `ops()` stays Koharu's.
-    pub(crate) fn detected(&self, project: &Project, ops: Vec<Op>) -> Vec<Op> {
+    /// write finds it and of `layout`, its removals and then its additions:
+    /// the removals as they are, and the additions through [`Self::added`]
+    /// (D2), with the panels and balloons `layout` reads a lettering in, so
+    /// the stage's own `ops()` stays Koharu's.
+    pub(crate) fn detected(&self, project: &Project, layout: &Layout, ops: Vec<Op>) -> Vec<Op> {
         let Ok(page) = project.page(self.member.page) else {
             return ops;
         };
         let (mut removals, additions): (Vec<Op>, Vec<Op>) = ops
             .into_iter()
             .partition(|op| matches!(op, Op::RemoveLayer { .. }));
-        removals.extend(self.added(page, additions));
+        removals.extend(self.added(page, &Lettered::of(layout), additions));
         removals
+    }
+}
+
+/// The panels and balloons Koharu's layout reads a lettering in, each by the
+/// outline Koharu's Detection stage writes for it (`detect/layers.rs`): a
+/// balloon's own, a panel's box. A lettering is its balloon's, else its
+/// panel's, as Koharu's tree places it (`detect/tree.rs`), which leaves out
+/// one a locked block holds (#1503) but adds its balloon and panel all the
+/// same, holding nothing then: so D2 drops such a one as a panel or balloon
+/// that held only blocks over what stays, as it did while Koharu added them.
+#[derive(Default)]
+pub(crate) struct Lettered(HashSet<Holder>);
+
+/// A panel or a balloon, by its outline.
+#[derive(PartialEq, Eq, Hash)]
+enum Holder {
+    Panel(String),
+    Balloon(String),
+}
+
+impl Holder {
+    /// What `content` is, a panel or a balloon, by its outline.
+    fn of(content: &Content) -> Option<Self> {
+        match content {
+            Content::Panel(panel) => Some(Self::Panel(panel.outline.as_str().to_owned())),
+            Content::Balloon(balloon) => Some(Self::Balloon(balloon.outline.as_str().to_owned())),
+            _ => None,
+        }
+    }
+}
+
+impl Lettered {
+    pub(crate) fn of(layout: &Layout) -> Self {
+        let panel = |at: usize| {
+            layout.panels.get(at).map(|panel| {
+                let [x0, y0, x1, y1] = panel.bbox.map(f64::from);
+                Holder::Panel(kurbo::Rect::new(x0, y0, x1, y1).to_path(0.0).to_svg())
+            })
+        };
+        Self(
+            layout
+                .lettering
+                .iter()
+                .filter_map(|lettering| match lettering.bubble {
+                    Some(bubble) => layout
+                        .bubbles
+                        .get(bubble)
+                        .map(|bubble| Holder::Balloon(bubble.outline.to_svg())),
+                    None => lettering.panel.and_then(panel),
+                })
+                .collect(),
+        )
+    }
+
+    /// Whether `content` is a panel or a balloon the layout reads a
+    /// lettering in.
+    fn holds(&self, content: &Content) -> bool {
+        Holder::of(content).is_some_and(|holder| self.0.contains(&holder))
     }
 }
 
@@ -534,6 +596,8 @@ struct New {
     label: String,
     parent: Option<String>,
     container: bool,
+    /// Whether it's a panel or a balloon the layout reads a lettering in.
+    lettered: bool,
     children: usize,
     held: usize,
     dropped: bool,
@@ -541,10 +605,16 @@ struct New {
 
 /// `additions` but for each new block whose source lies over one of
 /// `staying` by at least half the smaller of their areas, with its parts'
-/// pixels, and each new panel or balloon whose layers were all dropped, up
-/// to the top; the rest numbered again within each parent from 0, in order,
+/// pixels, and each new panel or balloon that held something, a new layer
+/// or a lettering of the layout (`lettered`), and keeps no new layer, up to
+/// the top; the rest numbered again within each parent from 0, in order,
 /// but the page's own top level from `start`.
-fn unrepeated(additions: Vec<Op>, staying: &[kurbo::Rect], start: usize) -> Vec<Op> {
+fn unrepeated(
+    additions: Vec<Op>,
+    staying: &[kurbo::Rect],
+    lettered: &Lettered,
+    start: usize,
+) -> Vec<Op> {
     let mut new: Vec<New> = additions
         .iter()
         .filter_map(|op| {
@@ -568,6 +638,7 @@ fn unrepeated(additions: Vec<Op>, staying: &[kurbo::Rect], start: usize) -> Vec<
                 label: id.label()?.to_owned(),
                 parent: parent.as_ref().and_then(Ref::label).map(str::to_owned),
                 container: matches!(layer.content, Content::Panel(_) | Content::Balloon(_)),
+                lettered: lettered.holds(&layer.content),
                 children: 0,
                 held: 0,
                 dropped: repeats,
@@ -583,7 +654,7 @@ fn unrepeated(additions: Vec<Op>, staying: &[kurbo::Rect], start: usize) -> Vec<
     // before its parent.
     for index in (0..new.len()).rev() {
         let layer = &mut new[index];
-        if layer.container && layer.children > 0 && layer.held == 0 {
+        if layer.container && (layer.children > 0 || layer.lettered) && layer.held == 0 {
             layer.dropped = true;
         }
         let held = usize::from(!layer.dropped);
@@ -685,6 +756,7 @@ mod tests {
     };
     use icu_locale_core::langid;
     use image::{ImageFormat, Rgb, RgbImage};
+    use koharu_ml::koharu_layout_highres as model;
     use koharu_scene::{Block, Created, Edit, Hash, RichText, Session, Span};
     use parking_lot::RwLock;
     use petgraph::stable_graph::NodeIndex;
@@ -694,7 +766,7 @@ mod tests {
     use crate::{
         Outcome, Target,
         scheduler::{Command, Plan, Run, Scheduler},
-        stages::detect::removals,
+        stages::detect::{ops as koharu_ops, removals},
     };
 
     /// The source wording of every block.
@@ -1925,7 +1997,9 @@ mod tests {
         let events = Events::new();
         let left = Left::of(Stage::Detect, Snapshot::default(), events.clone());
         let page = fixture.page()?;
-        let added = left.writing(&fixture.member(None)).added(&page, additions);
+        let added =
+            left.writing(&fixture.member(None))
+                .added(&page, &Lettered::default(), additions);
         let own = |label: &str| label.to_owned();
         assert_eq!(
             shape(&added),
@@ -1958,48 +2032,230 @@ mod tests {
         Ok(())
     }
 
-    /// Koharu's Detect ops, its removals then its additions, go through
-    /// `detected` as those removals, unchanged, and the additions `added`
-    /// leaves (D2).
+    /// A lettering Koharu's layout finds in the 20 by 40 box at `x`, `y`,
+    /// read in its balloon `bubble`, else in its panel `panel`.
+    fn found_again(
+        (x, y): (f32, f32),
+        bubble: Option<usize>,
+        panel: Option<usize>,
+    ) -> model::Lettering {
+        model::Lettering {
+            kind: model::Kind::Text,
+            score: 0.9,
+            bbox: [x, y, x + 20.0, y + 40.0],
+            mask: nothing_found(),
+            bubble,
+            panel,
+            room: None,
+        }
+    }
+
+    /// No pixels: Koharu's own tests' detections hold none.
+    fn nothing_found() -> model::Mask {
+        model::Mask {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+            pixels: Vec::new(),
+        }
+    }
+
+    /// A lettering's grown mask over the 20 by 40 box at `x`, `y`, as
+    /// Koharu's Detection stage hands its ops one.
+    fn grown((x, y): (i32, i32)) -> Option<(koharu_scene::Rect, Vec<u8>)> {
+        let rect = koharu_scene::Rect {
+            x,
+            y,
+            width: 20,
+            height: 40,
+        };
+        Some((rect, vec![255; 20 * 40]))
+    }
+
+    /// The page's layer tree: a fixture's layer by its label, a new one as
+    /// `+` and its kind, each with what it holds in brackets.
+    fn tree(fixture: &Fixture, layers: &[Layer]) -> String {
+        layers
+            .iter()
+            .map(|layer| {
+                let name = match fixture.ids.values().any(|id| *id == layer.id) {
+                    true => fixture.label(layer.id),
+                    false => match layer.content {
+                        Content::Panel(_) => "+panel".to_owned(),
+                        Content::Balloon(_) => "+balloon".to_owned(),
+                        Content::Block(_) => "+block".to_owned(),
+                        _ => "+layer".to_owned(),
+                    },
+                };
+                match layer.children.is_empty() {
+                    true => name,
+                    false => format!("{name}({})", tree(fixture, &layer.children)),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// Koharu's Detect ops go through `detected` with their removals
+    /// unchanged, and only the additions D2 leaves: Koharu's tree leaves out
+    /// the lettering a locked block holds (#1503), and Booharu the block
+    /// over one corrected by hand, which Koharu adds.
     #[test]
     fn koharus_detect_ops_keep_their_removals_and_lose_what_lies_over_a_kept_block() -> Result<()> {
         let fixture = Fixture::new(
             false,
             vec![
                 add("locked", None, 0, block("text", (100.0, 10.0))),
-                add("plain", None, 1, block("text", (150.0, 10.0))),
+                add("corrected", None, 1, block("text", (10.0, 10.0))),
+                add("plain", None, 2, block("text", (150.0, 10.0))),
             ],
         )?;
         fixture.lock("locked")?;
-        let at = fixture.page;
-        // Made once, as each new block's mask and clean-up get new ids.
-        let additions = vec![
-            // Over the locked block.
-            found(at, "d0", None, 0, lettering((100.0, 10.0)))?,
-            found_mask("d0", (100, 10))?,
-            // Over the untouched block, which goes.
-            found(at, "d1", None, 1, lettering((150.0, 10.0)))?,
-            found_mask("d1", (150, 10))?,
-        ];
-        let page = fixture.page()?;
-        let mut removed = Vec::new();
-        removals(&page, &page.layers, &mut removed);
-        assert_eq!(removed.len(), 1);
-        let left = Left::of(Stage::Detect, Snapshot::default(), Events::new());
-        let writing = left.writing(&fixture.member(None));
-        let mut koharu = removed.clone();
-        koharu.extend(additions.clone());
-        let detected = writing.detected(&fixture.project(), koharu);
-        let mut expected = removed;
-        expected.extend(writing.added(&page, additions));
+        fixture.correct("corrected")?;
+        // Each found again where it was, on no panel or balloon.
+        let layout = Layout {
+            width: SIDE,
+            height: SIDE,
+            lettering: vec![
+                found_again((100.0, 10.0), None, None),
+                found_again((10.0, 10.0), None, None),
+                found_again((150.0, 10.0), None, None),
+            ],
+            bubbles: Vec::new(),
+            panels: Vec::new(),
+        };
+        let project = fixture.project();
+        let masks = vec![grown((100, 10)), grown((10, 10)), grown((150, 10))];
+        let koharu = koharu_ops(&project, fixture.page, &layout, &[None; 3], masks, "test")?;
+        let removed = |ops: &[Op]| -> Result<Vec<Value>> {
+            ops.iter()
+                .filter(|op| matches!(op, Op::RemoveLayer { .. }))
+                .map(|op| Ok(serde_json::to_value(op)?))
+                .collect()
+        };
+        let removing = removed(&koharu)?;
+        // The untouched block goes.
         assert_eq!(
-            serde_json::to_value(&detected)?,
-            serde_json::to_value(&expected)?
+            removing,
+            [json!({"op": "remove_layer", "layer": fixture.id("plain")})]
         );
+        // Koharu adds the corrected block's lettering again, as `$d0`, and
+        // the untouched one's, as `$d1`, but none for the locked block.
         let own = |label: &str| label.to_owned();
+        assert_eq!(
+            shape(&koharu),
+            (
+                vec![(own("d0"), None, 0), (own("d1"), None, 1)],
+                vec![own("d0.mask"), own("d1.mask")],
+            )
+        );
+        let left = Left::of(Stage::Detect, Snapshot::default(), Events::new());
+        let detected = left
+            .writing(&fixture.member(None))
+            .detected(&project, &layout, koharu);
+        assert_eq!(removed(&detected)?, removing);
         assert_eq!(
             shape(&detected),
             (vec![(own("d1"), None, 0)], vec![own("d1.mask")])
+        );
+        Ok(())
+    }
+
+    /// Detect again, through Koharu's own ops, on a page whose balloon, in a
+    /// panel, holds only a locked block, and whose second panel holds only
+    /// another, all found again where they were: Koharu's tree leaves out
+    /// the letterings the locked blocks hold (#1503) but adds their balloon
+    /// and panels, holding nothing then, and D2 drops them as panels and
+    /// balloons that held only blocks over what stays, so none lies over the
+    /// ones that stay a second time; a new block's panel, and a balloon
+    /// found empty, come in as found.
+    #[test]
+    fn detect_again_adds_no_second_balloon_or_panel_round_a_locked_block() -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add(
+                    "panel",
+                    None,
+                    0,
+                    detected("panel", "M0 0 L100 0 L100 100 L0 100 Z"),
+                ),
+                add(
+                    "balloon",
+                    Some("panel"),
+                    0,
+                    detected("balloon", "M5 5 L40 5 L40 60 L5 60 Z"),
+                ),
+                add("boxed", Some("balloon"), 0, block("text", (10.0, 10.0))),
+                add(
+                    "second",
+                    None,
+                    1,
+                    detected("panel", "M100 0 L200 0 L200 100 L100 100 Z"),
+                ),
+                add("free", Some("second"), 0, block("text", (110.0, 10.0))),
+                add(
+                    "third",
+                    None,
+                    2,
+                    detected("panel", "M0 100 L100 100 L100 200 L0 200 Z"),
+                ),
+                add("plain", Some("third"), 0, block("text", (10.0, 110.0))),
+            ],
+        )?;
+        fixture.lock("boxed")?;
+        fixture.lock("free")?;
+        let panel = |bbox| model::Panel {
+            score: 0.9,
+            bbox,
+            mask: nothing_found(),
+        };
+        let bubble = |bbox: [f32; 4], lettering, panel| {
+            let [x0, y0, x1, y1] = bbox.map(f64::from);
+            model::Bubble {
+                score: 0.9,
+                bbox,
+                mask: nothing_found(),
+                outline: kurbo::Rect::new(x0, y0, x1, y1).to_path(0.1),
+                lettering,
+                panel,
+            }
+        };
+        let layout = Layout {
+            width: SIDE,
+            height: SIDE,
+            // The locked blocks' and the untouched one's.
+            lettering: vec![
+                found_again((10.0, 10.0), Some(0), Some(0)),
+                found_again((110.0, 10.0), None, Some(1)),
+                found_again((10.0, 110.0), None, Some(2)),
+            ],
+            // The balloon round the first, and one found empty.
+            bubbles: vec![
+                bubble([5.0, 5.0, 40.0, 60.0], vec![0], Some(0)),
+                bubble([120.0, 120.0, 180.0, 180.0], Vec::new(), None),
+            ],
+            panels: vec![
+                panel([0.0, 0.0, 100.0, 100.0]),
+                panel([100.0, 0.0, 200.0, 100.0]),
+                panel([0.0, 100.0, 100.0, 200.0]),
+            ],
+        };
+        let project = fixture.project();
+        let masks = vec![grown((10, 10)), grown((110, 10)), grown((10, 110))];
+        let koharu = koharu_ops(&project, fixture.page, &layout, &[None; 3], masks, "test")?;
+        let events = Events::new();
+        let left = Left::of(Stage::Detect, Snapshot::default(), events.clone());
+        let detected = left
+            .writing(&fixture.member(None))
+            .detected(&project, &layout, koharu);
+        fixture.edit(detected)?;
+        left.told();
+        assert_eq!(skipped(&events.told()), [(Stage::Detect, 0, 0, 2, false)]);
+        assert_eq!(
+            tree(&fixture, &fixture.page()?.layers),
+            "+panel(+block) +balloon panel(balloon(boxed)) second(free)"
         );
         Ok(())
     }
@@ -2046,7 +2302,11 @@ mod tests {
         let page = fixture.page()?;
         let mut ops = Vec::new();
         removals(&page, &page.layers, &mut ops);
-        ops.extend(left.writing(&fixture.member(None)).added(&page, additions));
+        ops.extend(left.writing(&fixture.member(None)).added(
+            &page,
+            &Lettered::default(),
+            additions,
+        ));
         assert!(ops.is_empty(), "{ops:?}");
         left.told();
         assert_eq!(skipped(&events.told()), [(Stage::Detect, 0, 2, 1, false)]);
@@ -2091,7 +2351,9 @@ mod tests {
         let page = fixture.page()?;
         let mut ops = Vec::new();
         removals(&page, &page.layers, &mut ops);
-        let added = left.writing(&fixture.member(None)).added(&page, additions);
+        let added =
+            left.writing(&fixture.member(None))
+                .added(&page, &Lettered::default(), additions);
         // No new block over the one hidden by hand; the others are replaced.
         let own = |label: &str| label.to_owned();
         assert_eq!(
@@ -2146,7 +2408,9 @@ mod tests {
         let page = fixture.page()?;
         let mut ops = Vec::new();
         removals(&page, &page.layers, &mut ops);
-        let added = left.writing(&fixture.member(None)).added(&page, additions);
+        let added =
+            left.writing(&fixture.member(None))
+                .added(&page, &Lettered::default(), additions);
         // No new block over the one shown by hand; the other is replaced.
         let own = |label: &str| label.to_owned();
         assert_eq!(
@@ -2211,7 +2475,11 @@ mod tests {
             let page = fixture.page()?;
             let mut ops = Vec::new();
             removals(&page, &page.layers, &mut ops);
-            ops.extend(left.writing(&fixture.member(None)).added(&page, merged()?));
+            ops.extend(left.writing(&fixture.member(None)).added(
+                &page,
+                &Lettered::default(),
+                merged()?,
+            ));
             assert!(ops.is_empty(), "{ops:?}");
             left.told();
             assert_eq!(skipped(&events.told()), [(Stage::Detect, 0, 2, 0, false)]);
@@ -2283,9 +2551,11 @@ mod tests {
         let events = Events::new();
         let left = Left::of(Stage::Detect, Snapshot::default(), events.clone());
         let page = fixture.page()?;
-        let added = left
-            .writing(&fixture.member(None))
-            .added(&page, finds(fixture.page)?);
+        let added = left.writing(&fixture.member(None)).added(
+            &page,
+            &Lettered::default(),
+            finds(fixture.page)?,
+        );
         // The block that goes counts for nothing: the new top-level layers
         // start above the second result, and the panel's block keeps its
         // place in the panel.
@@ -2347,9 +2617,11 @@ mod tests {
         fixture.lock("pinned")?;
         let left = Left::of(Stage::Detect, Snapshot::default(), Events::new());
         let page = fixture.page()?;
-        let added = left
-            .writing(&fixture.member(None))
-            .added(&page, finds(fixture.page)?);
+        let added = left.writing(&fixture.member(None)).added(
+            &page,
+            &Lettered::default(),
+            finds(fixture.page)?,
+        );
         // Both blocks go, so neither the group nor the panel letters the
         // page once this Detect's removals are made: the new top-level
         // layers start above the result, under the free text.
@@ -2390,9 +2662,11 @@ mod tests {
         )?;
         let left = Left::of(Stage::Detect, Snapshot::default(), Events::new());
         let page = fixture.page()?;
-        let added = left
-            .writing(&fixture.member(None))
-            .added(&page, finds(fixture.page)?);
+        let added = left.writing(&fixture.member(None)).added(
+            &page,
+            &Lettered::default(),
+            finds(fixture.page)?,
+        );
         let own = |label: &str| label.to_owned();
         assert_eq!(
             shape(&added).0,
