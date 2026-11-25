@@ -104,10 +104,7 @@ release that follow.
   source's blank in that style and adds the first translation in the
   source's place, keeping the style, and a resize, a reshape, a move, by a
   drag or an arrow key, or a turn changes its source, so the placeholder
-  stays one until something is typed. A first translation typed into a block
-  carries Booharu's marker of a translation typed by hand, written in the
-  same step, so once cleared it's no placeholder but the block's own blank
-  translation: typing into it again keeps its own frame and transform.
+  stays one until something is typed.
 
 ## Sources
 
