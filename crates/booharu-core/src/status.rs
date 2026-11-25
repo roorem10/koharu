@@ -18,7 +18,7 @@
 //! translatable, and a run that translates it keeps the style set by hand.
 
 use koharu_scene::{Block, CharStyle, Content, Direction, Layer, Page, Text};
-use serde_json::Value;
+use serde_json::{Map, Value, json};
 
 use crate::{
     attrs::Auto,
@@ -135,6 +135,52 @@ pub fn styled_source(block: &Block) -> Text {
         }
     }
     text
+}
+
+/// The values set on `block`'s [`placeholder`], which `layer` holds, as a
+/// patch of a translation, which the scene lays on the blank it starts
+/// another block's translation as, as a join carries them to the block it
+/// keeps: its own character values ([`own_chars`]), its alignment, line
+/// height, outline method and language where they aren't its source's
+/// blank's, and its direction where it's neither its source's nor, as
+/// [`styled_source`] reads it, horizontal. Never its words, frame or
+/// place, which are its own block's, nor what it holds of its source's
+/// blank. None when it isn't a placeholder.
+pub fn placeholder_values(layer: &Layer, block: &Block) -> Option<Map<String, Value>> {
+    let placeholder = block
+        .translation
+        .as_ref()
+        .filter(|_| placeholder(layer, block))?;
+    let blank = block.source.blank();
+    let mut values = Map::new();
+    let mut style = Map::new();
+    if let Ok(Value::Object(mut chars)) = serde_json::to_value(own_chars(layer, block)) {
+        // A value left unset sets nothing.
+        chars.retain(|_, value| !value.is_null());
+        if !chars.is_empty() {
+            style.insert("chars".to_owned(), Value::Object(chars));
+        }
+    }
+    let (own, base) = (&placeholder.style, &blank.style);
+    if own.align.is_some() && own.align != base.align {
+        style.insert("align".to_owned(), json!(own.align));
+    }
+    if own.line_height.is_some() && own.line_height != base.line_height {
+        style.insert("line_height".to_owned(), json!(own.line_height));
+    }
+    if own.stroke_method.is_some() && own.stroke_method != base.stroke_method {
+        style.insert("stroke_method".to_owned(), json!(own.stroke_method));
+    }
+    if !style.is_empty() {
+        values.insert("style".to_owned(), Value::Object(style));
+    }
+    if placeholder.direction != Direction::default() && placeholder.direction != blank.direction {
+        values.insert("direction".to_owned(), json!(placeholder.direction));
+    }
+    if placeholder.language != blank.language {
+        values.insert("language".to_owned(), json!(placeholder.language));
+    }
+    Some(values)
 }
 
 /// Whether `block`, which `layer` holds, has no translation of its own: none
@@ -490,6 +536,51 @@ mod tests {
         assert_eq!(base.style.align, Some(koharu_scene::Align::End));
         assert!(base.content.text().is_empty());
         assert_eq!(base.language, source.blank().language);
+    }
+
+    #[test]
+    fn a_placeholders_values_are_those_set_on_it_never_its_sources_or_place() {
+        let (_dir, mut session, [_, id]) = page(false, &[DETECTION, OCR]);
+        let values = |session: &Session| {
+            let project = session.project();
+            let layer = project.layer(id).expect("the block");
+            placeholder_values(layer, block(layer)).map(Value::Object)
+        };
+        // Lettered at 40 in blue, as Detection reads a source.
+        let read = op(
+            json!({"op": "update_layer", "layer": id, "patch": {"source": {
+                "style": {"chars": {"size": 40.0, "fill": [0.0, 0.0, 1.0, 1.0]}},
+            }}}),
+        );
+        apply(&mut session, vec![read]);
+        assert_eq!(values(&session), None);
+        // Styled, turned vertical, given a language and a box of its own: the
+        // values set, not the size and fill it holds from its source's blank
+        // (Koharu's #1494), nor its place.
+        let styled = op(
+            json!({"op": "update_layer", "layer": id, "patch": {"translation": {
+                "style": {"chars": {"family": "Comic Neue"}, "align": "end"},
+                "direction": "vertical",
+                "language": "en",
+                "frame": {"box": {"bounds": {"x": 0, "y": 0, "width": 40, "height": 20}}},
+            }}}),
+        );
+        apply(&mut session, vec![styled]);
+        assert_eq!(
+            values(&session),
+            Some(json!({
+                "style": {"chars": {"family": "Comic Neue"}, "align": "end"},
+                "direction": "vertical",
+                "language": "en",
+            }))
+        );
+        // Words typed in are no placeholder.
+        let typed = Op::SetText {
+            layer: id.into(),
+            text: "Why?".to_owned(),
+        };
+        apply(&mut session, vec![typed]);
+        assert_eq!(values(&session), None);
     }
 
     #[test]

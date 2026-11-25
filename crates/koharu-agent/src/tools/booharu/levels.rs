@@ -115,6 +115,7 @@ impl Tool for FixPageLevels {
          in Booharu's settings has it. A page's first fix keeps its scan as it was in a hidden, \
          locked image layer named Original scan, under everything, which \
          booharu_restore_original_pages puts back; later fixes keep that first original. \
+         view_page then shows the levelled scan, its `original` too, never the Original scan. \
          Levels come from the scan as it is, so fixing a page again with the same options \
          changes nothing, and gentler options need the original put back first. Fix pages \
          before cleaning them: a page is skipped, and reported with its `reason`, when it has \
