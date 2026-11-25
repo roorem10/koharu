@@ -62,8 +62,6 @@ describe('Booharu paragraph values the selected texts share (S11-h)', () => {
     expect(share).toEqual({
       align: { mixed: false, value: 'center' },
       vertical: { mixed: false, value: false },
-      // A box that shrinks its text, and point text, show the size set alike.
-      fit: { mixed: false, value: false },
       line_height: { mixed: false, value: 1.2 },
       stroke_method: { mixed: false, value: 'expansion' },
     })
@@ -83,18 +81,20 @@ describe('Booharu paragraph values the selected texts share (S11-h)', () => {
       // Unset, a vertical text starts its lines and a horizontal one centres them.
       align: { mixed: true },
       vertical: { mixed: true },
-      fit: { mixed: true },
       line_height: { mixed: true },
       stroke_method: { mixed: true },
     })
   })
 
-  it('reads a block by its translation, and leaves out other layers', () => {
+  it('reads a block by its translation, or its source before it has one, and leaves out other layers', () => {
     const share = paragraphShare([
       translated('one', { style: { align: 'end' } }),
       text('two', { style: { align: 'end' } }),
       { ...text('raster'), kind: 'raster' } as Layer,
-      block('untranslated', 'こんにちは'),
+      // Koharu's lettering of a block with no translation yet: its source without the words.
+      block('untranslated', 'こんにちは', {
+        source: { content: [{ insert: 'こんにちは' }], style: { align: 'end' } },
+      }),
     ])
 
     expect(share.align).toEqual({ mixed: false, value: 'end' })
@@ -104,7 +104,6 @@ describe('Booharu paragraph values the selected texts share (S11-h)', () => {
     expect(paragraphShare([])).toEqual({
       align: { mixed: false, value: 'center' },
       vertical: { mixed: false, value: false },
-      fit: { mixed: false, value: false },
       line_height: { mixed: false, value: 1.2 },
       stroke_method: { mixed: false, value: 'expansion' },
     })

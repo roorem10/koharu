@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "3"
 
 [workspace.package]
-version = "0.94.0"
+version = "0.95.2"
 edition = "2024"
 description = "Manga translation tools"
 license = "MIT OR Apache-2.0"
@@ -99,7 +99,8 @@ jieba-rs = "0.11.0"
 json-patch = { version = "5.0.0", default-features = false }
 jsonptr = "0.8.2"
 keyring = "4.2.0"
-koharu-extensions = { git = "https://github.com/koharu-rs/extensions", rev = "814d90444b6ffa0b3afa1f78366a281b8383400f" }
+koharu-extensions = { git = "https://github.com/koharu-rs/extensions", rev = "f5bb72d340c19c852d72a2598ab574cce8d6162f" }
+krilla = { version = "0.8.2", default-features = false, features = ["raster-images"] }
 kurbo = "0.13.1"
 libloading = "0.9.0"
 llguidance = "1.9.1"
@@ -126,15 +127,15 @@ prettyplease = "0.3.0"
 proc-macro2 = "1.0.107"
 quick_cache = "0.7.0"
 quote = "1.0.47"
-rars = "0.12.2"
+rars = "0.13.0"
 rayon = "1.12.0"
 reqwest = { version = "0.13.5", features = ["stream", "json", "form", "blocking", "multipart", "cookies"] }
 rfd = "0.18.0"
 # rig breaks its API in every release.
-rig-agent = { version = "=0.46.0", default-features = false }
-rig-core = { version = "=0.46.0", default-features = false }
-rig-memory = { version = "=0.46.0", default-features = false }
-rig-reqwest = { version = "=0.46.0", default-features = false }
+rig-agent = { version = "=0.47.0", default-features = false }
+rig-core = { version = "=0.47.0", default-features = false }
+rig-memory = { version = "=0.47.0", default-features = false }
+rig-reqwest = { version = "=0.47.0", default-features = false }
 rmcp = { version = "3.10.0", default-features = false, features = ["server", "transport-streamable-http-server"] }
 rusqlite = { version = "0.41.1", features = ["bundled"] }
 safetensors = "0.8.0"
@@ -233,7 +234,7 @@ windows = { version = "0.62.2", features = [
     "Win32_System_Console",
     "Win32_UI_WindowsAndMessaging",
 ] }
-x11rb = { version = "0.13.2", features = ["shape"] }
+x11rb = { version = "0.14.0", features = ["shape"] }
 zip = { version = "9.5.0", features = ["deflate"] }
 
 [patch.crates-io]

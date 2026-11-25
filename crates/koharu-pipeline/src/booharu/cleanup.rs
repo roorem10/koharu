@@ -196,6 +196,7 @@ mod tests {
         let work = AreaWork {
             area: area((0, 0), (2, 2), |_, _| 128),
             prompt: None,
+            layer: None,
         };
         // Koharu's config, as Generative Fill's and the agent's runs hold it.
         let hard = PipelineConfig::default();

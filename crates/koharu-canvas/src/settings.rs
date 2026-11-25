@@ -19,6 +19,8 @@ pub enum Tool {
     /// Photoshop's Lasso: marks a freehand shape of the page's pixels.
     Lasso,
     Text,
+    /// Draws a text block, for a text detection missed.
+    Block,
     Draw,
     Eraser,
     ColorPicker,
@@ -42,7 +44,9 @@ impl Tool {
             Self::Select | Self::DirectSelect => Some(CursorIcon::Default),
             Self::Text => Some(CursorIcon::Text),
             Self::Draw | Self::Eraser | Self::Remove => None,
-            Self::Marquee | Self::Lasso | Self::ColorPicker => Some(CursorIcon::Crosshair),
+            Self::Marquee | Self::Lasso | Self::Block | Self::ColorPicker => {
+                Some(CursorIcon::Crosshair)
+            }
             Self::Pan => Some(CursorIcon::Grab),
             Self::OcrBox => Some(CursorIcon::Crosshair), // Booharu: the O tool draws a box.
         }

@@ -138,7 +138,8 @@ export function showsGradient(text: Text | null): boolean {
 /** The gradient Gradient fill gives each of `targets` turning on, by layer: the gradient its
  * style has already, which words given a colour of their own hide, or else one seeded from its own
  * flat colour; none for a target every character of which shows a gradient already, which keeps
- * its own. A block with no translation yet seeds from black, as it'll letter. */
+ * its own. A block with no translation yet seeds from its source's colour, black where it sets
+ * none, as its first translation starts as its source (Koharu's #1494). */
 export function targetSeeds(targets: Layer[]): Map<LayerId, Gradient> {
   const seeds = new Map<LayerId, Gradient>()
   for (const layer of targets) {

@@ -305,15 +305,13 @@ pub fn emphasis_patch(
         Some(text) => text.style.chars.clone(),
         None => {
             let (page, _) = project.parent(layer)?;
-            match &project.layer(layer)?.content {
+            let found = project.layer(layer)?;
+            match &found.content {
                 Content::Block(block) => {
                     // A placeholder's values stay on the text typed into it,
-                    // and placement fills in the rest.
-                    let set = block
-                        .translation
-                        .as_ref()
-                        .map(|placeholder| placeholder.style.chars.clone())
-                        .unwrap_or_default();
+                    // and placement fills in the rest; not those it has from
+                    // its source's blank (Koharu's #1494).
+                    let set = status::own_chars(found, block);
                     set.or(&resolver::koharu_chars(page, block, set.size))
                 }
                 _ => CharStyle::default(),

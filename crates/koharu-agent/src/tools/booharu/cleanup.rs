@@ -229,6 +229,7 @@ mod tests {
             page: cleaned,
             area: Area { rect: at, pixels },
             prompt,
+            layer: None,
         } = &request.target
         else {
             panic!("{:?}", request.target);

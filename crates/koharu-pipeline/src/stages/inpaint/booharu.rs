@@ -116,6 +116,7 @@ impl Fixture {
         let painted = AreaWork {
             area: area.clone(),
             prompt: None,
+            layer: None,
         };
         let soft = cleanup::soft(config, Some(&painted));
         let (rect, mask) = cleanup::read(&painted.area, (SIDE, SIDE)).expect("on the page");
@@ -130,8 +131,7 @@ impl Fixture {
             *mask = cleanup::limit(soft.as_ref(), *rect, std::mem::take(mask));
         }
         let made = action("c2pa.created", "lama", None);
-        let project = self.session.project();
-        let ops = write::ops(&project, self.page, work, &made, "").expect("the ops");
+        let ops = write::ops(&self.session, self.page, work, None, &made, "").expect("the ops");
         self.apply(ops);
     }
 

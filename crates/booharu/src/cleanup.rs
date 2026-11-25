@@ -108,11 +108,11 @@ pub fn covered(area: &Area) -> u64 {
     area.pixels.iter().filter(|&&value| value != 0).count() as u64
 }
 
-/// The run cleaning `area` of `page` at once, as the Remove brush's does:
-/// the Inpainting stage alone, on the area, with no prompt, and `config`,
-/// the pipeline's settings as saved, so the inpainter set there cleans it.
-/// Its result's limit is the area itself, 0 or 255, as no flag of
-/// Booharu's softens it.
+/// The run cleaning `area` of `page` at once, as the Remove brush's does
+/// with no layer selected: the Inpainting stage alone, on the area, with no
+/// prompt, onto a new raster, and `config`, the pipeline's settings as
+/// saved, so the inpainter set there cleans it. Its result's limit is the
+/// area itself, 0 or 255, as no flag of Booharu's softens it.
 #[must_use]
 pub fn request(page: PageId, area: Area, config: PipelineConfig) -> Request {
     Request {
@@ -120,6 +120,7 @@ pub fn request(page: PageId, area: Area, config: PipelineConfig) -> Request {
             page,
             area,
             prompt: None,
+            layer: None,
         },
         stages: BTreeSet::from([Stage::Inpaint]),
         config: Some(config),

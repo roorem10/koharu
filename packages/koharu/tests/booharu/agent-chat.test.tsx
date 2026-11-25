@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AgentPanel } from '@/components/editor/AgentPanel'
+import { useConversation } from '@/lib/agent'
 import {
   chattedSinceDivider,
   rejoined,
@@ -15,14 +16,7 @@ import {
   type SavedTurn,
 } from '@/lib/booharu/agentChat'
 import { resources, supportedLanguages } from '@/lib/i18n'
-import {
-  modelsKey,
-  preferencesKey,
-  projectKey,
-  queryClient,
-  useProject,
-  type ProjectView,
-} from '@/lib/queries'
+import { modelsKey, preferencesKey, projectKey, queryClient, type ProjectView } from '@/lib/queries'
 import { commands, events, type AgentEntry, type AgentEvent } from '@koharu/ipc/protocol'
 
 import { gpt, koharuPreferences, models } from './reading'
@@ -100,10 +94,10 @@ function send(desk: { channels: Channel<AgentEvent>[] }, run: number, update: Ag
   act(() => desk.channels[run - 1]!.onmessage(update))
 }
 
-/** The agent's panel as the right pane holds it, one for each project. */
+/** The agent's panel as the right pane holds it, one for every project, as Koharu's conversation
+ * is kept apart from it. */
 function Chat() {
-  const project = useProject().data?.name ?? null
-  return <AgentPanel key={project} />
+  return <AgentPanel />
 }
 
 /** The app's listener for the agent file's changes and the project's, as the providers mount it. */
@@ -132,7 +126,8 @@ beforeEach(() => {
   }
   // A run's channel registers its callback with the webview.
   vi.stubGlobal('__TAURI_INTERNALS__', { transformCallback: () => 1, unregisterCallback: vi.fn() })
-  useAgentChat.setState({ project: null, turns: [], running: null, stale: false })
+  useAgentChat.setState({ project: null, stale: false })
+  useConversation.setState(useConversation.getInitialState())
   queryClient.setQueryData(modelsKey, models)
   queryClient.setQueryData(preferencesKey, {
     ...koharuPreferences(gpt.reference),
@@ -198,7 +193,8 @@ describe("Booharu agent's chat", () => {
     tell('project', 'Other')
 
     // Nothing of the project before shows, even before the other's chat is read.
-    expect(useAgentChat.getState()).toMatchObject({ project: 'Other', turns: [], running: null })
+    expect(useAgentChat.getState().project).toBe('Other')
+    expect(useConversation.getState()).toMatchObject({ turns: [], running: null })
     act(() => openProject('Other'))
     expect(screen.queryByText('Translate page 1')).toBeNull()
     // The read runs as a mutation does, a few promises after the project opened.
@@ -231,7 +227,9 @@ describe("Booharu agent's chat", () => {
     // The desktop wrote its own divider, which takes the panel's place.
     desk.files.Demo = [asked, answered, { role: 'divider', id: 'd1', at: 3, reason: 'new_chat' }]
     tell('booharuAgentHistoryChanged', null)
-    await waitFor(() => expect(useAgentChat.getState().turns.map(({ id }) => id)).toContain('d1'))
+    await waitFor(() =>
+      expect(useConversation.getState().turns.map(({ id }) => id)).toContain('d1'),
+    )
     expect(screen.getAllByText('Previous conversation')).toHaveLength(1)
     expect(screen.getByText('Translate page 1')).toBeInTheDocument()
   })

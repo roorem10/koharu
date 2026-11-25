@@ -430,14 +430,14 @@ describe('Booharu Gradient fill in Text effects (S12-c, S12-k)', () => {
 })
 
 describe('Booharu shared gradient controls in Text effects (S12-k)', () => {
-  /** Boxes sharing GRADIENT, and a block with no translation, so no gradient, among them. */
+  /** Boxes sharing GRADIENT; a block with no translation would show its source's paint, as
+   * Koharu letters it (#1494), so none is among them. */
   const sharing = () => [
     styled('one', { fill_gradient: GRADIENT }),
     styled('two', { fill: RED, fill_gradient: GRADIENT }),
-    block('first', 'やあ'),
   ]
 
-  /** One edit giving `gradient` to the boxes sharing GRADIENT, the block left be. */
+  /** One edit giving `gradient` to the boxes sharing GRADIENT. */
   const shared = (gradient: Gradient) =>
     restyled([
       ['one', { chars: { fill_gradient: gradient } }],

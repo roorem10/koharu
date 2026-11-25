@@ -104,7 +104,9 @@ fn owned(texts: &[&str]) -> Vec<String> {
 #[tokio::test]
 async fn a_turn_asking_for_emphasis_asks_for_its_shape_and_keeps_the_words_apart() -> Result<()> {
     let texts = owned(&["まさか!", "どうして"]);
-    let model = model(&[r#"{"1": {"text": " No way! ", "emphasis": ["No way"]}, "2": "Why?"}"#]);
+    let model = model(&[
+        r#"{"1": {"text": " No way! ", "emphasis": ["No way"]}, "2": {"text": "Why?", "emphasis": []}}"#,
+    ]);
     let picks = Mutex::new(Vec::new());
     let mut conversation = conversation()?;
     let taken = take(
@@ -225,10 +227,35 @@ async fn a_run_on_a_translation_model_sends_koharus_request_byte_for_byte() -> R
     Ok(())
 }
 
-/// How a turn of one text fails on `answer`, asking for the words to stress
-/// when `asks`.
-async fn failure(answer: &str, asks: bool) -> Result<String> {
-    let model = model(&[answer]);
+#[tokio::test]
+async fn an_answer_missing_the_shape_is_asked_for_once_more_and_kept_in_it() -> Result<()> {
+    // rig asks Koharu's turn once more for an answer that misses its
+    // schema, the emphasis slot's shape included (rig 0.47); the answer
+    // given again in the shape is the turn's, its words in the slot.
+    let model = model(&[
+        r#"{"1": "No way!"}"#,
+        r#"{"1": {"text": "No way!", "emphasis": ["No"]}}"#,
+    ]);
+    let picks = Mutex::new(Vec::new());
+    let taken = take(
+        &model,
+        "Translate.".to_owned(),
+        &owned(&["まさか!"]),
+        Some(&picks),
+        &mut *conversation()?,
+    )
+    .await?;
+    assert_eq!(taken, Some(owned(&["No way!"])));
+    assert_eq!(*picks.lock(), [owned(&["No"])]);
+    assert_eq!(model.request_count(), 2);
+    Ok(())
+}
+
+/// How a turn of one text fails on `answer`, given again when it's asked for
+/// once more, asking for the words to stress when `asks`, and how many
+/// requests it made.
+async fn failure(answer: &str, asks: bool) -> Result<(String, usize)> {
+    let model = model(&[answer, answer]);
     let picks = Mutex::new(Vec::new());
     let taken = take(
         &model,
@@ -240,44 +267,40 @@ async fn failure(answer: &str, asks: bool) -> Result<String> {
     .await;
     match taken {
         Ok(taken) => anyhow::bail!("{answer} passed as {taken:?}"),
-        Err(error) => Ok(error.to_string()),
+        Err(error) => Ok((error.to_string(), model.request_count())),
     }
 }
 
 #[tokio::test]
 async fn an_answer_in_the_shape_fails_koharus_checks_in_koharus_words() -> Result<()> {
-    // Each answer as Koharu's turn gets it, then in the shape.
+    // An answer that fits its schema, as Koharu's turn gets it and in the
+    // shape, fails Koharu's checks in Koharu's words, asked for once.
+    let blank = "the answer leaves text 1 blank".to_owned();
+    assert_eq!(failure(r#"{"1": " "}"#, false).await?, (blank.clone(), 1));
+    let shaped = r#"{"1": {"text": " ", "emphasis": ["No"]}}"#;
+    assert_eq!(failure(shaped, true).await?, (blank, 1));
+    // One that misses it, as Koharu's turn gets it and in the shape, is asked
+    // for once more, as rig asks Koharu's own turn since rig 0.47, and fails
+    // the run the second time.
     let cases = [
-        (
-            r#"{"1": " "}"#,
-            r#"{"1": {"text": " ", "emphasis": ["No"]}}"#,
-            "the answer leaves text 1 blank",
-        ),
-        (
-            r#"{"1": 3}"#,
-            r#"{"1": {"text": 3, "emphasis": []}}"#,
-            "the answer for text 1 isn't text",
-        ),
-        (
-            "{}",
-            r#"{"1": {"emphasis": ["No"]}}"#,
-            "the answer leaves text 1 out",
-        ),
+        (r#"{"1": 3}"#, r#"{"1": {"text": 3, "emphasis": []}}"#),
+        ("{}", r#"{"1": {"emphasis": ["No"]}}"#),
         (
             r#"{"1": "No", "2": "Why"}"#,
             r#"{"1": {"text": "No", "emphasis": []}, "2": {"text": "Why", "emphasis": []}}"#,
-            "the answer has texts the page doesn't",
         ),
-        ("No way!", "No way!", "the answer isn't JSON"),
-        (
-            r#"["No way!"]"#,
-            r#"[{"text": "No way!", "emphasis": []}]"#,
-            "the answer isn't a JSON object",
-        ),
+        ("No way!", "No way!"),
+        (r#"["No way!"]"#, r#"[{"text": "No way!", "emphasis": []}]"#),
     ];
-    for (plain, shaped, words) in cases {
-        assert_eq!(failure(plain, false).await?, words, "{plain}");
-        assert_eq!(failure(shaped, true).await?, words, "{shaped}");
+    for (plain, shaped) in cases {
+        for (answer, asks) in [(plain, false), (shaped, true)] {
+            let (error, requests) = failure(answer, asks).await?;
+            assert!(
+                error.starts_with("the answer does not satisfy the output schema"),
+                "{answer}: {error}"
+            );
+            assert_eq!(requests, 2, "{answer}");
+        }
     }
     Ok(())
 }

@@ -10,11 +10,11 @@ import { openFxOn } from '@/lib/booharu/fx'
 import { redoBoxes } from '@/lib/booharu/redo'
 import {
   findLayer,
-  findPart,
   isBlockLayer,
   isLockedLayer,
   isTextLayer,
   plainText,
+  walkLayers,
   type BlockLayer,
   type TextLayer,
 } from '@/lib/document'
@@ -54,7 +54,7 @@ export interface BoxSelection {
  * text layers, a block's selected mask or clean-up standing for the block. Other layers are left
  * out. */
 export function selectedBoxes(layers: Layer[], selected: LayerId[]): Box[] {
-  const ids = new Set(selected.map((id) => findPart(layers, id)?.block.id ?? id))
+  const ids = new Set(selected.map((id) => blockOfPart(layers, id)?.id ?? id))
   return [...ids].flatMap((id) => {
     const placed = findLayer(layers, id)
     if (!placed) return []
@@ -62,6 +62,17 @@ export function selectedBoxes(layers: Layer[], selected: LayerId[]): Box[] {
     if (!isBlockLayer(layer) && !isTextLayer(layer)) return []
     return [{ layer, parent: ancestors.at(-1) ?? null, locked: isLockedLayer(placed) }]
   })
+}
+
+/** The block whose clean-up or mask `id` is, among `layers`, as Koharu's `findPart` found it before
+ * Koharu 0.95.0 dropped it. */
+function blockOfPart(layers: Layer[], id: LayerId): BlockLayer | undefined {
+  return walkLayers(layers)
+    .map(({ layer }) => layer)
+    .find(
+      (layer): layer is BlockLayer =>
+        isBlockLayer(layer) && (layer.cleanup?.id === id || layer.mask?.id === id),
+    )
 }
 
 /** The texts a balloon holds, in tree order, which is reading order, its sound effects and hidden

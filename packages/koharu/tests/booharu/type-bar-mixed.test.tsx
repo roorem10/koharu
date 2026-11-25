@@ -172,20 +172,23 @@ describe('Booharu type bar over texts whose paragraphs differ (S11-h)', () => {
     )
   })
 
-  it('shows what the lettered texts share with a block that has no translation first', async () => {
+  it('shows what the texts share with a block that has no translation first, by its source', async () => {
+    const paragraph = {
+      direction: 'vertical',
+      frame: box('best'),
+      style: { align: 'end', line_height: 1.5, stroke_method: 'contour' },
+    } as const
     const { edits, bar, user } = await renderBar(
       [
-        block('first', 'やあ'),
-        text('two', {
-          direction: 'vertical',
-          frame: box('best'),
-          style: { align: 'end', line_height: 1.5, stroke_method: 'contour' },
-        }),
+        // Koharu's lettering of a block with no translation yet: its source without the words,
+        // where its first translation starts (#1494).
+        block('first', 'やあ', { source: { content: [{ insert: 'やあ' }], ...paragraph } }),
+        text('two', paragraph),
       ],
       { pending: true },
     )
 
-    // The paragraph of the text, as with the block after it, never a new text's.
+    // The paragraph they share, never a new text's.
     expect(bar.getByRole('button', { name: 'Align bottom' })).toHaveAttribute(
       'aria-pressed',
       'true',

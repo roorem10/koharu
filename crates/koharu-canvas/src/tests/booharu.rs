@@ -1890,10 +1890,7 @@ fn the_eraser_and_remove_take_no_opacity() {
     for settings in [BooharuSettings::default(), half_opacity()] {
         fixture.canvas.set_booharu(settings);
         let effects = gesture(&mut fixture.canvas, (20.0, 20.0), (40.0, 20.0));
-        let [Effect::Inpaint { rect, mask, .. }] = &effects[..] else {
-            panic!("{effects:?}");
-        };
-        asked.push((*rect, mask.clone()));
+        asked.push(inpaint(&effects));
     }
     assert_eq!(asked[0], asked[1]);
     let (rect, mask) = &asked[0];
@@ -1933,12 +1930,21 @@ fn soft_coverage(size: (u32, u32), points: &[(f64, f64)], diameter: f64, hard: f
     crate::booharu::brush::tests::reference(size, &points, diameter, hard)
 }
 
-/// The one inpaint request `effects` hold: its rect and its mask.
+/// The one inpaint request `effects` hold: its rect and its mask. With no
+/// raster or clean-up selected, Koharu's Remove adds a raster for it and
+/// selects it first (Koharu 0.95), which the effects before it hold.
 fn inpaint(effects: &[Effect]) -> (koharu_scene::Rect, Vec<u8>) {
-    let [Effect::Inpaint { rect, mask, .. }] = effects else {
+    let asked: Vec<_> = effects
+        .iter()
+        .filter_map(|effect| match effect {
+            Effect::Inpaint { rect, mask, .. } => Some((*rect, mask.clone())),
+            _ => None,
+        })
+        .collect();
+    let [asked] = &asked[..] else {
         panic!("{effects:?}");
     };
-    (*rect, mask.clone())
+    asked.clone()
 }
 
 /// A layer's pixels as the session holds them, read once, each by its own

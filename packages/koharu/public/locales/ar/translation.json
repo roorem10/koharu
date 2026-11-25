@@ -138,6 +138,7 @@
     "close": "إغلاق السجل",
     "opened": "عند الفتح",
     "steps": {
+      "add_layer": "طبقة جديدة",
       "add_text": "إضافة نص",
       "delete_layers": "حذف الطبقات",
       "delete_pages": "حذف الصفحات",
@@ -267,6 +268,7 @@
     "donate": "تبرّع",
     "edit": "تحرير",
     "export": "تصدير المشروع",
+    "exportSelected": "تصدير الصفحات المحدّدة",
     "feedback": "إرسال ملاحظات",
     "file": "ملف",
     "fit": "ملاءمة النافذة",
@@ -274,6 +276,7 @@
     "help": "مساعدة",
     "history": "السجل",
     "import": "استيراد الصفحات",
+    "original": "إظهار الأصل",
     "redo": "إعادة",
     "selectAllLayers": "تحديد كل الطبقات",
     "settings": "الإعدادات",
@@ -517,6 +520,7 @@
     "translate": "ترجمة {{name}}"
   },
   "tools": {
+    "block": "كتلة نص",
     "brushSize": "حجم الفرشاة",
     "brushSizeInput": "حجم الفرشاة",
     "brushSizePixels": "حجم الفرشاة: {{size}} بكسل",

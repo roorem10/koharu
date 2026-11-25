@@ -1,8 +1,8 @@
 //! The HTTP client hosted models go through: rig's own, shared by the process,
-//! sending a 429 or 5xx reply again, up to three times, after the wait rig reads
-//! from it, or a second, then two, then four when it names none; rig itself
-//! retries nothing. For a vendor the user signs in to, it also puts the
-//! sign-in's current credential on each request, so a long-lived model
+//! sending a request that failed for now again, up to three times, after the
+//! wait rig reads from its reply, or a second, then two, then four when it names
+//! none; rig itself retries nothing. For a vendor the user signs in to, it also
+//! puts the sign-in's current credential on each request, so a long-lived model
 //! outlives any one token.
 
 use std::{
@@ -16,7 +16,7 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::request::Parts;
 use rig_core::{
-    error::ProviderError,
+    error::{ErrorReport, ProviderError, RateLimits},
     http_client::{self, HttpClientExt, LazyBody, MultipartForm, StreamingResponse},
 };
 use rig_reqwest::ReqwestClient;
@@ -45,33 +45,66 @@ pub(crate) fn reqwest() -> Result<reqwest::Client> {
         .context("couldn't build the HTTP client")
 }
 
-/// Whether `error` is a 429 or 5xx reply, worth sending again.
-fn retryable(error: &http_client::Error) -> bool {
-    matches!(
-        error,
-        http_client::Error::InvalidStatusCodeWithDetails { status, .. }
-            if status.as_u16() == 429 || status.is_server_error()
-    )
-}
+/// The longest wait a request is sent again after, as OpenAI's Python library
+/// has it; a reply that asks for more fails with what it says.
+const LONGEST_WAIT: Duration = Duration::from_secs(120);
 
-/// The wait `error` names in place of `backoff`'s, until `backoff` runs out.
-fn retry_after(error: &http_client::Error, backoff: Option<Duration>) -> Option<Duration> {
-    let backoff = backoff?;
+/// The reply `error` holds, when the vendor answered, as rig reads it.
+fn reply(error: &http_client::Error) -> Option<ErrorReport> {
     let http_client::Error::InvalidStatusCodeWithDetails {
         status,
         body,
         headers,
     } = error
     else {
-        return Some(backoff);
+        return None;
     };
-    let report = ProviderError::from(http_client::Error::InvalidStatusCodeWithDetails {
-        status: *status,
-        body: body.clone(),
-        headers: headers.clone(),
-    })
-    .report();
-    Some(report.retry_after(SystemTime::now()).unwrap_or(backoff))
+    let error =
+        http_client::Error::non_success_with_details(*status, headers.clone(), body.clone());
+    Some(ProviderError::from(error).report())
+}
+
+/// Whether a request that failed with `error` may pass sent again: a reply rig
+/// calls retryable, or a connection lost before one. A server that couldn't be
+/// reached, such as a local one that isn't running, isn't tried again.
+fn retryable(error: &http_client::Error) -> bool {
+    if let Some(reply) = reply(error) {
+        return reply.is_retryable();
+    }
+    let http_client::Error::Transient(source) = error else {
+        return false;
+    };
+    !source
+        .downcast_ref::<reqwest::Error>()
+        .is_some_and(reqwest::Error::is_connect)
+}
+
+/// The wait before a request that failed with `error` is sent again: what its
+/// reply asks for, else until a spent allowance resets, else `backoff`'s.
+/// `None`, once `backoff` runs out or the wait is too long, sends it no more.
+fn wait(error: &http_client::Error, backoff: Option<Duration>) -> Option<Duration> {
+    let backoff = backoff?;
+    let now = SystemTime::now();
+    let asked = reply(error)
+        .and_then(|reply| reply.retry_after(now))
+        .or_else(|| reset(error, now))
+        .filter(|wait| !wait.is_zero());
+    match asked {
+        Some(asked) => (asked <= LONGEST_WAIT).then_some(asked),
+        None => Some(backoff),
+    }
+}
+
+/// How long after `now` the allowances `error`'s rate-limit headers say are
+/// spent reset. OpenRouter's say so in place of a wait.
+fn reset(error: &http_client::Error, now: SystemTime) -> Option<Duration> {
+    let limits = RateLimits::from_headers(error.non_success_headers()?, now);
+    [limits.requests, limits.tokens]
+        .into_iter()
+        .flatten()
+        .filter(|allowance| allowance.remaining == 0)
+        .filter_map(|allowance| allowance.resets_in)
+        .max()
 }
 
 impl Http {
@@ -90,24 +123,19 @@ impl Http {
             sign_in
                 .authorize(&mut parts)
                 .await
-                .map_err(|error| http_client::Error::Instance(error.into()))?;
+                .map_err(http_client::Error::permanent)?;
         }
         Ok(parts)
     }
 }
 
 impl HttpClientExt for Http {
-    fn send<T, U>(
+    fn send(
         &self,
-        request: http::Request<T>,
-    ) -> impl Future<Output = http_client::Result<http::Response<LazyBody<U>>>> + Send + 'static
-    where
-        T: Into<Bytes> + Send,
-        U: From<Bytes> + Send + 'static,
-    {
+        request: http::Request<Bytes>,
+    ) -> impl Future<Output = http_client::Result<http::Response<LazyBody>>> + Send + 'static {
         let http = self.clone();
         let (parts, body) = request.into_parts();
-        let body: Bytes = body.into();
         async move {
             (|| async {
                 let parts = http.authorized(parts.clone()).await?;
@@ -117,12 +145,12 @@ impl HttpClientExt for Http {
             })
             .retry(BACKOFF)
             .when(retryable)
-            .adjust(retry_after)
+            .adjust(wait)
             .await
             // Booharu: no address in a failed send, nor in a failed read of
             // the reply, where reqwest names it too.
             .map(|reply| {
-                reply.map(|body| -> LazyBody<U> {
+                reply.map(|body| -> LazyBody {
                     Box::pin(async move { body.await.map_err(without_url) })
                 })
             })
@@ -130,26 +158,19 @@ impl HttpClientExt for Http {
         }
     }
 
-    fn send_multipart<U>(
+    fn send_multipart(
         &self,
         request: http::Request<MultipartForm>,
-    ) -> impl Future<Output = http_client::Result<http::Response<LazyBody<U>>>> + Send + 'static
-    where
-        U: From<Bytes> + Send + 'static,
-    {
+    ) -> impl Future<Output = http_client::Result<http::Response<LazyBody>>> + Send + 'static {
         self.client.send_multipart(request)
     }
 
-    fn send_streaming<T>(
+    fn send_streaming(
         &self,
-        request: http::Request<T>,
-    ) -> impl Future<Output = http_client::Result<StreamingResponse>> + Send
-    where
-        T: Into<Bytes> + Send,
-    {
+        request: http::Request<Bytes>,
+    ) -> impl Future<Output = http_client::Result<StreamingResponse>> + Send {
         let http = self.clone();
         let (parts, body) = request.into_parts();
-        let body: Bytes = body.into();
         async move {
             (|| async {
                 let parts = http.authorized(parts.clone()).await?;
@@ -159,7 +180,7 @@ impl HttpClientExt for Http {
             })
             .retry(BACKOFF)
             .when(retryable)
-            .adjust(retry_after)
+            .adjust(wait)
             .await
             // Booharu: no address in a failed send; reqwest names none in a
             // streamed chunk's error.
@@ -169,12 +190,17 @@ impl HttpClientExt for Http {
 }
 
 /// Booharu: `error` without the address reqwest names in a transport error,
-/// which rig shows and which can carry a key or a token.
+/// which rig shows and which can carry a key or a token, transient or
+/// permanent as rig called it.
 fn without_url(error: http_client::Error) -> http_client::Error {
     match error {
-        http_client::Error::Instance(error) => match error.downcast::<reqwest::Error>() {
-            Ok(error) => http_client::Error::instance(error.without_url()),
-            Err(error) => http_client::Error::Instance(error),
+        http_client::Error::Transient(error) => match error.downcast::<reqwest::Error>() {
+            Ok(error) => http_client::Error::transient(error.without_url()),
+            Err(error) => http_client::Error::Transient(error),
+        },
+        http_client::Error::Permanent(error) => match error.downcast::<reqwest::Error>() {
+            Ok(error) => http_client::Error::permanent(error.without_url()),
+            Err(error) => http_client::Error::Permanent(error),
         },
         error => error,
     }
@@ -295,7 +321,7 @@ mod tests {
 
         // Nothing listens on the discard port.
         let unreachable = "http://127.0.0.1:9/v1beta/models?key=AIzaFAKE";
-        let sent = Http::default().send::<_, Bytes>(request(unreachable)).await;
+        let sent = Http::default().send(request(unreachable)).await;
         unaddressed(sent.err().unwrap());
         let streamed = Http::default().send_streaming(request(unreachable)).await;
         unaddressed(streamed.err().unwrap());
@@ -314,7 +340,7 @@ mod tests {
                 .await
                 .unwrap();
         });
-        let reply = Http::default().send::<_, Bytes>(request(&broken)).await;
+        let reply = Http::default().send(request(&broken)).await;
         unaddressed(reply.unwrap().into_body().await.unwrap_err());
     }
 }

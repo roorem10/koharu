@@ -138,6 +138,7 @@
     "close": "Close history",
     "opened": "Opened",
     "steps": {
+      "add_layer": "New layer",
       "add_text": "Add text",
       "delete_layers": "Delete layers",
       "delete_pages": "Delete pages",
@@ -267,6 +268,7 @@
     "donate": "Donate",
     "edit": "Edit",
     "export": "Export Project",
+    "exportSelected": "Export Selected Pages",
     "feedback": "Send Feedback",
     "file": "File",
     "fit": "Fit Window",
@@ -274,6 +276,7 @@
     "help": "Help",
     "history": "History",
     "import": "Import Pages",
+    "original": "Show Original",
     "redo": "Redo",
     "selectAllLayers": "Select All Layers",
     "settings": "Settings",
@@ -517,6 +520,7 @@
     "translate": "Translate {{name}}"
   },
   "tools": {
+    "block": "Text block",
     "brushSize": "Brush size",
     "brushSizeInput": "Brush size",
     "brushSizePixels": "Brush size: {{size}} pixels",

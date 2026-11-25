@@ -254,6 +254,15 @@ impl Screen {
         });
     }
 
+    pub fn set_original(&self, original: bool) {
+        self.change(move |main| {
+            main.settings.original = original;
+            if let Some(canvas) = &mut main.canvas {
+                canvas.set_original(original);
+            }
+        });
+    }
+
     /// Booharu: the app's handle once the window opened, through which
     /// Booharu's agent tools reach the app.
     pub fn handle(&self) -> Option<AppHandle<CefRuntime>> {
@@ -461,6 +470,7 @@ struct Settings {
     brush: Brush,
     colors: Colors,
     story: Story,
+    original: bool,
 }
 
 impl Main {
@@ -499,6 +509,7 @@ impl Main {
             canvas.set_brush(settings.brush);
             canvas.set_colors(settings.colors);
             canvas.set_story(settings.story);
+            canvas.set_original(settings.original);
             canvas.set_booharu(booharu); // Booharu: and Booharu's settings.
             canvas
         });

@@ -43,7 +43,7 @@ import {
   walkLayers,
 } from '@/lib/document'
 import { readPage, send, useFonts, usePage, usePreferences } from '@/lib/queries'
-import { setStyle, updateLayer } from '@/lib/scene'
+import { setFit, setStyle, updateLayer } from '@/lib/scene'
 import { useKoharuStore, type CanvasTool } from '@/lib/store'
 import {
   commands,
@@ -102,9 +102,7 @@ export function TypeBar() {
       .filter((layer) => leaves.includes(layer.id) && (isTextLayer(layer) || isBlockLayer(layer)))
   }, [page, selectedIds])
   const current = targets[0]
-  // Booharu: the first lettered target's, as a block with no translation yet has none and the
-  // values the targets share leave it out (S11-h).
-  const lettering: Text | null = targets.map(letteringOf).find((text) => text !== null) ?? null
+  const lettering: Text | null = current ? letteringOf(current) : null
   const typing = useKoharuStore((state) => state.typing)
   const chosen = useChosenWords(targets, typing) // Booharu: words chosen in Story in the one text shown.
   // The newest style asked for shows on the first target until the page is read with it.
@@ -143,15 +141,18 @@ export function TypeBar() {
   }
   const chars = style.chars ?? {}
   const mixed = new Set(shared.mixed.filter((key) => drafted?.chars?.[key] === undefined))
-  const frame = lettering?.frame ?? 'point'
   // A box and a path fit their text alike, a balloon's translation in a path; point text has no fit.
-  const fitted = typeof frame !== 'object' ? null : frame.box ? 'box' : 'path'
-  const fit = typeof frame === 'object' ? (frame.box ?? frame.path)?.fit : undefined
-  const autoFit = fit === 'best'
+  const fits = targets.flatMap((layer) => {
+    const frame = letteringOf(layer)?.frame
+    return typeof frame === 'object' ? [(frame.box ?? frame.path)?.fit] : []
+  })
+  const fitted = fits.length > 0
+  const autoFit = fitted && fits.every((fit) => fit === 'best')
+  // Frames that don't share Auto share no size.
+  const mixedFit = !autoFit && fits.includes('best')
   // Booharu: what the targets' paragraphs share; a value they don't shows empty, unless the draft
   // sets it, which every target then takes (S11-h).
   const share = useMemo(() => paragraphShare(targets), [targets])
-  const fitMixed = share.fit.mixed
 
   /** Merges `patch` into each target's style, shown at once on the first. */
   // Booharu: or gives each target its own patch from `each`, in one edit, shown by `patch`, what
@@ -222,7 +223,7 @@ export function TypeBar() {
     [...usableFontWeights(selectedFamily, false), ...usableFontWeights(selectedFamily, true)],
     weight,
   )
-  const size = mixed.has('size') ? null : Math.round((chars.size ?? 24) * 100) / 100
+  const size = mixed.has('size') || mixedFit ? null : Math.round((chars.size ?? 24) * 100) / 100
   // Booharu: the colour, or the gradient, every character shows, none while they differ (S12-c).
   const paint = sharedPaint(chars, mixed)
   const strokeWidth = chars.stroke_width ?? 0
@@ -332,10 +333,9 @@ export function TypeBar() {
         <PresetField
           name='font-size'
           testId='type-size'
-          // Booharu: empty, "Mixed", and neither Auto nor a size chosen while the boxes' fits differ;
-          // "Mixed" too while their sizes do (S11-h).
-          value={fitMixed ? null : size}
-          mixed={fitMixed || size === null ? t('booharu.typebar.mixed') : undefined}
+          value={size}
+          // Booharu: "Mixed" in the empty field, while the sizes or the frames' fits differ (S11-h).
+          mixed={size === null ? t('booharu.typebar.mixed') : undefined}
           min={0.5}
           // Photoshop's largest type size.
           max={1296}
@@ -344,17 +344,15 @@ export function TypeBar() {
           menuLabel={t('inspector.chooseFontSize')}
           auto={{
             label: t('inspector.auto'),
-            active: autoFit && !fitMixed, // Booharu: not while the fits differ (S11-h).
-            available: fitted !== null,
-            onPick: () => fitted && update({ frame: { [fitted]: { fit: 'best' } } }),
+            active: autoFit,
+            available: fitted,
+            onPick: () => send(setFit, targets, 'best'),
           }}
           onChange={(next) => {
             applyChars({ size: next })
             // A typed size is the size the text draws at, as in Photoshop and Clip Studio Paint, so
             // a frame that shrinks or grows its text stops fitting it; a growing box keeps the size.
-            if (fitted && fit !== 'none' && fit !== 'grow') {
-              update({ frame: { [fitted]: { fit: 'none' } } })
-            }
+            if (fitted) send(setFit, targets, 'none')
           }}
         />
       </div>

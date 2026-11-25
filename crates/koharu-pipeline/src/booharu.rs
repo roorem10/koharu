@@ -509,6 +509,22 @@ pub(crate) async fn answered<T, E: Into<anyhow::Error>>(
     within(ANSWER_LIMIT, hosted(model.spec()), request).await
 }
 
+/// `fitting`, Koharu's fit of a translation's conversation to `model`,
+/// which can call `model` for a summary: it fails as `Unanswered` after ten
+/// minutes when `model` is hosted, as [`answered`] limits a request, and
+/// waits as long as it takes for Koharu's own. Koharu's fit itself never
+/// fails: a summary that fails leaves the conversation as it was.
+pub(crate) async fn summarized(
+    model: &DynModel<Completion>,
+    fitting: impl Future<Output = ()>,
+) -> anyhow::Result<()> {
+    answered(model, async {
+        fitting.await;
+        Ok::<_, std::convert::Infallible>(())
+    })
+    .await
+}
+
 /// Whether the model `spec` describes is a hosted one: any vendor's but
 /// Koharu's own, as `stages::key` tells them apart by the `vendor/model`
 /// reference the spec was connected from.

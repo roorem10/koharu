@@ -35,7 +35,7 @@ use booharu_core::{
     sfx, status,
 };
 use icu_locale_core::LanguageIdentifier;
-use koharu_scene::{Content, Layer, LayerId, Op, Page, PageId, Project, Ref};
+use koharu_scene::{Block, Content, Layer, LayerId, Op, Page, PageId, Project, Ref, Session};
 use parking_lot::Mutex;
 use tokio_util::sync::CancellationToken;
 
@@ -112,6 +112,15 @@ impl Left {
             return member.clone();
         };
         let translating = self.0.stage == Stage::Translate;
+        let counted =
+            |block: &Block| !translating || !block.source.content.text().trim().is_empty();
+        // Koharu's `Member::blocks` leaves out a locked block itself (#1503):
+        // counted here, as the run tells what it left as it was.
+        for (_, block) in locked_out(&project, member, |_| false) {
+            if counted(block) {
+                self.count(member, Reason::Locked);
+            }
+        }
         let blocks = member.blocks(&project);
         let all = blocks.len();
         let mut kept = Vec::with_capacity(all);
@@ -122,7 +131,7 @@ impl Left {
                 .and_then(|layer| self.why(page, layer, named));
             match reason {
                 Some(reason) => {
-                    if !translating || !block.source.content.text().trim().is_empty() {
+                    if counted(block) {
                         self.count(member, reason);
                     }
                 }
@@ -203,7 +212,9 @@ impl Left {
     pub(crate) async fn unsent(&self, member: &Member) -> anyhow::Result<()> {
         let writing = self.writing(member);
         member
-            .apply(self.0.stage, move |project| Ok(writing.kept(project)))
+            .apply(self.0.stage, move |session| {
+                Ok(writing.kept(&session.project()))
+            })
             .await?;
         self.told();
         Ok(())
@@ -240,6 +251,29 @@ impl Writing {
 
     fn named(&self) -> bool {
         self.left.tally(&self.member, |tally| tally.named)
+    }
+
+    /// Counts the blocks with a mask on the page that Koharu's clean-up read
+    /// left out for a lock (#1503), locked, in a locked layer, or with their
+    /// clean-up locked, as left as they are (I2): all but `cleaned`, the
+    /// blocks the read took, which [`Self::leaves`] counts.
+    pub(crate) fn locked_out(&self, session: &Session, cleaned: &[LayerId]) {
+        let project = session.project();
+        let Ok(page) = project.page(self.member.page) else {
+            return;
+        };
+        let (width, height) = (page.size.width, page.size.height);
+        let masked = |block: &Block| {
+            session
+                .tiles(block.mask.id, None)
+                .is_ok_and(|tiles| tiles.coverage(width, height).is_some())
+        };
+        let left = locked_out(&project, &self.member, |block| block.cleanup.locked);
+        for (_, block) in left.into_iter().filter(|(id, _)| !cleaned.contains(id)) {
+            if masked(block) {
+                self.left.count(&self.member, Reason::Locked);
+            }
+        }
     }
 
     /// Whether the stage leaves out `block` now, counting it if so: one
@@ -412,6 +446,38 @@ impl Writing {
         let start = booharu_core::cleanup::detect_start(&remaining.iter().collect::<Vec<_>>());
         unrepeated(additions, &staying, start)
     }
+
+    /// Koharu's Detect ops for the page, `ops`, made of `project` as the
+    /// write finds it, its removals and then its additions: the removals as
+    /// they are, and the additions through [`Self::added`] (D2), so the
+    /// stage's own `ops()` stays Koharu's.
+    pub(crate) fn detected(&self, project: &Project, ops: Vec<Op>) -> Vec<Op> {
+        let Ok(page) = project.page(self.member.page) else {
+            return ops;
+        };
+        let (mut removals, additions): (Vec<Op>, Vec<Op>) = ops
+            .into_iter()
+            .partition(|op| matches!(op, Op::RemoveLayer { .. }));
+        removals.extend(self.added(page, additions));
+        removals
+    }
+}
+
+/// The blocks of `member`'s page, those it names when it names some, that
+/// Koharu leaves out of a run for a lock (#1503): locked, or in a locked
+/// layer, or `also`.
+fn locked_out<'p>(
+    project: &'p Project,
+    member: &Member,
+    also: impl Fn(&Block) -> bool,
+) -> Vec<(LayerId, &'p Block)> {
+    project
+        .blocks(member.page)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|(id, block)| project.locked_at(*id).is_some() || also(block))
+        .filter(|(id, _)| member.blocks.as_ref().is_none_or(|only| only.contains(id)))
+        .collect()
 }
 
 /// Whether `layer` of `page`, at its top level or in a layer Detect's
@@ -1845,6 +1911,52 @@ mod tests {
             .collect();
         assert_eq!(top.len(), 6, "{top:?}");
         assert_eq!(top[4..], ["kept".to_owned(), "locked".to_owned()]);
+        Ok(())
+    }
+
+    /// Koharu's Detect ops, its removals then its additions, go through
+    /// `detected` as those removals, unchanged, and the additions `added`
+    /// leaves (D2).
+    #[test]
+    fn koharus_detect_ops_keep_their_removals_and_lose_what_lies_over_a_kept_block() -> Result<()> {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("locked", None, 0, block("text", (100.0, 10.0))),
+                add("plain", None, 1, block("text", (150.0, 10.0))),
+            ],
+        )?;
+        fixture.lock("locked")?;
+        let at = fixture.page;
+        // Made once, as each new block's mask and clean-up get new ids.
+        let additions = vec![
+            // Over the locked block.
+            found(at, "d0", None, 0, lettering((100.0, 10.0)))?,
+            found_mask("d0", (100, 10))?,
+            // Over the untouched block, which goes.
+            found(at, "d1", None, 1, lettering((150.0, 10.0)))?,
+            found_mask("d1", (150, 10))?,
+        ];
+        let page = fixture.page()?;
+        let mut removed = Vec::new();
+        removals(&page, &page.layers, &mut removed);
+        assert_eq!(removed.len(), 1);
+        let left = Left::of(Stage::Detect, Snapshot::default(), Events::new());
+        let writing = left.writing(&fixture.member(None));
+        let mut koharu = removed.clone();
+        koharu.extend(additions.clone());
+        let detected = writing.detected(&fixture.project(), koharu);
+        let mut expected = removed;
+        expected.extend(writing.added(&page, additions));
+        assert_eq!(
+            serde_json::to_value(&detected)?,
+            serde_json::to_value(&expected)?
+        );
+        let own = |label: &str| label.to_owned();
+        assert_eq!(
+            shape(&detected),
+            (vec![(own("d1"), None, 0)], vec![own("d1.mask")])
+        );
         Ok(())
     }
 

@@ -71,16 +71,19 @@ impl Default for InpainterConfig {
     }
 }
 
-/// A painted area to inpaint, and its own prompt.
+/// A painted area to inpaint, its own prompt, and the layer its result goes
+/// onto, or a new one's.
 pub(crate) struct AreaWork {
     pub(crate) area: Area,
     pub(crate) prompt: Option<String>,
+    pub(crate) layer: Option<LayerId>,
 }
 
 /// A page's scan as it's being filled, and what the model redraws in it.
 struct Work {
     image: RgbImage,
-    /// What the model redraws, over the page.
+    /// What the model redraws, with the letterings the run leaves, over the
+    /// page.
     mask: GrayImage,
     regions: Vec<Region>,
     target: Target,
@@ -105,9 +108,9 @@ struct Cleanup {
     old: Tiles,
     rect: Rect,
     mask: GrayImage,
-    /// The tier that filled it, or `None` when the model redraws it.
+    /// The tier that filled it, or `None` when the model redraws any of it.
     fill: Option<Fill>,
-    /// Its region, when the model redraws it.
+    /// Its region, when the model redraws any of it.
     region: Option<usize>,
 }
 
@@ -137,6 +140,7 @@ pub(crate) async fn inpaint(
     let soft = crate::booharu::cleanup::soft(config, area.as_deref()); // Booharu: a soft stroke's own coverage (T23).
     // An area's own prompt names its layer, as Photoshop names a Generative
     // Fill's layer after its prompt.
+    let layer = area.as_ref().and_then(|area| area.layer);
     let own = area.and_then(|area| area.prompt.clone());
     let name = own.clone().unwrap_or_default();
     let prompt = own.unwrap_or_else(|| config.inpainter.prompt.clone());
@@ -166,14 +170,18 @@ pub(crate) async fn inpaint(
     let left = crate::booharu::Left::new(task, config); // Booharu: the run's filters.
     let cleaning = left.writing(member); // Booharu: the run's filters, for the write (I1).
     member
-        .apply(Stage::Inpaint, move |project| {
+        .apply(Stage::Inpaint, move |session| {
             // Booharu: the run's filters wrap Koharu's write instead of
             // sitting in write.rs, so its ops stay Koharu's own: a block the
             // stage leaves out now is dropped before them, and the kept art
             // of the effects a translation skips follows the clean-ups.
+            let project = &session.project(); // Booharu: what the filters read.
             let mut work = work;
             let kept = match &mut work.target {
                 Target::Blocks(cleanups) => {
+                    // Booharu: those Koharu's read left for a lock, counted (#1503).
+                    let read: Vec<LayerId> = cleanups.iter().map(|cleanup| cleanup.block).collect();
+                    cleaning.locked_out(session, &read);
                     cleanups.retain(|cleanup| !cleaning.leaves(project, cleanup.block)); // Booharu: nor locked now (I2).
                     cleaning.kept(project) // Booharu: the skipped effects keep their art (I2).
                 }
@@ -184,7 +192,7 @@ pub(crate) async fn inpaint(
             if let Target::Area { rect, mask } = &mut work.target {
                 *mask = crate::booharu::cleanup::limit(soft.as_ref(), *rect, std::mem::take(mask));
             }
-            let mut ops = write::ops(project, page, work, &made, &name)?;
+            let mut ops = write::ops(session, page, work, layer, &made, &name)?;
             ops.extend(kept); // Booharu: after the clean-ups (I2).
             Ok(ops)
         })

@@ -20,6 +20,7 @@ use std::collections::{BTreeSet, HashMap};
 use anyhow::Context as _;
 use booharu_core::{attrs::Auto, emphasis::EmphasisSettings, settings::Snapshot};
 use icu_locale_core::LanguageIdentifier;
+use koharu_llm::rig::structured_output::json_in_text;
 use koharu_scene::{Layer, LayerId, RichText};
 use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
@@ -117,17 +118,17 @@ pub(crate) fn emphasis_schema(keys: &[String]) -> anyhow::Result<schemars::Schem
 }
 
 /// `answer`, a turn's, as Koharu's own turn reads it, which checks its
-/// texts: for a turn that asks for the words to stress, whose `picks` is
-/// its slot, each object's text in its place, and the words each of `keys`
-/// picks, in order, in `picks`, over any an earlier answer left there, so
-/// the answer a turn asks again after an echo gives the words. A text given
-/// as a plain string, as Koharu's own schema asks, picks none. A missing or
-/// malformed list of words picks none, and a pick that isn't a string is
-/// left out, each logged; each word is trimmed, and a blank one left out.
-/// An answer that isn't an object, and a text without a translation or
-/// with one that isn't a string, go on as they are, so Koharu's checks
-/// fail them in their own words. With no slot, `answer` is Koharu's
-/// answer, as it is.
+/// texts and finds them in a code fence or prose too: for a turn that asks
+/// for the words to stress, whose `picks` is its slot, each object's text in
+/// its place, and the words each of `keys` picks, in order, in `picks`, over
+/// any an earlier answer left there, so the answer a turn asks again after
+/// an echo gives the words. A text given as a plain string, as Koharu's own
+/// schema asks, picks none. A missing or malformed list of words picks
+/// none, and a pick that isn't a string is left out, each logged; each word
+/// is trimmed, and a blank one left out. An answer that isn't an object,
+/// and a text without a translation or with one that isn't a string, go on
+/// as they are, so Koharu's checks fail them in their own words. With no
+/// slot, `answer` is Koharu's answer, as it is.
 pub(crate) fn emphasis_answers(
     answer: String,
     keys: &[String],
@@ -136,7 +137,8 @@ pub(crate) fn emphasis_answers(
     let Some(picks) = picks else {
         return answer;
     };
-    let Ok(Value::Object(values)) = serde_json::from_str::<Value>(&answer) else {
+    // As Koharu's turn reads its answer, also in a code fence or in prose.
+    let Ok(Value::Object(values)) = json_in_text::<Value>(&answer) else {
         return answer;
     };
     let mut texts = Map::new();
@@ -488,6 +490,23 @@ mod tests {
             ]
         );
         assert!(!log.contains("emphasis"), "{log}");
+    }
+
+    /// An answer in a code fence or after prose, which Koharu's turn reads
+    /// since Koharu 0.95.0, gives its words too, and its texts as plain
+    /// JSON.
+    #[test]
+    fn an_answer_in_a_code_fence_gives_its_words_too() {
+        let keys = keys(1);
+        let picks = Mutex::new(Vec::new());
+        let answer =
+            "Here:\n```json\n{\"1\": {\"text\": \"No way!\", \"emphasis\": [\"No\"]}}\n```";
+        let plain = emphasis_answers(answer.to_owned(), &keys, Some(&picks));
+        assert_eq!(
+            serde_json::from_str::<Value>(&plain).ok(),
+            Some(json!({"1": "No way!"}))
+        );
+        assert_eq!(*picks.lock(), [vec!["No".to_owned()]]);
     }
 
     #[test]

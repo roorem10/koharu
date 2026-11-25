@@ -319,22 +319,34 @@ describe('Booharu right pane tabs', () => {
     // Layers, Story, Context and Agent, 23 letters: 176 px tight in 170.
     pane(170)
     expect(shownFit()).toBe('icons')
-    const story = screen.getByRole('tab', { name: 'Story' })
-    expect(story).not.toHaveAttribute('title')
-    await user.hover(story)
-    await waitFor(() => expect(tooltip()).toHaveTextContent(/^Story$/))
-    await user.click(story)
-    expect(story).toHaveAttribute('aria-selected', 'true')
+    const agent = screen.getByRole('tab', { name: 'Agent' })
+    expect(agent).not.toHaveAttribute('title')
+    await user.hover(agent)
+    await waitFor(() => expect(tooltip()).toHaveTextContent(/^Agent$/))
+    await user.click(agent)
+    expect(agent).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('names no tab in a tooltip while its label shows', async () => {
+  it('names no tab in a tooltip while its label shows, but the one F7 shows', async () => {
     const user = userEvent.setup()
     // 262 px with the icons in 270.
     pane(270)
     expect(shownFit()).toBeNull()
-    await user.hover(screen.getByRole('tab', { name: 'Story' }))
+    await user.hover(screen.getByRole('tab', { name: 'Agent' }))
     await settle()
     expect(tooltip()).toBeNull()
+  })
+
+  it('names F7 beside the tab it shows, Story in front of Layers, then Layers', async () => {
+    const user = userEvent.setup()
+    pane(270)
+    await user.hover(screen.getByRole('tab', { name: 'Story' }))
+    await waitFor(() => expect(tooltip()).toHaveTextContent(/^StoryF7$/))
+    await user.unhover(screen.getByRole('tab', { name: 'Story' }))
+    await user.keyboard('{F7}')
+    expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true')
+    await user.hover(screen.getByRole('tab', { name: 'Layers' }))
+    await waitFor(() => expect(tooltip()).toHaveTextContent(/^LayersF7$/))
   })
 
   it('fits the tabs whole while the row isn’t laid out', () => {

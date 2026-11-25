@@ -7,12 +7,12 @@
 mod model;
 
 use image::{DynamicImage, GrayImage, Rgb, RgbImage};
-use koharu_scene::{Content, LayerId, Rect};
+use koharu_scene::{LayerId, Rect};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 pub use self::model::Recognizer;
-use super::{Member, Task, action, key};
+use super::{Member, Task, action, key, writable};
 use crate::{PipelineConfig, Stage};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -75,18 +75,16 @@ pub(crate) async fn recognize(task: &Task, config: &PipelineConfig) -> anyhow::R
         let name = name.clone();
         let writing = left.writing(member); // Booharu: the run's filters, for the write.
         member
-            .apply(Stage::Recognize, move |project| {
+            .apply(Stage::Recognize, move |session| {
+                let project = session.project();
                 let mut ops = Vec::new();
                 for (block, text) in texts {
-                    if !matches!(
-                        project.layer(block).map(|layer| &layer.content),
-                        Ok(Content::Block(_))
-                    ) {
+                    // Booharu: one locked or corrected by hand since the read
+                    // stays as it is, counted (R2), before Koharu's check.
+                    if writing.leaves(&project, block) {
                         continue;
                     }
-                    // Booharu: one locked or corrected by hand since the read
-                    // stays as it is (R2).
-                    if writing.leaves(project, block) {
+                    if writable(&project, block).is_none() {
                         continue;
                     }
                     ops.push(koharu_scene::Op::UpdateLayer {
@@ -100,7 +98,7 @@ pub(crate) async fn recognize(task: &Task, config: &PipelineConfig) -> anyhow::R
                         value: Some(action("c2pa.created", &name, None)),
                     });
                     // Booharu: the hand-edit record of the wording read.
-                    ops.push(crate::booharu::recognized(project, block, &text)?);
+                    ops.push(crate::booharu::recognized(&project, block, &text)?);
                 }
                 Ok(ops)
             })

@@ -33,9 +33,6 @@ export type ParagraphShare = {
   align: Shared<Align>
   /** Whether the text runs in vertical columns. */
   vertical: Shared<boolean>
-  /** Whether the frame fits its text by the best size, the size field's Auto; point text has no
-   * fit. The other fits all show the size set, so they don't differ here. */
-  fit: Shared<boolean>
   /** The line spacing, a multiple of each line's largest size: Koharu's 1.2 where the text sets
    * none. */
   line_height: Shared<number>
@@ -54,7 +51,6 @@ export function paragraphShare(targets: Layer[]): ParagraphShare {
       'center',
     ),
     vertical: share(texts.map(isVertical), false),
-    fit: share(texts.map(fitsBest), false),
     line_height: share(
       texts.map((text) => text.style?.line_height ?? DEFAULT_LINE_HEIGHT),
       DEFAULT_LINE_HEIGHT,
@@ -150,10 +146,4 @@ function share<T>(values: T[], empty: T): Shared<T> {
 
 function isVertical(text: Text): boolean {
   return text.direction === 'vertical'
-}
-
-/** Whether `text`'s frame fits it by the best size, as the type bar's Auto shows. */
-function fitsBest(text: Text): boolean {
-  const frame = text.frame ?? 'point'
-  return typeof frame === 'object' && (frame.box ?? frame.path)?.fit === 'best'
 }

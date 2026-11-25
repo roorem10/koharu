@@ -36,9 +36,9 @@ const RETYPED: &str = "set_text";
 /// as the values set by hand stay. Unlike the stage's, it gets no hand-edit
 /// record of its own: it was typed by hand. A sound effect kept as art has
 /// the kept mark taken from the record it holds (`styles::typed`), as its
-/// clean-up shows again. One with a translation of its own, blank or not,
-/// keeps its place, lettering, and language, and the step is labelled as
-/// the Story panel labels a retyped text.
+/// clean-up shows again. One with a translation of its own, words or a
+/// run's emptied by hand, keeps its place, lettering, and language, and the
+/// step is labelled as the Story panel labels a retyped text.
 pub fn edit(
     project: &Project,
     block: LayerId,
@@ -388,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn a_blank_translation_already_placed_is_retyped_in_place() -> Result<()> {
+    fn a_blank_translation_no_run_wrote_is_placed_again_as_a_first_one() -> Result<()> {
         let (_dir, mut session, block) = found("text")?;
         let english: LanguageIdentifier = "en".parse()?;
         let typed = edit(
@@ -399,7 +399,10 @@ mod tests {
             &Snapshot::default(),
         )?;
         session.apply(typed)?;
-        // Cleared by hand: blank, but placed, so no placeholder.
+        // Cleared by hand: blank, and no run wrote it, so only a placeholder,
+        // as Koharu counts a cleared translation as none (#1500); being
+        // placed tells nothing, as every first translation starts placed
+        // (#1494).
         apply(
             &mut session,
             vec![Op::SetText {
@@ -416,12 +419,12 @@ mod tests {
             &english,
             &Snapshot::default(),
         )?;
-        assert_eq!(retyped.label, "set_text");
-        assert!(matches!(retyped.ops.as_slice(), [Op::SetText { .. }]));
+        assert_eq!(retyped.label, LABEL);
         session.apply(retyped)?;
         let typed = translation(&session, block)?;
         assert_eq!(typed.content.text(), "Hm");
-        assert_eq!((typed.frame, typed.style), (cleared.frame, cleared.style));
+        // Where placement put it the first time.
+        assert_eq!(typed.frame, cleared.frame);
         Ok(())
     }
 

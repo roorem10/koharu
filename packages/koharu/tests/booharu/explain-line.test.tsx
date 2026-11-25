@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BoxDetailsDialog } from '@/components/booharu/details/BoxDetailsDialog'
 import { RightSidebar } from '@/components/editor/RightSidebar'
 import { StoryPanel } from '@/components/editor/StoryPanel'
+import { useConversation } from '@/lib/agent'
 import { useAgentChat } from '@/lib/booharu/agentChat'
 import { boxActions, runBoxAction, selectedBoxes } from '@/lib/booharu/boxActions'
 import { closeBoxDetails, openBoxDetails, useBoxDetails } from '@/lib/booharu/boxDetails'
@@ -115,7 +116,8 @@ async function explainFromStory(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   useBoxDetails.setState({ shown: null, reveal: null })
   useExplanations.setState({ project: null, lines: {} })
-  useAgentChat.setState({ project: null, turns: [], running: null, stale: false })
+  useAgentChat.setState({ project: null, stale: false })
+  useConversation.setState(useConversation.getInitialState())
 })
 
 describe('Booharu Explain this line', () => {
@@ -346,8 +348,10 @@ describe('Booharu Explain this line', () => {
       `Discuss text layer free. Source: 潔の武器. Translation: Isagi's weapon. Explanation: ${answer.explanation}. Use view_page for the page image.`,
     )
 
-    // Nothing is sent, and the line goes in once: the chat's panel, mounted again, starts empty.
+    // Nothing is sent, and the line goes in once: cleared, it doesn't come back as the chat's panel
+    // is mounted again, which keeps the composer's draft as Koharu keeps it.
     expect(commands.runAgent).not.toHaveBeenCalled()
+    await user.clear(composer)
     view.unmount()
     mount(<RightSidebar />)
     expect(screen.getByRole('textbox', { name: 'Message Booharu Agent' })).toHaveValue('')

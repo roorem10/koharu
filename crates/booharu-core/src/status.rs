@@ -11,12 +11,14 @@
 //! A box styled before it's translated has a translation that is only a
 //! placeholder ([`placeholder`]): Koharu's type bar, and Koharu's agent's
 //! edit tool, write a style change on a block with no translation into its
-//! translation, which the scene starts from empty point text. It holds no
-//! words and was never placed, so wherever the question is whether a block
-//! is translated, it counts as no translation ([`unwritten`]): the box stays
+//! translation, which the scene starts as its source's blank (Koharu's
+//! #1494). It holds no words and no run wrote it, so wherever the question
+//! is whether a block is translated, it counts as no translation
+//! ([`unwritten`]), as Koharu counts a blank one (#1500): the box stays
 //! translatable, and a run that translates it keeps the style set by hand.
 
-use koharu_scene::{Block, Content, Frame, Layer, Page};
+use koharu_scene::{Block, CharStyle, Content, Layer, Page};
+use serde_json::Value;
 
 use crate::{
     attrs::Auto,
@@ -53,28 +55,59 @@ pub fn blocks(page: &Page) -> Vec<(&Layer, &Block, bool)> {
 /// Whether `block`, which `layer` holds, has a translation that is only a
 /// placeholder: a style set on the block before it was translated, which
 /// Koharu's type bar and its agent's edit tool write into a block with no
-/// translation, and the scene starts from empty point text. Its words are
-/// blank, trimmed as the record's hash trims them ([`text_hash`]); its frame
-/// is still a point, as nothing placed it (Translate, typing on the canvas
-/// or in the Story panel, and the agent's typing all place a first
-/// translation, while a move or a skew changes only its transform, which
-/// isn't read); and no run wrote it: its hand-edit record holds no
-/// translation and Koharu's Translation stage recorded none, or the record
-/// holds the translation of no text a line given back leaves, styled since.
-/// A translation a run wrote and the user emptied isn't one, as its record
-/// holds the text the run wrote, so it stays a hand edit. False for a block
-/// with no translation at all.
+/// translation, and the scene starts as its source's blank, in its source's
+/// place (Koharu's #1494), so its frame tells nothing. Its words are blank,
+/// trimmed as the record's hash trims them ([`text_hash`]), and no run wrote
+/// it: its hand-edit record holds no translation and Koharu's Translation
+/// stage recorded none, or the record holds the translation of no text a
+/// line given back leaves, styled since. A translation a run wrote and the
+/// user emptied isn't one, as its record holds the text the run wrote, so it
+/// stays a hand edit. False for a block with no translation at all.
 pub fn placeholder(layer: &Layer, block: &Block) -> bool {
     let Some(translation) = &block.translation else {
         return false;
     };
     let blank = translation.content.text().trim().is_empty();
-    let unplaced = matches!(translation.frame, Frame::Point);
-    let by_no_run = match Auto::of(layer).text {
+    blank && by_no_run(layer)
+}
+
+/// Whether no run wrote the translation of the block `layer` holds: its
+/// hand-edit record holds no translation and Koharu's Translation stage
+/// recorded none, or the record holds the translation of no text a line
+/// given back leaves.
+fn by_no_run(layer: &Layer) -> bool {
+    match Auto::of(layer).text {
         Some(hash) => hash == text_hash(""),
         None => !recorded(layer, TRANSLATION),
+    }
+}
+
+/// The character values of `block`'s translation, which `layer` holds, that
+/// are its own, as a new translation's look keeps them: all of them when a
+/// run wrote it; when none did, as for a [`placeholder`] or a translation
+/// typed by hand, which the scene starts as its source's blank (Koharu's
+/// #1494), only those its source doesn't hold, so the source's look isn't
+/// read as set by hand. None for a block with no translation.
+pub fn own_chars(layer: &Layer, block: &Block) -> CharStyle {
+    let Some(translation) = &block.translation else {
+        return CharStyle::default();
     };
-    blank && unplaced && by_no_run
+    let chars = &translation.style.chars;
+    if !by_no_run(layer) {
+        return chars.clone();
+    }
+    // Compared as JSON, so every value counts, one added later too.
+    let (Ok(Value::Object(own)), Ok(Value::Object(source))) = (
+        serde_json::to_value(chars),
+        serde_json::to_value(&block.source.style.chars),
+    ) else {
+        return chars.clone();
+    };
+    let own = own
+        .into_iter()
+        .filter(|(key, value)| source.get(key) != Some(value))
+        .collect();
+    serde_json::from_value(Value::Object(own)).unwrap_or_else(|_| chars.clone())
 }
 
 /// Whether `block`, which `layer` holds, has no translation of its own: none
@@ -297,8 +330,9 @@ mod tests {
         // No translation at all is none of its own, but no placeholder.
         let (_dir, mut session, [_, id]) = page(false, &read_steps);
         assert_eq!(read(&session, id), (false, true));
-        // A font and a fill picked in the type bar start one from empty
-        // point text: a placeholder.
+        // A font and a fill picked in the type bar start one as its
+        // source's blank, in its source's place (Koharu's #1494): a
+        // placeholder.
         apply(&mut session, vec![type_bar_style(id)]);
         assert_eq!(read(&session, id), (true, true));
         // A move changes only its transform: still one.
@@ -315,13 +349,14 @@ mod tests {
         apply(&mut session, vec![typed(id, "Why?")]);
         assert_eq!(read(&session, id), (false, false));
 
-        // Resized into a box, it was placed by hand.
+        // Resized into another box, it still holds no words no run wrote:
+        // its frame tells nothing since Koharu's #1494.
         let (_dir, mut session, [_, id]) = page(false, &read_steps);
         let boxed = op(json!({"op": "update_layer", "layer": id,
             "patch": {"translation": {"frame": {"box": {"bounds":
                 {"x": 0, "y": 0, "width": 40, "height": 20}}}}}}));
         apply(&mut session, vec![type_bar_style(id), boxed]);
-        assert_eq!(read(&session, id), (false, false));
+        assert_eq!(read(&session, id), (true, true));
 
         // Whitespace typed into a block with none, unstyled, is point text
         // no run wrote too.

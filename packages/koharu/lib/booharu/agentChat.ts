@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useEffect } from 'react'
 import { create } from 'zustand'
 
+import { useConversation } from '@/lib/agent'
 import { call } from '@/lib/booharu/call'
 import { useProject } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
@@ -41,31 +42,25 @@ function running(turn: ChatTurn): boolean {
   return turn.role === 'assistant' && (turn as { state?: unknown }).state === 'running'
 }
 
-/** The open project's conversation with the agent as the chat panel shows it (D18): held apart from
- * the panel, which Settings unmounts, so the chat, and Stop for the run going, outlive it, while the
- * desktop's conversation goes on. */
+/** Whose chat Koharu's conversation holds (D18). Koharu's store (`useConversation`) holds the turns,
+ * the draft and the run going apart from the panel, which Settings and Read unmount, and starts over
+ * as the project closes; Booharu reads the project's saved chat into it. */
 interface AgentChat {
-  /** The project whose chat it holds; none while none is open. */
+  /** The project whose chat the conversation holds; none while none is open. */
   project: string | null
-  turns: ChatTurn[]
-  /** The run going, which Stop stops. */
-  running: number | null
   /** Whether the file changed while a turn ran, so it's read again once none does. */
   stale: boolean
 }
 
-const empty = { turns: [], running: null, stale: false }
+export const useAgentChat = create<AgentChat>()(() => ({ project: null, stale: false }))
 
-export const useAgentChat = create<AgentChat>()(() => ({ project: null, ...empty }))
-
-/** The turns of a project the store doesn't hold. */
-const none: ChatTurn[] = []
-
-/** Holds `project`'s chat: as it is when the store holds that project's already, else read from
- * its agent file, none until the file is read. */
+/** Holds `project`'s chat: as it is when the conversation holds that project's already, else
+ * started over, as Koharu starts it over as a project closes, and read from its agent file, none
+ * until the file is read. */
 function hold(project: string | null): void {
   if (useAgentChat.getState().project === project) return
-  useAgentChat.setState({ project, ...empty })
+  useAgentChat.setState({ project, stale: false })
+  useConversation.setState(useConversation.getInitialState())
   if (project !== null) void reread(project)
 }
 
@@ -113,20 +108,23 @@ export function rejoined(current: readonly ChatTurn[], saved: readonly SavedTurn
 let reads = 0
 
 /** Reads `project`'s agent file into its chat, unless a turn runs, which the read waits for. A file
- * that doesn't read shows its error, as every failed command's does, and leaves the chat as it is. */
+ * that doesn't read shows its error, as every failed command's does, and leaves the chat as it is.
+ * The file's turns take the conversation's place, so none shows twice. */
 async function reread(project: string): Promise<void> {
-  if (useAgentChat.getState().turns.some(running)) {
+  if (useConversation.getState().turns.some(running)) {
     useAgentChat.setState((state) => (state.project === project ? { stale: true } : state))
     return
   }
   const read = ++reads
   const entries = await call(commands.booharuGetAgentHistory).catch(() => null)
   if (!Array.isArray(entries)) return
-  useAgentChat.setState((state) => {
-    if (state.project !== project || read !== reads) return state
-    if (state.turns.some(running)) return { stale: true }
-    return { turns: rejoined(state.turns, entries.map(turnOf)), stale: false }
-  })
+  if (useAgentChat.getState().project !== project || read !== reads) return
+  if (useConversation.getState().turns.some(running)) {
+    useAgentChat.setState({ stale: true })
+    return
+  }
+  useAgentChat.setState({ stale: false })
+  useConversation.setState(({ turns }) => ({ turns: rejoined(turns, entries.map(turnOf)) }))
 }
 
 /** The desktop changed the open project's agent file: a turn ended, New chat was pressed, Explain
@@ -137,51 +135,17 @@ function chatChanged(): void {
   if (project !== null) void reread(project)
 }
 
-type SetTurns<T> = (update: T[] | ((current: T[]) => T[])) => void
-
-/** The open project's chat, `[turns, setTurns]` as `useState` gives them to the chat panel, whose
- * `Turn` must hold each `SavedTurn`, or this call doesn't compile: kept by project, read from the
- * project's agent file once it opens, and again whenever the desktop tells it changed, once no turn
- * runs, starting over with another project. A turn's setter changes only the project it was made
- * for, so a run's events that come once another project opened change nothing. */
-export function useBooharuAgentChat<T extends ChatTurn>(
-  // Empty when the panel's `Turn` holds each `SavedTurn`.
-  ..._fits: SavedTurn extends T ? [] : [never]
-): [T[], SetTurns<T>] {
+/** Holds the open project's chat in the agent's conversation, as the chat panel shows: read from
+ * the project's agent file once it opens, starting over with another project. */
+export function useBooharuAgentChat(): void {
   const project = useProject().data?.name ?? null
-  const turns = useAgentChat((state) => (state.project === project ? state.turns : none))
   useEffect(() => hold(project), [project])
-  const setTurns = useCallback<SetTurns<T>>(
-    (update) => {
-      useAgentChat.setState((state) => {
-        if (state.project !== project) return state
-        const current = state.turns as T[]
-        return { turns: typeof update === 'function' ? update(current) : update }
-      })
-      const { stale, turns: now } = useAgentChat.getState()
-      if (project !== null && stale && !now.some(running)) void reread(project)
-    },
-    [project],
-  )
-  return [turns as T[], setTurns]
-}
-
-/** The open project's agent run going, `[running, setRunning]`, as `useState` gives them to the
- * chat panel: kept with its chat, so Stop works after Settings. */
-export function useBooharuAgentRun(): [number | null, (run: number | null) => void] {
-  const project = useProject().data?.name ?? null
-  const running = useAgentChat((state) => (state.project === project ? state.running : null))
-  const setRunning = useCallback(
-    (run: number | null) =>
-      useAgentChat.setState((state) => (state.project === project ? { running: run } : state)),
-    [project],
-  )
-  return [running, setRunning]
 }
 
 /** Keeps the agent's chat with the open project: it starts over as another project opens, or the
  * open one closes, and is read again whenever the desktop tells it changed, whether or not the
- * panel shows, as while Settings is open. Mounted once, in the app's providers. */
+ * panel shows, as while Settings is open, or once no turn runs when one did. Mounted once, in the
+ * app's providers. */
 export function useBooharuAgentChatEvents(): void {
   useEffect(() => {
     let active = true
@@ -193,8 +157,16 @@ export function useBooharuAgentChatEvents(): void {
         if (active) hold(name)
       }),
     ].map((listener) => listener.catch(() => null))
+    // A file that changed while a turn ran is read once none does.
+    const ended = useConversation.subscribe(({ turns }) => {
+      const { project, stale } = useAgentChat.getState()
+      if (!active || project === null || !stale || turns.some(running)) return
+      useAgentChat.setState({ stale: false })
+      void reread(project)
+    })
     return () => {
       active = false
+      ended()
       for (const listener of listening) void listener.then((stop) => stop?.())
     }
   }, [])
@@ -221,23 +193,9 @@ export function withDivider<T extends ChatTurn>(turns: (T | BooharuTurn)[]): (T 
   ]
 }
 
-/** A line Discuss handed to the agent, which the chat's composer takes once. */
-const useAgentDrafts = create<{ draft: { text: string } | null }>()(() => ({ draft: null }))
-
-/** Discuss: puts `prompt` in the agent's composer, in place of what it holds, and shows the Agent
- * tab. Nothing is sent until the user sends it. */
+/** Discuss: puts `prompt` in the agent's composer, Koharu's draft, in place of what it holds, and
+ * shows the Agent tab. Nothing is sent until the user sends it. */
 export function discussInAgent(prompt: string): void {
-  useAgentDrafts.setState({ draft: { text: prompt } })
+  useConversation.setState({ prompt })
   useKoharuStore.getState().showPanel('agent')
-}
-
-/** Copies each line Discuss hands over into the chat's composer once, through `fill`, the
- * composer's setter. */
-export function useAgentDraft(fill: (text: string) => void): void {
-  const draft = useAgentDrafts((state) => state.draft)
-  useEffect(() => {
-    if (!draft) return
-    fill(draft.text)
-    useAgentDrafts.setState((state) => (state.draft === draft ? { draft: null } : state))
-  }, [draft, fill])
 }

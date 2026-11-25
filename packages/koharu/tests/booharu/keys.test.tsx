@@ -4,10 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { CanvasWorkspace } from '@/components/editor/CanvasWorkspace'
 import { controlKeepsKey, keyActions, reservedKeys } from '@/lib/booharu/keys'
-import { queryClient } from '@/lib/queries'
+import { pageKey, queryClient } from '@/lib/queries'
 import { toolKeys } from '@/lib/shortcuts'
 import { useKoharuStore } from '@/lib/store'
-import { commands } from '@koharu/ipc/protocol'
+import { commands, type Page } from '@koharu/ipc/protocol'
 
 /** Keys a focused control keeps: Space, the arrows, Enter, Delete, Escape, and the canvas's own
  * Ctrl, Cmd and Alt chords (undo, redo, select all, deselect, fit), as a browser names them, their
@@ -308,6 +308,25 @@ describe('Booharu tool keys on the canvas', () => {
   })
 
   it("takes Koharu's keys from the page: undo, the arrows' nudge, Delete and Escape", async () => {
+    // Delete takes the selected layers it finds on the shown page (Koharu's #1529).
+    queryClient.setQueryData(pageKey, {
+      id: 'page',
+      size: { width: 100, height: 100 },
+      background: null,
+      layers: [
+        {
+          id: 'layer',
+          name: 'layer',
+          kind: 'text',
+          content: [{ insert: 'Hi' }],
+          visible: true,
+          locked: false,
+          opacity: 1,
+          blend: 'normal',
+          attributes: {},
+        },
+      ],
+    } satisfies Page)
     const { sent } = await renderWorkspace()
     fireEvent.keyDown(document.body, { key: 'z', code: 'KeyZ', ctrlKey: true })
     expect(fireEvent.keyDown(document.body, { key: 'ArrowRight', code: 'ArrowRight' })).toBe(false)
@@ -319,6 +338,7 @@ describe('Booharu tool keys on the canvas', () => {
     expect(commands.nudge).toHaveBeenNthCalledWith(2, 0, -10)
     fireEvent.keyDown(document.body, { key: 'Escape', code: 'Escape' })
     expect(useKoharuStore.getState().selectedLayers).toEqual([])
+    queryClient.removeQueries({ queryKey: pageKey })
   })
 
   it('leaves every key in a dialog, a menu or an open list to it', async () => {

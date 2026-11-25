@@ -14,10 +14,11 @@ import { renderBar, restyled, settled, text } from './typeBar'
 /** A box frame fitting its text by `fit`. */
 const box = (fit: Fit) => ({ box: { bounds: { x: 0, y: 0, width: 100, height: 50 }, fit } })
 
-/** The edit Koharu sends to fit a box's text by `fit`. */
-const refit = (layer: string, fit: Fit): Edit => ({
+/** The edit Koharu sends to fit the text of each of `layers`, boxes, by `fit`: one edit for them
+ * all, a growing box left out of it when its fitting goes off (#1499). */
+const refit = (fit: Fit, ...layers: string[]): Edit => ({
   label: 'update_layer',
-  ops: [{ op: 'update_layer', layer, patch: { frame: { box: { fit } } } }],
+  ops: layers.map((layer) => ({ op: 'update_layer', layer, patch: { frame: { box: { fit } } } })),
 })
 
 describe('Booharu font size', () => {
@@ -46,7 +47,7 @@ describe('Booharu font size', () => {
     expect(edits).toEqual(
       expect.arrayContaining([
         restyled([['one', { chars: { size: 412.3 } }]]),
-        refit('one', 'none'),
+        refit('none', 'one'),
       ]),
     )
   })
@@ -59,7 +60,7 @@ describe('Booharu font size', () => {
 
     await waitFor(() => expect(edits).toHaveLength(2))
     expect(edits).toEqual(
-      expect.arrayContaining([restyled([['one', { chars: { size: 36 } }]]), refit('one', 'none')]),
+      expect.arrayContaining([restyled([['one', { chars: { size: 36 } }]]), refit('none', 'one')]),
     )
   })
 
@@ -70,9 +71,13 @@ describe('Booharu font size', () => {
     await user.clear(size)
     await user.type(size, '30{Enter}')
 
-    await waitFor(() => expect(edits).toHaveLength(1))
+    await waitFor(() => expect(edits).toHaveLength(2))
     await settled()
-    expect(edits).toEqual([restyled([['one', { chars: { size: 30 } }]])])
+    // Koharu's fit edit leaves the growing box out, so it holds no op.
+    expect(edits).toEqual(
+      expect.arrayContaining([restyled([['one', { chars: { size: 30 } }]]), refit('none')]),
+    )
+    expect(edits).toHaveLength(2)
   })
 
   it('sizes every box while their sizes and fits differ, shown as Mixed, and turns their fitting off', async () => {
@@ -86,15 +91,14 @@ describe('Booharu font size', () => {
     expect(size).toHaveAttribute('placeholder', 'Mixed')
     await user.type(size, '16{Enter}')
 
-    await waitFor(() => expect(edits).toHaveLength(3))
+    await waitFor(() => expect(edits).toHaveLength(2))
     expect(edits).toEqual(
       expect.arrayContaining([
         restyled([
           ['one', { chars: { size: 16 } }],
           ['two', { chars: { size: 16 } }],
         ]),
-        refit('one', 'none'),
-        refit('two', 'none'),
+        refit('none', 'one', 'two'),
       ]),
     )
   })
@@ -108,10 +112,9 @@ describe('Booharu font size', () => {
     await user.click(screen.getByRole('button', { name: 'Choose font size' }))
     await user.click(await screen.findByRole('menuitemradio', { name: 'Auto' }))
 
-    await waitFor(() => expect(edits).toHaveLength(2))
+    await waitFor(() => expect(edits).toHaveLength(1))
     await settled()
-    expect(edits).toEqual(expect.arrayContaining([refit('one', 'best'), refit('two', 'best')]))
-    expect(edits).toHaveLength(2)
+    expect(edits).toEqual([refit('best', 'one', 'two')])
   })
 
   it('steps the characters typed with A− and A+, never touching the fit (S11-e)', async () => {

@@ -891,8 +891,9 @@ mod tests {
         }
 
         // Off: the default fill, with no outline for dialogue and a
-        // legibility outline for the sound effect, as wide as Koharu's, its
-        // page having no lettering size.
+        // legibility outline for the sound effect, a sixteenth of the size
+        // its source gave it, as its first translation starts as its
+        // source's blank (Koharu's #1494), its page having no lettering size.
         let off = look(false, Some(YELLOW));
         fixture.apply(&StyleScope::Project, false, &off, Origin::Automatic)?;
         let a = fixture.translation("a")?.style.chars;
@@ -903,7 +904,7 @@ mod tests {
         let e = fixture.translation("e")?.style.chars;
         assert_eq!(
             (e.fill, e.stroke, e.stroke_width),
-            (Some(YELLOW), Some(BLACK), Some(3.0))
+            (Some(YELLOW), Some(BLACK), Some(2.0))
         );
         Ok(())
     }

@@ -508,6 +508,7 @@ fn the_run_cleans_the_area_alone_at_once_with_the_saved_settings() -> Result<()>
             page: fixture.scanned,
             area,
             prompt: None,
+            layer: None,
         }
     );
     assert_eq!(request.stages, BTreeSet::from([Stage::Inpaint]));

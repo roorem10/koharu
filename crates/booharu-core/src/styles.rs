@@ -482,11 +482,9 @@ fn looked(
         }
         other => bail!("placement's op is {other:?}, not a patch"),
     };
-    let own = block
-        .translation
-        .as_ref()
-        .map(|translation| translation.style.chars.clone())
-        .unwrap_or_default();
+    // Its own values, which for a translation no run wrote leave out what it
+    // has from its source's blank (Koharu's #1494).
+    let own = status::own_chars(layer, block);
     let placed = patched(&own, &placement)?;
     let sfx = block.role == Role::Sfx;
     let look = new_translation(settings, font, sfx, category, &own, &placed);
@@ -1369,8 +1367,13 @@ mod tests {
             }],
         );
         let found = layer(&session, block);
+        let Content::Block(sized) = &found.content else {
+            panic!("not a block");
+        };
+        // Its own values hold no look key: the source's, which it starts
+        // with as its source's blank (Koharu's #1494), aren't its own.
         assert_eq!(
-            AutoStyle::of(&translation(&session, block).style.chars),
+            AutoStyle::of(&status::own_chars(&found, sized)),
             AutoStyle::default()
         );
         assert!(edited(&found).style);

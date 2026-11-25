@@ -19,6 +19,12 @@ export function setRunner(next: Runner): void {
   runner = next
 }
 
+/**  An account signed in to a site. */
+export type Account = {
+  /**  `None` when the site doesn't say it. */
+  name: string | null
+}
+
 /**
  *  `[agent]`: the agent's model, how much it reasons, and how long a run
  *  goes.
@@ -856,7 +862,7 @@ export type ExplainAnswer = {
   model: string
 }
 
-export type ExportFormat = 'png' | 'psd' | 'cbz'
+export type ExportFormat = 'png' | 'psd' | 'cbz' | 'pdf'
 
 /**  The page facing the shown one in a two-page spread, and its side. */
 export type FacingPage = {
@@ -1617,7 +1623,8 @@ export type Op =
   /**
    *  Change a layer's values with a JSON Merge Patch (RFC 7396): `null`
    *  clears an optional value, and `{"translation": null}` removes a
-   *  block's translation.
+   *  block's translation. A patch into a missing one merges into the one
+   *  `set_text` adds.
    */
   | { op: 'update_layer'; layer: Ref; patch: Value }
   /**
@@ -1629,8 +1636,9 @@ export type Op =
    */
   | { op: 'transform_layer'; layer: Ref; transform: Transform }
   /**
-   *  Replace a text layer's text, or a block's translation, adding one if
-   *  the block has none. Styling on unchanged characters is kept.
+   *  Replace a text layer's text, or a block's translation. A block without
+   *  one gets one with its source's frame, transform, direction, and style.
+   *  Styling on unchanged characters is kept.
    */
   | { op: 'set_text'; layer: Ref; text: string }
   /**  Replace a text's spans, from the rich editor. */
@@ -1644,7 +1652,8 @@ export type Op =
    *  Replace pixels of a layer's picture, in its own pixel coordinates:
    *  RGBA8 for a raster or a block's `cleanup`, grey8 for a mask or a
    *  block's `mask`, each named by its own id. A block's parts take the
-   *  labels `$label.mask` and `$label.cleanup` from the block's.
+   *  labels `$label.mask` and `$label.cleanup` from the label, or the id, it's
+   *  added under.
    */
   | { op: 'write_pixels'; layer: Ref; rect: Rect; pixels: number[] }
   /**  Add an imported file, stored once by its content hash. */
@@ -1714,7 +1723,11 @@ export type PageSummary = {
   background: Background | null
   /**  Its blocks, hidden ones too. */
   texts: number
-  /**  Its blocks that hold a translation. */
+  /**
+   *  Its blocks whose translation isn't blank. A cleared translation keeps
+   *  its style, and styling an untranslated block makes an empty one, so
+   *  neither counts.
+   */
   translated: number
 }
 
@@ -2511,7 +2524,8 @@ export type Target =
   /**  Recognition, inpainting, or translation on blocks. */
   | ({ blocks: LayerId[] } & { area?: never; pages?: never })
   /**
-   *  Inpainting only: a new raster layer limited by a layer mask to the
+   *  Inpainting only, onto `layer`, a raster or a block's clean-up, whose
+   *  mask opens there, or a new raster layer limited by a layer mask to the
    *  area, as Photoshop's Generative Fill and Content-Aware Fill write one.
    *  Its prompt goes ahead of the inpainter section's; LaMa, which takes
    *  none, ignores it.
@@ -2521,6 +2535,7 @@ export type Target =
         page: PageId
         area: Area
         prompt: string | null
+        layer: LayerId | null
       }
     } & { blocks?: never; pages?: never })
 
@@ -2596,6 +2611,8 @@ export type Tool =
   /**  Photoshop's Lasso: marks a freehand shape of the page's pixels. */
   | 'lasso'
   | 'text'
+  /**  Draws a text block, for a text detection missed. */
+  | 'block'
   | 'draw'
   | 'eraser'
   | 'color_picker'
@@ -2760,7 +2777,7 @@ export const commands = {
   redo: () => runner('redo', (options) => invoke<null>('redo', {}, options)),
   /** Goes to the project as it was after `step` steps, as a click in Photoshop's History panel does; 0 is the project as it opened. */
   goTo: (step: number) => runner('go_to', (options) => invoke<null>('go_to', { step }, options)),
-  /** The page as it renders, `HEIGHT` pixels tall, as WebP. */
+  /** The page as it renders, `HEIGHT` pixels tall, as WebP: drawn twice as large and shrunk, as masks' edges are jagged drawn at that size. */
   getPageThumbnail: (page: PageId) =>
     runner('get_page_thumbnail', (options) =>
       invoke<ArrayBuffer>('get_page_thumbnail', { page }, options),
@@ -2831,9 +2848,9 @@ export const commands = {
     runner('sign_in_site', (options) => invoke<null>('sign_in_site', { site }, options)),
   signOutSite: (site: string) =>
     runner('sign_out_site', (options) => invoke<null>('sign_out_site', { site }, options)),
-  /** The name of the account signed in to the site `site`, `None` when no one is. */
+  /** The account signed in to the site `site`, `None` when no one is. */
   getAccount: (site: string) =>
-    runner('get_account', (options) => invoke<string | null>('get_account', { site }, options)),
+    runner('get_account', (options) => invoke<Account | null>('get_account', { site }, options)),
   /** Opens the chapter at `url` as the open project, and loads its pages into it, which `chapter` tells how far it went with; says how it reads. */
   readChapter: (url: string) =>
     runner('read_chapter', (options) => invoke<Reading>('read_chapter', { url }, options)),
@@ -2847,9 +2864,9 @@ export const commands = {
   /** Picks files or a folder and adds their pages after the project's last: the files in name order, numbers by value, an archive's or a PDF's own pages in theirs. */
   import: (source: ImportSource) =>
     runner('import', (options) => invoke<null>('import', { source }, options)),
-  /** Picks where the open project's pages go, and writes them there. `labels` names a PSD's layers the scene names nothing, in the interface's language. */
-  export: (format: ExportFormat, labels: Labels) =>
-    runner('export', (options) => invoke<null>('export', { format, labels }, options)),
+  /** Picks where the open project's pages go, and writes them there: `pages` alone, or every page when it's `None`, in the project's order. `labels` names a PSD's layers the scene names nothing, in the interface's language. */
+  export: (pages: PageId[] | null, format: ExportFormat, labels: Labels) =>
+    runner('export', (options) => invoke<null>('export', { pages, format, labels }, options)),
   /** The canvas element's rectangle, in CSS pixels from the window's corner. */
   setViewport: (x: number, y: number, width: number, height: number) =>
     runner('set_viewport', (options) =>
@@ -2864,6 +2881,9 @@ export const commands = {
   /** Whether the Story panel shows, and the text whose entry the pointer is on, which the canvas numbers and outlines. */
   setStory: (story: Story) =>
     runner('set_story', (options) => invoke<null>('set_story', { story }, options)),
+  /** Whether the page shows its scan alone, as Lightroom's Before view shows a photo without its edits. */
+  setOriginal: (original: boolean) =>
+    runner('set_original', (options) => invoke<null>('set_original', { original }, options)),
   /** The type bar's character settings for the text being typed: the selected characters take them, or at a caret the next ones typed. */
   styleTyping: (patch: CharStyle) =>
     runner('style_typing', (options) => invoke<null>('style_typing', { patch }, options)),

@@ -556,14 +556,11 @@ fn ended(
 
 #[cfg(test)]
 mod tests {
-    use koharu_llm::{
-        SummaryPrompts,
-        rig::{
-            completion::Usage,
-            message::{
-                AssistantContent, AssistantMessage, ImageMediaType, Message, ToolName,
-                ToolResultContent,
-            },
+    use koharu_llm::rig::{
+        completion::Usage,
+        message::{
+            AssistantContent, AssistantMessage, ImageMediaType, Message, ToolName,
+            ToolResultContent,
         },
     };
 
@@ -725,7 +722,7 @@ mod tests {
         let fold = recorder.fold();
         fold(&started("view_page", 1));
         fold(&text("Page 1 is"));
-        let mut context = Context::new(SummaryPrompts::DEFAULT);
+        let mut context = Context::default();
         context.record([(vec![Message::user("Read p. 1")], Usage::default())]);
         recorder.remember(&context);
         // No runtime here: it's written as it drops.
@@ -783,7 +780,7 @@ mod tests {
             ]
         };
         let page = ToolResultContent::image_base64("aGVsbG8=", Some(ImageMediaType::JPEG), None);
-        let mut context = Context::new(SummaryPrompts::DEFAULT);
+        let mut context = Context::default();
         context.record([(said(page), Usage::default())]);
 
         let mut recorder = Recorder::new(Arc::new(|| {}), project.clone(), "Hi", "m/1");
@@ -812,8 +809,7 @@ mod tests {
 
         let (conversation, lost) = remembered(&project).expect("the memory");
         assert!(!lost);
-        let restored =
-            Context::new(SummaryPrompts::DEFAULT).continuing(conversation.expect("a conversation"));
+        let restored = Context::default().continuing(conversation.expect("a conversation"));
         let mut kept = said(ToolResultContent::text(PAGE_NOT_KEPT));
         kept[0] = Message::user("What does page 1 say? My key is [REDACTED]");
         let kept: Vec<Arc<Message>> = kept.into_iter().map(Arc::new).collect();
@@ -868,7 +864,7 @@ mod tests {
     async fn a_run_ending_after_new_chat_leaves_the_memory_forgotten() {
         let _held = CHATTING.lock().await;
         let (_dir, project) = project();
-        let mut context = Context::new(SummaryPrompts::DEFAULT);
+        let mut context = Context::default();
         context.record([(vec![Message::user("Hi")], Usage::default())]);
         let mut recorder = Recorder::new(Arc::new(|| {}), project.clone(), "Hi", "m/1");
         recorder.remember(&context);
