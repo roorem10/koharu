@@ -44,7 +44,7 @@ pointer hits is what the user sees.
 | direct selection | reshapes the selected text's frame by its anchors: a press on an anchor or a segment drags what it picks, Shift adds to the picked anchors, and a marquee picks those it encloses; the text fits the new shape when the drag ends. A box becomes a path through its corners at its first edit. Delete removes the picked anchors and joins their neighbours, never leaving a ring fewer than three, so a frame stays closed | the Direct Selection tool reshapes a text's path by dragging its anchors [Photoshop text paths], picks segments and anchors by click or marquee, Shift adding [Photoshop path selection], and drags a segment [InDesign paths]; its Delete key would cut the segments at a point, where the Delete Anchor Point tool joins them [Photoshop anchor points] |
 | marquee, lasso | mark a rectangle, or a freehand shape closed as the pointer lifts, of the page's pixels as the area | the Rectangular Marquee [Photoshop marquee] and the Lasso, which closes its border on release [Photoshop lasso] |
 | text | types point text from a click and a text box over a drag, added when typing commits; a click on a text types into it at the click, as a double click with the select tool does | Photoshop's point type starts at the point you select on the canvas, and its paragraph type sits inside a bounding box [Photoshop type] |
-| text block | adds a block over the box a drag draws, in the balloon under the box's middle, else the panel, else the page<!-- Booharu: read in order. -->, where it's read in order among what that holds (Booharu); its source's frame and its mask are the box<!-- Booharu: read at once. -->, and asks the host, as Booharu's effect with the modifiers held as the pointer lifts, to read the block at once; a box being drawn outlasts a new revision of its page and another selection, so the next box drawn while the last one's block is read isn't dropped (Booharu, whose O tool folded into it) | a FineReader text area is drawn by dragging over the image [FineReader areas], and Clip Studio Paint's Rectangle frame adds a frame border folder where it's dragged [CSP frames] |
+| text block | adds a block over the box a drag draws, in the balloon under the box's middle, else the panel, else the page; its source's frame and its mask are the box<!-- Booharu: read at once. -->, and asks the host, as Booharu's effect with the modifiers held as the pointer lifts, to read the block at once; a box being drawn outlasts a new revision of its page and another selection, so the next box drawn while the last one's block is read isn't dropped (Booharu, whose O tool folded into it) | a FineReader text area is drawn by dragging over the image [FineReader areas], and Clip Studio Paint's Rectangle frame adds a frame border folder where it's dragged [CSP frames] |
 | draw, eraser | paint and erase a raster's or a block's clean-up's pixels along a stroke; on a block's mask, the draw tool uncovers the clean-up whatever its colour, and the eraser hides it | a layer mask is drawn on an alpha scale: the eraser masks more, and any colour uncovers more [CSP layer masks] |
 | remove | paints the area for the inpainting model to redraw, as the pipeline's area run takes it, onto the selected raster or clean-up, or a raster it adds and selects | |
 | colour picker | the page's own pixel under the pointer, not the screen's | |
@@ -89,14 +89,6 @@ release that follow.
   right-click inside a selection of several keeps it, and answers Booharu's
   effect for the host to open the box's menu at the pointer. It starts no
   gesture, and anything else under the pointer answers nothing.
-- **Booharu: a text block's box goes where it's read.** Koharu puts the block
-  a text block box adds on top of what its balloon, panel or page holds, last
-  in the reading. Booharu keeps Koharu's choice of holder but puts the block
-  where it's read in order among what's there, by the rule Booharu's agent box
-  follows: in a balloon, vertical lines right to left and horizontal ones top
-  to bottom; in a panel or on the page, rows top to bottom and right to left
-  along a row. So the story numbers it, and a run reads it, among its
-  neighbours.
 - **Booharu: a box styled before it's translated acts as one with none.** The
   type bar writes a style set on a block with no translation into the blank
   the scene starts its translation as, only a placeholder. The canvas shows

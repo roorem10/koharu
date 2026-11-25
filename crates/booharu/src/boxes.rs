@@ -19,7 +19,6 @@ use std::{
 use anyhow::{Context as _, Result, bail, ensure};
 use booharu_core::{
     attrs::{self, Attr, Auto, Flags, Lettering, QcOk, ReadNote, ReviewNote, Skew},
-    order,
     settings::OcrBoxMode,
     sfx, status,
     styles::{self, text_hash},
@@ -151,10 +150,8 @@ pub fn read_scan<S: Deref<Target = Session>>(
 /// no translation and no provenance, so it counts as made by hand. It goes in
 /// the smallest balloon holding at least 90% of the box, else the smallest
 /// panel holding its centre, else on the page, where it is read in order
-/// among what is there, by the rule the K tool's box follows too
-/// ([`order::reading_index`]). Only `ReadTranslateClean` gives it a mask,
-/// the whole box: the other modes leave it empty, so reading never erases
-/// the art.
+/// among what is there. Only `ReadTranslateClean` gives it a mask, the whole
+/// box: the other modes leave it empty, so reading never erases the art.
 pub fn add_box(
     session: &Session,
     page: PageId,
@@ -201,7 +198,7 @@ pub fn add_box(
         "id": format!("${BOX}"),
         "page": page,
         "parent": parent.map(|parent| parent.id),
-        "index": order::reading_index(siblings, rect, vertical, in_balloon),
+        "index": reading_index(siblings, rect, vertical, in_balloon),
         "layer": {"kind": "block", "role": "text", "source": {
             "frame": {"box": {"bounds": bounds(rect)}},
             "direction": direction,
@@ -1181,6 +1178,54 @@ fn clipped(polygon: &[Point], rect: kurbo::Rect) -> Vec<Point> {
         }
     }
     polygon
+}
+
+/// Where among `siblings` a block at `rect` goes to be read in order: just
+/// before the first sibling whose first text it is read before, else last.
+/// Among a balloon's texts, `in_balloon`, vertical text reads right to left
+/// then top to bottom, and horizontal text top to bottom then left to right,
+/// as Booharu 0.0.4 ordered a balloon's boxes. Among a panel's or the page's
+/// balloons and texts, as a manga page reads, those sharing a row read right
+/// to left and the rows top to bottom, so a vertical line low on the page
+/// isn't read before a balloon above it. A sibling holding no text is no
+/// part of the reading.
+fn reading_index(siblings: &[Layer], rect: kurbo::Rect, vertical: bool, in_balloon: bool) -> usize {
+    siblings
+        .iter()
+        .position(|sibling| {
+            first_text(sibling).is_some_and(|text| {
+                let order = match (in_balloon, vertical) {
+                    (true, true) => text
+                        .x0
+                        .total_cmp(&rect.x0)
+                        .then(rect.y0.total_cmp(&text.y0)),
+                    (true, false) => rect
+                        .y0
+                        .total_cmp(&text.y0)
+                        .then(rect.x0.total_cmp(&text.x0)),
+                    // One row: the one further right first.
+                    (false, _) if rect.y0 < text.y1 && text.y0 < rect.y1 => text
+                        .center()
+                        .x
+                        .total_cmp(&rect.center().x)
+                        .then(rect.y0.total_cmp(&text.y0)),
+                    (false, _) => rect.y0.total_cmp(&text.y0),
+                };
+                order.is_lt()
+            })
+        })
+        .unwrap_or(siblings.len())
+}
+
+/// Where the first text in `layer`, itself or one inside it, lies on the
+/// page.
+fn first_text(layer: &Layer) -> Option<kurbo::Rect> {
+    let own = match &layer.content {
+        Content::Block(block) => block.source.bounds(),
+        Content::Text(text) => text.bounds(),
+        _ => None,
+    };
+    own.or_else(|| layer.children.iter().find_map(first_text))
 }
 
 /// Whether the Recognition stage would find nothing to read in `rect` of

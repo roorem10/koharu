@@ -29,7 +29,6 @@ pub(crate) fn finish(draft: &Draft, cx: &Context) -> anyhow::Result<Vec<Effect>>
         .into_iter()
         .find_map(|kind| under(cx, &page.layers, kind, drawn.center()));
     let (id, add) = added(page, holder, content);
-    let add = crate::booharu::in_reading_order(add, page, holder); // Booharu: read in order (Q2).
     let mask = Op::WritePixels {
         layer: Ref::try_from(format!("${}.mask", id.0)).map_err(anyhow::Error::msg)?,
         rect,
