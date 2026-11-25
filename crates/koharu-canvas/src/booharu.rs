@@ -19,6 +19,10 @@
 //! typed, selects it unless it's selected already and answers `Effect::Menu`,
 //! for the host to open the box's menu there.
 //!
+//! A box drawn with K takes its block's place in reading order among its
+//! neighbours, as the O tool's block did, where Koharu adds it last in what
+//! holds it ([`in_reading_order`]).
+//!
 //! A box styled before it's translated holds a translation that is only a
 //! placeholder ([`status::placeholder`]): the type bar wrote a style set on
 //! a block with no translation into the translation the scene starts as its
@@ -33,10 +37,10 @@
 //! Show original draws a levelled page's Original scan, the scan as it came
 //! in, which its background no longer is ([`original_scan`]).
 
-use booharu_core::{lettering, settings::LetteringSettings, sfx, status, styles};
+use booharu_core::{lettering, order, settings::LetteringSettings, sfx, status, styles};
 use koharu_renderer::Drawn;
 use koharu_scene::{
-    Block, Content, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text, Transform,
+    Block, Content, Direction, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text, Transform,
 };
 use kurbo::{Affine, Point};
 use serde::{Deserialize, Serialize};
@@ -402,6 +406,27 @@ pub(crate) fn drawn(page: PageId, layer: LayerId, modifiers: Modifiers) -> crate
             shift: modifiers.shift(),
         },
     })
+}
+
+/// `add`, Koharu's op adding the K tool's block to `holder`, else to `page`,
+/// last among what that holds, with the block where it's read in order
+/// among what's there instead, by the rule the agent's box follows
+/// ([`order::reading_index`]), as the O tool placed its box's block before
+/// it folded into the K tool (the owner's Q2), so Story numbers it and a run
+/// reads it among its neighbours. The holder stays Koharu's choice, and the
+/// block reads in the direction Koharu gave its source. Any other op, as it
+/// is.
+pub(crate) fn in_reading_order(mut add: Op, page: &Page, holder: Option<&Layer>) -> Op {
+    if let Op::AddLayer { index, layer, .. } = &mut add
+        && let Content::Block(block) = &layer.content
+        && let Some(bounds) = block.source.bounds()
+    {
+        let siblings = holder.map_or(&page.layers, |holder| &holder.children);
+        let in_balloon = holder.is_some_and(|holder| matches!(holder.content, Content::Balloon(_)));
+        let vertical = block.source.direction == Direction::Vertical;
+        *index = order::reading_index(siblings, bounds, vertical, in_balloon);
+    }
+    add
 }
 
 /// Whether `gesture`, the one in progress, outlasts a change it didn't make:

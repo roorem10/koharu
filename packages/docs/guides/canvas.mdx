@@ -46,9 +46,10 @@ Use **Select** to pick layers. Click a layer, hold `Shift`, `Ctrl`, or `Command`
     [typography](/guides/typesetting).
   </Tab>
   <Tab title='Text block'>
-    {/* Booharu: a box is read at once. */}
+    {/* Booharu: a box is read at once, in its place in reading order. */}
     Drag with **Text block** over text that detection missed. It adds a text block with the box as
-    its frame and its mask, in the balloon or panel under it. In Booharu, it's read at once, then
+    its frame and its mask, in the balloon or panel under it. In Booharu, it goes where it's read
+    among the text blocks there, so **Story** numbers it in reading order. It's read at once, then
     translated and cleaned if the default action in **Settings → Pipeline** says so; hold `Alt` as
     you let go to read only, or `Shift` to read, translate and clean. A box with nothing to read
     keeps its block for you to type into. Paint its mask smaller to keep the art around the text.
