@@ -1,9 +1,9 @@
 //! A block's translation set by the agent as the Story panel sets one: a
 //! block without a translation of its own, none or only the placeholder a
-//! style set before translating leaves, gets it placed into its own frame
-//! first, in the same undo step, where the scene's `set_text` alone would
-//! leave it at the page's corner, with the default look a new translation
-//! gets where the placeholder set no value of its own.
+//! style set before translating leaves, gets its first translation where
+//! Koharu's scene starts one, in its source's place, in the same undo step
+//! as the target language, its clean-up shown, and the default look a new
+//! translation gets where the placeholder set no value of its own.
 
 use booharu_core::settings::Snapshot;
 use koharu_pipeline::PipelineConfig;
@@ -36,16 +36,15 @@ impl Tool for SetTranslation {
     fn description(&self) -> String {
         "Set a block's translation to a text, as one undo step. A block without a translation \
          of its own, none or only the empty placeholder a style set on the box before it was \
-         translated leaves, gets one placed first, as the Translation stage places its own in \
-         the translator's target language: in the block's room in its balloon, or in its \
-         source's frame, at the page's lettering size, with the block's clean-up shown under \
-         it. It keeps the values set on the placeholder, and gets the default look new \
-         translations get for the rest: the first Preferred font, or while Pick fonts \
-         automatically is on its lettering category's font, and with colour detection off the \
-         default colours. A block with a translation of its own, blank or not, keeps its \
-         place, lettering, and language. A translation set this way counts as typed by hand, \
-         so booharu_apply_text_style leaves it alone unless told to include such blocks. \
-         Answers what changed."
+         translated leaves, gets its first translation as typing on the canvas starts one: in \
+         its source's place, frame and lettering, in the translator's target language, with \
+         the block's clean-up shown under it. It keeps the values set on the placeholder, and \
+         gets the default look new translations get for the rest: the first Preferred font, \
+         or while Pick fonts automatically is on its lettering category's font, and with \
+         colour detection off the default colours. A block with a translation of its own, \
+         blank or not, keeps its place, lettering, and language. A translation set this way \
+         counts as typed by hand, so booharu_apply_text_style leaves it alone unless told to \
+         include such blocks. Answers what changed."
             .to_owned()
     }
 
@@ -60,7 +59,7 @@ impl Tool for SetTranslation {
     ) -> Result<Change, Self::Error> {
         let tools = project(context)?;
         // On a blocking thread, as `edit` applies, and under one lock, so a
-        // translation is placed only where the edit finds none.
+        // first translation is written only where the edit finds none.
         tokio::task::spawn_blocking(move || -> anyhow::Result<Change> {
             let target = koharu_config::get::<PipelineConfig>()?.translator.target;
             let families =

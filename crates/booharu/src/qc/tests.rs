@@ -16,7 +16,7 @@ use booharu_core::{
 };
 use koharu_pipeline::Stage;
 use koharu_renderer::{Renderer, RendererConfig};
-use koharu_scene::{Change, Created, Edit, Op, Session, Transform};
+use koharu_scene::{Answer, Change, Created, Edit, Op, Query, Session, Transform};
 use serde_json::{Value, json};
 
 use super::*;
@@ -455,6 +455,53 @@ fn a_line_given_back_unchanged_is_leftover_source_not_missing() -> Result<()> {
         [&Problem::LeftoverSource { unchanged: true }]
     );
     assert_eq!(found[0].text, "原文");
+    Ok(())
+}
+
+#[test]
+fn a_blank_translation_is_missing_exactly_where_koharus_page_summary_counts_none() -> Result<()> {
+    // Koharu counts a block translated only when its translation has text
+    // once trimmed as Rust trims it (#1500): spaces, an ideographic space
+    // and a next line are blank, a zero-width no-break space isn't. Whoever
+    // wrote it, typed by hand or a run.
+    let cases = [
+        ("  ", true),
+        ("\u{3000}", true),
+        ("\n\u{85}", true),
+        ("\u{feff}", false),
+        ("Hm", false),
+    ];
+    for (wording, blank) in cases {
+        for steps in [
+            &["detection", "ocr"][..],
+            &["detection", "ocr", "translation"],
+        ] {
+            let page = Fixture::new(
+                400,
+                400,
+                vec![
+                    translated("done", 0, "Done."),
+                    block(
+                        "case",
+                        1,
+                        "原文",
+                        translation(wording, boxed(10.0, 70.0, 300.0, 150.0, "best"), None),
+                        c2pa(steps),
+                    ),
+                ],
+            );
+            let Answer::Project(summary) = page.session.query(Query::GetProject)? else {
+                panic!("not the project's summary");
+            };
+            let counted = summary.pages[0].translated == 2;
+            let missing = page
+                .found("case")
+                .iter()
+                .any(|(check, _)| check == MISSING_TRANSLATION);
+            assert_eq!(counted, !blank, "{wording:?} {steps:?}");
+            assert_eq!(missing, !counted, "{wording:?} {steps:?}");
+        }
+    }
     Ok(())
 }
 

@@ -499,7 +499,8 @@ mod tests {
             })
             .expect("the block");
         // A font and a fill picked in the type bar, merged into a translation
-        // the block doesn't have, start one from empty point text.
+        // the block doesn't have, start one as its source's blank (Koharu's
+        // #1494).
         apply(vec![json!({
             "op": "update_layer",
             "layer": styled,

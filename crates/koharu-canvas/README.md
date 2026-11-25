@@ -86,12 +86,13 @@ release that follow.
   effect for the host to open the box's menu at the pointer. It starts no
   gesture, and anything else under the pointer answers nothing.
 - **Booharu: a box styled before it's translated acts as one with none.** The
-  type bar writes a style set on a block with no translation into an empty
-  point text, only a placeholder. The canvas shows such a block by its
-  source's frame, typing into it starts from its source in that style and
-  adds the first translation in the source's place, keeping the style, and a
-  resize, a reshape, a move, by a drag or an arrow key, or a turn changes its
-  source, so the placeholder stays one until something is typed.
+  type bar writes a style set on a block with no translation into the blank
+  the scene starts its translation as, only a placeholder. The canvas shows
+  such a block by its source's frame, typing into it starts from its
+  source's blank in that style and adds the first translation in the
+  source's place, keeping the style, and a resize, a reshape, a move, by a
+  drag or an arrow key, or a turn changes its source, so the placeholder
+  stays one until something is typed.
 
 ## Sources
 

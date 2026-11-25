@@ -353,10 +353,14 @@ fn untranslated() -> Option<(Fixture, LayerId, LayerId)> {
             "style": {"chars": {"size": 32.0, "fill": BLUE, "stroke": WHITE, "stroke_width": 3.0}},
         }})
     };
-    let fixture = unscaled(vec![
-        json!({"op": "add_layer", "page": "$page", "index": 0, "layer": block("text", 50.0)}),
-        json!({"op": "add_layer", "page": "$page", "index": 1, "layer": block("sfx", 250.0)}),
-    ])?;
+    // Typing needs no GPU, only a draw does (`gpu_free`).
+    let fixture = gpu_free(
+        (400, 400),
+        vec![
+            json!({"op": "add_layer", "page": "$page", "index": 0, "layer": block("text", 50.0)}),
+            json!({"op": "add_layer", "page": "$page", "index": 1, "layer": block("sfx", 250.0)}),
+        ],
+    );
     let [talk, boom] = layers(&fixture)[..] else {
         panic!("two blocks");
     };
@@ -507,27 +511,29 @@ fn json_of(ops: &[Op]) -> Value {
     serde_json::to_value(ops).expect("JSON")
 }
 
-/// The ops Koharu's typing gives `block`, read from `fixture` before the
-/// commit, with nothing pushed: the translation in its source's place and
-/// style, and its words, "Hi", as `ops`, the commit's, hold them second.
-fn koharus(fixture: &Fixture, block: LayerId, ops: &[Op]) -> Value {
-    let mut placed = layer(fixture, block)["source"].clone();
-    placed.as_object_mut().expect("a text").remove("content");
-    let Some(Op::SetRichText { spans, .. }) = ops.get(1) else {
-        panic!("{ops:?} hold no words second");
+/// The ops Koharu's typing gives `block` for "Hi", as `ops`, the commit's,
+/// hold them first: the words alone, as the scene adds a block's missing
+/// translation as its source's blank (Koharu's #1494).
+fn koharus(block: LayerId, ops: &[Op]) -> Value {
+    let Some(Op::SetRichText { spans, .. }) = ops.first() else {
+        panic!("{ops:?} hold no words first");
     };
     let words: String = spans.iter().map(|span| span.insert.as_str()).collect();
     assert_eq!(words, "Hi");
-    json_of(&[
-        Op::UpdateLayer {
-            layer: block.into(),
-            patch: json!({ "translation": placed }),
-        },
-        Op::SetRichText {
-            layer: block.into(),
-            spans: spans.clone(),
-        },
-    ])
+    json_of(&[Op::SetRichText {
+        layer: block.into(),
+        spans: spans.clone(),
+    }])
+}
+
+/// Whether `block`'s translation lies where its source does, as the scene
+/// starts a first translation (Koharu's #1494): its frame, transform and
+/// direction.
+fn in_sources_place(fixture: &Fixture, block: LayerId) -> bool {
+    let found = layer(fixture, block);
+    ["frame", "transform", "direction"]
+        .iter()
+        .all(|key| found["translation"][key] == found["source"][key])
 }
 
 #[test]
@@ -538,10 +544,10 @@ fn a_translation_typed_into_an_effect_kept_as_art_shows_its_clean_up_in_the_same
     keep_as_art(&mut fixture, boom);
     let effects = commit_translation(&mut fixture, boom, (300.0, 100.0));
     let ops = set_text(&effects);
-    // Koharu's two ops, then the clean-up shown and the record cleared, as
-    // it held only the mark.
-    assert_eq!(ops.len(), 4, "{ops:?}");
-    assert_eq!(json_of(&ops[..2]), koharus(&fixture, boom, &ops));
+    // Koharu's op, then the clean-up shown and the record cleared, as it
+    // held only the mark.
+    assert_eq!(ops.len(), 3, "{ops:?}");
+    assert_eq!(json_of(&ops[..1]), koharus(boom, &ops));
     let shown = [
         Op::UpdateLayer {
             layer: boom.into(),
@@ -549,11 +555,12 @@ fn a_translation_typed_into_an_effect_kept_as_art_shows_its_clean_up_in_the_same
         },
         attrs::clear::<Auto>(boom),
     ];
-    assert_eq!(json_of(&ops[2..]), json_of(&shown));
+    assert_eq!(json_of(&ops[1..]), json_of(&shown));
 
     assert_eq!(apply(&mut fixture, effects), ["set_text"]);
     let typed = layer(&fixture, boom);
     assert!(typed["translation"].is_object(), "{typed}");
+    assert!(in_sources_place(&fixture, boom), "{typed}");
     assert_eq!(typed["cleanup"]["visible"], json!(true));
     assert!(typed["attributes"]["booharu"]["auto"].is_null(), "{typed}");
     // One step: undone, the effect is kept as art again.
@@ -583,17 +590,18 @@ fn a_translation_typed_into_a_block_without_the_mark_is_koharus_alone() {
     );
     let effects = commit_translation(&mut fixture, boom, (300.0, 100.0));
     let ops = set_text(&effects);
-    assert_eq!(json_of(&ops), koharus(&fixture, boom, &ops));
+    assert_eq!(json_of(&ops), koharus(boom, &ops));
     assert_eq!(apply(&mut fixture, effects), ["set_text"]);
     let typed = layer(&fixture, boom);
     assert!(typed["translation"].is_object(), "{typed}");
+    assert!(in_sources_place(&fixture, boom), "{typed}");
     assert_eq!(typed["cleanup"]["visible"], json!(false));
     assert!(typed["attributes"]["booharu"].is_null(), "{typed}");
 
     // Dialogue, its clean-up showing, alike.
     let effects = commit_translation(&mut fixture, talk, (100.0, 100.0));
     let ops = set_text(&effects);
-    assert_eq!(json_of(&ops), koharus(&fixture, talk, &ops));
+    assert_eq!(json_of(&ops), koharus(talk, &ops));
 }
 
 #[test]
@@ -1371,7 +1379,7 @@ fn placeholder(fixture: &Fixture, block: LayerId) -> bool {
 
 /// Styles `block` before it's translated, as the type bar does, writing
 /// `translation` into the translation the block lacks, which the scene
-/// starts from empty point text at the page's corner: a placeholder.
+/// starts as its source's blank (Koharu's #1494): a placeholder.
 fn style_before_translating(fixture: &mut Fixture, block: LayerId, translation: Value) {
     other_writer(
         fixture,
@@ -1405,8 +1413,7 @@ fn a_box_styled_before_its_translated_types_a_first_translation_in_its_place() {
     );
 
     // A press types into the dialogue as into a block with none, its caret
-    // in the block's box rather than at the corner its placeholder lies
-    // at, and the type bar showing the style set by hand.
+    // in the block's box, and the type bar showing the style set by hand.
     fixture.canvas.set_booharu(pushed(false, Some(WHITE)));
     fixture.canvas.set_tool(Tool::Text);
     let effects = gesture(&mut fixture.canvas, (100.0, 100.0), (100.0, 100.0));

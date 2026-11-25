@@ -70,9 +70,9 @@ pub(crate) mod testing {
 
     /// The edit Koharu's type bar sends as a font and a fill are picked for
     /// `block`, merged into its translation's style. On a block with no
-    /// translation the scene starts one from empty point text, so it leaves
-    /// a box styled before it's translated: a placeholder
-    /// (`status::placeholder`).
+    /// translation the scene starts one as its source's blank (Koharu's
+    /// #1494), so it leaves a box styled before it's translated: a
+    /// placeholder (`status::placeholder`).
     pub(crate) fn type_bar_style(block: LayerId) -> Op {
         Op::UpdateLayer {
             layer: block.into(),

@@ -639,8 +639,8 @@ const BLACK: Rgba = Rgba([0.0, 0.0, 0.0, 1.0]);
 
 /// The op Koharu's type bar sends to style `block`, which has no translation
 /// yet, with `patch` on its translation, as a family or a colour picked
-/// before translating: the scene starts the translation from empty point
-/// text, a placeholder (`status::placeholder`).
+/// before translating: the scene starts the translation as its source's
+/// blank (Koharu's #1494), a placeholder (`status::placeholder`).
 fn type_bar(block: LayerId, patch: serde_json::Value) -> Op {
     Op::UpdateLayer {
         layer: block.into(),

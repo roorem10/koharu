@@ -606,7 +606,7 @@ pub struct Edited {
     pub source: bool,
     /// Its translation isn't what the Translation stage wrote, or no stage
     /// wrote it, as one typed by hand; never for a placeholder
-    /// ([`status::placeholder`]), the empty point text a style set before
+    /// ([`status::placeholder`]), the blank translation a style set before
     /// translating leaves, which holds no words.
     pub text: bool,
     /// A style value of its translation isn't the one recorded, a span of
@@ -661,7 +661,7 @@ pub fn edited(layer: &Layer) -> Edited {
     let (text, style) = match &block.translation {
         None => (false, false),
         Some(translation) => {
-            // A placeholder, the empty point text a style set before
+            // A placeholder, the blank translation a style set before
             // translating leaves, holds no words typed by hand; a run's
             // translation emptied by hand still differs from its hash.
             let text = match &record.text {

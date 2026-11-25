@@ -17,7 +17,7 @@
 //! ([`unwritten`]), as Koharu counts a blank one (#1500): the box stays
 //! translatable, and a run that translates it keeps the style set by hand.
 
-use koharu_scene::{Block, CharStyle, Content, Layer, Page};
+use koharu_scene::{Block, CharStyle, Content, Direction, Layer, Page, Text};
 use serde_json::Value;
 
 use crate::{
@@ -110,6 +110,33 @@ pub fn own_chars(layer: &Layer, block: &Block) -> CharStyle {
     serde_json::from_value(Value::Object(own)).unwrap_or_else(|_| chars.clone())
 }
 
+/// What a first translation typed into `block`, with no translation of its
+/// own ([`unwritten`]), starts from, on the canvas and in the Story panel
+/// alike: the blank Koharu's scene starts a block's translation as, its
+/// source's place and style with no words, in no language (`Text::blank`,
+/// Koharu's #1494), with a [`placeholder`]'s character values and paragraph
+/// keys, its alignment, line spacing and border method, laid over the
+/// source's, so the style set by hand stays. Its direction is the
+/// placeholder's only when that isn't the scene's default, horizontal, which
+/// can't be told from one never chosen in a placeholder made before #1494,
+/// empty point text at the page's corner. Its frame and place are always its
+/// source's, as the canvas moves and resizes a placeholder's source, so a
+/// placeholder of either kind is placed where its block is.
+pub fn styled_source(block: &Block) -> Text {
+    let mut text = block.source.blank();
+    if let Some(placeholder) = &block.translation {
+        let (own, style) = (&placeholder.style, &mut text.style);
+        style.chars = own.chars.or(&style.chars);
+        style.align = own.align.or(style.align);
+        style.line_height = own.line_height.or(style.line_height);
+        style.stroke_method = own.stroke_method.or(style.stroke_method);
+        if placeholder.direction != Direction::default() {
+            text.direction = placeholder.direction;
+        }
+    }
+    text
+}
+
 /// Whether `block`, which `layer` holds, has no translation of its own: none
 /// at all, or only a [`placeholder`]. Every reader asking whether a block is
 /// translated asks this, so a box styled before it's translated stays
@@ -149,7 +176,7 @@ pub fn given_back(layer: &Layer, block: &Block) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use koharu_scene::{Created, Edit, LayerId, Op, Session};
+    use koharu_scene::{Answer, Created, Edit, LayerId, Op, Query, Session};
     use serde_json::{Value, json};
 
     use super::*;
@@ -358,8 +385,8 @@ mod tests {
         apply(&mut session, vec![type_bar_style(id), boxed]);
         assert_eq!(read(&session, id), (true, true));
 
-        // Whitespace typed into a block with none, unstyled, is point text
-        // no run wrote too.
+        // Whitespace typed into a block with none, unstyled, is a blank no
+        // run wrote too.
         let (_dir, mut session, [_, id]) = page(false, &read_steps);
         apply(&mut session, vec![typed(id, "  ")]);
         assert_eq!(read(&session, id), (true, true));
@@ -390,6 +417,79 @@ mod tests {
         give_back(&mut session, id);
         apply(&mut session, vec![type_bar_style(id)]);
         assert_eq!(read(&session, id), (true, true));
+    }
+
+    #[test]
+    fn a_blank_translation_no_run_wrote_is_none_as_koharus_page_summary_counts_it() {
+        // Koharu counts a block translated only when its translation has
+        // text once trimmed as Rust trims it (#1500): spaces, an ideographic
+        // space and a next line are blank, a zero-width no-break space isn't.
+        let cases = [
+            ("  ", true),
+            ("\u{3000}", true),
+            ("\n\u{85}", true),
+            ("\u{feff}", false),
+            ("Hm", false),
+        ];
+        for (wording, blank) in cases {
+            let (_dir, mut session, [_, id]) = page(false, &[DETECTION, OCR]);
+            apply(
+                &mut session,
+                vec![Op::SetText {
+                    layer: id.into(),
+                    text: wording.to_owned(),
+                }],
+            );
+            let Ok(Answer::Project(summary)) = session.query(Query::GetProject) else {
+                panic!("no summary");
+            };
+            let counted = summary.pages[0].translated == 1;
+            assert_eq!(counted, !blank, "{wording:?}");
+            assert_eq!(read(&session, id), (blank, blank), "{wording:?}");
+            // With its styles from its source's blank (Koharu's #1494), in
+            // its source's place.
+            let project = session.project();
+            let layer = project.layer(id).expect("the block");
+            let translation = block(layer).translation.clone().expect("a translation");
+            assert_eq!(
+                translation,
+                Text {
+                    content: translation.content.clone(),
+                    ..styled_source(block(layer))
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn a_first_translation_starts_from_its_sources_blank_in_a_placeholders_style() {
+        // None: the source's blank.
+        let (_dir, mut session, [_, id]) = page(false, &[DETECTION, OCR]);
+        let project = session.project();
+        let source = block(project.layer(id).expect("the block")).source.clone();
+        assert_eq!(
+            styled_source(block(project.layer(id).expect("the block"))),
+            source.blank()
+        );
+        // A placeholder: its values over the source's, the frame its
+        // source's, and a vertical direction kept.
+        let styled = op(
+            json!({"op": "update_layer", "layer": id, "patch": {"translation": {
+                "frame": "point",
+                "direction": "vertical",
+                "style": {"chars": {"family": "Comic Neue", "size": 30.0}, "align": "end"},
+            }}}),
+        );
+        apply(&mut session, vec![styled]);
+        let project = session.project();
+        let base = styled_source(block(project.layer(id).expect("the block")));
+        assert_eq!(base.frame, source.frame);
+        assert_eq!(base.direction, Direction::Vertical);
+        assert_eq!(base.style.chars.family.as_deref(), Some("Comic Neue"));
+        assert_eq!(base.style.chars.size, Some(30.0));
+        assert_eq!(base.style.align, Some(koharu_scene::Align::End));
+        assert!(base.content.text().is_empty());
+        assert_eq!(base.language, source.blank().language);
     }
 
     #[test]

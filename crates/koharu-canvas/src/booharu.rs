@@ -17,21 +17,22 @@
 //!
 //! A box styled before it's translated holds a translation that is only a
 //! placeholder ([`status::placeholder`]): the type bar wrote a style set on
-//! a block with no translation into an empty point text. The canvas reads
-//! such a block as one with none ([`placeholder`]): it shows its source's
-//! control, typing into it starts from its source's blank with that style
-//! laid over ([`styled_source`]) and makes a first translation in its
-//! source's place that keeps the style ([`first_translation`]), and a
-//! resize, a reshape, a move or a turn changes its source ([`lettering()`],
-//! [`moved()`]), so the placeholder stays one.
+//! a block with no translation into the translation the scene starts as its
+//! source's blank (Koharu's #1494). The canvas reads such a block as one
+//! with none ([`placeholder`]): it shows its source's control, typing into
+//! it starts from its source's blank with that style laid over
+//! ([`styled_source`]) and makes a first translation in its source's place
+//! that keeps the style ([`first_translation`]), and a resize, a reshape, a
+//! move or a turn changes its source ([`lettering()`], [`moved()`]), so the
+//! placeholder stays one.
 
 use booharu_core::{lettering, settings::LetteringSettings, sfx, status, styles};
 use koharu_scene::{
-    Block, Content, Direction, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text, Transform,
+    Block, Content, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text, Transform,
 };
 use kurbo::{Affine, Point, Rect, Size};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Map, Value, json};
 use ui_events::keyboard::Modifiers;
 
 use crate::{
@@ -134,15 +135,16 @@ pub(crate) fn drafted(mut text: Text, settings: &BooharuSettings) -> Text {
     text
 }
 
-/// `base`, the source of `layer`, a block on `page` with no translation,
-/// standing in for the translation typed into it, with the default look of
-/// `settings` a new translation gets, as Booharu's Translation stage hook
-/// gives it: the default font when it has no family, or the block's
-/// category's while Pick fonts automatically is on, and with colour
-/// detection off the default colours in place of its source's, a sound
-/// effect keeping a legibility outline when the default sets none. With
-/// detection on, its source's colours stay. A block whose translation is
-/// only a placeholder has a style of its own, set by hand before it was
+/// `base`, the text typing took for `layer`, a block on `page` with no
+/// translation of its own (the blank its source starts a translation as, or
+/// [`styled_source`]), standing in for the translation typed into it, with
+/// the default look of `settings` a new translation gets, as Booharu's
+/// Translation stage hook gives it: the default font when it has no family,
+/// or the block's category's while Pick fonts automatically is on, and with
+/// colour detection off the default colours in place of its source's, a
+/// sound effect keeping a legibility outline when the default sets none.
+/// With detection on, its source's colours stay. A block whose translation
+/// is only a placeholder has a style of its own, set by hand before it was
 /// translated, whose values the look keeps, as placement keeps a
 /// translation's: with detection off, a colour set there stays.
 pub(crate) fn untranslated(
@@ -151,21 +153,7 @@ pub(crate) fn untranslated(
     layer: LayerId,
     settings: &BooharuSettings,
 ) {
-    let defaults = &settings.text;
-    let sfx = role(&page.layers, layer) == Some(Role::Sfx);
-    // Not those the placeholder has from its source's blank (Koharu's #1494).
-    let own = find(&page.layers, layer)
-        .and_then(|found| styled(found).map(|block| status::own_chars(found, block)))
-        .unwrap_or_default();
-    let category = lettering::auto_category(page, layer, &defaults.lettering);
-    let patch = styles::new_translation(
-        &defaults.lettering,
-        defaults.family.as_deref(),
-        sfx,
-        category,
-        &own,
-        &base.style.chars,
-    );
+    let patch = look(base, page, layer, settings);
     // The patch holds only character values, so the merge can't fail; were
     // it to, the translation would keep its source's look.
     if let Ok(chars) = styles::patched(&base.style.chars, &patch) {
@@ -173,15 +161,42 @@ pub(crate) fn untranslated(
     }
 }
 
+/// The patch on `base`'s character values giving it the look
+/// [`untranslated`] gives it, null where a value goes.
+fn look(
+    base: &Text,
+    page: &Page,
+    layer: LayerId,
+    settings: &BooharuSettings,
+) -> Map<String, Value> {
+    let defaults = &settings.text;
+    let sfx = role(&page.layers, layer) == Some(Role::Sfx);
+    // Not those the placeholder has from its source's blank (Koharu's #1494).
+    let own = find(&page.layers, layer)
+        .and_then(|found| styled(found).map(|block| status::own_chars(found, block)))
+        .unwrap_or_default();
+    let category = lettering::auto_category(page, layer, &defaults.lettering);
+    styles::new_translation(
+        &defaults.lettering,
+        defaults.family.as_deref(),
+        sfx,
+        category,
+        &own,
+        &base.style.chars,
+    )
+}
+
 /// `typed`, the ops Koharu's typing commits for what was typed into `layer`
 /// on `page`, and when that's the block's first translation, typed into a
-/// block with none or with only a placeholder ([`placeholder`]), `base`, the
-/// text typing took (the blank its source starts a translation as, or
-/// [`styled_source`]), written whole as the translation ahead of them with
-/// the look [`untranslated`] gives it, and [`shown_again`]'s ops after
+/// block with none or with only a placeholder ([`placeholder`]), the look
+/// [`untranslated`] gives it ahead of them and [`shown_again`]'s ops after
 /// them, all in the commit's one step. Koharu's scene adds a missing
-/// translation as its source's blank, which the patch merges into, and
-/// places a placeholder in its source's place. Any other text, as it is.
+/// translation as its source's blank (#1494), which the look merges into,
+/// so a block with none gets only the look, nothing more when the look
+/// changes nothing; a placeholder gets `base`, the text typing took
+/// ([`styled_source`]), written whole with the look, so its first
+/// translation goes in its source's place in the style set on it. Any other
+/// text, as it is.
 pub(crate) fn first_translation(
     mut base: Text,
     page: &Page,
@@ -189,24 +204,35 @@ pub(crate) fn first_translation(
     settings: &BooharuSettings,
     typed: Vec<Op>,
 ) -> Vec<Op> {
-    let first = find(&page.layers, layer).is_some_and(|found| match &found.content {
-        Content::Block(block) => block.translation.is_none() || placeholder(found),
-        _ => false,
-    });
-    if !first {
+    let Some(found) = find(&page.layers, layer) else {
+        return typed;
+    };
+    let styled = placeholder(found);
+    if !matches!(&found.content, Content::Block(block) if block.translation.is_none() || styled) {
         return typed;
     }
-    untranslated(&mut base, page, layer, settings);
-    // The translation takes the base's place and style; its characters come
-    // only through the text ops.
-    let mut placed = serde_json::to_value(&base).expect("a text serializes");
-    if let Some(fields) = placed.as_object_mut() {
-        fields.remove("content");
+    let mut ops = Vec::with_capacity(typed.len() + 3);
+    if styled {
+        untranslated(&mut base, page, layer, settings);
+        // The translation takes the base's place and style; its characters
+        // come only through the text ops.
+        let mut placed = serde_json::to_value(&base).expect("a text serializes");
+        if let Some(fields) = placed.as_object_mut() {
+            fields.remove("content");
+        }
+        ops.push(Op::UpdateLayer {
+            layer: layer.into(),
+            patch: json!({ "translation": placed }),
+        });
+    } else {
+        let patch = look(&base, page, layer, settings);
+        if !patch.is_empty() {
+            ops.push(Op::UpdateLayer {
+                layer: layer.into(),
+                patch: json!({ "translation": {"style": {"chars": patch}} }),
+            });
+        }
     }
-    let mut ops = vec![Op::UpdateLayer {
-        layer: layer.into(),
-        patch: json!({ "translation": placed }),
-    }];
     ops.extend(typed);
     ops.extend(shown_again(page, layer));
     ops
@@ -243,28 +269,10 @@ fn styled(layer: &Layer) -> Option<&Block> {
 
 /// What typing into `block`, whose translation is only a placeholder, takes
 /// as its text, as typing into a block with none takes the blank its source
-/// starts a translation as (`Text::blank`): that blank, with the
-/// placeholder's character values and paragraph keys, its alignment, line
-/// spacing and border method, laid over the source's, so what's typed shows
-/// in the style set by hand and the first translation, which the commit
-/// writes from it whole, keeps it. Its direction is the placeholder's only
-/// when that isn't the scene's default, horizontal, which can't be told from
-/// one never chosen. Its frame and place are its source's, so the caret
-/// starts in the block's place, and it holds no words.
-pub(crate) fn styled_source(block: &Block) -> Text {
-    let mut text = block.source.blank();
-    if let Some(placeholder) = &block.translation {
-        let (own, style) = (&placeholder.style, &mut text.style);
-        style.chars = own.chars.or(&style.chars);
-        style.align = own.align.or(style.align);
-        style.line_height = own.line_height.or(style.line_height);
-        style.stroke_method = own.stroke_method.or(style.stroke_method);
-        if placeholder.direction != Direction::default() {
-            text.direction = placeholder.direction;
-        }
-    }
-    text
-}
+/// starts a translation as: that blank with the placeholder's style laid
+/// over, booharu-core's rule, which a first translation the Story panel or
+/// the agent writes follows too.
+pub(crate) use booharu_core::status::styled_source;
 
 /// Where `layer`'s drawn text lives for a resize or a reshape, as
 /// [`Lettering::of`] reads it, but a block whose translation is only a
@@ -476,7 +484,8 @@ mod tests {
         settings::DefaultTextStyle,
     };
     use koharu_scene::{
-        Align, Bounds, CharStyle, Created, Edit, Op, Rgba, Session, StrokeMethod, TextStyle,
+        Align, Bounds, CharStyle, Created, Direction, Edit, Op, Rgba, Session, StrokeMethod,
+        TextStyle,
     };
     use serde_json::{Value, json};
 
@@ -788,8 +797,8 @@ mod tests {
     const GREEN: Rgba = Rgba([0.0, 0.5, 0.0, 1.0]);
 
     /// The op the type bar sends for a style set on the block `label` while
-    /// it has no translation: `translation`, which the scene merges into an
-    /// empty point text, a placeholder.
+    /// it has no translation: `translation`, which the scene merges into its
+    /// source's blank (Koharu's #1494), a placeholder.
     fn styled_by_hand(label: &str, translation: Value) -> Value {
         json!({"op": "update_layer", "layer": format!("${label}"),
             "patch": {"translation": translation}})

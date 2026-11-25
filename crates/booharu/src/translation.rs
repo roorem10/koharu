@@ -1,13 +1,15 @@
 //! A block's translation as someone types it, in the Story panel or through
-//! the agent: one undo step that sets its text and writes a block's first
-//! translation as the Translation stage writes one it places, with the
-//! default look a new translation gets. The scene's `set_text` alone gives
-//! a block's first translation a default text, point text at the page's
-//! corner in no language (#128), which the scene's own tests hold it to.
-//! A box styled before it's translated holds only a placeholder
-//! (`status::placeholder`), the empty point text the type bar merged its
-//! style into, so its first translation is placed the same way, keeping the
-//! values set on it.
+//! the agent: one undo step that sets its text and, for a block's first
+//! translation, gives it what a typed translation lacks in Koharu: the
+//! default look a new translation gets, the translator's target language,
+//! and its clean-up shown. Where it goes is Koharu's: the scene starts a
+//! block's first translation as its source's blank, in its source's place
+//! (Koharu's #1494, which replaced Booharu's own placement of it, #128), as
+//! the canvas types one. A box styled before it's translated holds only a
+//! placeholder (`status::placeholder`), the blank the type bar merged its
+//! style into, so its first translation starts in its source's place with
+//! that style laid over (`status::styled_source`), as on the canvas,
+//! keeping the values set on it.
 
 use anyhow::{Result, bail};
 use booharu_core::{settings::Snapshot, status, styles};
@@ -25,20 +27,22 @@ const RETYPED: &str = "set_text";
 
 /// The edit setting `block`'s translation in `project` to `text`. A block
 /// with no translation of its own ([`status::unwritten`]: none, or only a
-/// placeholder a style set before translating leaves) gets it as the
-/// Translation stage writes one it places: in the block's room in its
-/// balloon, or in its source's frame, at the page's lettering size, in
-/// `target`'s language, with the block's clean-up shown under it, labelled
-/// [`LABEL`]. It gets the default look of `look`, as a new translation
-/// does: the default font, or its category's while Pick fonts automatically
-/// is on, and with colour detection off the default colours in place of the
-/// measured ones, each only where the placeholder set no value of its own,
-/// as the values set by hand stay. Unlike the stage's, it gets no hand-edit
-/// record of its own: it was typed by hand. A sound effect kept as art has
-/// the kept mark taken from the record it holds (`styles::typed`), as its
-/// clean-up shows again. One with a translation of its own, words or a
-/// run's emptied by hand, keeps its place, lettering, and language, and the
-/// step is labelled as the Story panel labels a retyped text.
+/// placeholder a style set before translating leaves) gets a first
+/// translation, labelled [`LABEL`]: where the scene starts one, in its
+/// source's place and style (Koharu's #1494), a placeholder placed there
+/// anew in the style set on it ([`status::styled_source`]), as the canvas
+/// types one; in `target`'s language, with the block's clean-up shown under
+/// it, as the Translation stage leaves one; and with the default look of
+/// `look`, as a new translation gets it: the default font, or its
+/// category's while Pick fonts automatically is on, and with colour
+/// detection off the default colours in place of its source's, each only
+/// where the placeholder set no value of its own, as the values set by hand
+/// stay. Unlike the stage's, it gets no hand-edit record of its own: it was
+/// typed by hand. A sound effect kept as art has the kept mark taken from
+/// the record it holds (`styles::typed`), as its clean-up shows again. One
+/// with a translation of its own, words or a run's emptied by hand, keeps
+/// its place, lettering, and language, and the step is labelled as the
+/// Story panel labels a retyped text.
 pub fn edit(
     project: &Project,
     block: LayerId,
@@ -50,22 +54,30 @@ pub fn edit(
     let Content::Block(found) = &layer.content else {
         bail!("layer {block} isn't a block");
     };
-    let mut ops = vec![Op::SetText {
+    let typed = Op::SetText {
         layer: block.into(),
         text,
-    }];
+    };
     if !status::unwritten(layer, found) {
         return Ok(Edit {
             label: RETYPED.to_owned(),
-            ops,
+            ops: vec![typed],
         });
     }
-    // The stage's ops for a translation it places (`written` in
-    // koharu-pipeline's stages/translate), less its records, its c2pa one
-    // naming the model that made the translation and Booharu's hand-edit
-    // one: someone typed this one. `typed` still drops the kept mark of a
-    // sound effect kept as art, whose clean-up this shows.
-    let placed = koharu_pipeline::placement(project, block, target)?;
+    // What the first translation starts as: for a block with none, the
+    // source's blank `set_text` adds, and for a placeholder, that blank with
+    // its style laid over, written whole, so it goes in the source's place.
+    let mut base = serde_json::to_value(status::styled_source(found))?;
+    if let Some(fields) = base.as_object_mut() {
+        // Only `set_text` writes the words.
+        fields.remove("content");
+    }
+    let placed = Op::UpdateLayer {
+        layer: block.into(),
+        patch: json!({"translation": base}),
+    };
+    // The look over what it starts as; `typed` still drops the kept mark of
+    // a sound effect kept as art, whose clean-up this shows.
     let looked = styles::typed(
         project,
         block,
@@ -73,7 +85,11 @@ pub fn edit(
         &look.lettering,
         look.font.as_deref(),
     )?;
-    ops.push(placed);
+    let mut ops = Vec::with_capacity(looked.len() + 3);
+    if found.translation.is_some() {
+        ops.push(placed);
+    }
+    ops.push(typed);
     ops.extend(looked);
     ops.push(Op::UpdateLayer {
         layer: block.into(),
@@ -112,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn a_typed_translation_is_placed_as_the_translation_stage_places_one() -> Result<()> {
+    fn a_typed_translation_starts_in_its_sources_place_in_the_target_language() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let mut session = Session::create(dir.path().join("test.khr"))?;
         // A box drawn by hand, with no source text, away from the corner,
@@ -149,6 +165,20 @@ mod tests {
         assert_eq!(history.steps.last().map(String::as_str), Some(LABEL));
         let typed = translation(&session, block)?;
         assert_eq!(typed.content.text(), "Hello");
+        // Where the scene starts a first translation (Koharu's #1494): its
+        // source's blank, in its source's place, frame and style.
+        let project = session.project();
+        let Content::Block(found) = &project.layer(block)?.content else {
+            bail!("{block} isn't a block");
+        };
+        assert_eq!(
+            Text {
+                content: typed.content.clone(),
+                language: typed.language.clone(),
+                ..found.source.blank()
+            },
+            typed
+        );
         let bounds = typed.bounds().context("a frame, not point text")?;
         assert_eq!(
             (bounds.x0, bounds.y0, bounds.x1, bounds.y1),
@@ -330,7 +360,8 @@ mod tests {
         const BLACK: Rgba = Rgba([0.0, 0.0, 0.0, 1.0]);
         let (_dir, mut session, block) = found("text")?;
         // A font and a fill picked on the type bar before it's translated
-        // leave a placeholder, empty point text, which the typing places.
+        // leave a placeholder, its source's blank in that style, which the
+        // typing fills.
         apply(&mut session, vec![type_bar_style(block)])?;
         let english: LanguageIdentifier = "en".parse()?;
         let look = Snapshot {
@@ -355,8 +386,8 @@ mod tests {
         )?;
         assert_eq!(typed.label, LABEL);
         session.apply(typed)?;
-        // In the block's place, not at the page's corner, in the target
-        // language, over its clean-up.
+        // In the block's place, its source's, in the target language, over
+        // its clean-up.
         let typed = translation(&session, block)?;
         assert_eq!(typed.content.text(), "Why?");
         let bounds = typed.bounds().context("a frame, not point text")?;
@@ -388,6 +419,51 @@ mod tests {
     }
 
     #[test]
+    fn a_placeholder_made_before_koharus_fix_at_the_pages_corner_goes_in_its_sources_place()
+    -> Result<()> {
+        let (_dir, mut session, block) = found("text")?;
+        // Before Koharu's #1494, the type bar's style merged into empty
+        // point text at the page's corner.
+        apply(
+            &mut session,
+            vec![op(
+                json!({"op": "update_layer", "layer": block, "patch": {"translation": {
+                    "frame": "point",
+                    "transform": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+                    "direction": "horizontal",
+                    "style": {"chars": {"family": FAMILY, "fill": FILL}},
+                }}}),
+            )?],
+        )?;
+        let corner = translation(&session, block)?;
+        assert!(corner.bounds().is_none(), "{corner:?}");
+        let english: LanguageIdentifier = "en".parse()?;
+        let typed = edit(
+            &session.project(),
+            block,
+            "Why?".to_owned(),
+            &english,
+            &Snapshot::default(),
+        )?;
+        assert_eq!(typed.label, LABEL);
+        session.apply(typed)?;
+        // In the block's place, not at the corner, in the style set on it.
+        let typed = translation(&session, block)?;
+        let bounds = typed.bounds().context("a frame, not point text")?;
+        assert_eq!(
+            (bounds.x0, bounds.y0, bounds.x1, bounds.y1),
+            (300.0, 20.0, 340.0, 140.0)
+        );
+        assert_eq!(
+            (typed.style.chars.family.as_deref(), typed.style.chars.fill),
+            (Some(FAMILY), Some(FILL))
+        );
+        // The rest of its look is its source's, lettered at size 32.
+        assert_eq!(typed.style.chars.size, Some(32.0));
+        Ok(())
+    }
+
+    #[test]
     fn a_blank_translation_no_run_wrote_is_placed_again_as_a_first_one() -> Result<()> {
         let (_dir, mut session, block) = found("text")?;
         let english: LanguageIdentifier = "en".parse()?;
@@ -400,8 +476,8 @@ mod tests {
         )?;
         session.apply(typed)?;
         // Cleared by hand: blank, and no run wrote it, so only a placeholder,
-        // as Koharu counts a cleared translation as none (#1500); being
-        // placed tells nothing, as every first translation starts placed
+        // as Koharu counts a cleared translation as none (#1500); its frame
+        // tells nothing, as every first translation starts in its source's
         // (#1494).
         apply(
             &mut session,
@@ -423,7 +499,7 @@ mod tests {
         session.apply(retyped)?;
         let typed = translation(&session, block)?;
         assert_eq!(typed.content.text(), "Hm");
-        // Where placement put it the first time.
+        // Where it went the first time, its source's place.
         assert_eq!(typed.frame, cleared.frame);
         Ok(())
     }

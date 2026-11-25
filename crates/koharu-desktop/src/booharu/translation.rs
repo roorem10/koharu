@@ -1,8 +1,9 @@
 //! Typing a block's translation in the Story panel: a block without one of
 //! its own, none or only the placeholder a style set before translating
-//! leaves, gets it placed into its own frame first, in the same undo step,
-//! where the scene's `set_text` alone would leave it at the page's corner
-//! (#128), with the default look a new translation gets where the
+//! leaves, gets its first translation where Koharu's scene starts one, in
+//! its source's place (#1494), as the canvas types one, in the same undo
+//! step as what Koharu's lacks: the translator's target language, its
+//! clean-up shown, and the default look a new translation gets where the
 //! placeholder set no value of its own.
 
 use std::sync::Arc;
@@ -15,10 +16,11 @@ use tauri::State;
 
 use crate::{app::App, commands::Result};
 
-/// Sets `block`'s translation to `text` as one undo step, placing it first
-/// as the Translation stage places its own, in the translator's target
-/// language, when the block has none of its own: none, or only the
-/// placeholder a style set before translating leaves, whose values stay.
+/// Sets `block`'s translation to `text` as one undo step, and when the
+/// block has none of its own, none or only the placeholder a style set
+/// before translating leaves, whose values stay, writes it as a first
+/// translation: in its source's place, in the translator's target language,
+/// over its clean-up shown, with the default look.
 #[tauri::command]
 #[specta::specta]
 pub async fn booharu_set_translation(
@@ -28,7 +30,8 @@ pub async fn booharu_set_translation(
 ) -> Result<Change> {
     let app = Arc::clone(&app);
     // As `App::edit` applies an edit, but under the lock the edit is made
-    // under, so a translation is placed only where the edit finds none.
+    // under, so a first translation is written only where the edit finds
+    // none.
     Ok(
         tokio::task::spawn_blocking(move || -> anyhow::Result<Change> {
             let target = koharu_config::get::<PipelineConfig>()?.translator.target;
