@@ -764,6 +764,41 @@ mod tests {
         assert_eq!(get::<Auto>(&layer(&session, id)), None);
     }
 
+    /// The records the interface's `typedByHand` is held to as well
+    /// (`packages/koharu/tests/booharu/typed-by-hand.test.ts`), so the two
+    /// read the marker of a translation typed by hand alike: from a record
+    /// that reads whole, never from one taken for none. The stricter ones
+    /// are forms read here that Booharu never writes, which the interface
+    /// reads as none.
+    #[test]
+    fn the_typed_marker_reads_as_the_interface_reads_it() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../packages/koharu/tests/booharu/auto-records.json"
+        ))
+        .expect("the records");
+        let cases = fixture["cases"].as_array().expect("the cases");
+        let stricter = fixture["stricter"].as_array().expect("the stricter ones");
+        assert!(cases.len() > 40, "{} cases", cases.len());
+        let (_dir, mut session, id) = project();
+        let mut typed = |auto: &Value| {
+            let ops = vec![Op::SetAttribute {
+                layer: id.into(),
+                namespace: NAMESPACE.to_owned(),
+                key: Auto::KEY.to_owned(),
+                value: Some(auto.clone()),
+            }];
+            session.apply(edit(ops)).expect("the record");
+            Auto::of(&layer(&session, id)).typed
+        };
+        for case in cases {
+            let answer = case["typed"].as_bool().expect("an answer");
+            assert_eq!(typed(&case["auto"]), answer, "{}", case["case"]);
+        }
+        for case in stricter {
+            assert!(typed(&case["auto"]), "{}", case["case"]);
+        }
+    }
+
     #[test]
     fn a_labels_role_reads_back_and_is_absent_by_default() {
         let (_dir, mut session, id) = project();

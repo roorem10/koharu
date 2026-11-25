@@ -1,0 +1,381 @@
+{
+  "about": "Booharu's hand-edit record, booharu.auto, as a block may hold it. In cases, whether its marker of a translation typed by hand reads: booharu-core's attrs.rs tests hold Auto::of to these answers and tests/booharu/typed-by-hand.test.ts holds the interface's typedByHand to the same ones, so a record the desktop can't read, which it takes for none, marker and all, never reads as typed by hand in the interface. In stricter, forms booharu-core reads the marker from and Booharu never writes, which the interface reads as none, so it may miss a marker but never reads one the desktop doesn't.",
+  "cases": [
+    { "case": "the marker alone", "auto": { "typed": true }, "typed": true },
+    { "case": "an empty record", "auto": {}, "typed": false },
+    { "case": "a marker that's false", "auto": { "typed": false }, "typed": false },
+    {
+      "case": "hashes of 16 lowercase hex digits",
+      "auto": { "source": "fedcba9876543210", "text": "0123456789abcdef", "typed": true },
+      "typed": true
+    },
+    {
+      "case": "a hash in capitals",
+      "auto": { "text": "0123456789ABCDEF", "typed": true },
+      "typed": false
+    },
+    {
+      "case": "a hash one digit short",
+      "auto": { "text": "0123456789abcde", "typed": true },
+      "typed": false
+    },
+    {
+      "case": "a hash one digit long",
+      "auto": { "source": "0123456789abcdef0", "typed": true },
+      "typed": false
+    },
+    { "case": "words for a hash", "auto": { "text": "Hello", "typed": true }, "typed": false },
+    { "case": "a number for a hash", "auto": { "text": 5, "typed": true }, "typed": false },
+    {
+      "case": "null hashes, read as none",
+      "auto": { "source": null, "text": null, "typed": true },
+      "typed": true
+    },
+    { "case": "the agent's style", "auto": { "origin": "agent", "typed": true }, "typed": true },
+    {
+      "case": "an automatic step's style, named",
+      "auto": { "origin": "automatic", "typed": true },
+      "typed": true
+    },
+    { "case": "an unknown origin", "auto": { "origin": "robot", "typed": true }, "typed": false },
+    { "case": "a null origin", "auto": { "origin": null, "typed": true }, "typed": false },
+    {
+      "case": "the kept mark and a split half beside it",
+      "auto": { "kept": true, "split": true, "typed": true },
+      "typed": true
+    },
+    { "case": "a null kept mark", "auto": { "kept": null, "typed": true }, "typed": false },
+    { "case": "words for a split half", "auto": { "split": "yes", "typed": true }, "typed": false },
+    { "case": "words for the marker", "auto": { "typed": "true" }, "typed": false },
+    { "case": "a number for the marker", "auto": { "typed": 1 }, "typed": false },
+    { "case": "a null marker", "auto": { "typed": null }, "typed": false },
+    {
+      "case": "marks that aren't marks, which cost only themselves",
+      "auto": { "marks": "not marks", "typed": true },
+      "typed": true
+    },
+    {
+      "case": "a mark that doesn't read",
+      "auto": { "marks": [{ "start": 0, "end": 2, "style": { "fill": "red" } }], "typed": true },
+      "typed": true
+    },
+    {
+      "case": "a key a later stage may add",
+      "auto": { "category": ["shout", 1], "typed": true },
+      "typed": true
+    },
+    { "case": "a null style", "auto": { "style": null, "typed": true }, "typed": true },
+    { "case": "an empty style", "auto": { "style": {}, "typed": true }, "typed": true },
+    {
+      "case": "a whole style",
+      "auto": {
+        "style": {
+          "family": "Anime Ace",
+          "weight": 700,
+          "italic": false,
+          "fill": [0, 0, 0, 1],
+          "stroke": [1, 1, 1, 1],
+          "stroke_width": 2.5,
+          "outer_stroke": null,
+          "outer_stroke_width": null,
+          "tracking": -10,
+          "size": 30
+        },
+        "typed": true
+      },
+      "typed": true
+    },
+    { "case": "words for a style", "auto": { "style": "bold", "typed": true }, "typed": false },
+    {
+      "case": "words for a weight",
+      "auto": { "style": { "weight": "bold" }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "a weight that isn't whole",
+      "auto": { "style": { "weight": 700.5 }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "a weight below 0",
+      "auto": { "style": { "weight": -1 }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "a weight past 65535",
+      "auto": { "style": { "weight": 70000 }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "the heaviest weight",
+      "auto": { "style": { "weight": 65535 }, "typed": true },
+      "typed": true
+    },
+    {
+      "case": "a colour of three components",
+      "auto": { "style": { "fill": [0, 0, 0] }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "a colour of five components",
+      "auto": { "style": { "stroke": [0, 0, 0, 1, 1] }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "a colour as words",
+      "auto": { "style": { "fill": "#000000" }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "a colour with a null component",
+      "auto": { "style": { "outer_stroke": [0, 0, 0, null] }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "words for italic",
+      "auto": { "style": { "italic": "yes" }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "a number for a family",
+      "auto": { "style": { "family": 3 }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "words for a width",
+      "auto": { "style": { "stroke_width": "2" }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "a gradient fill",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "linear",
+            "angle": 90,
+            "stops": [
+              { "offset": 0, "color": [0, 0, 0, 1] },
+              { "offset": 1, "color": [1, 1, 1, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": true
+    },
+    {
+      "case": "a radial gradient with no angle and a hard edge",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "radial",
+            "stops": [
+              { "offset": 0.5, "color": [0, 0, 0, 1] },
+              { "offset": 0.5, "color": [1, 1, 1, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": true
+    },
+    {
+      "case": "an unknown kind of gradient",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "conic",
+            "stops": [
+              { "offset": 0, "color": [0, 0, 0, 1] },
+              { "offset": 1, "color": [1, 1, 1, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    {
+      "case": "a gradient of no kind",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "stops": [
+              { "offset": 0, "color": [0, 0, 0, 1] },
+              { "offset": 1, "color": [1, 1, 1, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    {
+      "case": "a gradient of one stop",
+      "auto": {
+        "style": {
+          "fill_gradient": { "kind": "linear", "stops": [{ "offset": 0, "color": [0, 0, 0, 1] }] }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    {
+      "case": "a gradient of nine stops",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "linear",
+            "stops": [
+              { "offset": 0, "color": [0, 0, 0, 1] },
+              { "offset": 0.1, "color": [0, 0, 0, 1] },
+              { "offset": 0.2, "color": [0, 0, 0, 1] },
+              { "offset": 0.3, "color": [0, 0, 0, 1] },
+              { "offset": 0.4, "color": [0, 0, 0, 1] },
+              { "offset": 0.5, "color": [0, 0, 0, 1] },
+              { "offset": 0.6, "color": [0, 0, 0, 1] },
+              { "offset": 0.7, "color": [0, 0, 0, 1] },
+              { "offset": 0.8, "color": [0, 0, 0, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    {
+      "case": "a gradient with no stops",
+      "auto": { "style": { "fill_gradient": { "kind": "linear" } }, "typed": true },
+      "typed": false
+    },
+    {
+      "case": "stops out of order",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "linear",
+            "stops": [
+              { "offset": 0.8, "color": [0, 0, 0, 1] },
+              { "offset": 0.2, "color": [1, 1, 1, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    {
+      "case": "a stop past the end",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "linear",
+            "stops": [
+              { "offset": 0, "color": [0, 0, 0, 1] },
+              { "offset": 1.5, "color": [1, 1, 1, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    {
+      "case": "a stop before the start",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "linear",
+            "stops": [
+              { "offset": -0.1, "color": [0, 0, 0, 1] },
+              { "offset": 1, "color": [1, 1, 1, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    {
+      "case": "a stop with no colour",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "linear",
+            "stops": [{ "offset": 0 }, { "offset": 1, "color": [1, 1, 1, 1] }]
+          }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    {
+      "case": "a stop with a key it doesn't know",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "linear",
+            "stops": [
+              { "offset": 0, "color": [0, 0, 0, 1], "alpha": 1 },
+              { "offset": 1, "color": [1, 1, 1, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    {
+      "case": "a gradient with a key it doesn't know",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "linear",
+            "spread": "pad",
+            "stops": [
+              { "offset": 0, "color": [0, 0, 0, 1] },
+              { "offset": 1, "color": [1, 1, 1, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    {
+      "case": "a null angle",
+      "auto": {
+        "style": {
+          "fill_gradient": {
+            "kind": "linear",
+            "angle": null,
+            "stops": [
+              { "offset": 0, "color": [0, 0, 0, 1] },
+              { "offset": 1, "color": [1, 1, 1, 1] }
+            ]
+          }
+        },
+        "typed": true
+      },
+      "typed": false
+    },
+    { "case": "words for a record", "auto": "typed", "typed": false },
+    { "case": "a null record", "auto": null, "typed": false },
+    { "case": "a record that's a flag", "auto": true, "typed": false },
+    { "case": "an empty list for a record", "auto": [], "typed": false }
+  ],
+  "stricter": [
+    {
+      "case": "the record as a list of its keys' values, in order",
+      "auto": ["automatic", null, null, null, null, false, false, true]
+    },
+    {
+      "case": "the origin named as an object",
+      "auto": { "origin": { "agent": null }, "typed": true }
+    },
+    {
+      "case": "the style as a list of its keys' values",
+      "auto": { "style": [null, 700], "typed": true }
+    }
+  ]
+}
