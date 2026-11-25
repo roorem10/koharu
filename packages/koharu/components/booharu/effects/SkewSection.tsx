@@ -46,14 +46,12 @@ export function SkewSection({
 }) {
   const { t } = useTranslation()
   // A block with no translation has no skew to show, as the desktop skews none, nor one with only a
-  // placeholder, styled before it was translated (P-d). Read by its translation itself, as
-  // Koharu's letteringOf gives a block with none its source without the words (#1494).
+  // placeholder, styled before it was translated (P-d), though one typed by hand and cleared since
+  // is its own. Read by its translation itself, as Koharu's letteringOf gives a block with none its
+  // source without the words (#1494).
   const lettered = targets
     .filter((layer) => letteringOf(layer) !== null)
-    .filter(
-      (layer) =>
-        !isBlockLayer(layer) || (layer.translation != null && !isPlaceholder(layer.translation)),
-    )
+    .filter((layer) => !isBlockLayer(layer) || (layer.translation != null && !isPlaceholder(layer)))
     .map(({ id }) => id)
   const shown = effects ? sharedSkew(effects, lettered) : null
   const disabled = typing !== null || targets.length === 0

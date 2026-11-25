@@ -41,7 +41,8 @@ impl Tool for GetProjectOverview {
          translation run stressed, also when the agent chose it with booharu_apply_text_style \
          or booharu_style_words, and `drawn`, a block drawn by hand rather than detected (a \
          style set on a block before it was translated is a `style` edit, never `text`: its \
-         empty placeholder is no translation, so the block stays untranslated); the \
+         empty placeholder is no translation, so the block stays untranslated, while a \
+         translation typed by hand and cleared since stays a `text` edit, blank on purpose); the \
          translator's model, target language, and instructions, with `connected`: whether the \
          model's vendor has its API key or sign-in stored, as the Providers settings show it, \
          never the key itself (Koharu's own models need neither, nor may a server named by its \
@@ -515,7 +516,37 @@ mod tests {
         // Its empty placeholder is no translation, nor one typed by hand,
         // but the look picked for it is the user's.
         assert_eq!((overview[0].blocks, overview[0].translated), (1, 0));
-        assert_eq!(json!(overview[0].hand_edited), json!({styled: ["style"]}));
+        assert_eq!(
+            json!(overview[0].hand_edited),
+            json!({styled.clone(): ["style"]})
+        );
+
+        // A first translation typed by hand, with the marker its step
+        // writes, then cleared: still no translation with text, as Koharu
+        // counts it, but its blank text is the user's.
+        let typed = [
+            json!({"op": "set_text", "layer": styled, "text": "Hm"}),
+            json!({"op": "set_attribute", "layer": styled, "namespace": "booharu",
+                "key": "auto", "value": {"typed": true}}),
+        ];
+        let cleared = [json!({"op": "set_text", "layer": styled, "text": ""})];
+        for ops in [&typed[..], &cleared[..]] {
+            session
+                .apply(Edit {
+                    label: "test".to_owned(),
+                    ops: ops
+                        .iter()
+                        .map(|op| serde_json::from_value(op.clone()).expect("an op"))
+                        .collect(),
+                })
+                .expect("an edit");
+        }
+        let overview = pages(&session.project()).expect("the pages");
+        assert_eq!((overview[0].blocks, overview[0].translated), (1, 0));
+        assert_eq!(
+            json!(overview[0].hand_edited),
+            json!({styled: ["text", "style"]})
+        );
     }
 
     #[test]

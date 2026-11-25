@@ -463,7 +463,9 @@ fn a_blank_translation_is_missing_exactly_where_koharus_page_summary_counts_none
     // Koharu counts a block translated only when its translation has text
     // once trimmed as Rust trims it (#1500): spaces, an ideographic space
     // and a next line are blank, a zero-width no-break space isn't. Whoever
-    // wrote it, typed by hand or a run.
+    // wrote it, typed by hand or a run, and with the marker of a translation
+    // typed by hand or none: one typed and cleared is a hand edit runs leave
+    // blank, yet Koharu's page ring counts it none, so it shows missing too.
     let cases = [
         ("  ", true),
         ("\u{3000}", true),
@@ -472,9 +474,12 @@ fn a_blank_translation_is_missing_exactly_where_koharus_page_summary_counts_none
         ("Hm", false),
     ];
     for (wording, blank) in cases {
-        for steps in [
-            &["detection", "ocr"][..],
-            &["detection", "ocr", "translation"],
+        let mut typed = c2pa(&["detection", "ocr"]);
+        typed["booharu"] = json!({"auto": {"typed": true}});
+        for attributes in [
+            c2pa(&["detection", "ocr"]),
+            typed,
+            c2pa(&["detection", "ocr", "translation"]),
         ] {
             let page = Fixture::new(
                 400,
@@ -486,7 +491,7 @@ fn a_blank_translation_is_missing_exactly_where_koharus_page_summary_counts_none
                         1,
                         "原文",
                         translation(wording, boxed(10.0, 70.0, 300.0, 150.0, "best"), None),
-                        c2pa(steps),
+                        attributes.clone(),
                     ),
                 ],
             );
@@ -498,8 +503,8 @@ fn a_blank_translation_is_missing_exactly_where_koharus_page_summary_counts_none
                 .found("case")
                 .iter()
                 .any(|(check, _)| check == MISSING_TRANSLATION);
-            assert_eq!(counted, !blank, "{wording:?} {steps:?}");
-            assert_eq!(missing, !counted, "{wording:?} {steps:?}");
+            assert_eq!(counted, !blank, "{wording:?} {attributes}");
+            assert_eq!(missing, !counted, "{wording:?} {attributes}");
         }
     }
     Ok(())

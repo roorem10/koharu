@@ -753,7 +753,7 @@ mod tests {
         attrs::{self, Auto, ReviewNote, SfxSubtitle},
         emphasis::EmphasisSettings,
         settings::{LetteringSettings, SfxMode},
-        styles::{given_back, recognized, recorded},
+        styles::{given_back, hand_typed, recognized, recorded},
     };
     use icu_locale_core::langid;
     use image::{ImageFormat, Rgb, RgbImage};
@@ -1183,6 +1183,64 @@ mod tests {
                 set(&["plain", "corrected", "typed"]),
                 vec![(Stage::Translate, 1, 0, 1, false)]
             )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_translation_typed_by_hand_and_cleared_is_left_out_but_a_placeholder_is_sent() -> Result<()>
+    {
+        let fixture = Fixture::new(
+            false,
+            vec![
+                add("cleared", None, 0, block("text", (10.0, 10.0))),
+                add("styled", None, 1, block("text", (40.0, 10.0))),
+                add("older", None, 2, block("text", (70.0, 10.0))),
+            ],
+        )?;
+        // A first translation typed by hand, with the marker its step
+        // writes, then cleared: blank on purpose.
+        let marker = hand_typed(&fixture.layer("cleared")?)?;
+        fixture.edit(vec![
+            Op::SetText {
+                layer: fixture.id("cleared").into(),
+                text: "Hm".to_owned(),
+            },
+            marker,
+        ])?;
+        fixture.type_in("cleared", "")?;
+        // A box styled before it's translated, as the type bar styles one.
+        fixture.op(json!({"op": "update_layer", "layer": fixture.id("styled"),
+            "patch": {"translation": {"style": {"chars": {"family": "Comic Neue"}}}}}))?;
+        // One typed with no marker, as a project saved before Booharu kept
+        // one holds it, then cleared: a placeholder, as before.
+        fixture.type_in("older", "Hm")?;
+        fixture.type_in("older", "")?;
+        let sent = |redo: bool| {
+            let events = Events::new();
+            let left = Left::of(
+                Stage::Translate,
+                snapshot(SfxMode::Skip, redo, false),
+                events.clone(),
+            );
+            let sent = fixture.sent(&left.sent(&fixture.member(None)));
+            left.told();
+            (sent, skipped(&events.told()))
+        };
+        let set = |labels: &[&str]| labels.iter().map(|label| (*label).to_owned()).collect();
+        // Translate leaves the hand edit alone, telling it as fixed by hand,
+        // and fills the placeholders.
+        assert_eq!(
+            sent(false),
+            (
+                set(&["styled", "older"]),
+                vec![(Stage::Translate, 0, 1, 0, false)]
+            )
+        );
+        // Redo boxes takes it on purpose.
+        assert_eq!(
+            sent(true),
+            (set(&["cleared", "styled", "older"]), Vec::new())
         );
         Ok(())
     }

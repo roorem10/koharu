@@ -1515,6 +1515,43 @@ fn a_box_styled_before_its_translated_types_a_first_translation_in_its_place() {
 }
 
 #[test]
+fn a_translation_typed_by_hand_and_cleared_is_retyped_in_its_own_frame() {
+    let Some((mut fixture, talk, _)) = untranslated() else {
+        return;
+    };
+    // A first translation typed in, with the marker of one typed by hand.
+    let effects = commit_translation(&mut fixture, talk, (100.0, 100.0));
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    // Resized and moved by hand, then cleared: blank on purpose, no
+    // placeholder.
+    other_writer(
+        &mut fixture,
+        vec![
+            json!({"op": "update_layer", "layer": talk, "patch": {"translation": {
+                "frame": {"box": {"bounds": {"x": 40.0, "y": 40.0, "width": 150.0, "height": 120.0}}},
+                "transform": [[1.0, 0.0, 4.0], [0.0, 1.0, 4.0]],
+            }}}),
+            json!({"op": "set_text", "layer": talk, "text": ""}),
+        ],
+    );
+    assert!(!placeholder(&fixture, talk));
+    let cleared = layer(&fixture, talk)["translation"].clone();
+    assert_ne!(cleared["frame"], layer(&fixture, talk)["source"]["frame"]);
+
+    // Typed into again, it's Koharu's retyping alone, in its own frame and
+    // transform, never its source's place.
+    fixture.canvas.select(Vec::new());
+    let effects = commit_translation(&mut fixture, talk, (100.0, 100.0));
+    let ops = set_text(&effects);
+    assert!(matches!(ops[..], [Op::SetRichText { .. }]), "{ops:?}");
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    let typed = layer(&fixture, talk)["translation"].clone();
+    assert_eq!(typed["content"], json!([{"insert": "Hi"}]));
+    assert_eq!(typed["frame"], cleared["frame"]);
+    assert_eq!(typed["transform"], cleared["transform"]);
+}
+
+#[test]
 fn a_first_translation_keeps_the_paragraph_keys_and_a_vertical_direction_set_before() {
     let Some((mut fixture, talk, boom)) = untranslated() else {
         return;

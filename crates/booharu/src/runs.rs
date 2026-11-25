@@ -15,10 +15,12 @@
 //! - a block with no inpainting record needs inpainting;
 //! - a block with a source, no translation, and no translation record needs
 //!   translation, a box styled before it's translated among them, whose
-//!   translation is only a placeholder (`status::placeholder`: blank point
-//!   text no run wrote, which counts as none, `status::unwritten`), and one
-//!   the Translation stage was given back unchanged (no translation, its
-//!   clean-up hidden) or with a blank source counts as translated;
+//!   translation is only a placeholder (`status::placeholder`: a blank
+//!   translation no run wrote and nobody typed, which counts as none,
+//!   `status::unwritten`), while one typed by hand and cleared since is the
+//!   user's, left blank on purpose, and one the Translation stage was given
+//!   back unchanged (no translation, its clean-up hidden) or with a blank
+//!   source counts as translated;
 //! - a sound effect the SFX mode keeps as art, or one with a subtitle
 //!   (`sfx::skipped` under the lettering settings, read once per plan, as a
 //!   run's snapshot reads them), needs translation only while the
@@ -926,6 +928,40 @@ mod tests {
         chapter.translate("a")?;
         assert_eq!(chapter.needs("styled")?, NOTHING);
         assert_eq!(chapter.plan(&["styled", "hidden", "given"])?, Vec::new());
+        Ok(())
+    }
+
+    #[test]
+    fn a_translation_typed_by_hand_and_cleared_needs_no_translation() -> Result<()> {
+        let read = ["detection", "ocr", "inpainting"];
+        let ops = [
+            block("cleared", "a", 0, "どうして", &read, false),
+            block("styled", "b", 0, "どうして", &read, false),
+        ]
+        .concat();
+        let mut chapter = Chapter::new(&[("cleared", true), ("styled", true)], ops)?;
+        // A first translation typed by hand, with the marker its step
+        // writes, then cleared: blank on purpose, which no plan fills.
+        let a = chapter.layers["a"];
+        let marker = styles::hand_typed(chapter.session.project().layer(a)?)?;
+        chapter.edit(vec![
+            Op::SetText {
+                layer: a.into(),
+                text: "Why?".to_owned(),
+            },
+            marker,
+        ])?;
+        chapter.edit(vec![Op::SetText {
+            layer: a.into(),
+            text: String::new(),
+        }])?;
+        assert_eq!(chapter.needs("cleared")?, NOTHING);
+        // Styled since, still none; a box styled before it's translated
+        // still needs its translation.
+        let b = chapter.layers["b"];
+        chapter.edit(vec![type_bar_style(a), type_bar_style(b)])?;
+        assert_eq!(chapter.needs("cleared")?, NOTHING);
+        assert_eq!(chapter.needs("styled")?, [Stage::Translate]);
         Ok(())
     }
 

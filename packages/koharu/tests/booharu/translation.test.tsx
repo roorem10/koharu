@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { StoryPanel } from '@/components/editor/StoryPanel'
 import { isPlaceholder, setTranslation } from '@/lib/booharu/translation'
+import type { BlockLayer } from '@/lib/document'
 import { pagesKey, projectKey, queryClient, type ProjectView } from '@/lib/queries'
 import {
   commands,
@@ -39,6 +40,10 @@ function block(id: string, source: string, translation?: string | Text): Layer {
 
 const bounds = { x: 0, y: 0, width: 120, height: 60 }
 
+/** The record of a block whose first translation was typed by hand, as the canvas, Story and the
+ * agent write it in the same undo step. */
+const typedByHand = { booharu: { auto: { typed: true } } }
+
 /** What the type bar leaves on a block styled before it's translated: its source's blank, in its
  * source's frame (Koharu's #1494), with the style merged in. */
 const placeholder: Text = {
@@ -59,6 +64,11 @@ const page: Page = {
     block('styled', 'やあ', placeholder),
     // Translated, then its text cleared in Story: blank in its frame, as a placeholder is.
     block('cleared', 'またね', { content: [], frame: { box: { bounds } } }),
+    // Typed by hand, then cleared: blank, but marked as typed by hand.
+    {
+      ...block('typed', 'じゃあ', { content: [], frame: { box: { bounds } } }),
+      attributes: typedByHand,
+    },
   ],
 }
 
@@ -94,7 +104,7 @@ function story() {
   queryClient.setQueryData(projectKey, project)
   queryClient.setQueryData([...pagesKey, page.id], {
     page,
-    story: ['empty', 'translated', 'styled', 'cleared'],
+    story: ['empty', 'translated', 'styled', 'cleared', 'typed'],
   })
   render(
     <QueryClientProvider client={queryClient}>
@@ -103,21 +113,38 @@ function story() {
   )
 }
 
+/** A block holding `translation`, with `attributes`, none by default. */
+function holding(translation: Text | null | undefined, attributes: Layer['attributes'] = {}) {
+  return { ...block('b', 'やあ'), translation, attributes } as BlockLayer
+}
+
 describe('Booharu placeholder translation (P-d)', () => {
   it('is blank text in whatever frame its source gave it, and not no translation or text', () => {
-    expect(isPlaceholder(undefined)).toBe(false)
-    expect(isPlaceholder(null)).toBe(false)
-    expect(isPlaceholder(placeholder)).toBe(true)
+    expect(isPlaceholder(holding(undefined))).toBe(false)
+    expect(isPlaceholder(holding(null))).toBe(false)
+    expect(isPlaceholder(holding(placeholder))).toBe(true)
     // A frame tells nothing since the scene starts it in its source's (#1494): point, path or none.
-    expect(isPlaceholder({ ...placeholder, frame: 'point' })).toBe(true)
-    expect(isPlaceholder({ content: [], frame: { path: { path: 'M0 0 L9 0 L9 9 Z' } } })).toBe(true)
-    expect(isPlaceholder({})).toBe(true)
+    expect(isPlaceholder(holding({ ...placeholder, frame: 'point' }))).toBe(true)
+    const path = { path: { path: 'M0 0 L9 0 L9 9 Z' } }
+    expect(isPlaceholder(holding({ content: [], frame: path }))).toBe(true)
+    expect(isPlaceholder(holding({}))).toBe(true)
     // Whitespace as the desktop trims it, NEL among it, which JavaScript's trim keeps, and
     // U+FEFF not, which JavaScript's trim takes.
     const blank = [{ insert: ' \n' }, { insert: '\u3000\u0085' }]
-    expect(isPlaceholder({ ...placeholder, content: blank })).toBe(true)
-    expect(isPlaceholder({ ...placeholder, content: [{ insert: '\uFEFF' }] })).toBe(false)
-    expect(isPlaceholder({ ...placeholder, content: [{ insert: ' Hi ' }] })).toBe(false)
+    expect(isPlaceholder(holding({ ...placeholder, content: blank }))).toBe(true)
+    expect(isPlaceholder(holding({ ...placeholder, content: [{ insert: '\uFEFF' }] }))).toBe(false)
+    expect(isPlaceholder(holding({ ...placeholder, content: [{ insert: ' Hi ' }] }))).toBe(false)
+  })
+
+  it('is never a blank translation typed by hand, which its record marks', () => {
+    expect(isPlaceholder(holding(placeholder, typedByHand))).toBe(false)
+    expect(isPlaceholder(holding({ content: [{ insert: ' ' }] }, typedByHand))).toBe(false)
+    // A marker that isn't true, or a record that isn't one, marks nothing.
+    expect(isPlaceholder(holding(placeholder, { booharu: { auto: { typed: 'yes' } } }))).toBe(true)
+    expect(isPlaceholder(holding(placeholder, { booharu: { auto: 'typed' } }))).toBe(true)
+    // Beside the other parts of the record, it marks as alone.
+    const kept = { booharu: { auto: { kept: true, typed: true } } }
+    expect(isPlaceholder(holding(placeholder, kept))).toBe(false)
   })
 })
 
@@ -170,5 +197,19 @@ describe('Booharu typed translation', () => {
     expect(typed).toHaveBeenCalledTimes(2)
     expect(typed).toHaveBeenLastCalledWith('cleared', 'Bye')
     expect(edits).toEqual([])
+  })
+
+  it('retypes a translation typed by hand and cleared since where it is, as Koharu edits one', async () => {
+    const { edits, typed } = desktop()
+    story()
+    const user = userEvent.setup()
+
+    const fields = await screen.findAllByPlaceholderText('Translation')
+    await user.type(fields[4], 'Hi')
+    await user.tab()
+    expect(typed).not.toHaveBeenCalled()
+    expect(edits).toEqual([
+      { label: 'set_text', ops: [{ op: 'set_text', layer: 'typed', text: 'Hi' }] },
+    ])
   })
 })

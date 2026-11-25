@@ -183,7 +183,7 @@ mod tests {
         attrs::SfxSubtitle,
         settings::SfxMode,
         status,
-        styles::{given_back, recognized, text_hash},
+        styles::{given_back, hand_typed, recognized, text_hash},
         testing::type_bar_style,
     };
 
@@ -519,6 +519,45 @@ mod tests {
     }
 
     #[test]
+    fn a_translation_typed_by_hand_and_cleared_is_left_alone_but_by_a_redo() {
+        let mut fixture = Fixture::new();
+        let settings = translate_all();
+        let translating = |fixture: &Fixture, name: &str, redo: bool| {
+            fixture.left_out(name, RunStage::Translate, &settings, redo, false)
+        };
+        let set = |id: LayerId, text: &str| Op::SetText {
+            layer: id.into(),
+            text: text.to_owned(),
+        };
+        // A first translation typed by hand, with the marker in its step,
+        // then cleared: blank on purpose, a hand edit Translate leaves alone
+        // unless Redo boxes takes it.
+        let held = fixture.id("held");
+        let marker = hand_typed(&fixture.layer("held")).expect("the record");
+        fixture.apply(vec![set(held, "Why?"), marker]);
+        fixture.apply(vec![set(held, "")]);
+        assert_eq!(
+            translating(&fixture, "held", false),
+            Some(Reason::HandFixed)
+        );
+        assert_eq!(translating(&fixture, "held", true), None);
+        // Styled since, it's still one.
+        fixture.apply(vec![type_bar_style(held)]);
+        assert_eq!(
+            translating(&fixture, "held", false),
+            Some(Reason::HandFixed)
+        );
+
+        // The same with no marker, as a project saved before Booharu kept
+        // one holds it, or as Koharu's agent edit tool types it: a
+        // placeholder, which Translate fills.
+        let text = fixture.id("text");
+        fixture.apply(vec![set(text, "Why?")]);
+        fixture.apply(vec![set(text, "")]);
+        assert_eq!(translating(&fixture, "text", false), None);
+    }
+
+    #[test]
     fn what_the_planner_translates_is_never_left_out_as_fixed_by_hand() {
         // Each block the planner sends to the Translation stage, as it has
         // no translation of its own and wasn't given back, or carries the
@@ -537,6 +576,17 @@ mod tests {
                 layer: fixture.id(name).into(),
                 text: " ".to_owned(),
             }]);
+        }
+        /// As a first translation is typed by hand, the marker in its step.
+        fn typed(fixture: &mut Fixture, name: &str) {
+            let marker = hand_typed(&fixture.layer(name)).expect("the record");
+            fixture.apply(vec![
+                Op::SetText {
+                    layer: fixture.id(name).into(),
+                    text: "Why?".to_owned(),
+                },
+                marker,
+            ]);
         }
         fn keep(fixture: &mut Fixture, name: &str) {
             let ops = sfx::kept_original(&fixture.layer(name));
@@ -569,7 +619,7 @@ mod tests {
             hide(fixture, name);
             fixture.apply(vec![record]);
         }
-        let sequences: [&[Step]; 7] = [
+        let sequences: [&[Step]; 9] = [
             &[style, moved, blank, hide, show],
             &[blank, style, keep],
             &[keep, style, show, hide],
@@ -577,6 +627,8 @@ mod tests {
             &[give_back, style, show],
             &[style, give_back, show, style],
             &[style, give_back_styled, show],
+            &[style, typed, blank, keep, hide, show],
+            &[give_back, typed, blank, style],
         ];
         let names = ["held", "text", "effect"];
         let mut planned = 0;

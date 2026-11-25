@@ -711,9 +711,11 @@ pub struct Edited {
     /// stage read the wording it has.
     pub source: bool,
     /// Its translation isn't what the Translation stage wrote, or no stage
-    /// wrote it, as one typed by hand; never for a placeholder
-    /// ([`status::placeholder`]), the blank translation a style set before
-    /// translating leaves, which holds no words.
+    /// wrote it, as one typed by hand, which stays one once cleared, also on
+    /// a line given back, as its record's marker says ([`Auto::typed`]);
+    /// never for a placeholder ([`status::placeholder`]), the blank
+    /// translation a style set before translating leaves, which holds no
+    /// words.
     pub text: bool,
     /// A style value of its translation isn't the one recorded, a span of
     /// it is marked with one, but for the marks a run's emphasis gave it and
@@ -745,7 +747,10 @@ impl Edited {
 /// translation ([`status::placeholder`]): its values count as set by hand,
 /// so Detect again keeps the box, Apply leaves it alone and a category
 /// change keeps its font, but it holds no text typed by hand, so the next
-/// run still translates the box, keeping those values.
+/// run still translates the box, keeping those values. A translation typed
+/// by hand and cleared since isn't one: the marker of a translation typed
+/// by hand its record carries ([`Auto::typed`]) keeps its text a hand edit,
+/// so the next run leaves it blank, as left, unless told to take it.
 pub fn edited(layer: &Layer) -> Edited {
     let block = match &layer.content {
         Content::Block(block) => block,
@@ -769,11 +774,14 @@ pub fn edited(layer: &Layer) -> Edited {
         Some(translation) => {
             // A placeholder, the blank translation a style set before
             // translating leaves, holds no words typed by hand; a run's
-            // translation emptied by hand still differs from its hash.
-            let text = match &record.text {
-                Some(hash) => *hash != text_hash(&translation.content.text()),
-                None => !recorded("translation") && !status::placeholder(layer, block),
-            };
+            // translation emptied by hand still differs from its hash, and
+            // one typed by hand carries the marker, emptied or not, even on
+            // a line given back, whose record holds the hash of no text.
+            let text = record.typed
+                || match &record.text {
+                    Some(hash) => *hash != text_hash(&translation.content.text()),
+                    None => !recorded("translation") && !status::placeholder(layer, block),
+                };
             // A span's marks are a hand edit but for the values a run's
             // emphasis set there and that still hold, and those whitespace
             // typed beside a mark at either end of the line took from it;
@@ -1859,6 +1867,34 @@ mod tests {
         let given = given_back(&layer(&session, block)).expect("the record");
         apply(&mut session, vec![given]);
         assert!(!Auto::of(&layer(&session, block)).typed);
+    }
+
+    #[test]
+    fn a_translation_typed_by_hand_stays_a_hand_edit_once_cleared() {
+        let look = settings(true, None, None);
+        let set = |block: LayerId, text: &str| Op::SetText {
+            layer: block.into(),
+            text: text.to_owned(),
+        };
+        let typed_and_cleared = |session: &mut Session, block: LayerId| {
+            let marker = hand_typed(&layer(session, block)).expect("the record");
+            apply(session, vec![set(block, "Why?"), marker]);
+            apply(session, vec![set(block, "")]);
+            edited(&layer(session, block))
+        };
+        // Typed into a block with none, then cleared.
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        assert!(typed_and_cleared(&mut session, block).text);
+        // On a line given back, whose record holds the translation of no
+        // text, alike.
+        let (_dir, mut session, block) = given_back_after_a_run(&look);
+        assert!(typed_and_cleared(&mut session, block).text);
+        // With no marker, as a project saved before Booharu kept one holds
+        // a translation typed there: no text typed once cleared, as before.
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        apply(&mut session, vec![set(block, "Why?")]);
+        apply(&mut session, vec![set(block, "")]);
+        assert!(!edited(&layer(&session, block)).text);
     }
 
     #[test]

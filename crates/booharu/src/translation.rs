@@ -45,9 +45,10 @@ const RETYPED: &str = "set_text";
 /// same step, so Undo takes it back with the text and a translation cleared
 /// later stays a hand edit; a sound effect kept as art loses the kept mark
 /// from it, as its clean-up shows again. One
-/// with a translation of its own, words or a run's emptied by hand, keeps
-/// its place, lettering, and language, and the step is labelled as the
-/// Story panel labels a retyped text.
+/// with a translation of its own, words, a run's emptied by hand or one
+/// typed by hand and cleared since, keeps its place, lettering, and
+/// language, and the step is labelled as the Story panel labels a retyped
+/// text.
 pub fn edit(
     project: &Project,
     block: LayerId,
@@ -513,7 +514,7 @@ mod tests {
     }
 
     #[test]
-    fn a_blank_translation_no_run_wrote_is_placed_again_as_a_first_one() -> Result<()> {
+    fn a_translation_typed_by_hand_and_cleared_is_retyped_in_its_own_place() -> Result<()> {
         let (_dir, mut session, block) = found("text")?;
         let english: LanguageIdentifier = "en".parse()?;
         let typed = edit(
@@ -524,17 +525,65 @@ mod tests {
             &Snapshot::default(),
         )?;
         session.apply(typed)?;
-        // Cleared by hand: blank, and no run wrote it, so only a placeholder,
-        // as Koharu counts a cleared translation as none (#1500); its frame
-        // tells nothing, as every first translation starts in its source's
-        // (#1494).
+        // Moved by hand, then cleared: blank, as Koharu counts it as none
+        // (#1500), but typed by hand, as its record's marker says, so a
+        // translation of its own left blank on purpose, not a placeholder.
+        let moved = json!({"translation": {"frame": {"box": {"bounds":
+            {"x": 100.0, "y": 20.0, "width": 40.0, "height": 120.0}}}}});
         apply(
             &mut session,
-            vec![Op::SetText {
-                layer: block.into(),
-                text: String::new(),
-            }],
+            vec![
+                Op::UpdateLayer {
+                    layer: block.into(),
+                    patch: moved,
+                },
+                Op::SetText {
+                    layer: block.into(),
+                    text: String::new(),
+                },
+            ],
         )?;
+        let layer = session.project().layer(block)?.clone();
+        let Content::Block(found) = &layer.content else {
+            bail!("{block} isn't a block");
+        };
+        assert!(!status::unwritten(&layer, found));
+        assert!(edited(&layer).text);
+        let retyped = edit(
+            &session.project(),
+            block,
+            "Hm".to_owned(),
+            &english,
+            &Snapshot::default(),
+        )?;
+        assert!(matches!(retyped.ops.as_slice(), [Op::SetText { .. }]));
+        assert_eq!(retyped.label, "set_text");
+        session.apply(retyped)?;
+        let typed = translation(&session, block)?;
+        assert_eq!(typed.content.text(), "Hm");
+        // Where the user moved it, not its source's place.
+        assert_eq!(typed.bounds().map(|bounds| bounds.x0), Some(100.0));
+        Ok(())
+    }
+
+    #[test]
+    fn a_blank_translation_nobody_typed_is_placed_again_as_a_first_one() -> Result<()> {
+        let (_dir, mut session, block) = found("text")?;
+        let english: LanguageIdentifier = "en".parse()?;
+        // Typed with no marker, as Koharu's agent edit tool types one or a
+        // project saved before Booharu kept it holds one, then cleared:
+        // blank, and no run wrote it, so only a placeholder; its frame
+        // tells nothing, as every first translation starts in its source's
+        // (#1494).
+        for text in ["Why?", ""] {
+            apply(
+                &mut session,
+                vec![Op::SetText {
+                    layer: block.into(),
+                    text: text.to_owned(),
+                }],
+            )?;
+        }
         let cleared = translation(&session, block)?;
         assert!(cleared.bounds().is_some());
         let retyped = edit(
@@ -548,8 +597,12 @@ mod tests {
         session.apply(retyped)?;
         let typed = translation(&session, block)?;
         assert_eq!(typed.content.text(), "Hm");
-        // Where it went the first time, its source's place.
+        // Where it went the first time, its source's place, and marked now.
         assert_eq!(typed.frame, cleared.frame);
+        assert_eq!(
+            attrs::get::<Auto>(session.project().layer(block)?),
+            Some(marker())
+        );
         Ok(())
     }
 

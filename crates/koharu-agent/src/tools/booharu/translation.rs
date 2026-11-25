@@ -2,8 +2,10 @@
 //! block without a translation of its own, none or only the placeholder a
 //! style set before translating leaves, gets its first translation where
 //! Koharu's scene starts one, in its source's place, in the same undo step
-//! as the target language, its clean-up shown, and the default look a new
-//! translation gets where the placeholder set no value of its own.
+//! as the target language, its clean-up shown, the default look a new
+//! translation gets where the placeholder set no value of its own, and the
+//! marker of a translation typed by hand, so once cleared it stays a hand
+//! edit.
 
 use booharu_core::settings::Snapshot;
 use koharu_pipeline::PipelineConfig;
@@ -43,8 +45,9 @@ impl Tool for SetTranslation {
          or while Pick fonts automatically is on its lettering category's font, and with \
          colour detection off the default colours. A block with a translation of its own, \
          blank or not, keeps its place, lettering, and language. A translation set this way \
-         counts as typed by hand, so booharu_apply_text_style leaves it alone unless told to \
-         include such blocks. Answers what changed."
+         counts as typed by hand, also once cleared or set blank, so translation runs leave it \
+         alone unless booharu_redo_boxes takes it, and booharu_apply_text_style leaves it alone \
+         unless told to include such blocks. Answers what changed."
             .to_owned()
     }
 

@@ -17,6 +17,15 @@ export function readNote(layer: Layer): string | null {
   return typeof value === 'string' && value.trim() ? value : null
 }
 
+/** `auto`'s `typed` on a block: whether its translation was typed by hand, a first translation
+ * written on the canvas, in Story or through Booharu's agent tools, with the marker in the same undo
+ * step, which keeps it a hand edit once cleared, as booharu-core's `Auto::typed` reads the record.
+ * A record that isn't an object, or a marker that isn't `true`, reads as none. */
+export function typedByHand(layer: Layer): boolean {
+  const auto = layer.attributes[namespace]?.auto
+  return typeof auto === 'object' && auto !== null && !Array.isArray(auto) && auto.typed === true
+}
+
 /** `original_scan` on an image layer: whether it's the page's Original scan, the hidden, locked
  * layer Fix page levels keeps the scan in as it came, as booharu-core's `is_original_scan` reads
  * it. */

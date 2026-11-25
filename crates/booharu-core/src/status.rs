@@ -12,10 +12,14 @@
 //! placeholder ([`placeholder`]): Koharu's type bar, and Koharu's agent's
 //! edit tool, write a style change on a block with no translation into its
 //! translation, which the scene starts as its source's blank (Koharu's
-//! #1494). It holds no words and no run wrote it, so wherever the question
-//! is whether a block is translated, it counts as no translation
-//! ([`unwritten`]), as Koharu counts a blank one (#1500): the box stays
-//! translatable, and a run that translates it keeps the style set by hand.
+//! #1494). It holds no words, no run wrote it and nobody typed it, so
+//! wherever the question is whether a block is translated, it counts as no
+//! translation ([`unwritten`]), as Koharu counts a blank one (#1500): the
+//! box stays translatable, and a run that translates it keeps the style set
+//! by hand. A translation typed by hand starts as the same blank, so its
+//! block's record carries a marker of it ([`Auto::typed`]), which keeps it,
+//! once cleared, a blank translation of its own, a hand edit runs leave
+//! alone, while Koharu and the quality check still count it untranslated.
 
 use koharu_scene::{Block, CharStyle, Content, Direction, Layer, Page, Text};
 use serde_json::{Map, Value, json};
@@ -57,18 +61,25 @@ pub fn blocks(page: &Page) -> Vec<(&Layer, &Block, bool)> {
 /// Koharu's type bar and its agent's edit tool write into a block with no
 /// translation, and the scene starts as its source's blank, in its source's
 /// place (Koharu's #1494), so its frame tells nothing. Its words are blank,
-/// trimmed as the record's hash trims them ([`text_hash`]), and no run wrote
+/// trimmed as the record's hash trims them ([`text_hash`]); no run wrote
 /// it: its hand-edit record holds no translation and Koharu's Translation
 /// stage recorded none, or the record holds the translation of no text a
-/// line given back leaves, styled since. A translation a run wrote and the
-/// user emptied isn't one, as its record holds the text the run wrote, so it
-/// stays a hand edit. False for a block with no translation at all.
+/// line given back leaves, styled since; and nobody typed it: the record
+/// carries no marker of a translation typed by hand ([`Auto::typed`]),
+/// which a first translation typed on the canvas, in the Story panel or
+/// through Booharu's agent tools writes, blank or not, so one typed and
+/// cleared since stays a hand edit, left blank on purpose. A translation a
+/// run wrote and the user emptied isn't one either, as its record holds the
+/// text the run wrote. One typed in a project saved before Booharu kept the
+/// marker, or by Koharu's own agent edit tool, which writes none, reads as
+/// before: a placeholder once cleared. False for a block with no
+/// translation at all.
 pub fn placeholder(layer: &Layer, block: &Block) -> bool {
     let Some(translation) = &block.translation else {
         return false;
     };
     let blank = translation.content.text().trim().is_empty();
-    blank && by_no_run(layer)
+    blank && by_no_run(layer) && !Auto::of(layer).typed
 }
 
 /// Whether no run wrote the translation of the block `layer` holds: its
@@ -462,6 +473,65 @@ mod tests {
         let (_dir, mut session, [_, id]) = page(false, &read_steps);
         give_back(&mut session, id);
         apply(&mut session, vec![type_bar_style(id)]);
+        assert_eq!(read(&session, id), (true, true));
+    }
+
+    #[test]
+    fn a_translation_typed_by_hand_and_cleared_is_no_placeholder() {
+        let set = |id: LayerId, text: &str| Op::SetText {
+            layer: id.into(),
+            text: text.to_owned(),
+        };
+        // Typed as a first translation, the marker in its step, as the
+        // canvas and the Story panel type one.
+        let typed = |session: &mut Session, id: LayerId, text: &str| {
+            let project = session.project();
+            let marker = styles::hand_typed(project.layer(id).expect("the block"));
+            apply(session, vec![set(id, text), marker.expect("the record")]);
+        };
+        let untranslated_by_koharu = |session: &Session| {
+            let Ok(Answer::Project(summary)) = session.query(Query::GetProject) else {
+                panic!("no summary");
+            };
+            summary.pages[0].translated == 0
+        };
+        let read_steps = [DETECTION, OCR];
+
+        // Cleared: a blank translation of its own, which Koharu still
+        // counts as none (#1500).
+        let (_dir, mut session, [_, id]) = page(false, &read_steps);
+        typed(&mut session, id, "Why?");
+        apply(&mut session, vec![set(id, "")]);
+        assert_eq!(read(&session, id), (false, false));
+        assert!(untranslated_by_koharu(&session));
+        // Styled since, still one.
+        apply(&mut session, vec![type_bar_style(id)]);
+        assert_eq!(read(&session, id), (false, false));
+        // Undone back to the block with none, and styled: a placeholder.
+        session.undo().expect("the undo").expect("a step");
+        session.undo().expect("the undo").expect("a step");
+        session.undo().expect("the undo").expect("a step");
+        apply(&mut session, vec![type_bar_style(id)]);
+        assert_eq!(read(&session, id), (true, true));
+
+        // Typed blank on purpose, it's one too.
+        let (_dir, mut session, [_, id]) = page(false, &read_steps);
+        typed(&mut session, id, "  ");
+        assert_eq!(read(&session, id), (false, false));
+
+        // On a line given back, styled since, alike.
+        let (_dir, mut session, [_, id]) = page(false, &read_steps);
+        give_back(&mut session, id);
+        apply(&mut session, vec![type_bar_style(id)]);
+        typed(&mut session, id, "Why?");
+        apply(&mut session, vec![set(id, "")]);
+        assert_eq!(read(&session, id), (false, false));
+
+        // With no marker, as a project saved before Booharu kept one holds
+        // a translation typed there: a placeholder once cleared, as before.
+        let (_dir, mut session, [_, id]) = page(false, &read_steps);
+        apply(&mut session, vec![set(id, "Why?")]);
+        apply(&mut session, vec![set(id, "")]);
         assert_eq!(read(&session, id), (true, true));
     }
 

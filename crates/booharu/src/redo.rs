@@ -338,6 +338,39 @@ mod tests {
     }
 
     #[test]
+    fn a_translation_typed_by_hand_and_cleared_is_taken_only_on_purpose() -> Result<()> {
+        let mut fixture = Fixture::new()?;
+        let ready = fixture.id("ready");
+        // A first translation typed in the Story panel, then cleared: a hand
+        // edit left blank on purpose, which Redo boxes asks before taking,
+        // as a Translate run leaves it alone.
+        let english: koharu_scene::LanguageIdentifier = "en".parse()?;
+        let typed = crate::translation::edit(
+            &fixture.session.project(),
+            ready,
+            "Why?".to_owned(),
+            &english,
+            &booharu_core::settings::Snapshot::default(),
+        )?;
+        fixture.session.apply(typed)?;
+        fixture.session.apply(Edit {
+            label: "test".to_owned(),
+            ops: vec![Op::SetText {
+                layer: ready.into(),
+                text: String::new(),
+            }],
+        })?;
+        let (stages, settings) = ([RunStage::Translate], LetteringSettings::default());
+        let project = fixture.session.project();
+        let without = redo_targets(&project, &[ready], &stages, &settings, false)?;
+        assert_eq!(without.counts, counts(0, 1, 0));
+        assert!(without.blocks.is_empty());
+        let with = redo_targets(&project, &[ready], &stages, &settings, true)?;
+        assert_eq!(with.blocks, [ready]);
+        Ok(())
+    }
+
+    #[test]
     fn it_refuses_other_stages_none_and_a_layer_that_isnt_a_block() -> Result<()> {
         let fixture = Fixture::new()?;
         for stages in [&[RunStage::Detect][..], &[RunStage::Read], &[]] {
