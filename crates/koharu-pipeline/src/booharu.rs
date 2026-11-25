@@ -1746,6 +1746,64 @@ mod tests {
     }
 
     #[test]
+    fn a_box_styled_before_its_translated_is_placed_as_one_with_none_but_for_what_was_set()
+    -> Result<()> {
+        // Lettered at 32 but for c and d, at 40, so the page's lettering
+        // size is 32.
+        let big = |x: f64| {
+            let mut block = found("text", (x, 20.0));
+            block["source"]["style"]["chars"]["size"] = json!(40.0);
+            block
+        };
+        let add = |label: &str, index: usize, layer: Value| json!({"op": "add_layer", "id": format!("${label}"), "page": "$p", "index": index, "layer": layer});
+        let mut page = Page::of(vec![
+            add("a", 0, found("text", (10.0, 20.0))),
+            add("b", 1, found("text", (60.0, 20.0))),
+            add("c", 2, big(110.0)),
+            add("d", 3, big(160.0)),
+        ])?;
+        // Styled before they're translated, each a placeholder holding its
+        // source's size and colours (Koharu's #1494): c in a family of the
+        // user's, d at a size of the user's.
+        let style = |label: &str, chars: Value| Op::UpdateLayer {
+            layer: page.id(label).into(),
+            patch: json!({"translation": {"style": {"chars": chars}}}),
+        };
+        let styled = vec![
+            style("c", json!({"family": "Comic Neue"})),
+            style("d", json!({"size": 24.0})),
+        ];
+        page.edit(styled)?;
+        page.translate(
+            &[("c", "Why?"), ("d", "Why?")],
+            &snapshot(true, None, None, Some("CCWildWords")),
+        )?;
+        // c at the page's size, its source's outline scaled to it, as a box
+        // with none is placed, in the family set on it.
+        let c = page.chars("c")?;
+        assert_eq!(c.size, Some(32.0));
+        let scaled = Some(3.0 * (32.0 / 40.0));
+        assert_eq!(colours(&c), (Some(BLUE), Some(WHITE), scaled));
+        assert_eq!(c.family.as_deref(), Some("Comic Neue"));
+        // d at the size set on it, its outline scaled to that.
+        let d = page.chars("d")?;
+        assert_eq!(d.size, Some(24.0));
+        assert_eq!(
+            colours(&d),
+            (Some(BLUE), Some(WHITE), Some(3.0 * (24.0 / 40.0)))
+        );
+        // Those values are the run's, recorded as automatic; the family set
+        // stays the user's.
+        let record = Auto::of(&page.layer("c")?).style.context("a style")?;
+        assert_eq!(
+            (record.fill, record.stroke, record.stroke_width),
+            (Some(BLUE), Some(WHITE), scaled)
+        );
+        assert_eq!(record.family, None);
+        Ok(())
+    }
+
+    #[test]
     fn every_translated_block_gets_a_record_that_reads_as_automatic() -> Result<()> {
         let mut page = Page::new(&[("a", "text"), ("b", "sfx"), ("c", "text")])?;
         // Styling nothing, as Koharu's own run would: still recorded. c is

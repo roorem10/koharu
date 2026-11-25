@@ -22,9 +22,11 @@
 //! - A style set on a block before it's translated leaves a placeholder
 //!   translation (`status::placeholder`): [`edited`] counts its values as
 //!   set by hand but no text as typed, and a run translating the block keeps
-//!   them, filling in only the keys left unset. Koharu's record of a run
-//!   before doesn't make them the stage's once a later run gives the line
-//!   back ([`stage_styled`]), so this holds on a block translated before too.
+//!   them, filling in only the keys left unset, its size, colours and
+//!   outline as Koharu's placement fills a block with none. Koharu's record
+//!   of a run before doesn't make them the stage's once a later run gives
+//!   the line back ([`stage_styled`]), so this holds on a block translated
+//!   before too.
 
 use std::collections::BTreeSet;
 
@@ -250,6 +252,13 @@ pub fn patched(chars: &CharStyle, patch: &Map<String, Value>) -> Result<CharStyl
 /// skew's record moves to that pivot ([`skew::carried`]). With no skew to
 /// carry, as for a first translation, a record left beside the translation
 /// goes.
+///
+/// A placeholder ([`status::placeholder`]) is placed as a block with no
+/// translation is, but for the values set on it: the scene starts one as
+/// its source's blank (Koharu's #1494), so it holds its source's size,
+/// colours and outline, which placement keeps, and the ops first give it,
+/// for each of those not set on it ([`status::own_chars`]), placement's for
+/// a block with none (`placeholder_chars`), which count as placement's.
 pub fn translated(
     project: &Project,
     block: LayerId,
@@ -260,6 +269,8 @@ pub fn translated(
     marking: &Marking<'_>,
 ) -> Result<Vec<Op>> {
     let layer = project.layer(block)?;
+    let filled = placeholder_chars(project, block)?;
+    let placed = &with_chars(placed, &filled);
     let looked = looked(project, block, placed, settings, font)?;
     let mut record = Auto::of(layer);
     let before = match &layer.content {
@@ -303,7 +314,14 @@ pub fn translated(
     // A translation drops the kept mark: its clean-up shows under it.
     record.kept = false;
     let record = record.restyled(&looked.after, &looked.written);
-    let mut ops = Vec::from_iter(looked.op);
+    let mut ops = Vec::new();
+    if !filled.is_empty() {
+        ops.push(Op::UpdateLayer {
+            layer: layer.id.into(),
+            patch: json!({"translation": {"style": {"chars": filled}}}),
+        });
+    }
+    ops.extend(looked.op);
     // The stage's text op carries the marks over as they were, the run's
     // own among them.
     if content != before.replaced(text) {
@@ -317,6 +335,66 @@ pub fn translated(
         ops.extend(carried_skew(layer, patch)?);
     }
     Ok(ops)
+}
+
+/// The character values Koharu's placement gives the translation of the
+/// block `id` in `project` where it holds only a placeholder
+/// ([`status::placeholder`]), read before the edit: for each of its size,
+/// fill and outline not set on it ([`status::own_chars`]), what placement
+/// gives a block with none ([`crate::resolver::koharu_chars`]): the page's
+/// lettering size, its source's ink, and its source's outline scaled to its
+/// size, or for a sound effect without one an outline against the fill set
+/// on it, else its source's, as placement picks one against the
+/// translation's fill. Placement keeps the values a placeholder holds from
+/// its source's blank, which would leave it at its source's size. None for
+/// any other block.
+fn placeholder_chars(project: &Project, id: LayerId) -> Result<Map<String, Value>> {
+    let layer = project.layer(id)?;
+    let mut chars = Map::new();
+    let Content::Block(block) = &layer.content else {
+        return Ok(chars);
+    };
+    if !status::placeholder(layer, block) {
+        return Ok(chars);
+    }
+    let own = status::own_chars(layer, block);
+    let koharu = crate::resolver::koharu_chars(project.parent(id)?.0, block, own.size);
+    if own.size.is_none()
+        && let Some(size) = koharu.size
+    {
+        chars.insert("size".to_owned(), json!(size));
+    }
+    if own.fill.is_none()
+        && let Some(fill) = koharu.fill
+    {
+        chars.insert("fill".to_owned(), json!(fill));
+    }
+    if own.stroke.is_none()
+        && let (Some(stroke), Some(width)) = (koharu.stroke, koharu.stroke_width)
+    {
+        let source = &block.source.style.chars;
+        let stroke = match (source.stroke, source.stroke_width) {
+            (Some(_), Some(_)) => stroke,
+            _ => crate::resolver::contrasting(own.fill.or(source.fill)),
+        };
+        chars.insert("stroke".to_owned(), json!(stroke));
+        chars.insert("stroke_width".to_owned(), json!(width));
+    }
+    Ok(chars)
+}
+
+/// `placed`, placement's op, with `chars` laid over the character values
+/// it writes, so they count as its own.
+fn with_chars(placed: &Op, chars: &Map<String, Value>) -> Op {
+    let mut placed = placed.clone();
+    if let Op::UpdateLayer { patch, .. } = &mut placed
+        && let Some(written) = patch
+            .pointer_mut("/translation/style/chars")
+            .and_then(Value::as_object_mut)
+    {
+        written.extend(chars.clone());
+    }
+    placed
 }
 
 /// The ops carrying the skew `layer`'s translation shows onto the placement

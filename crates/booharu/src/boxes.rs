@@ -563,7 +563,9 @@ fn joined(session: &Session, project: &Project, page: PageId, groups: &[Group]) 
 /// adds no line, the joined translation takes no language from it, and with
 /// a translation of none of them to join, the first block keeps one rather
 /// than a blank translation placed in no language: its own, or else the
-/// first other block's, which would go with its block (D1).
+/// values set on the first other block's, which would go with its block
+/// (D1), laid on its joined source's blank ([`status::placeholder_values`]),
+/// so the other block's source style and place stay behind.
 fn join(
     session: &Session,
     project: &Project,
@@ -693,21 +695,23 @@ fn join(
             group.balloon.id
         );
         // Any translation here is a placeholder: the kept block keeps its
-        // own, or takes the first other block's, blank in its point frame.
-        if first.translation.is_none()
-            && let Some(placeholder) = rest
-                .iter()
-                .find_map(|(_, block)| block.translation.as_ref())
-        {
-            let mut carried = serde_json::to_value(placeholder)?;
-            if let Some(fields) = carried.as_object_mut() {
-                // Blank, and only `set_text` writes it.
-                fields.remove("content");
+        // own, or takes the values set on the first other block's, which
+        // the scene lays on the blank of its source as the join leaves it,
+        // in the joined box, as a style set on the joined block would.
+        if first.translation.is_none() {
+            let mut carried = None;
+            for (id, block) in rest {
+                carried = status::placeholder_values(project.layer(*id)?, block);
+                if carried.is_some() {
+                    break;
+                }
             }
-            ops.push(Op::UpdateLayer {
-                layer: (*kept).into(),
-                patch: json!({"translation": carried}),
-            });
+            if let Some(values) = carried {
+                ops.push(Op::UpdateLayer {
+                    layer: (*kept).into(),
+                    patch: json!({"translation": values}),
+                });
+            }
         }
     }
     // With no clean-up to show, a translated block's shows, as the
@@ -2220,17 +2224,33 @@ mod tests {
 
     #[test]
     fn a_join_of_boxes_styled_before_theyre_translated_keeps_the_first_style() -> Result<()> {
-        // The first read with no translation, the other styled by hand: the
-        // joined block takes the other's placeholder, never a blank
-        // translation placed in no language, and stays untranslated.
+        // The first read with no translation, the other, lettered larger,
+        // styled by hand: the joined block takes the values set on the
+        // other's placeholder, in the joined box and its own source's style,
+        // not the other's source's size or place, never a blank translation
+        // placed in no language, and stays untranslated.
         let (mut page, [first, second]) = two_cleaned("あ", "う")?;
+        for (block, size) in [(first, 32.0), (second, 40.0)] {
+            page.update(
+                block,
+                json!({"source": {"style": {"chars": {"size": size}}}}),
+            )?;
+        }
         style_by_hand(&mut page, second)?;
-        let styled = page.block(second)?.translation.context("a placeholder")?;
         page.session.apply(join_balloon(&page.session, first)?)?;
         let project = page.session.project();
         let layer = project.layer(first)?;
         let joined = page.block(first)?;
+        let mut styled = joined.source.blank();
+        styled.style.chars.family = Some(FAMILY.to_owned());
+        styled.style.chars.fill = Some(FILL);
         assert_eq!(joined.translation.as_ref(), Some(&styled));
+        assert_eq!(styled.style.chars.size, Some(32.0));
+        assert_eq!(
+            styled.bounds().map(|bounds| bounds.x0),
+            Some(10.0),
+            "in the joined box"
+        );
         assert!(status::placeholder(layer, &joined));
         assert!(status::untranslated(layer, &joined));
         assert!(booharu_core::edited(layer).style);
