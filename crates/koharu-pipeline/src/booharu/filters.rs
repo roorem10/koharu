@@ -21,7 +21,8 @@
 //!   again by hand on an effect kept as art, among it), labelled, noted,
 //!   subtitled, or locked, and whatever holds it.
 //! - [`Left::told`] tells each page's counts once its edit is in, when any is
-//!   above 0.
+//!   above 0; a clean-up whose read found nothing to clean, as Koharu's read
+//!   leaves locked blocks out, tells them through [`Left::cleaned_none`].
 
 use std::{
     collections::{HashMap, HashSet},
@@ -218,6 +219,16 @@ impl Left {
             .await?;
         self.told();
         Ok(())
+    }
+
+    /// The end of a clean-up of the blocks of `member`'s page whose read
+    /// found none to clean, as Koharu's read leaves out a block locked, in a
+    /// locked layer, or with its clean-up locked (#1503): those with a mask
+    /// counted, as the stage's write counts them (I2), then the counts told,
+    /// so a page whose every masked block is locked still tells them.
+    pub(crate) fn cleaned_none(&self, member: &Member) {
+        self.writing(member).locked_out(&member.session.lock(), &[]);
+        self.told();
     }
 
     /// The filters as `member`'s write checks them.
@@ -1247,6 +1258,39 @@ mod tests {
                 .map(|layer| recorded(&layer, status::INPAINTING))
         };
         assert!(cleaned("free")?);
+        assert!(!cleaned("part")?);
+        assert!(!cleaned("whole")?);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn cleaning_a_page_whose_every_masked_block_is_locked_still_tells_them() -> Result<()> {
+        // Koharu's read leaves each out (#1503), so it finds nothing to
+        // clean; the run still tells them as left as they are.
+        let fixture = Fixture::new(
+            true,
+            vec![
+                add("part", None, 0, block("text", (10.0, 10.0))),
+                mask("part", (10, 10)),
+                add("whole", None, 1, block("text", (70.0, 10.0))),
+                mask("whole", (70, 10)),
+                add("bare", None, 2, block("text", (130.0, 10.0))),
+            ],
+        )?;
+        fixture.op(json!({"op": "update_layer", "layer": fixture.id("part"),
+            "patch": {"cleanup": {"locked": true}}}))?;
+        fixture.lock("whole")?;
+        // One with no mask the run would never clean either: not counted.
+        fixture.lock("bare")?;
+        let told = fixture
+            .run(Target::Project, &[Stage::Inpaint], skip())
+            .await?;
+        assert_eq!(skipped(&told), [(Stage::Inpaint, 0, 0, 2, false)]);
+        let cleaned = |label| {
+            fixture
+                .layer(label)
+                .map(|layer| recorded(&layer, status::INPAINTING))
+        };
         assert!(!cleaned("part")?);
         assert!(!cleaned("whole")?);
         Ok(())

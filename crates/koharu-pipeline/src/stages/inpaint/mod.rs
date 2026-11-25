@@ -133,6 +133,10 @@ pub(crate) async fn inpaint(
     })
     .await??;
     let Some(work) = work else {
+        // Booharu: the masked blocks Koharu's read left for a lock, counted (#1503).
+        if area.is_none() {
+            crate::booharu::Left::new(task, config).cleaned_none(member);
+        }
         return Ok(());
     };
     let key = key(Stage::Inpaint, config).expect("an inpainter is Koharu's");
