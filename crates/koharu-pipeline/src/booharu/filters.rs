@@ -432,9 +432,10 @@ impl Writing {
     /// made them, but for each new block whose source lies over a block that
     /// stays, one locked or kept (`protect::keeps`), by at least half the
     /// smaller of their areas, with its mask, and each new panel or balloon
-    /// that held nothing else, up to the top, one `lettered` says held a
-    /// lettering Koharu's tree left out among them; the rest numbered again
-    /// within each parent from 0 (D2), but the page's own from
+    /// that held nothing else, counting a lettering the layout reads in it
+    /// (`lettered`), which Koharu's tree leaves out when a locked block
+    /// holds it, up to the top; the rest numbered again within each parent
+    /// from 0 (D2), but the page's own from
     /// `booharu_core::cleanup::detect_start` of the layers this Detect's
     /// removals leave, as they stand once they're made ([`standing`]), so
     /// the new layers go above the Original scan and the results that stay
