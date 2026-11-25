@@ -2,7 +2,9 @@
 //! the agent: one undo step that sets its text and, for a block's first
 //! translation, gives it what a typed translation lacks in Koharu: the
 //! default look a new translation gets, the translator's target language,
-//! and its clean-up shown. Where it goes is Koharu's: the scene starts a
+//! and its clean-up shown, and the marker of a translation typed by hand in
+//! its record, so once cleared it stays a hand edit, as the canvas's typing
+//! writes it too. Where it goes is Koharu's: the scene starts a
 //! block's first translation as its source's blank, in its source's place
 //! (Koharu's #1494, which replaced Booharu's own placement of it, #128), as
 //! the canvas types one. A box styled before it's translated holds only a
@@ -37,9 +39,12 @@ const RETYPED: &str = "set_text";
 /// category's while Pick fonts automatically is on, and with colour
 /// detection off the default colours in place of its source's, each only
 /// where the placeholder set no value of its own, as the values set by hand
-/// stay. Unlike the stage's, it gets no hand-edit record of its own: it was
-/// typed by hand. A sound effect kept as art has the kept mark taken from
-/// the record it holds (`styles::typed`), as its clean-up shows again. One
+/// stay. Unlike the stage's, its record keeps nothing an automatic step
+/// writes, as it was typed by hand, but gets the marker of a translation
+/// typed by hand (`styles::typed`, through `styles::hand_typed`), in the
+/// same step, so Undo takes it back with the text and a translation cleared
+/// later stays a hand edit; a sound effect kept as art loses the kept mark
+/// from it, as its clean-up shows again. One
 /// with a translation of its own, words or a run's emptied by hand, keeps
 /// its place, lettering, and language, and the step is labelled as the
 /// Story panel labels a retyped text.
@@ -76,8 +81,9 @@ pub fn edit(
         layer: block.into(),
         patch: json!({"translation": base}),
     };
-    // The look over what it starts as; `typed` still drops the kept mark of
-    // a sound effect kept as art, whose clean-up this shows.
+    // The look over what it starts as, and the marker of a translation typed
+    // by hand, whose record drops the kept mark of a sound effect kept as
+    // art, whose clean-up this shows.
     let looked = styles::typed(
         project,
         block,
@@ -185,7 +191,8 @@ mod tests {
             (300.0, 20.0, 340.0, 140.0)
         );
         // As the Translation stage leaves one: in the target language, over
-        // the clean-up shown, but with no record of a model making it.
+        // the clean-up shown, but with no record of a model making it, only
+        // the marker of a translation typed by hand.
         assert_eq!(typed.language, english);
         let project = session.project();
         let layer = project.layer(block)?;
@@ -193,7 +200,10 @@ mod tests {
             bail!("{block} isn't a block");
         };
         assert!(found.cleanup.visible);
-        assert!(layer.attributes.is_empty(), "{:?}", layer.attributes);
+        assert_eq!(
+            json!(layer.attributes),
+            json!({"booharu": {"auto": {"typed": true}}})
+        );
 
         // Once it has a translation, wherever the user moved it, only the
         // text changes, in the language it has, and History names the step as
@@ -305,14 +315,23 @@ mod tests {
             (Some("CCWildWords"), Some(RED), None)
         );
 
-        // Typed by hand: no record, so the text is the user's.
+        // Typed by hand: only the marker, so the text is the user's.
         let project = session.project();
         for block in [on, off] {
             let layer = project.layer(block)?;
-            assert_eq!(attrs::get::<Auto>(layer), None);
+            assert_eq!(attrs::get::<Auto>(layer), Some(marker()));
             assert!(edited(layer).text);
         }
         Ok(())
+    }
+
+    /// The record a first translation typed by hand leaves on a block whose
+    /// record held nothing else: the marker alone.
+    fn marker() -> Auto {
+        Auto {
+            typed: true,
+            ..Auto::default()
+        }
     }
 
     /// A project of one 400-pixel page holding a block of `role` found and
@@ -350,6 +369,36 @@ mod tests {
             label: "test".to_owned(),
             ops,
         })?;
+        Ok(())
+    }
+
+    #[test]
+    fn undo_takes_the_marker_back_with_the_first_translation() -> Result<()> {
+        let (_dir, mut session, block) = found("text")?;
+        let english: LanguageIdentifier = "en".parse()?;
+        let steps = session.history().steps.len();
+        let typed = edit(
+            &session.project(),
+            block,
+            "Why?".to_owned(),
+            &english,
+            &Snapshot::default(),
+        )?;
+        session.apply(typed)?;
+        // The text and the marker, in one step.
+        assert_eq!(session.history().steps.len(), steps + 1);
+        assert_eq!(
+            attrs::get::<Auto>(session.project().layer(block)?),
+            Some(marker())
+        );
+        session.undo()?.context("a step")?;
+        let project = session.project();
+        let layer = project.layer(block)?;
+        let Content::Block(found) = &layer.content else {
+            bail!("{block} isn't a block");
+        };
+        assert!(found.translation.is_none());
+        assert_eq!(attrs::get::<Auto>(layer), None);
         Ok(())
     }
 
@@ -404,15 +453,15 @@ mod tests {
             (Some(FAMILY), Some(FILL))
         );
         assert_eq!((chars.stroke, chars.stroke_width), (Some(BLACK), Some(1.5)));
-        // Typed by hand: no record, so the text and its values are the
-        // user's.
+        // Typed by hand: only the marker, so the text and its values are
+        // the user's.
         let project = session.project();
         let layer = project.layer(block)?;
         let Content::Block(found) = &layer.content else {
             bail!("{block} isn't a block");
         };
         assert!(found.cleanup.visible);
-        assert_eq!(attrs::get::<Auto>(layer), None);
+        assert_eq!(attrs::get::<Auto>(layer), Some(marker()));
         let hand = edited(layer);
         assert_eq!((hand.text, hand.style), (true, true));
         Ok(())
@@ -523,15 +572,16 @@ mod tests {
         )?;
         assert_eq!(typed.label, LABEL);
         session.apply(typed)?;
-        // Its clean-up shows under the translation, and the mark goes with
-        // the record it was alone in.
+        // Its clean-up shows under the translation, and the record it was
+        // alone in holds the marker of a translation typed by hand in its
+        // place.
         let project = session.project();
         let layer = project.layer(block)?;
         let Content::Block(found) = &layer.content else {
             bail!("{block} isn't a block");
         };
         assert!(found.cleanup.visible);
-        assert_eq!(attrs::get::<Auto>(layer), None);
+        assert_eq!(attrs::get::<Auto>(layer), Some(marker()));
         let typed = translation(&session, block)?;
         assert_eq!(typed.content.text(), "Bam");
         assert!(typed.bounds().is_some());

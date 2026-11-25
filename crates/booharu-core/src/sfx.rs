@@ -18,9 +18,11 @@
 //! record, which [`crate::styles::given_back`] writes when Koharu's
 //! Translation stage is given its source back, as the stage records nothing
 //! there; it would have the quality check report every effect as given back
-//! untranslated. A first translation typed into such an effect on the
-//! canvas shows its clean-up again and takes the mark off ([`shown_again`]),
-//! as one typed in the Story panel does.
+//! untranslated. A first translation typed into such an effect, on the
+//! canvas, in the Story panel or through the agent, shows its clean-up
+//! again ([`shown_again`]) and takes the mark off, as the record of a
+//! translation typed by hand it writes carries none
+//! ([`crate::styles::hand_typed`]).
 //!
 //! The run filters, the planner, the quality check, and the commands all
 //! call these functions, never a copy of their own.
@@ -154,41 +156,35 @@ pub fn kept_original(layer: &Layer) -> Vec<Op> {
     ]
 }
 
-/// The inverse of [`kept_original`], for a first translation typed into an
-/// effect kept as art, read before the edit: for a block with no translation
-/// of its own ([`status::unwritten`]: none, or only a placeholder) that
-/// carries the kept mark, its clean-up shown when hidden and its hand-edit
-/// record without the mark, or none at all when nothing else is left in it,
-/// as [`styles::typed`](crate::styles::typed) writes it. Any other layer
-/// gets none: a block with no mark has its clean-up as the user left it,
-/// hidden by hand or shown, and a translated block had its mark dealt with
-/// as the translation came.
-pub fn shown_again(layer: &Layer) -> Result<Vec<Op>> {
+/// The inverse of [`kept_original`]'s clean-up, for a first translation
+/// typed into an effect kept as art, read before the edit: for a block with
+/// no translation of its own ([`status::unwritten`]: none, or only a
+/// placeholder) that carries the kept mark, the op showing its clean-up
+/// when hidden. The mark comes off in the same edit, with the record of a
+/// translation typed by hand that the typing writes
+/// ([`styles::hand_typed`](crate::styles::hand_typed)), which carries none.
+/// Any other layer gets none: a block with no mark has its clean-up as the
+/// user left it, hidden by hand or shown, and a translated block had its
+/// mark dealt with as the translation came.
+pub fn shown_again(layer: &Layer) -> Vec<Op> {
     let Content::Block(block) = &layer.content else {
-        return Ok(Vec::new());
+        return Vec::new();
     };
-    if !status::unwritten(layer, block) {
-        return Ok(Vec::new());
+    if !status::unwritten(layer, block) || !Auto::of(layer).kept || block.cleanup.visible {
+        return Vec::new();
     }
-    let Some(unmark) = unmarked(layer)? else {
-        return Ok(Vec::new());
-    };
-    let mut ops = Vec::with_capacity(2);
-    if !block.cleanup.visible {
-        ops.push(Op::UpdateLayer {
-            layer: layer.id.into(),
-            patch: json!({"cleanup": {"visible": true}}),
-        });
-    }
-    ops.push(unmark);
-    Ok(ops)
+    vec![Op::UpdateLayer {
+        layer: layer.id.into(),
+        patch: json!({"cleanup": {"visible": true}}),
+    }]
 }
 
 /// The op taking the kept mark off `layer`'s hand-edit record: the record
 /// without it, or no record at all when nothing else is left in it; none for
-/// a layer whose record carries no mark. A translation typed into the block
-/// takes it off ([`styles::typed`](crate::styles::typed)), as does a join
-/// that shows the block's clean-up or writes it a translation.
+/// a layer whose record carries no mark. A join that shows the block's
+/// clean-up or writes it a translation takes it off; a first translation
+/// typed into the block does with the marker of one typed by hand
+/// ([`styles::hand_typed`](crate::styles::hand_typed)).
 pub fn unmarked(layer: &Layer) -> Result<Option<Op>> {
     let record = Auto::of(layer);
     if !record.kept {
@@ -274,9 +270,10 @@ pub fn subtitle_rect(source: Rect, vertical: bool, size: f64, page: (f64, f64)) 
 /// removed, but for only the placeholder a style set before translating
 /// leaves ([`status::placeholder`]), which stays with its style as
 /// [`kept_original`] keeps it, and its clean-up hidden, with the kept mark,
-/// so the effect stays the original art. Fails for a layer that isn't a
-/// block on `page`, or a block whose source has no frame to put the
-/// subtitle beside.
+/// so the effect stays the original art, its record losing the marker of a
+/// translation typed by hand, which goes with the translation. Fails for a
+/// layer that isn't a block on `page`, or a block whose source has no frame
+/// to put the subtitle beside.
 pub fn subtitle_ops(
     page: &Page,
     block: LayerId,
@@ -337,8 +334,10 @@ pub fn subtitle_ops(
             }},
         },
     });
+    // The translation goes, and the marker of one typed by hand with it.
     let marked = Auto {
         kept: true,
+        typed: false,
         ..Auto::of(layer)
     };
     // A style set on the effect before it's translated is the user's (D1).
@@ -735,24 +734,32 @@ mod tests {
     #[test]
     fn showing_a_kept_effect_again_undoes_keeping_it_and_nothing_else() {
         let mut fixture = Fixture::new("sfx");
-        let shown = |layer: &Layer| shown_again(layer).expect("the ops");
+        let shown = |layer: &Layer| shown_again(layer);
         let json = |ops: &[Op]| serde_json::to_value(ops).expect("JSON");
         let show = |id: LayerId| Op::UpdateLayer {
             layer: id.into(),
             patch: json!({"cleanup": {"visible": true}}),
         };
+        // The record the typing writes in the same edit, which takes the
+        // mark off.
+        let typed = |layer: &Layer| styles::hand_typed(layer).expect("the record");
+        let marker = |before: Auto| Auto {
+            typed: true,
+            ..before
+        };
 
         // Kept as art with nothing else recorded: its clean-up shows, and the
-        // record, left empty, goes.
+        // record holds only the marker of a translation typed by hand.
         let id = fixture.outside;
         let ops = kept_original(&fixture.layer(id));
         fixture.apply(ops);
         let ops = shown(&fixture.layer(id));
-        assert_eq!(json(&ops), json(&[show(id), attrs::clear::<Auto>(id)]));
-        fixture.apply(ops);
+        assert_eq!(json(&ops), json(&[show(id)]));
+        let record = typed(&fixture.layer(id));
+        fixture.apply(ops.into_iter().chain([record]).collect());
         let layer = fixture.layer(id);
         assert!(fixture.block(id).cleanup.visible);
-        assert_eq!(attrs::get::<Auto>(&layer), None);
+        assert_eq!(attrs::get::<Auto>(&layer), Some(marker(Auto::default())));
         assert!(shown(&layer).is_empty());
 
         // A record holding more keeps it, as it was before the mark.
@@ -763,18 +770,22 @@ mod tests {
         let ops = kept_original(&fixture.layer(id));
         fixture.apply(ops);
         let ops = shown(&fixture.layer(id));
-        assert_eq!(ops.len(), 2, "{ops:?}");
-        fixture.apply(ops);
+        assert_eq!(json(&ops), json(&[show(id)]));
+        let record = typed(&fixture.layer(id));
+        fixture.apply(ops.into_iter().chain([record]).collect());
         assert!(fixture.block(id).cleanup.visible);
-        assert_eq!(attrs::get::<Auto>(&fixture.layer(id)), Some(before));
+        assert_eq!(attrs::get::<Auto>(&fixture.layer(id)), Some(marker(before)));
 
-        // Marked, but its clean-up shown by hand: only the mark goes.
+        // Marked, but its clean-up shown by hand: there's nothing to show,
+        // and the typing's record alone takes the mark off.
         let id = fixture.held;
         let ops = kept_original(&fixture.layer(id));
         fixture.apply(ops);
         fixture.apply(vec![show(id)]);
-        let ops = shown(&fixture.layer(id));
-        assert_eq!(json(&ops), json(&[attrs::clear::<Auto>(id)]));
+        assert!(shown(&fixture.layer(id)).is_empty());
+        let record = typed(&fixture.layer(id));
+        fixture.apply(vec![record]);
+        assert!(!Auto::of(&fixture.layer(id)).kept);
 
         // A clean-up hidden by hand, with no mark, stays hidden.
         let mut fixture = Fixture::new("sfx");
@@ -891,18 +902,18 @@ mod tests {
         assert_eq!(family, Some(FAMILY));
         assert!(!hand_kept(&layer, &block) && !hand_shown(&layer, &block));
         assert!(kept_original(&layer).is_empty());
-        // A first translation typed in shows the clean-up and takes the mark
-        // off, the record going with it.
-        let ops = shown_again(&layer).expect("the ops");
-        assert_eq!(json(&ops), json(&[show.clone(), attrs::clear::<Auto>(id)]));
+        // A first translation typed in shows the clean-up, its record taking
+        // the mark off.
+        let ops = shown_again(&layer);
+        assert_eq!(json(&ops), json(std::slice::from_ref(&show)));
 
-        // Shown again by hand, the mark left: the user's choice.
+        // Shown again by hand, the mark left: the user's choice, with no
+        // clean-up left to show.
         fixture.apply(vec![show]);
         let (layer, block) = (fixture.layer(id), fixture.block(id));
         assert!(hand_shown(&layer, &block));
         assert!(kept_original(&layer).is_empty());
-        let ops = shown_again(&layer).expect("the ops");
-        assert_eq!(json(&ops), json(&[attrs::clear::<Auto>(id)]));
+        assert!(shown_again(&layer).is_empty());
 
         // Hidden by hand with no mark: kept by hand.
         let id = fixture.under;
@@ -916,7 +927,7 @@ mod tests {
         let (layer, block) = (fixture.layer(id), fixture.block(id));
         assert!(hand_kept(&layer, &block));
         assert!(kept_original(&layer).is_empty());
-        assert!(shown_again(&layer).expect("the ops").is_empty());
+        assert!(shown_again(&layer).is_empty());
     }
 
     #[test]
@@ -946,6 +957,36 @@ mod tests {
             .as_ref()
             .and_then(|translation| translation.style.chars.family.as_deref());
         assert_eq!(family, Some(FAMILY));
+    }
+
+    #[test]
+    fn a_subtitle_takes_a_translation_typed_by_hand_away_with_its_marker() {
+        let mut fixture = Fixture::new("sfx");
+        let id = fixture.held;
+        let marker = styles::hand_typed(&fixture.layer(id)).expect("the record");
+        fixture.apply(vec![
+            Op::SetText {
+                layer: id.into(),
+                text: "BOOM".to_owned(),
+            },
+            marker,
+        ]);
+        assert!(Auto::of(&fixture.layer(id)).typed);
+        let english: LanguageIdentifier = "en".parse().expect("a tag");
+        let ops = subtitle_ops(
+            &fixture.page(),
+            id,
+            "Boom",
+            &english,
+            &SubtitleStyle::default(),
+            None,
+        )
+        .expect("the ops");
+        fixture.apply(ops);
+        let (layer, block) = (fixture.layer(id), fixture.block(id));
+        assert!(block.translation.is_none() && !block.cleanup.visible);
+        let record = Auto::of(&layer);
+        assert!(record.kept && !record.typed);
     }
 
     #[test]

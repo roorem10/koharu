@@ -4,8 +4,10 @@
 //! the O tool folded into the K tool, and such a box outlasting a change it
 //! didn't make ([`outlasts`]); and the default look of new text, which the T
 //! tool's text and a translation typed into a block with none get. Such a
-//! translation typed into a sound effect kept as art also shows its clean-up
-//! again, without the kept mark, in the same step. The Booharu settings the
+//! translation also gets the marker of one typed by hand in its block's
+//! record, in the same step, so it stays a hand edit once cleared, and,
+//! typed into a sound effect kept as art, shows its clean-up again, the
+//! record carrying no kept mark ([`hand_typed`]). The Booharu settings the
 //! canvas needs are one `BooharuSettings`, which the host pushes at startup
 //! and whenever the settings they come from are saved, and whenever the
 //! brush's feel changes (`BrushFeel`): each brush tool's hardness and Draw's
@@ -194,14 +196,14 @@ fn look(
 /// `typed`, the ops Koharu's typing commits for what was typed into `layer`
 /// on `page`, and when that's the block's first translation, typed into a
 /// block with none or with only a placeholder ([`placeholder`]), the look
-/// [`untranslated`] gives it ahead of them and [`shown_again`]'s ops after
-/// them, all in the commit's one step. Koharu's scene adds a missing
-/// translation as its source's blank (#1494), which the look merges into,
-/// so a block with none gets only the look, nothing more when the look
-/// changes nothing; a placeholder gets `base`, the text typing took
-/// ([`styled_source`]), written whole with the look, so its first
-/// translation goes in its source's place in the style set on it. Any other
-/// text, as it is.
+/// [`untranslated`] gives it ahead of them and [`hand_typed`]'s ops after
+/// them, all in the commit's one step, so Undo takes the marker of a
+/// translation typed by hand back with the text. Koharu's scene adds a
+/// missing translation as its source's blank (#1494), which the look merges
+/// into, so a block with none gets only the look and the marker; a
+/// placeholder gets `base`, the text typing took ([`styled_source`]),
+/// written whole with the look, so its first translation goes in its
+/// source's place in the style set on it. Any other text, as it is.
 pub(crate) fn first_translation(
     mut base: Text,
     page: &Page,
@@ -239,22 +241,27 @@ pub(crate) fn first_translation(
         }
     }
     ops.extend(typed);
-    ops.extend(shown_again(page, layer));
+    ops.extend(hand_typed(page, layer));
     ops
 }
 
 /// The ops a first translation typed into `layer`, a block on `page` with
-/// none, adds to its step: for a sound effect Booharu kept as art, its
-/// clean-up shown again and the kept mark taken off, as the Story panel's
-/// typing does ([`sfx::shown_again`]); none for any other block, so a
-/// clean-up hidden by hand stays hidden, as Koharu leaves it.
-pub(crate) fn shown_again(page: &Page, layer: LayerId) -> Vec<Op> {
-    // A record read as valid stays valid without the mark, so this never
-    // fails; were it to, the clean-up would stay hidden and marked, as
-    // Koharu's typing alone leaves it.
-    find(&page.layers, layer)
-        .and_then(|found| sfx::shown_again(found).ok())
-        .unwrap_or_default()
+/// none, adds to its step, as the Story panel's typing does: for a sound
+/// effect Booharu kept as art, its clean-up shown again
+/// ([`sfx::shown_again`]), and the block's record of a translation typed by
+/// hand ([`styles::hand_typed`]), the marker that keeps the translation a
+/// hand edit once cleared, never read as a placeholder, with no kept mark.
+/// A clean-up hidden by hand stays hidden, as Koharu leaves it.
+pub(crate) fn hand_typed(page: &Page, layer: LayerId) -> Vec<Op> {
+    let Some(found) = find(&page.layers, layer) else {
+        return Vec::new();
+    };
+    let mut ops = sfx::shown_again(found);
+    // A record read as valid stays valid with the marker, so this never
+    // fails; were it to, the translation would read as Koharu's typing
+    // alone leaves it.
+    ops.extend(styles::hand_typed(found).ok());
+    ops
 }
 
 /// Whether `layer` is a block whose translation is only a placeholder

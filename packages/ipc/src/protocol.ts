@@ -2915,7 +2915,7 @@ export const commands = {
     runner('booharu_save_preferences', (options) =>
       invoke<BooharuPreferences>('booharu_save_preferences', { preferences }, options),
     ),
-  /** Sets `block`'s translation to `text` as one undo step, and when the block has none of its own, none or only the placeholder a style set before translating leaves, whose values stay, writes it as a first translation: in its source's place, in the translator's target language, over its clean-up shown, with the default look. */
+  /** Sets `block`'s translation to `text` as one undo step, and when the block has none of its own, none or only the placeholder a style set before translating leaves, whose values stay, writes it as a first translation: in its source's place, in the translator's target language, over its clean-up shown, with the default look, and with the marker of a translation typed by hand in the same step, so once cleared it stays a hand edit. */
   booharuSetTranslation: (block: LayerId, text: string) =>
     runner('booharu_set_translation', (options) =>
       invoke<Change>('booharu_set_translation', { block, text }, options),

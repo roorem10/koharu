@@ -83,15 +83,16 @@ pub enum LetteringSource {
 /// `auto`: `{"origin"?: "agent", "source"?: hash, "text"?: hash, "style"?:
 /// {family, weight, italic, fill, stroke, stroke_width, outer_stroke,
 /// outer_stroke_width, fill_gradient, tracking}, "marks"?: [{start, end, style}], "kept"?: true,
-/// "split"?: true}`, on a block: the hand-edit record, what Booharu's
+/// "split"?: true, "typed"?: true}`, on a block: the hand-edit record, what Booharu's
 /// automatic steps last wrote there, so `styles::edited` tells a hand edit,
 /// a part that now differs, from their own, the word marks a run's emphasis
 /// gave the translation, whether Booharu hid its clean-up to keep the
-/// original art, and whether it's a half of a block split by hand, whose box
-/// a hand cut where Koharu's records say detection made it. Hand edits win.
-/// Each part is left out until a step writes it; later stages add their
-/// own, such as the category they applied, which is why it takes keys it
-/// doesn't know.
+/// original art, whether it's a half of a block split by hand, whose box
+/// a hand cut where Koharu's records say detection made it, and whether its
+/// translation was typed by hand, which keeps it a hand edit once cleared.
+/// Hand edits win. Each part is left out until a step writes it; later
+/// stages add their own, such as the category they applied, which is why it
+/// takes keys it doesn't know.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct Auto {
     /// Who chose the style: Booharu's automatic steps, or the agent on
@@ -140,6 +141,23 @@ pub struct Auto {
     /// restyles it as any other box. Automatic steps keep it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub split: bool,
+    /// Whether the block's translation was written by hand and no run has
+    /// written it since: a first translation typed on the canvas, in the
+    /// Story panel or through Booharu's agent tools, blank or not, or one a
+    /// join gives a block that had none of its own, each with the marker in
+    /// the same edit (`styles::hand_typed`), so Undo takes it off with the
+    /// text. Since Koharu's #1494 a translation typed by hand and the
+    /// placeholder a style set before translating leaves both start as
+    /// their source's blank, in its source's frame, so once cleared only the
+    /// marker tells them apart: a blank translation carrying it stays a hand
+    /// edit, as left on purpose, while one no run wrote without it is the
+    /// placeholder a run fills (`status::placeholder`). A run's translation,
+    /// a line given back and a subtitle taking the translation away drop
+    /// it, and Booharu's other steps keep it. Koharu's own agent edit tool
+    /// writes none, and a project saved before Booharu kept it has none, so
+    /// such a translation reads as before: a placeholder once cleared.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub typed: bool,
 }
 
 impl Attr for Auto {
@@ -514,6 +532,7 @@ mod tests {
             }],
             kept: true,
             split: true,
+            typed: true,
         };
         let qc_ok = QcOk(vec!["overflow".to_owned(), "glossary:Shale".to_owned()]);
         let flags = Flags(vec![Flag {
@@ -707,6 +726,42 @@ mod tests {
                 .expect("a record")
                 .split
         );
+    }
+
+    #[test]
+    fn the_typed_marker_is_written_only_when_set_and_an_older_record_reads_without_it() {
+        let (_dir, mut session, id) = project();
+        let typed = Auto {
+            typed: true,
+            ..Auto::default()
+        };
+        assert_eq!(json!(typed), json!({"typed": true}));
+        session
+            .apply(edit(vec![set(id, &typed).expect("the marker")]))
+            .expect("the record");
+        let written = layer(&session, id);
+        assert_eq!(get::<Auto>(&written), Some(typed));
+        assert_eq!(
+            written.attributes[NAMESPACE]["auto"],
+            json!({"typed": true})
+        );
+        // A record a project saved before the marker holds none.
+        let older = json!({"text": "0123456789abcdef", "kept": true});
+        let read = serde_json::from_value::<Auto>(older).expect("a record");
+        assert!(!read.typed);
+        assert_eq!(
+            json!(read),
+            json!({"text": "0123456789abcdef", "kept": true})
+        );
+        // A marker that isn't a boolean is a bad record, read as none.
+        let ops = vec![Op::SetAttribute {
+            layer: id.into(),
+            namespace: NAMESPACE.to_owned(),
+            key: Auto::KEY.to_owned(),
+            value: Some(json!({"typed": "yes"})),
+        }];
+        session.apply(edit(ops)).expect("the record");
+        assert_eq!(get::<Auto>(&layer(&session, id)), None);
     }
 
     #[test]

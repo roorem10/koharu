@@ -474,9 +474,9 @@ impl Typing {
             Target::Layer(layer) if self.content != self.original => {
                 let typed = vec![spans(layer, self.content)];
                 // Booharu: a block's first translation takes the default look
-                // a new translation gets, and a sound effect kept as art
-                // shows its clean-up again and loses the kept mark, in the
-                // same step.
+                // a new translation gets and the marker of one typed by hand,
+                // and a sound effect kept as art shows its clean-up again and
+                // loses the kept mark, in the same step.
                 let typed =
                     crate::booharu::first_translation(self.base, page, layer, booharu, typed);
                 vec![edit("set_text", typed)]

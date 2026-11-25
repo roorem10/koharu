@@ -1,7 +1,8 @@
 //! The K tool's box, which the canvas adds as Koharu's block and asks the
 //! host to read, the default look of the text the T tool adds and of a
-//! translation typed into a block with none, the clean-up such a
-//! translation shows again on a sound effect kept as art, and, while typing,
+//! translation typed into a block with none, the marker of a translation
+//! typed by hand such a translation writes in its step, the clean-up it
+//! shows again on a sound effect kept as art, and, while typing,
 //! Escape keeping what's typed, marks taken off, size steps, the selected
 //! text the type bar quotes and the empty line a line break typed at the end
 //! starts, a right-click's box menu, a box styled before it's translated,
@@ -490,6 +491,16 @@ fn koharus(block: LayerId, ops: &[Op]) -> Value {
     }])
 }
 
+/// The record of a translation typed by hand that a first translation's
+/// step writes on `block`, whose record held nothing else: the marker alone.
+fn marker(block: LayerId) -> Op {
+    let typed = Auto {
+        typed: true,
+        ..Auto::default()
+    };
+    attrs::set(block, &typed).expect("the record")
+}
+
 /// Whether `block`'s translation lies where its source does, as the scene
 /// starts a first translation (Koharu's #1494): its frame, transform and
 /// direction.
@@ -508,7 +519,8 @@ fn a_translation_typed_into_an_effect_kept_as_art_shows_its_clean_up_in_the_same
     keep_as_art(&mut fixture, boom);
     let effects = commit_translation(&mut fixture, boom, (300.0, 100.0));
     let ops = set_text(&effects);
-    // Koharu's op, then the clean-up shown and the record cleared, as it
+    // Koharu's op, then the clean-up shown and the record holding the
+    // marker of a translation typed by hand in place of the mark, as it
     // held only the mark.
     assert_eq!(ops.len(), 3, "{ops:?}");
     assert_eq!(json_of(&ops[..1]), koharus(boom, &ops));
@@ -517,7 +529,7 @@ fn a_translation_typed_into_an_effect_kept_as_art_shows_its_clean_up_in_the_same
             layer: boom.into(),
             patch: json!({"cleanup": {"visible": true}}),
         },
-        attrs::clear::<Auto>(boom),
+        marker(boom),
     ];
     assert_eq!(json_of(&ops[1..]), json_of(&shown));
 
@@ -526,8 +538,11 @@ fn a_translation_typed_into_an_effect_kept_as_art_shows_its_clean_up_in_the_same
     assert!(typed["translation"].is_object(), "{typed}");
     assert!(in_sources_place(&fixture, boom), "{typed}");
     assert_eq!(typed["cleanup"]["visible"], json!(true));
-    assert!(typed["attributes"]["booharu"]["auto"].is_null(), "{typed}");
-    // One step: undone, the effect is kept as art again.
+    assert_eq!(
+        typed["attributes"]["booharu"]["auto"],
+        json!({"typed": true})
+    );
+    // One step: undone, the effect is kept as art again, with no marker.
     fixture
         .session
         .lock()
@@ -538,11 +553,14 @@ fn a_translation_typed_into_an_effect_kept_as_art_shows_its_clean_up_in_the_same
     let undone = layer(&fixture, boom);
     assert!(undone["translation"].is_null(), "{undone}");
     assert_eq!(undone["cleanup"]["visible"], json!(false));
-    assert_eq!(undone["attributes"]["booharu"]["auto"]["kept"], json!(true));
+    assert_eq!(
+        undone["attributes"]["booharu"]["auto"],
+        json!({"kept": true})
+    );
 }
 
 #[test]
-fn a_translation_typed_into_a_block_without_the_mark_is_koharus_alone() {
+fn a_translation_typed_into_a_block_without_the_mark_is_koharus_with_the_marker() {
     let Some((mut fixture, talk, boom)) = untranslated() else {
         return;
     };
@@ -554,18 +572,70 @@ fn a_translation_typed_into_a_block_without_the_mark_is_koharus_alone() {
     );
     let effects = commit_translation(&mut fixture, boom, (300.0, 100.0));
     let ops = set_text(&effects);
-    assert_eq!(json_of(&ops), koharus(boom, &ops));
+    let mut expected = koharus(boom, &ops);
+    expected
+        .as_array_mut()
+        .expect("a list")
+        .push(json_of(&[marker(boom)])[0].clone());
+    assert_eq!(json_of(&ops), expected);
     assert_eq!(apply(&mut fixture, effects), ["set_text"]);
     let typed = layer(&fixture, boom);
     assert!(typed["translation"].is_object(), "{typed}");
     assert!(in_sources_place(&fixture, boom), "{typed}");
     assert_eq!(typed["cleanup"]["visible"], json!(false));
-    assert!(typed["attributes"]["booharu"].is_null(), "{typed}");
+    assert_eq!(
+        typed["attributes"]["booharu"]["auto"],
+        json!({"typed": true})
+    );
 
     // Dialogue, its clean-up showing, alike.
     let effects = commit_translation(&mut fixture, talk, (100.0, 100.0));
     let ops = set_text(&effects);
-    assert_eq!(json_of(&ops), koharus(talk, &ops));
+    assert_eq!(json_of(&ops[1..]), json_of(&[marker(talk)]));
+    assert_eq!(json_of(&ops[..1]), koharus(talk, &ops));
+}
+
+#[test]
+fn a_first_translation_typed_on_the_canvas_writes_the_marker_in_its_step_and_undo_takes_both() {
+    let Some((mut fixture, talk, _)) = untranslated() else {
+        return;
+    };
+    fixture.canvas.set_booharu(pushed(false, None));
+    let before = steps(&fixture);
+    let effects = commit_translation(&mut fixture, talk, (100.0, 100.0));
+    // The look, Koharu's words and the marker, in the commit's one edit.
+    let ops = set_text(&effects);
+    assert!(
+        matches!(
+            ops[..],
+            [
+                Op::UpdateLayer { .. },
+                Op::SetRichText { .. },
+                Op::SetAttribute { .. }
+            ]
+        ),
+        "{ops:?}"
+    );
+    assert_eq!(json_of(&ops[2..]), json_of(&[marker(talk)]));
+    assert_eq!(apply(&mut fixture, effects), ["set_text"]);
+    assert_eq!(steps(&fixture), before + 1);
+    let typed = layer(&fixture, talk);
+    assert_eq!(typed["translation"]["content"], json!([{"insert": "Hi"}]));
+    assert_eq!(
+        typed["attributes"]["booharu"]["auto"],
+        json!({"typed": true})
+    );
+    // Undone, the text and the marker go together.
+    fixture
+        .session
+        .lock()
+        .undo()
+        .expect("the undo")
+        .expect("a step");
+    fixture.render();
+    let undone = layer(&fixture, talk);
+    assert!(undone["translation"].is_null(), "{undone}");
+    assert!(undone["attributes"]["booharu"].is_null(), "{undone}");
 }
 
 #[test]
@@ -1392,10 +1462,18 @@ fn a_box_styled_before_its_translated_types_a_first_translation_in_its_place() {
     );
     type_text(&mut fixture.canvas, "Hi");
     let effects = leave(&mut fixture.canvas, Leave::Commit);
-    // Koharu's first translation: its place and style, then its words.
+    // Koharu's first translation: its place and style, then its words, and
+    // the marker of a translation typed by hand.
     let ops = set_text(&effects);
     assert!(
-        matches!(ops[..], [Op::UpdateLayer { .. }, Op::SetRichText { .. }]),
+        matches!(
+            ops[..],
+            [
+                Op::UpdateLayer { .. },
+                Op::SetRichText { .. },
+                Op::SetAttribute { .. }
+            ]
+        ),
         "{ops:?}"
     );
     assert_eq!(apply(&mut fixture, effects), ["set_text"]);

@@ -21,7 +21,7 @@ use booharu_core::{
     attrs::{self, Attr, Auto, Flags, Lettering, QcOk, ReadNote, ReviewNote, Skew},
     settings::OcrBoxMode,
     sfx, status,
-    styles::text_hash,
+    styles::{self, text_hash},
 };
 use image::{DynamicImage, Rgb, RgbImage};
 use koharu_pipeline::{RunId, Stage};
@@ -257,14 +257,17 @@ pub fn find_split_balloons(project: &Project, page: Option<PageId>) -> Result<Ve
 /// one text block has nothing to join, and a hidden block, which isn't
 /// drawn, is no part of its balloon's text. The first keeps its hand-edit
 /// record, so a style set on it by hand stays a hand edit, and its joined
-/// wording, which no automatic step wrote, counts as changed by hand; the
-/// record loses the kept mark of a sound effect kept as art when the joined
-/// clean-up shows or the join writes a translation. A placeholder, the
-/// style set on a block before it was translated (`status::placeholder`),
-/// is no translation: it gives no line and no language, and the first
-/// block's keeps its values under the joined translation. With no
-/// translation in any block, the first keeps a placeholder, its own or else
-/// the first other block's, so the style set by hand stays (D1).
+/// wording, which no automatic step wrote, counts as changed by hand; when
+/// it had no translation of its own, the joined one, its first, gets the
+/// marker of a translation typed by hand (`styles::hand_typed`), so cleared
+/// later it stays a hand edit; the record loses the kept mark of a sound
+/// effect kept as art when the joined clean-up shows or the join writes a
+/// translation. A placeholder, the style set on a block before it was
+/// translated (`status::placeholder`), is no translation: it gives no line
+/// and no language, and the first block's keeps its values under the
+/// joined translation. With no translation in any block, the first keeps a
+/// placeholder, its own or else the first other block's, so the style set
+/// by hand stays (D1).
 pub fn join_balloon(session: &Session, block: LayerId) -> Result<Edit> {
     let project = session.project();
     let layer = project.layer(block)?;
@@ -732,8 +735,12 @@ fn join(
     }
     // A block kept as art no longer keeps it once its clean-up shows or it
     // has a translation, so it loses the kept mark, which would read a
-    // clean-up the join showed as one shown by hand (`sfx::hand_shown`).
-    if shown || translated {
+    // clean-up the join showed as one shown by hand (`sfx::hand_shown`). A
+    // first translation the join writes is the user's, as one typed is, so
+    // its record gets the marker of one typed by hand in place of the mark.
+    if translated && matches!(owned.first(), Some(None)) {
+        ops.push(styles::hand_typed(project.layer(*kept)?)?);
+    } else if shown || translated {
         ops.extend(sfx::unmarked(project.layer(*kept)?)?);
     }
     let others: Vec<&Block> = rest.iter().map(|(_, block)| *block).collect();
@@ -2436,6 +2443,36 @@ mod tests {
             assert!(!page.block(first)?.cleanup.visible);
             assert!(Auto::of(&layer).kept);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn a_first_translation_a_join_writes_carries_the_marker_of_one_typed_by_hand() -> Result<()> {
+        let typed = |page: &Fixture, block: LayerId| -> Result<bool> {
+            Ok(Auto::of(page.session.project().layer(block)?).typed)
+        };
+        // The kept text with none of its own takes the other's: its first,
+        // the user's, with the marker in the join's step.
+        let (mut page, [first, second]) = two_cleaned("あ", "う")?;
+        translate(&mut page, second, "Oh")?;
+        page.session.apply(join_balloon(&page.session, first)?)?;
+        assert_eq!(joined_translation(&page, first)?.as_deref(), Some("Oh"));
+        assert!(typed(&page, first)?);
+        // Undone, the marker goes with the join.
+        page.session.undo()?.context("a step")?;
+        assert!(!typed(&page, first)?);
+
+        // A kept text with a translation of its own, a run's, keeps its
+        // record: the joined wording reads as changed by hand as it is.
+        let (mut page, [first, second]) = two_cleaned("あ", "う")?;
+        stage_translates(&mut page, first, "Ah")?;
+        translate(&mut page, second, "Oh")?;
+        let before = Auto::of(page.session.project().layer(first)?);
+        page.session.apply(join_balloon(&page.session, first)?)?;
+        assert_eq!(joined_translation(&page, first)?.as_deref(), Some("Ah\nOh"));
+        let layer = page.session.project().layer(first)?.clone();
+        assert_eq!(Auto::of(&layer), before);
+        assert!(!before.typed && booharu_core::edited(&layer).text);
         Ok(())
     }
 

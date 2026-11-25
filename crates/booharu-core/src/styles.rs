@@ -16,7 +16,11 @@
 //!   same edit: the source wording the Recognition stage wrote, the
 //!   translation the Translation stage wrote, the words it marked for
 //!   emphasis, and the style values a step left. [`edited`] compares a block
-//!   with its record.
+//!   with its record. A first translation written by hand, typed or joined,
+//!   gets only the marker of one typed by hand there ([`hand_typed`]), in
+//!   the edit writing it, so once cleared it stays a hand edit, where a
+//!   blank translation no run wrote and nobody typed is a placeholder
+//!   (below).
 //! - A translated block's skew stays when it's translated again (D13,
 //!   [`translated`]).
 //! - A style set on a block before it's translated leaves a placeholder
@@ -313,6 +317,8 @@ pub fn translated(
     record.marks = marks;
     // A translation drops the kept mark: its clean-up shows under it.
     record.kept = false;
+    // The translation is the run's now, no longer one typed by hand.
+    record.typed = false;
     let record = record.restyled(&looked.after, &looked.written);
     let mut ops = Vec::new();
     if !filled.is_empty() {
@@ -463,12 +469,13 @@ fn merge(target: &mut Value, patch: &Value) {
 /// values stay, in the Story panel or through the agent, the default
 /// look, its category's font among it while Pick fonts automatically is on,
 /// as [`new_translation`] gives one, after `placed`, placement's op for it,
-/// both read before the edit; none when they write nothing. It gets no
-/// record of its own: it's hand-made. A block carrying the kept mark has the
-/// record written without it, as the translation shows its clean-up: the
-/// record's part of [`crate::sfx::shown_again`]. A skew's record left
-/// from a translation the block had before goes, as there's no skew to
-/// carry.
+/// both read before the edit, where the look changes anything, and the
+/// block's record of a translation typed by hand ([`hand_typed`]): nothing
+/// an automatic step wrote, as it's hand-made, but the marker, so it stays
+/// a hand edit once cleared, and on a block carrying the kept mark the
+/// record without it, as the translation shows its clean-up. A skew's
+/// record left from a translation the block had before goes, as there's no
+/// skew to carry.
 pub fn typed(
     project: &Project,
     block: LayerId,
@@ -478,11 +485,30 @@ pub fn typed(
 ) -> Result<Vec<Op>> {
     let layer = project.layer(block)?;
     let mut ops = Vec::from_iter(looked(project, block, placed, settings, font)?.op);
-    ops.extend(crate::sfx::unmarked(layer)?);
+    ops.push(hand_typed(layer)?);
     if let Op::UpdateLayer { patch, .. } = placed {
         ops.extend(carried_skew(layer, patch)?);
     }
     Ok(ops)
+}
+
+/// The op writing `layer`'s hand-edit record, read before the edit, in the
+/// edit giving its block a first translation written by hand, typed on the
+/// canvas, in the Story panel or through the agent, blank or not, or joined
+/// into a block that had none of its own: the record with the marker of a
+/// translation typed by hand ([`Auto::typed`]), so a translation cleared
+/// later stays a hand edit, never the placeholder a style set before
+/// translating leaves ([`status::placeholder`]), which looks the same since
+/// Koharu's #1494, and without the kept mark, as the translation shows the
+/// block's clean-up again ([`crate::sfx::shown_again`]). Its other parts are
+/// kept, so Undo takes the marker off with the text.
+pub fn hand_typed(layer: &Layer) -> Result<Op> {
+    let record = Auto {
+        typed: true,
+        kept: false,
+        ..Auto::of(layer)
+    };
+    attrs::set(layer.id, &record)
 }
 
 /// The op recording on `layer`, a block read before the edit, that the
@@ -491,8 +517,9 @@ pub fn typed(
 /// so one typed there later counts as typed by hand, even as the wording
 /// the stage was given, and the record keeps no style, marks or origin,
 /// which went with any translation the block had, nor the kept mark, as the
-/// stage's own keeping replaces Booharu's. Its source part is kept. Koharu
-/// keeps its `c2pa.translation` record of a run before, but with the
+/// stage's own keeping replaces Booharu's, nor the marker of a translation
+/// typed by hand, which went with the translation. Its source part is kept.
+/// Koharu keeps its `c2pa.translation` record of a run before, but with the
 /// translation of no text recorded the stage styled nothing
 /// ([`stage_styled`]), so a value set on the block since stays a hand edit.
 pub fn given_back(layer: &Layer) -> Result<Op> {
@@ -502,6 +529,7 @@ pub fn given_back(layer: &Layer) -> Result<Op> {
         style: None,
         marks: Vec::new(),
         kept: false,
+        typed: false,
         ..Auto::of(layer)
     };
     attrs::set(layer.id, &record)
@@ -1467,7 +1495,8 @@ mod tests {
         let (_dir, mut session, block) = given_back_after_a_run(&look);
         apply(&mut session, vec![type_bar_style(block)]);
         // Typed as the Story panel types a first translation: placed, with
-        // the look in the keys left unset and no record of its own.
+        // the look in the keys left unset and the marker of one typed by
+        // hand.
         let placed = placement(&session, block);
         let looked = typed(
             &session.project(),
@@ -1747,8 +1776,12 @@ mod tests {
         translate(&mut session, block, "BOOM", &look, None);
         assert!(!Auto::of(&layer(&session, block)).kept);
 
-        // Typed by hand: no record of its own, so a record holding nothing
-        // but the mark goes, and one holding more keeps the rest.
+        // Typed by hand: the record holds the marker of a translation typed
+        // by hand and no mark, keeping whatever else it held.
+        let marker = Auto {
+            typed: true,
+            ..Auto::default()
+        };
         let (_dir, mut session, block) = page("ドン", &["detection", "ocr"]);
         keep(&mut session, block);
         let ops = typed(
@@ -1761,8 +1794,8 @@ mod tests {
         .expect("the ops");
         assert_eq!(
             json!(ops),
-            json!([attrs::clear::<Auto>(block)]),
-            "the look writes nothing here, so the mark's removal alone"
+            json!([attrs::set(block, &marker).expect("the record")]),
+            "the look writes nothing here, so the record alone"
         );
         let read = recognized(&layer(&session, block), "ドン").expect("the record");
         apply(&mut session, vec![read]);
@@ -1780,19 +1813,9 @@ mod tests {
             attrs::get::<Auto>(&layer(&session, block)),
             Some(Auto {
                 source: Some(text_hash("ドン")),
-                ..Auto::default()
+                ..marker
             })
         );
-        // With no mark, a typed translation writes no record at all.
-        let ops = typed(
-            &session.project(),
-            block,
-            &placement(&session, block),
-            &look,
-            None,
-        )
-        .expect("the ops");
-        assert!(ops.is_empty(), "{ops:?}");
 
         // Given back.
         let (_dir, mut session, block) = page("ドン", &["detection", "ocr"]);
@@ -1805,9 +1828,48 @@ mod tests {
     }
 
     #[test]
-    fn a_typed_translation_gets_the_look_and_no_record() {
+    fn a_run_or_a_line_given_back_drops_the_marker_of_a_translation_typed_by_hand() {
+        let look = settings(true, None, None);
+        let typed_by_hand = |session: &mut Session, block: LayerId| {
+            let marker = hand_typed(&layer(session, block)).expect("the record");
+            apply(
+                session,
+                vec![
+                    Op::SetText {
+                        layer: block.into(),
+                        text: "Hm".to_owned(),
+                    },
+                    marker,
+                ],
+            );
+            assert!(Auto::of(&layer(session, block)).typed);
+        };
+        // Read again, the block keeps it.
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        typed_by_hand(&mut session, block);
+        let read = recognized(&layer(&session, block), "どうして").expect("the record");
+        apply(&mut session, vec![read]);
+        assert!(Auto::of(&layer(&session, block)).typed);
+        // Translated by a stage, the translation is the run's.
+        translate(&mut session, block, "Why?", &look, None);
+        assert!(!Auto::of(&layer(&session, block)).typed);
+        // Given back, the translation went with it.
+        let (_dir, mut session, block) = page("どうして", &["detection", "ocr"]);
+        typed_by_hand(&mut session, block);
+        let given = given_back(&layer(&session, block)).expect("the record");
+        apply(&mut session, vec![given]);
+        assert!(!Auto::of(&layer(&session, block)).typed);
+    }
+
+    #[test]
+    fn a_typed_translation_gets_the_look_and_only_the_marker_of_one_typed_by_hand() {
         let (_dir, session, block) = page("どうして", &["detection", "ocr"]);
         let look = settings(false, Some(RED), None);
+        let marker = Auto {
+            typed: true,
+            ..Auto::default()
+        };
+        let marker = json!(attrs::set(block, &marker).expect("the record"));
         let mut ops = typed(
             &session.project(),
             block,
@@ -1816,7 +1878,8 @@ mod tests {
             Some("CCWildWords"),
         )
         .expect("the look");
-        assert_eq!(ops.len(), 1, "the look alone, and no record: {ops:?}");
+        assert_eq!(ops.len(), 2, "the look and the marker: {ops:?}");
+        assert_eq!(json!(ops.remove(1)), marker);
         let op = ops.remove(0);
         let Op::UpdateLayer { patch, .. } = op else {
             panic!("{op:?}");
@@ -1827,18 +1890,17 @@ mod tests {
                 "family": "CCWildWords", "fill": RED, "stroke": null, "stroke_width": null,
             }}}})
         );
+        // A look that changes nothing leaves the marker alone.
         let on = settings(true, None, None);
-        assert!(
-            typed(
-                &session.project(),
-                block,
-                &placement(&session, block),
-                &on,
-                None
-            )
-            .expect("the look")
-            .is_empty()
-        );
+        let ops = typed(
+            &session.project(),
+            block,
+            &placement(&session, block),
+            &on,
+            None,
+        )
+        .expect("the look");
+        assert_eq!(json!(ops), json!([marker]));
         // Placement's op for another layer is refused.
         let other = Op::UpdateLayer {
             layer: LayerId(koharu_scene::Uuid::now_v7()).into(),
