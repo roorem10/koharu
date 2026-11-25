@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 import { foldRun, toldLive, type RunRecord } from '@/lib/booharu/jobs' // Booharu: its record of runs.
+import { mergeWorkspace } from '@/lib/booharu/workspace' // Booharu: no kept tool the app lacks.
 import type {
   Bounds,
   LayerId,
@@ -178,6 +179,7 @@ export const useKoharuStore = create<KoharuStore>()(
         processingStages,
         galleryOpen,
       }),
+      merge: mergeWorkspace, // Booharu: a kept tool the app doesn't have, as the O tool, reads as none.
     },
   ),
 )
