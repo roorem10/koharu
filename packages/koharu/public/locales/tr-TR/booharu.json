@@ -53,7 +53,7 @@
       "increaseHardness": "Sertliği artır",
       "increaseOpacity": "Opaklığı artır",
       "opacity": "Opaklık",
-      "removeNote": "Temizleme dizginin altına gelir. Bir kutunun kendi temizlemesini düzeltmek için içini boyayın ya da yeniden temizleyin."
+      "removeNote": "Bir raster katman ya da temizleme seçili değilken temizleme dizginin altına gelir. Bir kutunun kendi temizlemesini düzeltmek için onu seçip içini boyayın ya da kutuyu yeniden temizleyin."
     },
     "context": {
       "accept": "Kabul et",

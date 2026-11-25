@@ -59,7 +59,7 @@
       "increaseHardness": "Aumentar dureza",
       "increaseOpacity": "Aumentar opacidade",
       "opacity": "Opacidade",
-      "removeNote": "A limpeza fica sob o letreiramento. Para corrigir a limpeza de uma caixa, pinte dentro dela ou limpe-a novamente."
+      "removeNote": "Sem uma camada raster ou limpeza selecionada, a limpeza fica sob o letreiramento. Para corrigir a limpeza de uma caixa, selecione-a e pinte dentro dela, ou limpe a caixa novamente."
     },
     "context": {
       "accept": "Aceitar",

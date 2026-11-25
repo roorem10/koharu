@@ -59,7 +59,7 @@
       "increaseHardness": "Augmenter la dureté",
       "increaseOpacity": "Augmenter l’opacité",
       "opacity": "Opacité",
-      "removeNote": "Le nettoyage passe sous le lettrage. Pour corriger le nettoyage d’une zone de texte, peignez dedans ou nettoyez-la à nouveau."
+      "removeNote": "Sans calque matriciel ni nettoyage sélectionné, le nettoyage passe sous le lettrage. Pour corriger le nettoyage d’une zone de texte, sélectionnez-le et peignez dedans, ou nettoyez à nouveau la zone."
     },
     "context": {
       "accept": "Accepter",

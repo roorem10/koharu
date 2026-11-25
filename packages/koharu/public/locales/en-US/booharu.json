@@ -53,7 +53,7 @@
       "increaseHardness": "Increase hardness",
       "increaseOpacity": "Increase opacity",
       "opacity": "Opacity",
-      "removeNote": "Clean-up goes under the lettering. To fix a box's own clean-up, paint into it or clean it again."
+      "removeNote": "With no raster layer or clean-up selected, clean-up goes under the lettering. To fix a box's own clean-up, select it and paint into it, or clean the box again."
     },
     "context": {
       "accept": "Accept",

@@ -59,7 +59,7 @@
       "increaseHardness": "Aumentar dureza",
       "increaseOpacity": "Aumentar opacidad",
       "opacity": "Opacidad",
-      "removeNote": "La limpieza va debajo de la rotulación. Para corregir la limpieza de un cuadro, pinta dentro de él o vuelve a limpiarlo."
+      "removeNote": "Sin una capa ráster ni una limpieza seleccionada, la limpieza va debajo de la rotulación. Para corregir la limpieza de un cuadro, selecciónala y pinta dentro de ella, o vuelve a limpiar el cuadro."
     },
     "context": {
       "accept": "Aceptar",

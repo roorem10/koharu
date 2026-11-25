@@ -13,7 +13,7 @@ import { TooltipProvider } from '@koharu/ui/components/tooltip'
 const page: Page = { id: 'page', size: { width: 800, height: 1200 }, background: null, layers: [] }
 
 const removeNote =
-  "Clean-up goes under the lettering. To fix a box's own clean-up, paint into it or clean it again."
+  "With no raster layer or clean-up selected, clean-up goes under the lettering. To fix a box's own clean-up, select it and paint into it, or clean the box again."
 
 /** The tool rail with `tool` picked and its brush size popover open, which the popover's options
  * sit in. */
