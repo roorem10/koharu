@@ -16,7 +16,9 @@
 //!
 //! The levels' preview and the pages' levels status have no tool of their
 //! own: the preview is pictures for the dialog, and `get_page` shows a
-//! page's Original scan layer.
+//! page's Original scan layer. Koharu's `view_page` with `original` shows a
+//! levelled page's Original scan, as the canvas's Show original does
+//! ([`scan_alone`]), and without it the levelled scan the stages read.
 
 use std::collections::BTreeSet;
 
@@ -25,8 +27,9 @@ use booharu::{
     levels::{self, LevelsReport},
     runs,
 };
-use booharu_core::settings::LevelsSettings;
-use koharu_scene::PageId;
+use booharu_core::{cleanup, settings::LevelsSettings};
+use koharu_renderer::{Drawn, Frame};
+use koharu_scene::{PageId, Session};
 use rig_core::tool::{Tool, ToolContext, ToolExecutionError};
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -115,7 +118,7 @@ impl Tool for FixPageLevels {
          in Booharu's settings has it. A page's first fix keeps its scan as it was in a hidden, \
          locked image layer named Original scan, under everything, which \
          booharu_restore_original_pages puts back; later fixes keep that first original. \
-         view_page then shows the levelled scan, its `original` too, never the Original scan. \
+         view_page then shows the levelled scan, and with `original` the Original scan. \
          Levels come from the scan as it is, so fixing a page again with the same options \
          changes nothing, and gentler options need the original put back first. Fix pages \
          before cleaning them: a page is skipped, and reported with its `reason`, when it has \
@@ -228,6 +231,20 @@ impl Tool for RestoreOriginalPages {
     }
 }
 
+/// What `view_page` draws as `frame`'s page's scan alone: a levelled page's
+/// Original scan, the scan as it came in, which its background no longer is
+/// (D37), shown though it's hidden, as the canvas's Show original draws it;
+/// else its background, as Koharu's does; `None` for a page with neither.
+pub(crate) fn scan_alone<'f>(session: &Session, frame: &'f Frame) -> Option<Drawn<'f>> {
+    let original = session
+        .project()
+        .page(frame.page())
+        .ok()
+        .and_then(cleanup::original_scan)
+        .and_then(|(layer, _)| frame.layer(layer));
+    original.or_else(|| frame.background())
+}
+
 /// Whether pages are still loading into the open project, as the app's runs
 /// host tells it, Koharu's Gallery loading a chapter's once it opened the
 /// chapter as the project; outside the app, none do.
@@ -257,6 +274,7 @@ mod tests {
         time::Duration,
     };
 
+    use base64::Engine as _;
     use booharu::{
         levels::{LevelsSkip, LevelsSkipped},
         runs::{RunHost, RunPlan},
@@ -268,7 +286,10 @@ mod tests {
     use koharu_renderer::{Renderer, RendererConfig};
     use koharu_scene::{Edit, Hash, Op, Session};
     use parking_lot::Mutex;
-    use rig_core::completion::ToolAnnotations;
+    use rig_core::completion::{
+        ToolAnnotations,
+        message::{DocumentSourceKind, ToolResultContent},
+    };
     use serde_json::{Map, json};
     use tokio::sync::MutexGuard;
 
@@ -694,6 +715,66 @@ mod tests {
         assert!(restore(&tools, &[page, id(9)]).await.is_err());
         assert_eq!(scan(&tools, page), before);
         assert_eq!(tools.session.lock().history().steps, steps);
+    }
+
+    /// What Koharu's `view_page` shows with `args`.
+    async fn view(tools: &Tools, args: Value) -> RgbImage {
+        let args = serde_json::from_value(args).expect("a view's arguments");
+        let view = crate::tools::ViewPage
+            .call(&mut tools.tool_context(), args)
+            .await
+            .expect("a view");
+        let ToolResultContent::Image(image) = view else {
+            panic!("{view:?}");
+        };
+        let DocumentSourceKind::Base64(data) = &image.data else {
+            panic!("{:?}", image.data);
+        };
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(data)
+            .expect("base 64");
+        image::load_from_memory(&bytes).expect("a JPEG").to_rgb8()
+    }
+
+    /// The scan alone of a levelled page is its Original scan, as the
+    /// canvas's Show original draws it, and its region the same part of
+    /// it; the page as drawn shows the levelled scan the stages read.
+    #[tokio::test]
+    async fn view_page_shows_a_levelled_pages_original_scan_alone() {
+        let _alone = alone().await;
+        let (_dir, tools, _app, [page, _]) = open(LevelsSettings::default());
+        // The middle of each band `view` shows, at `x`, within the few
+        // levels a JPEG moves a flat colour.
+        let shows = |view: &RgbImage, bands: &[(u32, u8)]| {
+            for &(x, value) in bands {
+                let seen = view.get_pixel(x, view.height() / 2).0;
+                let near = seen.iter().all(|channel| channel.abs_diff(value) <= 4);
+                assert!(near, "{seen:?} at {x}, not {value}");
+            }
+        };
+        // 80 view pixels to a page pixel: ink, the mid grey and paper.
+        let faded = [(160, 40), (480, 120), (960, 200)];
+        let original = json!({"page": page, "original": true});
+        shows(&view(&tools, original.clone()).await, &faded);
+        let report = fix(&tools, json!({"pages": [page]})).await;
+        assert_eq!(report, Ok(reported(&[page], &[])));
+        let level = levelled(&LevelsSettings::default());
+        let level = |x: u32| level.get_pixel(x, 0).0[0];
+        let drawn = view(&tools, json!({"page": page})).await;
+        shows(
+            &drawn,
+            &[(160, level(0)), (480, level(5)), (960, level(12))],
+        );
+        shows(&view(&tools, original.clone()).await, &faded);
+        // Page pixels 4 to 12, the mid grey and paper, fill 640 by 1280.
+        let region = json!({"x": 4, "y": 0, "width": 8, "height": 16});
+        let part = json!({"page": page, "original": true, "region": region});
+        let part = view(&tools, part).await;
+        assert_eq!(part.dimensions(), (640, 1280));
+        shows(&part, &[(160, 120), (480, 200)]);
+        // Put back, the scan is its background again.
+        assert_eq!(restore(&tools, &[page]).await, Ok(reported(&[page], &[])));
+        shows(&view(&tools, original).await, &faded);
     }
 
     #[tokio::test]

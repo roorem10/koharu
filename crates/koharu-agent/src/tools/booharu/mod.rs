@@ -73,6 +73,7 @@ mod words;
 
 pub(crate) use self::{
     context::outlined,
+    levels::scan_alone,
     mcp::McpCalls,
     runs::{RUN, WAIT},
 };

@@ -396,8 +396,8 @@ impl Tool for ViewPage {
                 }
             }
             if args.original {
-                frame = frame
-                    .background()
+                // Booharu: a levelled page's scan as it came in, its Original scan (D37).
+                frame = booharu::scan_alone(&tools.session.lock(), &frame)
                     .ok_or_else(|| failed("the page has no scan"))?
                     .cropped();
             }

@@ -38,9 +38,9 @@ can't. The scene and the pipeline know nothing of tools.
   scales one to fit its screenshots, so a model reads text too small for it on
   the whole page [Claude computer use].
 - **The scan alone** shows what a block's source says after its clean-up covers
-  it, as the canvas shows it to the user<!-- Booharu: a levelled page's scan. -->,
-  but on a levelled page it shows the levelled scan the stages read, where the
-  canvas shows the scan as it came in, its hidden Original scan (Booharu).
+  it, as the canvas shows it to the user<!-- Booharu: a levelled page's scan. -->;
+  on a levelled page that's its hidden Original scan, the scan as it came in,
+  not the levelled scan the stages read (Booharu).
 - **Errors reach the model word for word**, because the message is what lets it
   correct itself.
 - **No project, no call.** A tool finds the open project when it runs, not when
