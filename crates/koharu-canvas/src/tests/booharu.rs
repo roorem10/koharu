@@ -2120,6 +2120,55 @@ fn on_page(size: (u32, u32), (rect, mask): (koharu_scene::Rect, Vec<u8>)) -> Vec
 }
 
 #[test]
+fn a_remove_strokes_new_raster_goes_under_all_lettering_and_stays_selected() {
+    // A raster drawn by hand, under a block that letters the page and a
+    // text over it.
+    let ops = vec![
+        json!({"op": "add_layer", "page": "$page", "index": 0,
+            "layer": {"kind": "raster"}}),
+        json!({"op": "add_layer", "page": "$page", "index": 1,
+            "layer": {"kind": "block", "source": {"content": "やあ"}}}),
+        json!({"op": "add_layer", "page": "$page", "index": 2,
+            "layer": {"kind": "text", "content": "Hi"}}),
+    ];
+    for settings in [BooharuSettings::default(), hardness(0.5)] {
+        let mut fixture = gpu_free((100, 100), ops.clone());
+        let before = layers(&fixture);
+        fixture.canvas.set_booharu(settings);
+        fixture.canvas.set_tool(Tool::Remove);
+        fixture.canvas.set_brush(brush(8.0, [0.0, 0.0, 0.0, 1.0]));
+        let effects = gesture(&mut fixture.canvas, (20.0, 20.0), (40.0, 20.0));
+        let Some(Effect::Inpaint { layer, .. }) = effects.last() else {
+            panic!("{effects:?}");
+        };
+        let layer = *layer;
+        assert_eq!(apply(&mut fixture, effects), ["add_layer"]);
+        // Over the raster drawn by hand, under the block and the text.
+        assert_eq!(layers(&fixture), [before[0], layer, before[1], before[2]]);
+        assert_eq!(fixture.canvas.selection(), [layer]);
+        // The next stroke goes onto it, and adds none.
+        let effects = gesture(&mut fixture.canvas, (60.0, 60.0), (70.0, 60.0));
+        assert!(matches!(effects[..], [Effect::Inpaint { layer: next, .. }] if next == layer));
+        // With the raster drawn by hand selected, a stroke goes onto it.
+        fixture.canvas.select(vec![before[0]]);
+        let effects = gesture(&mut fixture.canvas, (60.0, 60.0), (70.0, 60.0));
+        assert!(matches!(effects[..], [Effect::Inpaint { layer: onto, .. }] if onto == before[0]));
+    }
+    // A page with no lettering takes it at its top, as Koharu's does.
+    let mut fixture = gpu_free((100, 100), ops[..1].to_vec());
+    let before = layers(&fixture);
+    fixture.canvas.set_tool(Tool::Remove);
+    fixture.canvas.set_brush(brush(8.0, [0.0, 0.0, 0.0, 1.0]));
+    let effects = gesture(&mut fixture.canvas, (20.0, 20.0), (40.0, 20.0));
+    let Some(Effect::Inpaint { layer, .. }) = effects.last() else {
+        panic!("{effects:?}");
+    };
+    let layer = *layer;
+    apply(&mut fixture, effects);
+    assert_eq!(layers(&fixture), [before[0], layer]);
+}
+
+#[test]
 fn a_stroke_takes_its_own_tools_hardness_whatever_the_others_are() {
     let size = (100, 100);
     // Remove soft at its own hardness, with Draw's softer and the

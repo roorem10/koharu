@@ -163,6 +163,10 @@ fn onto(
     if let Some((_, block)) = block {
         ops.push(laid(session, block.mask.id, rect, area, area)?);
     }
+    // Booharu: a soft stroke's limit blends its edge in and opens a
+    // clean-up's mask by it, never closing what's open (T23).
+    let laid_onto = (layer, block.map(|(_, block)| block.mask.id)); // Booharu: the layer and its mask.
+    crate::booharu::cleanup::soften(session, &mut ops, laid_onto, rect, area, &drawn)?; // Booharu: soft edges.
     ops.push(Op::SetAttribute {
         layer: block.map_or(layer, |(id, _)| *id).into(),
         namespace: "c2pa".to_owned(),

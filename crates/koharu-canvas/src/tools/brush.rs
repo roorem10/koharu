@@ -94,6 +94,8 @@ impl Stroke {
                 // goes onto it too.
                 let raster = Content::Raster(Raster::default());
                 let (id, add) = added(cx.snapshot.page(), None, raster);
+                // Booharu: under all lettering, as an area's result goes (D17).
+                let add = crate::booharu::brush::under_lettering(cx.snapshot.page(), add);
                 let edit = Edit {
                     label: "add_layer".to_owned(),
                     ops: vec![add],
