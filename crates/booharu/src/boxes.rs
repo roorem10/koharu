@@ -1,7 +1,9 @@
 //! Fixing a page's text blocks by hand, which the desktop's commands and the
-//! agent's tools share: a box drawn with the O tool becomes a block, a
-//! balloon's text blocks are joined into one, a block is split in two, and a
-//! block or a text takes a reviewer's note, each as one undo step.
+//! agent's tools share: a box the agent draws becomes a block, a balloon's
+//! text blocks are joined into one, a block is split in two, and a block or a
+//! text takes a reviewer's note, each as one undo step. A block the K tool
+//! drew, which Koharu's canvas adds, is read by the stages a mode picks
+//! ([`stages`]) unless it holds nothing to read ([`nothing_to_read`]).
 //!
 //! Each builder reads the project as the session holds it and answers the
 //! edit, which the caller applies under the same lock. One that would change
@@ -31,7 +33,7 @@ use kurbo::{Affine, BezPath, PathEl, Point, Shape as _};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-/// The undo step's label for a box drawn with the O tool.
+/// The undo step's label for a box the agent draws ([`add_box`]).
 pub const ADD_BOX: &str = "booharu_add_box";
 /// The undo step's label for joining one balloon's text blocks.
 pub const JOIN_BALLOON: &str = "booharu_join_balloon";
@@ -85,7 +87,8 @@ pub struct SplitBlock {
     pub run: RunId,
 }
 
-/// The stages a box drawn in `mode` goes through, run on its block alone.
+/// The stages a box drawn in `mode` goes through, run on its block alone:
+/// a block the K tool drew, or one the agent added.
 pub fn stages(mode: OcrBoxMode) -> BTreeSet<Stage> {
     match mode {
         OcrBoxMode::Read => BTreeSet::from([Stage::Recognize]),
@@ -102,18 +105,19 @@ pub fn split_stages() -> BTreeSet<Stage> {
     BTreeSet::from([Stage::Recognize, Stage::Translate])
 }
 
-/// A page's scan, decoded, which [`add_box`] reads a box against, and
-/// Read chapter and Explain this line show a model.
+/// A page's scan, decoded, which [`add_box`] and [`nothing_to_read`] read a
+/// box against, and Read chapter and Explain this line show a model.
 pub struct Scan {
     /// The file it was decoded from, which the page may have changed since.
     file: Hash,
     pub(crate) image: DynamicImage,
 }
 
-/// `page`'s scan, decoded, which [`add_box`] reads a box against; `None`
-/// when the page has none. `lock` locks the session only while the scan's
-/// bytes are read, as the pipeline's stages read a scan: decoding a big page
-/// takes a while, which the session's other users shouldn't wait on.
+/// `page`'s scan, decoded, which [`add_box`] and [`nothing_to_read`] read a
+/// box against; `None` when the page has none. `lock` locks the session only
+/// while the scan's bytes are read, as the pipeline's stages read a scan:
+/// decoding a big page takes a while, which the session's other users
+/// shouldn't wait on.
 pub fn read_scan<S: Deref<Target = Session>>(
     lock: impl FnOnce() -> S,
     page: PageId,
@@ -1232,59 +1236,116 @@ fn unreadable(
     masked: bool,
     scan: Option<&Scan>,
 ) -> Result<bool> {
-    let Some(background) = page.background else {
+    let Some((cut, mut crop)) = cropped(page, rect, scan)? else {
         return Ok(true);
     };
-    let scan = scan
-        .filter(|scan| scan.file == background.file)
-        .context("the page's scan changed while the box was being read; draw it again")?;
-    let Some(cut) = Rect::covering(rect, scan.image.width(), scan.image.height()) else {
-        return Ok(true);
-    };
-    let mut crop = scan
-        .image
-        .crop_imm(cut.x as u32, cut.y as u32, cut.width, cut.height)
-        .to_rgb8();
     if !masked {
-        blank_glyphs(session, project, page.id, cut, &mut crop)?;
+        blank_glyphs(session, project, page.id, cut, &mut crop, None)?;
     }
     Ok(blank(&crop))
 }
 
+/// Whether the Recognition stage would find nothing to read in `block`, a
+/// text block already on its page, as one the K tool drew: the scan inside
+/// its source's frame, cropped as the stage crops it, with the glyphs of the
+/// page's other blocks blanked as it blanks them, but for those the block's
+/// own mask holds too, is [`blank`]. A block with no frame, or on a page
+/// without a scan, has nothing to read, and `scan`, the page's as
+/// [`read_scan`] decoded it, fails once the page's scan has changed.
+pub fn nothing_to_read(session: &Session, block: LayerId, scan: Option<&Scan>) -> Result<bool> {
+    let project = session.project();
+    let Content::Block(found) = &project.layer(block)?.content else {
+        bail!("layer {block} isn't a block");
+    };
+    let (page, _) = project.parent(block)?;
+    let Some(frame) = found.source.bounds() else {
+        return Ok(true);
+    };
+    let Some((cut, mut crop)) = cropped(page, frame, scan)? else {
+        return Ok(true);
+    };
+    blank_glyphs(session, &project, page.id, cut, &mut crop, Some(block))?;
+    Ok(blank(&crop))
+}
+
+/// `page`'s scan over `rect`, cropped as the Recognition stage crops a
+/// block's source frame, with where the crop lies; `None` when the page has
+/// no scan or `rect` lies off it. `scan` is the page's, as [`read_scan`]
+/// decoded it; one the page has changed since fails.
+fn cropped(
+    page: &Page,
+    rect: kurbo::Rect,
+    scan: Option<&Scan>,
+) -> Result<Option<(Rect, RgbImage)>> {
+    let Some(background) = page.background else {
+        return Ok(None);
+    };
+    let scan = scan
+        .filter(|scan| scan.file == background.file)
+        .context("the page's scan changed while the box was being read; try again")?;
+    let Some(cut) = Rect::covering(rect, scan.image.width(), scan.image.height()) else {
+        return Ok(None);
+    };
+    let crop = scan
+        .image
+        .crop_imm(cut.x as u32, cut.y as u32, cut.width, cut.height)
+        .to_rgb8();
+    Ok(Some((cut, crop)))
+}
+
 /// Blanks in `crop`, the scan over `cut`, the pixels the masks of `page`'s
 /// blocks hold, in the crop's median colour, as the Recognition stage leaves
-/// other blocks' glyphs out of a block's crop.
+/// other blocks' glyphs out of a block's crop: every block's but `own`'s,
+/// and none that `own`'s mask holds too.
 fn blank_glyphs(
     session: &Session,
     project: &Project,
     page: PageId,
     cut: Rect,
     crop: &mut RgbImage,
+    own: Option<LayerId>,
 ) -> Result<()> {
     let median: [u8; 3] = std::array::from_fn(|channel| {
         let mut values: Vec<u8> = crop.pixels().map(|pixel| pixel.0[channel]).collect();
         values.sort_unstable();
         values.get(values.len() / 2).copied().unwrap_or(u8::MAX)
     });
-    let size = i64::from(Tile::SIZE);
-    for (_, block) in project.blocks(page)? {
-        let tiles = session.tiles(block.mask.id, Some(shifted(cut, block.mask.content.offset)))?;
-        for tile in &tiles.tiles {
-            for (at, &value) in tile.pixels.iter().enumerate() {
-                let x = i64::from(tile.x) * size + at as i64 % size + i64::from(tiles.offset.x)
-                    - i64::from(cut.x);
-                let y = i64::from(tile.y) * size + at as i64 / size + i64::from(tiles.offset.y)
-                    - i64::from(cut.y);
-                if value != 0
-                    && (0..i64::from(cut.width)).contains(&x)
-                    && (0..i64::from(cut.height)).contains(&y)
-                {
-                    crop.put_pixel(x as u32, y as u32, Rgb(median));
-                }
+    let blocks = project.blocks(page)?;
+    let kept: HashSet<(u32, u32)> = match blocks.iter().find(|(id, _)| Some(*id) == own) {
+        Some((_, block)) => masked_in(session, block, cut)?.into_iter().collect(),
+        None => HashSet::new(),
+    };
+    for (_, block) in blocks.iter().filter(|(id, _)| Some(*id) != own) {
+        for (x, y) in masked_in(session, block, cut)? {
+            if !kept.contains(&(x, y)) {
+                crop.put_pixel(x, y, Rgb(median));
             }
         }
     }
     Ok(())
+}
+
+/// The pixels of `cut` that `block`'s mask holds, each by its place in the
+/// crop over `cut`.
+fn masked_in(session: &Session, block: &Block, cut: Rect) -> Result<Vec<(u32, u32)>> {
+    let size = i64::from(Tile::SIZE);
+    let tiles = session.tiles(block.mask.id, Some(shifted(cut, block.mask.content.offset)))?;
+    let mut held = Vec::new();
+    for tile in &tiles.tiles {
+        for (at, &value) in tile.pixels.iter().enumerate() {
+            let x = i64::from(tile.x) * size + at as i64 % size + i64::from(tiles.offset.x)
+                - i64::from(cut.x);
+            let y = i64::from(tile.y) * size + at as i64 / size + i64::from(tiles.offset.y)
+                - i64::from(cut.y);
+            if value != 0
+                && (0..i64::from(cut.width)).contains(&x)
+                && (0..i64::from(cut.height)).contains(&y)
+            {
+                held.push((x as u32, y as u32));
+            }
+        }
+    }
+    Ok(held)
 }
 
 /// How far apart two pixels compared for an edge lie: a scan softens a
@@ -1730,6 +1791,60 @@ mod tests {
         assert_eq!(refusal(covered), Some(Refusal::NothingToRead));
         let cleaned = page.box_edit(inked, OcrBoxMode::ReadTranslateClean);
         assert!(cleaned.is_ok());
+        Ok(())
+    }
+
+    /// A block as Koharu's K tool draws one over `rect`: on the page, its
+    /// source framed by the box with no wording, and its mask the whole box.
+    fn drawn(page: &mut Fixture, rect: Rect) -> Result<LayerId> {
+        let (x, y) = (f64::from(rect.x), f64::from(rect.y));
+        let bounds = page_bounds(x, y, f64::from(rect.width), f64::from(rect.height));
+        let block = page.add(
+            None,
+            json!({"kind": "block", "source": {
+                "frame": {"box": {"bounds": bounds}},
+                "direction": "horizontal",
+            }}),
+        )?;
+        let mask = page.block(block)?.mask.id;
+        page.write(mask, rect, &[255])?;
+        Ok(block)
+    }
+
+    #[test]
+    fn a_drawn_block_over_blank_art_has_nothing_to_read() -> Result<()> {
+        let mut page = Fixture::new(200, 200, &[rect(10.0, 10.0, 50.0, 50.0)])?;
+        let scan = page.scan()?;
+        let blank = drawn(&mut page, pixel_rect(100, 100, 50, 50))?;
+        assert!(nothing_to_read(&page.session, blank, scan.as_ref())?);
+        let inked = drawn(&mut page, pixel_rect(10, 10, 50, 50))?;
+        assert!(!nothing_to_read(&page.session, inked, scan.as_ref())?);
+
+        // Lettering the other blocks' masks hold is left out, as the
+        // Recognition stage leaves it out, but for what the block's own mask
+        // holds too, as the K tool's, the whole box, does.
+        let other = page.add(
+            None,
+            text_block(
+                page_bounds(10.0, 10.0, 50.0, 50.0),
+                Direction::Horizontal,
+                "あ",
+            ),
+        )?;
+        let mask = page.block(other)?.mask.id;
+        page.write(mask, pixel_rect(10, 10, 50, 50), &[255])?;
+        assert!(!nothing_to_read(&page.session, inked, scan.as_ref())?);
+        let unmasked = page.add(
+            None,
+            json!({"kind": "block", "source": {
+                "frame": {"box": {"bounds": page_bounds(10.0, 10.0, 50.0, 50.0)}},
+            }}),
+        )?;
+        assert!(nothing_to_read(&page.session, unmasked, scan.as_ref())?);
+
+        // Read against no scan, or one the page has changed since, it fails.
+        let error = nothing_to_read(&page.session, inked, None).expect_err("no scan");
+        assert!(error.to_string().contains("scan changed"), "{error:#}");
         Ok(())
     }
 
