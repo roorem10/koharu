@@ -15,6 +15,7 @@ import {
   withDivider,
   type SavedTurn,
 } from '@/lib/booharu/agentChat'
+import { hear } from '@/lib/events'
 import { resources, supportedLanguages } from '@/lib/i18n'
 import { modelsKey, preferencesKey, projectKey, queryClient, type ProjectView } from '@/lib/queries'
 import { commands, events, type AgentEntry, type AgentEvent } from '@koharu/ipc/protocol'
@@ -104,6 +105,11 @@ function Chat() {
 function Events() {
   useBooharuAgentChatEvents()
   return null
+}
+
+/** Lets the reads under way answer. */
+async function settle(): Promise<void> {
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
 }
 
 function mount(ui: ReactNode) {
@@ -202,6 +208,67 @@ describe("Booharu agent's chat", () => {
     act(() => read())
     expect(await screen.findByText('Check the other book')).toBeInTheDocument()
     expect(history).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the draft while Read takes the panel, and starts over as the project closes, reading the chat once as it opens again', async () => {
+    const { desk, history } = chatDesktop({ Demo: [asked, answered] })
+    // The project read again as the desktop tells it open, as Koharu reads it.
+    let open: string | null = desk.open
+    vi.spyOn(commands, 'getOpenProject').mockImplementation(async () => open)
+    vi.spyOn(commands, 'query').mockImplementation(async ({ query }) =>
+      query === 'get_project'
+        ? { id: 'project', version: '1', pages: [] }
+        : { steps: [], current: 0 },
+    )
+    vi.spyOn(commands, 'getPipelineEvents').mockResolvedValue([])
+    // Koharu's listeners and Booharu's, as the providers mount them.
+    void hear(() => true)
+    const user = userEvent.setup()
+    mount(<Events />)
+    const view = mount(<Chat />)
+    await screen.findByText('Page 1 is translated.')
+    await ask(user, 'Letter page 2')
+    await waitFor(() => expect(useConversation.getState().running).toBe(1))
+    await user.type(screen.getByRole('textbox', { name: 'Message Booharu Agent' }), 'Clean page 3')
+
+    // Read takes the panel's place, and gives it back.
+    view.unmount()
+    mount(<Chat />)
+    expect(screen.getByRole('textbox', { name: 'Message Booharu Agent' })).toHaveValue(
+      'Clean page 3',
+    )
+    expect(screen.getByText('Letter page 2')).toBeInTheDocument()
+
+    // The desktop closes the project, Koharu's listener and Booharu's both hearing it.
+    open = null
+    tell('project', null)
+    expect(useConversation.getState()).toEqual(useConversation.getInitialState())
+    expect(useAgentChat.getState()).toEqual({ project: null, stale: false })
+    expect(screen.queryByText('Translate page 1')).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Message Booharu Agent' })).toHaveValue('')
+    // The run's end, told once the project closed, shows nothing.
+    send(desk, 1, { type: 'completed', answer: 'Page 2 is lettered.' })
+    expect(screen.queryByText('Page 2 is lettered.')).toBeNull()
+
+    // It opens again, the desktop having saved the turn.
+    desk.files.Demo = [
+      asked,
+      answered,
+      { role: 'user', id: 'u2', at: 6, text: 'Letter page 2' },
+      { ...answered, id: 'a2', at: 7, parts: [{ type: 'text', text: 'Page 2 is lettered.' }] },
+    ]
+    open = 'Demo'
+    tell('project', 'Demo')
+    expect(await screen.findByText('Page 2 is lettered.')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(queryClient.getQueryData(projectKey)).toMatchObject({ name: 'Demo' }),
+    )
+    await settle()
+    for (const said of ['Translate page 1', 'Page 1 is translated.', 'Letter page 2'])
+      expect(screen.getAllByText(said), said).toHaveLength(1)
+    expect(screen.getAllByText('Page 2 is lettered.')).toHaveLength(1)
+    expect(history).toHaveBeenCalledTimes(2)
+    expect(useAgentChat.getState().project).toBe('Demo')
   })
 
   it('keeps what was said above a divider on New chat', async () => {
