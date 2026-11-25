@@ -55,8 +55,8 @@
     color: #000 !important;
   }
 
-  /* A Booharu tool's hint, such as the O tool's Alt and Shift modes, sits on a line of its own
-   * under the tool's name and key: Koharu's tooltip lays its content out in one row. */
+  /* A Booharu hint in a tool's tooltip, such as the K tool's Alt and Shift modes, sits on a line of
+   * its own under the tool's name and key: Koharu's tooltip lays its content out in one row. */
   [data-slot='tooltip-content']:has(> .booharu-tool-hint) {
     flex-wrap: wrap;
   }

@@ -55,7 +55,7 @@ function desktop() {
   return { file, saves, save }
 }
 
-/** Settings > Pipeline, where the O tool's section sits after the stages. */
+/** Settings > Pipeline, where the text block tool's section sits after the stages. */
 function renderPipeline() {
   render(
     <QueryClientProvider client={queryClient}>
@@ -69,20 +69,21 @@ function shownMode(select: HTMLElement): string | null | undefined {
   return select.querySelector('[data-slot="select-value"]')?.textContent
 }
 
-/** The O tool's default mode, once the file's value shows. */
+/** The text block tool's default mode, once the file's value shows. */
 async function modeSelect(shown: string): Promise<HTMLElement> {
   const select = await screen.findByRole('combobox', { name: 'Default action' })
   await waitFor(() => expect(shownMode(select)).toBe(shown))
   return select
 }
 
-describe('Booharu O tool settings', () => {
+describe("Booharu's text block tool settings", () => {
   it("reads the mode and saves a choice over every section's latest value", async () => {
     const { file, saves } = desktop()
     const user = userEvent.setup()
     renderPipeline()
 
-    expect(screen.getByRole('heading', { name: 'OCR box' })).toBeInTheDocument()
+    // Titled with Koharu's name for its K tool, into which the O tool folded.
+    expect(screen.getByRole('heading', { name: 'Text block' })).toBeInTheDocument()
     const select = await modeSelect('Read only')
     // Another writer changes another section after the page read the file.
     file.preferences['booharu-mcp'] = { port: 50000 }

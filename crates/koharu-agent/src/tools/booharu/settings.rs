@@ -29,7 +29,7 @@ impl Tool for GetSettings {
     fn description(&self) -> String {
         "Booharu's settings, each section under its table name with every key's value: \
          `booharu-mcp` has the `port` the MCP server outside apps reach Booharu through listens \
-         on; `booharu-ocr-box` has the `default_mode` a box drawn with the O tool goes through, \
+         on; `booharu-ocr-box` has the `default_mode` a box drawn with the K tool goes through, \
          `read`, `read_translate`, or `read_translate_clean`; `booharu-lettering` has the \
          `default` text look, its `fill` and `stroke` colours as [red, green, blue, alpha] from \
          0 to 1, or null for Koharu's black and no outline, and its `stroke_width` from 0 to \

@@ -453,14 +453,13 @@
       "koharuGithub": "GitHub의 Koharu"
     },
     "notice": {
-      "failed": "상자를 추가하지 못했습니다: {{message}}",
-      "locked": "이 상자를 넣을 레이어가 잠겨 있습니다. 먼저 잠금을 해제하세요.",
-      "nothing_to_read": "이 상자에는 읽을 텍스트가 없습니다."
+      "failed": "텍스트 블록은 추가했지만 OCR하지 못했습니다: {{message}}",
+      "nothing_to_read": "이 상자에는 읽을 텍스트가 없습니다. 텍스트 블록은 남겨 두었으니 직접 입력할 수 있습니다."
     },
     "ocrBox": {
       "defaultMode": "기본 동작",
       "defaultModeDescription": "Alt를 누른 채 놓으면 OCR만, Shift를 누른 채 놓으면 OCR, 번역, 정리를 수행합니다.",
-      "description": "O 도구로 그린 상자는 텍스트 블록이 됩니다. 항상 OCR을 수행하며, 번역과 정리까지 할지는 동작에 따라 정해집니다.",
+      "description": "텍스트 블록 도구(K)로 그린 상자는 텍스트 블록이 되고 바로 OCR을 수행합니다. 번역과 정리까지 할지는 동작에 따라 정해집니다.",
       "modes": {
         "read": "OCR만",
         "read_translate": "OCR 및 번역",
@@ -759,8 +758,5 @@
   "startup": {
     "opening": "Booharu 여는 중…",
     "title": "Booharu 준비 중"
-  },
-  "tools": {
-    "ocr_box": "OCR 상자"
   }
 }

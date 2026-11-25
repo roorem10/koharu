@@ -1,19 +1,21 @@
-//! Booharu's part of the canvas: the O tool, whose box dragged out over the
-//! page the canvas answers as `Effect::Booharu`, for the host to make a text
-//! block of, and the default look of new text, which the T tool's text and a
-//! translation typed into a block with none get. Such a translation typed
-//! into a sound effect kept as art also shows its clean-up again, without
-//! the kept mark, in the same step. The Booharu settings the canvas needs
-//! are one `BooharuSettings`, which the host pushes at startup and whenever
-//! the settings they come from are saved, and whenever the brush's feel
-//! changes (`BrushFeel`): each brush tool's hardness and Draw's opacity,
-//! which its strokes take, soft below a hardness of 1 (`brush`). What the
-//! type bar takes off the characters being typed is an `Unmark`, which
-//! typing's own Booharu part, `typing/booharu.rs`, does, with the size steps
-//! and the selected text the type bar quotes. A right-click on a text or a
-//! block with the Select, Direct Select or Text tool, while nothing is
-//! typed, selects it unless it's selected already and answers
-//! `Effect::Menu`, for the host to open the box's menu there.
+//! Booharu's part of the canvas: what a box drawn with Koharu's K tool, the
+//! text block tool, asks of the host beside the edit adding its block, to be
+//! read at once ([`drawn`], `Effect::Block`), as the O tool's box was before
+//! the O tool folded into the K tool, and such a box outlasting a change it
+//! didn't make ([`outlasts`]); and the default look of new text, which the T
+//! tool's text and a translation typed into a block with none get. Such a
+//! translation typed into a sound effect kept as art also shows its clean-up
+//! again, without the kept mark, in the same step. The Booharu settings the
+//! canvas needs are one `BooharuSettings`, which the host pushes at startup
+//! and whenever the settings they come from are saved, and whenever the
+//! brush's feel changes (`BrushFeel`): each brush tool's hardness and Draw's
+//! opacity, which its strokes take, soft below a hardness of 1 (`brush`).
+//! What the type bar takes off the characters being typed is an `Unmark`,
+//! which typing's own Booharu part, `typing/booharu.rs`, does, with the size
+//! steps and the selected text the type bar quotes. A right-click on a text
+//! or a block with the Select, Direct Select or Text tool, while nothing is
+//! typed, selects it unless it's selected already and answers `Effect::Menu`,
+//! for the host to open the box's menu there.
 //!
 //! A box styled before it's translated holds a translation that is only a
 //! placeholder ([`status::placeholder`]): the type bar wrote a style set on
@@ -34,7 +36,7 @@ use koharu_renderer::Drawn;
 use koharu_scene::{
     Block, Content, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text, Transform,
 };
-use kurbo::{Affine, Point, Rect, Size};
+use kurbo::{Affine, Point};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use ui_events::keyboard::Modifiers;
@@ -42,8 +44,7 @@ use ui_events::keyboard::Modifiers;
 use crate::{
     Tool,
     control::Control,
-    draw::overlay::Overlay,
-    gesture::{self, Context, GestureLook, Press},
+    gesture::{self, Context, Press},
     snapshot::Snapshot,
     tools::transform::Lettering,
     view::Sample,
@@ -355,12 +356,14 @@ pub enum Unmark {
 /// What one of Booharu's gestures or presses did, for the host to act on.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Effect {
-    /// A box drawn with the O tool over `rect` of `page`, in page pixels, cut
-    /// to the page, with the modifiers held as the pointer lifted, by which
-    /// the host picks what the box goes through.
-    Box {
+    /// A text block the K tool drew, `layer` of `page`, which the edit
+    /// before this effect adds and selects as Koharu's tool does, for the
+    /// host to read at once, and translate and clean as the modifiers held
+    /// as the pointer lifted pick, as Booharu's O tool did before it folded
+    /// into the K tool.
+    Block {
         page: PageId,
-        rect: Rect,
+        layer: LayerId,
         modifiers: BoxModifiers,
     },
     /// A right-click on `layer`, a text or a block of `page`, for the host
@@ -373,25 +376,34 @@ pub enum Effect {
     },
 }
 
-/// The modifiers held as an O tool box's pointer lifted.
+/// The modifiers held as a text block's box's pointer lifted.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BoxModifiers {
     pub alt: bool,
     pub shift: bool,
 }
 
-/// A box shorter than this across or down on screen once cut to the page, in
-/// device-independent pixels, is no box, as Booharu 0.0.4's O tool ignored
-/// one.
-const SMALLEST: f64 = 4.0;
+/// What the K tool's box, `layer` of `page`, asks of the host beside
+/// Koharu's edit adding it, with `modifiers`, those the drag held as it
+/// lifted: to be read ([`Effect::Block`]).
+pub(crate) fn drawn(page: PageId, layer: LayerId, modifiers: Modifiers) -> crate::Effect {
+    crate::Effect::Booharu(Effect::Block {
+        page,
+        layer,
+        modifiers: BoxModifiers {
+            alt: modifiers.alt(),
+            shift: modifiers.shift(),
+        },
+    })
+}
 
 /// Whether `gesture`, the one in progress, outlasts a change it didn't make:
-/// a new revision of the page it's on, or another selection. Only an O tool
-/// box does, as it reads neither and writes nothing until it lifts, so the
-/// next box drawn while the last one's block is added, selected and read
-/// isn't dropped.
+/// a new revision of the page it's on, or another selection. Only a text
+/// block's box does, as the O tool's did, as it reads neither until it lifts
+/// and then adds its block to the page as it is by then, so the next box
+/// drawn while the last one's block is read isn't dropped.
 pub(crate) fn outlasts(gesture: Option<&gesture::Gesture>) -> bool {
-    matches!(gesture, Some(gesture::Gesture::Booharu(_)))
+    matches!(gesture, Some(gesture::Gesture::Block(_)))
 }
 
 /// A right-click, with the Select, Direct Select or Text tool while nothing
@@ -422,70 +434,6 @@ pub(crate) fn menu(cx: &Context, sample: Sample) -> Press {
         at: (window / cx.view.scale()).to_point(),
     }));
     Press::answers(effects)
-}
-
-/// A press with the O tool starts a box.
-pub(crate) fn press(sample: Sample) -> Press {
-    Press::starts(gesture::Gesture::Booharu(OcrBox {
-        start: sample.page,
-        current: sample.page,
-        modifiers: sample.modifiers,
-    }))
-}
-
-/// The O tool's box being dragged out, in page points, and the modifiers the
-/// pointer last held. As every gesture, a cancel or another tool drops it
-/// unmade.
-pub(crate) struct OcrBox {
-    start: Point,
-    current: Point,
-    modifiers: Modifiers,
-}
-
-impl OcrBox {
-    pub fn moved(&mut self, samples: &[Sample]) {
-        if let Some(last) = samples.last() {
-            self.current = last.page;
-            self.modifiers = last.modifiers;
-        }
-    }
-
-    /// The box on a page of `size`, cut to it.
-    fn cut(&self, size: Size) -> Rect {
-        Rect::from_points(self.start, self.current).intersect(size.to_rect())
-    }
-
-    /// The box made as the pointer lifts, which the canvas moves it to first,
-    /// with the modifiers held then; none when it's shorter than `SMALLEST`
-    /// across or down.
-    pub fn finish(self, cx: &Context) -> Vec<crate::Effect> {
-        let rect = self.cut(cx.snapshot.size());
-        let smallest = cx.view.page_length(SMALLEST);
-        if rect.width() < smallest || rect.height() < smallest {
-            return Vec::new();
-        }
-        vec![crate::Effect::Booharu(Effect::Box {
-            page: cx.snapshot.page().id,
-            rect,
-            modifiers: BoxModifiers {
-                alt: self.modifiers.alt(),
-                shift: self.modifiers.shift(),
-            },
-        })]
-    }
-
-    /// The box as it would be made, cut to the page, dashed in the
-    /// selection's colour as the Type tool's frame being dragged out is.
-    pub fn preview(&self, cx: &Context, overlay: &mut Overlay) {
-        let rect = self.cut(cx.snapshot.size());
-        if rect.area() > 0.0 {
-            overlay.dashed(rect);
-        }
-    }
-
-    pub fn look(&self) -> GestureLook {
-        GestureLook::Rect(Rect::from_points(self.start, self.current))
-    }
 }
 
 #[cfg(test)]

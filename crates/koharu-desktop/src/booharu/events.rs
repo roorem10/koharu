@@ -9,16 +9,16 @@ use specta::Type;
 
 use crate::events::Event;
 
-/// Why a box drawn with the O tool added nothing, or what failed reading it,
-/// for the interface to say in the user's language.
+/// Why the block a box drawn with the K tool added wasn't read, or what
+/// failed reading it, for the interface to say in the user's language.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum BooharuNotice {
-    /// The box holds no ink to read.
+    /// The box holds no ink to read: its block stays, for typing into, and
+    /// nothing runs on it.
     NothingToRead,
-    /// The box would change a locked layer.
-    Locked,
-    /// The box couldn't be added, read, translated, or cleaned.
+    /// The box's block, which stays, couldn't be read, translated, or
+    /// cleaned.
     Failed { message: String },
 }
 

@@ -38,7 +38,11 @@ pub(crate) fn finish(draft: &Draft, cx: &Context) -> anyhow::Result<Vec<Effect>>
         label: "add_text".to_owned(),
         ops: vec![add, mask],
     };
-    Ok(vec![Effect::Edit(edit), Effect::Selection(vec![id])])
+    Ok(vec![
+        Effect::Edit(edit),
+        Effect::Selection(vec![id]),
+        crate::booharu::drawn(page.id, id, draft.modifiers), // Booharu: read at once.
+    ])
 }
 
 /// The topmost unlocked layer of `kind` whose outline holds `at`.

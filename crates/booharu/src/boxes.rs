@@ -944,7 +944,7 @@ fn dropped(layer: &Layer, target: &Ref, record: bool) -> Result<Vec<Op>> {
 /// The hand-edit record a split gives each half of the block `layer` holds,
 /// read before the edit: split, as the split cut the half's box by hand
 /// though it keeps the detection record it was copied with, so Detect again
-/// keeps it (D1), as it keeps a box drawn with the O tool, while Apply
+/// keeps it (D1), as it keeps a box drawn with the K tool, while Apply
 /// restyles it, as a split writes no wording or look of its own; the
 /// kept mark of an effect Booharu kept as art; and, for a line the
 /// Translation stage gave back unchanged, the translation of no text that
@@ -3247,8 +3247,8 @@ mod tests {
             assert!(keeps(&page, id)?);
         }
 
-        // A box drawn with the O tool, translated by the stage, is drawn by
-        // hand, which Apply keeps; the halves, whose run wrote their look,
+        // A box the agent adds, translated by the stage, is drawn by hand,
+        // which Apply keeps; the halves, whose run wrote their look,
         // take the new font, as a split writes no wording or look of its own.
         let drawn = page.add_box(page_bounds(250.0, 20.0, 40.0, 100.0), OcrBoxMode::Read)?;
         stage_translates(&mut page, drawn, "Hey")?;

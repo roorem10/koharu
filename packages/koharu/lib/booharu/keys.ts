@@ -2,36 +2,26 @@
  * no Booharu key may take, and which keys a focused control keeps from the canvas's shortcuts. */
 
 import { shortcuts, toolKeys } from '@/lib/shortcuts'
-import type { CanvasTool } from '@/lib/store'
 
 /** A key as the registry names it: the modifiers it needs, in the order `ctrl`, `alt`, `shift`,
  * then the key, `event.key` in lower case or `space` for the space bar, joined by `+`, as in
  * `ctrl+shift+z`. `ctrl` also stands for Cmd, as Koharu's canvas reads either. */
 export type KeyName = string
 
-/** One of Booharu's key actions: its default key, and the tool it selects when it's a tool's key.
- * A tool's key reaches the canvas through Koharu's `toolKeys` (`lib/shortcuts.ts`), which holds the
- * same letter, so Koharu's tool hotkey in CanvasWorkspace selects the tool as it selects its own. */
+/** One of Booharu's key actions: its default key. Booharu adds no tool of its own, and so no tool's
+ * key: the O tool folded into Koharu's text block tool, K, by the owner's decision of 2026-11-25. */
 interface KeyAction {
   key: KeyName
-  tool?: CanvasTool
 }
 
 /** Every Booharu key action, by its id, with its default key. */
 export const keyActions = {
-  /** The O tool: a box drawn with it becomes a text block that is read. */
-  ocrBoxTool: { key: 'o', tool: 'ocr_box' },
   /** A smaller brush, with Brush, the Eraser or Remove: by a tenth of its size, at least 2 px, as
    * Photoshop's [ steps it (`lib/booharu/brush.ts`). */
   brushSmaller: { key: '[' },
   /** A larger brush, with Brush, the Eraser or Remove, as Photoshop's ]. */
   brushLarger: { key: ']' },
 } as const satisfies Record<string, KeyAction>
-
-/** The tools Booharu adds to Koharu's canvas, whose keys are Booharu's. */
-export const booharuTools: ReadonlySet<CanvasTool> = new Set(
-  Object.values<KeyAction>(keyActions).flatMap(({ tool }) => (tool ? [tool] : [])),
-)
 
 /** The keys no Booharu key action may take: those Koharu's hotkeys in CanvasWorkspace take (its
  * `shortcuts` and `toolKeys` in `lib/shortcuts.ts`), undo, redo, select all, deselect, fit, Show
@@ -54,9 +44,7 @@ export const reservedKeys: ReadonlySet<KeyName> = new Set([
   'escape',
   'space',
   ...['arrowleft', 'arrowright', 'arrowup', 'arrowdown'].flatMap((key) => [key, `shift+${key}`]),
-  ...(Object.entries(toolKeys) as [CanvasTool, string][])
-    .filter(([tool]) => !booharuTools.has(tool))
-    .flatMap(([, key]) => [key, `shift+${key}`]),
+  ...Object.values(toolKeys).flatMap((key) => [key, `shift+${key}`]),
 ])
 
 // Which keys a focused control keeps from the canvas's shortcuts (koharu#1181), the rule Booharu

@@ -21,16 +21,16 @@ use super::events::{BOX_MENU, BooharuBoxMenu};
 use crate::{app::App, screen::Screen};
 
 /// Carries out what the canvas's Booharu `effect` asks: a box drawn with the
-/// O tool, which Booharu adds and reads off the window's thread
-/// (`ocr_box`), or a right-click on a box, whose menu the interface opens
-/// where the pointer pressed, told as `booharu_box_menu`.
+/// K tool, whose block, which Koharu's canvas edit added, Booharu reads off
+/// the window's thread (`block`), or a right-click on a box, whose menu the
+/// interface opens where the pointer pressed, told as `booharu_box_menu`.
 pub(crate) fn carry(app: &Arc<App>, effect: Effect) {
     match effect {
-        Effect::Box {
+        Effect::Block {
             page,
-            rect,
+            layer,
             modifiers,
-        } => super::ocr_box::carry(app, page, rect, modifiers),
+        } => super::block::carry(app, page, layer, modifiers),
         Effect::Menu { page, layer, at } => app.emit(
             BOX_MENU,
             BooharuBoxMenu {
@@ -106,7 +106,7 @@ fn of(snapshot: Snapshot) -> BooharuSettings {
 #[cfg(test)]
 mod tests {
     use booharu_core::settings::{DefaultTextStyle, LetteringSettings};
-    use koharu_canvas::{Point, Rect, booharu::BoxModifiers};
+    use koharu_canvas::{Point, booharu::BoxModifiers};
     use koharu_scene::{LayerId, PageId, Rgba, Uuid};
 
     use super::*;
@@ -119,9 +119,9 @@ mod tests {
             layer,
             at: Point::new(160.0, 101.0),
         });
-        let drawn = CanvasEffect::Booharu(Effect::Box {
+        let drawn = CanvasEffect::Booharu(Effect::Block {
             page,
-            rect: Rect::new(0.0, 0.0, 10.0, 10.0),
+            layer,
             modifiers: BoxModifiers::default(),
         });
         let selected = CanvasEffect::Selection(vec![layer]);

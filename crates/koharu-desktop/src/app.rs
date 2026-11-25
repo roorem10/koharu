@@ -410,8 +410,8 @@ impl App {
                         crate::booharu::brush::remove_config(), // Booharu: a soft stroke keeps its edge.
                     )
                     .map(drop),
-                // Booharu: a box drawn with the O tool, which Booharu adds
-                // and reads off this thread, or a box's menu to open.
+                // Booharu: a K tool box's block, which Booharu reads off
+                // this thread, or a box's menu to open.
                 Effect::Booharu(effect) => {
                     crate::booharu::canvas::carry(self, effect);
                     Ok(())

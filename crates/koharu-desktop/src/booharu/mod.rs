@@ -1,21 +1,22 @@
 //! Booharu's part of the app: its commands, which the Booharu block of
 //! `commands` lists, its events, which `events::bindings` lists, what the
-//! canvas's Booharu effect does (`canvas::carry`: an O tool box, or a box's
-//! menu to open), the Booharu settings pushed to the canvas, the brush's
-//! feel, which a soft Remove stroke's run reads (`brush`), the MCP server's
-//! start on Booharu's own port, Read chapter, Explain this line and Fix page
-//! levels as jobs Stop and closing the project end (`jobs`; `levels` runs
-//! the fix, and puts the original scans back), the agent's
-//! chat kept beside its project (`agent_history`), the quality check's
-//! findings, its watcher and its one-page check (`qc`), the type bar's
-//! commands for the text being typed on the canvas (`typing`), the report
-//! beside each PSD of the texts its export drew into pixels (`export`), and
-//! the host Booharu's agent tools reach the app through, which tells the
-//! interface when they write a series or the chapter's notes, or save the
-//! Instructions, has the quality check look again after those writes and
-//! after a settings save, and reads the chapter for them.
+//! canvas's Booharu effect does (`canvas::carry`: a K tool box's block to
+//! read, or a box's menu to open), the Booharu settings pushed to the canvas,
+//! the brush's feel, which a soft Remove stroke's run reads (`brush`), the
+//! MCP server's start on Booharu's own port, Read chapter, Explain this line
+//! and Fix page levels as jobs Stop and closing the project end (`jobs`;
+//! `levels` runs the fix, and puts the original scans back), the agent's chat
+//! kept beside its project (`agent_history`), the quality check's findings,
+//! its watcher and its one-page check (`qc`), the type bar's commands for the
+//! text being typed on the canvas (`typing`), the report beside each PSD of
+//! the texts its export drew into pixels (`export`), and the host Booharu's
+//! agent tools reach the app through, which tells the interface when they
+//! write a series or the chapter's notes, or save the Instructions, has the
+//! quality check look again after those writes and after a settings save, and
+//! reads the chapter for them.
 
 pub(crate) mod agent_history;
+pub(crate) mod block;
 pub(crate) mod boxes;
 pub(crate) mod brush;
 pub(crate) mod canvas;
@@ -30,7 +31,6 @@ pub(crate) mod lettering;
 pub(crate) mod levels;
 pub(crate) mod mcp;
 pub(crate) mod notes;
-pub(crate) mod ocr_box;
 pub(crate) mod qc;
 pub(crate) mod read_chapter;
 pub(crate) mod redo;

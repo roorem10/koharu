@@ -453,14 +453,13 @@
       "koharuGithub": "Koharu on GitHub"
     },
     "notice": {
-      "failed": "Couldn't add the box: {{message}}",
-      "locked": "The layer that box would go in is locked. Unlock it first.",
-      "nothing_to_read": "Nothing to read in that box."
+      "failed": "The text block was added but couldn't be read: {{message}}",
+      "nothing_to_read": "Nothing to read in that box. Its text block was kept, for you to type into."
     },
     "ocrBox": {
       "defaultMode": "Default action",
       "defaultModeDescription": "Hold Alt as you let go to read only, or Shift to read, translate and clean.",
-      "description": "A box drawn with the O tool becomes a text block. It's always read, and its action decides whether it's also translated and cleaned.",
+      "description": "A box drawn with the Text block tool (K) becomes a text block that's read at once. Its action decides whether it's also translated and cleaned.",
       "modes": {
         "read": "Read only",
         "read_translate": "Read and translate",
@@ -759,8 +758,5 @@
   "startup": {
     "opening": "Opening Booharu…",
     "title": "Preparing Booharu"
-  },
-  "tools": {
-    "ocr_box": "OCR box"
   }
 }

@@ -4,7 +4,7 @@ import { ChevronDown } from 'lucide-react'
 import { type ReactNode, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { OcrBoxPreferences } from '@/components/booharu/boxes/OcrBoxPreferences' // Booharu: the O tool.
+import { OcrBoxPreferences } from '@/components/booharu/boxes/OcrBoxPreferences' // Booharu: K's mode.
 import { GlossaryRow } from '@/components/booharu/context/GlossaryRow' // Booharu: the glossary editor.
 import { ReadingPreferences } from '@/components/booharu/context/ReadingPreferences' // Booharu: Read chapter.
 import { LevelsPreferences } from '@/components/booharu/levels/LevelsPreferences' // Booharu: Fix page levels.
@@ -158,7 +158,7 @@ export function PipelinePreferences({
       </Stage>
       {/* Booharu: Read chapter's model, whether it asks, and its pages per request, saved at once. */}
       <ReadingPreferences />
-      {/* Booharu: the O tool's default mode, saved to its own section at once. */}
+      {/* Booharu: the text block tool's default mode, saved to its own section at once. */}
       <OcrBoxPreferences />
       {/* Booharu: the quality check's smallest readable text, saved to its own section. */}
       <QcPreferences />

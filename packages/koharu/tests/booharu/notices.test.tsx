@@ -21,18 +21,17 @@ describe('Booharu notices', () => {
     const hook = renderHook(() => useBooharuNotices(), { wrapper: StrictMode })
     expect(handlers).toHaveLength(2)
 
+    // A K tool box's block, which stays either way.
     tell({ kind: 'nothing_to_read' })
-    tell({ kind: 'locked' })
     tell({ kind: 'failed', message: 'the page has no scan' })
     expect(shown.mock.calls.map(([options]) => [options.type, options.title])).toEqual([
-      ['info', 'Nothing to read in that box.'],
-      ['info', 'The layer that box would go in is locked. Unlock it first.'],
-      ['error', "Couldn't add the box: the page has no scan"],
+      ['info', 'Nothing to read in that box. Its text block was kept, for you to type into.'],
+      ['error', "The text block was added but couldn't be read: the page has no scan"],
     ])
 
     hook.unmount()
     await waitFor(() => expect(stop).toHaveBeenCalledTimes(handlers.length))
-    tell({ kind: 'locked' })
-    expect(shown).toHaveBeenCalledTimes(3)
+    tell({ kind: 'nothing_to_read' })
+    expect(shown).toHaveBeenCalledTimes(2)
   })
 })

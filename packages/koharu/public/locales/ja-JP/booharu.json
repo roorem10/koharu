@@ -453,14 +453,13 @@
       "koharuGithub": "GitHub の Koharu"
     },
     "notice": {
-      "failed": "ボックスを追加できませんでした：{{message}}",
-      "locked": "そのボックスを追加するレイヤーがロックされています。先にロックを解除してください。",
-      "nothing_to_read": "そのボックスには読み取れる文字がありません。"
+      "failed": "テキストブロックは追加しましたが、OCRできませんでした：{{message}}",
+      "nothing_to_read": "そのボックスには読み取れる文字がありません。テキストブロックは残してあるので、そこに入力できます。"
     },
     "ocrBox": {
       "defaultMode": "既定の操作",
       "defaultModeDescription": "Altを押しながら離すとOCRのみ、Shiftを押しながら離すとOCR・翻訳・クリーンアップを実行します。",
-      "description": "Oツールで描いたボックスはテキストブロックになります。必ずOCRされ、翻訳とクリーンアップも行うかどうかは操作で決まります。",
+      "description": "テキストブロックツール（K）で描いたボックスはテキストブロックになり、すぐにOCRされます。翻訳とクリーンアップも行うかどうかは操作で決まります。",
       "modes": {
         "read": "OCRのみ",
         "read_translate": "OCRと翻訳",
@@ -762,8 +761,5 @@
   "startup": {
     "opening": "Booharuを起動中…",
     "title": "Booharu を準備しています"
-  },
-  "tools": {
-    "ocr_box": "OCRボックス"
   }
 }

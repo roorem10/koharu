@@ -59,8 +59,10 @@ fn port<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u16, D::Error> {
     Ok(port)
 }
 
-/// `[booharu-ocr-box]`: the O tool, whose box drawn on a page becomes a text
-/// block that is read, and as its mode says translated and cleaned.
+/// `[booharu-ocr-box]`: the K tool's, Koharu's text block tool, whose box
+/// drawn on a page becomes a text block that is read at once, and as its
+/// mode says translated and cleaned. It's named for the O tool, which did so
+/// before it folded into the K tool, so a mode saved then stays.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(default)]
 pub struct OcrBoxSettings {
@@ -72,9 +74,10 @@ impl Section for OcrBoxSettings {
     const NAME: &'static str = "booharu-ocr-box";
 }
 
-/// What a box drawn with the O tool goes through, Booharu 0.0.4's three
-/// modes: it's always read. Only a box that is cleaned gets a mask, the whole
-/// box, so reading it never erases the art inside.
+/// What a box drawn with the K tool, or added by the agent, goes through,
+/// Booharu 0.0.4's three modes: it's always read. The K tool's block has
+/// Koharu's mask, the whole box, whatever the mode; one the agent adds gets
+/// that mask only when it's cleaned, so reading it never erases the art.
 #[derive(
     Clone,
     Copy,

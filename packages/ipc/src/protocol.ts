@@ -293,15 +293,19 @@ export type BooharuJob = {
 }
 
 /**
- *  Why a box drawn with the O tool added nothing, or what failed reading it,
- *  for the interface to say in the user's language.
+ *  Why the block a box drawn with the K tool added wasn't read, or what
+ *  failed reading it, for the interface to say in the user's language.
  */
 export type BooharuNotice =
-  /**  The box holds no ink to read. */
+  /**
+   *  The box holds no ink to read: its block stays, for typing into, and
+   *  nothing runs on it.
+   */
   | { kind: 'nothing_to_read' }
-  /**  The box would change a locked layer. */
-  | { kind: 'locked' }
-  /**  The box couldn't be added, read, translated, or cleaned. */
+  /**
+   *  The box's block, which stays, couldn't be read, translated, or
+   *  cleaned.
+   */
   | { kind: 'failed'; message: string }
 
 /**
@@ -1540,9 +1544,10 @@ export type NewLayer = {
 export type Notice = 'eraser_needs_raster'
 
 /**
- *  What a box drawn with the O tool goes through, Booharu 0.0.4's three
- *  modes: it's always read. Only a box that is cleaned gets a mask, the whole
- *  box, so reading it never erases the art inside.
+ *  What a box drawn with the K tool, or added by the agent, goes through,
+ *  Booharu 0.0.4's three modes: it's always read. The K tool's block has
+ *  Koharu's mask, the whole box, whatever the mode; one the agent adds gets
+ *  that mask only when it's cleaned, so reading it never erases the art.
  */
 export type OcrBoxMode =
   /**  Read only. */
@@ -1553,8 +1558,10 @@ export type OcrBoxMode =
   | 'read_translate_clean'
 
 /**
- *  `[booharu-ocr-box]`: the O tool, whose box drawn on a page becomes a text
- *  block that is read, and as its mode says translated and cleaned.
+ *  `[booharu-ocr-box]`: the K tool's, Koharu's text block tool, whose box
+ *  drawn on a page becomes a text block that is read at once, and as its
+ *  mode says translated and cleaned. It's named for the O tool, which did so
+ *  before it folded into the K tool, so a mode saved then stays.
  */
 export type OcrBoxSettings = {
   /**  What a drawn box goes through when the drawing picks no other mode. */
@@ -2618,11 +2625,6 @@ export type Tool =
   | 'color_picker'
   | 'remove'
   | 'pan'
-  /**
-   *  Booharu: the O tool. A box drawn with it becomes a text block that is
-   *  read, and as chosen translated and cleaned.
-   */
-  | 'ocr_box'
 
 /**  One transfer's whole state. */
 export type Transfer = {

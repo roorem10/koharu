@@ -20,8 +20,10 @@ const modes = [
   'read_translate_clean',
 ] as const satisfies readonly OcrBoxMode[]
 
-/** The O tool's section of Settings > Pipeline, the `[booharu-ocr-box]` table: what a box drawn
- * with it goes through when neither Alt nor Shift picks another mode. A choice is saved at once. */
+/** The text block tool's section of Settings > Pipeline, the `[booharu-ocr-box]` table, named for
+ * the O tool that folded into Koharu's K: what a box drawn with K goes through when neither Alt nor
+ * Shift picks another mode. It's titled with Koharu's own name for the tool. A choice is saved at
+ * once. */
 export function OcrBoxPreferences() {
   const { t } = useTranslation()
   const preferences = useBooharuPreferences()
@@ -36,7 +38,7 @@ export function OcrBoxPreferences() {
   )
 
   return (
-    <PreferenceSection title={t('tools.ocr_box')} description={t('booharu.ocrBox.description')}>
+    <PreferenceSection title={t('tools.block')} description={t('booharu.ocrBox.description')}>
       <PreferenceRow
         title={t('booharu.ocrBox.defaultMode')}
         description={t('booharu.ocrBox.defaultModeDescription')}

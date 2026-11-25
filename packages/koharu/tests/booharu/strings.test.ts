@@ -3,7 +3,6 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { booharuTools } from '@/lib/booharu/keys'
 import { booharuTabs } from '@/lib/booharu/settingsLink'
 import { booharuStrings, mergeStrings } from '@/lib/booharu/strings'
 import { resources, supportedLanguages } from '@/lib/i18n'
@@ -28,13 +27,12 @@ const pluralForm = /_(zero|one|two|few|many|other)$/
 const tags = (value: string) => Array.from(value.matchAll(/<\/?\w+>/g), ([tag]) => tag).sort()
 
 /** Whether `key` is one of Booharu's own strings, which every language has, rather than an override
- * of one of Koharu's at Koharu's path: its own, its edits' history steps, its tools' names, which
- * Koharu's tool rail looks up by the tool's id, and its Settings tabs' names, which Koharu's tab
- * list looks up by the tab's id. */
+ * of one of Koharu's at Koharu's path: its own, its edits' history steps, and its Settings tabs'
+ * names, which Koharu's tab list looks up by the tab's id. Booharu names no tool in Koharu's tool
+ * rail since the O tool folded into Koharu's K, so a `tools.` key is an override. */
 const isBooharuKey = (key: string) =>
   key.startsWith('booharu.') ||
   key.startsWith('history.steps.booharu_') ||
-  [...booharuTools].some((tool) => key === `tools.${tool}`) ||
   booharuTabs.some((tab) => key === `settings.tabs.${tab}`)
 
 describe('Booharu strings overlay', () => {

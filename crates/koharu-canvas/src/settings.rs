@@ -26,9 +26,6 @@ pub enum Tool {
     ColorPicker,
     Remove,
     Pan,
-    /// Booharu: the O tool. A box drawn with it becomes a text block that is
-    /// read, and as chosen translated and cleaned.
-    OcrBox,
 }
 
 impl Tool {
@@ -48,7 +45,6 @@ impl Tool {
                 Some(CursorIcon::Crosshair)
             }
             Self::Pan => Some(CursorIcon::Grab),
-            Self::OcrBox => Some(CursorIcon::Crosshair), // Booharu: the O tool draws a box.
         }
     }
 }

@@ -488,14 +488,13 @@
       "koharuGithub": "Koharu en GitHub"
     },
     "notice": {
-      "failed": "No se ha podido añadir el cuadro: {{message}}",
-      "locked": "La capa donde iría ese cuadro está bloqueada. Desbloquéala primero.",
-      "nothing_to_read": "No hay nada que leer en ese cuadro."
+      "failed": "Se ha añadido el bloque de texto, pero no se ha podido leer: {{message}}",
+      "nothing_to_read": "No hay nada que leer en ese cuadro. Su bloque de texto se ha conservado para que escribas en él."
     },
     "ocrBox": {
       "defaultMode": "Acción predeterminada",
       "defaultModeDescription": "Suelta con Alt para solo leer, o con Mayús para leer, traducir y limpiar.",
-      "description": "Un cuadro dibujado con la herramienta O se convierte en un bloque de texto. Siempre se lee, y la acción decide si además se traduce y se limpia.",
+      "description": "Un cuadro dibujado con la herramienta Bloque de texto (K) se convierte en un bloque de texto que se lee al momento. La acción decide si además se traduce y se limpia.",
       "modes": {
         "read": "Solo leer",
         "read_translate": "Leer y traducir",
@@ -820,8 +819,5 @@
   "startup": {
     "opening": "Abriendo Booharu…",
     "title": "Preparando Booharu"
-  },
-  "tools": {
-    "ocr_box": "Cuadro de OCR"
   }
 }

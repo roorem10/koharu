@@ -695,7 +695,7 @@ pub struct Edited {
     /// chose its style on purpose; with nothing recorded, no stage styled
     /// it ([`stage_styled`]).
     pub style: bool,
-    /// It was drawn by hand: no detection made it, as the O tool's boxes.
+    /// It was drawn by hand: no detection made it, as the K tool's boxes.
     /// A split's halves keep the detection record they were copied with, so
     /// they aren't: a split writes no wording or look of its own, and only
     /// Detect again keeps them, by their record's [`Auto::split`].

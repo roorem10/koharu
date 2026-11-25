@@ -453,14 +453,13 @@
       "koharuGithub": "GitHub 浪个 Koharu"
     },
     "notice": {
-      "failed": "框加勿上：{{message}}",
-      "locked": "箇只框要加进去个图层锁牢哉，先解锁。",
-      "nothing_to_read": "箇只框里向呒没好识别个文字。"
+      "failed": "文本块加上去哉，不过识别勿出来：{{message}}",
+      "nothing_to_read": "箇只框里向呒没好识别个文字。文本块留牢辣海，好勒里向打字。"
     },
     "ocrBox": {
       "defaultMode": "默认操作",
       "defaultModeDescription": "放开鼠标辰光，按牢 Alt 光识别；按牢 Shift 会识别、翻译搭清理。",
-      "description": "用 O 工具画个框会变成文本块。框里向个文字总归会识别，要勿要再翻译搭清理，由拣个操作决定。",
+      "description": "用文本块工具（K）画个框会变成文本块，马上识别。要勿要再翻译搭清理，由拣个操作决定。",
       "modes": {
         "read": "光识别",
         "read_translate": "识别搭翻译",
@@ -759,8 +758,5 @@
   "startup": {
     "opening": "来勒打开 Booharu…",
     "title": "来勒准备 Booharu"
-  },
-  "tools": {
-    "ocr_box": "OCR 框"
   }
 }

@@ -16,8 +16,23 @@ const page: Page = {
   layers: [],
 }
 
-describe('Booharu O tool in the tool rail', () => {
-  it('shows the O tool before Pan with its key and modes, and selects it', async () => {
+/** Koharu 0.95's tools in its rail, in order: the O tool folded into its text block tool, K. */
+const koharuTools = [
+  'Select',
+  'Direct Selection',
+  'Rectangular Marquee',
+  'Lasso',
+  'Text',
+  'Text block',
+  'Brush',
+  'Eraser',
+  'Color picker',
+  'Remove',
+  'Pan',
+]
+
+describe("Booharu's K tool in the tool rail", () => {
+  it("holds Koharu's tools and no O tool, and shows K's modes under its name and key", async () => {
     queryClient.setQueryData(pageKey, page)
     const user = userEvent.setup()
     render(
@@ -28,19 +43,20 @@ describe('Booharu O tool in the tool rail', () => {
       </QueryClientProvider>,
     )
 
+    // The tools come first, then the colour well and the brush size.
     const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
-    const index = names.indexOf('OCR box')
-    expect(names.slice(index - 1, index + 2)).toEqual(['Remove', 'OCR box', 'Pan'])
+    expect(names.slice(0, koharuTools.length)).toEqual(koharuTools)
+    expect(names).not.toContain('OCR box')
 
-    const tool = screen.getByRole('button', { name: 'OCR box' })
+    const tool = screen.getByRole('button', { name: 'Text block' })
     await user.hover(tool)
     const hint = await screen.findByText('Alt: read only. Shift: read, translate and clean.')
-    expect(hint.parentElement).toHaveTextContent(/^OCR boxO/)
+    expect(hint.parentElement).toHaveTextContent(/^Text blockK/)
     // app/booharu.css wraps the tooltip's row for the hint by this parent.
     expect(hint.parentElement).toHaveAttribute('data-slot', 'tooltip-content')
 
     await user.click(tool)
-    expect(useKoharuStore.getState().tool).toBe('ocr_box')
+    expect(useKoharuStore.getState().tool).toBe('block')
     expect(tool).toHaveAttribute('data-active', 'true')
   })
 })

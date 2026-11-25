@@ -34,8 +34,8 @@ pub enum Effect {
     /// Paste while typing: the host gives its clipboard's text to
     /// `Canvas::insert`.
     Paste,
-    /// Booharu: what one of Booharu's gestures did, such as a box drawn with
-    /// the O tool.
+    /// Booharu: what one of Booharu's hooks asks of the host, such as reading
+    /// a box drawn with the K tool.
     Booharu(crate::booharu::Effect),
 }
 

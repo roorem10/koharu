@@ -12,7 +12,7 @@
 //! | `booharu_get_settings` | every Booharu settings section, by its table name | yes |
 //! | `booharu_set_settings` | changes keys of one section and saves that section alone, all of them or none; an outside app can't change `booharu-mcp` | no |
 //! | `booharu_set_translation` | sets a block's translation, placing it first as the Translation stage does when the block has none of its own (none, or only the placeholder a style set before translating leaves), as one undo step | no |
-//! | `booharu_add_text_box` | adds a text block over a box the automatic run missed, as the O tool does, and starts the run reading it, and as its mode says translating and cleaning it | no |
+//! | `booharu_add_text_box` | adds a text block over a box the automatic run missed and starts the run reading it, and as its mode says translating and cleaning it, as a box drawn with the K tool is read | no |
 //! | `booharu_find_split_balloons` | the balloons whose text is split over two or more text blocks, on a page or every page | yes |
 //! | `booharu_join_balloon_blocks` | joins the text blocks of a block's balloon into the first one read, as one undo step | no |
 //! | `booharu_join_page_balloons` | joins every split balloon of a page, as one undo step | no |

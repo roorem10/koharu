@@ -1,8 +1,8 @@
 //! The canvas's behaviour, through its public API, on a real project and
 //! GPU.
 
-// Booharu: the O tool's box and the default look of new text, on this
-// harness.
+// Booharu: the K tool's box read at once and the default look of new text,
+// on this harness.
 mod booharu;
 
 use std::{io::Cursor, sync::Arc};

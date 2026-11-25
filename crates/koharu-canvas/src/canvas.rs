@@ -176,7 +176,7 @@ impl Canvas {
         // write over that change, so it's dropped, as the editor's was.
         if self.snapshot.as_ref().is_some_and(|old| {
             old.frame().revision() != snapshot.frame().revision()
-                // Booharu: unless it's an O tool box on the page it's drawn over.
+                // Booharu: unless it's a text block's box on the page it's drawn over.
                 && !(crate::booharu::outlasts(self.gesture.as_ref().map(|active| &active.gesture))
                     && old.page().id == snapshot.page().id)
         }) {
@@ -296,7 +296,7 @@ impl Canvas {
     /// in progress is cancelled, and typing into another layer is committed;
     /// returns what that commit does.
     pub fn select(&mut self, layers: Vec<LayerId>) -> Vec<Effect> {
-        // Booharu: an O tool box outlasts a selection, which it doesn't read.
+        // Booharu: a text block's box outlasts a selection, which it doesn't read.
         if !crate::booharu::outlasts(self.gesture.as_ref().map(|active| &active.gesture)) {
             self.cancel();
         }
@@ -693,8 +693,6 @@ impl Canvas {
             (Tool::ColorPicker, Some(PointerButton::Primary)) => {
                 Press::answers(tools::picker::pick(&cx, sample)?)
             }
-            // Booharu: the O tool drags out a box.
-            (Tool::OcrBox, Some(PointerButton::Primary)) => crate::booharu::press(sample),
             // Booharu: a right-click on a text or a block opens its menu.
             (Tool::Select | Tool::DirectSelect | Tool::Text, Some(PointerButton::Secondary))
                 if self.typing.is_none() =>

@@ -14,6 +14,9 @@ const CLICK: f64 = 4.0;
 pub(crate) struct Draft {
     start: Point,
     current: Point,
+    /// Booharu: the modifiers the pointer last held, the lift's once it
+    /// lifts, by which a text block's box is read (`booharu::drawn`).
+    pub(crate) modifiers: ui_events::keyboard::Modifiers,
 }
 
 impl Draft {
@@ -21,6 +24,7 @@ impl Draft {
         Self {
             start: sample.page,
             current: sample.page,
+            modifiers: sample.modifiers, // Booharu: as it's pressed.
         }
     }
 
@@ -31,6 +35,7 @@ impl Draft {
     pub fn moved(&mut self, samples: &[Sample]) {
         if let Some(last) = samples.last() {
             self.current = last.page;
+            self.modifiers = last.modifiers; // Booharu: as it last moved.
         }
     }
 

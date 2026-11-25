@@ -32,7 +32,6 @@ export const toolKeys: Record<Tool, string> = {
   color_picker: 'i',
   remove: 'j',
   pan: 'h',
-  ocr_box: 'o', // Booharu: the O tool, a box read as a text block.
 }
 
 const macOS = typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh')

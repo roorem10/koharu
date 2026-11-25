@@ -39,7 +39,6 @@ const canvasKeys: KeyboardEventInit[] = [
   { key: 'v', code: 'KeyV' },
   { key: 'b', code: 'KeyB' },
   { key: 'k', code: 'KeyK' },
-  { key: 'o', code: 'KeyO' },
   { key: 'B', code: 'KeyB', shiftKey: true },
   { key: '\\', code: 'Backslash' },
   { key: 'Delete', code: 'Delete' },
@@ -129,22 +128,18 @@ describe('Booharu key registry', () => {
       expect(reservedKeys.has(key), key).toBe(true)
     }
     // Koharu's tool hotkey selects a tool by its letter, and with Shift too as Booharu binds it,
-    // whatever tools a Koharu release adds; only Booharu's own tool keys are left to Booharu.
+    // whatever tools a Koharu release adds: every tool is Koharu's.
     for (const [tool, key] of Object.entries(toolKeys)) {
-      const koharu = tool !== 'ocr_box'
-      expect(reservedKeys.has(key), tool).toBe(koharu)
-      expect(reservedKeys.has(`shift+${key}`), tool).toBe(koharu)
+      expect(reservedKeys.has(key), tool).toBe(true)
+      expect(reservedKeys.has(`shift+${key}`), tool).toBe(true)
     }
   })
 
-  it('maps O to the O tool, the key Koharu reads from toolKeys', () => {
-    expect(keyActions.ocrBoxTool).toEqual({ key: 'o', tool: 'ocr_box' })
-    expect(toolKeys.ocr_box).toBe(keyActions.ocrBoxTool.key)
-  })
-
-  it("keeps Booharu's [, ] and O apart from Koharu 0.95.0's K, F7 and \\", () => {
-    expect(Object.values(keyActions).map(({ key }) => key)).toEqual(['o', '[', ']'])
+  it("keeps Booharu's [ and ] apart from Koharu 0.95.0's K, F7 and \\, and binds no O", () => {
+    // The O tool folded into Koharu's K, by the owner's decision of 2026-11-25.
+    expect(Object.values(keyActions).map(({ key }) => key)).toEqual(['[', ']'])
     expect([shortcuts.original, shortcuts.layers, toolKeys.block]).toEqual(['\\', 'f7', 'k'])
+    expect(Object.values(toolKeys)).not.toContain('o')
   })
 })
 
@@ -185,7 +180,7 @@ describe('Booharu tool keys in a focused control', () => {
       const button = document.createElement('button')
       dialog.append(button)
       document.body.append(dialog)
-      for (const init of [{ key: 'v' }, { key: 'o' }, ...controlKeys]) {
+      for (const init of [{ key: 'v' }, { key: 'k' }, ...controlKeys]) {
         expect(controlKeepsKey(press(button, init)), `${role} ${JSON.stringify(init)}`).toBe(true)
       }
       dialog.remove()
@@ -201,7 +196,7 @@ describe('Booharu tool keys in a focused control', () => {
     list.append(option)
     document.body.append(list)
     for (const target of [list, option]) {
-      for (const init of [{ key: 'v' }, { key: 'o' }, ...controlKeys]) {
+      for (const init of [{ key: 'v' }, { key: 'k' }, ...controlKeys]) {
         const role = target.getAttribute('role')
         expect(controlKeepsKey(press(target, init)), `${role} ${JSON.stringify(init)}`).toBe(true)
       }
@@ -224,7 +219,7 @@ describe('Booharu tool keys in a focused control', () => {
     document.body.append(menu, bar)
 
     for (const target of [menu, item]) {
-      for (const init of [{ key: 'v' }, { key: 'o' }, ...controlKeys]) {
+      for (const init of [{ key: 'v' }, { key: 'k' }, ...controlKeys]) {
         const role = target.getAttribute('role')
         expect(controlKeepsKey(press(target, init)), `${role} ${JSON.stringify(init)}`).toBe(true)
       }
@@ -284,28 +279,25 @@ describe('Booharu tool keys on the canvas', () => {
     expect(useKoharuStore.getState().tool).toBe('select')
   })
 
-  it('selects the O tool with O, from the page and from a focused slider', async () => {
+  it('selects no tool with O, the O tool having folded into K, from the page or a slider', async () => {
     const { view } = await renderWorkspace()
-    fireEvent.keyDown(document.body, { key: 'o' })
-    expect(useKoharuStore.getState().tool).toBe('ocr_box')
-    fireEvent.keyDown(document.body, { key: 'v' })
-    expect(useKoharuStore.getState().tool).toBe('select')
+    fireEvent.keyDown(document.body, { key: 'k', code: 'KeyK' })
+    fireEvent.keyDown(document.body, { key: 'o', code: 'KeyO' })
+    fireEvent.keyDown(document.body, { key: 'O', code: 'KeyO', shiftKey: true })
+    expect(useKoharuStore.getState().tool).toBe('block')
 
     const slider = view.container.querySelector<HTMLInputElement>('footer input[type="range"]')
     act(() => slider!.focus())
-    fireEvent.keyDown(slider!, { key: 'o' })
-    expect(useKoharuStore.getState().tool).toBe('ocr_box')
-    // A chord stays the slider's: Alt+V leaves the O tool selected.
-    fireEvent.keyDown(slider!, { key: 'v', altKey: true })
-    expect(useKoharuStore.getState().tool).toBe('ocr_box')
+    fireEvent.keyDown(slider!, { key: 'o', code: 'KeyO' })
+    expect(useKoharuStore.getState().tool).toBe('block')
   })
 
-  it("selects Koharu's Block tool with K, with Shift too and from a focused slider, beside O", async () => {
+  it("selects Koharu's text block tool with K, with Shift too and from a focused slider", async () => {
     const { view } = await renderWorkspace()
     fireEvent.keyDown(document.body, { key: 'k', code: 'KeyK' })
     expect(useKoharuStore.getState().tool).toBe('block')
-    fireEvent.keyDown(document.body, { key: 'o', code: 'KeyO' })
-    expect(useKoharuStore.getState().tool).toBe('ocr_box')
+    fireEvent.keyDown(document.body, { key: 'v', code: 'KeyV' })
+    expect(useKoharuStore.getState().tool).toBe('select')
     fireEvent.keyDown(document.body, { key: 'K', code: 'KeyK', shiftKey: true })
     expect(useKoharuStore.getState().tool).toBe('block')
 
@@ -313,6 +305,9 @@ describe('Booharu tool keys on the canvas', () => {
     act(() => slider!.focus())
     fireEvent.keyDown(slider!, { key: 'v', code: 'KeyV' })
     fireEvent.keyDown(slider!, { key: 'k', code: 'KeyK' })
+    expect(useKoharuStore.getState().tool).toBe('block')
+    // A chord stays the slider's: Alt+V leaves the text block tool selected.
+    fireEvent.keyDown(slider!, { key: 'v', code: 'KeyV', altKey: true })
     expect(useKoharuStore.getState().tool).toBe('block')
   })
 
@@ -361,8 +356,8 @@ describe('Booharu tool keys on the canvas', () => {
     await renderWorkspace()
     fireEvent.keyDown(document.body, { key: 'B', code: 'KeyB', shiftKey: true })
     expect(useKoharuStore.getState().tool).toBe('draw')
-    fireEvent.keyDown(document.body, { key: 'O', code: 'KeyO', shiftKey: true })
-    expect(useKoharuStore.getState().tool).toBe('ocr_box')
+    fireEvent.keyDown(document.body, { key: 'T', code: 'KeyT', shiftKey: true })
+    expect(useKoharuStore.getState().tool).toBe('text')
     fireEvent.keyDown(document.body, { key: 'V', code: 'KeyV', shiftKey: true })
     expect(useKoharuStore.getState().tool).toBe('select')
   })

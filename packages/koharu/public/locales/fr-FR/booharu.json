@@ -488,14 +488,13 @@
       "koharuGithub": "Koharu sur GitHub"
     },
     "notice": {
-      "failed": "Impossible d’ajouter la zone : {{message}}",
-      "locked": "Le calque où irait cette zone est verrouillé. Déverrouillez-le d’abord.",
-      "nothing_to_read": "Rien à lire dans cette zone."
+      "failed": "Le bloc de texte a été ajouté, mais n’a pas pu être lu : {{message}}",
+      "nothing_to_read": "Rien à lire dans cette zone. Son bloc de texte a été conservé, pour y saisir du texte."
     },
     "ocrBox": {
       "defaultMode": "Action par défaut",
       "defaultModeDescription": "Relâchez avec Alt pour lire uniquement, ou avec Maj pour lire, traduire et nettoyer.",
-      "description": "Une zone tracée avec l’outil O devient un bloc de texte. Elle est toujours lue, et l’action choisie décide si elle est aussi traduite et nettoyée.",
+      "description": "Une zone tracée avec l’outil Bloc de texte (K) devient un bloc de texte lu aussitôt. L’action choisie décide s’il est aussi traduit et nettoyé.",
       "modes": {
         "read": "Lire uniquement",
         "read_translate": "Lire et traduire",
@@ -819,8 +818,5 @@
   "startup": {
     "opening": "Ouverture de Booharu…",
     "title": "Préparation de Booharu"
-  },
-  "tools": {
-    "ocr_box": "Zone OCR"
   }
 }

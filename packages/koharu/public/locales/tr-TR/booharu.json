@@ -453,14 +453,13 @@
       "koharuGithub": "GitHub'da Koharu"
     },
     "notice": {
-      "failed": "Kutu eklenemedi: {{message}}",
-      "locked": "Bu kutunun ekleneceği katman kilitli. Önce kilidini açın.",
-      "nothing_to_read": "Bu kutuda okunacak bir şey yok."
+      "failed": "Metin bloğu eklendi ama okunamadı: {{message}}",
+      "nothing_to_read": "Bu kutuda okunacak bir şey yok. Metin bloğu, içine yazabilmeniz için korundu."
     },
     "ocrBox": {
       "defaultMode": "Varsayılan işlem",
       "defaultModeDescription": "Yalnızca okumak için Alt basılıyken bırakın; okumak, çevirmek ve temizlemek için Shift basılıyken bırakın.",
-      "description": "O aracıyla çizilen kutu bir metin bloğu olur. Kutu her zaman okunur; ayrıca çevrilip temizlenip temizlenmeyeceğine seçilen işlem karar verir.",
+      "description": "Metin bloğu aracıyla (K) çizilen kutu bir metin bloğu olur ve hemen okunur. Ayrıca çevrilip temizlenip temizlenmeyeceğine seçilen işlem karar verir.",
       "modes": {
         "read": "Yalnızca oku",
         "read_translate": "Oku ve çevir",
@@ -759,8 +758,5 @@
   "startup": {
     "opening": "Booharu açılıyor…",
     "title": "Booharu hazırlanıyor"
-  },
-  "tools": {
-    "ocr_box": "OCR kutusu"
   }
 }

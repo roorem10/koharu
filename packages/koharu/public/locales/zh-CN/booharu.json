@@ -453,14 +453,13 @@
       "koharuGithub": "GitHub 上的 Koharu"
     },
     "notice": {
-      "failed": "无法添加该框：{{message}}",
-      "locked": "该框要加入的图层已锁定，请先解锁。",
-      "nothing_to_read": "该框内没有可识别的文字。"
+      "failed": "文本块已添加，但无法识别：{{message}}",
+      "nothing_to_read": "该框内没有可识别的文字。已保留其文本块，可在其中输入文字。"
     },
     "ocrBox": {
       "defaultMode": "默认操作",
       "defaultModeDescription": "松开鼠标时按住 Alt 仅识别；按住 Shift 则识别、翻译并清理。",
-      "description": "用 O 工具画出的框会成为文本块。框内文字总会被识别，是否再翻译和清理由所选操作决定。",
+      "description": "用文本块工具（K）画出的框会成为文本块，并立即识别。是否再翻译和清理由所选操作决定。",
       "modes": {
         "read": "仅识别",
         "read_translate": "识别并翻译",
@@ -759,8 +758,5 @@
   "startup": {
     "opening": "正在打开 Booharu…",
     "title": "正在准备 Booharu"
-  },
-  "tools": {
-    "ocr_box": "OCR 框"
   }
 }

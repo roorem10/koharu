@@ -6,8 +6,9 @@ import i18n from '@/lib/i18n'
 import { events, type BooharuNotice } from '@koharu/ipc/protocol'
 import { toast } from '@koharu/ui/components/toast'
 
-/** Shows each notice the desktop sends as `booharu_notice`, such as why a box drawn with the O
- * tool added nothing, as Koharu shows its canvas's notices: a toast in the interface's language. */
+/** Shows each notice the desktop sends as `booharu_notice`, such as why the text block a box drawn
+ * with the K tool added wasn't read, as Koharu shows its canvas's notices: a toast in the
+ * interface's language. */
 export function useBooharuNotices(): void {
   useEffect(() => {
     let active = true
@@ -21,7 +22,8 @@ export function useBooharuNotices(): void {
   }, [])
 }
 
-/** A refusal is told as Koharu tells its canvas's; a failure as an error, with what failed. */
+/** A box with nothing to read is told as Koharu tells its canvas's notices; a failure as an error,
+ * with what failed. */
 function show(notice: BooharuNotice): void {
   if (notice.kind === 'failed') {
     toast.add({

@@ -1,13 +1,14 @@
-//! The O tool's box, as the canvas answers it, the default look of the text
-//! the T tool adds and of a translation typed into a block with none, the
-//! clean-up such a translation shows again on a sound effect kept as art,
-//! and, while typing, Escape keeping what's typed, marks taken off, size
-//! steps, the selected text the type bar quotes and the empty line a line
-//! break typed at the end starts, a right-click's box menu, a box styled
-//! before it's translated, which the canvas types into, outlines, resizes,
-//! moves and turns as a block with none, the brush's feel, Draw's opacity
-//! and the soft strokes below a hardness of 1, and Show original on a
-//! levelled page, on the canvas's harness. The brush's tests ask for no GPU
+//! The K tool's box, which the canvas adds as Koharu's block and asks the
+//! host to read, the default look of the text the T tool adds and of a
+//! translation typed into a block with none, the clean-up such a
+//! translation shows again on a sound effect kept as art, and, while typing,
+//! Escape keeping what's typed, marks taken off, size steps, the selected
+//! text the type bar quotes and the empty line a line break typed at the end
+//! starts, a right-click's box menu, a box styled before it's translated,
+//! which the canvas types into, outlines, resizes, moves and turns as a
+//! block with none, the brush's feel, Draw's opacity and the soft strokes
+//! below a hardness of 1, and Show original on a levelled page, on the
+//! canvas's harness. The K tool's and the brush's tests ask for no GPU
 //! (`gpu_free`), so they run without one, but for a soft stroke's preview,
 //! which is drawn, as are Show original's pixels.
 
@@ -17,7 +18,7 @@ use booharu_core::{
     attrs::{self, Auto},
     lettering::{CategoryFont, LetteringCategory},
     settings::{DefaultTextStyle, LetteringSettings},
-    sfx, status,
+    sfx, status, styles,
 };
 use koharu_scene::{CharStyle, Fit, RichText};
 use kurbo::{Circle, Size};
@@ -29,11 +30,12 @@ use crate::booharu::{
 
 const NONE: Modifiers = Modifiers::empty();
 
-/// A 400×400 page at its own size, with the O tool picked.
-fn o_tool() -> Option<Fixture> {
-    let mut fixture = unscaled(Vec::new())?;
-    fixture.canvas.set_tool(Tool::OcrBox);
-    Some(fixture)
+/// A 400×400 page at its own size, with the K tool, the text block tool,
+/// picked; it asks for no GPU.
+fn k_tool() -> Fixture {
+    let mut fixture = gpu_free((400, 400), Vec::new());
+    fixture.canvas.set_tool(Tool::Block);
+    fixture
 }
 
 /// The primary button released at `at` with `modifiers` held.
@@ -60,30 +62,33 @@ fn draw(
     effects
 }
 
-/// The boxes `effects` hold, which hold nothing else.
-fn boxes(effects: &[Effect]) -> Vec<Booharu> {
-    effects
-        .iter()
-        .map(|effect| match effect {
-            Effect::Booharu(effect) => *effect,
-            other => panic!("{other:?} isn't an O tool box"),
-        })
-        .collect()
+/// What a K tool box's `effects` hold, which hold nothing else, in their
+/// order: Koharu's edit adding the block, labelled `add_text`, its
+/// selection, and Booharu's ask to read it, which names the block selected.
+fn drawn(effects: &[Effect]) -> (Edit, Booharu) {
+    match effects {
+        [
+            Effect::Edit(edit),
+            Effect::Selection(selected),
+            Effect::Booharu(read @ Booharu::Block { layer, .. }),
+        ] if edit.label == "add_text" && selected[..] == [*layer] => (edit.clone(), *read),
+        other => panic!("{other:?} isn't a K tool box"),
+    }
 }
 
-fn page_rect(fixture: &Fixture, rect: Rect) -> Vec<Booharu> {
-    vec![Booharu::Box {
-        page: fixture.page,
-        rect,
-        modifiers: BoxModifiers::default(),
-    }]
+/// The block Booharu's ask to read names, with the modifiers it holds.
+fn read_block(read: Booharu) -> (LayerId, BoxModifiers) {
+    match read {
+        Booharu::Block {
+            layer, modifiers, ..
+        } => (layer, modifiers),
+        other => panic!("{other:?} reads no block"),
+    }
 }
 
 #[test]
-fn a_drag_answers_one_box_over_its_page_rect() {
-    let Some(mut fixture) = o_tool() else {
-        return;
-    };
+fn a_drag_adds_koharus_block_and_asks_the_host_to_read_it() {
+    let mut fixture = k_tool();
     // Dragged up and to the left, as any way round.
     let effects = draw(
         &mut fixture.canvas,
@@ -92,92 +97,59 @@ fn a_drag_answers_one_box_over_its_page_rect() {
         NONE,
         NONE,
     );
+    let (edit, read) = drawn(&effects);
     assert_eq!(
-        boxes(&effects),
-        page_rect(&fixture, Rect::new(50.0, 60.0, 150.0, 100.0))
+        read,
+        Booharu::Block {
+            page: fixture.page,
+            layer: read_block(read).0,
+            modifiers: BoxModifiers::default(),
+        }
+    );
+    // The block the edit adds, over the box, as Koharu's tool adds it.
+    fixture
+        .session
+        .lock()
+        .apply(edit)
+        .expect("the edit applies");
+    let (block, _) = read_block(read);
+    let project = fixture.session.lock().project();
+    let koharu_scene::Content::Block(added) = &project.layer(block).expect("the block").content
+    else {
+        panic!("{block} isn't a block");
+    };
+    assert_eq!(
+        added.source.bounds(),
+        Some(Rect::new(50.0, 60.0, 150.0, 100.0))
     );
 }
 
 #[test]
-fn a_drag_under_four_screen_pixels_answers_nothing() {
-    let Some(mut fixture) = o_tool() else {
-        return;
-    };
+fn a_click_adds_and_asks_nothing() {
+    let mut fixture = k_tool();
     let canvas = &mut fixture.canvas;
     assert!(draw(canvas, (50.0, 50.0), (53.0, 53.0), NONE, NONE).is_empty());
-    // Too short either way is too short.
-    assert!(draw(canvas, (50.0, 50.0), (250.0, 53.0), NONE, NONE).is_empty());
     // Zoomed out to half, three screen pixels are six of the page's, and
-    // still too short; four are enough.
+    // still a click.
     canvas.set_camera(TranslateScale::scale(0.5));
     assert!(draw(canvas, (50.0, 50.0), (53.0, 53.0), NONE, NONE).is_empty());
-    let effects = draw(canvas, (50.0, 50.0), (54.0, 54.0), NONE, NONE);
-    assert_eq!(
-        boxes(&effects),
-        page_rect(&fixture, Rect::new(100.0, 100.0, 108.0, 108.0))
-    );
-}
-
-#[test]
-fn a_drag_running_off_the_page_is_cut_to_it() {
-    let Some(mut fixture) = o_tool() else {
-        return;
-    };
-    let effects = draw(
-        &mut fixture.canvas,
-        (350.0, 300.0),
-        (480.0, 430.0),
-        NONE,
-        NONE,
-    );
-    assert_eq!(
-        boxes(&effects),
-        page_rect(&fixture, Rect::new(350.0, 300.0, 400.0, 400.0))
-    );
-    let effects = draw(
-        &mut fixture.canvas,
-        (30.0, 40.0),
-        (-20.0, -10.0),
-        NONE,
-        NONE,
-    );
-    assert_eq!(
-        boxes(&effects),
-        page_rect(&fixture, Rect::new(0.0, 0.0, 30.0, 40.0))
-    );
-    // Wholly off the page, or a sliver of it, is no box.
-    let off = draw(
-        &mut fixture.canvas,
-        (410.0, 10.0),
-        (480.0, 90.0),
-        NONE,
-        NONE,
-    );
-    assert!(off.is_empty());
-    let sliver = draw(
-        &mut fixture.canvas,
-        (398.0, 10.0),
-        (480.0, 90.0),
-        NONE,
-        NONE,
-    );
-    assert!(sliver.is_empty());
+    // Short only one way, it's a box, as Koharu's is, for the host to find
+    // nothing in, the O tool's rule of four pixels either way gone with it.
+    canvas.set_camera(TranslateScale::default());
+    let (_, read) = drawn(&draw(canvas, (50.0, 50.0), (250.0, 53.0), NONE, NONE));
+    assert!(matches!(read, Booharu::Block { .. }));
 }
 
 #[test]
 fn the_modifiers_held_as_the_pointer_lifts_pass_through() {
-    let Some(mut fixture) = o_tool() else {
-        return;
-    };
+    let mut fixture = k_tool();
     let canvas = &mut fixture.canvas;
     let mut held = |pressed, lifted| {
         let effects = draw(canvas, (50.0, 50.0), (150.0, 120.0), pressed, lifted);
-        match boxes(&effects)[..] {
-            [Booharu::Box { modifiers, .. }] => modifiers,
-            ref other => panic!("{other:?}"),
-        }
+        read_block(drawn(&effects).1).1
     };
     let modifiers = |alt, shift| BoxModifiers { alt, shift };
+    assert_eq!(held(NONE, NONE), modifiers(false, false));
     assert_eq!(held(NONE, Modifiers::ALT), modifiers(true, false));
     assert_eq!(held(NONE, SHIFT), modifiers(false, true));
     assert_eq!(held(NONE, Modifiers::ALT | SHIFT), modifiers(true, true));
@@ -187,9 +159,7 @@ fn the_modifiers_held_as_the_pointer_lifts_pass_through() {
 
 #[test]
 fn a_cancelled_drag_draws_no_box() {
-    let Some(mut fixture) = o_tool() else {
-        return;
-    };
+    let mut fixture = k_tool();
     let canvas = &mut fixture.canvas;
     canvas.input(down((50.0, 50.0), NONE)).expect("input");
     canvas.input(drag(1, (150.0, 150.0))).expect("input");
@@ -204,16 +174,13 @@ fn a_cancelled_drag_draws_no_box() {
 
 #[test]
 fn a_box_outlasts_another_change_to_its_page_and_a_selection() {
-    let Some(mut fixture) = o_tool() else {
-        return;
-    };
+    let mut fixture = k_tool();
     fixture
         .canvas
         .input(down((50.0, 50.0), NONE))
         .expect("input");
     fixture.canvas.input(drag(1, (100.0, 90.0))).expect("input");
-    // The last box's block is added, selected and read while this one is
-    // drawn.
+    // The last box's block is read while this one is drawn.
     let page = fixture.page;
     other_writer(
         &mut fixture,
@@ -231,43 +198,39 @@ fn a_box_outlasts_another_change_to_its_page_and_a_selection() {
             .input(lift((150.0, 120.0), NONE))
             .expect("input"),
     );
-    assert_eq!(
-        boxes(&effects),
-        page_rect(&fixture, Rect::new(50.0, 50.0, 150.0, 120.0))
-    );
+    // Its block goes on the page as the change left it.
+    let (edit, read) = drawn(&effects);
+    assert_eq!(apply(&mut fixture, vec![Effect::Edit(edit)]), ["add_text"]);
+    let (block, _) = read_block(read);
+    assert_eq!(layers(&fixture).len(), 2);
+    assert_eq!(layers(&fixture)[1], block);
 }
 
 #[test]
-fn the_box_shows_dashed_in_the_selection_colour_while_dragged() {
-    let Some(mut fixture) = o_tool() else {
-        return;
-    };
-    let canvas = &mut fixture.canvas;
-    canvas.set_colors(Colors {
-        selection: Rgba([1.0, 0.0, 0.0, 1.0]),
-        ..Colors::default()
-    });
-    // On half pixels, so the box's top edge fills row 50 alone.
-    canvas.input(down((50.5, 50.5), NONE)).expect("input");
-    canvas.input(drag(1, (150.5, 120.5))).expect("input");
-    let red = |canvas: &mut Canvas| {
-        canvas.draw().expect("a draw");
-        let shown = canvas.snapshot().expect("pixels");
-        let inside = shown.get_pixel(100, 85).0;
-        let reds = (51..150)
-            .filter(|&x| {
-                let [r, g, b, _] = shown.get_pixel(x, 50).0;
-                r > 200 && g < 60 && b < 60
-            })
-            .count();
-        (reds, inside)
-    };
-    let (reds, inside) = red(canvas);
-    // Dashes, with gaps between them, and nothing filled.
-    assert!(reds > 20 && reds < 90, "{reds} red pixels along the top");
-    assert_eq!(inside, [255; 4]);
-    canvas.input(up(1, (150.5, 120.5))).expect("input");
-    assert_eq!(red(canvas).0, 0);
+fn a_block_the_k_tool_draws_is_made_by_hand_and_types_with_the_default_look() {
+    let mut fixture = k_tool();
+    let effects = draw(
+        &mut fixture.canvas,
+        (40.0, 40.0),
+        (240.0, 120.0),
+        NONE,
+        NONE,
+    );
+    let (edit, read) = drawn(&effects);
+    assert_eq!(apply(&mut fixture, vec![Effect::Edit(edit)]), ["add_text"]);
+    let (block, _) = read_block(read);
+    // No detection made it, so runs and Detect again keep it as hand-made.
+    let project = fixture.session.lock().project();
+    let layer = project.layer(block).expect("the block");
+    assert!(layer.attributes.is_empty(), "{:?}", layer.attributes);
+    assert!(styles::edited(layer).drawn);
+    // Its first translation, typed into it, gets a new translation's look.
+    fixture.canvas.set_booharu(pushed(false, Some(WHITE)));
+    fixture.canvas.select(Vec::new());
+    let typed = type_translation(&mut fixture, block, (140.0, 80.0));
+    assert_eq!(typed.family.as_deref(), Some(FONT));
+    assert_eq!(typed.fill, Some(RED));
+    assert_eq!(typed.stroke, Some(WHITE));
 }
 
 const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
@@ -1334,7 +1297,7 @@ fn a_right_click_while_typing_or_with_another_tool_answers_nothing() {
         Tool::ColorPicker,
         Tool::Remove,
         Tool::Pan,
-        Tool::OcrBox,
+        Tool::Block,
     ] {
         canvas.set_tool(tool);
         assert_eq!(right_click(canvas, on), [], "{tool:?}");
