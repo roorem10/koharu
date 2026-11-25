@@ -10,6 +10,8 @@
 //! (`runs`), what Koharu's stages did to a page's
 //! blocks (`status`), which sound effects stay as art and their subtitles
 //! (`sfx`), what a run's stages and Detect again leave alone (`protect`),
+//! where a block a box adds goes to be read in order among its neighbours
+//! (`order`),
 //! the look Reset to lettering default gives back (`resolver`), the series
 //! glossaries and the chapter notes every translation
 //! follows (`context`), the quality check's Mark OK record (`qc`), where
@@ -27,6 +29,7 @@ pub mod context;
 pub mod effects;
 pub mod emphasis;
 pub mod lettering;
+pub mod order;
 pub mod protect;
 pub mod qc;
 pub mod resolver;

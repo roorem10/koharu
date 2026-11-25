@@ -1,9 +1,11 @@
 //! Booharu's part of the canvas: what a box drawn with Koharu's K tool, the
 //! text block tool, asks of the host beside the edit adding its block, to be
 //! read at once ([`drawn`], `Effect::Block`), as the O tool's box was before
-//! the O tool folded into the K tool, and such a box outlasting a change it
-//! didn't make ([`outlasts`]); and the default look of new text, which the T
-//! tool's text and a translation typed into a block with none get. Such a
+//! the O tool folded into the K tool, its block's place in reading order
+//! among its neighbours, as the O tool's was ([`in_reading_order`]), and
+//! such a box outlasting a change it didn't make ([`outlasts`]); and the
+//! default look of new text, which the T tool's text and a translation typed
+//! into a block with none get. Such a
 //! translation also gets the marker of one typed by hand in its block's
 //! record, in the same step, so it stays a hand edit once cleared, and,
 //! typed into a sound effect kept as art, shows its clean-up again, the
@@ -33,10 +35,10 @@
 //! Show original draws a levelled page's Original scan, the scan as it came
 //! in, which its background no longer is ([`original_scan`]).
 
-use booharu_core::{lettering, settings::LetteringSettings, sfx, status, styles};
+use booharu_core::{lettering, order, settings::LetteringSettings, sfx, status, styles};
 use koharu_renderer::Drawn;
 use koharu_scene::{
-    Block, Content, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text, Transform,
+    Block, Content, Direction, Fit, Frame, Layer, LayerId, Op, Page, PageId, Role, Text, Transform,
 };
 use kurbo::{Affine, Point};
 use serde::{Deserialize, Serialize};
@@ -402,6 +404,27 @@ pub(crate) fn drawn(page: PageId, layer: LayerId, modifiers: Modifiers) -> crate
             shift: modifiers.shift(),
         },
     })
+}
+
+/// `add`, Koharu's op adding the K tool's block to `holder`, else to `page`,
+/// last among what that holds, with the block where it's read in order
+/// among what's there instead, by the rule the agent's box follows
+/// ([`order::reading_index`]), as the O tool placed its box's block before
+/// it folded into the K tool (the owner's Q2), so Story numbers it and a run
+/// reads it among its neighbours. The holder stays Koharu's choice, and the
+/// block reads in the direction Koharu gave its source. Any other op, as it
+/// is.
+pub(crate) fn in_reading_order(mut add: Op, page: &Page, holder: Option<&Layer>) -> Op {
+    if let Op::AddLayer { index, layer, .. } = &mut add
+        && let Content::Block(block) = &layer.content
+        && let Some(bounds) = block.source.bounds()
+    {
+        let siblings = holder.map_or(&page.layers, |holder| &holder.children);
+        let in_balloon = holder.is_some_and(|holder| matches!(holder.content, Content::Balloon(_)));
+        let vertical = block.source.direction == Direction::Vertical;
+        *index = order::reading_index(siblings, bounds, vertical, in_balloon);
+    }
+    add
 }
 
 /// Whether `gesture`, the one in progress, outlasts a change it didn't make:

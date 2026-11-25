@@ -234,6 +234,153 @@ fn a_block_the_k_tool_draws_is_made_by_hand_and_types_with_the_default_look() {
     assert_eq!(typed.stroke, Some(WHITE));
 }
 
+/// A text block reading `あ` whose source fills `(x, y, width, height)`,
+/// vertical when it's taller than wide, added to `parent` at `index`.
+fn block_at(parent: &str, index: usize, (x, y, width, height): (f64, f64, f64, f64)) -> Value {
+    let direction = if height > width {
+        "vertical"
+    } else {
+        "horizontal"
+    };
+    json!({"op": "add_layer", "page": "$page", "parent": parent, "index": index, "layer": {
+        "kind": "block", "source": {"content": "あ", "direction": direction,
+            "frame": {"box": {"bounds": {"x": x, "y": y, "width": width, "height": height}}}},
+    }})
+}
+
+/// A K tool box dragged from `from` to `to` with no modifier held, its
+/// edit applied: the block it added.
+fn k_box(fixture: &mut Fixture, from: (f64, f64), to: (f64, f64)) -> LayerId {
+    let effects = draw(&mut fixture.canvas, from, to, NONE, NONE);
+    let (edit, read) = drawn(&effects);
+    assert_eq!(apply(fixture, vec![Effect::Edit(edit)]), ["add_text"]);
+    read_block(read).0
+}
+
+/// The layers `holder` holds, in the scene's order, which is reading order.
+fn children(fixture: &Fixture, holder: LayerId) -> Vec<LayerId> {
+    let project = fixture.session.lock().project();
+    let found = project.layer(holder).expect("the holder");
+    found.children.iter().map(|child| child.id).collect()
+}
+
+/// The page's texts in the order Story lists and numbers them.
+fn story(fixture: &Fixture) -> Vec<LayerId> {
+    let project = fixture.session.lock().project();
+    project.story(fixture.page).expect("the page's story")
+}
+
+#[test]
+fn a_k_box_between_two_blocks_of_a_balloon_goes_between_them_in_reading_order() {
+    // A balloon of two vertical lines, right then left, and below it one of
+    // two horizontal lines, top then bottom.
+    let mut fixture = gpu_free(
+        (400, 600),
+        vec![
+            json!({"op": "add_layer", "id": "$tall", "page": "$page", "index": 0, "layer": {
+                "kind": "balloon", "outline": "M20 20 H380 V260 H20 Z",
+            }}),
+            block_at("$tall", 0, (280.0, 40.0, 40.0, 200.0)),
+            block_at("$tall", 1, (80.0, 40.0, 40.0, 200.0)),
+            json!({"op": "add_layer", "id": "$wide", "page": "$page", "index": 1, "layer": {
+                "kind": "balloon", "outline": "M20 300 H380 V580 H20 Z",
+            }}),
+            block_at("$wide", 0, (40.0, 320.0, 320.0, 40.0)),
+            block_at("$wide", 1, (40.0, 500.0, 320.0, 40.0)),
+        ],
+    );
+    fixture.canvas.set_tool(Tool::Block);
+    let [tall, wide] = layers(&fixture)[..] else {
+        panic!("two balloons");
+    };
+    let [right, left] = children(&fixture, tall)[..] else {
+        panic!("two vertical lines");
+    };
+    let [top, bottom] = children(&fixture, wide)[..] else {
+        panic!("two horizontal lines");
+    };
+    let before = steps(&fixture);
+    // A box taller than wide, a vertical line, reads right to left: between
+    // the two, where Koharu would put it last.
+    let line = k_box(&mut fixture, (180.0, 40.0), (220.0, 240.0));
+    assert_eq!(children(&fixture, tall), [right, line, left]);
+    // A box wider than tall, a horizontal line, reads top to bottom.
+    let row = k_box(&mut fixture, (40.0, 410.0), (360.0, 450.0));
+    assert_eq!(children(&fixture, wide), [top, row, bottom]);
+    // Story numbers them there, as a run reads them.
+    assert_eq!(story(&fixture), [right, line, left, top, row, bottom]);
+    // Each is one step, which Undo takes back whole.
+    assert_eq!(steps(&fixture), before + 2);
+    fixture
+        .session
+        .lock()
+        .undo()
+        .expect("the undo")
+        .expect("a step");
+    fixture.render();
+    assert_eq!(children(&fixture, wide), [top, bottom]);
+    assert_eq!(children(&fixture, tall), [right, line, left]);
+}
+
+#[test]
+fn a_k_box_between_two_blocks_of_a_panel_goes_between_them_in_reading_order() {
+    // A panel holding two vertical lines in a row, in no balloon, right then
+    // left.
+    let mut fixture = gpu_free(
+        (400, 400),
+        vec![
+            json!({"op": "add_layer", "id": "$panel", "page": "$page", "index": 0, "layer": {
+                "kind": "panel", "outline": "M0 0 H400 V400 H0 Z",
+            }}),
+            block_at("$panel", 0, (300.0, 40.0, 40.0, 200.0)),
+            block_at("$panel", 1, (40.0, 40.0, 40.0, 200.0)),
+        ],
+    );
+    fixture.canvas.set_tool(Tool::Block);
+    let [panel] = layers(&fixture)[..] else {
+        panic!("a panel");
+    };
+    let [right, left] = children(&fixture, panel)[..] else {
+        panic!("two lines");
+    };
+    // A row reads right to left: one between the two goes between them, and
+    // one right of both first.
+    let between = k_box(&mut fixture, (170.0, 40.0), (210.0, 240.0));
+    let first = k_box(&mut fixture, (350.0, 40.0), (390.0, 240.0));
+    // And the rows read top to bottom: one low at the right, after them all.
+    let low = k_box(&mut fixture, (300.0, 300.0), (340.0, 390.0));
+    assert_eq!(
+        children(&fixture, panel),
+        [first, right, between, left, low]
+    );
+    assert_eq!(story(&fixture), [first, right, between, left, low]);
+}
+
+#[test]
+fn a_k_box_in_an_empty_holder_is_its_only_child() {
+    let mut fixture = gpu_free(
+        (400, 400),
+        vec![
+            json!({"op": "add_layer", "id": "$panel", "page": "$page", "index": 0, "layer": {
+                "kind": "panel", "outline": "M0 0 H400 V400 H0 Z",
+            }}),
+            json!({"op": "add_layer", "page": "$page", "parent": "$panel", "index": 0, "layer": {
+                "kind": "balloon", "outline": "M100 100 H300 V300 H100 Z",
+            }}),
+        ],
+    );
+    fixture.canvas.set_tool(Tool::Block);
+    let [panel] = layers(&fixture)[..] else {
+        panic!("a panel");
+    };
+    let [balloon] = children(&fixture, panel)[..] else {
+        panic!("a balloon");
+    };
+    let block = k_box(&mut fixture, (150.0, 150.0), (250.0, 200.0));
+    assert_eq!(children(&fixture, balloon), [block]);
+    assert_eq!(children(&fixture, panel), [balloon]);
+}
+
 const RED: Rgba = Rgba([1.0, 0.0, 0.0, 1.0]);
 const WHITE: Rgba = Rgba([1.0; 4]);
 const BLUE: Rgba = Rgba([0.0, 0.0, 1.0, 1.0]);
